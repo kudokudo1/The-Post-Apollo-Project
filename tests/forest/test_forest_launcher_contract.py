@@ -171,6 +171,25 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("Quickshell.execDetached", adapter)
         self.assertIn("generation_enabled !== false", policy)
         self.assertIn("model_count !== value.models.length", policy)
+        self.assertIn("id: sessionPreview", view)
+        self.assertIn("anchors.top: modelStrip.bottom", view)
+        self.assertIn("anchors.bottom: sendGate.top", view)
+        self.assertIn("clip: true", view)
+        self.assertIn("id: sendGate", view)
+        self.assertIn('visible: root.chassisLevel >= 2', view)
+        self.assertIn('MODEL LIST READY // CHAT HOST NOT CONNECTED', view)
+        self.assertIn('SEND LOCKED // HOST NOT CONNECTED', view)
+        self.assertIn('Accessible.name: "Scan local Ollama models, read-only"', view)
+        self.assertIn('Accessible.name: "Select next inventoried local model"', view)
+        self.assertNotIn('y: Math.max(modelStrip.y + modelStrip.height', view)
+        # Bounded layout at all four nominal chassis heights. Native font
+        # metrics remain an operator verification, not a source-test proof.
+        for height in (340, 340, 540, 610):
+            chat_height = height - 56 - 30
+            strip_bottom = 14 + 20 + 58 + 18
+            send_gate_top = chat_height - 13 - 40
+            self.assertGreater(send_gate_top - 6 - (strip_bottom + 8), 0)
+
         self.assertIn("InventoryPolicy.beginScan()", adapter)
         self.assertIn("InventoryPolicy.captureStdoutScan(", adapter)
         self.assertIn("InventoryPolicy.captureStderrScan(", adapter)

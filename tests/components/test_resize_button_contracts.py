@@ -79,49 +79,75 @@ for token in (
 ):
     present(token)
 
-# Yellow is canonical; purple is a distinct local theme identity, NOT a
-# fabricated Colors.purple or the existing magenta pressed interaction shade.
-present("property color decreaseAccentColor: Colors.yellow")
+# Decrease is canonical orange; increase retains its approved distinct purple.
+present("property color decreaseAccentColor: Colors.orange")
 present('property color increaseAccentColor: "#A46AFF"')
 present("accentColor: increasing ? increaseAccentColor : decreaseAccentColor")
+assert 'readonly property color orange:' in COLORS
 assert 'readonly property color yellow:' in COLORS
 assert not re.search(r"(?m)^\s*readonly property color purple:", COLORS)
 assert "Colors.magenta" not in RESIZE
 
-# Ordinary ActionButton states and effect intensities must be inherited EXACTLY.
-# No custom hover, pressed, unavailable, glow palette or shadow constructed here.
-for prop in (
-    "destructive", "idleFillColor", "hoverFillColor", "pressedFillColor",
-    "idleForegroundColor", "hoverForegroundColor", "pressedForegroundColor",
-    "idleBorderColor", "hoverBorderColor", "pressedBorderColor",
-    "contentGlowEnabled", "contentGlowSource", "contentGlowIdleOpacity",
-    "contentGlowHoverOpacity", "contentGlowPressedOpacity",
-    "softGlowEnabled", "softGlowIdleOpacity", "softGlowHoverOpacity",
-    "softGlowPressedOpacity", "wideGlowEnabled", "wideGlowIdleOpacity",
-    "wideGlowHoverOpacity", "wideGlowPressedOpacity",
-    "unavailableOpacity", "unavailableContentGlowOpacity",
-    "unavailableSoftGlowOpacity", "unavailableWideGlowOpacity",
-    "trackLabelGlowLocally", "selectedFillColor", "keyboardSelectedFillColor",
+# CloseButton-like behavior, but each direction owns its own semantic hue.
+# The widget does not duplicate text, shadows, or mouse handling.
+visual_colors = {
+    "idleFillColor": "Colors.black",
+    "hoverFillColor": "Colors.yellow",
+    "pressedFillColor": "accentColor",
+    "selectedFillColor": "Colors.yellow",
+    "keyboardSelectedFillColor": "Colors.yellow",
+    "idleForegroundColor": "accentColor",
+    "hoverForegroundColor": "accentColor",
+    "pressedForegroundColor": "Colors.black",
+    "selectedForegroundColor": "accentColor",
+    "keyboardSelectedForegroundColor": "accentColor",
+    "idleBorderColor": "accentColor",
+    "hoverBorderColor": "accentColor",
+    "pressedBorderColor": "Colors.black",
+    "selectedBorderColor": "accentColor",
+    "keyboardSelectedBorderColor": "accentColor",
+}
+for prop, value in visual_colors.items():
+    assert re.search(rf"(?m)^\s*{prop}:\s*{re.escape(value)}\s*$", RESIZE), (prop, value)
+
+# Hover and press preserve the directional hue across all three glow planes.
+# Use CloseButton intensities, including visible pressed glyph and wide glow.
+for prefix, opacity in (
+    ("contentGlow", {"Idle": .34, "Hover": .72, "Pressed": 1.0, "Selected": .72, "KeyboardSelected": .72}),
+    ("softGlow", {"Idle": .48, "Hover": .70, "Pressed": 1.0, "Selected": .70, "KeyboardSelected": .70}),
+    ("wideGlow", {"Idle": .22, "Hover": .32, "Pressed": 1.0, "Selected": .32, "KeyboardSelected": .32}),
 ):
-    assert not re.search(rf"(?m)^\s*{prop}\s*:", RESIZE), f"must inherit {prop}"
+    present(f"{prefix}Enabled: true")
+    for state in ("idle", "hover", "pressed", "selected", "keyboardSelected"):
+        present(f"{state}{prefix[0].upper() + prefix[1:]}Color: accentColor")
+    for state, value in opacity.items():
+        present(f"{prefix}{state}Opacity: {value:.2f}" if value != 1.0 else f"{prefix}{state}Opacity: 1.0")
 
 for token in (
-    "property color hoverFillColor: Colors.yellow",
-    "property color hoverForegroundColor: Colors.orange",
-    "property color pressedFillColor:",
-    "destructive ? destructiveColor : Colors.magenta",
-    "property color pressedForegroundColor: Colors.black",
-    "property real contentGlowIdleOpacity: 0.34",
-    "property real contentGlowHoverOpacity: 0.72",
-    "property real contentGlowPressedOpacity: 0.0",
-    "property real softGlowIdleOpacity: 0.22",
-    "property real softGlowHoverOpacity: 0.56",
-    "property real softGlowPressedOpacity: 0.60",
-    "property bool wideGlowEnabled: false",
-    "property bool trackLabelGlowLocally: true",
+    "idleBorderWidth: 1",
+    "hoverBorderWidth: 1",
+    "pressedBorderWidth: 1",
+    "selectedBorderWidth: 1",
+    "keyboardSelectedBorderWidth: 1",
+    "trackLabelGlowLocally: true",
+    "contentGlowRadius: 7",
+    "contentGlowSamples: 7",
+    "softGlowSpread: 3",
+    "softGlowMargin: 0",
+    "wideGlowSpread: 10",
+):
+    present(token)
+
+# The two existing ActionButton glow layers source the actual rendered label.
+for token in (
+    "property Item contentGlowSource:",
+    "showLabel ? labelText : contentHost",
+    "actionButton.contentGlowSource === labelText",
+    "contentHost.x + labelText.x",
+    "contentHost.y + labelText.y",
     "safeSource: actionButton.contentGlowSource",
 ):
-    assert token in BASE, f"underlying shared state contract changed: {token}"
+    assert token in BASE, f"base glyph-sampling invariant missing: {token}"
 
 for forbidden in (
     "MouseArea {", "DropShadow {", "SafeDropShadow {",

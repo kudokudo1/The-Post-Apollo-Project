@@ -37,6 +37,24 @@ def glow(button, glyph, soft, wide, name):
     near(button.property("effectiveWideGlowOpacity"), wide, f"{name} wide")
 
 
+def check_visual(button, label, identity, fill, ink, border, glows):
+    """Check active colors plus the three actual glow-plane colors/opacities."""
+    for prop, expected in (
+        ("accentColor", identity),
+        ("fillColor", fill),
+        ("foregroundColor", ink),
+        ("activeBorderColor", border),
+        ("contentGlowColor", identity),
+        ("softGlowColor", identity),
+        ("wideGlowColor", identity),
+    ):
+        color = button.property(prop)
+        assert color.name().lower() == expected.lower(), (
+            f"{label} {prop}: {color.name()}, expected {expected}"
+        )
+    glow(button, *glows, name=label)
+
+
 def ink_centered(window, name):
     assert window.property("downInkCentered") is True, f"{name}: down ink offset"
     assert window.property("upInkCentered") is True, f"{name}: up ink offset"
@@ -71,17 +89,18 @@ with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
         near(up.property("height"), 30, "up height")
         assert down.property("labelPixelSize") == 17
         assert up.property("labelPixelSize") == 17
-        check_identity(down, "down", "⮟", -1, "#F2BE4E")
+        check_identity(down, "down", "⮟", -1, "#ED981A")
         check_identity(up, "up", "⮝", 1, "#A46AFF")
 
         assert down.property("destructive") is False
         assert up.property("destructive") is False
-        assert up.property("wideGlowEnabled") is False
+        assert up.property("wideGlowEnabled") is True
         assert down.property("trackLabelGlowLocally") is True
         assert window.property("downAligned") is True
         assert window.property("upAligned") is True
         ink_centered(window, "up/down 30px")
-        glow(down, .34, .22, .015, "idle")
+        check_visual(down, "down idle", "#ED981A", "#1B0623", "#ED981A", "#ED981A", (.34, .48, .22))
+        check_visual(up, "up idle", "#A46AFF", "#1B0623", "#A46AFF", "#A46AFF", (.34, .48, .22))
 
         down.setProperty("width", 28)
         app.processEvents()
@@ -93,48 +112,53 @@ with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
         # Keyboard selected state is inherited, not independently recreated.
         down.setProperty("keyboardSelected", True)
         app.processEvents()
-        glow(down, .72, .56, .08, "keyboard selected")
+        check_visual(down, "keyboard selected", "#ED981A", "#F2BE4E", "#ED981A", "#ED981A", (.72, .70, .32))
         down.setProperty("keyboardSelected", False)
 
-        # Hover and press use the *ordinary* ActionButton recipe, including a
-        # zero pressed glyph glow and no wide halo. Do NOT use CloseButton V5.
+        # CloseButton-style three-plane glows preserve the orange/purple
+        # identity through hover and press, with a black pressed glyph/border.
         QTest.mouseMove(window, QPoint(5, 5))
         app.processEvents()
-        glow(down, .34, .22, .015, "rest")
+        check_visual(down, "down rest", "#ED981A", "#1B0623", "#ED981A", "#ED981A", (.34, .48, .22))
 
         QTest.mouseMove(window, QPoint(45, 45))
         QTest.qWait(30)
         assert down.property("hovered") is True
-        glow(down, .72, .56, .08, "hover")
+        check_visual(down, "down hover", "#ED981A", "#F2BE4E", "#ED981A", "#ED981A", (.72, .70, .32))
         assert window.property("downAligned") is True
 
         QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, QPoint(45, 45))
         app.processEvents()
         assert down.property("pressed") is True
-        glow(down, .0, .60, .10, "pressed")
+        check_visual(down, "down pressed", "#ED981A", "#ED981A", "#1B0623", "#1B0623", (1.0, 1.0, 1.0))
         QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, QPoint(45, 45))
         app.processEvents()
         assert window.property("downRequests") == 1
         assert window.property("lastDownDelta") == -1
+        check_visual(down, "down released", "#ED981A", "#F2BE4E", "#ED981A", "#ED981A", (.72, .70, .32))
 
         # The other arrow has the same base states and the opposite request.
         QTest.mouseMove(window, QPoint(124, 46))
         QTest.qWait(30)
         assert up.property("hovered") is True
+        check_visual(up, "up hover", "#A46AFF", "#F2BE4E", "#A46AFF", "#A46AFF", (.72, .70, .32))
         QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, QPoint(124, 46))
         app.processEvents()
-        glow(up, .0, .60, .10, "up pressed")
+        check_visual(up, "up pressed", "#A46AFF", "#A46AFF", "#1B0623", "#1B0623", (1.0, 1.0, 1.0))
         QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, QPoint(124, 46))
         app.processEvents()
         assert window.property("upRequests") == 1
         assert window.property("lastUpDelta") == 1
+        check_visual(up, "up released", "#A46AFF", "#F2BE4E", "#A46AFF", "#A46AFF", (.72, .70, .32))
 
         # All four exact glyphs use the same two semantic directions.
         down.setProperty("direction", "left")
         up.setProperty("direction", "right")
         app.processEvents()
-        check_identity(down, "left", "⮜", -1, "#F2BE4E")
+        check_identity(down, "left", "⮜", -1, "#ED981A")
         check_identity(up, "right", "➤", 1, "#A46AFF")
+        check_visual(down, "left hover", "#ED981A", "#1B0623", "#ED981A", "#ED981A", (.34, .48, .22))
+        check_visual(up, "right hover", "#A46AFF", "#F2BE4E", "#A46AFF", "#A46AFF", (.72, .70, .32))
         assert window.property("downAligned") is True
         assert window.property("upAligned") is True
         ink_centered(window, "left/right 30px")

@@ -1,0 +1,41 @@
+name: Git and TimeW responsive inner content
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsCompact.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "widgets/AngelPane.qml"
+      - "tests/components/test_git_time_responsive_content.py"
+      - "tests/git/test_git_compact_evidence_layout_contracts.py"
+      - ".github/workflows/git-time-responsive-content.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/TimeW.qml"
+      - "widgets/TimeSettingsCompact.qml"
+      - "widgets/AlarmManagerPane.qml"
+      - "widgets/AngelPane.qml"
+      - "tests/components/test_git_time_responsive_content.py"
+      - "tests/git/test_git_compact_evidence_layout_contracts.py"
+      - ".github/workflows/git-time-responsive-content.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-geometry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resized Git and Time inner pane budget plus actual TimeW JS
+        run: python3 -B -I tests/components/test_git_time_responsive_content.py
+      - name: Existing Git evidence remains exact and unchanged
+        run: python3 -B -I tests/git/test_git_compact_evidence_layout_contracts.py
+      - name: Existing resize controls and header placement remain stable
+        run: |
+          python3 -B -I tests/components/test_core_chassis_resize_controls.py
+          python3 -B -I tests/components/test_widget_top_edge_alignment_contracts.py

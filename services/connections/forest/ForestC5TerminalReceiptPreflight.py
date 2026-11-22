@@ -92,11 +92,15 @@ def verify_unenrolled_terminal_receipt(
     # Terminal outcome may be received after the original consent expires.
     # Validate the signed intent's structure and original lease rather than
     # incorrectly refusing reconciliation solely because time has advanced.
-    original = S._parse_exact(intent_wire, S.INTENT_FIELDS)
-    original, original_digest = S._intent(
-        intent_wire, now_ms=original["issuedAtMs"]
-    )
-    receipt = S._parse_exact(receipt_wire, RECEIPT_FIELDS)
+    try:
+        original = S._parse_exact(intent_wire, S.INTENT_FIELDS)
+        original, original_digest = S._intent(
+            intent_wire, now_ms=original["issuedAtMs"]
+        )
+        receipt = S._parse_exact(receipt_wire, RECEIPT_FIELDS)
+    except S.EvidenceHold as exc:
+        # One public fail-closed exception contract for all receipt inputs.
+        raise ReceiptHold("FOREST_B4C_WRITER_RECEIPT_HOLD // " + str(exc)) from exc
     if (receipt["schema"] != RECEIPT_SCHEMA or
             receipt["audience"] != S.AUDIENCE or
             receipt["role"] != WRITER_ROLE):

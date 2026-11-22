@@ -7,7 +7,8 @@ const context=vm.createContext({Date,Set});
 vm.runInContext(source,context);
 
 const choices=context.accounts();
-assert.deepEqual(choices.map(a=>a.id),["cashapp","chime","paypal","bank"]);
+assert.equal(JSON.stringify(choices.map(a=>a.id)),
+    JSON.stringify(["cashapp","chime","paypal","bank"]));
 assert.equal(context.money(-120050),"-$1200.50");
 assert.equal(context.canonicalDate("11/22/2026"),"2026-11-22");
 assert.equal(context.canonicalDate("2026-11-22"),"2026-11-22");

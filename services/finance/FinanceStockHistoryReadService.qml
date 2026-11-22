@@ -79,6 +79,21 @@ Scope {
         }
         return true;
     }
+    // M15: calendar-day shortcuts update only the pending RANGE selection.
+    // No implicit provider call; the operator must still press LOAD RANGE.
+    function selectPresetRange(days) {
+        if (!monitoring || displayMode !== "range" || loading || reader.running)
+            return false;
+        const window = StockModePolicy.presetWindow(days, dateOffset(0));
+        if (!window) return false;
+        if (startDate !== window.from || endDate !== window.to) {
+            startDate = window.from;
+            endDate = window.to;
+            clear();
+            message = "LAST " + days + " CALENDAR DAYS SELECTED // PRESS LOAD RANGE.";
+        }
+        return true;
+    }
     function selectDayDate(day) {
         if (!validDate(day) || day < "2000-01-01"
                 || day > dateOffset(0)) return false;

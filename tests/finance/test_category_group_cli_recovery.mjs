@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {createHash} from "node:crypto";
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,
-  statSync,existsSync,rmSync} from "node:fs";
+  statSync,existsSync,rmSync,chmodSync} from "node:fs";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {fileURLToPath} from "node:url";
@@ -132,7 +132,8 @@ test("M5 incorrect permit and unsafe mode refuse",()=>{
     const path=join(f.config,permitName);
     writeFileSync(path,"WRONG\n",{mode:0o600});
     outcome(invoke(f),"blocked:writes-disabled",1);
-    writeFileSync(path,"FINANCEW_CATEGORY_GROUP_WRITES_APPROVED\n",{mode:0o644});
+    writeFileSync(path,"FINANCEW_CATEGORY_GROUP_WRITES_APPROVED\n");
+    chmodSync(path,0o644);
     outcome(invoke(f),"blocked:writes-disabled",1);
     assert.deepEqual(state(f).events,[]);
   }finally{cleanup(f);}

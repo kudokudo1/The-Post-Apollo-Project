@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "ForestInventoryPolicy.js" as InventoryPolicy
 
-// Only the B0 list-models action is accessible to ForestW.
-// No automatic start, inference, session storage, arbitrary commands or tools.
+// Forest B0 UI-owned read-only invocation. Never a generation/session host.
+// Delay model publication until stdout + stderr + normal exit all finish.
 Scope {
     id: inventory
     property bool scanning: false
@@ -12,20 +12,17 @@ Scope {
     property string reason: ""
     property var models: []
     readonly property int modelCount: models.length
-    property int exitCode: -999
-    property bool stdoutReady: false
-    property string stdoutBody: ""
+    property var scanState: InventoryPolicy.beginScan()
 
     function scanModels() {
         if (scanning || scanProcess.running)
             return false;
+        scanState = InventoryPolicy.beginScan();
         scanning = true;
         status = "CHECKING";
         reason = "";
         models = [];
-        exitCode = -999;
-        stdoutReady = false;
-        stdoutBody = "";
+        // No shell, model execution, arbitrary endpoint, or user-supplied argv.
         scanProcess.exec([
             "python3",
             Quickshell.shellPath("scripts/forest/ollama_inventory.py"),
@@ -34,22 +31,15 @@ Scope {
         return true;
     }
 
-    function complete() {
-        if (!scanning || exitCode === -999)
+    function acceptProgress(nextState) {
+        if (!scanning || !nextState)
             return;
-        var reply = stdoutReady
-                ? InventoryPolicy.parseInventory(stdoutBody)
-                : {valid: false};
-        var expected = reply.status === "REACHABLE" ? 0 : 2;
-        if (!reply.valid || exitCode !== expected) {
-            status = "UNAVAILABLE";
-            reason = "INVALID_RESPONSE";
-            models = [];
-        } else {
-            status = reply.status;
-            reason = reply.reason;
-            models = reply.models;
-        }
+        scanState = nextState;
+        if (!scanState.complete)
+            return;
+        status = scanState.status;
+        reason = scanState.reason;
+        models = scanState.accepted ? scanState.models : [];
         scanning = false;
     }
 
@@ -58,18 +48,23 @@ Scope {
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
-                inventory.stdoutBody = String(this.text || "");
-                inventory.stdoutReady = true;
-                inventory.complete();
+                inventory.acceptProgress(
+                    InventoryPolicy.captureStdoutScan(
+                        inventory.scanState, String(this.text || "")));
             }
         }
         stderr: StdioCollector {
-            // Hide raw OS errors; only static B0 refusal codes reach the UI.
-            onStreamFinished: {}
+            onStreamFinished: {
+                // Stderr is an error bit only; never expose raw host output.
+                inventory.acceptProgress(
+                    InventoryPolicy.captureStderrScan(
+                        inventory.scanState, String(this.text || "")));
+            }
         }
         onExited: function(code, exitStatus) {
-            inventory.exitCode = Number(code);
-            Qt.callLater(function() { inventory.complete(); });
+            inventory.acceptProgress(
+                InventoryPolicy.captureExitScan(
+                    inventory.scanState, code, exitStatus));
         }
     }
 }

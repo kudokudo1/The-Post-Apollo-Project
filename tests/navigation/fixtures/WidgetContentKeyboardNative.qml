@@ -114,21 +114,36 @@ ShellRoot {
             if(root.phase===0) {
                 if(!localKeys.selectInitial()
                    || localKeys.selectedItem!==first
-                   || !localKeys.hasContentSelection)
+                   || !localKeys.hasContentSelection
+                   || !localKeys.keyboardPrimaryActive
+                   || !first.contentKeyboardPrimary
+                   || second.contentKeyboardPrimary
+                   || first.foregroundColor!==first.keyboardSelectedForegroundColor)
                     return root.fail("NO_VISIBLE_INITIAL_CONTENT_SELECTOR");
                 root.phase++;
                 return;
             }
             if(root.phase===1) {
                 if(!localKeys.handleDirectionKey(Qt.Key_Right,Qt.NoModifier)
-                    || localKeys.selectedItem!==second)
+                    || localKeys.selectedItem!==second
+                    || !second.contentKeyboardPrimary
+                    || first.contentKeyboardPrimary)
                     return root.fail("RIGHT_NOT_SPATIAL");
+                // Exercise the exact method that the real mouse-position
+                // signal calls. This does NOT claim physical pointer delivery.
+                if(!localKeys.followPointer(second)
+                    || localKeys.keyboardPrimaryActive
+                    || second.contentKeyboardPrimary
+                    || first.contentKeyboardNavigationActive)
+                    return root.fail("POINTER_RECOMBINATION_FAILED");
                 root.phase++;
                 return;
             }
             if(root.phase===2) {
                 if(!localKeys.handleDirectionKey(Qt.Key_J,Qt.NoModifier)
-                    || localKeys.selectedItem!==third)
+                    || localKeys.selectedItem!==third
+                    || !localKeys.keyboardPrimaryActive
+                    || !third.contentKeyboardPrimary)
                     return root.fail("J_NOT_DOWN_OR_DANGEROUS_TARGET_REACHED");
                 root.phase++;
                 return;
@@ -150,6 +165,8 @@ ShellRoot {
                 localKeys.navigationActive=false;
                 if(localKeys.handleDirectionKey(Qt.Key_Down,Qt.NoModifier)
                     || localKeys.hasContentSelection
+                    || first.contentKeyboardNavigationActive
+                    || second.contentKeyboardPrimary
                     || localKeys.activate())
                     return root.fail("INACTIVE_OWNER_STOLE_INPUT");
                 root.phase++;

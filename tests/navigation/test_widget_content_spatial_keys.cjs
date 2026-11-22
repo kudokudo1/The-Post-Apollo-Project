@@ -47,7 +47,18 @@ test("Spatial selection starts on content and follows row/column, bounded at edg
 });
 test("Content selector is visibly separate from ModeButton and never owns focus",()=>{
   assert.match(nav,/objectName: "widget-content-keyboard-selection"/);
-  assert.match(nav,/border.color: Colors.yellow/);
+  assert.match(nav,/\? Colors.magenta : Colors.orange/);
+  assert.doesNotMatch(nav,/border.color: Colors.yellow/);
+  assert.match(nav,/function followPointer\(item\)/);
+  assert.match(nav,/keyboardPrimaryActive=false/);
+  assert.match(nav,/function synchronizeButtonCursor\(controls\)/);
+  assert.match(nav,/item.contentKeyboardPrimary=keyboardPrimaryActive/);
+  assert.match(nav,/item.contentKeyboardNavigationActive=keyboardPrimaryActive/);
+  assert.match(nav,/typeof navigator.selectedItem.contentKeyboardPrimary/);
+  assert.match(button,/contentKeyboardNavigationActive && hovered/);
+  assert.match(button,/pointerSecondaryHovered \? secondaryHoverFillColor : hoverFillColor/);
+  assert.match(button,/nav.followPointer\(actionButton\)/);
+  assert.match(button,/keyboardSelectedForegroundColor: hoverForegroundColor/);
   assert.match(nav,/focus: false/);
   assert.doesNotMatch(nav,/Keys\.onPressed|Shortcut \{|MouseArea \{/);
   assert.match(nav,/property Item contentRoot: null/);

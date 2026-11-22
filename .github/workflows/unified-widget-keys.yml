@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - "components/ActionButton.qml"
+      - "components/ModeButton.qml"
       - "components/WidgetContentKeyboardNavigator.qml"
+      - "tests/components/test_unified_hover_activation_contracts.py"
       - "components/WidgetContentSpatialPolicy.js"
       - "widgets/weather/StationSubjectOverviewRail.qml"
       - "widgets/AppControlW.qml"
@@ -53,6 +55,8 @@ jobs:
         run: |
           python3 tests/navigation/test_unified_widget_keys.py
           python3 tests/navigation/test_widget_keys_tasks_company_weather.py
+          python3 tests/components/test_unified_hover_activation_contracts.py
+          python3 tests/components/test_mode_button_contracts.py
           node --test tests/navigation/test_weather_lower_tabs_keys.cjs
           node --test tests/navigation/test_widget_content_spatial_keys.cjs
 

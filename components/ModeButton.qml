@@ -28,7 +28,11 @@ Rectangle {
     property color selectedPrimaryColor: Colors.magenta
     property color pressedPrimaryColor: Colors.black
     property color pressedBorderColor: Colors.black
-    property color perimeterGlowColor: Colors.orange
+    // An opened/activated mode retains its magenta identity and halo.
+    // Hover-only controls use orange; callers may still override specialized
+    // perimeter glow identities without changing their selected state.
+    property color perimeterGlowColor:
+        selected ? selectedPrimaryColor : hoverPrimaryColor
 
     // Menu chooses arrangement, sizing and custom glyph composition.
     property bool customArtwork: false

@@ -15,7 +15,7 @@ keymap, compositor, focus broker, or keyboard-ownership coordinator.
 | Main Mode | `Tab` next; `Shift+Tab` previous | Cycles the current window's actual primary modes, wrapping when cyclic |
 | Top Sub Mode | `Shift+Left/Right` | Cycles the present upper secondary selector/filter |
 | Bottom Sub Mode | `Ctrl+Left/Right` | Cycles the present lower secondary selector/filter |
-| Within the current menu | Unmodified arrows; **H/J/K/L** as alternate directional keys | **H = left, J = down, K = up, L = right.** A visible yellow focus outline follows actual content controls, not main-mode rails. These keys do not change a Main Mode. |
+| Within the current menu | Unmodified arrows; **H/J/K/L** as alternate directional keys | **H = left, J = down, K = up, L = right.** The existing ActionButton content cursor follows the real control's orange unactivated border/icon/glow, not an independent yellow rectangle. Active selections remain magenta. These keys do not change a Main Mode. |
 | Activation | `Enter` / `Return` | Activates the currently keyboard-selected *action/control* when safe |
 | Exit / Back | Contextual `Escape` / Back | Returns from local layers or closes according to the owning window's existing semantics |
 
@@ -37,8 +37,17 @@ the internal layout or a license to replace valid local navigation.
   nested editors, operation locks and long-running work. These contexts may
   override or temporarily suspend mode keys.
 - Arrows follow the current layout; preview/highlight must remain distinct
-  from Enter activation. Pointer entry/movement may synchronize the keyboard
-  cursor without itself triggering an action.
+  from Enter activation. The mouse and keyboard normally share one selector;
+  keyboard movement makes it primary while a stationary mouse may retain a
+  separate orange hover border/icon/glow without yellow fill. Actual mouse
+  movement over a selectable control reunifies the selectors there. Pointer
+  entry alone must not steal keyboard primary, and no cursor movement triggers
+  an action.
+- Orange means hovered or keyboard-previewed, not activated; magenta border,
+  icon and sampled glow mean the owning control has actually activated or
+  selected its state, whether by click, approved Enter or an explicitly
+  hover-activating control. Its functional owner determines whether that state
+  persists, pulses, or clears. Do not latch every one-shot command as selected.
 - Cyclic mode groups wrap; bounded selector ranges stay bounded. Dedicated
   contextual Back, history, Floor/Room/Bed and playback controls retain their
   meanings unless the operator approves a specific remapping.

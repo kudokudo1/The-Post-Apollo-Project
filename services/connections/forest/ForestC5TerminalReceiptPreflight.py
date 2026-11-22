@@ -101,10 +101,10 @@ def verify_unenrolled_terminal_receipt(
             receipt["audience"] != S.AUDIENCE or
             receipt["role"] != WRITER_ROLE):
         _hold("WRONG_WRITER_DOMAIN")
-    if receipt["terminalOutcome"] not in TERMINAL_OUTCOMES:
-        _hold("NONTERMINAL_OR_FORGED_OUTCOME")
     if type(receipt["terminalOutcome"]) is not str:
         _hold("OUTCOME_TYPE")
+    if receipt["terminalOutcome"] not in TERMINAL_OUTCOMES:
+        _hold("NONTERMINAL_OR_FORGED_OUTCOME")
     for field in ("permitId", "attempt", "grant", "request",
                   "principal", "tree", "challenge", "storageTxnId"):
         _exact_text(receipt[field], field)

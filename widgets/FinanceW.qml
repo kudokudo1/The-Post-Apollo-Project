@@ -178,6 +178,7 @@ PanelWindow {
     readonly property bool headerReloadAvailable: root.menuOpen && (
         (selectedMainMode === "market" && !marketService.loading)
         || (selectedMainMode === "research"
+            && (researchTool === "sec" || researchTool === "crawl")
             && (researchTool === "sec" ? !secService.loading
                                       : !crawlService.loading))
         || (selectedMainMode === "budget"

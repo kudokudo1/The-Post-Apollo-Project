@@ -1,0 +1,33 @@
+name: FinanceW Transfer Guide TG0
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/FinanceTransferGuidePolicy.js'
+      - 'widgets/FinanceTransferGuidePane.qml'
+      - 'widgets/FinanceAccountsPane.qml'
+      - 'tests/finance/test_finance_transfer_guide_tg0.mjs'
+      - 'tests/finance/test_finance_transfer_guide_tg0_contract.py'
+      - '.github/workflows/finance-transfer-guide-tg0.yml'
+  push:
+    paths:
+      - 'widgets/FinanceTransferGuidePolicy.js'
+      - 'widgets/FinanceTransferGuidePane.qml'
+      - 'widgets/FinanceAccountsPane.qml'
+      - 'tests/finance/test_finance_transfer_guide_tg0.mjs'
+      - 'tests/finance/test_finance_transfer_guide_tg0_contract.py'
+      - '.github/workflows/finance-transfer-guide-tg0.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-transfer-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deterministic fictional transfer guidance
+        run: node tests/finance/test_finance_transfer_guide_tg0.mjs
+      - name: Test isolated read-only QML integration
+        run: python3 tests/finance/test_finance_transfer_guide_tg0_contract.py

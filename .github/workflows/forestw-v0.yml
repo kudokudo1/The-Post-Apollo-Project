@@ -1,0 +1,27 @@
+name: ForestW V0 Launcher Contract
+
+on:
+  pull_request:
+    paths:
+      - 'modules/Forest.qml'
+      - 'widgets/ForestW.qml'
+      - 'widgets/ForestChassisPolicy.js'
+      - 'shell.qml'
+      - 'tests/forest/**'
+      - '.github/workflows/forestw-v0.yml'
+  push:
+    paths:
+      - 'modules/Forest.qml'
+      - 'widgets/ForestW.qml'
+      - 'widgets/ForestChassisPolicy.js'
+      - 'shell.qml'
+      - 'tests/forest/**'
+      - '.github/workflows/forestw-v0.yml'
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Forest launcher and geometry regressions
+        run: python3 tests/forest/test_forest_launcher_contract.py

@@ -167,6 +167,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(view.count("VoiceToTextButton {"), 1)
         self.assertEqual(view.count("AskSendButton {"), 1)
         self.assertIn("id: voiceToTextButton", view)
+        # Forest overrides only the icon, not Hospital shared component behavior.
+        self.assertIn('voiceGlyph: "🎤"', view)
+        self.assertNotIn('voiceGlyph: "🗣︎"', view)
+        self.assertIn('property string voiceGlyph: "🗣︎"', voice)
         self.assertIn("id: forestAskSendButton", view)
         self.assertIn("id: modelPickerButton", view)
         self.assertIn("anchors.right: voiceToTextButton.left", view)

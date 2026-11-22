@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'tests/connections/test_connections_c3e_timew_native_external_sender.py'
+      - 'tests/connections/test_connections_c3e_timew_native_rights_cleanup.py'
       - 'tests/connections/test_connections_c3e_timew_native_packet_observer.py'
       - 'services/connections/ConnectionsTimeWNativePacketObservation.py'
       - '.github/workflows/connections-c3e-timew-independent-sender-ci.yml'
@@ -35,6 +36,8 @@ jobs:
           from pathlib import Path
           code=Path('services/connections/ConnectionsTimeWNativePacketObservation.py').read_text()
           for phrase in ('SO_PEERPIDFD','SO_PEERCRED','SCM_CREDENTIALS',
+                         'SCM_RIGHTS', 'MSG_CMSG_CLOEXEC',
+                         '_discard_unexpected_rights(controls)',
                          '"productionAuthority": False',
                          '"nativeGeometryAllowed": False',
                          'PROTECTED_SWAYPX_SOURCE_AND_C5_NOT_ENROLLED'):

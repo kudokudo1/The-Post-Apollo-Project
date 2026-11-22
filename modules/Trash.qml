@@ -1772,26 +1772,28 @@ PanelWindow {
                 }
 
                 // Finance-style in-place size stepping: no extra window.
-                ActionButton {
+                ResizeButton {
                     id: collapseTrashButton
                     width: 28
-                    height: 28
-                    label: "↓"
-                    labelPixelSize: 17
-                    accentColor: Colors.cyan
+                    direction: "down"
                     available: trashLauncher.chassisSize !== "compact"
-                    onLeftClicked: trashLauncher.stepChassis(-1)
+                    onResizeRequested: function(delta) {
+                        if (delta !== -1)
+                            return;
+                        trashLauncher.stepChassis(-1);
+                    }
                 }
 
-                ActionButton {
+                ResizeButton {
                     id: expandTrashButton
                     width: 28
-                    height: 28
-                    label: "↑"
-                    labelPixelSize: 17
-                    accentColor: Colors.magenta
+                    direction: "up"
                     available: trashLauncher.chassisSize !== "full"
-                    onLeftClicked: trashLauncher.stepChassis(1)
+                    onResizeRequested: function(delta) {
+                        if (delta !== 1)
+                            return;
+                        trashLauncher.stepChassis(1);
+                    }
                 }
 
                 // This indicator is a real GIO index heartbeat, not a

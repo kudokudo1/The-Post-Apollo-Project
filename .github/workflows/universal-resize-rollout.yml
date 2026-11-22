@@ -1,0 +1,46 @@
+name: Universal chassis ResizeButton rollout
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "widgets/FinanceW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/CameraW.qml"
+      - "modules/Trash.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/HospitalW.qml"
+      - "components/ResizeButton.qml"
+      - "tests/components/test_universal_resize_rollout.py"
+      - ".github/workflows/universal-resize-rollout.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/FinanceW.qml"
+      - "widgets/CompanyNetworkW.qml"
+      - "widgets/TasksW.qml"
+      - "widgets/CameraW.qml"
+      - "modules/Trash.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/HospitalW.qml"
+      - "components/ResizeButton.qml"
+      - "tests/components/test_universal_resize_rollout.py"
+      - ".github/workflows/universal-resize-rollout.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Universal resize controls and legacy-arrow audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all 14 chassis controls and preserve owners
+        run: python3 -B -I tests/components/test_universal_resize_rollout.py
+      - name: Verify shared semantic component and Finance pilot
+        run: |
+          python3 -B -I tests/components/test_resize_button_contracts.py
+          python3 -B -I tests/components/test_finance_resize_button_pilot.py

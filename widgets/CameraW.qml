@@ -2598,25 +2598,25 @@ PanelWindow {
 
                 // Finance-style ↓/↑ geometry controls: they resize the
                 // existing mapped Camera surface, never create another.
-                ActionButton {
+                ResizeButton {
                     id: cameraCollapseButton
-                    width: 30
-                    height: 30
-                    label: "↓"
-                    labelPixelSize: 17
-                    accentColor: Colors.cyan
+                    direction: "down"
                     available: camera.chassisLevel !== "compact"
-                    onLeftClicked: camera.collapseChassis()
+                    onResizeRequested: function(delta) {
+                        if (delta !== -1)
+                            return;
+                        camera.collapseChassis();
+                    }
                 }
-                ActionButton {
+                ResizeButton {
                     id: cameraExpandButton
-                    width: 30
-                    height: 30
-                    label: "↑"
-                    labelPixelSize: 17
-                    accentColor: Colors.magenta
+                    direction: "up"
                     available: camera.chassisLevel !== "fullscreen"
-                    onLeftClicked: camera.expandChassis()
+                    onResizeRequested: function(delta) {
+                        if (delta !== 1)
+                            return;
+                        camera.expandChassis();
+                    }
                 }
                 CloseButton {
                     id: cameraCloseButton

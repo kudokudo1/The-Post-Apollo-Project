@@ -34,11 +34,14 @@ assert "chassisLevel = TasksChassisPolicy.step(chassisLevel, 1);" in MENU
 assert "chassisLevel = TasksChassisPolicy.step(chassisLevel, -1);" in MENU
 assert "id: collapseChassisButton" in MENU
 assert "id: expandChassisButton" in MENU
-assert 'label: "↓"' in MENU and 'label: "↑"' in MENU
+assert MENU.count("ResizeButton {") == 2
+assert 'direction: "down"' in MENU and 'direction: "up"' in MENU
 assert 'available: root.chassisLevel !== "compact"' in MENU
 assert 'available: root.chassisLevel !== "large"' in MENU
-assert "onLeftClicked: root.collapseChassis()" in MENU
-assert "onLeftClicked: root.expandChassis()" in MENU
+assert "onResizeRequested: function(delta)" in MENU
+assert "if (delta !== -1)" in MENU and "if (delta !== 1)" in MENU
+assert "root.collapseChassis();" in MENU
+assert "root.expandChassis();" in MENU
 assert "anchors.right: collapseChassisButton.left" in MENU
 assert "anchors.right: expandChassisButton.left" in MENU
 assert "anchors.right: feedBadge.left" in MENU

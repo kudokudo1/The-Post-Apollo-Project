@@ -5,6 +5,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 host = (ROOT / "widgets/HospitalW.qml").read_text()
 policy = (ROOT / "services/hospital/HospitalHorizontalChassisPolicy.js").read_text()
+shared = (ROOT / "components/ResizeButton.qml").read_text()
+base = (ROOT / "components/ActionButton.qml").read_text()
 checks = []
 
 def check(ok, description):
@@ -40,17 +42,26 @@ check('id: hospitalHeaderActions' in host
       and 'id: narrowHospitalButton' in host
       and 'id: widenHospitalButton' in host,
       "Arrows must live in the existing header action row")
-check('label: "←"' in host
-      and 'label: "→"' in host
+check('ResizeButton {' in host
+      and 'direction: "left"' in host
+      and 'direction: "right"' in host
       and 'available: root.canNarrowHospital' in host
       and 'available: root.canWidenHospital' in host,
-      "Left and right size arrows must respect available size")
+      "Left/right shared ResizeButton pair must preserve horizontal size boundaries")
 check('root.stepHospitalWidth(-1);' in host
       and 'root.stepHospitalWidth(1);' in host,
       "Arrow activation must only adjust a width level")
-check('contentGlowEnabled: false' in host.split('id: narrowHospitalButton',1)[1][:420]
-      and 'contentGlowEnabled: false' in host.split('id: widenHospitalButton',1)[1][:420],
-      "Avoid offset dual text shadows on new size arrows")
+check('contentGlowEnabled: false' not in host.split('id: narrowHospitalButton',1)[1][:450]
+      and 'contentGlowEnabled: false' not in host.split('id: widenHospitalButton',1)[1][:450]
+      and 'trackLabelGlowLocally: true' in shared
+      and 'contentGlowEnabled: true' in shared
+      and 'safeSource: actionButton.contentGlowSource' in base,
+      "Arrows must use shared source-aligned sampled glyph glow, not duplicate shadows")
+check('onResizeRequested: function(delta)' in host
+      and 'if (delta !== -1)' in host
+      and 'if (delta !== 1)' in host
+      and 'root.keyboardOwnershipRequested();' in host,
+      "Hospital shared arrows must retain guarded width steps and keyboard focus")
 check('right: hospitalHeaderActions.left' in host
       and 'elide: Text.ElideRight' in host,
       "Long title must not overlap header size buttons on compact")

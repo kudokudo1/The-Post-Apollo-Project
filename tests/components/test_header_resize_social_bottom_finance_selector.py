@@ -49,7 +49,12 @@ assert "anchors.topMargin: root.topGlowGutter" in git
 assert "readonly property int chassisRightMargin:" in cpu
 assert "resizeLevel === resizeSteps.length - 1 ? 1 : 220" in cpu
 assert "top: -3" in cpu
-assert "anchors.bottomMargin: cpuPlusWindow.resizeLevel" in cpu
+assert "readonly property int chassisBottomInset:" in cpu
+assert "? Math.max(0, visualBottomGap - 3) : 12" in cpu
+for pane in ("background", "sharedInstrumentPane", "targetPane", "actuatorPane"):
+    fragment=cpu.split("id: "+pane,1)[1].split("anchors.bottomMargin:",1)[1]
+    assert fragment.lstrip().startswith("cpuPlusWindow.chassisBottomInset"), pane
+assert cpu.count("anchors.bottomMargin: cpuPlusWindow.chassisBottomInset")==4
 
 for screen_height in (768, 900, 1080, 1440, 2160):
     for bottom_margin, inset in ((5,8),(8,8),(5,12)):

@@ -1,0 +1,53 @@
+name: TimeW Scope A native outcome UNKNOWN/HOLD fixture matrix
+
+on:
+  pull_request:
+    paths:
+      - 'tests/timew/TimeWScopeAOutcomeHoldPreflight.py'
+      - 'tests/timew/test_timew_scope_a_native_outcome_hold.py'
+      - 'docs/timew-machine-v2-scope-a-native-outcome-matrix.md'
+      - '.github/workflows/timew-scope-a-native-outcome-hold-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  outcome-uncertainty-no-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test real local SQLite journal plus synthetic C5/resize/move outcome matrix
+        run: python3 -B -I tests/timew/test_timew_scope_a_native_outcome_hold.py
+      - name: Preserve previous crash-safe journal and selected geometry continuity tests
+        run: |
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py
+          python3 -B -I tests/timew/test_machine_v2_surface_continuity_review.py
+      - name: Verify no privileged entrypoint, signer, socket or TimeW UI consumer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/timew/TimeWScopeAOutcomeHoldPreflight.py').read_text()
+          t = Path('widgets/TimeW.qml').read_text()
+          for forbidden in (
+              'subprocess', 'socket', 'swaymsg', 'Ed25519PrivateKey',
+              'command_runner', 'def authorize(', 'def execute(', 'def main(',
+          ):
+              assert forbidden not in p, forbidden
+          for required in (
+              '"restore_allowed": False',
+              '"production_authorized": False',
+              '"automatic_retry_allowed": False',
+              '"native_geometry_dispatch_allowed": False',
+              'def run_native_restore(*_args, **_kwargs):',
+          ):
+              assert required in p, required
+          assert 'TimeWScopeAOutcomeHoldPreflight' not in t
+          print('TIMEW OUTCOME MATRIX // SOURCE ONLY, ALL NATIVE AUTHORITY FALSE')
+          PY

@@ -1440,6 +1440,13 @@ PanelWindow {
         if (root.operationsSurface === "staff")
             return specialistRegistryService.refreshPresence();
         if (root.operationsSurface === "reception") {
+            // Unlike a passive reopen, an explicit header click requests
+            // fresh local reads before rebuilding the receptionist summary.
+            if (!roundsService.running)
+                roundsService.refresh();
+            if (specialistRegistryService.loaded
+                    && !specialistRegistryService.probing)
+                specialistRegistryService.refreshPresence();
             root.refreshReceptionData();
             return true;
         }

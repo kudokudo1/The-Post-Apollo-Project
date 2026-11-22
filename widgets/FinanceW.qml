@@ -230,8 +230,7 @@ PanelWindow {
 
     // Independent navigation state; no financial services are attached.
     readonly property var mainModes: [
-        { id: "banking", name: "Banking", icon: "₊˚⋆🏛⊹",
-          prefix: "₊˚⋆", core: "🏛", suffix: "⊹", coreSize: 30 },
+        { id: "banking", name: "Banking", icon: "₊˚⋆🏛⊹", prefix: "₊˚⋆", core: "🏛", suffix: "⊹", coreSize: 30 },
         { id: "budget", name: "Budget", icon: "⋆$🗓₊˚" },
         { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", dollar: "$", core: "🗠๋࣭", suffix: "⭑" },
         { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹", prefix: "࣪ ˖(˓", core: "🛰", suffix: "₊˚⊹", coreSize: 30 },

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "components/ConversationFeed.qml"
+      - "components/qmldir"
       - "components/VoiceToTextButton.qml"
       - "components/AskSendButton.qml"
       - "services/hospital/**"
@@ -15,6 +16,7 @@ on:
       - main
     paths:
       - "components/ConversationFeed.qml"
+      - "components/qmldir"
       - "components/VoiceToTextButton.qml"
       - "components/AskSendButton.qml"
       - "services/hospital/**"

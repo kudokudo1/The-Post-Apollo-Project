@@ -95,6 +95,10 @@ def _parse_exact(wire: object, expected_fields: frozenset[str]) -> dict:
             wire.decode("utf-8"), object_pairs_hook=_pairs_unique,
             parse_constant=lambda _: _hold("JSON_CONSTANT_REFUSED"),
         )
+    except EvidenceHold:
+        # Duplicate-field/constant refusal is already a specific fail-closed
+        # result. Do not mask it as generic malformed JSON.
+        raise
     except (ValueError, UnicodeError, RecursionError) as exc:
         raise EvidenceHold("FOREST_B4C_EVIDENCE_HOLD // INVALID_JSON") from exc
     if type(value) is not dict or set(value) != expected_fields:

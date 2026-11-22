@@ -11,6 +11,7 @@ read, and no observation enables geometry, recovery, or authorization.
 """
 from __future__ import annotations
 
+import array
 import hashlib
 import os
 import select
@@ -55,6 +56,41 @@ def _live(fd: int) -> bool:
     return not poll.poll(0)
 
 
+def _discard_unexpected_rights(controls) -> None:
+    """Close *all* delivered SCM_RIGHTS fds, then refuse the entire packet.
+
+    recvmsg() allocates live descriptors in the receiving process. Even if
+    MSG_CTRUNC or bad credentials force HOLD, those descriptors must be closed
+    before raising. Continue through every rights cmsg after a malformed
+    first one so later descriptors cannot be orphaned. The kernel owns any
+    descriptors it could not deliver because of ancillary truncation.
+    """
+    saw_rights = False
+    malformed_or_close_failed = False
+    fd_size = array.array("i").itemsize
+    for level, kind, raw in controls:
+        if level != socket.SOL_SOCKET or kind != socket.SCM_RIGHTS:
+            continue
+        saw_rights = True
+        complete = len(raw) // fd_size * fd_size
+        received = array.array("i")
+        received.frombytes(raw[:complete])
+        if complete != len(raw):
+            malformed_or_close_failed = True
+        for fd in received:
+            if fd < 0:
+                malformed_or_close_failed = True
+                continue
+            try:
+                os.close(fd)
+            except OSError:
+                malformed_or_close_failed = True
+    if malformed_or_close_failed:
+        _hold("UNEXPECTED_SCM_RIGHTS_MALFORMED_OR_CLOSE_FAILED")
+    if saw_rights:
+        _hold("UNEXPECTED_SCM_RIGHTS_CLOSED")
+
+
 def inspect_one_untrusted_packet(receiver: socket.socket) -> dict:
     """Consume one real bounded packet. Never return authorization or raw data.
 
@@ -92,8 +128,15 @@ def inspect_one_untrusted_packet(receiver: socket.socket) -> dict:
         original = _CREDS.unpack(raw_creds)
         if original[0] <= 1 or original[1] < 0 or original[2] < 0:
             _hold("KERNEL_PEER_CREDENTIALS_INVALID")
+        if not hasattr(socket, "MSG_CMSG_CLOEXEC"):
+            _hold("RECEIVED_FD_CLOSE_ON_EXEC_UNAVAILABLE")
         payload, controls, flags, address = receiver.recvmsg(
-            MAX_PAYLOAD + 1, socket.CMSG_SPACE(_CREDS.size))
+            MAX_PAYLOAD + 1, socket.CMSG_SPACE(_CREDS.size),
+            socket.MSG_CMSG_CLOEXEC)
+        # Before any other refusal, dispose of all SCM_RIGHTS the kernel
+        # installed into this receiver. Otherwise even a truncated packet
+        # could leak a descriptor into a long-running Connections host.
+        _discard_unexpected_rights(controls)
         if ((flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC))
                 or address or not 0 < len(payload) <= MAX_PAYLOAD):
             _hold("PACKET_TRUNCATED_OVERSIZED_OR_EMPTY")

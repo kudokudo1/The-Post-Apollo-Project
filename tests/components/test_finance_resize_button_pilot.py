@@ -40,7 +40,7 @@ assert "implicitWidth: 30" in shared
 assert "labelPixelSize: 17" in shared
 assert "property color decreaseAccentColor: Colors.orange" in shared
 assert 'property color increaseAccentColor: "#A46AFF"' in shared
-assert 'FinanceChassisPolicy.step(chassisLevel, 1)' in finance
-assert 'FinanceChassisPolicy.step(chassisLevel, -1)' in finance
+assert 'FinanceChassisPolicy.step(chassisLevel, 1, "finance")' in finance
+assert 'FinanceChassisPolicy.step(chassisLevel, -1, "finance")' in finance
 assert "property string chassisLevel: \"compact\"" in finance
 print("Finance ResizeButton pilot contracts PASS")

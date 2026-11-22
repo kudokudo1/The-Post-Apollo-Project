@@ -28,6 +28,9 @@ assert "property int frameInset: 8" in hub
 for path,source in (("apollo",apollo),("git",git),("cpu",cpu)):
     assert "property var notificationsReference: null" in source, path
     assert "notificationsReference.panelBottomMargin + notificationsReference.frameInset" in source, path
+    assert "notificationsReference.height" in source, path
+    assert "notificationsReference.panelTopMargin" in source, path
+    assert "readonly property int visualBottomY:" in source, path
     assert "{ width: 99999, height: 99999 }" in source, path
     assert "property int resizeLevel: 1" in source, path
     assert "resizeLevel + delta" in source, path
@@ -39,11 +42,13 @@ for path,token in (
     assert shell.count(token)>=3, (path,"one live source bound to all three widgets")
 assert "top: 0" in apollo and "anchors.topMargin: 0" in apollo
 assert "readonly property int frameHeight: Math.min(" in apollo
+assert "resizeSteps[resizeLevel].height, visualBottomY" in apollo
 assert "- visualBottomGap" in apollo
 assert "readonly property int effectivePanelLeftMargin:" in git
 assert "resizeLevel === resizeSteps.length - 1 ? glowGutter : panelLeftMargin" in git
 assert "readonly property int effectiveBottomGlowGutter:" in git
 assert "panelHeight + topGlowGutter + effectiveBottomGlowGutter" in git
+assert "visualBottomY - panelTopMargin - topGlowGutter" in git
 assert "top: panelTopMargin" in git
 assert "anchors.topMargin: root.topGlowGutter" in git
 assert "readonly property int chassisRightMargin:" in cpu
@@ -55,24 +60,32 @@ for pane in ("background", "sharedInstrumentPane", "targetPane", "actuatorPane")
     fragment=cpu.split("id: "+pane,1)[1].split("anchors.bottomMargin:",1)[1]
     assert fragment.lstrip().startswith("cpuPlusWindow.chassisBottomInset"), pane
 assert cpu.count("anchors.bottomMargin: cpuPlusWindow.chassisBottomInset")==4
+assert "readonly property int fullscreenHeightBudget:" in cpu
+assert "visualBottomY + chassisBottomInset + 3" in cpu
+assert "resizeLevel === resizeSteps.length - 1 ? fullscreenHeightBudget : 99999" in cpu
 
+# A layer-shell surface occupies the compositor's AVAILABLE height; the
+# physical screen can be taller when the dock reserves a top strip. Regression:
+# old fullscreen sizes wrongly used screen_height and overran the bottom.
 for screen_height in (768, 900, 1080, 1440, 2160):
-    for bottom_margin, inset in ((5,8),(8,8),(5,12)):
-        target=screen_height-bottom_margin-inset
-        # Apollo starts at 0, no top offset.
-        hub_frame=min(99999,screen_height-(bottom_margin+inset))
-        # Git visible chassis starts at topGlowGutter=9.
-        git_frame=min(99999,screen_height-9-(bottom_margin+inset))
-        # CPU++ top -3 and frame top/bottom as implemented.
-        cpu_outer=min(99999,screen_height)
-        cpu_frame_bottom= -3+cpu_outer-max(0,(bottom_margin+inset)-3)
-        assert hub_frame == target
-        assert 9+git_frame == target
-        assert cpu_frame_bottom == target
-        # None of the visible frames exceeds its output height.
-        assert 0 < hub_frame <= screen_height
-        assert 0 < git_frame <= screen_height
-        assert 0 < cpu_outer <= screen_height
+    for dock_reserve in (0, 42, 80, 120):
+        for bottom_margin, inset in ((5,8),(8,8),(5,12)):
+            notifications_height = screen_height - dock_reserve - bottom_margin
+            target = notifications_height - inset
+            # Apollo begins at visible y=0; Git begins at visible y=9.
+            hub_frame = min(99999, target)
+            git_frame = min(99999, max(1, target-9))
+            # CPU++ visible bottom is y=-3 + outer height - bottom inset.
+            cpu_bottom_inset = max(0, (bottom_margin+inset)-3)
+            cpu_outer = min(99999, screen_height,
+                            target + cpu_bottom_inset + 3)
+            cpu_frame_bottom = -3 + cpu_outer - cpu_bottom_inset
+            assert hub_frame == target
+            assert 9 + git_frame == target
+            assert cpu_frame_bottom == target
+            assert 0 < hub_frame <= screen_height
+            assert 0 < git_frame <= screen_height
+            assert 0 < cpu_outer <= screen_height
 
 # Header arrows ALWAYS precede the status indicator when one exists.
 # Apollo has no LIVE badge: its controls precede EDIT and Close instead.
@@ -128,4 +141,4 @@ assert "contentRoot: workArea" in work
 assert "navigationActive: root.standardKeysAvailable" in work
 assert "financeKeyboardAnchor.activeFocus" in work
 
-print("Header placement, four-level visible-bottom geometry and Finance selector: PASS")
+print("Header placement, compositor-capped fullscreen geometry and Finance selector: PASS")

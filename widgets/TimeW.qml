@@ -36,13 +36,15 @@ PanelWindow {
     // Window geometry only: preserve Clock, Alarm and MACHINE state while
     // stepping one permanently mapped TimeW surface. Default is original size.
     property int resizeLevel: 0
+    // TASKS' three portrait targets, with the same 0.58 width/height ceiling.
     readonly property var resizeSteps: [
         { width: 432, height: 790 },
-        { width: 560, height: 840 },
-        { width: 700, height: 920 }
+        { width: 560, height: 1020 },
+        { width: 760, height: 1345 }
     ]
     readonly property int frameWidth: Math.min(
         resizeSteps[resizeLevel].width,
+        Math.max(1, Math.floor(frameHeight * 0.58)),
         Math.max(1, (screen ? screen.width : 2560) - 13 - glowGutter * 2))
     readonly property int frameHeight: Math.min(
         resizeSteps[resizeLevel].height,

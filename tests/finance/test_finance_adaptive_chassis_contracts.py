@@ -13,24 +13,30 @@ assert 'property string chassisLevel: "compact"' in menu
 assert 'readonly property var chassisFrame: FinanceChassisPolicy.frame(' in menu
 assert 'readonly property int frameWidth: chassisFrame.width' in menu
 assert 'readonly property int frameHeight: chassisFrame.height' in menu
-# All three FinanceW levels share the Git/Hospital 9px visible top line;
+# All five FinanceW levels share the Git/Hospital 9px visible top line;
 # the 8px bottom reserve is part of the actual mapped window's height.
 # Git retains the same 790px height at its default (middle) tier,
 # but now permits a deliberately operator-selected fullscreen fourth tier.
 assert '{ width: 1120, height: 790 }' in git
 assert 'readonly property int panelHeight: Math.min(' in git
 assert 'property int topGlowGutter: 9' in git
-assert 'mode === "fullscreen" ? 1345' in policy
+assert 'var financeLevels = ["compact", "expanded", "tall", "large", "fullscreen"]' in policy
+assert 'var levels = ["compact", "expanded", "fullscreen"]' in policy
+assert 'var targetWidth = mode === "fullscreen" ? width' in policy
+assert 'mode === "compact" ? 432 : 1000' in policy
+assert 'mode === "compact" || mode === "expanded" ? 790' in policy
+assert 'mode === "tall" ? 1020 : 1345' in policy
 # Finance Large retains the separately approved 1345px height cap.
 # Social now follows the *visible* Notifications frame, not the screen
 # dimensions. Neither changes FinanceW's own geometry policy.
 social = (root / "widgets/messanger/MessagingW.qml").read_text(encoding="utf-8")
 assert 'property int defaultPanelHeight: Math.max(' in social
 assert 'Math.round(notificationsReference.height) - 2 * notificationsFrameInset' in social
-assert 'mode === "expanded" ? 900 : 790' in policy
+assert 'width: Math.min(width, targetWidth)' in policy
+assert 'height: Math.min(height, targetHeight)' in policy
 assert 'readonly property int frameTopInset: 9' in menu
 assert 'readonly property int bottomScreenGap: 8' in menu
-assert 'frameTopInset, bottomScreenGap' in menu
+assert 'frameTopInset, bottomScreenGap, "finance"' in menu
 assert 'compactTopLift' not in menu
 assert 'chassisLevel === "compact" ? glowGutter' not in menu
 assert 'implicitHeight: frameHeight + frameTopInset + bottomScreenGap' in menu
@@ -39,8 +45,8 @@ assert 'anchors.topMargin: root.frameTopInset' in menu
 assert 'anchors.bottomMargin: root.bottomScreenGap' in menu
 assert 'FinanceChassisPolicy.topMargin(' in menu
 assert 'FinanceChassisPolicy.leftMargin(' in menu
-assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);' in menu
-assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1);' in menu
+assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1, "finance");' in menu
+assert 'chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1, "finance");' in menu
 assert 'id: expandChassisButton' in menu
 assert 'id: collapseChassisButton' in menu
 assert 'available: root.chassisLevel !== "fullscreen"' in menu
@@ -76,10 +82,10 @@ assert 'active: host.toolConnected' in host
 assert 'sourceComponent: host.embeddedComponent' in host
 assert 'visible: host.toolConnected' in host
 assert 'IN-WORKSPACE TOOL // NOT CONNECTED' in host
-assert 'function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap)' in policy
+assert 'function frame(level, viewportWidth, viewportHeight, gutter, topInset, bottomGap, profile)' in policy
 assert 'viewportPixels(viewportHeight, 768) - top - bottom' in policy
 assert 'root.implicitHeight, root.frameTopInset)' in menu
-assert 'function step(level, direction)' in policy
+assert 'function step(level, direction, profile)' in policy
 for forbidden in ('Qt.openUrlExternally', 'Process {', 'openUrl(',
                   'exec(', 'financeWrite.submit(', 'financeFundingWrite.submit('):
     assert forbidden not in host, forbidden

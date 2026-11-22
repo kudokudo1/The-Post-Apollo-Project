@@ -859,16 +859,24 @@ PanelWindow {
         { width: 99999, height: 99999 }
     ]
     // The visible frame begins at y=-3+12=9. On the fourth level,
-    // preserve the top and align its actual bottom with Notifications.
+    // preserve the top and align its actual bottom with the compositor-
+    // resolved Notifications surface, not the physical screen height.
     property var notificationsReference: null
     readonly property int visualBottomGap: notificationsReference
         ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
         : 13
+    readonly property int visualBottomY: notificationsReference
+        ? Math.max(1, Math.floor(notificationsReference.panelTopMargin
+                                  + notificationsReference.height
+                                  - notificationsReference.frameInset))
+        : Math.max(1, (screen ? screen.height : 1440) - visualBottomGap)
     readonly property int chassisRightMargin:
         resizeLevel === resizeSteps.length - 1 ? 1 : 220
     readonly property int chassisBottomInset:
         resizeLevel === resizeSteps.length - 1
         ? Math.max(0, visualBottomGap - 3) : 12
+    readonly property int fullscreenHeightBudget:
+        Math.max(1, visualBottomY + chassisBottomInset + 3)
     implicitWidth: Math.min(
         resizeSteps[resizeLevel].width,
         Math.max(1, (screen ? screen.width : 2560)
@@ -877,7 +885,8 @@ PanelWindow {
     implicitHeight: Math.min(
         resizeSteps[resizeLevel].height,
         Math.max(1, (screen ? screen.height : 1440)
-                 - (resizeLevel === resizeSteps.length - 1 ? 0 : 12)))
+                 - (resizeLevel === resizeSteps.length - 1 ? 0 : 12)),
+        resizeLevel === resizeSteps.length - 1 ? fullscreenHeightBudget : 99999)
     function stepWindowSize(delta) {
         if (delta !== -1 && delta !== 1)
             return;

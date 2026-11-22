@@ -369,10 +369,10 @@ PanelWindow {
     property real chassisTopY: 0
 
     // The one mapped layer-shell surface resizes; editors, services and
-    // navigation are not recreated on Compact / Expanded / Fullscreen changes.
+    // navigation are not recreated across the five resize tiers.
     property string chassisLevel: "compact"
     readonly property int glowGutter: 12
-    // All three levels share the same visible top edge (9px). Reserve
+    // All five levels share the same visible top edge (9px). Reserve
     // 8px beneath the visible frame for the operator's Sway bottom gap.
     readonly property int frameTopInset: 9
     readonly property int bottomScreenGap: 8
@@ -380,16 +380,16 @@ PanelWindow {
         chassisLevel,
         root.screen ? root.screen.width : 456,
         root.screen ? root.screen.height : 768,
-        glowGutter, frameTopInset, bottomScreenGap
+        glowGutter, frameTopInset, bottomScreenGap, "finance"
     )
     readonly property int frameWidth: chassisFrame.width
     readonly property int frameHeight: chassisFrame.height
 
     function expandChassis() {
-        chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1);
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, 1, "finance");
     }
     function collapseChassis() {
-        chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1);
+        chassisLevel = FinanceChassisPolicy.step(chassisLevel, -1, "finance");
     }
     function toggle() {
         menuOpen = !menuOpen;
@@ -420,7 +420,7 @@ PanelWindow {
         right: false
     }
 
-    // Compact remains dock-centered; Expanded is screen-clamped; Fullscreen
+    // Intermediate tiers remain dock-centered and viewport-clamped; fullscreen
     // fills the space between the common 9px top and 8px bottom border gaps.
     margins {
         top: FinanceChassisPolicy.topMargin(

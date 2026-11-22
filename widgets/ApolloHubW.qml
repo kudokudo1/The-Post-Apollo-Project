@@ -164,18 +164,22 @@ PanelWindow {
     ]
     readonly property int glowGutter: 12
     readonly property int frameInset: 8
-    // Keep the visible Apollo top at y=0. Match Notifications' visible
-    // bottom edge, which also establishes Social's original shared height.
+    // Apollo starts at y=0. The live Notifications surface, not physical
+    // screen.height, defines the usable viewport below the top dock.
     property var notificationsReference: null
     readonly property int visualBottomGap: notificationsReference
         ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
         : 13
+    readonly property int visualBottomY: notificationsReference
+        ? Math.max(1, Math.floor(notificationsReference.panelTopMargin
+                                  + notificationsReference.height
+                                  - notificationsReference.frameInset))
+        : Math.max(1, (screen ? screen.height : 1440) - visualBottomGap)
     readonly property int frameWidth: Math.min(
         resizeSteps[resizeLevel].width,
         Math.max(1, (screen ? screen.width : 2560) - glowGutter * 2))
     readonly property int frameHeight: Math.min(
-        resizeSteps[resizeLevel].height,
-        Math.max(1, (screen ? screen.height : 1440) - visualBottomGap))
+        resizeSteps[resizeLevel].height, visualBottomY)
     function stepWindowSize(delta) {
         if (delta !== -1 && delta !== 1)
             return;

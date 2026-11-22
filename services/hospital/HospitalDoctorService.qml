@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "HospitalDoctorDirectoryExitPolicy.js" as DoctorReadPolicy
 
 Scope {
     id: root
@@ -81,6 +82,7 @@ Scope {
         loaded = false;
         listResponseAccepted = false;
         doctors = [];
+        listProcess.pendingRead = DoctorReadPolicy.begin();
         lastRefreshedAt = "";
         lastError = "";
 
@@ -111,76 +113,68 @@ Scope {
         );
     }
 
+    // Only this callback publishes the directory. The policy refuses to
+    // complete before stdout, stderr, AND exit are all observed; it also
+    // refuses all malformed/nonzero/crashed outcomes. Until then only the
+    // internal Process.pendingRead may hold staged metadata.
+    function advanceDoctorRead(next) {
+        if (!refreshing || !listProcess.pendingRead || !next)
+            return;
+        listProcess.pendingRead = next;
+        if (!next.complete)
+            return;
+
+        // Once all three callbacks have arrived, no output from this
+        // process instance may be promoted by a late/duplicate callback.
+        listProcess.pendingRead = null;
+        refreshing = false;
+        if (next.accepted) {
+            listResponseAccepted = true;
+            loaded = true;
+            lastError = "";
+            lastRefreshedAt = new Date().toLocaleString();
+            doctors = next.records;
+        } else {
+            listResponseAccepted = false;
+            loaded = false;
+            doctors = [];
+            lastRefreshedAt = "";
+            lastError = next.error ||
+                "HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER";
+        }
+        doctorsRefreshed();
+    }
+
     Process {
         id: listProcess
+        property var pendingRead: null
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const body = String(this.text || "").trim();
-
-                // Empty stdout is NOT an empty roster: the native client
-                // must explicitly emit [] or a validated metadata array.
-                if (!body)
+                if (!root.refreshing || !listProcess.pendingRead)
                     return;
-
-                try {
-                    const result = JSON.parse(body);
-                    if (!Array.isArray(result) || result.length > 250)
-                        throw new Error("INVALID PROTECTED DOCTOR DIRECTORY");
-
-                    const identities = {};
-                    const doctors = result.map(function(row) {
-                        const normalized = root.normalizeDoctor(row);
-                        if (!normalized.id
-                                || Object.prototype.hasOwnProperty.call(
-                                    identities, normalized.id))
-                            throw new Error("INVALID PROTECTED DOCTOR ID");
-                        identities[normalized.id] = true;
-                        return normalized;
-                    });
-
-                    root.doctors = doctors;
-                    root.listResponseAccepted = true;
-                    root.lastError = "";
-                } catch (error) {
-                    root.doctors = [];
-                    root.listResponseAccepted = false;
-                    root.lastError = root.compactPxError(
-                        error,
-                        "HOSPITAL PROTECTED DOCTORS"
-                    );
-                }
+                root.advanceDoctorRead(DoctorReadPolicy.captureStdout(
+                    listProcess.pendingRead, this.text
+                ));
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
-                const detail = String(this.text || "").trim();
-                if (detail)
-                    root.lastError = root.compactPxError(
-                        detail,
-                        "HOSPITAL DOCTOR"
-                    );
+                if (!root.refreshing || !listProcess.pendingRead)
+                    return;
+                root.advanceDoctorRead(DoctorReadPolicy.captureStderr(
+                    listProcess.pendingRead, this.text
+                ));
             }
         }
 
         onExited: function(code, exitStatus) {
-            root.refreshing = false;
-            const accepted = Number(code) === 0
-                && root.listResponseAccepted && !root.lastError;
-            root.loaded = accepted;
-            if (accepted) {
-                root.lastRefreshedAt = new Date().toLocaleString();
-            } else {
-                root.doctors = [];
-                root.lastRefreshedAt = "";
-                root.listResponseAccepted = false;
-                if (!root.lastError)
-                    root.lastError =
-                        "HOSPITAL BACKEND NOT READY // PROTECTED DOCTOR READER";
-            }
-
-            root.doctorsRefreshed();
+            if (!root.refreshing || !listProcess.pendingRead)
+                return;
+            root.advanceDoctorRead(DoctorReadPolicy.captureExit(
+                listProcess.pendingRead, code, exitStatus
+            ));
         }
     }
 

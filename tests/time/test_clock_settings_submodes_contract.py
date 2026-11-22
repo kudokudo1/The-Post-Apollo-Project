@@ -28,7 +28,8 @@ class ClockSettingsSubmodesContracts(unittest.TestCase):
         self.assertLess(TIMEW.index('id: settingsSubModeStrip'),
                         TIMEW.index('id: clockSettingsPane'))
         self.assertIn('settingsSection: timew.settingsView', TIMEW)
-        self.assertIn('height: 505 - settingsSubModeStrip.height - parent.spacing', TIMEW)
+        self.assertIn('height: timePageContent.availablePaneHeight(', TIMEW)
+        self.assertIn('settingsSubModeStrip.height, true, 0)', TIMEW)
 
     def test_shared_cpu_pane_keeps_all_sections(self):
         self.assertIn('property string settingsSection: "all"', PANE)

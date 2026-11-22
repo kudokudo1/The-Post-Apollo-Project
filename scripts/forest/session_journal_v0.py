@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 import sqlite3
-import time
 import uuid
 from contextlib import contextmanager
 
@@ -71,9 +70,13 @@ def _time(value: object) -> int:
 
 
 def _text(value: object, max_size: int) -> str:
-    if (type(value) is not str or not value or "\x00" in value
-            or len(value.encode("utf-8")) > max_size):
+    if type(value) is not str or not value or "\x00" in value:
         raise JournalRefusal("INVALID_TEXT")
+    try:
+        if len(value.encode("utf-8")) > max_size:
+            raise JournalRefusal("INVALID_TEXT")
+    except UnicodeError as exc:
+        raise JournalRefusal("INVALID_TEXT") from exc
     return value
 
 
@@ -174,12 +177,16 @@ class ForestSessionJournal:
             raise JournalRefusal("INVALID_REVISION")
         if role not in ("user", "assistant") or type(role) is not str:
             raise JournalRefusal("INVALID_ROLE")
+        if type(provider) is not str or type(model) is not str:
+            raise JournalRefusal("INVALID_MODEL_IDENTITY")
         if role == "assistant":
             provider, model = _key(provider), _key(model)
         elif provider or model:
             raise JournalRefusal("UNEXPECTED_MODEL_IDENTITY")
         with _write(self.db):
             session = self._owned(owner, session_id)
+            if now_ms < session["updated_at_ms"]:
+                raise JournalRefusal("TIME_ROLLBACK")
             if session["state"] != "OPEN":
                 raise JournalRefusal("SESSION_NOT_OPEN")
             if session["revision"] != expected_revision:
@@ -233,6 +240,8 @@ class ForestSessionJournal:
             raise JournalRefusal("INVALID_STATE")
         with _write(self.db):
             row = self._owned(owner, session_id)
+            if now_ms < row["updated_at_ms"]:
+                raise JournalRefusal("TIME_ROLLBACK")
             if row["revision"] != expected_revision:
                 raise JournalRefusal("STALE_REVISION")
             if row["state"] == "ARCHIVED" or (

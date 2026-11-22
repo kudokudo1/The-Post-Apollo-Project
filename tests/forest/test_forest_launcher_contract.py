@@ -2,6 +2,7 @@
 from pathlib import Path
 import subprocess
 import unittest
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -82,6 +83,48 @@ class ForestLauncherContract(unittest.TestCase):
         artwork = dock - 2 * pad
         self.assertEqual((dock - artwork) / 2, pad)
         self.assertEqual(artwork, 30)
+
+    def test_tree_selector_uses_local_outline_svg_assets(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        self.assertIn('iconPath: "../assets/forest/cherry-outline.svg"', view)
+        self.assertIn('iconPath: "../assets/forest/maple-outline.svg"', view)
+        self.assertIn("source: Qt.resolvedUrl(modelData.iconPath)", view)
+        self.assertIn("fillMode: Image.PreserveAspectFit", view)
+        self.assertIn("width: 22", view)
+        self.assertIn("height: 22", view)
+        self.assertIn("text: modelData.name", view)
+        self.assertIn("onClicked: root.selectedTreeIndex = index", view)
+        self.assertIn("index === root.selectedTreeIndex ? Colors.magenta : Colors.white", view)
+        self.assertNotIn("modelData.mark", view)
+        self.assertNotIn('mark: "🍁"', view)
+        self.assertNotIn('mark: "✿"', view)
+
+        palette = (ROOT / "components/Colors.qml").read_text()
+        self.assertIn('#C74EC7', palette)
+        self.assertIn('#ED981A', palette)
+        for asset, color, min_paths in (
+            ("cherry-outline.svg", "#C74EC7", 5),
+            ("maple-outline.svg", "#ED981A", 2),
+        ):
+            with self.subTest(icon=asset):
+                filename = ROOT / "assets/forest" / asset
+                svg = ET.parse(filename).getroot()
+                ns = "{http://www.w3.org/2000/svg}"
+                self.assertEqual(svg.tag, ns + "svg")
+                self.assertEqual(svg.attrib.get("viewBox"), "0 0 48 48")
+                descendants = list(svg.iter())
+                self.assertTrue(any(el.attrib.get("stroke") == color for el in descendants))
+                self.assertTrue(any(el.attrib.get("fill") == "none" for el in descendants))
+                self.assertGreaterEqual(
+                    sum(el.tag == ns + "path" for el in descendants), min_paths)
+                # No gradients, masks, bitmap/foreign embeds or filled petals.
+                forbidden = {"rect", "image", "foreignObject", "linearGradient",
+                             "radialGradient", "filter", "pattern"}
+                for el in descendants:
+                    self.assertNotIn(el.tag.removeprefix(ns), forbidden)
+                    self.assertIn(el.attrib.get("fill", "none"), ("none",))
+                    if "stroke" in el.attrib:
+                        self.assertEqual(el.attrib["stroke"], color)
 
     def test_live_status_is_between_resize_and_close(self):
         text = (ROOT / "widgets/ForestW.qml").read_text()

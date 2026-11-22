@@ -11,6 +11,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -23,6 +24,8 @@ PRODUCTION_AUTHORITY = False
 C5_CONSENT_VERIFIED = False
 INSTALLED_SOURCE_VERIFIED = False
 SCOPE_ACTION = "GENERATE"
+# Keep syntax identical to ForestC5SignedEvidencePreflight.MODEL.
+MODEL_SYNTAX = re.compile(r"[A-Za-z0-9_./:-]{1,120}\Z", re.ASCII)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fixture_scopes (
@@ -79,8 +82,12 @@ def _canonical_intent(data):
         raise FenceHold("WRONG_AUDIENCE_OR_ACTION")
     # Audience is already checked against an exact dotted namespace above;
     # do not treat it as a human/fixture identifier.
-    for name in required - {"revision", "epoch", "expiresAt", "audience"}:
+    for name in required - {"revision", "epoch", "expiresAt", "audience", "model"}:
         _key(data[name])
+    # A real local model ID may include ':', '/', or '.' (qwen3:1.7b).
+    # Preserve its exact spelling; never sanitize to a lossy alias.
+    if type(data["model"]) is not str or MODEL_SYNTAX.fullmatch(data["model"]) is None:
+        raise FenceHold("INVALID_MODEL_IDENTIFIER")
     if any(type(data[n]) is not int for n in ("revision", "epoch", "expiresAt")):
         raise FenceHold("INVALID_INTENT_COUNTER")
     if data["revision"] < 0 or data["epoch"] < 1 or data["expiresAt"] <= 0:

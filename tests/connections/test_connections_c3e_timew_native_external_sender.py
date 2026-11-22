@@ -135,8 +135,14 @@ class C3eTimeWExternalPeerTests(unittest.TestCase):
                  array.array("i", [source_fd]))])
         finally:
             os.close(source_fd)
-        with self.assertRaisesRegex(P.ObservationHold,
-                                    "PACKET_TRUNCATED_OVERSIZED_OR_EMPTY"):
+        # Whether Linux delivers the rights cmsg before or after credentials,
+        # both outcomes must HOLD. If rights were delivered, the observer now
+        # closes them before reporting the original ancillary failure.
+        with self.assertRaisesRegex(
+                P.ObservationHold,
+                "PACKET_TRUNCATED_OVERSIZED_OR_EMPTY|"
+                "UNEXPECTED_SCM_RIGHTS_CLOSED|"
+                "UNEXPECTED_SCM_RIGHTS_MALFORMED_OR_CLOSE_FAILED"):
             P.inspect_one_untrusted_packet(receiver)
 
     def test_05_external_packet_does_not_upgrade_native_admission(self):

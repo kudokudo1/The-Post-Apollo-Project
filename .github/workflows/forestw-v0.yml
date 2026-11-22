@@ -5,6 +5,7 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'assets/forest/**'
       - 'widgets/ForestChassisPolicy.js'
       - 'shell.qml'
       - 'tests/forest/**'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'assets/forest/**'
       - 'widgets/ForestChassisPolicy.js'
       - 'shell.qml'
       - 'tests/forest/**'

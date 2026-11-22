@@ -284,7 +284,7 @@ for (const omit of ["stdout", "stderr", "exit"]) {
     // Missing callback from retired process after retry starts is refused.
     assert.equal(h.scope.refresh(), true);
     assert.equal(h.deliver(job, omit, omit === "exit" ? [0, 0] : ""), false);
-    unpublished(h);
+    unpublished(h, 1);
 }
 // A real [] is successful, and stale data is cleared at refresh start.
 const h = mock();

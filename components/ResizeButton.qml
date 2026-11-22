@@ -33,7 +33,7 @@ ActionButton {
 
     label: direction === "left" ? "⮜"
            : direction === "up" ? "⮝"
-           : direction === "right" ? "➤"
+           : direction === "right" ? "⮞"
            : "⮟"
     labelPixelSize: 17
 

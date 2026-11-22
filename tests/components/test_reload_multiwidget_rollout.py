@@ -122,7 +122,9 @@ assert "return refresh(false, true);" in trash_refresh
 assert "receipt = \"\"" not in trash_refresh
 for forbidden in ("burn(", "burnAll(", "runBurn(", "moveToTrash(", "hospitalRestore."):
     assert forbidden not in trash_refresh
-assert "width: parent.width - 216" in TRASH
+assert "id: trashHeaderRow" in TRASH
+assert "trashHeaderReloadButton.width" in TRASH
+assert "trashHeaderRow.spacing * 5" in TRASH
 
 # Camera: read-only status and existing gallery inventory only. Never
 # auto-take a screenshot, open Zoom or mutate cleanup/Trash marks.

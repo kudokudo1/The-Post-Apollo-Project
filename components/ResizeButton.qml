@@ -4,8 +4,10 @@ import QtQuick
 // consumers keep ownership of their actual size levels, window geometry,
 // unsaved edits and keyboard focus. A request must not resize by itself.
 //
-// Visual and interaction states deliberately inherit ActionButton defaults;
-// unlike CloseButton, no custom hover, pressed or glow recipes apply.
+// Shared optical alignment and input inherit ActionButton. The visual states
+// intentionally mirror CloseButton's three-plane, persistent identity recipe:
+// hover keeps the directional color on icon/border/glows; press fills with it
+// while the icon and border turn black. Actual resizing stays consumer-owned.
 ActionButton {
     id: resizeButton
 
@@ -19,10 +21,9 @@ ActionButton {
         direction === "up" || direction === "right"
     readonly property int sizeDelta: increasing ? 1 : -1
 
-    // Colors.yellow exists in the canonical palette; purple does not yet.
-    // Keep the approved purple identity local and overridable rather than
-    // silently treating the established magenta interaction color as purple.
-    property color decreaseAccentColor: Colors.yellow
+    // Canonical orange for decreasing; purple is not in Colors yet, so keep
+    // the existing approved purple swatch local and overridable.
+    property color decreaseAccentColor: Colors.orange
     property color increaseAccentColor: "#A46AFF"
 
     implicitWidth: 30
@@ -56,13 +57,83 @@ ActionButton {
         - glyphInkBounds.y - glyphInkBounds.height / 2
 
     accentColor: increasing ? increaseAccentColor : decreaseAccentColor
+
+    // Match the shared CloseButton behavior, with the arrow's own orange or
+    // purple identity persisting on the text, perimeter, and all glow planes.
+    // Hover uses a yellow surface. Press uses the semantic color as the fill
+    // with a black arrow and black border. Selection mirrors hover.
+    idleFillColor: Colors.black
+    hoverFillColor: Colors.yellow
+    pressedFillColor: accentColor
+    selectedFillColor: Colors.yellow
+    keyboardSelectedFillColor: Colors.yellow
+
+    idleForegroundColor: accentColor
+    hoverForegroundColor: accentColor
+    pressedForegroundColor: Colors.black
+    selectedForegroundColor: accentColor
+    keyboardSelectedForegroundColor: accentColor
+
+    idleBorderColor: accentColor
+    hoverBorderColor: accentColor
+    pressedBorderColor: Colors.black
+    selectedBorderColor: accentColor
+    keyboardSelectedBorderColor: accentColor
+    idleBorderWidth: 1
+    hoverBorderWidth: 1
+    pressedBorderWidth: 1
+    selectedBorderWidth: 1
+    keyboardSelectedBorderWidth: 1
+
+    // Source-aligned glyph glow keeps sampling the actual centered arrow,
+    // including while the icon is black over the colored pressed fill.
+    trackLabelGlowLocally: true
+    contentGlowEnabled: true
+    idleContentGlowColor: accentColor
+    hoverContentGlowColor: accentColor
+    pressedContentGlowColor: accentColor
+    selectedContentGlowColor: accentColor
+    keyboardSelectedContentGlowColor: accentColor
+    contentGlowRadius: 7
+    contentGlowSamples: 7
+    contentGlowIdleOpacity: 0.34
+    contentGlowHoverOpacity: 0.72
+    contentGlowPressedOpacity: 1.0
+    contentGlowSelectedOpacity: 0.72
+    contentGlowKeyboardSelectedOpacity: 0.72
+
+    softGlowEnabled: true
+    softGlowSpread: 3
+    softGlowMargin: 0
+    idleSoftGlowColor: accentColor
+    hoverSoftGlowColor: accentColor
+    pressedSoftGlowColor: accentColor
+    selectedSoftGlowColor: accentColor
+    keyboardSelectedSoftGlowColor: accentColor
+    softGlowIdleOpacity: 0.48
+    softGlowHoverOpacity: 0.70
+    softGlowPressedOpacity: 1.0
+    softGlowSelectedOpacity: 0.70
+    softGlowKeyboardSelectedOpacity: 0.70
+
+    wideGlowEnabled: true
+    wideGlowSpread: 10
+    idleWideGlowColor: accentColor
+    hoverWideGlowColor: accentColor
+    pressedWideGlowColor: accentColor
+    selectedWideGlowColor: accentColor
+    keyboardSelectedWideGlowColor: accentColor
+    wideGlowIdleOpacity: 0.22
+    wideGlowHoverOpacity: 0.32
+    wideGlowPressedOpacity: 1.0
+    wideGlowSelectedOpacity: 0.32
+    wideGlowKeyboardSelectedOpacity: 0.32
+
     interactive: available && directionValid
     Accessible.name: increasing ? "Increase window size" : "Decrease window size"
 
-    // ActionButton retains its original black idle, yellow/orange hover,
-    // magenta/black press, disabled fade and EXACT inherited glow values:
-    // glyph: .34 / .72 / 0, soft: .22 / .56 / .60, wide disabled.
-    // Its existing SafeDropShadow samples the actual rendered arrow glyph.
+    // The three existing ActionButton shadow implementations remain the only
+    // effect sources. No copy of the arrow, extra MouseArea, or resize engine.
     signal resizeRequested(int delta)
     onLeftClicked: {
         if (directionValid)

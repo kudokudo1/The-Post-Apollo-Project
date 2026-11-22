@@ -106,6 +106,21 @@ Item {
         vectorController.stop();
     }
 
+    // Header refresh reads only the current consented source. Re-reading
+    // saved hubs leaves the viewport, selected geography and editor intact;
+    // the saved-document change handler repaints the existing mapCanvas.
+    // Street tiles are re-requested only when STREET MODE is already active,
+    // never as a hidden opt-in to online map access.
+    function refreshVisibleCoverage() {
+        if (!root.visible || hubEditorOpen || hubPlacementArmed
+                || vectorConsentOpen || streetConsentOpen
+                || hubStore.state === "saving")
+            return false;
+        if (streetMode)
+            return streetMap.active && streetMap.requestTiles();
+        return hubStore.refresh();
+    }
+
     function openVectorChoice() {
         if (vectorController.running)
             vectorController.stop();

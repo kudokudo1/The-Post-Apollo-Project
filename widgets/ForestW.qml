@@ -225,17 +225,17 @@ PanelWindow {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
-                            anchors.topMargin: 7
+                            anchors.topMargin: 6
                             anchors.leftMargin: 9
                             anchors.rightMargin: 9
-                            height: 24
+                            height: 26
 
                             Image {
                                 id: treeGlyph
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 22
-                                height: 22
+                                width: 26
+                                height: 26
                                 source: Qt.resolvedUrl(modelData.iconPath)
                                 sourceSize: Qt.size(64, 64)
                                 fillMode: Image.PreserveAspectFit

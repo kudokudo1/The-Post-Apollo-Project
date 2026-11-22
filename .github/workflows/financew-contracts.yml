@@ -72,6 +72,8 @@ on:
       - "scripts/finance/household_reserve_preference_store.py"
       - "services/finance/FinanceHouseholdReservePreferenceStore.qml"
       - "tests/finance/test_household_reserve_preferences_fp1k.py"
+      - "tests/finance/test_household_reserve_preference_provenance_fp1k_n1.py"
+      - "tests/finance/test_household_reserve_preference_provenance_fp1k_n1_contracts.py"
       - "tests/finance/test_household_reserve_preferences_fp1k_contracts.py"
       - "scripts/finance/HOUSEHOLD_RESERVE_PREFERENCES_FP1K_README.md"
       - "tests/finance/test_household_reserve_cushion_fp1j_contracts.py"
@@ -232,6 +234,8 @@ on:
       - "scripts/finance/household_reserve_preference_store.py"
       - "services/finance/FinanceHouseholdReservePreferenceStore.qml"
       - "tests/finance/test_household_reserve_preferences_fp1k.py"
+      - "tests/finance/test_household_reserve_preference_provenance_fp1k_n1.py"
+      - "tests/finance/test_household_reserve_preference_provenance_fp1k_n1_contracts.py"
       - "tests/finance/test_household_reserve_preferences_fp1k_contracts.py"
       - "scripts/finance/HOUSEHOLD_RESERVE_PREFERENCES_FP1K_README.md"
       - "tests/finance/test_household_reserve_cushion_fp1j_contracts.py"
@@ -373,6 +377,10 @@ jobs:
         run: node tests/finance/test_finance_household_planning.mjs
       - name: Test FP1c v1 file read compatibility and guarded edits
         run: python3 tests/finance/test_household_plan_store_fp1c.py
+      - name: Test FP1k.N1 saved versus missing preference provenance
+        run: python3 tests/finance/test_household_reserve_preference_provenance_fp1k_n1.py
+      - name: Verify FP1k.N1 saved status bridge and UI contracts
+        run: python3 tests/finance/test_household_reserve_preference_provenance_fp1k_n1_contracts.py
       - name: Test FP1k preference private store, permissions and stale writes
         run: python3 tests/finance/test_household_reserve_preferences_fp1k.py
       - name: Verify FP1k preference UI, context and IO isolation contracts

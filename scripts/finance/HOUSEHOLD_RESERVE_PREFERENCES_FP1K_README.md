@@ -104,3 +104,35 @@ by source-only CI and require separate verification and operator approval.
 Do not merge this source branch or change desktop application files
 without the operator's scoped authorization. Do not use this preference
 store as a substitute for verified per-member household permissions.
+
+
+## FP1k.N1 // Saved preference provenance correction
+
+A **missing preference file** returns an in-memory 100% default with
+revision 0 and *savedOnDisk=false*. The Timeline must label that case
+"DEFAULT 100% // NO SAVED FILE", not claim a saved local preference.
+
+The first explicit SAVE of **any** selected percentage, including 100%,
+creates a version-1 document and advances the revision to 1.
+Subsequent reads return *savedOnDisk=true*. An explicit RESET writes
+100% with another revision advance; it is still saved on disk.
+Selecting a percentage without pressing SAVE remains a preview.
+
+The transient *savedOnDisk* field is included in the framed subprocess
+**response only**, never the stored JSON file. This preserves exact
+four-key v1 file format and all existing permission and recovery rules.
+The bridge accepts this flag only when it is a boolean and agrees with
+the revision. A persisted document with forged revision 0 is refused,
+because version 1 writes always begin at revision 1.
+
+The operator's FP1k interface approval and native Quickshell testing
+are **not established** by this source-level correction. The prior
+merge and CI history also do not prove that it is running on the host.
+
+Run after the independent review:
+python3 tests/finance/test_household_reserve_preference_provenance_fp1k_n1.py
+python3 tests/finance/test_household_reserve_preference_provenance_fp1k_n1_contracts.py
+
+Restore the pre-N1 source to roll back without data migration; the
+persisted preference format remains v1. Do not confuse this with
+the separately protected FP1g/FP1h schedule v3/v4 rollback.

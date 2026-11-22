@@ -95,7 +95,13 @@ def read_doc(directory, context):
             doc = json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeError):
             fail("INVALID_STORE")
-        return validate(doc, context)
+        saved = validate(doc, context)
+        # A version 1 on-disk record can only be created by an explicit
+        # revisioned SAVE or RESET. Revision zero is reserved for the
+        # synthetic missing-file default; refuse forged/partial records.
+        if saved["revision"] == 0:
+            fail("INVALID_STORE")
+        return saved
     finally:
         os.close(fd)
 
@@ -204,6 +210,8 @@ def main():
     print(PREFIX + "RESULT " + json.dumps({
         "source": "LOCAL_OPERATOR_RESERVE_PREFS",
         "identityVerified": False, "bankVerified": False,
+        # Presentation provenance only. This is NOT written into the v1 file.
+        "savedOnDisk": doc["revision"] > 0,
         **doc
     }, separators=(",", ":"), ensure_ascii=False))
 

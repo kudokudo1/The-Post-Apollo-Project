@@ -1,0 +1,23 @@
+name: Forest Core B0 Local Ollama Inventory
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/**'
+      - 'tests/forest/test_ollama_inventory.py'
+      - '.github/workflows/forest-core-b0-ollama.yml'
+  push:
+    paths:
+      - 'scripts/forest/**'
+      - 'tests/forest/test_ollama_inventory.py'
+      - '.github/workflows/forest-core-b0-ollama.yml'
+
+jobs:
+  disposable-local-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test isolated loopback model inventory
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_inventory.py' -v
+      - name: Python syntax
+        run: python3 -m py_compile scripts/forest/ollama_inventory.py tests/forest/test_ollama_inventory.py

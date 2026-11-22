@@ -79,7 +79,7 @@ def first(source,token):
 time_header=time.split("id: header\n",1)[1].split("id: headerDivider",1)[0]
 assert first(time_header,"id: growTimeButton") < first(time_header,"id: stateIndicator")
 assert first(time_header,"id: shrinkTimeButton") < first(time_header,"id: stateIndicator")
-git_header=git.split('text: "GIT // LOCAL REPOSITORY"',1)[1].split("id: pageStatusText",1)[0]
+git_header=git.split("id: frame\n",1)[1].split("id: pageStatusText",1)[0]
 assert "id: shrinkGitButton" in git_header
 assert "id: growGitButton" in git_header
 # Place the LIVE badge after both controls inside one shared row.

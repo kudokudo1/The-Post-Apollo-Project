@@ -119,8 +119,8 @@ PanelWindow {
             }
             ResizeButton {
                 id: expandButton
-                anchors.right: closeButton.left
-                anchors.rightMargin: 8
+                anchors.right: liveIndicator.left
+                anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
                 direction: "up"
                 available: root.chassisLevel < 3
@@ -128,6 +128,40 @@ PanelWindow {
                     if (delta === 1) root.expandChassis();
                 }
             }
+
+            // LIVE is the Quickshell workspace state, not AI connectivity.
+            // Ollama/Hermes still say NOT CONNECTED in the chat body.
+            Rectangle {
+                id: liveIndicator
+                anchors.right: closeButton.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                width: 60
+                height: 25
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.green
+                Accessible.name: "Forest workspace live; AI engine not connected"
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: Colors.green
+                }
+                GohuText {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "LIVE"
+                    font.pixelSize: 11
+                    color: Colors.green
+                }
+            }
+
             CloseButton {
                 id: closeButton
                 anchors.right: parent.right

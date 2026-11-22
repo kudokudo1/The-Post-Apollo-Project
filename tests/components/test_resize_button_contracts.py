@@ -30,6 +30,32 @@ for token in (
 ):
     present(token)
 
+# Optical centering is owned by the shared ResizeButton, not Finance or
+# another consumer. ActionButton defaults stay zero for every other button.
+for token in (
+    "property real labelCenterOffsetX: 0",
+    "property real labelCenterOffsetY: 0",
+    "property alias labelItem: labelText",
+    "anchors.horizontalCenterOffset: actionButton.labelCenterOffsetX",
+    "anchors.verticalCenterOffset: actionButton.labelCenterOffsetY",
+):
+    assert token in BASE, f"base opt-in centering hook missing: {token}"
+
+for token in (
+    "TextMetrics {",
+    "font: resizeButton.labelItem.font",
+    "text: resizeButton.label",
+    "arrowInk.tightBoundingRect",
+    "arrowInk.advanceWidth",
+    "labelCenterOffsetX:",
+    "labelCenterOffsetY:",
+    "resizeButton.labelItem.baselineOffset",
+):
+    present(token)
+assert "anchors.centerIn:" not in RESIZE
+assert "direction === \"up\"" in RESIZE
+assert "onResizeRequested:" not in BASE
+
 # EXACT operator-supplied code points, no ASCII/ordinary arrows.
 for token in ('"⮜"', '"⮝"', '"⮟"', '"➤"'):
     present(token)

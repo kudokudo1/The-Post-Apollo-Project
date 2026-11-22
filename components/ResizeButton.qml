@@ -35,6 +35,26 @@ ActionButton {
            : direction === "right" ? "➤"
            : "⮟"
     labelPixelSize: 17
+
+    // ActionButton centers the line layout, but an arrow's actual ink can sit
+    // above/below or to one side of that box depending on font fallback.
+    // Center the measured glyph bounds for ALL four arrows, at any button
+    // width; the base label and its sampled glow still move together.
+    TextMetrics {
+        id: arrowInk
+        font: resizeButton.labelItem.font
+        text: resizeButton.label
+    }
+    readonly property rect glyphInkBounds: arrowInk.tightBoundingRect
+    readonly property real glyphAdvanceWidth: arrowInk.advanceWidth
+    labelCenterOffsetX:
+        glyphAdvanceWidth / 2
+        - glyphInkBounds.x - glyphInkBounds.width / 2
+    labelCenterOffsetY:
+        resizeButton.labelItem.height / 2
+        - resizeButton.labelItem.baselineOffset
+        - glyphInkBounds.y - glyphInkBounds.height / 2
+
     accentColor: increasing ? increaseAccentColor : decreaseAccentColor
     interactive: available && directionValid
     Accessible.name: increasing ? "Increase window size" : "Decrease window size"

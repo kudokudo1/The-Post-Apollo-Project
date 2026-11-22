@@ -37,6 +37,11 @@ def glow(button, glyph, soft, wide, name):
     near(button.property("effectiveWideGlowOpacity"), wide, f"{name} wide")
 
 
+def ink_centered(window, name):
+    assert window.property("downInkCentered") is True, f"{name}: down ink offset"
+    assert window.property("upInkCentered") is True, f"{name}: up ink offset"
+
+
 app = QGuiApplication([])
 with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
     # ActionButton imports Quickshell but uses no Quickshell native types.
@@ -75,12 +80,14 @@ with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
         assert down.property("trackLabelGlowLocally") is True
         assert window.property("downAligned") is True
         assert window.property("upAligned") is True
+        ink_centered(window, "up/down 30px")
         glow(down, .34, .22, .015, "idle")
 
         down.setProperty("width", 28)
         app.processEvents()
         near(down.property("height"), 28, "compact keeps square")
         assert window.property("downAligned") is True
+        ink_centered(window, "down 28px")
         down.setProperty("width", 30)
 
         # Keyboard selected state is inherited, not independently recreated.
@@ -130,6 +137,13 @@ with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
         check_identity(up, "right", "➤", 1, "#A46AFF")
         assert window.property("downAligned") is True
         assert window.property("upAligned") is True
+        ink_centered(window, "left/right 30px")
+        up.setProperty("width", 28)
+        down.setProperty("width", 28)
+        app.processEvents()
+        ink_centered(window, "left/right 28px")
+        up.setProperty("width", 30)
+        down.setProperty("width", 30)
 
         # No unexpected events from a disabled or unsupported button.
         down.setProperty("available", False)

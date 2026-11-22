@@ -262,6 +262,48 @@ class SignedNativeCommandTests(unittest.TestCase):
         with self.assertRaises(ReceiptRejected):
             self.client.status()
 
+    def test_fragment_drip_exhausts_total_transaction_deadline(self):
+        # A peer returning one byte before each fresh idle timeout must not
+        # extend the command indefinitely. No real browser/login is started.
+        class DrippingSocket:
+            def __init__(self):
+                self.reads = 0
+                self.timeouts = []
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def settimeout(self, value):
+                self.timeouts.append(value)
+
+            def connect(self, _):
+                return None
+
+            def sendall(self, _):
+                return None
+
+            def recv(self, _):
+                self.reads += 1
+                return b"x"
+
+        fake = DrippingSocket()
+        peer = KernelPeer(os.getpid(), os.geteuid(), os.getegid())
+        with patch("desktop_signed_command_client_v0.socket.socket",
+                   return_value=fake), \
+             patch("desktop_signed_command_client_v0._peer",
+                   return_value=peer), \
+             patch("desktop_signed_command_client_v0.time.monotonic",
+                   side_effect=[0.0, 0.0, 0.0, 0.25, 0.75, 1.25, 1.75, 2.25]):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(fake.reads, 4)
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 0)
+        self.assertEqual(len(fake.timeouts), 6)
+
     def test_signer_failure_revokes_host_instead_of_orphan_login(self):
         # Existing gateway bound socket and signed mode. Fail signing after
         # successful side-effect-bearing host BEGIN.

@@ -1,0 +1,84 @@
+name: Connections Forest C5 writer custody claims (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5WriterCustodyClaimPreflight.py'
+      - 'tests/connections/test_connections_forest_c5_writer_custody_claim_preflight.py'
+      - 'docs/connections-forest-c5-writer-custody-claim-preflight.md'
+      - '.github/workflows/connections-forest-c5-writer-custody-claims.yml'
+      - 'services/connections/forest/ForestC5TerminalReceiptPreflight.py'
+      - 'services/connections/forest/ForestC5SignedEvidencePreflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unenrolled-three-role-custody:
+    name: Signed writer/enrollment/custody fixtures never settle C5
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable Ed25519 dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile and statically forbid accidental activation
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5WriterCustodyClaimPreflight.py \
+            tests/connections/test_connections_forest_c5_writer_custody_claim_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('services/connections/forest/ForestC5WriterCustodyClaimPreflight.py').read_text()
+          for required in (
+              'Ed25519PublicKey', 'NO_AUTHORITY', '"safeActions": []',
+              '"writerEnrollmentIndependentlyAuthenticated": False',
+              '"journalCustodianIndependentlyAuthenticated": False',
+              '"historicalWriterKeyRevocationChecked": False',
+              '"custodyAntirollbackVerified": False',
+              'R.verify_unenrolled_terminal_receipt(',
+              '"enrollmentAndCustodyRootsCallerControlled": True',
+          ):
+              assert required in src, required
+          for forbidden in (
+              'Ed25519PrivateKey', 'sqlite3.connect(', 'subprocess.run(',
+              'socket.bind(', 'socket.connect(', 'os.open(',
+              '"terminalOutcomeAuthenticated": True',
+              '"c5RevocationFenceSettled": True',
+              '"productionAuthority": True',
+          ):
+              assert forbidden not in src, forbidden
+          for path in ('scripts/forest/host_admission_b4a.py',
+                       'scripts/forest/turn_bridge_b3.py'):
+              assert 'ForestC5WriterCustodyClaimPreflight' not in Path(path).read_text()
+          print('FOREST_C5_WRITER_CUSTODY_CLAIMS // NO_TRUSTED_ROOT_OR_REAL_SETTLEMENT')
+          PY
+      - name: Eighteen fresh three-role signed custody refusals
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_writer_custody_claim_preflight.py' -v
+      - name: Preserve signed receipt roles, interop, two-store race and B4b
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_terminal_receipt_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_signed_role_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_contract_interop.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_host_precommit_b4b.py' -v
+          echo 'FOREST_C5_UNENROLLED_CUSTODY // PRODUCTION_HOLD'

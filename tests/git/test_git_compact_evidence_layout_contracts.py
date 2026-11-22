@@ -23,7 +23,9 @@ assert "REFRESHED // repository view " in service
 assert "FINISHED // after snapshot " in service
 assert "PREPARED // snapshot " in service
 assert "JOURNAL NOT RECORDED" in service
-assert "height: 112" in view
+# Height may grow with the Git chassis; the raw output model is unchanged.
+assert "height: gitControlCamera.outputPanelHeight" in view
+assert "readonly property int outputPanelHeight:" in view
 
 node = r"""
 const assert = require('node:assert/strict');

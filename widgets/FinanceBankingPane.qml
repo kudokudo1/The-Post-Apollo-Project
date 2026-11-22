@@ -1,4 +1,7 @@
 import QtQuick
+import QtQuick.Dialogs
+import Quickshell
+import Quickshell.Io
 import "../components"
 import "FinanceBankingImportPolicy.js" as BankingPolicy
 
@@ -16,12 +19,50 @@ Item {
     property bool clearArmed: false
     property string armedPairKey: ""
     property string notice: ""
+    // M2 file selection: the picker chooses one local file and a bounded
+    // subprocess reads it. Raw financial statement bytes are never logged.
+    property int fileSequence: 0
+    property int editorEpoch: 0
+    property int fileEditorEpoch: -1
+    property string fileToken: ""
+    property string fileSource: ""
+    property string pickerSource: ""
+    property string fileFrame: ""
+    property string fileOutput: ""
+    property string fileState: "idle" // idle | pending | refused | ready | cancelled
     readonly property var sources: BankingPolicy.accounts()
     readonly property var summary: BankingPolicy.review(ledger,confirmed)
     readonly property var candidates: summary.ok ? summary.candidates : []
 
     function sourceId() {
         return sources[importSourceIndex].id;
+    }
+    function beginFileRead(fileUrl, selectedSource) {
+        if(!active || selectedTool!=="import"
+                || fileReader.running || fileState==="pending"
+                || selectedSource!==sourceId()) {
+            notice="FILE SELECTION CANCELLED // SOURCE OR VIEW CHANGED";
+            return false;
+        }
+        fileSequence+=1;
+        if(fileSequence>99999999)fileSequence=1;
+        fileToken="file-"+fileSequence;
+        fileSource=selectedSource;
+        fileEditorEpoch=editorEpoch;
+        fileFrame=JSON.stringify({version:1,token:fileToken,fileUrl:fileUrl})+"\n";
+        fileOutput="";
+        pending=null;
+        armedPairKey="";
+        clearArmed=false;
+        fileState="pending";
+        notice="READING SELECTED CSV // LOCAL ONLY // NO IMPORT YET";
+        fileReader.exec({
+            command:["/usr/bin/env","python3",
+                Quickshell.shellPath("scripts/finance/banking_csv_reader.py")],
+            environment: ({ACTUAL_PASSWORD_FILE:null,ACTUAL_SYNC_ID:null,
+                ACTUAL_SERVER_URL:null,ACTUAL_SYNC_ID_FILE:null})
+        });
+        return true;
     }
     function previewCsv() {
         clearArmed=false;
@@ -99,15 +140,96 @@ Item {
         nextRowId=1;
         armedPairKey="";
         clearArmed=false;
+        if(fileState==="pending")fileState="cancelled";
+        fileFrame="";
+        fileOutput="";
         notice="SESSION CLEARED // NO FILES WERE MODIFIED";
     }
     onImportSourceIndexChanged: {
         pending=null;
         armedPairKey="";
+        if(fileState==="pending")fileState="cancelled";
     }
     onSelectedToolChanged: {
         armedPairKey="";
         clearArmed=false;
+        if(fileState==="pending")fileState="cancelled";
+    }
+    onActiveChanged: {
+        if(!active && fileState==="pending")fileState="cancelled";
+    }
+
+    // A native Qt dialog selects one file. No requested paths are persisted.
+    FileDialog {
+        id: statementPicker
+        title: "Select one local CSV statement"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["CSV statements (*.csv)"]
+        options: FileDialog.ReadOnly
+        onAccepted: banking.beginFileRead(String(selectedFile),banking.pickerSource)
+        onRejected: banking.notice="FILE PICKER CANCELLED // NO CHANGE"
+    }
+
+    Process {
+        id: fileReader
+        stdinEnabled: true
+        onStarted: {
+            if(banking.fileFrame) {
+                fileReader.write(banking.fileFrame);
+                banking.fileFrame="";
+            }
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                // No raw CSV or selected path is printed or sent to logs.
+                const lines=String(text||"").split(/\r?\n/);
+                for(let i=0;i<lines.length;i++) {
+                    if(lines[i].startsWith("FINANCEW_BANKING_FILE_RESULT "))
+                        banking.fileOutput=lines[i].slice(29);
+                }
+            }
+        }
+        onExited: function(exitCode,exitStatus) {
+            Qt.callLater(function() {
+                const sameRequest=banking.fileState==="pending"
+                    && banking.fileSource===banking.sourceId()
+                    && banking.fileEditorEpoch===banking.editorEpoch
+                    && banking.active && banking.selectedTool==="import";
+                if(sameRequest) {
+                    try {
+                        if(exitCode!==0 || !banking.fileOutput
+                                || banking.fileOutput.length>550000)
+                            throw new Error("FILE_READ_REFUSED");
+                        const payload=JSON.parse(banking.fileOutput);
+                        if(!payload || payload.version!==1
+                                || payload.token!==banking.fileToken
+                                || payload.ok!==true
+                                || typeof payload.csv!=="string"
+                                || payload.csv.length>65536)
+                            throw new Error("FILE_READ_REFUSED");
+                        const result=BankingPolicy.parseCsv(
+                            payload.csv,banking.fileSource);
+                        banking.pending=result;
+                        banking.notice=result.ok
+                            ? "SELECTED CSV VERIFIED // "+result.rowsCount
+                                +" ROWS // REVIEW BEFORE IMPORT"
+                            : "SELECTED CSV REFUSED // "+result.error;
+                        banking.fileState=result.ok?"ready":"refused";
+                    } catch(error) {
+                        banking.pending=null;
+                        banking.fileState="refused";
+                        banking.notice="LOCAL CSV COULD NOT BE READ OR VERIFIED";
+                    }
+                }
+                banking.fileFrame="";
+                banking.fileOutput="";
+                banking.fileToken="";
+                banking.fileSource="";
+                banking.fileEditorEpoch=-1;
+                if(!sameRequest && banking.fileState==="cancelled")
+                    banking.notice="STALE FILE RESULT DISCARDED // NO IMPORT";
+            });
+        }
     }
 
     Row {
@@ -182,7 +304,7 @@ Item {
             GohuText {
                 width: parent.width
                 visible: banking.selectedTool==="import"
-                text: "PASTE CSV TEXT EXPORTED BY YOUR BANKING APP. EXPECTED COLUMNS: DATE, DESCRIPTION, AMOUNT. NEGATIVE = MONEY OUT. ACCEPTS MM/DD/YYYY OR YYYY-MM-DD."
+                text: "SELECT A LOCAL CSV FILE OR PASTE CSV TEXT EXPORTED BY YOUR BANKING APP. EXPECTED COLUMNS: DATE, DESCRIPTION, AMOUNT. NEGATIVE = MONEY OUT. ACCEPTS MM/DD/YYYY OR YYYY-MM-DD."
                 font.pixelSize: 9
                 color: Colors.cyan
                 textFormat: Text.PlainText
@@ -206,6 +328,20 @@ Item {
                 accentColor: Colors.magenta
                 onLeftClicked: banking.importSourceIndex=
                     (banking.importSourceIndex+1)%banking.sources.length
+            }
+            ActionButton {
+                width: parent.width
+                height: visible ? 29 : 0
+                visible: banking.selectedTool==="import"
+                label: banking.fileState==="pending"
+                       ? "READING SELECTED CSV" : "SELECT LOCAL CSV FILE"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                available: banking.fileState!=="pending" && !fileReader.running
+                onLeftClicked: {
+                    banking.pickerSource=banking.sourceId();
+                    statementPicker.open();
+                }
             }
             Rectangle {
                 id: pasteFrame
@@ -235,8 +371,11 @@ Item {
                         selectByMouse: true
                         activeFocusOnPress: true
                         onTextChanged: {
+                            banking.editorEpoch+=1;
                             banking.pending=null;
                             banking.clearArmed=false;
+                            if(banking.fileState==="pending")
+                                banking.fileState="cancelled";
                         }
                     }
                 }
@@ -258,6 +397,7 @@ Item {
                 labelPixelSize: 9
                 accentColor: Colors.omnitrix
                 available: !!banking.pending&&banking.pending.ok
+                           && banking.fileState!=="pending"
                 onLeftClicked: banking.commitCsv()
             }
             GohuText {
@@ -383,7 +523,7 @@ Item {
             GohuText {
                 width: parent.width
                 visible: banking.selectedTool==="import"
-                text: "NO RECORDS ARE WRITTEN TO ACTUAL OR BANKS. NO FILE ACCESS, ACCOUNT SYNC, PAYMENT EXECUTION OR PERSONAL PROFILE IS ACTIVE."
+                text: "SELECTED FILES ARE READ ONLY AND NEVER SAVED BY BANKING. NO ACTUAL/BANK WRITES, ACCOUNT SYNC, PAYMENT EXECUTION OR PERSONAL PROFILE IS ACTIVE."
                 textFormat: Text.PlainText
                 font.pixelSize: 9
                 color: Colors.orange

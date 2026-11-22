@@ -415,7 +415,7 @@ PanelWindow {
                 semanticColor: Colors.yellow
                 hoverSurfaceColor: Colors.orange
                 available: root.menuOpen && root.selectedMainModeIndex === 0
-                           && root.coverageLoaded && coverageLoader.item !== null
+                           && root.coverageLoaded && !!coverageLoader.item
                            && !coverageLoader.item.hubEditorOpen
                            && !coverageLoader.item.hubPlacementArmed
                            && !coverageLoader.item.vectorConsentOpen

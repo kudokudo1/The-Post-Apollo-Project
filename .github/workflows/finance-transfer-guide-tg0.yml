@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1
+name: FinanceW Banking TG0 + M1 + M2
 
 on:
   pull_request:
@@ -8,6 +8,9 @@ on:
       - 'widgets/FinanceAccountsPane.qml'
       - 'widgets/FinanceW.qml'
       - 'widgets/FinanceBankingPane.qml'
+      - 'scripts/finance/banking_csv_reader.py'
+      - 'tests/finance/test_banking_file_picker_m2.py'
+      - 'tests/finance/test_banking_file_picker_m2_contracts.py'
       - 'widgets/FinanceBankingImportPolicy.js'
       - 'tests/finance/test_banking_import_m1.mjs'
       - 'tests/finance/test_banking_import_m1_contracts.py'
@@ -21,6 +24,9 @@ on:
       - 'widgets/FinanceAccountsPane.qml'
       - 'widgets/FinanceW.qml'
       - 'widgets/FinanceBankingPane.qml'
+      - 'scripts/finance/banking_csv_reader.py'
+      - 'tests/finance/test_banking_file_picker_m2.py'
+      - 'tests/finance/test_banking_file_picker_m2_contracts.py'
       - 'widgets/FinanceBankingImportPolicy.js'
       - 'tests/finance/test_banking_import_m1.mjs'
       - 'tests/finance/test_banking_import_m1_contracts.py'
@@ -45,3 +51,7 @@ jobs:
         run: node tests/finance/test_banking_import_m1.mjs
       - name: Test Banking menu, icon and offline boundaries
         run: python3 tests/finance/test_banking_import_m1_contracts.py
+      - name: Test bounded read-only CSV selection with hostile file fixtures
+        run: python3 tests/finance/test_banking_file_picker_m2.py
+      - name: Test Banking M2 file-picker integration and source isolation
+        run: python3 tests/finance/test_banking_file_picker_m2_contracts.py

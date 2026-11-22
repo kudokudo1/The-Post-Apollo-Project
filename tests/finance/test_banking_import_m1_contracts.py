@@ -43,12 +43,16 @@ assert "onTextChanged:" in banking and "banking.pending=null" in banking
 # These are not public service calls or import-to-Actual features.
 for source in (banking,parser):
     for forbidden in (
-        "Process {", "FileView {", "XMLHttpRequest", "Qt.openUrlExternally",
+        "FileView {", "XMLHttpRequest", "Qt.openUrlExternally",
         "financeFundingWrite", "financeWrite", "actual-cli", "access_token",
         "client_secret", "credentialStore", "onPaymentSent", "localStorage",
-        "writeFile", "FileDialog {", "fetch(", "WebSocket"
+        "writeFile", "fetch(", "WebSocket"
     ):
         assert forbidden not in source, forbidden
+# M2 adds one strictly read-only file-picker Process, not a bank action.
+assert banking.count("Process {") == 1
+assert banking.count("FileDialog {") == 1
+assert "Process {" not in parser
 assert "FinanceServices." not in banking
 assert "sourceKey" not in banking
 assert "FinanceAllocationWriteService" not in banking

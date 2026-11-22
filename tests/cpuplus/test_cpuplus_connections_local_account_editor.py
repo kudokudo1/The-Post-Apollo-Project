@@ -16,7 +16,10 @@ REQUEST = (ROOT / "services/connections/ConnectionsRequestStatus.qml").read_text
 
 class CpuPlusConnectionsLocalAccountEditor(unittest.TestCase):
     def test_existing_connections_three_bays_and_selection_preserved(self):
-        for part in ("implicitWidth: 1000", "implicitHeight: 834",
+        # CPU++ keeps its original chassis size as a middle resize step.
+        for part in ("property int resizeLevel: 1",
+                     "{ width: 1000, height: 834 }",
+                     "implicitWidth: Math.min(", "implicitHeight: Math.min(",
                      "width: 390", "width: 260",
                      "id: settingsConnectionsOverview",
                      "id: settingsConnectionsList",

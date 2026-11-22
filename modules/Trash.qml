@@ -1771,12 +1771,19 @@ PanelWindow {
             spacing: 6
 
             Row {
+                id: trashHeaderRow
                 width: parent.width
                 height: 29
                 spacing: 6
 
                 GohuText {
-                    width: parent.width - 216
+                    // Keep the title clear of all five sibling controls at
+                    // every chassis size. Reusable button widths stay owned
+                    // by those controls, not copied into a magic offset.
+                    width: Math.max(0, parent.width
+                           - collapseTrashButton.width - expandTrashButton.width
+                           - trashLiveIndicator.width - trashHeaderReloadButton.width
+                           - closeTrashButton.width - trashHeaderRow.spacing * 5)
                     height: parent.height
                     text: "TRASH++ // " + trashLauncher.activeMode.toUpperCase()
                           + " // " + trashLauncher.chassisSize.toUpperCase()

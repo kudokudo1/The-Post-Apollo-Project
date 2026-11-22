@@ -25,6 +25,17 @@ function selectWindow(mode, dayDate, startDate, endDate, today) {
     }
     return null;
 }
+// M15: inclusive calendar-day shortcuts ending on the caller-supplied UTC date.
+// Never guess sessions or request data; the existing RANGE validator is authoritative.
+function presetWindow(days, today) {
+    if (![7,30,90,180].includes(days)) return null;
+    const upper = calendarDay(today);
+    const minimum = calendarDay("2000-01-01");
+    if (upper === null || upper < minimum || upper - (days - 1) < minimum)
+        return null;
+    const from = new Date((upper - days + 1) * 86400000).toISOString().slice(0,10);
+    return selectWindow("range", "", from, today, today);
+}
 function daySession(snapshot, requestedDay) {
     if (!snapshot || snapshot.from !== requestedDay || snapshot.to !== requestedDay
             || !Array.isArray(snapshot.bars) || snapshot.bars.length > 1)

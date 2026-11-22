@@ -39,8 +39,11 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(text.count("id: forestButton"), 1)
         self.assertEqual(text.count("id: forestWindow"), 1)
         self.assertIn("onToggleRequested: forestWindow.toggle()", text)
-        # Center dock owns ApolloHub. Forest is the adjacent right sibling.
-        self.assertIn("anchors.left: apolloHubHost.right", text)
+        # Center dock owns ApolloHub. Forest uses its free LEFT side, not
+        # the Network dock to the right. One anchor, one launcher instance.
+        self.assertIn("anchors.right: apolloHubHost.left", text)
+        self.assertIn("anchors.rightMargin: 8", text)
+        self.assertNotIn("anchors.left: apolloHubHost.right", text)
         self.assertIn("anchors.top: apolloHubHost.top", text)
         self.assertIn("dockCenterX: shellRoot.margins.left + forestHost.x", text)
         left_modules = text.split("id: leftModules", 1)[1].split(
@@ -49,10 +52,11 @@ class ForestLauncherContract(unittest.TestCase):
 
     def test_ai_palette_and_compact_decorated_icon(self):
         text = (ROOT / "modules/Forest.qml").read_text()
-        for required in ('text: "🏕"', 'text: "࣪݁"', 'text: "๋⭑"',
-                         "anchors.top: campFace.top",
-                         "anchors.right: campFace.left",
-                         "anchors.left: campFace.right",
+        for required in ('text: "࣪݁🏕๋⭑"',
+                         "GohuText {",
+                         "textFormat: Text.PlainText",
+                         "font.letterSpacing: -1",
+                         "contentGlowSource: forestMark",
                          "normalForegroundColor: Colors.green",
                          "normalDockGlowColor: Colors.green",
                          "normalContentGlowColor: Colors.green",
@@ -61,6 +65,11 @@ class ForestLauncherContract(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, text)
         self.assertNotIn('text: "🌲"', text)
+        self.assertNotIn("NotoText {", text)
+        self.assertEqual(text.count("GohuText {"), 1)
+        self.assertEqual(text.count('text: "࣪݁🏕๋⭑"'), 1)
+        self.assertEqual(text.count("id: forestMark"), 1)
+
 
     def test_live_status_is_between_resize_and_close(self):
         text = (ROOT / "widgets/ForestW.qml").read_text()

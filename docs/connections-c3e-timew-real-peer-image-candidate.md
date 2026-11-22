@@ -29,6 +29,8 @@ Existing #2122/#2126/#2130 packet sender and ancillary descriptor tests remain u
 
 ## WATCH OUT FOR
 
+**Cooperative monotonic deadline:** The imported observer now starts a fixed 2-second monotonic budget at the beginning of kernel-peer measurement. It checks before/after bounded `/proc` reads, around each executable-image chunk, and again before returning a diagnostic. A late image read raises `OBSERVATION_DEADLINE_EXPIRED` and closes its executable fd and original-peer pidfd; this cannot be promoted into source/geometry/C5 authority. The bound is **cooperative only**: an OS read blocked indefinitely *inside one syscall* cannot be interrupted by these in-process checks. A future installed Connections supervisor must enforce a separate hard external deadline on the child/worker process, and independent NRS-2 review of stall/cancellation/cleanup is required before native enrollment.
+
 - A SHA-256 measurement is not proof that a signed release is operator-enrolled. It is a fact about bytes at read time. No private key/root is minted; no release floor, issuer signature, host trust or seat origin is approved.
 - \`/proc\` and LSM access can fail because of permissions, kernel policy or replaced/changed process state; all failures HOLD. Do not add a fallback to caller metadata, PID/title or raw GET_TREE.
 - A process that execs *after* return is not covered; before native authority, a stronger sender-owned protected root/host/seat transaction and per-request process/release revalidation are required.

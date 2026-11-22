@@ -152,10 +152,28 @@ PanelWindow {
     // Derived presentation only. Packing never changes the stored tile order.
     readonly property var tileGrid: Layout.packTiles(activeTiles)
 
-    readonly property int frameWidth: 1000
-    readonly property int frameHeight: 700
+    // Shell-only size changes; tile order/widths and unsaved EDIT work live
+    // in their existing stores and never get reconstructed by a resize.
+    property int resizeLevel: 1
+    readonly property var resizeSteps: [
+        { width: 860, height: 640 },
+        { width: 1000, height: 700 },
+        { width: 1200, height: 850 }
+    ]
     readonly property int glowGutter: 12
     readonly property int frameInset: 8
+    readonly property int frameWidth: Math.min(
+        resizeSteps[resizeLevel].width,
+        Math.max(1, (screen ? screen.width : 2560) - glowGutter * 2))
+    readonly property int frameHeight: Math.min(
+        resizeSteps[resizeLevel].height,
+        Math.max(1, (screen ? screen.height : 1440) - glowGutter))
+    function stepWindowSize(delta) {
+        if (delta !== -1 && delta !== 1)
+            return;
+        resizeLevel = Math.max(0, Math.min(resizeSteps.length - 1,
+                                           resizeLevel + delta));
+    }
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -780,7 +798,9 @@ PanelWindow {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - editButton.width - closeButton.width - 20
+                    width: Math.max(125, parent.width - editButton.width
+                           - closeButton.width - shrinkHubButton.width
+                           - growHubButton.width - header.spacing * 4)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 18
@@ -797,6 +817,22 @@ PanelWindow {
                     label: hub.editMode ? "VIEW" : "EDIT"
                     selected: hub.editMode
                     onLeftClicked: hub.editMode = !hub.editMode
+                }
+                ResizeButton {
+                    id: shrinkHubButton
+                    direction: "down"
+                    available: hub.resizeLevel > 0
+                    onResizeRequested: function(delta) {
+                        hub.stepWindowSize(delta);
+                    }
+                }
+                ResizeButton {
+                    id: growHubButton
+                    direction: "up"
+                    available: hub.resizeLevel < hub.resizeSteps.length - 1
+                    onResizeRequested: function(delta) {
+                        hub.stepWindowSize(delta);
+                    }
                 }
                 CloseButton {
                     id: closeButton

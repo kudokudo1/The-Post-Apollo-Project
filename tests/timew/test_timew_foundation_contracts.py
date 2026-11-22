@@ -778,7 +778,9 @@ assert "id: machineResolverProcess" in window
 # borderless modes. The top ⟳ opens local controls without changing modes.
 assert 'text: "TIME // " + timew.headerModeName' in window
 assert 'selectedMode === "calc" ? "CALCULATOR" : selectedName' in window
-assert 'onLeftClicked: timew.toggleResyncPopup()' in window
+assert "ReloadButton {" in window
+assert 'onReloadRequested: timew.toggleResyncPopup()' in window
+assert 'onLeftClicked: timew.toggleResyncPopup()' not in window
 assert 'text: "TIME // W"' not in window
 assert "color: Colors.magenta" in window
 assert "id: headerDivider" in window

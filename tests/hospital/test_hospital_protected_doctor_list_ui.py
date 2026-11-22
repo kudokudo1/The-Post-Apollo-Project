@@ -45,7 +45,7 @@ for field in (
     'onTriggered: root.failDoctorRead(',
     'Qt.callLater(function() { process.destroy(); });',
     'loaded = true;',
-    'doctors = next.records;',
+    'doctors = result.records;',
     'DoctorReadPolicy.captureStdout(',
     'DoctorReadPolicy.captureStderr(',
     'DoctorReadPolicy.captureExit(',

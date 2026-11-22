@@ -72,7 +72,7 @@ Rectangle {
         color: trayButtonPressed ? Colors.cyan : trayButtonHovered ? Colors.cyan : Colors.cyan
     }
 
-    // ===== EMPTY STATE / VISIBLE G0HU MARK =====================
+    // ===== EMPTY STATE / VISIBLE GOHU LABEL =====================
     // The label describes an empty native tray; it is not an inert button
     // masquerading as a real external application icon.
     Column {
@@ -82,13 +82,15 @@ Rectangle {
         visible: trayItems.count === 0
 
         GohuText {
-            anchors.horizontalCenter: parent.horizontalCenter
+            width: 92
+            horizontalAlignment: Text.AlignHCenter
             text: "TRAY"
             font.pixelSize: 14
             color: Colors.cyan
         }
         GohuText {
-            anchors.horizontalCenter: parent.horizontalCenter
+            width: 92
+            horizontalAlignment: Text.AlignHCenter
             text: "NO ICONS"
             font.pixelSize: 9
             color: Colors.white

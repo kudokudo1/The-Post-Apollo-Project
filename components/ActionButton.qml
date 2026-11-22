@@ -18,6 +18,16 @@ Rectangle {
     property bool interactive: available
     property bool selected: false
     property bool keyboardSelected: false
+    // Additional cursor flags never overwrite another widget's existing
+    // keyboardSelected binding. Stationary mouse hover can remain secondary.
+    property bool contentKeyboardPrimary: false
+    property bool contentKeyboardNavigationActive: false
+    property var contentNavigator: null
+    readonly property bool cursorPrimaryNotActivated:
+        (keyboardSelected || contentKeyboardPrimary) && !selected
+    readonly property bool pointerSecondaryHovered:
+        contentKeyboardNavigationActive && hovered
+        && !contentKeyboardPrimary && !keyboardSelected
     // Content navigators may point at this button without changing its
     // existing keyboardSelected binding or mouse interaction. Activation
     // requires a deliberate per-button opt-in ("leftClicked"/"triggered").
@@ -54,6 +64,9 @@ Rectangle {
 
     property color idleFillColor: Colors.black
     property color hoverFillColor: Colors.yellow
+    // Stationary secondary hover shows orange artwork/border/glow on black,
+    // never the primary cursor's yellow fill.
+    property color secondaryHoverFillColor: idleFillColor
     property color pressedFillColor:
         destructive ? destructiveColor : Colors.magenta
     property color selectedFillColor: Colors.yellow
@@ -63,7 +76,7 @@ Rectangle {
     property color hoverForegroundColor: Colors.orange
     property color pressedForegroundColor: Colors.black
     property color selectedForegroundColor: Colors.magenta
-    property color keyboardSelectedForegroundColor: selectedForegroundColor
+    property color keyboardSelectedForegroundColor: hoverForegroundColor
 
     property color idleBorderColor: accentColor
     property color hoverBorderColor: Colors.orange
@@ -186,18 +199,18 @@ Rectangle {
     readonly property color fillColor:
         pressed
         ? pressedFillColor
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedFillColor
         : selected
         ? selectedFillColor
         : hovered
-        ? hoverFillColor
+        ? (pointerSecondaryHovered ? secondaryHoverFillColor : hoverFillColor)
         : idleFillColor
 
     readonly property color foregroundColor:
         pressed
         ? pressedForegroundColor
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedForegroundColor
         : selected
         ? selectedForegroundColor
@@ -208,7 +221,7 @@ Rectangle {
     readonly property color activeBorderColor:
         pressed
         ? pressedBorderColor
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedBorderColor
         : selected
         ? selectedBorderColor
@@ -219,7 +232,7 @@ Rectangle {
     readonly property int activeBorderWidth:
         pressed
         ? pressedBorderWidth
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedBorderWidth
         : selected
         ? selectedBorderWidth
@@ -230,7 +243,7 @@ Rectangle {
     readonly property color contentGlowColor:
         pressed
         ? pressedContentGlowColor
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedContentGlowColor
         : selected
         ? selectedContentGlowColor
@@ -241,7 +254,7 @@ Rectangle {
     readonly property real stateContentGlowOpacity:
         pressed
         ? contentGlowPressedOpacity
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? contentGlowKeyboardSelectedOpacity
         : selected
         ? contentGlowSelectedOpacity
@@ -257,7 +270,7 @@ Rectangle {
     readonly property color softGlowColor:
         pressed
         ? pressedSoftGlowColor
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedSoftGlowColor
         : selected
         ? selectedSoftGlowColor
@@ -268,7 +281,7 @@ Rectangle {
     readonly property real stateSoftGlowOpacity:
         pressed
         ? softGlowPressedOpacity
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? softGlowKeyboardSelectedOpacity
         : selected
         ? softGlowSelectedOpacity
@@ -284,7 +297,7 @@ Rectangle {
     readonly property color wideGlowColor:
         pressed
         ? pressedWideGlowColor
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? keyboardSelectedWideGlowColor
         : selected
         ? selectedWideGlowColor
@@ -295,7 +308,7 @@ Rectangle {
     readonly property real stateWideGlowOpacity:
         pressed
         ? wideGlowPressedOpacity
-        : keyboardSelected
+        : cursorPrimaryNotActivated
         ? wideGlowKeyboardSelectedOpacity
         : selected
         ? wideGlowSelectedOpacity
@@ -455,6 +468,12 @@ Rectangle {
         }
 
         onPositionChanged: function(mouseEvent) {
+            // Actual mouse movement reunifies the selectors. Entering
+            // due to a layout change or remaining stationary does not.
+            const nav = actionButton.contentNavigator;
+            if (nav && actionButton.keyboardNavTarget
+                    && typeof nav.followPointer === "function")
+                nav.followPointer(actionButton);
             actionButton.pointerMoved(mouseEvent);
         }
 

@@ -866,6 +866,9 @@ PanelWindow {
         : 13
     readonly property int chassisRightMargin:
         resizeLevel === resizeSteps.length - 1 ? 1 : 220
+    readonly property int chassisBottomInset:
+        resizeLevel === resizeSteps.length - 1
+        ? Math.max(0, visualBottomGap - 3) : 12
     implicitWidth: Math.min(
         resizeSteps[resizeLevel].width,
         Math.max(1, (screen ? screen.width : 2560)
@@ -911,9 +914,7 @@ PanelWindow {
         anchors.margins: 12
         // Fullscreen frame ends at screen.height-visualBottomGap.
         // Top margin stays 12 so the original visual y9 never moves.
-        anchors.bottomMargin: cpuPlusWindow.resizeLevel
-            === cpuPlusWindow.resizeSteps.length - 1
-            ? Math.max(0, cpuPlusWindow.visualBottomGap - 3) : 12
+        anchors.bottomMargin: cpuPlusWindow.chassisBottomInset
 
         fillVisible: false
         borderVisible: false
@@ -1417,7 +1418,7 @@ PanelWindow {
         anchors.bottom: parent.bottom
 
         anchors.leftMargin: 12
-        anchors.bottomMargin: 12
+        anchors.bottomMargin: cpuPlusWindow.chassisBottomInset
 
         color: Qt.rgba(
             Colors.black.r,
@@ -2116,7 +2117,7 @@ PanelWindow {
         anchors.top: modeRail.bottom
         anchors.bottom: parent.bottom
 
-        anchors.bottomMargin: 12
+        anchors.bottomMargin: cpuPlusWindow.chassisBottomInset
 
         color: Colors.black
 
@@ -3008,7 +3009,7 @@ PanelWindow {
         anchors.bottom: parent.bottom
 
         anchors.rightMargin: 12
-        anchors.bottomMargin: 12
+        anchors.bottomMargin: cpuPlusWindow.chassisBottomInset
 
         color: Colors.dark
 

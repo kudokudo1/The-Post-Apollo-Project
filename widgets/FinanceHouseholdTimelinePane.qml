@@ -14,6 +14,9 @@ Item {
     property var sourceRows: []
     property var scheduleRows: []
     property bool schedulesReady: false
+    // This UI choice is in-memory only and resets between households.
+    property int reserveMarginPercent: 100
+    onContextIdChanged: reserveMarginPercent=100
     signal horizonRequested(int months)
     readonly property var coverage: active && schedulesReady
         ? Timeline.coverage(sourceRows,scheduleRows) : null
@@ -21,7 +24,7 @@ Item {
         ? Timeline.project(sourceRows,scheduleRows,startMonth,horizonMonths,contextId)
         : null
     readonly property var reserves: projection && projection.ok
-        ? Reserves.annotate(sourceRows,scheduleRows,projection) : null
+        ? Reserves.annotate(sourceRows,scheduleRows,projection,reserveMarginPercent) : null
     width: parent ? parent.width : 0
     implicitHeight: timelineBody.implicitHeight
     height: visible ? implicitHeight : 0
@@ -134,6 +137,42 @@ Item {
             color: Colors.orange
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.cadenceCount>0
+            text: "RESERVE CUSHION // OPTIONAL PLANNING SCENARIO // "
+                +timeline.reserveMarginPercent+"% OF EACH PERIODIC CHARGE TARGET"
+                +" // RESETS WHEN HOUSEHOLD CONTEXT CHANGES; NOT SAVED"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        Flow {
+            id: reserveMarginRail
+            width: parent.width
+            visible: timeline.coverage && timeline.coverage.ok
+                && timeline.coverage.cadenceCount>0
+            spacing: 5
+            Repeater {
+                model: [
+                    {percent:100,label:"100% // BASE"},
+                    {percent:110,label:"110% // +10%"},
+                    {percent:125,label:"125% // +25%"}
+                ]
+                delegate: ActionButton {
+                    required property var modelData
+                    width: Math.max(94,(reserveMarginRail.width-10)/3)
+                    height: 29
+                    label: modelData.label
+                    labelPixelSize: 9
+                    selected: timeline.reserveMarginPercent===modelData.percent
+                    accentColor: Colors.magenta
+                    onLeftClicked: timeline.reserveMarginPercent=modelData.percent
+                }
+            }
         }
         GohuText {
             width: parent.width
@@ -309,6 +348,8 @@ Item {
                             text: "EARMARK // "+modelData.title
                                 +" // EVERY "+modelData.intervalMonths+" MONTHS"
                                 +" // PLAN "+timeline.money(modelData.setAsideCents)
+                                +" // BUFFER ADDED "+timeline.money(modelData.bufferAddedCents)
+                                +" // BUFFER HELD "+timeline.money(modelData.bufferHeldCents)
                                 +" // USED "+timeline.money(modelData.usedCents)
                                 +" // HELD "+timeline.money(modelData.heldCents)
                                 +(modelData.unfundedCents>0
@@ -422,7 +463,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "OPTIONAL MONTHLY EARMARKS ARE NOT MONEY MOVED, PAID, SAVED OR BANK-VERIFIED; UNRESERVED CHANGE IS NOT SPENDABLE CASH. NO PRE-EXISTING RESERVE BALANCES ARE ASSUMED. NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
+            text: "RESERVE CUSHION CONTROLS ARE SCENARIO-ONLY AND NEVER SAVE SETTINGS OR ADD A SECOND BILL. THE EXTRA BUFFER IS CAPPED AND DRAWS DOWN ONLY WHEN NEEDED BY A MODELED CHARGE. OPTIONAL MONTHLY EARMARKS ARE NOT MONEY MOVED, PAID, SAVED OR BANK-VERIFIED; UNRESERVED CHANGE IS NOT SPENDABLE CASH. NO PRE-EXISTING RESERVE BALANCES ARE ASSUMED. NONMONTHLY BILLS USE PER-CHARGE AMOUNTS ONLY IN OCCURRENCE MONTHS; THIS IS NOT MONTHLY ACCRUAL. ESTIMATES ONLY: AN EXPLICIT DEFERRED BILL IS MODELED IN ITS NEW MONTH, ON TOP OF THAT MONTH\u0027S ORDINARY BILL. DEFERRED AMOUNTS TRACK THE CURRENT MANUAL MONTHLY COST, NOT A CONTRACTUAL PAYMENT. A BILL EXCLUDED FOR ONE MONTH IS NOT ASSUMED FORGIVEN, PAID OR DEFERRED. DUE DAYS LABEL MONTHLY COSTS COUNTED ONCE. ONE-TIME PURCHASES ARE SEPARATE; GOAL RESERVES ARE USED FIRST. UNKNOWN BILLS, TAX, DEBT, INFLATION AND STARTING CASH ARE OMITTED. NOTHING IS TRANSFERRED."
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

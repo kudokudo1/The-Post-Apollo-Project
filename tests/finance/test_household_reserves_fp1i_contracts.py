@@ -6,7 +6,10 @@ policy=(root/"widgets/FinanceHouseholdReservePolicy.js").read_text()
 timeline=(root/"widgets/FinanceHouseholdTimelinePane.qml").read_text()
 month=(root/"widgets/FinanceHouseholdTimelinePolicy.js").read_text()
 store=(root/"scripts/finance/household_schedule_store.py").read_text()
-assert 'function annotate(rows,schedules,projection)' in policy
+# FP1j extends the optional parameter; FP1i's 3-argument runtime behavior
+# remains tested with a real JS call and equal-output assertion.
+assert ('function annotate(rows,schedules,projection)' in policy or
+        'function annotate(rows,schedules,projection,marginPercent)' in policy)
 assert 'function depositFor(fund,month)' in policy
 assert 'source:"LOCAL_MANUAL_RESERVE_ESTIMATE"' in policy
 assert "notAvailableCash:true" in policy
@@ -21,7 +24,8 @@ assert "if(offset<1-fund.intervalMonths)return 0;" in policy
 assert 'idx(projection.startMonth)===null' in policy
 assert 'projection.bankVerified!==false' in policy
 assert 'import "FinanceHouseholdReservePolicy.js" as Reserves' in timeline
-assert "Reserves.annotate(sourceRows,scheduleRows,projection)" in timeline
+assert ('Reserves.annotate(sourceRows,scheduleRows,projection)' in timeline or
+        'Reserves.annotate(sourceRows,scheduleRows,projection,reserveMarginPercent)' in timeline)
 assert "timeline.reserves.byMonth[modelData.month]" in timeline
 assert "SINKING FUNDS" in timeline
 assert "NOT AN EXTRA EXPENSE OR A BANK TRANSFER" in timeline

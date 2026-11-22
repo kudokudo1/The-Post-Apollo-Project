@@ -293,5 +293,5 @@ commit(h, 0, [["stdout", "[]"], ["stderr", ""], ["exit", [0, 0]]]);
 assert.equal(h.scope.loaded, true);
 assert.equal(h.scope.doctors.length, 0);
 assert.equal(h.scope.refresh(), true);
-unpublished(h);
+unpublished(h, 1);
 console.log("HOSPITAL DOCTOR GENERATION // PASS // six event orders, hostile failures, old/new process isolation, startup denial and bounded watchdog recovery // SOURCE-ONLY");

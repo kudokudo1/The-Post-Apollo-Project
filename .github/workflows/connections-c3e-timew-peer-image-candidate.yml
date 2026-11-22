@@ -37,6 +37,8 @@ jobs:
           text=Path("services/connections/ConnectionsTimeWNativePeerImageCandidate.py").read_text()
           for required in ("SO_PEERPIDFD", "SO_PEERCRED", "/proc",
                            "_pidfd_alive", "_start_ticks", "_cgroup", "_lsm",
+                           "MAX_OBSERVATION_NS", "time.monotonic_ns",
+                           "OBSERVATION_DEADLINE_EXPIRED",
                            "executableSha256ObservedUntrusted",
                            '"sourceEvidenceTrusted": False',
                            '"nativeGeometryAllowed": False',

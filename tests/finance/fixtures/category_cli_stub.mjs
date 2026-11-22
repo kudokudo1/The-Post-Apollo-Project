@@ -41,6 +41,27 @@ export async function updateCategory(id,fields) {
   await save(data);
   return null;
 }
+export async function createCategoryGroup(group) {
+  if(Object.keys(group).sort().join(",")!=="is_income,name"
+      || group.is_income!==false)throw Error("bad-test-group-fields");
+  const data=await read();
+  const id="fictional-group-new";
+  data.events.push("group-create");
+  data.groups.push({...group,id});
+  await save(data);
+  return id;
+}
+export async function updateCategoryGroup(id,fields) {
+  if(Object.keys(fields).join(",")!=="name")
+    throw Error("bad-test-group-update");
+  const data=await read();
+  const group=data.groups.find(g=>g.id===id);
+  if(!group)throw Error("missing-test-group");
+  group.name=fields.name;
+  data.events.push("group-rename");
+  await save(data);
+  return id;
+}
 export async function sync() {
   const data=await read();
   data.events.push("sync");

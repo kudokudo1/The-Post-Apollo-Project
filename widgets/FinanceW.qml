@@ -2171,7 +2171,7 @@ Row {
                 }
 
                 // Owner-scoped Banking page: manual CSV review + provider-native
-                // instructions. No Actual write or Connections/Identity route.
+                // instructions. No financial writer or protected connection route.
                 FinanceBankingPane {
                     anchors.fill: parent
                     visible: root.selectedMainMode === "banking"

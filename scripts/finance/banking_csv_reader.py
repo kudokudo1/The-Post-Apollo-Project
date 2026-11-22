@@ -54,7 +54,7 @@ def selected_path(file_url: str) -> str:
 def safe_read(file_url: str) -> str:
     path = selected_path(file_url)
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
-    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= os.O_NOFOLLOW  # Supported Linux hosts must not follow a final symlink.
     try:
         descriptor = os.open(path, flags)
     except OSError as exc:

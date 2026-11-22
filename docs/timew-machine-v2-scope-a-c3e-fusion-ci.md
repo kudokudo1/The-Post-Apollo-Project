@@ -15,7 +15,9 @@ A new **test-only** TimeW consumer, `tests/timew/TimeWScopeAC3eFusionPreflight.p
 2. An Ed25519 signature valid for the **TimeW-only** purpose, matching independently caller-pinned test public key fingerprint, host, release floor and expiry; a Hospital-purpose proof or original Brave PAIR v1 audience refuses.
 3. Exact checkpoint/window key, one selected live con ID, selected seat/session, saved before/target rectangle, and consistent identity across before-resize, after-resize and after-move snapshots.
 4. Explicit denial flags from every underlying result. An upstream result that claims native geometry permission or consent is **refused**, not promoted.
-5. A fresh result with `restore_allowed=false`, `production_authorized=false`, `native_timew_geometry_allowed=false`, `safe_actions=[]` and all native issuer/seat/C5 fields FALSE, even if the injected fixtures are internally consistent.
+5. The first continuity inventory must be exactly the same set of surfaces and values as the initial preflight inventory, regardless of list ordering. No unrelated surface may silently change between the two fixture components.
+6. Synthetic time must run from the initial review into the three phases, and the hypothetical final move must precede the **verified signed test proof's expiry**, not merely the separately claimed selected-surface lease. The current CI rule is deliberately stricter than an eventual owner-approved native grant/renewal contract.
+7. A fresh result with `restore_allowed=false`, `production_authorized=false`, `native_timew_geometry_allowed=false`, `safe_actions=[]` and all native issuer/seat/C5 fields FALSE, even if the injected fixtures are internally consistent.
 
 The fixture uses a temporary SQLite checkpoint, a fake read-only Sway process output, two same-app Brave-like windows, unrelated tiled Kitty and fullscreen Obsidian, ephemeral CI Ed25519 keys with **no installed trust root**, plus hostile mismatches and replay tests. Existing production geometry, C3e code, C5, SwayPX, Hospital, TimeW QML and Brave PAIR v1 are unchanged. No network, actual Sway command, signing service, consent grant, live host access or activation exists.
 
@@ -29,7 +31,7 @@ GitHub Actions CI only: `python3 -B -I tests/timew/test_timew_scope_a_c3e_fusion
 
 The dedicated Scope A GitHub workflow runs this new test alongside previously merged source-only selected-surface continuity, separate signed Brave pairing, journal and original one-click Restore/UI regressions.
 
-Hostile tests refuse altered signed purposes, proof hash or signature, signer-key substitution and revocation, host and release-floor mismatch, selected current window substitution, changed checkpoint/window key, challenge/seat/session mismatch, altered before/after rectangles, compositor lifecycle and generation changes, overwritten unrelated window inventory, and unsolicited upstream positive authority.
+Hostile tests refuse altered signed purposes, proof hash or signature, signer-key substitution and revocation, host and release-floor mismatch, selected current window substitution, changed checkpoint/window key, challenge/seat/session mismatch, altered before/after rectangles, compositor lifecycle and generation changes, **initial-versus-phase inventory substitution**, a first phase earlier than preflight, a final phase at or after proof expiry (including a genuinely signed shorter lease), overwritten unrelated window inventory, and unsolicited upstream positive authority. Reordering unchanged inventory entries remains valid.
 
 ## WATCH OUT FOR
 

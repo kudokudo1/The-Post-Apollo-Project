@@ -141,7 +141,16 @@ assert "visible: trayItems.count === 0" in tray
 assert 'text: "TRAY"' in tray and 'text: "NO ICONS"' in tray
 assert tray.count("GohuText {") >= 2
 assert "border.width: 1" in tray
-assert "border.color: trayButtonPressed ? Colors.orange" in tray
+assert "border.color: accentColor" in tray
+assert "readonly property color accentColor:" in tray
+assert tray.count("color: trayDock.accentColor") == 4
+assert "QsMenuAnchor {" in tray
+assert "menu: trayButton.modelData.menu" in tray
+assert "anchor.item: trayButton" in tray
+assert "anchor.edges: Edges.Top" in tray
+assert "anchor.gravity: Edges.Top" in tray
+assert "trayNativeMenu.open();" in tray
+assert "// Right-click function" not in tray
 assert "anchors.fill: parent\n        anchors.margins: 4" not in tray
 assert "bottom: 10" in trash
 assert "bottom: 10" in power

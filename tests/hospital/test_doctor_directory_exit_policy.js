@@ -34,15 +34,23 @@ const names = [
     ["completeDoctorRead", "process, generation, result"],
     ["advanceDoctorRead", "process, generation, next"],
     ["failDoctorRead", "process, generation, reason"],
+    ["timeoutDoctorRead", "watchdog, process, generation"],
 ];
 const methods = names.map(([n, args]) => method(n, args));
 for (const needle of [
     "doctorReadFactory.createObject(root, {",
     "requestGeneration: generation",
     "readGeneration += 1;",
-    "doctorReadWatchdog.start();",
-    "doctorReadWatchdog.stop();",
-    "Qt.callLater(function() { process.destroy(); });",
+    "doctorWatchdogFactory.createObject(root, {",
+    "ownerProcess: process,",
+    "requestGeneration: generation",
+    "activeWatchdog = watchdog;",
+    "activeWatchdog = null;",
+    "watchdog.start();",
+    "watchdog.stop();",
+    "watchdog.destroy();",
+    "Qt.callLater(function() {",
+    "process.destroy();",
     "activeRead === process",
     "generation === readGeneration",
     "requestProcess, requestProcess.requestGeneration",
@@ -51,10 +59,15 @@ for (const needle of [
     "DoctorReadPolicy.captureExit(",
     "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT",
     'process.exec([nativeReaderPath, "doctor-directory"]);',
-    "onTriggered: root.failDoctorRead(",
+    "onTriggered: root.timeoutDoctorRead(",
+    "requestWatchdog, requestWatchdog.ownerProcess,",
+    "requestWatchdog.requestGeneration",
+    "activeWatchdog !== watchdog",
 ]) assert.ok(qml.includes(needle), "Unpinned QML source: " + needle);
 for (const forbidden of [
     "listProcess.pendingRead",
+    "doctorReadWatchdog",
+    "root.activeRead, root.readGeneration",
     "root.doctors = doctors;",
     "saveProcess.exec(",
     "pxArgs(",
@@ -71,6 +84,7 @@ function doctor(id = "doctor-fixture") {
 const stdout = JSON.stringify([doctor()]);
 function mock(options = {}) {
     const jobs = [];
+    const timers = [];
     const later = [];
     const scope = vm.createContext({
         root: null,
@@ -84,15 +98,11 @@ function mock(options = {}) {
         lastRefreshedAt: "",
         lastSavedDoctor: null,
         activeRead: null,
+        activeWatchdog: null,
         readGeneration: 0,
         nativeReaderPath: "/usr/libexec/post-apollo/hospital/hospital-room-read",
         notifications: 0,
         doctorsRefreshed: function() { scope.notifications++; },
-        doctorReadWatchdog: {
-            active: false,
-            start: function() { this.active = true; },
-            stop: function() { this.active = false; },
-        },
         Qt: {callLater: function(fn) { later.push(fn); }},
         Date: Date,
     });
@@ -117,6 +127,27 @@ function mock(options = {}) {
             return instance;
         }
     };
+    scope.doctorWatchdogFactory = {
+        createObject: function(parent, props) {
+            if (options.timerFactoryFails) return null;
+            const timer = {
+                ownerProcess: props.ownerProcess,
+                requestGeneration: props.requestGeneration,
+                active: false,
+                stopped: false,
+                destroyed: false,
+                start: function() {
+                    if (options.timerStartThrows)
+                        throw new Error("watchdog timer start failure");
+                    this.active = true;
+                },
+                stop: function() { this.active = false; this.stopped = true; },
+                destroy: function() { this.destroyed = true; },
+            };
+            timers.push(timer);
+            return timer;
+        }
+    };
     for (const source of methods)
         vm.runInContext(source, scope);
     const deliver = (job, kind, value) => {
@@ -131,7 +162,14 @@ function mock(options = {}) {
         scope.advanceDoctorRead(job, job.requestGeneration, next);
         return true;
     };
-    return {scope, jobs, later, deliver};
+    const fireWatchdog = (timer) => {
+        // The QML Timer's onTriggered forwards its ORIGINAL owner identity,
+        // not the current active request's mutable state.
+        return scope.timeoutDoctorRead(
+            timer, timer.ownerProcess, timer.requestGeneration
+        );
+    };
+    return {scope, jobs, timers, later, deliver, fireWatchdog};
 }
 const events = [
     ["stdout", stdout],
@@ -174,13 +212,16 @@ for (const sequence of orders) {
     assert.equal(h.scope.loaded, true);
     assert.equal(h.scope.doctors[0].id, "doctor-fixture");
     assert.equal(h.scope.notifications, 1);
-    assert.equal(h.scope.doctorReadWatchdog.active, false);
+    assert.equal(h.timers.length, 1);
+    assert.equal(h.timers[0].active, false);
+    assert.equal(h.timers[0].stopped, true);
     assert.equal(job.pendingRead, null);
     assert.equal(h.scope.activeRead, null);
     assert.equal(h.scope.refreshing, false);
     assert.equal(job.running, false);
     h.later.forEach(fn => fn());
     assert.equal(job.destroyed, true);
+    assert.equal(h.timers[0].destroyed, true);
 }
 for (const [label, override] of [
     ["nonzero", {exit: [2, 0]}],
@@ -213,11 +254,9 @@ for (const terminal of ["success", "nonzero", "timeout"]) {
     const h = mock();
     assert.equal(h.scope.refresh(), true);
     const old = h.jobs[0];
+    const oldTimer = h.timers[0];
     if (terminal === "timeout") {
-        assert.equal(h.scope.failDoctorRead(
-            old, old.requestGeneration,
-            "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT"
-        ), true);
+        assert.equal(h.fireWatchdog(oldTimer), true);
     } else {
         const responses = events.map(([k, v]) =>
             [k, terminal === "nonzero" && k === "exit" ? [1, 0] : v]);
@@ -225,8 +264,23 @@ for (const terminal of ["success", "nonzero", "timeout"]) {
     }
     assert.equal(h.scope.refresh(), true);
     const current = h.jobs[1];
+    const currentTimer = h.timers[1];
     assert.notStrictEqual(old, current);
+    assert.notStrictEqual(oldTimer, currentTimer);
     assert.notEqual(old.requestGeneration, current.requestGeneration);
+    assert.strictEqual(oldTimer.ownerProcess, old);
+    assert.strictEqual(currentTimer.ownerProcess, current);
+    assert.equal(oldTimer.requestGeneration, old.requestGeneration);
+    assert.equal(currentTimer.requestGeneration, current.requestGeneration);
+    assert.equal(oldTimer.active, false, "OLD_TIMER_MUST_BE_STOPPED");
+    assert.equal(currentTimer.active, true, "NEW_TIMER_MUST_BE_RUNNING");
+    unpublished(h, 1);
+    // Emulate an already-queued timeout handler from A AFTER B starts.
+    // It must not cancel B, even if A's timer was previously stopped.
+    assert.equal(h.fireWatchdog(oldTimer), false);
+    assert.equal(h.scope.timeoutDoctorRead(
+        oldTimer, current, current.requestGeneration), false,
+        "A_STALE_TIMER_CANNOT_BORROW_B_PROCESS_AND_GENERATION");
     unpublished(h, 1);
     for (const [kind, value] of [
         ["stdout", JSON.stringify([doctor("stale")])],
@@ -249,6 +303,12 @@ for (const terminal of ["success", "nonzero", "timeout"]) {
     assert.equal(h.scope.loaded, true);
     assert.equal(h.scope.doctors.length, 1);
     assert.equal(h.scope.doctors[0].id, "fresh");
+    assert.equal(currentTimer.active, false);
+    // Already-queued old A and current B timeout events cannot erase
+    // a roster once the B Process has completed and been retired.
+    assert.equal(h.fireWatchdog(oldTimer), false);
+    assert.equal(h.fireWatchdog(currentTimer), false);
+    assert.equal(h.scope.doctors[0].id, "fresh");
     // Even after new success, old callbacks cannot replace the roster.
     assert.equal(h.deliver(old, "stdout",
         JSON.stringify([doctor("later") ])), false);
@@ -256,14 +316,25 @@ for (const terminal of ["success", "nonzero", "timeout"]) {
 }
 // If the host process fails before process-exit signal, watchdog recovery
 // makes the directory unavailable and a NEW isolated retry possible.
-for (const opts of [{factoryFails: true}, {execThrows: true}]) {
+for (const opts of [
+    {factoryFails: true},
+    {execThrows: true},
+    {timerFactoryFails: true},
+    {timerStartThrows: true},
+]) {
     const h = mock(opts);
     assert.equal(h.scope.refresh(), false);
     assert.equal(h.scope.doctors.length, 0);
     assert.equal(h.scope.loaded, false);
     assert.equal(h.scope.refreshing, false);
     assert.equal(h.scope.activeRead, null);
-    assert.match(h.scope.lastError, /START FAILED/);
+    assert.match(h.scope.lastError, /(START FAILED|WATCHDOG UNAVAILABLE)/);
+    assert.equal(h.scope.activeWatchdog, null);
+    h.later.forEach(fn => fn());
+    assert.ok(h.jobs.every(job => job.destroyed),
+        "FAILED_START_LEAKED_PROCESS_OBJECT");
+    assert.ok(h.timers.every(timer => timer.destroyed),
+        "FAILED_START_LEAKED_WATCHDOG_OBJECT");
 }
 for (const omit of ["stdout", "stderr", "exit"]) {
     const h = mock();
@@ -272,9 +343,7 @@ for (const omit of ["stdout", "stderr", "exit"]) {
     for (const [kind, val] of events)
         if (kind !== omit) h.deliver(job, kind, val);
     unpublished(h);
-    assert.equal(h.scope.failDoctorRead(
-        job, job.requestGeneration,
-        "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT"), true);
+    assert.equal(h.fireWatchdog(h.timers[0]), true);
     assert.equal(h.scope.loaded, false);
     assert.equal(h.scope.refreshing, false);
     assert.equal(h.scope.activeRead, null);
@@ -284,6 +353,9 @@ for (const omit of ["stdout", "stderr", "exit"]) {
     // Missing callback from retired process after retry starts is refused.
     assert.equal(h.scope.refresh(), true);
     assert.equal(h.deliver(job, omit, omit === "exit" ? [0, 0] : ""), false);
+    assert.equal(h.fireWatchdog(h.timers[0]), false,
+        "OLD_TIMEOUT_CANNOT_CANCEL_RETRY");
+    assert.equal(h.timers[1].active, true);
     unpublished(h, 1);
 }
 // A real [] is successful, and stale data is cleared at refresh start.
@@ -294,4 +366,20 @@ assert.equal(h.scope.loaded, true);
 assert.equal(h.scope.doctors.length, 0);
 assert.equal(h.scope.refresh(), true);
 unpublished(h, 1);
-console.log("HOSPITAL DOCTOR GENERATION // PASS // six event orders, hostile failures, old/new process isolation, startup denial and bounded watchdog recovery // SOURCE-ONLY");
+// Another queued-event ordering: A succeeds, B becomes active, then both
+// A's stale timer and A's late stream callback run. Neither may promote or
+// cancel B before its own watchdog fires.
+const retry = mock();
+assert.equal(retry.scope.refresh(), true);
+commit(retry, 0);
+assert.equal(retry.scope.refresh(), true);
+assert.equal(retry.fireWatchdog(retry.timers[0]), false);
+assert.equal(retry.deliver(retry.jobs[0], "stdout",
+    JSON.stringify([doctor("stale") ])), false);
+unpublished(retry, 1);
+assert.equal(retry.fireWatchdog(retry.timers[1]), true);
+assert.equal(retry.scope.loaded, false);
+assert.equal(retry.scope.doctors.length, 0);
+assert.match(retry.scope.lastError, /TIMED OUT/);
+assert.equal(retry.scope.notifications, 2);
+console.log("HOSPITAL DOCTOR WATCHDOG OWNER // PASS // six event orders, old-timer-after-retry isolation, wrong-owner timer refusal, startup and timeout cleanup // SOURCE-ONLY");

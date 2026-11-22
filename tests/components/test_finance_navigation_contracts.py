@@ -8,6 +8,7 @@ menu = (root / "widgets/FinanceW.qml").read_text(encoding="utf-8")
 shared_close = (root / "components/CloseButton.qml").read_text(encoding="utf-8")
 
 main_modes = [
+    ('"banking"', '"Banking"', '"₊˚⋆🏛⊹"'),
     ('"budget"', '"Budget"', '"⋆$🗓₊˚"'),
     ('"market"', '"Market"', '"₊˚$🗠๋࣭⭑"'),
     ('"radar"', '"Radar"', '"࣪ ˖(˓🛰₊˚⊹"'),
@@ -109,9 +110,10 @@ assert 'color: mainModeButton.pressed ? Colors.black : Colors.white' in menu
 assert 'mainModeButton.selected || mainModeButton.hovered' in menu
 assert '? 0.48 : 0.34' in menu
 
-# No increase in ornament size: the two core glyphs are larger, the
-# decorations remain smaller and Unicode combining marks stay on the core.
+# Existing core ornament sizes are unchanged; Banking uses the same
+# centered segmented-icon method with its own 30px temple core.
 segmented = {
+    '"banking"': ("₊˚⋆", "", "🏛", "⊹", "₊˚⋆🏛⊹"),
     '"market"': ("₊˚", "$", "🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
     '"radar"': ("࣪ ˖(˓", "", "🛰", "₊˚⊹", "࣪ ˖(˓🛰₊˚⊹"),
     '"strategies"': ("˙°", "", "⚖︎๋࣭", "⭑", "˙°⚖︎๋࣭⭑"),
@@ -152,7 +154,7 @@ assert 'font.pixelSize: 31' in menu
 for size in (31, 15, 12):
     assert f"font.pixelSize: {size}" in menu
 assert "font.pixelSize: modelData.coreSize || 34" in menu
-for ident, size in (("radar", 30), ("strategies", 28), ("safety", 28)):
+for ident, size in (("banking", 30), ("radar", 30), ("strategies", 28), ("safety", 28)):
     row = next(line for line in menu.splitlines()
                if f'id: "{ident}", name:' in line)
     assert f'coreSize: {size}' in row, (ident, row)
@@ -160,7 +162,7 @@ for ident in ("market", "agentic"):
     row = next(line for line in menu.splitlines()
                if f'id: "{ident}", name:' in line)
     assert "coreSize:" not in row, (ident, row)
-assert menu.count("coreSize:") == 3
+assert menu.count("coreSize:") == 4
 assert "scale: Math.min(1, mainIcon.width" in menu
 assert "scale: Math.min(1, subIcon.width" in menu
 

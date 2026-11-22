@@ -336,16 +336,24 @@ PanelWindow {
                         // orange/magenta state grammar with no Tree exception.
                         readonly property color iconIdentityColor:
                             modelData.name === "CHERRY" ? Colors.white : Colors.orange
+                        // Keep idle lettering and border in the original
+                        // outline colors, while the default icon/name/halo glow
+                        // follows each Tree's own identity: Cherry magenta,
+                        // Maple red. Hover/open are still shared DockButton
+                        // state transitions, not per-Tree exceptions.
+                        readonly property color idleGlowColor:
+                            modelData.name === "CHERRY" ? Colors.magenta : Colors.red
                         normalForegroundColor: iconIdentityColor
                         hoverForegroundColor: Colors.orange
                         pressedForegroundColor: Colors.magenta
-                        normalDockGlowColor: iconIdentityColor
-                        normalContentGlowColor: iconIdentityColor
+                        normalDockGlowColor: idleGlowColor
+                        normalContentGlowColor: idleGlowColor
                         // DockButton owns the two perimeter halos; separate
                         // text and icon samples avoid duplicate full-row glow.
                         contentGlowEnabled: false
                         border.width: 1
-                        border.color: treeRow.dockGlowColor
+                        border.color: treeRow.open || treeRow.pressed || treeRow.hovered
+                            ? treeRow.dockGlowColor : treeRow.iconIdentityColor
                         Accessible.name: modelData.name + " Tree"
                         onLeftClicked: root.selectedTreeIndex = index
 

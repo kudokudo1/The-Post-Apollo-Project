@@ -141,6 +141,9 @@ class PreferenceStoreFP1k(unittest.TestCase):
         self.assertEqual(target.read_text(),"{}")
         record.unlink()
         lock = self.directory/"mine.lock"
+        # Earlier refused SAVE was allowed to create the private lock file
+        # before rejecting the symlinked document. Replace only this fixture.
+        lock.unlink(missing_ok=True)
         lock.symlink_to(target)
         with self.assertRaises(store.Refusal):
             self.save()

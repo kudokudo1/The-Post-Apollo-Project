@@ -15,7 +15,10 @@ assert 'readonly property int frameWidth: chassisFrame.width' in menu
 assert 'readonly property int frameHeight: chassisFrame.height' in menu
 # All three FinanceW levels share the Git/Hospital 9px visible top line;
 # the 8px bottom reserve is part of the actual mapped window's height.
-assert 'property int panelHeight: 790' in git
+# Git retains the same 790px height at its default (middle) tier,
+# but now permits a deliberately operator-selected fullscreen fourth tier.
+assert '{ width: 1120, height: 790 }' in git
+assert 'readonly property int panelHeight: Math.min(' in git
 assert 'property int topGlowGutter: 9' in git
 assert 'mode === "fullscreen" ? 1345' in policy
 # Finance Large retains the separately approved 1345px height cap.

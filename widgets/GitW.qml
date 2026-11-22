@@ -267,21 +267,33 @@ PanelWindow {
     readonly property var resizeSteps: [
         { width: 1000, height: 720 },
         { width: 1120, height: 790 },
-        { width: 1360, height: 920 }
+        { width: 1360, height: 920 },
+        { width: 99999, height: 99999 }
     ]
     property int panelTopMargin: 0
     property int panelLeftMargin: 600
     property int frameInset: 8
     property int glowGutter: 14
     property int topGlowGutter: 9
+    property var notificationsReference: null
+    readonly property int visualBottomGap: notificationsReference
+        ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
+        : 13
+    // Fullscreen releases Git's normal 600px reserved left strip. Its
+    // visible top stays at the original 9px and aligns at the bottom
+    // with the actual Notifications/Social visible frame.
+    readonly property int effectivePanelLeftMargin:
+        resizeLevel === resizeSteps.length - 1 ? glowGutter : panelLeftMargin
+    readonly property int effectiveBottomGlowGutter:
+        resizeLevel === resizeSteps.length - 1 ? visualBottomGap : glowGutter
     readonly property int panelWidth: Math.min(
         resizeSteps[resizeLevel].width,
         Math.max(1, (screen ? screen.width : 2560)
-                 - panelLeftMargin - glowGutter))
+                 - effectivePanelLeftMargin - glowGutter))
     readonly property int panelHeight: Math.min(
         resizeSteps[resizeLevel].height,
         Math.max(1, (screen ? screen.height : 1440)
-                 - panelTopMargin - topGlowGutter - glowGutter))
+                 - panelTopMargin - topGlowGutter - visualBottomGap))
     function stepWindowSize(delta) {
         if (delta !== -1 && delta !== 1)
             return;
@@ -290,7 +302,7 @@ PanelWindow {
     }
 
     implicitWidth: panelWidth + glowGutter * 2
-    implicitHeight: panelHeight + topGlowGutter + glowGutter
+    implicitHeight: panelHeight + topGlowGutter + effectiveBottomGlowGutter
 
     anchors {
         top: true
@@ -301,7 +313,7 @@ PanelWindow {
 
     margins {
         top: panelTopMargin
-        left: panelLeftMargin - glowGutter
+        left: effectivePanelLeftMargin - glowGutter
         right: 0
         bottom: 0
     }
@@ -4176,6 +4188,29 @@ PanelWindow {
 
                     spacing: 8
 
+                    // Both size arrows sit immediately LEFT of Git's
+                    // LOCAL LIVE / PX LIVE status indicator.
+                    // Chassis geometry only. Keep active Git repository,
+                    // editor drafts, and GitHub run selection untouched.
+                    SharedComponents.ResizeButton {
+                        id: shrinkGitButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        direction: "down"
+                        available: root.resizeLevel > 0
+                        onResizeRequested: function(delta) {
+                            root.stepWindowSize(delta);
+                        }
+                    }
+                    SharedComponents.ResizeButton {
+                        id: growGitButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        direction: "up"
+                        available: root.resizeLevel < root.resizeSteps.length - 1
+                        onResizeRequested: function(delta) {
+                            root.stepWindowSize(delta);
+                        }
+                    }
+
                     Rectangle {
                         width: 94
                         height: 26
@@ -4230,27 +4265,6 @@ PanelWindow {
                                 color: pageStatusText.color
                                 transparentBorder: true
                             }
-                        }
-                    }
-
-                    // Chassis geometry only. Keep active Git repository,
-                    // editor drafts, and GitHub run selection untouched.
-                    SharedComponents.ResizeButton {
-                        id: shrinkGitButton
-                        anchors.verticalCenter: parent.verticalCenter
-                        direction: "down"
-                        available: root.resizeLevel > 0
-                        onResizeRequested: function(delta) {
-                            root.stepWindowSize(delta);
-                        }
-                    }
-                    SharedComponents.ResizeButton {
-                        id: growGitButton
-                        anchors.verticalCenter: parent.verticalCenter
-                        direction: "up"
-                        available: root.resizeLevel < root.resizeSteps.length - 1
-                        onResizeRequested: function(delta) {
-                            root.stepWindowSize(delta);
                         }
                     }
 

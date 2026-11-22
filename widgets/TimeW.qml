@@ -3046,6 +3046,25 @@ PanelWindow {
                     text: "TIME // " + timew.headerModeName
                 }
 
+                // Size controls belong in the top header, directly LEFT of
+                // the measured clock-status indicator (before sync/close).
+                ResizeButton {
+                    id: shrinkTimeButton
+                    direction: "down"
+                    available: timew.resizeLevel > 0
+                    onResizeRequested: function(delta) {
+                        timew.stepWindowSize(delta);
+                    }
+                }
+                ResizeButton {
+                    id: growTimeButton
+                    direction: "up"
+                    available: timew.resizeLevel < timew.resizeSteps.length - 1
+                    onResizeRequested: function(delta) {
+                        timew.stepWindowSize(delta);
+                    }
+                }
+
                 Rectangle {
                     id: stateIndicator
                     width: 99
@@ -3126,23 +3145,6 @@ PanelWindow {
                     // confirmed correction is awaiting authorization.
                     selected: timew.resyncPopupOpen
                     onLeftClicked: timew.toggleResyncPopup()
-                }
-
-                ResizeButton {
-                    id: shrinkTimeButton
-                    direction: "down"
-                    available: timew.resizeLevel > 0
-                    onResizeRequested: function(delta) {
-                        timew.stepWindowSize(delta);
-                    }
-                }
-                ResizeButton {
-                    id: growTimeButton
-                    direction: "up"
-                    available: timew.resizeLevel < timew.resizeSteps.length - 1
-                    onResizeRequested: function(delta) {
-                        timew.stepWindowSize(delta);
-                    }
                 }
 
                 CloseButton {

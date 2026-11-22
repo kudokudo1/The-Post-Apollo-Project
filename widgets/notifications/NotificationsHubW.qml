@@ -1545,7 +1545,9 @@ PanelWindow {
                     anchors.topMargin: 8
                     anchors.leftMargin: 18
 
-                    width: 260
+                    // Leave the top-row size controls visible even at the
+                    // original compact 480px chassis width.
+                    width: Math.max(120, notificationHeaderActions.x - 26)
                     height: 30
 
                     text: "NOTIFICATION HUB"
@@ -1623,30 +1625,32 @@ PanelWindow {
                     glowColor: Colors.cyan
                 }
 
-                // Resize the full-height history *width* only. The red X
-                // in the title row hides this mapped hub and never dismisses
-                // history or applies pending service preference changes.
+                // Top-header resize controls sit left of the stored/status
+                // indicator and the red X. Right-anchored panels expand
+                // LEFTWARD, so left/purple grows and right/orange shrinks.
                 Row {
                     id: notificationHeaderActions
                     anchors.top: parent.top
-                    anchors.topMargin: 45
-                    anchors.right: parent.right
-                    anchors.rightMargin: 14
+                    anchors.topMargin: 7
+                    anchors.right: storedCountNumber.left
+                    anchors.rightMargin: 8
                     spacing: 4
                     z: 3
 
                     ResizeButton {
-                        id: narrowNotificationButton
+                        id: widenNotificationButton
                         direction: "left"
-                        available: root.resizeLevel > 0
+                        reverseHorizontalGrowth: true
+                        available: root.resizeLevel < root.resizeSteps.length - 1
                         onResizeRequested: function(delta) {
                             root.stepWindowWidth(delta);
                         }
                     }
                     ResizeButton {
-                        id: widenNotificationButton
+                        id: narrowNotificationButton
                         direction: "right"
-                        available: root.resizeLevel < root.resizeSteps.length - 1
+                        reverseHorizontalGrowth: true
+                        available: root.resizeLevel > 0
                         onResizeRequested: function(delta) {
                             root.stepWindowWidth(delta);
                         }
@@ -1666,7 +1670,7 @@ PanelWindow {
 
                     anchors.topMargin: 45
                     anchors.leftMargin: 14
-                    anchors.rightMargin: notificationHeaderActions.width + 22
+                    anchors.rightMargin: 14
 
                     height: root.searchHeight
 

@@ -147,7 +147,9 @@ assert "property int sharedPanelWidth: defaultPanelWidth" in social
 assert "property int sharedPanelHeight: defaultPanelHeight" in social
 assert "const" not in social.split("readonly property int defaultPanelY:", 1)[1].split("readonly property int discordX:", 1)[0]
 assert "notificationsReference: notificationsHubWindow" in shell
-assert shell.count("notificationsReference: notificationsHubWindow") == 2
+# Social and Hospital retain their original visible-height reference;
+# Apollo, Git and CPU++ now also clamp fullscreen against the same source.
+assert shell.count("notificationsReference: notificationsHubWindow") == 5
 
 # Geometry arithmetic. All three visible frames use identical 8px insets
 # and lower screen clearance. The Sway floating position is a separately

@@ -963,6 +963,7 @@ PanelWindow {
                 focusKeyTraceEnabled: shellRoot.focusKeyTraceEnabled
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
+                notificationsReference: notificationsHubWindow
                 keyboardActive: relationshipFocus.active
                                 ? relationshipFocus.owner === "git"
                                 : shellRoot.controlKeyboardOwner === "git"
@@ -1094,6 +1095,7 @@ PanelWindow {
         ApolloHubW {
             id: apolloHubWindow
             screen: shellRoot.screen
+            notificationsReference: notificationsHubWindow
             liveBridge: apolloHubLive
             // Same monotonic TimeW stopwatch used by the standalone menu.
             // Hub neither creates a second stopwatch nor changes TimeW modes.
@@ -1213,6 +1215,7 @@ PanelWindow {
                 id: cpuPlusWindow
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
+                notificationsReference: notificationsHubWindow
 
                 appControlWindow: appControlWindow
                 systemTelemetry: sharedSystemTelemetry

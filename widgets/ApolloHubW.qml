@@ -155,19 +155,27 @@ PanelWindow {
     // Shell-only size changes; tile order/widths and unsaved EDIT work live
     // in their existing stores and never get reconstructed by a resize.
     property int resizeLevel: 1
+    // The fourth level is always clamped to the actual display.
     readonly property var resizeSteps: [
         { width: 860, height: 640 },
         { width: 1000, height: 700 },
-        { width: 1200, height: 850 }
+        { width: 1200, height: 850 },
+        { width: 99999, height: 99999 }
     ]
     readonly property int glowGutter: 12
     readonly property int frameInset: 8
+    // Keep the visible Apollo top at y=0. Match Notifications' visible
+    // bottom edge, which also establishes Social's original shared height.
+    property var notificationsReference: null
+    readonly property int visualBottomGap: notificationsReference
+        ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
+        : 13
     readonly property int frameWidth: Math.min(
         resizeSteps[resizeLevel].width,
         Math.max(1, (screen ? screen.width : 2560) - glowGutter * 2))
     readonly property int frameHeight: Math.min(
         resizeSteps[resizeLevel].height,
-        Math.max(1, (screen ? screen.height : 1440) - glowGutter))
+        Math.max(1, (screen ? screen.height : 1440) - visualBottomGap))
     function stepWindowSize(delta) {
         if (delta !== -1 && delta !== 1)
             return;
@@ -808,16 +816,8 @@ PanelWindow {
                     color: Colors.magenta
                     text: "APOLLO // HUB"
                 }
-                ActionButton {
-                    // Keep text and its sampled glow aligned during layout/state changes.
-                    trackLabelGlowLocally: true
-                    id: editButton
-                    width: 85
-                    height: 32
-                    label: hub.editMode ? "VIEW" : "EDIT"
-                    selected: hub.editMode
-                    onLeftClicked: hub.editMode = !hub.editMode
-                }
+                // The Hub has no separate LIVE badge; keep these arrows
+                // in its top header left of EDIT and the red CloseButton.
                 ResizeButton {
                     id: shrinkHubButton
                     direction: "down"
@@ -833,6 +833,16 @@ PanelWindow {
                     onResizeRequested: function(delta) {
                         hub.stepWindowSize(delta);
                     }
+                }
+                ActionButton {
+                    // Keep text and its sampled glow aligned during layout/state changes.
+                    trackLabelGlowLocally: true
+                    id: editButton
+                    width: 85
+                    height: 32
+                    label: hub.editMode ? "VIEW" : "EDIT"
+                    selected: hub.editMode
+                    onLeftClicked: hub.editMode = !hub.editMode
                 }
                 CloseButton {
                     id: closeButton

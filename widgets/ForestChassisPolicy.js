@@ -1,10 +1,11 @@
-// FOREST V0: bounded visual geometry. No host/workarea mutation.
-// 0 compact -> 1 wider -> 2 taller -> 3 wider again.
+// Forest opens at the old largest (930x610) size, then grows vertically,
+// horizontally, and finally to a Git-bounded fullscreen stage.
+// Each stage is clamped to its own screen plus Git's fullscreen maximum.
 var stages = [
-    { width: 480, height: 340 },
-    { width: 660, height: 340 },
-    { width: 660, height: 540 },
-    { width: 930, height: 610 }
+    { width: 930, height: 610 },
+    { width: 930, height: 790 },
+    { width: 1360, height: 790 },
+    { width: 99999, height: 99999 }
 ];
 
 function step(level, delta) {
@@ -13,7 +14,8 @@ function step(level, delta) {
     return Math.max(0, Math.min(stages.length - 1, next));
 }
 
-function frame(level, screenWidth, screenHeight, gutter, topInset, bottomGap) {
+function frame(level, screenWidth, screenHeight, gutter, topInset, bottomGap,
+               gitMaxWidth, gitMaxHeight) {
     var index = Math.max(0, Math.min(stages.length - 1, Number(level) || 0));
     var width = Math.max(1, Number(screenWidth) || 1366);
     var height = Math.max(1, Number(screenHeight) || 768);
@@ -22,9 +24,19 @@ function frame(level, screenWidth, screenHeight, gutter, topInset, bottomGap) {
     // Only the frame's 9px optical inset precedes visible content.
     var heightAllowance = Math.max(0, Number(topInset) || 0)
                         + Math.max(0, Number(bottomGap) || 0) + 12;
+    // Match Git's 14px left/right fullscreen gutters and 9px top inset
+    // as the fallback. ForestW passes Git's measured caps at runtime.
+    var gitWidth = Number(gitMaxWidth);
+    if (!isFinite(gitWidth) || gitWidth <= 0)
+        gitWidth = Math.max(1, width - 28);
+    var gitHeight = Number(gitMaxHeight);
+    if (!isFinite(gitHeight) || gitHeight <= 0)
+        gitHeight = Math.max(1, height - 22);
     return {
-        width: Math.max(1, Math.min(stages[index].width, width - leftRightAllowance)),
-        height: Math.max(1, Math.min(stages[index].height, height - heightAllowance))
+        width: Math.max(1, Math.min(stages[index].width,
+                                     width - leftRightAllowance, gitWidth)),
+        height: Math.max(1, Math.min(stages[index].height,
+                                      height - heightAllowance, gitHeight))
     };
 }
 

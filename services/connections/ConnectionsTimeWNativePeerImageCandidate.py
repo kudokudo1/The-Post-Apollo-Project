@@ -201,11 +201,16 @@ def observe_untrusted_peer_process_image(receiver: socket.socket) -> dict:
     pidfd = None
     try:
         raw = receiver.getsockopt(socket.SOL_SOCKET, SO_PEERPIDFD, 4)
-        _check_deadline(deadline_ns)
         if len(raw) != 4:
             _hold("ORIGINAL_PEER_PIDFD_REQUIRED")
+        # The kernel just installed a live pidfd in this process. Assign it
+        # before the first potentially throwing deadline check so finally
+        # always closes the received descriptor.
         pidfd = struct.unpack("=i", raw)[0]
-        if pidfd < 0 or not _pidfd_alive(pidfd):
+        if pidfd < 0:
+            _hold("ORIGINAL_PEER_PIDFD_REQUIRED")
+        _check_deadline(deadline_ns)
+        if not _pidfd_alive(pidfd):
             _hold("ORIGINAL_PEER_EXITED")
         raw_creds = receiver.getsockopt(
             socket.SOL_SOCKET, socket.SO_PEERCRED, _CREDS.size)

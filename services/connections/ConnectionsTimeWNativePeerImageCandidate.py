@@ -58,7 +58,8 @@ def _pidfd_alive(fd):
 
 def _read_proc(pid, filename, maximum=MAX_PROC):
     try:
-        raw = (Path("/proc") / str(pid) / filename).read_bytes()
+        with (Path("/proc") / str(pid) / filename).open("rb") as source:
+            raw = source.read(maximum + 1)
     except (OSError, ValueError) as exc:
         raise PeerImageHold("C3E_TIMEW_PEER_IMAGE_HOLD // PROC_UNAVAILABLE") from exc
     if not raw or len(raw) > maximum:
@@ -67,8 +68,8 @@ def _read_proc(pid, filename, maximum=MAX_PROC):
 
 
 def _start_ticks(pid):
-    raw = _read_proc(pid, "stat").decode("ascii")
     try:
+        raw = _read_proc(pid, "stat").decode("ascii")
         # Linux /proc/pid/stat field 22, index 19 after ') '.
         start = raw.rsplit(") ", 1)[1].split()[19]
         if not start.isdecimal() or int(start) < 1:

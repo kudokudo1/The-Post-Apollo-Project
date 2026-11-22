@@ -29,6 +29,7 @@ const binary=join(here,"node_modules",".bin","actual-server");
 const writer=join(here,"write_allocation.mjs");
 const fundingWriter=join(here,"write_funding.mjs");
 const categoryWriter=join(here,"write_category.mjs");
+const groupWriter=join(here,"write_category_group.mjs");
 const host="http://127.0.0.1:5006";
 const password="FICTIONAL-ONLY-D12-TEST-2026";
 const date=new Date().toISOString().slice(0,7)+"-01";
@@ -506,6 +507,64 @@ async function main(){
     && c.group_id===groupId).length,1);
   assert.equal(catAfter.filter(c=>c.id===categoryId
     && c.name===catRename.proposedName && c.group_id===groupId).length,1);
+  await endClient();
+  // M5: The production group CLI operates only on this disposable fictional
+  // Actual server and a temporary CI-only private HOME.
+  const groupCreate={
+    mode:"create",requestId:"7".repeat(32),sourceKey,month,
+    groupId:"",expectedName:"",proposedName:"M5 FICTIONAL Reserve"
+  };
+  const groupRename={
+    mode:"rename",requestId:"8".repeat(32),sourceKey,month,
+    groupId,expectedName:"FICTIONAL Expenses",
+    proposedName:"M5 FICTIONAL Expenses"
+  };
+  const runGroup=cmd=>spawnSync(process.execPath,[groupWriter],{
+    encoding:"utf8",timeout:45000,input:JSON.stringify(cmd)+"\n",
+    env:{...process.env,HOME:writerHome,ACTUAL_SERVER_URL:"",
+      ACTUAL_SYNC_ID:"",ACTUAL_SYNC_ID_FILE:"",
+      ACTUAL_PASSWORD_FILE:"",ACTUAL_ENCRYPTION_PASSWORD_FILE:""}
+  });
+  const groupReceipt=cmd=>join(writerHome,".local","state","financew",
+    "operations","category-group-"+cmd.requestId+".json");
+  const resultToken=result=>/^FINANCEW_CATEGORY_GROUP_RESULT (committed|uncertain|blocked:[a-z0-9-]+)$/m
+    .exec(result.stdout)?.[1] || "missing-result";
+  stage="m5-group-permit-absent";
+  const groupLocked=runGroup(groupCreate);
+  assert.equal(groupLocked.status,1);
+  assert.equal(resultToken(groupLocked),"blocked:writes-disabled");
+  stage="m5-group-disposable-permit";
+  await writeFile(join(config,"category-group-writes-enabled"),
+    "FINANCEW_CATEGORY_GROUP_WRITES_APPROVED\n",
+    {mode:0o600,flag:"wx"});
+  stage="m5-group-create";
+  const madeGroup=runGroup(groupCreate);
+  if(madeGroup.status!==0 || resultToken(madeGroup)!=="committed")
+    throw new Error("group-create-"+resultToken(madeGroup));
+  stage="m5-group-rename";
+  const renamedGroup=runGroup(groupRename);
+  if(renamedGroup.status!==0 || resultToken(renamedGroup)!=="committed")
+    throw new Error("group-rename-"+resultToken(renamedGroup));
+  stage="m5-group-journal";
+  for(const cmd of [groupCreate,groupRename]){
+    const receiptPath=groupReceipt(cmd);
+    assert.equal(JSON.parse(await readFile(receiptPath,"utf8")).status,"committed");
+    assert.equal((await stat(receiptPath)).mode & 0o077,0);
+    assert.ok(!(await readFile(receiptPath,"utf8")).includes(cmd.proposedName));
+  }
+  stage="m5-group-replay";
+  const groupReplay=runGroup(groupCreate);
+  assert.equal(groupReplay.status,1);
+  assert.equal(resultToken(groupReplay),"blocked:operation-already-attempted");
+  stage="m5-group-fresh-readback";
+  await startClient("m5-group-independent");
+  await api.downloadBudget(syncId);
+  const realGroups=await api.getCategoryGroups();
+  assert.equal(realGroups.filter(g=>g.name===groupCreate.proposedName
+    && !g.is_income).length,1);
+  assert.equal(realGroups.filter(g=>g.id===groupId
+    && g.name===groupRename.proposedName).length,1);
+  process.stdout.write("FINANCEW_M5_DISPOSABLE_PASS group-create/rename/locked/replay/readback\n");
   stage="pass";
   process.stdout.write("FINANCEW_M2_DISPOSABLE_PASS category-create/rename/locked/replay/readback\\n");
   process.stdout.write("FINANCEW_D17C_DISPOSABLE_PASS locked/income/opening/replay/recovery/readback\n");

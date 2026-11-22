@@ -77,7 +77,9 @@ def _canonical_intent(data):
         raise FenceHold("EXACT_INTENT_REQUIRED")
     if data["audience"] != AUDIENCE or data["action"] != SCOPE_ACTION:
         raise FenceHold("WRONG_AUDIENCE_OR_ACTION")
-    for name in required - {"revision", "epoch", "expiresAt"}:
+    # Audience is already checked against an exact dotted namespace above;
+    # do not treat it as a human/fixture identifier.
+    for name in required - {"revision", "epoch", "expiresAt", "audience"}:
         _key(data[name])
     if any(type(data[n]) is not int for n in ("revision", "epoch", "expiresAt")):
         raise FenceHold("INVALID_INTENT_COUNTER")

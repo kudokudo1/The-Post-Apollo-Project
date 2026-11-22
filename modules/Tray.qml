@@ -17,12 +17,17 @@ Rectangle {
 
     color: Colors.black
     border.width: 1
-    border.color: trayButtonPressed ? Colors.orange
-                  : trayButtonHovered ? Colors.magenta : Colors.cyan
+    border.color: accentColor
     radius: 0
 
     property bool trayButtonPressed: false
     property bool trayButtonHovered: false
+    // Border, rear halos, icon halos and bottom marker all use the same
+    // single interaction state. Right-click no longer lights up the border
+    // in orange while the two shadows remain cyan.
+    readonly property color accentColor:
+        trayButtonPressed ? Colors.orange
+        : trayButtonHovered ? Colors.magenta : Colors.cyan
 
     // Exact application identity, never a substring match on a random tray
     // tooltip. Other applications retain their own native tray activation.
@@ -55,7 +60,7 @@ Rectangle {
 
         opacity: trayButtonPressed ? 0.6 : trayButtonHovered ? 0.5 : 0.4
 
-        color: trayButtonPressed ? Colors.cyan : trayButtonHovered ? Colors.cyan : Colors.cyan
+        color: trayDock.accentColor
     }
 
     RectangularShadow {
@@ -69,7 +74,7 @@ Rectangle {
 
         opacity: trayButtonPressed ? 0.12 : trayButtonHovered ? 0.09 : 0.07
 
-        color: trayButtonPressed ? Colors.cyan : trayButtonHovered ? Colors.cyan : Colors.cyan
+        color: trayDock.accentColor
     }
 
     // ===== EMPTY STATE / VISIBLE GOHU LABEL =====================
@@ -103,7 +108,7 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 3
-        color: Colors.magenta
+        color: trayDock.accentColor
         opacity: 0.85
     }
 
@@ -175,10 +180,24 @@ Rectangle {
 
                         // Tray selection belongs to the external item; a local
                         // click toggle cannot represent its menu/open state.
-                        color: trayButtonMouse.pressed ? Colors.cyan : trayButtonMouse.containsMouse ? Colors.orange : Colors.cyan
+                        color: trayDock.accentColor
 
                         transparentBorder: true
                     }
+                }
+
+                // Menu entries, labels, enablement and submenu behavior
+                // are supplied by the *application* through StatusNotifier.
+                // Quickshell displays that real menu; Post-Apollo does not
+                // invent a second per-application command list.
+                QsMenuAnchor {
+                    id: trayNativeMenu
+                    menu: trayButton.modelData.menu
+                    anchor.item: trayButton
+                    // This is a BOTTOM dock. Expand toward the screen above,
+                    // rather than trying to draw the menu below its edge.
+                    anchor.edges: Edges.Top
+                    anchor.gravity: Edges.Top
                 }
 
                 // ===== MOUSE ====================================
@@ -214,16 +233,25 @@ Rectangle {
 
                     onClicked: function (mouse) {
                         if (mouse.button === Qt.LeftButton) {
-                            // Activate the actual tray item; no undeclared
-                            // local test-state assignment may intercept this.
-                            if (trayDock.isDiscordTrayItem(trayButton.modelData))
+                            // Some StatusNotifier entries are menu-only:
+                            // activate() would be a no-op for those apps.
+                            if (trayButton.modelData.onlyMenu) {
+                                if (trayButton.modelData.hasMenu
+                                        && trayButton.modelData.menu)
+                                    trayNativeMenu.open();
+                            } else if (trayDock.isDiscordTrayItem(trayButton.modelData)) {
                                 trayDock.openDiscordFromTray();
-                            else
+                            } else {
                                 trayButton.modelData.activate();
+                            }
                         }
 
                         if (mouse.button === Qt.RightButton) {
-                            // Right-click function
+                            // No synthetic menu for an application that
+                            // does not advertise a native menu handle.
+                            if (trayButton.modelData.hasMenu
+                                    && trayButton.modelData.menu)
+                                trayNativeMenu.open();
                         }
                     }
 

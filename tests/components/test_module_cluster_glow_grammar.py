@@ -134,7 +134,12 @@ assert "clickTest" not in tray
 assert "trayButton.modelData.activate();" in tray
 assert "if (mouse.button === Qt.LeftButton)" in tray
 assert "if (mouse.button === Qt.RightButton)" in tray
-assert "color: trayButtonMouse.pressed ? Colors.cyan : trayButtonMouse.containsMouse ? Colors.orange : Colors.cyan" in tray
+# Tray border, both chassis shadows, icon glow and bottom accent now share
+# one stateful color; no independently colored icon halo can contradict it.
+assert 'readonly property color accentColor:' in tray
+assert 'border.color: accentColor' in tray
+assert tray.count('color: trayDock.accentColor') == 4
+assert 'color: trayButtonMouse.pressed ? Colors.cyan' not in tray
 assert "trayDock.trayButtonPressed = false;" in tray
 assert "trayDock.trayButtonHovered = false;" in tray
 assert 'model: SystemTray.items' in tray

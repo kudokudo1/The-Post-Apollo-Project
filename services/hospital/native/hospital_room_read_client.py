@@ -24,6 +24,9 @@ SCHEMA = "postapollo.hospital.protected-read-client.v1"
 REQUEST_SCHEMA = "post-apollo.hospital.protected-room-writer.v1"
 SOCKET_NAME = "hospital-room-writer-v1.sock"
 CONFIG_FIELDS = {"schema", "clientUid", "writerUid", "socketPath"}
+DOCTOR_FIELDS = {"id", "name", "role", "status", "createdAt", "updatedAt"}
+DOCTOR_STATUSES = {"ACTIVE", "INACTIVE", "RELEASED"}
+MAX_DOCTORS = 250
 ROOM_RE = re.compile(r"[A-Za-z0-9._:/-]{1,160}\Z", re.ASCII)
 SHA_RE = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 MAX_RESPONSE = 1_048_576
@@ -162,6 +165,9 @@ def _exchange(s: socket.socket, operation: str, room_id: str | None,
         request = {"schema": REQUEST_SCHEMA, "operation": "review", "roomId": room_id}
     elif operation == "bin" and room_id is None:
         request = {"schema": REQUEST_SCHEMA, "operation": "bin"}
+    elif operation == "doctor-directory" and room_id is None:
+        # Fixed metadata-only list. No caller-supplied filter, argv or SQL.
+        request = {"schema": REQUEST_SCHEMA, "operation": "doctor-directory"}
     else:
         refuse("READ_ONLY_OPERATION_REQUIRED")
     initial_peer = _peer(s, writer_uid)
@@ -191,7 +197,7 @@ def _exchange(s: socket.socket, operation: str, room_id: str | None,
                 or body.get("canBurn") is not False
                 or body.get("operatorAuthenticated") is not False):
             refuse("INVALID_PROTECTED_ROOM_REVIEW")
-    else:
+    elif operation == "bin":
         if type(body) is not list or len(body) > 2500:
             refuse("INVALID_PROTECTED_BIN")
         for row in body:
@@ -203,6 +209,33 @@ def _exchange(s: socket.socket, operation: str, room_id: str | None,
                     or type(row.get("revision")) is not int
                     or row["revision"] <= 0):
                 refuse("INVALID_PROTECTED_ROOM_ENTRY")
+    else:
+        # Doctor names are metadata, not authority. Reject unexpected
+        # fields, duplicate identities, unbounded strings or partial lists.
+        if type(body) is not list or len(body) > MAX_DOCTORS:
+            refuse("INVALID_PROTECTED_DOCTOR_DIRECTORY")
+        ids = set()
+        for row in body:
+            if (type(row) is not dict or set(row) != DOCTOR_FIELDS
+                    or type(row["id"]) is not str
+                    or not 1 <= len(row["id"]) <= 160
+                    or "\x00" in row["id"]
+                    or row["id"] in ids
+                    or type(row["name"]) is not str
+                    or not 1 <= len(row["name"]) <= 1024
+                    or "\x00" in row["name"]
+                    or type(row["role"]) is not str
+                    or not 1 <= len(row["role"]) <= 128
+                    or "\x00" in row["role"]
+                    or type(row["status"]) is not str
+                    or row["status"] not in DOCTOR_STATUSES
+                    or any(
+                        type(row[key]) is not str
+                        or len(row[key]) > 96 or "\x00" in row[key]
+                        for key in ("createdAt", "updatedAt")
+                    )):
+                refuse("INVALID_PROTECTED_DOCTOR_ENTRY")
+            ids.add(row["id"])
     return body
 
 def main(argv):
@@ -210,6 +243,8 @@ def main(argv):
         op, room_id = "review", argv[1]
     elif len(argv) == 1 and argv[0] == "bin":
         op, room_id = "bin", None
+    elif len(argv) == 1 and argv[0] == "doctor-directory":
+        op, room_id = "doctor-directory", None
     else:
         refuse("READ_ONLY_ARGUMENTS_REQUIRED")
     _installed_client()

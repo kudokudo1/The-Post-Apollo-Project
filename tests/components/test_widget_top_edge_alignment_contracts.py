@@ -66,12 +66,13 @@ assert "height: weatherStation.menuOpen ? weatherStation.frameHeight : 0" in wea
 # Expanded/Large grow without losing the common 9px visible top inset.
 policy = source("widgets/FinanceChassisPolicy.js")
 tasks_policy = source("widgets/TasksChassisPolicy.js")
-assert 'mode === "expanded" ? 900 : 790' in policy
+assert 'mode === "compact" || mode === "expanded" ? 790' in policy
+assert 'mode === "tall" ? 1020 : 1345' in policy
 assert 'mode === "large" ? 1345 : mode === "expanded" ? 1020 : 790' in tasks_policy
 assert 'var position = Number(chassisTopY) - Number(gutter);' in tasks_policy
 assert 'readonly property int frameHeight: Math.min(' in time
 
-# Finance uses one 9px visible top line in Compact, Expanded and Fullscreen.
+# Finance uses one 9px visible top line through all five chassis levels.
 assert "readonly property int frameTopInset: 9" in finance
 assert "readonly property int bottomScreenGap: 8" in finance
 assert "compactTopLift" not in finance
@@ -148,7 +149,7 @@ assert "property int sharedPanelHeight: defaultPanelHeight" in social
 assert "const" not in social.split("readonly property int defaultPanelY:", 1)[1].split("readonly property int discordX:", 1)[0]
 assert "notificationsReference: notificationsHubWindow" in shell
 # Social and Hospital retain their original visible-height reference;
-# Apollo, Git and CPU++ now also clamp fullscreen against the same source.
+# Apollo, Git and CPU++ now use the resolved Notifications window height.
 assert shell.count("notificationsReference: notificationsHubWindow") == 5
 
 # Geometry arithmetic. All three visible frames use identical 8px insets

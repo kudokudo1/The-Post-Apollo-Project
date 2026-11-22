@@ -1,0 +1,17 @@
+name: Connections TimeW C5 spend reference (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/**"
+      - "docs/connections/timew-c5-spend-fence-reference.md"
+      - ".github/workflows/connections-timew-c5-spend-reference.yml"
+  workflow_dispatch:
+jobs:
+  reference-negative-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify two-process spend and revocation refusal
+        run: python3 -B -I tests/connections/timew/test_timew_c5_spend_fence_reference.py

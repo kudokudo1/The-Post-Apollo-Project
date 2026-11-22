@@ -8,7 +8,7 @@
 >
 > **AUTHORITY //** Operator chooses the final product design and implementation scope. This record preserves the discussion and intended direction; it does **not** authorize code changes to other Rooms, bank connections, credential collection, financial transactions, migrations, merges or host activation.
 >
-> **PROVENANCE //** Operator's Banking menu/icon request and subsequent discussion on whether Banking should host full Cash App/Chime/PayPal experiences, provider screens and a combined Post-Apollo view. Relevant source milestones: [Banking M1 PR #2174](../../pull/2174) and [bounded CSV picker M2 PR #2179](../../pull/2179) (use absolute GitHub URLs below for review; check current merge states).
+> **PROVENANCE //** Operator's Banking menu/icon request and subsequent discussion on whether Banking should host full Cash App/Chime/PayPal experiences, provider screens and a combined Post-Apollo view. Relevant source milestones: [Banking M1 PR #2174](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2174) and [bounded CSV picker M2 PR #2179](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2179) (check current merge states).
 >
 > **STAFF //** Existing FinanceW Banking & Transfers lane, Hospital-compatible external DOC. No live Hospital Room/Assignment registration asserted.
 

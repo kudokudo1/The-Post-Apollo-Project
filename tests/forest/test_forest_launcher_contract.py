@@ -39,7 +39,52 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(text.count("id: forestButton"), 1)
         self.assertEqual(text.count("id: forestWindow"), 1)
         self.assertIn("onToggleRequested: forestWindow.toggle()", text)
-        self.assertIn("dockCenterX: shellRoot.margins.left + leftModules.x", text)
+        # Center dock owns ApolloHub. Forest is the adjacent right sibling.
+        self.assertIn("anchors.left: apolloHubHost.right", text)
+        self.assertIn("anchors.top: apolloHubHost.top", text)
+        self.assertIn("dockCenterX: shellRoot.margins.left + forestHost.x", text)
+        left_modules = text.split("id: leftModules", 1)[1].split(
+            "id: apolloHubHost", 1)[0]
+        self.assertNotIn("id: forestHost", left_modules)
+
+    def test_ai_palette_and_compact_decorated_icon(self):
+        text = (ROOT / "modules/Forest.qml").read_text()
+        for required in ('text: "🏕"', 'text: "࣪݁"', 'text: "๋⭑"',
+                         "anchors.top: campFace.top",
+                         "anchors.right: campFace.left",
+                         "anchors.left: campFace.right",
+                         "normalForegroundColor: Colors.green",
+                         "normalDockGlowColor: Colors.green",
+                         "normalContentGlowColor: Colors.green",
+                         "openForegroundColor: Colors.magenta",
+                         "openGlowColor: Colors.magenta"):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+        self.assertNotIn('text: "🌲"', text)
+
+    def test_live_status_is_between_resize_and_close(self):
+        text = (ROOT / "widgets/ForestW.qml").read_text()
+        first = text.index("id: expandButton")
+        middle = text.index("id: liveIndicator")
+        last = text.index("id: closeButton")
+        self.assertLess(first, middle)
+        self.assertLess(middle, last)
+        self.assertIn("anchors.right: liveIndicator.left", text)
+        self.assertIn("anchors.right: closeButton.left", text)
+        self.assertIn('text: "LIVE"', text)
+        self.assertIn("border.color: Colors.green", text)
+        # LIVE reflects an open QML workspace, not an inference backend.
+        self.assertIn("AI engine not connected", text)
+        self.assertIn("ADAPTER NOT CONNECTED", text)
+
+    def test_chassis_has_common_top_edge(self):
+        text = (ROOT / "widgets/ForestChassisPolicy.js").read_text()
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        self.assertIn("function topMargin(", text)
+        self.assertIn("    return 0;", text)
+        self.assertNotIn("topAllowance = height >= 300 ? 80", text)
+        self.assertIn("readonly property int frameTopInset: 9", view)
+        self.assertIn("anchors.topMargin: root.frameTopInset", view)
 
     def test_geometry_script(self):
         script = ROOT / "tests/forest/forest_geometry_test.cjs"

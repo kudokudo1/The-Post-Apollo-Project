@@ -18,8 +18,9 @@ function frame(level, screenWidth, screenHeight, gutter, topInset, bottomGap) {
     var width = Math.max(1, Number(screenWidth) || 1366);
     var height = Math.max(1, Number(screenHeight) || 768);
     var leftRightAllowance = Math.max(0, 2 * (Number(gutter) || 0)) + 12;
-    var topAllowance = height >= 300 ? 80 : 12;
-    var heightAllowance = topAllowance + Math.max(0, Number(topInset) || 0)
+    // Other top-row menus start at the compositor workarea top.
+    // Only the frame's 9px optical inset precedes visible content.
+    var heightAllowance = Math.max(0, Number(topInset) || 0)
                         + Math.max(0, Number(bottomGap) || 0) + 12;
     return {
         width: Math.max(1, Math.min(stages[index].width, width - leftRightAllowance)),
@@ -28,9 +29,9 @@ function frame(level, screenWidth, screenHeight, gutter, topInset, bottomGap) {
 }
 
 function topMargin(screenHeight, windowHeight) {
-    var height = Math.max(1, Number(screenHeight) || 768);
-    var windowSize = Math.max(1, Number(windowHeight) || 1);
-    return Math.max(0, Math.min(height >= 300 ? 80 : 12, height - windowSize - 12));
+    // Zero matches Git/Tasks/Time's workarea-aligned top edge. Frame owns 9px.
+    // Keep this accessor for existing ForestW geometry bindings and tests.
+    return 0;
 }
 
 function leftMargin(screenWidth, windowWidth, dockCenterX) {

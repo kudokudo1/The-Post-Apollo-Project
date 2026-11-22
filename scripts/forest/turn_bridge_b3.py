@@ -136,7 +136,8 @@ class ForestTurnBridge:
         return attempt_id, messages
 
     def _commit(self, owner: str, session_id: str, attempt_id: str,
-                revision: int, model: str, response: str) -> dict[str, object]:
+                revision: int, model: str, response: str,
+                pre_commit: Callable[[], bool] | None = None) -> dict[str, object]:
         # Never persist an unbounded output even if the model stream allows it.
         answer = _text(response, MAX_BODY)
         now = _time(self.clock_ms())
@@ -168,6 +169,16 @@ class ForestTurnBridge:
             ordinal = last[2] + 1
             if ordinal > MAX_MESSAGES_PER_SESSION:
                 raise BridgeRefusal("TURN_LIMIT")
+            # B4b: host-owned authorization must be fresh immediately before
+            # the durable INSERT, in the same SQLite transaction. A refusal
+            # rolls back all writes; the outer exchange aborts the attempt.
+            if pre_commit is not None:
+                try:
+                    approved = pre_commit()
+                except Exception as exc:
+                    raise BridgeRefusal("PRE_COMMIT_AUTHORIZATION_DENIED") from exc
+                if approved is not True:
+                    raise BridgeRefusal("PRE_COMMIT_AUTHORIZATION_DENIED")
             reply_turn_id = "t_" + uuid.uuid4().hex
             self.db.execute(
                 "INSERT INTO forest_turns "
@@ -204,7 +215,8 @@ class ForestTurnBridge:
     def exchange(self, *, owner: str, session_id: str,
                  expected_revision: int, model: str,
                  endpoint: str = "http://127.0.0.1:11434",
-                 max_predict: int = 256, num_ctx: int = 4096
+                 max_predict: int = 256, num_ctx: int = 4096,
+                 pre_commit: Callable[[], bool] | None = None,
                  ) -> Iterator[dict[str, object]]:
         """Provisional DELTA events; COMMITTED only after atomic durable write.
 
@@ -215,6 +227,8 @@ class ForestTurnBridge:
         completed = False
         transport = None
         try:
+            if pre_commit is not None and not callable(pre_commit):
+                raise BridgeRefusal("INVALID_PRE_COMMIT_HOOK")
             # Validate network and resource policy BEFORE reserving a turn.
             # A malformed request must not consume its one-time attempt.
             _number(max_predict, lower=1, upper=MAX_OUTPUT_TOKENS,
@@ -277,7 +291,8 @@ class ForestTurnBridge:
                 raise BridgeRefusal("INCOMPLETE_STREAM")
             receipt = self._commit(
                 _key(owner), _key(session_id), reserved,
-                expected_revision, _model_name(model), completed_text)
+                expected_revision, _model_name(model), completed_text,
+                pre_commit=pre_commit)
             completed = True
             yield receipt
         except (BridgeRefusal, ChatRefusal, JournalRefusal) as exc:

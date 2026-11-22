@@ -41,11 +41,16 @@ assert "visible: !bottomCenterTrayWindow.fullscreenWidgetActive" in bottom
 assert "visible: true" in bottom  # Surface remains mapped while art + input hide
 for owner in (
     "gitWindow", "apolloHubWindow", "cpuPlusWindow", "financeWindow",
-    "weatherStationWindow",
+    "weatherStationWindow", "companyNetworkWindow", "hospitalWindow",
+    "forestWindow", "trashWindow",
 ):
     assert owner + ".menuOpen" in bottom, owner
 assert 'financeWindow.chassisLevel === "fullscreen"' in bottom
 assert 'weatherStationWindow.chassisLevel === "fullscreen"' in bottom
+assert 'companyNetworkWindow.chassisLevel === "fullscreen"' in bottom
+assert 'hospitalWindow.panelWidthLevel === 3' in bottom
+assert 'forestWindow.chassisLevel === 3' in bottom
+assert 'trashWindow.chassisSize === "full"' in bottom
 # No extra shell/service process to poll Sway state; compositor z-order owns
 # external fullscreen and the opt-in guard owns the internal full-size modes.
 assert "Process {" not in bottom
@@ -70,7 +75,11 @@ const root = {
  apolloHubWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
  cpuPlusWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
  financeWindow: {menuOpen:false, chassisLevel:"compact"},
- weatherStationWindow: {menuOpen:false, chassisLevel:"compact"}
+ weatherStationWindow: {menuOpen:false, chassisLevel:"compact"},
+ companyNetworkWindow: {menuOpen:false, chassisLevel:"standard"},
+ hospitalWindow: {menuOpen:false, panelWidthLevel:0},
+ forestWindow: {menuOpen:false, chassisLevel:0},
+ trashWindow: {menuOpen:false, chassisSize:"compact"}
 };
 function blocked() { return vm.runInNewContext("Boolean(" + expression + ")", root); }
 assert.equal(blocked(), false);
@@ -91,6 +100,20 @@ for(const key of ["financeWindow", "weatherStationWindow"]) {
  assert.equal(blocked(), true, key + " full tier");
  root[key].menuOpen = false;
  assert.equal(blocked(), false, key + " closed");
+}
+for(const [name, key, full, middle] of [
+ ["companyNetworkWindow", "chassisLevel", "fullscreen", "standard"],
+ ["hospitalWindow", "panelWidthLevel", 3, 2],
+ ["forestWindow", "chassisLevel", 3, 2],
+ ["trashWindow", "chassisSize", "full", "large"]
+]) {
+ root[name].menuOpen = true;
+ root[name][key] = middle;
+ assert.equal(blocked(), false, name + " intermediate tier");
+ root[name][key] = full;
+ assert.equal(blocked(), true, name + " final tier");
+ root[name].menuOpen = false;
+ assert.equal(blocked(), false, name + " closed");
 }
 console.log("Post-Apollo fullscreen tray visibility gate: PASS");
 """

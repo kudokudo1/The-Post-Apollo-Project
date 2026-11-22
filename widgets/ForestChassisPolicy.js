@@ -1,10 +1,11 @@
-// Forest opens at the old largest (930x610) size, then grows vertically,
-// horizontally, and finally to a Git-bounded fullscreen stage.
+// Forest opens at the old largest (930x610) size. Stage 2 grows taller,
+// stage 3 fills Git's permitted height while retaining 930px width, and
+// stage 4 grows wider to Git-bounded fullscreen without growing taller.
 // Each stage is clamped to its own screen plus Git's fullscreen maximum.
 var stages = [
     { width: 930, height: 610 },
     { width: 930, height: 790 },
-    { width: 1360, height: 790 },
+    { width: 930, height: 99999 },
     { width: 99999, height: 99999 }
 ];
 

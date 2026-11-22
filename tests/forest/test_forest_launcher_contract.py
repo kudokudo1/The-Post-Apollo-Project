@@ -99,10 +99,13 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("open: index === root.selectedTreeIndex", view)
         self.assertIn('modelData.name === "CHERRY" ? Colors.white : Colors.orange', view)
         self.assertIn("normalForegroundColor: iconIdentityColor", view)
-        self.assertIn("normalDockGlowColor: iconIdentityColor", view)
+        self.assertIn('modelData.name === "CHERRY" ? Colors.magenta : Colors.red', view)
+        self.assertIn("normalDockGlowColor: idleGlowColor", view)
+        self.assertIn("normalContentGlowColor: idleGlowColor", view)
         self.assertIn("hoverForegroundColor: Colors.orange", view)
         self.assertIn("pressedForegroundColor: Colors.magenta", view)
-        self.assertIn("border.color: treeRow.dockGlowColor", view)
+        self.assertIn("border.color: treeRow.open || treeRow.pressed || treeRow.hovered", view)
+        self.assertIn("? treeRow.dockGlowColor : treeRow.iconIdentityColor", view)
         self.assertIn("color: treeRow.foregroundColor", view)
         self.assertIn("id: treeNameGlow", view)
         self.assertIn("safeSource: treeName", view)
@@ -242,9 +245,8 @@ class ForestLauncherContract(unittest.TestCase):
                      "components/AskSendButton.qml"):
             self.assertEqual(workflow.count(path), 2)
 
-        # Nominal chassis sizes from ForestChassisPolicy, including the
-        # narrow 480px stage. The placeholder retains meaningful width.
-        for frame_width in (930, 930, 1360, 1884):
+        # First three stages retain 930px width; only the fourth expands.
+        for frame_width in (930, 930, 930, 1884):
             side = min(204, max(144, round(frame_width * 0.31)))
             row = frame_width - side - 24
             mic = max(32, min(42, round(row * 0.12)))
@@ -510,7 +512,7 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("gitFullscreenWidthCap, gitFullscreenHeightCap", view)
         self.assertIn("{ width: 930, height: 610 }", policy)
         self.assertIn("{ width: 930, height: 790 }", policy)
-        self.assertIn("{ width: 1360, height: 790 }", policy)
+        self.assertIn("{ width: 930, height: 99999 }", policy)
         self.assertIn("{ width: 99999, height: 99999 }", policy)
         self.assertIn("visible: root.frameHeight >= 540", view)
         self.assertIn("text: root.frameHeight < 540", view)

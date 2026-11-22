@@ -101,7 +101,7 @@ test("M4 rename binds exactly one existing expense group ID",()=>{
 });
 test("M4 duplicate, reserved, untrusted IDs and unsafe group names refuse",()=>{
   for(const name of ["", "  ", "Income", "INCOME", "Needs", "needs",
-      "Z".repeat(81), "\\u0001unsafe"]) {
+      "Z".repeat(81), "\u0001unsafe"]) {
     assert.equal(previewGroup(snapshot,"create","",name).ok,false,name);
   }
   assert.equal(previewGroup(snapshot,"create","needs","Other").ok,false);

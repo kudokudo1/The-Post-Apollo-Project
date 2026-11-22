@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real Quickshell 0.3.2 H1 lifecycle smoke in an isolated fake-reader tree.
+"""Real Quickshell 0.3.0 H1 lifecycle smoke in an isolated fake-reader tree.
 
 NEVER installs native reader, touches the operator's desktop, opens real
 Hospital records or invokes PX. The production QML is copied verbatim except
@@ -68,7 +68,7 @@ def main():
     version = subprocess.run([str(qs), "--version"], capture_output=True,
                              text=True, timeout=15)
     version_text = (version.stdout + version.stderr).strip()
-    if version.returncode != 0 or "0.3.2" not in version_text:
+    if version.returncode != 0 or "0.3.0" not in version_text:
         raise RuntimeError("QUICKSHELL_VERSION_MISMATCH: " + version_text[:350])
     print("H1 REAL QUICKSHELL VERSION // " + version_text, flush=True)
 
@@ -171,7 +171,7 @@ def main():
                         pass
             raise RuntimeError("FAKE_READER_NOT_REAPED: " + repr(sorted(alive)))
         print(
-            "HOSPITAL H1 REAL QUICKSHELL // PASS // pinned 0.3.2, "
+            "HOSPITAL H1 REAL QUICKSHELL // PASS // pinned 0.3.0, "
             "hung fake reader terminated and reaped, 12-second timeout, "
             "stale timer refused and immediate fresh retry accepted "
             "// DISPOSABLE CI ONLY", flush=True

@@ -10,10 +10,16 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: trayDock
 
-    implicitWidth: trayRow.implicitWidth + 13
+    // Never collapse to a 13px black sliver when SystemTray.items is empty.
+    // Dynamic icon rows grow naturally, with their entire group centered.
+    implicitWidth: Math.max(92, trayRow.implicitWidth + 16)
     implicitHeight: 50
 
     color: Colors.black
+    border.width: 1
+    border.color: trayButtonPressed ? Colors.orange
+                  : trayButtonHovered ? Colors.magenta : Colors.cyan
+    radius: 0
 
     property bool trayButtonPressed: false
     property bool trayButtonHovered: false
@@ -66,17 +72,52 @@ Rectangle {
         color: trayButtonPressed ? Colors.cyan : trayButtonHovered ? Colors.cyan : Colors.cyan
     }
 
+    // ===== EMPTY STATE / VISIBLE G0HU MARK =====================
+    // The label describes an empty native tray; it is not an inert button
+    // masquerading as a real external application icon.
+    Column {
+        id: emptyTrayState
+        anchors.centerIn: parent
+        spacing: 1
+        visible: trayItems.count === 0
+
+        GohuText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "TRAY"
+            font.pixelSize: 14
+            color: Colors.cyan
+        }
+        GohuText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "NO ICONS"
+            font.pixelSize: 9
+            color: Colors.white
+        }
+    }
+
+    Rectangle {
+        width: 34
+        height: 2
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 3
+        color: Colors.magenta
+        opacity: 0.85
+    }
+
     // ===== TRAY ITEMS ===========================================
 
     RowLayout {
         id: trayRow
 
-        anchors.fill: parent
-        anchors.margins: 4
+        // Without a centered RowLayout, a single 30px icon in the new
+        // 92px minimum-width plaque would sit against the left edge.
+        anchors.centerIn: parent
 
         spacing: 3
 
         Repeater {
+            id: trayItems
             model: SystemTray.items
 
             delegate: Rectangle {

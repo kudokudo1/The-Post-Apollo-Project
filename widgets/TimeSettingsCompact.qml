@@ -15,6 +15,15 @@ Item {
     property bool zoneOpen: false
     property bool detailsOpen: false
     readonly property bool zoneSearchFocused: compactZonePicker.searchFocused
+    // The 457px compact controls preserve their original gaps. Larger TimeW
+    // viewports spread the same controls vertically instead of leaving a
+    // postage-stamp form against a fullscreen blank background. CPU++ uses
+    // the separate settingsSection="all" path, which stays unchanged.
+    readonly property int verticalGrowth: Math.max(0, height - 457)
+    readonly property int visualGap:
+        Math.min(52, 5 + Math.floor(verticalGrowth / 14))
+    readonly property int syncGap:
+        Math.min(45, 3 + Math.floor(verticalGrowth / 16))
     signal dockFormatRequested(bool use24)
 
     onSettingsSectionChanged: {
@@ -35,7 +44,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 3
-        spacing: 5
+        spacing: compact.visualGap
 
         GohuText {
             width: parent.width
@@ -302,7 +311,7 @@ Item {
         anchors.margins: 3
         // Extra trigger controls fit without a page scroller, including
         // a visible manual RESYNC confirmation row.
-        spacing: 3
+        spacing: compact.syncGap
         GohuText {
             width: parent.width
             height: 16

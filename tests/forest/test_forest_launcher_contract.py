@@ -167,6 +167,17 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(view.count("VoiceToTextButton {"), 1)
         self.assertEqual(view.count("AskSendButton {"), 1)
         self.assertIn("id: voiceToTextButton", view)
+        # The original speaking glyph and glyph glow stay enabled. Binding
+        # the glow to ActionButton's anchored content layer avoids sampling
+        # a centered glyph whose mapped x/y can become stale on resize.
+        forest_voice = view.split("VoiceToTextButton {", 1)[1].split("\n                }", 1)[0]
+        self.assertIn("glyphGlowEnabled: true", forest_voice)
+        self.assertIn("contentGlowSource: contentItem", forest_voice)
+        self.assertNotIn("voiceGlyph:", forest_voice)
+        self.assertIn('property string voiceGlyph: "🗣︎"', voice)
+        button = (ROOT / "components/ActionButton.qml").read_text()
+        self.assertIn("default property alias contentData: contentHost.data", button)
+        self.assertIn("property alias contentItem: contentHost", button)
         self.assertIn("id: forestAskSendButton", view)
         self.assertIn("id: modelPickerButton", view)
         self.assertIn("anchors.right: voiceToTextButton.left", view)

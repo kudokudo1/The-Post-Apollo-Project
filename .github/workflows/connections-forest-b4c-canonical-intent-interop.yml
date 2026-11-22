@@ -1,0 +1,81 @@
+name: Connections Forest B4c canonical signed-intent interop (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/forest_b4c_fixture_interop.py'
+      - 'tests/connections/test_connections_forest_b4c_contract_interop.py'
+      - 'tests/connections/test_connections_forest_b4c_fence_reference.py'
+      - 'docs/connections-forest-b4c-canonical-intent-interoperability.md'
+      - '.github/workflows/connections-forest-b4c-canonical-intent-interop.yml'
+      - 'services/connections/forest/ForestC5SignedEvidencePreflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-canonical-intent-interop-reference:
+    name: Signed-role to two-store fence parity, no native C5 authority
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned disposable Ed25519 test dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Static no-authority import boundary
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/forest_b4c_fixture_interop.py \
+            tests/connections/test_connections_forest_b4c_contract_interop.py \
+            tests/connections/test_connections_forest_b4c_fence_reference.py
+          python3 - <<'PY'
+          from pathlib import Path
+          b = Path('tests/connections/forest_b4c_fixture_interop.py').read_text()
+          f = Path('tests/connections/test_connections_forest_b4c_fence_reference.py').read_text()
+          for must in (
+              'FIXTURE_ONLY = True', 'PRODUCTION_AUTHORITY = False',
+              'SIGNED.verify_unenrolled_role_consistency(',
+              'SIGNED._intent(intent_wire, now_ms)',
+              'FENCE._canonical_intent(legacy_fixture)',
+              '"issuerWitness": digest',
+          ):
+              assert must in b, must
+          for forbidden in (
+              'socket.bind(', 'subprocess.run(', 'os.system(',
+              'Ed25519PrivateKey', 'PRODUCTION_AUTHORITY = True',
+          ):
+              assert forbidden not in b, forbidden
+          assert 'MODEL_SYNTAX' in f
+          assert 'INVALID_MODEL_IDENTIFIER' in f
+          for path in [
+              'scripts/forest/host_admission_b4a.py',
+              'scripts/forest/turn_bridge_b3.py',
+          ]:
+              text = Path(path).read_text()
+              assert 'forest_b4c_fixture_interop' not in text
+          PY
+      - name: Real Ed25519 to separate SQLite fixture interoperability
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_contract_interop.py' -v
+      - name: Previously reviewed signed-role and revocation regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_signed_role_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_host_precommit_b4b.py' -v
+          echo 'FOREST_B4C_INTEROP_TEST_ONLY // NO_ENROLLED_ROOT_OR_C5_PERMIT'

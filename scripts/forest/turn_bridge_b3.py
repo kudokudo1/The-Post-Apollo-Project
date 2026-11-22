@@ -17,8 +17,10 @@ from collections.abc import Callable, Iterator
 from contextlib import closing
 
 from ollama_chat_transport import (
-    ChatRefusal, _messages, _model_name, stream_chat,
+    ChatRefusal, _messages, _model_name, _number, stream_chat,
+    MIN_CONTEXT, MAX_CONTEXT, MAX_OUTPUT_TOKENS,
 )
+from ollama_inventory import InventoryFailure, _target
 from session_journal_v0 import (
     ForestSessionJournal, JournalRefusal, MAX_BODY, MAX_MESSAGES_PER_SESSION,
     _key, _text, _time, _write,
@@ -213,6 +215,16 @@ class ForestTurnBridge:
         completed = False
         transport = None
         try:
+            # Validate network and resource policy BEFORE reserving a turn.
+            # A malformed request must not consume its one-time attempt.
+            _number(max_predict, lower=1, upper=MAX_OUTPUT_TOKENS,
+                    code="INVALID_PREDICT_LIMIT")
+            _number(num_ctx, lower=MIN_CONTEXT, upper=MAX_CONTEXT,
+                    code="INVALID_CONTEXT")
+            try:
+                _target(endpoint)
+            except InventoryFailure as exc:
+                raise BridgeRefusal(exc.reason) from exc
             reserved, messages = self._reserve(
                 owner, session_id, expected_revision, model)
             yield {"event": "RESERVED", "attempt_id": reserved}

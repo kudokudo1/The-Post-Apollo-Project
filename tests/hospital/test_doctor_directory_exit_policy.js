@@ -142,19 +142,21 @@ const orders = [
     [0, 1, 2], [0, 2, 1], [1, 0, 2],
     [1, 2, 0], [2, 0, 1], [2, 1, 0],
 ];
-function unpublished(h) {
+function unpublished(h, priorNotifications = 0) {
     assert.equal(h.scope.doctors.length, 0, "PUBLISHED_PREMATURE_ROSTER");
     assert.equal(h.scope.loaded, false);
     assert.equal(h.scope.listResponseAccepted, false);
     assert.equal(h.scope.refreshing, true);
-    assert.equal(h.scope.notifications, 0);
+    assert.equal(h.scope.notifications, priorNotifications,
+        "UNVERIFIED_REFRESH_EMITTED_NEW_NOTIFICATION");
 }
 function commit(h, index, values = events, sequence = [0, 1, 2]) {
     const job = h.jobs[index];
+    const priorNotifications = h.scope.notifications;
     for (let i = 0; i < 3; i++) {
         const [kind, val] = values[sequence[i]];
         assert.equal(h.deliver(job, kind, val), true);
-        if (i < 2) unpublished(h);
+        if (i < 2) unpublished(h, priorNotifications);
     }
     return job;
 }
@@ -225,20 +227,20 @@ for (const terminal of ["success", "nonzero", "timeout"]) {
     const current = h.jobs[1];
     assert.notStrictEqual(old, current);
     assert.notEqual(old.requestGeneration, current.requestGeneration);
-    unpublished(h);
+    unpublished(h, 1);
     for (const [kind, value] of [
         ["stdout", JSON.stringify([doctor("stale")])],
         ["stderr", "STALE ERROR"],
         ["exit", [0, 0]],
     ]) {
         assert.equal(h.deliver(old, kind, value), false);
-        unpublished(h);
+        unpublished(h, 1);
     }
     assert.equal(h.scope.advanceDoctorRead(
         old, old.requestGeneration, policy.captureStdout(
             policy.begin(), JSON.stringify([doctor("forged-old")])
         )), undefined);
-    unpublished(h);
+    unpublished(h, 1);
     commit(h, 1, [
         ["stdout", JSON.stringify([doctor("fresh")])],
         ["stderr", ""],

@@ -28,7 +28,8 @@ assert 'gitService.actionOutput,' in view
 assert 'syncTimingHeader.isSyncOutput,' in view
 assert 'gitService.syncTimingRepoViewMs)' in view
 assert 'gitOutputPanel.showDetails\n                                        ? gitService.actionOutput' in view
-assert 'height: 112' in view
+assert 'height: gitControlCamera.outputPanelHeight' in view
+assert 'readonly property int outputPanelHeight:' in view
 assert 'syncTimingHeader.visible ? 33 : 24' in view
 assert 'NeonScrollBar {' in view
 assert 'text: gitOutputPanel.showDetails' in view

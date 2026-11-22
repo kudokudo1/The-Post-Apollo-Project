@@ -5,6 +5,9 @@ on:
     paths:
       - 'services/time/MachineV2SelectedSurfaceReview.py'
       - 'services/time/MachineV2SurfaceContinuityReview.py'
+      - 'tests/timew/TimeWScopeAC3eFusionPreflight.py'
+      - 'tests/timew/test_timew_scope_a_c3e_fusion.py'
+      - 'docs/timew-machine-v2-scope-a-c3e-fusion-ci.md'
       - 'tests/timew/test_machine_v2_surface_continuity_review.py'
       - 'docs/timew-machine-v2-scope-a-continuity.md'
       - 'tests/timew/test_machine_v2_selected_surface_review.py'
@@ -32,6 +35,8 @@ jobs:
         run: python3 -B -I tests/timew/test_machine_v2_selected_surface_review.py
       - name: Refuse inter-command surface reuse, compositor restart and geometry drift
         run: python3 -B -I tests/timew/test_machine_v2_surface_continuity_review.py
+      - name: Refuse cross-purpose C3e signatures and mismatched selected window continuity
+        run: python3 -B -I tests/timew/test_timew_scope_a_c3e_fusion.py
       - name: Preserve existing separate signed Brave pairing and durable V2 journal
         run: |
           python3 -B -I tests/timew/test_machine_v2_pair_consent.py
@@ -58,7 +63,12 @@ jobs:
           assert '"source_origin_verified": False' in p
           assert "MachineV2SelectedSurfaceReview" not in ui
           assert "MachineV2SurfaceContinuityReview" not in ui
+          assert "TimeWScopeAC3eFusionPreflight" not in ui
           assert '"restore_allowed": False' in continuity
           assert '"production_authorized": False' in continuity
+          fusion = Path("tests/timew/TimeWScopeAC3eFusionPreflight.py").read_text()
+          assert '"production_authorized": False' in fusion
+          assert '"restore_allowed": False' in fusion
+          assert "def run_native_timew_scope_a(*_args, **_kwargs):" in fusion
           print("TIMEW SCOPE A // READ-ONLY / NOT TRUSTED / NO PRODUCTION UI PATH")
           PY

@@ -2,15 +2,22 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// FOREST V0 // AI / automation identity uses Sub-Omnitrix green throughout
-// the closed dock. The canonical yellow fill and magenta open-state survive.
+// FOREST // AI/automation: Sub-Omnitrix green artwork and self-colored glow.
+// Decorative stars stay white until the widget is open, then turn magenta.
+// Shared DockButton owns the selected yellow fill, click, and outer halo.
 DockButton {
     id: dock
+
     property bool menuOpen: false
     signal toggleRequested()
+    readonly property int iconPadding: 10
+    readonly property color starColor: dock.open ? Colors.magenta : Colors.white
 
-    implicitWidth: 72
+    // Standard 50px rail height. The icon lives in the centered 30x30
+    // content square, leaving the same 10px padding on all four sides.
+    implicitWidth: 50
     implicitHeight: 50
+    radius: 0
     open: menuOpen
 
     normalForegroundColor: Colors.green
@@ -26,22 +33,49 @@ DockButton {
     normalContentGlowColor: Colors.green
     hoverContentGlowColor: Colors.green
     pressedContentGlowColor: Colors.green
-    contentGlowSource: forestMark
+    // Sample only the campsite so the WHITE idle stars are not green-glowed.
+    contentGlowSource: tentFace
     trackArtworkGlowLocally: true
 
-    // One Gohu shaping run: the stars stay adjacent to the campsite,
-    // rather than being independently offset by fallback-font geometry.
-    // Emoji glyph fallback is owned by Qt, but the requested text item,
-    // ornament metrics and glow source all use GohuText.
-    GohuText {
-        id: forestMark
+    Item {
+        id: forestArtwork
+        width: dock.width - 2 * dock.iconPadding
+        height: dock.height - 2 * dock.iconPadding
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: -2
-        textFormat: Text.PlainText
-        text: "࣪݁🏕๋⭑"
-        font.pixelSize: 25
-        font.letterSpacing: -1
-        color: dock.foregroundColor
+
+        GohuText {
+            id: tentFace
+            anchors.centerIn: parent
+            textFormat: Text.PlainText
+            text: "🏕"
+            font.pixelSize: 23
+            color: dock.foregroundColor
+        }
+
+        // Star decoration is independent of the green tent foreground.
+        // Keep both marks inside the same centered artwork footprint,
+        // tucked above the tent instead of extending the dock width.
+        GohuText {
+            id: upperLeftStars
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.topMargin: -1
+            textFormat: Text.PlainText
+            text: "࣪݁✧"
+            font.pixelSize: 11
+            color: dock.starColor
+        }
+
+        GohuText {
+            id: upperRightStars
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: -1
+            textFormat: Text.PlainText
+            text: "๋⭑"
+            font.pixelSize: 12
+            color: dock.starColor
+        }
     }
 
     onLeftClicked: toggleRequested()

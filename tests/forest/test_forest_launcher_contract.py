@@ -39,24 +39,29 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(text.count("id: forestButton"), 1)
         self.assertEqual(text.count("id: forestWindow"), 1)
         self.assertIn("onToggleRequested: forestWindow.toggle()", text)
-        # Center dock owns ApolloHub. Forest uses its free LEFT side, not
-        # the Network dock to the right. One anchor, one launcher instance.
-        self.assertIn("anchors.right: apolloHubHost.left", text)
-        self.assertIn("anchors.rightMargin: 8", text)
+        # One Forest host inside the standard 8px left Row after To-do.
+        left = text.split("// ===== LEFT MODULES", 1)[1].split(
+            "// ===== CENTER MODULE", 1)[0]
+        self.assertIn("spacing: 8", left)
+        self.assertIn("id: forestHost", left)
+        self.assertLess(left.index("id: tasksHost"), left.index("id: forestHost"))
+        self.assertIn("dockCenterX: shellRoot.margins.left + leftModules.x", left)
+        self.assertIn("+ forestHost.x + forestButton.width / 2", left)
+        self.assertNotIn("anchors.right: apolloHubHost.left", text)
         self.assertNotIn("anchors.left: apolloHubHost.right", text)
-        self.assertIn("anchors.top: apolloHubHost.top", text)
-        self.assertIn("dockCenterX: shellRoot.margins.left + forestHost.x", text)
-        left_modules = text.split("id: leftModules", 1)[1].split(
-            "id: apolloHubHost", 1)[0]
-        self.assertNotIn("id: forestHost", left_modules)
+        self.assertEqual(text.count("id: forestHost"), 1)
 
     def test_ai_palette_and_compact_decorated_icon(self):
         text = (ROOT / "modules/Forest.qml").read_text()
-        for required in ('text: "࣪݁🏕๋⭑"',
-                         "GohuText {",
-                         "textFormat: Text.PlainText",
-                         "font.letterSpacing: -1",
-                         "contentGlowSource: forestMark",
+        for required in ('text: "🏕"', 'text: "࣪݁✧"', 'text: "๋⭑"',
+                         "GohuText {", "textFormat: Text.PlainText",
+                         "readonly property int iconPadding: 10",
+                         "readonly property color starColor: dock.open ? Colors.magenta : Colors.white",
+                         "implicitWidth: 50", "implicitHeight: 50",
+                         "width: dock.width - 2 * dock.iconPadding",
+                         "height: dock.height - 2 * dock.iconPadding",
+                         "anchors.centerIn: parent",
+                         "contentGlowSource: tentFace",
                          "normalForegroundColor: Colors.green",
                          "normalDockGlowColor: Colors.green",
                          "normalContentGlowColor: Colors.green",
@@ -64,12 +69,19 @@ class ForestLauncherContract(unittest.TestCase):
                          "openGlowColor: Colors.magenta"):
             with self.subTest(required=required):
                 self.assertIn(required, text)
-        self.assertNotIn('text: "🌲"', text)
         self.assertNotIn("NotoText {", text)
-        self.assertEqual(text.count("GohuText {"), 1)
-        self.assertEqual(text.count('text: "࣪݁🏕๋⭑"'), 1)
-        self.assertEqual(text.count("id: forestMark"), 1)
-
+        self.assertEqual(text.count("GohuText {"), 3)
+        self.assertEqual(text.count("color: dock.starColor"), 2)
+        self.assertEqual(text.count("id: tentFace"), 1)
+        self.assertEqual(text.count("color: dock.foregroundColor"), 1)
+        self.assertNotIn("anchors.verticalCenterOffset", text)
+        # Geometry constraint: a 50px square with 10px insets yields
+        # a centered 30px square on both axes. Text ink needs live review.
+        dock = 50
+        pad = 10
+        artwork = dock - 2 * pad
+        self.assertEqual((dock - artwork) / 2, pad)
+        self.assertEqual(artwork, 30)
 
     def test_live_status_is_between_resize_and_close(self):
         text = (ROOT / "widgets/ForestW.qml").read_text()

@@ -1038,6 +1038,27 @@ PanelWindow {
                 }
             }
         }
+        // Forest lives directly after To-do in leftModules. Row.spacing
+        // supplies the standard 8px gap; Apollo Hub stays center-anchored.
+        Item {
+            id: forestHost
+            width: forestButton.implicitWidth
+            height: forestButton.implicitHeight
+
+            Forest {
+                id: forestButton
+                anchors.fill: parent
+                menuOpen: forestWindow.menuOpen
+                onToggleRequested: forestWindow.toggle()
+            }
+
+            ForestW {
+                id: forestWindow
+                screen: shellRoot.screen
+                dockCenterX: shellRoot.margins.left + leftModules.x
+                             + forestHost.x + forestButton.width / 2
+            }
+        }
     }
 
     // ===== CENTER MODULE ========================================
@@ -1164,32 +1185,6 @@ PanelWindow {
             keyboardActive: !relationshipFocus.active
             relationshipFocusModeActive: relationshipFocus.active
             relationshipFocused: false
-        }
-    }
-
-    // FOREST V0 // use the space LEFT of Apollo Hub, not the Network dock.
-    // Visual proximity does not transfer the Hub's or Hospital's authority.
-    Item {
-        id: forestHost
-        width: forestButton.implicitWidth
-        height: forestButton.implicitHeight
-
-        anchors.top: apolloHubHost.top
-        anchors.right: apolloHubHost.left
-        anchors.rightMargin: 8
-
-        Forest {
-            id: forestButton
-            anchors.fill: parent
-            menuOpen: forestWindow.menuOpen
-            onToggleRequested: forestWindow.toggle()
-        }
-
-        ForestW {
-            id: forestWindow
-            screen: shellRoot.screen
-            dockCenterX: shellRoot.margins.left + forestHost.x
-                         + forestButton.width / 2
         }
     }
 

@@ -261,14 +261,33 @@ PanelWindow {
     readonly property string selectedRunStatus:
         selectedRun ? String(selectedRun.status || "").toLowerCase() : ""
 
-    // One physical machine, two cameras. Page changes never resize the chassis.
-    property int panelWidth: 1120
-    property int panelHeight: 790
+    // One physical machine, two cameras. Only the new explicit size arrows
+    // alter the mapped chassis; Git/GitHub page changes never resize it.
+    property int resizeLevel: 1
+    readonly property var resizeSteps: [
+        { width: 1000, height: 720 },
+        { width: 1120, height: 790 },
+        { width: 1360, height: 920 }
+    ]
     property int panelTopMargin: 0
     property int panelLeftMargin: 600
     property int frameInset: 8
     property int glowGutter: 14
     property int topGlowGutter: 9
+    readonly property int panelWidth: Math.min(
+        resizeSteps[resizeLevel].width,
+        Math.max(1, (screen ? screen.width : 2560)
+                 - panelLeftMargin - glowGutter))
+    readonly property int panelHeight: Math.min(
+        resizeSteps[resizeLevel].height,
+        Math.max(1, (screen ? screen.height : 1440)
+                 - panelTopMargin - topGlowGutter - glowGutter))
+    function stepWindowSize(delta) {
+        if (delta !== -1 && delta !== 1)
+            return;
+        resizeLevel = Math.max(0, Math.min(resizeSteps.length - 1,
+                                           resizeLevel + delta));
+    }
 
     implicitWidth: panelWidth + glowGutter * 2
     implicitHeight: panelHeight + topGlowGutter + glowGutter
@@ -4211,6 +4230,27 @@ PanelWindow {
                                 color: pageStatusText.color
                                 transparentBorder: true
                             }
+                        }
+                    }
+
+                    // Chassis geometry only. Keep active Git repository,
+                    // editor drafts, and GitHub run selection untouched.
+                    SharedComponents.ResizeButton {
+                        id: shrinkGitButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        direction: "down"
+                        available: root.resizeLevel > 0
+                        onResizeRequested: function(delta) {
+                            root.stepWindowSize(delta);
+                        }
+                    }
+                    SharedComponents.ResizeButton {
+                        id: growGitButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        direction: "up"
+                        available: root.resizeLevel < root.resizeSteps.length - 1
+                        onResizeRequested: function(delta) {
+                            root.stepWindowSize(delta);
                         }
                     }
 

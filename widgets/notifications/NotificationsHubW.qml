@@ -116,8 +116,20 @@ PanelWindow {
     }
 
     // ===== QUICK CONFIG =========================================
-    // Main panel geometry. These preserve the placement you already dialed in.
-    property int panelWidth: 520
+    // Full-height Notifications remains right-anchored. Only its horizontal
+    // width changes; popups, history, filters and draft settings survive.
+    property int resizeLevel: 1
+    readonly property var resizeSteps: [480, 520, 680]
+    readonly property int panelWidth: Math.min(
+        resizeSteps[resizeLevel],
+        Math.max(1, (screen ? screen.width : 2560)
+                 - panelLeftMargin - panelRightMargin))
+    function stepWindowWidth(delta) {
+        if (delta !== -1 && delta !== 1)
+            return;
+        resizeLevel = Math.max(0, Math.min(resizeSteps.length - 1,
+                                           resizeLevel + delta));
+    }
 
     property int panelTopMargin: 0
     property int panelBottomMargin: 5
@@ -1544,6 +1556,19 @@ PanelWindow {
                     glowColor: Colors.magenta
                 }
 
+                // Whole-hub red X in the universal top-right position.
+                // This only closes the history UI, never dismisses a card.
+                CloseButton {
+                    id: closeNotificationsHubButton
+                    anchors.top: parent.top
+                    anchors.topMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    z: 3
+                    Accessible.name: "Close Notifications Hub"
+                    onCloseRequested: root.close()
+                }
+
                 // Stored notification count:
                 // > 0 = orange/orange
                 // 0   = white/cyan
@@ -1581,11 +1606,11 @@ PanelWindow {
 
                     anchors {
                         top: parent.top
-                        right: parent.right
+                        right: closeNotificationsHubButton.left
                     }
 
                     anchors.topMargin: 8
-                    anchors.rightMargin: 18
+                    anchors.rightMargin: 8
 
                     width: 56
                     height: 30
@@ -1596,6 +1621,36 @@ PanelWindow {
 
                     textColor: Colors.cyan
                     glowColor: Colors.cyan
+                }
+
+                // Resize the full-height history *width* only. The red X
+                // in the title row hides this mapped hub and never dismisses
+                // history or applies pending service preference changes.
+                Row {
+                    id: notificationHeaderActions
+                    anchors.top: parent.top
+                    anchors.topMargin: 45
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    spacing: 4
+                    z: 3
+
+                    ResizeButton {
+                        id: narrowNotificationButton
+                        direction: "left"
+                        available: root.resizeLevel > 0
+                        onResizeRequested: function(delta) {
+                            root.stepWindowWidth(delta);
+                        }
+                    }
+                    ResizeButton {
+                        id: widenNotificationButton
+                        direction: "right"
+                        available: root.resizeLevel < root.resizeSteps.length - 1
+                        onResizeRequested: function(delta) {
+                            root.stepWindowWidth(delta);
+                        }
+                    }
                 }
 
                 // ===== SEARCH ===================================
@@ -1611,7 +1666,7 @@ PanelWindow {
 
                     anchors.topMargin: 45
                     anchors.leftMargin: 14
-                    anchors.rightMargin: 14
+                    anchors.rightMargin: notificationHeaderActions.width + 22
 
                     height: root.searchHeight
 

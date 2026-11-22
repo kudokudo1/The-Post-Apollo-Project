@@ -24,7 +24,11 @@ class CpuPlusIdManagementMainModeContracts(unittest.TestCase):
         self.assertIn("Math.min(modes.length - 1", CPU)
 
     def test_chassis_geometry_and_existing_settings_unchanged(self):
-        for snippet in ("implicitWidth: 1000", "implicitHeight: 834",
+        # Default 1000×834 is preserved as the middle window-size level.
+        for snippet in ("property int resizeLevel: 1",
+                        "{ width: 1000, height: 834 }",
+                        "implicitWidth: Math.min(",
+                        "implicitHeight: Math.min(",
                         "id: modeRail", "height: 110",
                         "id: sharedInstrumentPane", "width: 390",
                         "id: targetPane", "width: 260",

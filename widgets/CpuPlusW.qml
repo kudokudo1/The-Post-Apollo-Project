@@ -849,8 +849,26 @@ PanelWindow {
     // filters, and future actuator controls room to breathe.
     // ============================================================
 
-    implicitWidth: 1000
-    implicitHeight: 834
+    // Keep the established 1000x834 default and preserve the same CPU++ actor.
+    // Size steps affect the existing panel only, not monitors or control state.
+    property int resizeLevel: 1
+    readonly property var resizeSteps: [
+        { width: 960, height: 834 },
+        { width: 1000, height: 834 },
+        { width: 1180, height: 980 }
+    ]
+    implicitWidth: Math.min(
+        resizeSteps[resizeLevel].width,
+        Math.max(1, (screen ? screen.width : 2560) - 220))
+    implicitHeight: Math.min(
+        resizeSteps[resizeLevel].height,
+        Math.max(1, (screen ? screen.height : 1440) - 12))
+    function stepWindowSize(delta) {
+        if (delta !== -1 && delta !== 1)
+            return;
+        resizeLevel = Math.max(0, Math.min(resizeSteps.length - 1,
+                                           resizeLevel + delta));
+    }
 
     anchors {
         top: true
@@ -1019,10 +1037,34 @@ PanelWindow {
             onCloseRequested: cpuPlusWindow.close()
         }
 
+        ResizeButton {
+            id: shrinkCpuButton
+            anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
+            anchors.right: growCpuButton.left
+            anchors.rightMargin: 4
+            direction: "down"
+            available: cpuPlusWindow.resizeLevel > 0
+            onResizeRequested: function(delta) {
+                cpuPlusWindow.stepWindowSize(delta);
+            }
+        }
+        ResizeButton {
+            id: growCpuButton
+            anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
+            anchors.right: cpuPlusCloseButton.left
+            anchors.rightMargin: 7
+            direction: "up"
+            available: cpuPlusWindow.resizeLevel
+                       < cpuPlusWindow.resizeSteps.length - 1
+            onResizeRequested: function(delta) {
+                cpuPlusWindow.stepWindowSize(delta);
+            }
+        }
+
         Rectangle {
             id: cpuPlusInternetIndicator
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
-            anchors.right: cpuPlusCloseButton.left
+            anchors.right: shrinkCpuButton.left
             anchors.rightMargin: 8
             width: 156
             height: 22

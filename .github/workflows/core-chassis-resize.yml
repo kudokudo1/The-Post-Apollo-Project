@@ -1,0 +1,39 @@
+name: Core chassis resize and Notifications close
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "widgets/ApolloHubW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/components/test_core_chassis_resize_controls.py"
+      - ".github/workflows/core-chassis-resize.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/TimeW.qml"
+      - "widgets/ApolloHubW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/components/test_core_chassis_resize_controls.py"
+      - ".github/workflows/core-chassis-resize.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    name: Core window-size and Notifications close contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Five owned window size policies, shared arrows, red X
+        run: python3 -B -I tests/components/test_core_chassis_resize_controls.py
+      - name: Shared component and chassis rollout remain intact
+        run: |
+          python3 -B -I tests/components/test_resize_button_contracts.py
+          python3 -B -I tests/components/test_universal_resize_rollout.py

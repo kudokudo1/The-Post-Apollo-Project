@@ -1,0 +1,29 @@
+name: Tray persistent watcher preflight
+
+on:
+  pull_request:
+    paths:
+      - "scripts/tray/persistent_watcher.sh"
+      - "tests/components/test_persistent_tray_registry.py"
+      - "OPERATE/persistent-system-tray.md"
+      - ".github/workflows/tray-persistent-watcher.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/tray/persistent_watcher.sh"
+      - "tests/components/test_persistent_tray_registry.py"
+      - "OPERATE/persistent-system-tray.md"
+      - ".github/workflows/tray-persistent-watcher.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-and-actuation-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell syntax
+        run: bash -n scripts/tray/persistent_watcher.sh
+      - name: Verify no live activation by default and guarded next-login enable
+        run: python3 -B -I tests/components/test_persistent_tray_registry.py

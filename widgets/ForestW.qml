@@ -55,6 +55,18 @@ PanelWindow {
         return true;
     }
     onSelectedTreeIndexChanged: modelPopupOpen = false
+    // An actual operator popup-open gesture explicitly authorizes one B0
+    // read-only inventory refresh. Reopening refreshes, but merely opening
+    // Forest or loading this QML component never scans automatically.
+    onModelPopupOpenChanged: {
+        if (modelPopupOpen) {
+            pendingModelScan = "";
+            lastScannedModel = "";
+            lastModelScanResult = "";
+            if (!localInventory.scanning)
+                localInventory.scanModels();
+        }
+    }
     onMenuOpenChanged: {
         if (!menuOpen)
             modelPopupOpen = false;
@@ -442,7 +454,9 @@ PanelWindow {
                 color: Colors.black
                 border.width: 1
                 border.color: Colors.magenta
-                clip: true
+                // The ListView clips its own content. Keep this outer popup
+                // unclipped so the shared red CloseButton halos remain intact.
+                clip: false
 
                 Item {
                     id: popupHeader
@@ -491,28 +505,17 @@ PanelWindow {
                             }
                         }
                     }
-                    Rectangle {
+                    // Reuse the ordinary red CloseButton contract:
+                    // U+00D7, red border/foreground/glow, yellow hover,
+                    // 17:16 ratio, and guarded ActionButton illumination.
+                    CloseButton {
                         id: closeModelPopupButton
                         anchors.right: parent.right
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 22
-                        height: 23
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.magenta
+                        width: 24
                         Accessible.name: "Close Forest model selector"
-                        GohuText {
-                            anchors.centerIn: parent
-                            text: "×"
-                            color: Colors.magenta
-                            font.pixelSize: 14
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.modelPopupOpen = false
-                        }
+                        onCloseRequested: root.modelPopupOpen = false
                     }
                 }
 
@@ -802,25 +805,51 @@ PanelWindow {
                     border.color: Colors.magenta
                     Accessible.name: "Open Forest model selector"
 
-                    GohuText {
-                        id: modelPickerGlyph
+                    // Split the decorated identity ⊹❦︎๋࣭⭑ into independent
+                    // Gohu layers. The botanical core stays AI green and its
+                    // two white ornaments do not inherit the selected tint.
+                    Item {
+                        id: modelPickerArt
                         anchors.centerIn: parent
-                        width: parent.width - 4
-                        text: "⊹❦︎๋࣭⭑"
-                        textFormat: Text.PlainText
-                        font.pixelSize: 16
-                        color: Colors.magenta
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                    TextHashGlow {
-                        safeSource: modelPickerGlyph
-                        requestedVisible: root.menuOpen
-                        foregroundColor: Colors.magenta
-                        preferredGlowColor: Colors.magenta
-                        radius: 8
-                        samples: 17
-                        opacity: 0.75
-                        z: -1
+                        width: 46
+                        height: 36
+
+                        GohuText {
+                            id: pickerLeftStar
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            text: "⊹"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 14
+                            color: Colors.white
+                        }
+                        GohuText {
+                            id: pickerFlower
+                            anchors.centerIn: parent
+                            text: "❦︎๋࣭"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 21
+                            color: Colors.green
+                        }
+                        GohuText {
+                            id: pickerRightStars
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            text: "⭑"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 13
+                            color: Colors.white
+                        }
+                        TextHashGlow {
+                            safeSource: pickerFlower
+                            requestedVisible: root.menuOpen
+                            foregroundColor: Colors.green
+                            preferredGlowColor: Colors.green
+                            radius: 8
+                            samples: 17
+                            opacity: 0.75
+                            z: -1
+                        }
                     }
                     MouseArea {
                         anchors.fill: parent

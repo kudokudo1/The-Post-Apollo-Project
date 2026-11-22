@@ -155,6 +155,48 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIsNotNone(veins)
         self.assertGreaterEqual(contour.attrib["d"].count("C"), 8)
 
+    def test_b0_inventory_ui_is_explicit_and_fail_closed(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        adapter = (ROOT / "services/forest/ForestInventoryAdapter.qml").read_text()
+        policy = (ROOT / "services/forest/ForestInventoryPolicy.js").read_text()
+        self.assertIn("ForestInventoryAdapter {", view)
+        self.assertIn("onClicked: localInventory.scanModels()", view)
+        self.assertIn("SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED", view)
+        self.assertIn("B1 / B2 / B3 READY AS CONTRACTS", view)
+        self.assertIn("running: false", adapter)
+        self.assertIn('Quickshell.shellPath("scripts/forest/ollama_inventory.py")', adapter)
+        self.assertIn('"list-models"', adapter)
+        self.assertNotIn("ollama_chat_transport", adapter)
+        self.assertNotIn("session_journal_v0", adapter)
+        self.assertNotIn("Quickshell.execDetached", adapter)
+        self.assertIn("generation_enabled !== false", policy)
+        self.assertIn("model_count !== value.models.length", policy)
+
+        node = r'''
+const fs=require("fs"), vm=require("vm");
+const ctx={}; vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"),ctx);
+const base={schema_version:1,provider:"ollama",status:"REACHABLE",
+ models:[{name:"qwen3:1.7b",size_bytes:1024}],model_count:1,
+ capabilities:["list_models"],generation_enabled:false,tools_enabled:false,sessions_enabled:false};
+const parse=o=>ctx.parseInventory(JSON.stringify(o));
+if (!parse(base).valid || parse(base).models[0].name!=="qwen3:1.7b")process.exit(1);
+for(const x of [
+ {...base,generation_enabled:true},{...base,sessions_enabled:true},
+ {...base,tools_enabled:true},{...base,model_count:2},
+ {...base,capabilities:["list_models","generate"]},
+ {...base,models:[{name:"bad name",size_bytes:1}]},
+ {...base,provider:"cloud"},
+ {...base,models:[{name:"a",size_bytes:1},{name:"a",size_bytes:2}],model_count:2}
+])if(parse(x).valid)process.exit(2);
+const unavailable={...base,status:"UNAVAILABLE",models:[],model_count:0,capabilities:[],reason:"OLLAMA_UNAVAILABLE"};
+if(!parse(unavailable).valid || parse(unavailable).status!=="UNAVAILABLE")process.exit(3);
+if(ctx.parseInventory("not-json").valid)process.exit(4);
+'''
+        result = subprocess.run(
+            ["node", "-e", node, str(ROOT / "services/forest/ForestInventoryPolicy.js")],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_live_status_is_between_resize_and_close(self):
         text = (ROOT / "widgets/ForestW.qml").read_text()
         first = text.index("id: expandButton")

@@ -981,3 +981,40 @@ Bounded files: `FinanceCategoriesPane.qml`, new
 documentation. No `FinanceW.qml` or shared widget-shell wiring.
 Nurse 2 coordination: [FinanceW Categories parallel lane issue
 #2182](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2182).
+
+
+## FinanceW Categories M5 // Dormant guarded expense-group writer
+
+This milestone adds an **independent, disconnected** backend for category
+group **create and same-ID rename**. It does not connect group PREVIEW to a
+save button or activate any real financial write.
+
+- `category_group_guard.mjs`: strict seven-field input (action mode, one-shot
+  request, source fingerprint, month, existing group ID, old and proposed
+  names), fresh `getCategoryGroups()` preflight, duplicate case-insensitive
+  name protection, income-group refusal, and post-sync readback. Only
+  `createCategoryGroup({name,is_income:false})` or
+  `updateCategoryGroup(groupId,{name})` is allowed. Never delete or move.
+- `write_category_group.mjs`: requires separately provisioned mode-0600
+  `~/.config/financew/category-group-writes-enabled` containing the exact
+  marker `FINANCEW_CATEGORY_GROUP_WRITES_APPROVED`. **No code creates this
+  marker** on the operator's host. Existing category-name permission is not
+  sufficient. Only the previously authenticated local standalone Actual
+  server is supported, with matching source fingerprint.
+- The writer shares `~/.local/state/financew/operations/.write-lock` and
+  committed/attempted journal with existing transaction, allocation,
+  funding, and category writes. The attempt receipt is fsynced before the
+  first mutation. Any failed post-mutation sync is *uncertain*: the durable
+  attempted receipt blocks all subsequent financial writes until manual
+  reconciliation. No automatic retries or journal clearing. Receipts never
+  include the group name or Actual credentials.
+
+Tests use a separate fictional ledger, a fake API fixture and the
+production writer against a **disposable Actual 26.10.0 server in CI only**,
+including permission refusal, create/rename, replay, private journals, and
+fresh readback.
+
+**Next:** Nurse 2 independent security/ownership review; after acceptance,
+a separate UI confirmation integration milestone. Real write authorization,
+operator desktop configuration, and deletion/reparenting require distinct
+operator approval. This change does not modify the live machine.

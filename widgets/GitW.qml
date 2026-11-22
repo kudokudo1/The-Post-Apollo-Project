@@ -280,8 +280,13 @@ PanelWindow {
         ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
         : 13
     // Fullscreen releases Git's normal 600px reserved left strip. Its
-    // visible top stays at the original 9px and aligns at the bottom
-    // with the actual Notifications/Social visible frame.
+    // visible top stays at the original 9px. Measure the actual mapped
+    // Notifications height, since screen.height includes the dock reserve.
+    readonly property int visualBottomY: notificationsReference
+        ? Math.max(1, Math.floor(notificationsReference.panelTopMargin
+                                  + notificationsReference.height
+                                  - notificationsReference.frameInset))
+        : Math.max(1, (screen ? screen.height : 1440) - visualBottomGap)
     readonly property int effectivePanelLeftMargin:
         resizeLevel === resizeSteps.length - 1 ? glowGutter : panelLeftMargin
     readonly property int effectiveBottomGlowGutter:
@@ -292,8 +297,7 @@ PanelWindow {
                  - effectivePanelLeftMargin - glowGutter))
     readonly property int panelHeight: Math.min(
         resizeSteps[resizeLevel].height,
-        Math.max(1, (screen ? screen.height : 1440)
-                 - panelTopMargin - topGlowGutter - visualBottomGap))
+        Math.max(1, visualBottomY - panelTopMargin - topGlowGutter))
     function stepWindowSize(delta) {
         if (delta !== -1 && delta !== 1)
             return;

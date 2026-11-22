@@ -46,6 +46,7 @@ PanelWindow {
         resizeSteps[resizeLevel].width,
         Math.max(1, Math.floor(frameHeight * 0.58)),
         Math.max(1, (screen ? screen.width : 2560) - 13 - glowGutter * 2))
+    readonly property int extraVerticalRoom: Math.max(0, frameHeight - 790)
     readonly property int frameHeight: Math.min(
         resizeSteps[resizeLevel].height,
         Math.max(1, (screen ? screen.height : 1440)
@@ -3207,17 +3208,37 @@ PanelWindow {
                 border.color: Colors.cyan
 
                 Column {
+                    id: timePageContent
                     anchors.fill: parent
                     anchors.margins: 14
                     spacing: 14
 
+                    // One bounded viewport shared by the selected pane.
+                    // Count only the visible page chrome and navigation.
+                    // Settings, Angel, and Alarm fill remaining height without
+                    // touching their saved data, mode state or editor objects.
+                    function availablePaneHeight(stripHeight, footerVisible, navHeight) {
+                        var strip = Math.max(0, Number(stripHeight) || 0);
+                        var nav = Math.max(0, Number(navHeight) || 0);
+                        var blocks = 3 + (strip > 0 ? 1 : 0)
+                                      + (nav > 0 ? 1 : 0)
+                                      + (footerVisible ? 1 : 0);
+                        var reserved = pageTitle.implicitHeight
+                                       + pageRule.height + strip + nav
+                                       + (footerVisible ? modeFooter.implicitHeight : 0)
+                                       + (blocks - 1) * spacing;
+                        return Math.max(0, height - reserved);
+                    }
+
                     GohuText {
+                        id: pageTitle
                         text: timew.selectedName + " // TIMEW"
                         color: timew.semanticColor
                         font.pixelSize: 18
                     }
 
                     Rectangle {
+                        id: pageRule
                         width: parent.width
                         height: 2
                         color: Colors.cyan
@@ -4768,13 +4789,11 @@ PanelWindow {
                         visible: timew.selectedMode === "tools"
                                  && timew.toolsView === "alarm"
                         width: parent.width
-                        // Same bounded content budget as the other TIMEW
-                        // secondary screens. Never size the pane from its
-                        // full editor/list content.
-                        // Reserve space for PREVIOUS/NEXT in the shared
-                        // bottom TimeW footer, outside the alarm list.
-                        height: Math.max(0, 505 - toolsSubModeStrip.height
-                                        - parent.spacing - 24)
+                        // Keep the editor pinned; let the saved alarm ListView
+                        // consume the extra height, with PREVIOUS/NEXT outside.
+                        height: timePageContent.availablePaneHeight(
+                            toolsSubModeStrip.height, false,
+                            alarmFooterNavigation.height)
                     }
 
                     Column {
@@ -4887,7 +4906,7 @@ PanelWindow {
                         Item {
                             id: stopwatchLapArea
                             width: parent.width
-                            height: 315
+                            height: 315 + Math.round(timew.extraVerticalRoom * 0.60)
 
                             ListView {
                                 id: stopwatchLapList
@@ -5031,7 +5050,7 @@ PanelWindow {
                         Item {
                             id: countdownListArea
                             width: parent.width
-                            height: 126
+                            height: 126 + Math.round(timew.extraVerticalRoom * 0.45)
 
                             ListView {
                                 id: countdownTimerList
@@ -7316,7 +7335,8 @@ PanelWindow {
                     TimeSettingsPane {
                         id: clockSettingsPane
                         width: parent.width
-                        height: 505 - settingsSubModeStrip.height - parent.spacing
+                        height: timePageContent.availablePaneHeight(
+                            settingsSubModeStrip.height, true, 0)
                         visible: timew.selectedMode === "settings"
                         settingsSection: timew.settingsView
                         showResyncTrigger: true
@@ -7332,7 +7352,7 @@ PanelWindow {
                     AngelPane {
                         id: angelPane
                         width: parent.width
-                        height: 505
+                        height: timePageContent.availablePaneHeight(0, true, 0)
                         visible: timew.selectedMode === "planned"
                         currentEpochMs: localClock.date.getTime()
                     }
@@ -7375,6 +7395,7 @@ PanelWindow {
                     }
 
                     GohuText {
+                        id: modeFooter
                         // The floating result sheet owns this space while it
                         // is open; the footer must not overlap its entries.
                         visible: !(timew.selectedMode === "clock"

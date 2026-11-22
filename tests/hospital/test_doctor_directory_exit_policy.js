@@ -34,14 +34,21 @@ const names = [
     ["completeDoctorRead", "process, generation, result"],
     ["advanceDoctorRead", "process, generation, next"],
     ["failDoctorRead", "process, generation, reason"],
+    ["timeoutDoctorRead", "watchdog, process, generation"],
 ];
 const methods = names.map(([n, args]) => method(n, args));
 for (const needle of [
     "doctorReadFactory.createObject(root, {",
     "requestGeneration: generation",
     "readGeneration += 1;",
-    "doctorReadWatchdog.start();",
-    "doctorReadWatchdog.stop();",
+    "doctorWatchdogFactory.createObject(root, {",
+    "ownerProcess: process,",
+    "requestGeneration: generation",
+    "activeWatchdog = watchdog;",
+    "activeWatchdog = null;",
+    "watchdog.start();",
+    "watchdog.stop();",
+    "watchdog.destroy();",
     "Qt.callLater(function() { process.destroy(); });",
     "activeRead === process",
     "generation === readGeneration",
@@ -51,10 +58,15 @@ for (const needle of [
     "DoctorReadPolicy.captureExit(",
     "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT",
     'process.exec([nativeReaderPath, "doctor-directory"]);',
-    "onTriggered: root.failDoctorRead(",
+    "onTriggered: root.timeoutDoctorRead(",
+    "requestWatchdog, requestWatchdog.ownerProcess,",
+    "requestWatchdog.requestGeneration",
+    "activeWatchdog !== watchdog",
 ]) assert.ok(qml.includes(needle), "Unpinned QML source: " + needle);
 for (const forbidden of [
     "listProcess.pendingRead",
+    "doctorReadWatchdog",
+    "root.activeRead, root.readGeneration",
     "root.doctors = doctors;",
     "saveProcess.exec(",
     "pxArgs(",
@@ -71,6 +83,7 @@ function doctor(id = "doctor-fixture") {
 const stdout = JSON.stringify([doctor()]);
 function mock(options = {}) {
     const jobs = [];
+    const timers = [];
     const later = [];
     const scope = vm.createContext({
         root: null,
@@ -84,15 +97,11 @@ function mock(options = {}) {
         lastRefreshedAt: "",
         lastSavedDoctor: null,
         activeRead: null,
+        activeWatchdog: null,
         readGeneration: 0,
         nativeReaderPath: "/usr/libexec/post-apollo/hospital/hospital-room-read",
         notifications: 0,
         doctorsRefreshed: function() { scope.notifications++; },
-        doctorReadWatchdog: {
-            active: false,
-            start: function() { this.active = true; },
-            stop: function() { this.active = false; },
-        },
         Qt: {callLater: function(fn) { later.push(fn); }},
         Date: Date,
     });
@@ -117,6 +126,27 @@ function mock(options = {}) {
             return instance;
         }
     };
+    scope.doctorWatchdogFactory = {
+        createObject: function(parent, props) {
+            if (options.timerFactoryFails) return null;
+            const timer = {
+                ownerProcess: props.ownerProcess,
+                requestGeneration: props.requestGeneration,
+                active: false,
+                stopped: false,
+                destroyed: false,
+                start: function() {
+                    if (options.timerStartThrows)
+                        throw new Error("watchdog timer start failure");
+                    this.active = true;
+                },
+                stop: function() { this.active = false; this.stopped = true; },
+                destroy: function() { this.destroyed = true; },
+            };
+            timers.push(timer);
+            return timer;
+        }
+    };
     for (const source of methods)
         vm.runInContext(source, scope);
     const deliver = (job, kind, value) => {
@@ -131,7 +161,14 @@ function mock(options = {}) {
         scope.advanceDoctorRead(job, job.requestGeneration, next);
         return true;
     };
-    return {scope, jobs, later, deliver};
+    const fireWatchdog = (timer) => {
+        // The QML Timer's onTriggered forwards its ORIGINAL owner identity,
+        // not the current active request's mutable state.
+        return scope.timeoutDoctorRead(
+            timer, timer.ownerProcess, timer.requestGeneration
+        );
+    };
+    return {scope, jobs, timers, later, deliver, fireWatchdog};
 }
 const events = [
     ["stdout", stdout],
@@ -174,13 +211,16 @@ for (const sequence of orders) {
     assert.equal(h.scope.loaded, true);
     assert.equal(h.scope.doctors[0].id, "doctor-fixture");
     assert.equal(h.scope.notifications, 1);
-    assert.equal(h.scope.doctorReadWatchdog.active, false);
+    assert.equal(h.timers.length, 1);
+    assert.equal(h.timers[0].active, false);
+    assert.equal(h.timers[0].stopped, true);
     assert.equal(job.pendingRead, null);
     assert.equal(h.scope.activeRead, null);
     assert.equal(h.scope.refreshing, false);
     assert.equal(job.running, false);
     h.later.forEach(fn => fn());
     assert.equal(job.destroyed, true);
+    assert.equal(h.timers[0].destroyed, true);
 }
 for (const [label, override] of [
     ["nonzero", {exit: [2, 0]}],
@@ -256,14 +296,20 @@ for (const terminal of ["success", "nonzero", "timeout"]) {
 }
 // If the host process fails before process-exit signal, watchdog recovery
 // makes the directory unavailable and a NEW isolated retry possible.
-for (const opts of [{factoryFails: true}, {execThrows: true}]) {
+for (const opts of [
+    {factoryFails: true},
+    {execThrows: true},
+    {timerFactoryFails: true},
+    {timerStartThrows: true},
+]) {
     const h = mock(opts);
     assert.equal(h.scope.refresh(), false);
     assert.equal(h.scope.doctors.length, 0);
     assert.equal(h.scope.loaded, false);
     assert.equal(h.scope.refreshing, false);
     assert.equal(h.scope.activeRead, null);
-    assert.match(h.scope.lastError, /START FAILED/);
+    assert.match(h.scope.lastError, /(START FAILED|WATCHDOG UNAVAILABLE)/);
+    assert.equal(h.scope.activeWatchdog, null);
 }
 for (const omit of ["stdout", "stderr", "exit"]) {
     const h = mock();
@@ -272,9 +318,7 @@ for (const omit of ["stdout", "stderr", "exit"]) {
     for (const [kind, val] of events)
         if (kind !== omit) h.deliver(job, kind, val);
     unpublished(h);
-    assert.equal(h.scope.failDoctorRead(
-        job, job.requestGeneration,
-        "HOSPITAL BACKEND NOT READY // DOCTOR READ TIMED OUT"), true);
+    assert.equal(h.fireWatchdog(h.timers[0]), true);
     assert.equal(h.scope.loaded, false);
     assert.equal(h.scope.refreshing, false);
     assert.equal(h.scope.activeRead, null);

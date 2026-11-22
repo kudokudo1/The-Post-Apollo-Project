@@ -33,10 +33,27 @@ PanelWindow {
         menuOpen && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
 
-    // Match FinanceW Compact's 790px visible height while retaining TimeW's
-    // existing 432px width, 9px top inset and distinct time controls.
-    readonly property int frameWidth: 432
-    readonly property int frameHeight: 790
+    // Window geometry only: preserve Clock, Alarm and MACHINE state while
+    // stepping one permanently mapped TimeW surface. Default is original size.
+    property int resizeLevel: 0
+    readonly property var resizeSteps: [
+        { width: 432, height: 790 },
+        { width: 560, height: 840 },
+        { width: 700, height: 920 }
+    ]
+    readonly property int frameWidth: Math.min(
+        resizeSteps[resizeLevel].width,
+        Math.max(1, (screen ? screen.width : 2560) - 13 - glowGutter * 2))
+    readonly property int frameHeight: Math.min(
+        resizeSteps[resizeLevel].height,
+        Math.max(1, (screen ? screen.height : 1440)
+                 - frameTopInset - glowGutter))
+    function stepWindowSize(delta) {
+        if (delta !== -1 && delta !== 1)
+            return;
+        resizeLevel = Math.max(0, Math.min(resizeSteps.length - 1,
+                                           resizeLevel + delta));
+    }
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9 // shared visible top line
     // TimeW identity is white. Universal magenta header, cyan dividers and
@@ -3014,9 +3031,10 @@ PanelWindow {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - stateIndicator.width
+                    width: Math.max(90, parent.width - stateIndicator.width
                            - syncButton.width - closeButton.width
-                           - header.spacing * 3
+                           - shrinkTimeButton.width - growTimeButton.width
+                           - header.spacing * 5)
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 18
@@ -3108,6 +3126,23 @@ PanelWindow {
                     // confirmed correction is awaiting authorization.
                     selected: timew.resyncPopupOpen
                     onLeftClicked: timew.toggleResyncPopup()
+                }
+
+                ResizeButton {
+                    id: shrinkTimeButton
+                    direction: "down"
+                    available: timew.resizeLevel > 0
+                    onResizeRequested: function(delta) {
+                        timew.stepWindowSize(delta);
+                    }
+                }
+                ResizeButton {
+                    id: growTimeButton
+                    direction: "up"
+                    available: timew.resizeLevel < timew.resizeSteps.length - 1
+                    onResizeRequested: function(delta) {
+                        timew.stepWindowSize(delta);
+                    }
                 }
 
                 CloseButton {

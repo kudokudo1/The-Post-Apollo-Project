@@ -88,25 +88,38 @@ class ForestLauncherContract(unittest.TestCase):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         self.assertIn('iconPath: "../assets/forest/cherry-outline.svg"', view)
         self.assertIn('iconPath: "../assets/forest/maple-outline.svg"', view)
-        self.assertIn("source: Qt.resolvedUrl(modelData.iconPath)", view)
+        self.assertIn("source: Qt.resolvedUrl(", view)
+        self.assertIn("modelData.hoverIconPath", view)
+        self.assertIn("modelData.openIconPath", view)
         self.assertIn("fillMode: Image.PreserveAspectFit", view)
         self.assertIn("width: 26", view)
         self.assertIn("height: 26", view)
         self.assertIn("text: modelData.name", view)
-        self.assertIn("onClicked: root.selectedTreeIndex = index", view)
-        self.assertIn("index === root.selectedTreeIndex ? Colors.magenta : Colors.white", view)
+        self.assertIn("onLeftClicked: root.selectedTreeIndex = index", view)
+        self.assertIn("open: index === root.selectedTreeIndex", view)
+        self.assertIn('modelData.name === "CHERRY" ? Colors.white : Colors.orange', view)
+        self.assertIn("normalForegroundColor: iconIdentityColor", view)
+        self.assertIn("normalDockGlowColor: iconIdentityColor", view)
+        self.assertIn("hoverForegroundColor: Colors.orange", view)
+        self.assertIn("pressedForegroundColor: Colors.magenta", view)
+        self.assertIn("border.color: treeRow.dockGlowColor", view)
+        self.assertIn("color: treeRow.foregroundColor", view)
+        self.assertIn("id: treeNameGlow", view)
+        self.assertIn("safeSource: treeName", view)
+        self.assertIn("contentGlowEnabled: false", view)
+        self.assertNotIn("color: index === root.selectedTreeIndex ?", view)
         self.assertNotIn("modelData.mark", view)
         self.assertNotIn('mark: "🍁"', view)
         self.assertNotIn('mark: "✿"', view)
 
-        # Forest-specific icon identity: foreground and halo are different
-        # color axes, with the effect sampling its sibling Image.
+        # Shared DockButton governs idle, hover, pressed and open
+        # consistently across the Tree artwork, title, border and glows.
         self.assertIn("TextHashGlow {", view)
         self.assertIn("id: treeGlyphGlow", view)
         self.assertIn("safeSource: treeGlyph", view)
         self.assertIn("requestedVisible: root.menuOpen", view)
-        self.assertIn('foregroundColor: modelData.name === "CHERRY" ? Colors.white : Colors.orange', view)
-        self.assertIn('preferredGlowColor: modelData.name === "CHERRY" ? Colors.magenta : Colors.red', view)
+        self.assertIn("foregroundColor: treeRow.foregroundColor", view)
+        self.assertIn("preferredGlowColor: treeRow.contentGlowColor", view)
         self.assertIn("z: -1", view)
         self.assertNotIn("layer.effect: DropShadow", view)
 
@@ -136,6 +149,25 @@ class ForestLauncherContract(unittest.TestCase):
                     self.assertIn(el.attrib.get("fill", "none"), ("none",))
                     if "stroke" in el.attrib:
                         self.assertEqual(el.attrib["stroke"], color)
+
+        # Variant SVGs must keep every original outline path intact while
+        # carrying the shared orange hover and magenta open palette.
+        for original, variant, ink in (
+            ("cherry-outline.svg", "cherry-hover-orange.svg", "#ED981A"),
+            ("cherry-outline.svg", "cherry-open-magenta.svg", "#C74EC7"),
+            ("maple-outline.svg", "maple-open-magenta.svg", "#C74EC7"),
+        ):
+            normal = ET.parse(ROOT / "assets/forest" / original).getroot()
+            colored = ET.parse(ROOT / "assets/forest" / variant).getroot()
+            paths_a = [p.attrib.get("d") for p in normal.iter()
+                       if p.tag == ns + "path"]
+            paths_b = [p.attrib.get("d") for p in colored.iter()
+                       if p.tag == ns + "path"]
+            self.assertEqual(paths_a, paths_b)
+            strokes = [n.attrib["stroke"] for n in colored.iter()
+                       if "stroke" in n.attrib]
+            self.assertTrue(strokes)
+            self.assertTrue(all(color == ink for color in strokes))
 
         cherry = ET.parse(ROOT / "assets/forest/cherry-outline.svg").getroot()
         petals = cherry.find(".//" + ns + "g[@id='sakura-petals']")
@@ -212,7 +244,7 @@ class ForestLauncherContract(unittest.TestCase):
 
         # Nominal chassis sizes from ForestChassisPolicy, including the
         # narrow 480px stage. The placeholder retains meaningful width.
-        for frame_width in (480, 660, 660, 930):
+        for frame_width in (930, 930, 1360, 1884):
             side = min(204, max(144, round(frame_width * 0.31)))
             row = frame_width - side - 24
             mic = max(32, min(42, round(row * 0.12)))
@@ -243,7 +275,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("clip: true", view)
         self.assertIn("id: sendGate", view)
         self.assertIn("id: promptRow", view)
-        self.assertIn('visible: root.chassisLevel >= 2', view)
+        self.assertIn('visible: root.frameHeight >= 540', view)
         self.assertIn('MODEL LIST READY // CHAT HOST NOT CONNECTED', view)
         self.assertIn('SEND LOCKED // HOST NOT CONNECTED', view)
         self.assertIn('Accessible.name: "Scan local Ollama models, read-only"', view)
@@ -251,7 +283,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("id: modelStrip", view)
         self.assertNotIn("id: nextModelButton", view)
         # Popups are bounded to the local chat panel even at the 340px stage.
-        for height in (340, 340, 540, 610):
+        for height in (610, 790, 790, 1051):
             chat_height = height - 56 - 30
             prompt_top = chat_height - 13 - 40
             popup_height = max(120, min(360, prompt_top - 42))
@@ -465,6 +497,25 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertNotIn("topAllowance = height >= 300 ? 80", text)
         self.assertIn("readonly property int frameTopInset: 9", view)
         self.assertIn("anchors.topMargin: root.frameTopInset", view)
+
+    def test_green_outer_frame_and_git_fullscreen_cap(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        shell = (ROOT / "shell.qml").read_text()
+        policy = (ROOT / "widgets/ForestChassisPolicy.js").read_text()
+        self.assertIn("borderColor: Colors.green", view)
+        self.assertIn("glowColor: Colors.green", view)
+        self.assertIn("gitFullscreenReference: gitWindow", shell)
+        self.assertIn("gitFullscreenReference.visualBottomY", view)
+        self.assertIn("gitFullscreenReference.glowGutter", view)
+        self.assertIn("gitFullscreenWidthCap, gitFullscreenHeightCap", view)
+        self.assertIn("{ width: 930, height: 610 }", policy)
+        self.assertIn("{ width: 930, height: 790 }", policy)
+        self.assertIn("{ width: 1360, height: 790 }", policy)
+        self.assertIn("{ width: 99999, height: 99999 }", policy)
+        self.assertIn("visible: root.frameHeight >= 540", view)
+        self.assertIn("text: root.frameHeight < 540", view)
+        self.assertIn("gitWidth", policy)
+        self.assertIn("gitHeight", policy)
 
     def test_geometry_script(self):
         script = ROOT / "tests/forest/forest_geometry_test.cjs"

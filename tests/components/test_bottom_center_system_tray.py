@@ -4,6 +4,7 @@
 Does not run a user's compositor, inspect tray contents, or mutate the desktop.
 """
 from pathlib import Path
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
@@ -53,6 +54,51 @@ assert "focusable: false" in bottom
 assert 'color: "transparent"' in bottom
 assert "surfaceFormat.opaque: false" in bottom
 assert "visible: true" in bottom
+
+# Execute the actual source boolean in JavaScript against every known
+# internal fullscreen tier; none should leave visible tray artwork or input.
+# The compositor itself owns external fullscreen through WlrLayer.Top.
+fullscreen_expression = bottom.split(
+    "readonly property bool fullscreenWidgetActive:", 1
+)[1].split("// Retain the permanently", 1)[0].strip()
+node = r"""
+const assert = require("node:assert/strict");
+const vm = require("node:vm");
+const expression = process.argv[1];
+const root = {
+ gitWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
+ apolloHubWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
+ cpuPlusWindow: {menuOpen:false, resizeLevel:1, resizeSteps:[0,1,2,3]},
+ financeWindow: {menuOpen:false, chassisLevel:"compact"},
+ weatherStationWindow: {menuOpen:false, chassisLevel:"compact"}
+};
+function blocked() { return vm.runInNewContext("Boolean(" + expression + ")", root); }
+assert.equal(blocked(), false);
+for(const key of ["gitWindow", "apolloHubWindow", "cpuPlusWindow"]) {
+ root[key].menuOpen = true;
+ root[key].resizeLevel = 2;
+ assert.equal(blocked(), false, key + " mid tier");
+ root[key].resizeLevel = 3;
+ assert.equal(blocked(), true, key + " full tier");
+ root[key].menuOpen = false;
+ assert.equal(blocked(), false, key + " closed");
+}
+for(const key of ["financeWindow", "weatherStationWindow"]) {
+ root[key].menuOpen = true;
+ root[key].chassisLevel = "large";
+ assert.equal(blocked(), false, key + " non-full tier");
+ root[key].chassisLevel = "fullscreen";
+ assert.equal(blocked(), true, key + " full tier");
+ root[key].menuOpen = false;
+ assert.equal(blocked(), false, key + " closed");
+}
+console.log("Post-Apollo fullscreen tray visibility gate: PASS");
+"""
+p = subprocess.run(
+    ["node", "-e", node, fullscreen_expression],
+    check=False, capture_output=True, text=True, timeout=12
+)
+assert p.returncode == 0, p.stdout + "\n" + p.stderr
 
 # The tray width changes as applications register/unregister. Centering must
 # be computed from the whole screen, without a left/right dock size offset.

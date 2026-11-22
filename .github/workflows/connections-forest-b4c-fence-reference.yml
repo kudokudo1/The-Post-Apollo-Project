@@ -1,0 +1,61 @@
+name: Connections Forest B4c revocation fence reference (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/test_connections_forest_b4c_fence_reference.py'
+      - 'docs/connections-forest-b4c-revocation-fence-reference.md'
+      - '.github/workflows/connections-forest-b4c-fence-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-two-store-ordering-no-issuer:
+    name: Two-store revocation reference, C5 Forest issuer not available
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify no trust/production path and compile test-only reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile tests/connections/test_connections_forest_b4c_fence_reference.py
+          python3 - <<'PY'
+          from pathlib import Path
+          file = Path('tests/connections/test_connections_forest_b4c_fence_reference.py')
+          source = file.read_text()
+          for required in (
+              'FENCE_REFERENCE_ONLY = True',
+              'PRODUCTION_AUTHORITY = False',
+              'C5_CONSENT_VERIFIED = False',
+              'INSTALLED_SOURCE_VERIFIED = False',
+              'BEGIN IMMEDIATE',
+              'UNKNOWN_HOLD',
+              'REVOCATION_WAITING_FOR_FENCE',
+              'SIMULATED_REVOCATION_ACK',
+              'ThreadPoolExecutor',
+          ):
+              assert required in source, required
+          for forbidden in (
+              'socket.bind(', 'socket.connect(', 'Ed25519PrivateKey',
+              'subprocess.run(', 'PRODUCTION_AUTHORITY = True',
+              'C5_CONSENT_VERIFIED = True', 'INSTALLED_SOURCE_VERIFIED = True',
+          ):
+              assert forbidden not in source, forbidden
+          PY
+      - name: Run separate issuer/Forest SQLite crash, replay and concurrency tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover \
+            -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+          echo 'FOREST_B4C_REF_ONLY // NO_C5_ISSUER_OR_PRODUCTION_AUTHORIZATION'

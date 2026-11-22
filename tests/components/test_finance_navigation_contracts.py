@@ -41,7 +41,8 @@ assert "root.keyboardOwnershipRequested();" in menu
 assert menu.count("ModeButton {") == 1
 # Existing controls plus local-draft actions, ALLOCATE and CHECK WRITE LOCK.
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
-assert menu.count("ActionButton {") == 22  # One header action now uses CloseButton
+assert menu.count("ActionButton {") == 20  # CloseButton and two ResizeButtons replace three raw header actions
+assert menu.count("ResizeButton {") == 2
 assert menu.count("CloseButton {") == 1
 assert "MouseArea {" not in menu
 

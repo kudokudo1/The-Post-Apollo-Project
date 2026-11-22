@@ -1606,11 +1606,10 @@ PanelWindow {
 
                     anchors {
                         top: parent.top
-                        right: parent.right
+                        right: closeNotificationsHubButton.left
                     }
 
                     anchors.topMargin: 8
-                    anchors.right: closeNotificationsHubButton.left
                     anchors.rightMargin: 8
 
                     width: 56

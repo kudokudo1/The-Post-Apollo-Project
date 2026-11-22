@@ -326,17 +326,29 @@ PanelWindow {
                 spacing: 7
                 Repeater {
                     model: root.treeSlots
-                    Rectangle {
+                    DockButton {
                         id: treeRow
                         width: treeColumn.width
                         height: 59
-                        color: index === root.selectedTreeIndex ? Colors.dark : Colors.black
+                        open: index === root.selectedTreeIndex
+                        // Each Tree keeps its own idle outline identity.
+                        // Hover, press, and open use the SAME shared DockButton
+                        // orange/magenta state grammar with no Tree exception.
+                        readonly property color iconIdentityColor:
+                            modelData.name === "CHERRY" ? Colors.white : Colors.orange
+                        normalForegroundColor: iconIdentityColor
+                        hoverForegroundColor: Colors.orange
+                        pressedForegroundColor: Colors.magenta
+                        normalDockGlowColor: iconIdentityColor
+                        normalContentGlowColor: iconIdentityColor
+                        // DockButton owns the two perimeter halos; separate
+                        // text and icon samples avoid duplicate full-row glow.
+                        contentGlowEnabled: false
                         border.width: 1
-                        border.color: index === root.selectedTreeIndex ? Colors.magenta : Colors.cyan
-                        // Hollow line artwork uses the same independent QML
-                        // layout as CameraGlyph, with an SVG Image as source.
-                        // Keep selected-state emphasis on text/border, not
-                        // recoloring Maple into Cherry's magenta.
+                        border.color: treeRow.dockGlowColor
+                        Accessible.name: modelData.name + " Tree"
+                        onLeftClicked: root.selectedTreeIndex = index
+
                         Item {
                             id: treeTitleRow
                             anchors.left: parent.left
@@ -353,28 +365,32 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 26
                                 height: 26
-                                source: Qt.resolvedUrl(modelData.iconPath)
+                                // Same vector silhouette in identity, hover,
+                                // and open palettes: no overlay tint or font fallback.
+                                source: Qt.resolvedUrl(
+                                    treeRow.open || treeRow.pressed
+                                    ? modelData.openIconPath
+                                    : treeRow.hovered
+                                      ? modelData.hoverIconPath : modelData.iconPath)
                                 sourceSize: Qt.size(64, 64)
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
                             }
 
-                            // The actual Image remains the foreground source. Sample it
-                            // from a sibling so the glow tracks its exact coordinates
-                            // and disconnects safely when the QML window goes away.
                             TextHashGlow {
                                 id: treeGlyphGlow
                                 safeSource: treeGlyph
                                 requestedVisible: root.menuOpen
-                                foregroundColor: modelData.name === "CHERRY" ? Colors.white : Colors.orange
-                                preferredGlowColor: modelData.name === "CHERRY" ? Colors.magenta : Colors.red
+                                foregroundColor: treeRow.foregroundColor
+                                preferredGlowColor: treeRow.contentGlowColor
                                 radius: 8
                                 samples: 17
-                                opacity: 0.82
+                                opacity: treeRow.contentGlowOpacity
                                 z: -1
                             }
 
                             GohuText {
+                                id: treeName
                                 anchors.left: treeGlyph.right
                                 anchors.leftMargin: 6
                                 anchors.right: parent.right
@@ -383,7 +399,18 @@ PanelWindow {
                                 font.pixelSize: 12
                                 font.bold: true
                                 elide: Text.ElideRight
-                                color: index === root.selectedTreeIndex ? Colors.magenta : Colors.white
+                                color: treeRow.foregroundColor
+                            }
+                            TextHashGlow {
+                                id: treeNameGlow
+                                safeSource: treeName
+                                requestedVisible: root.menuOpen
+                                foregroundColor: treeRow.foregroundColor
+                                preferredGlowColor: treeRow.contentGlowColor
+                                radius: 7
+                                samples: 13
+                                opacity: treeRow.contentGlowOpacity
+                                z: -1
                             }
                         }
                         GohuText {
@@ -395,12 +422,7 @@ PanelWindow {
                             elide: Text.ElideRight
                             text: modelData.role
                             font.pixelSize: 9
-                            color: Colors.cyan
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.selectedTreeIndex = index
+                            color: treeRow.foregroundColor
                         }
                     }
                 }

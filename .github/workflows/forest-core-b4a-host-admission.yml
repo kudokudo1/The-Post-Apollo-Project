@@ -1,0 +1,25 @@
+name: Forest Core B4a Synthetic Host Admission
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/HOST_ADMISSION_B4A.md'
+      - 'tests/forest/test_host_admission_b4a.py'
+      - '.github/workflows/forest-core-b4a-host-admission.yml'
+  push:
+    paths:
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/HOST_ADMISSION_B4A.md'
+      - 'tests/forest/test_host_admission_b4a.py'
+      - '.github/workflows/forest-core-b4a-host-admission.yml'
+
+jobs:
+  host-admission-synthetic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check synthetic host trust and permission contracts
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: Python syntax
+        run: python3 -m py_compile scripts/forest/host_admission_b4a.py tests/forest/test_host_admission_b4a.py

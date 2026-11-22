@@ -101,7 +101,9 @@ class AlarmManagerV2Contracts(unittest.TestCase):
         self.assertNotIn('id: alarmViewport', PANE)
         self.assertNotIn('id: editorScroll', PANE)
         self.assertNotIn('id: panRow', PANE)
-        self.assertIn('505 - toolsSubModeStrip.height', TIMEW)
+        self.assertIn('height: timePageContent.availablePaneHeight(', TIMEW)
+        self.assertIn('toolsSubModeStrip.height, false,', TIMEW)
+        self.assertIn('alarmFooterNavigation.height)', TIMEW)
         self.assertIn('- parent.spacing - 24', TIMEW)
 
     def test_previous_and_next_are_pinned_in_timew_bottom_footer(self):

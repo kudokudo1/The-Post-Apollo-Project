@@ -89,7 +89,8 @@ require("|| doctorService.lastError", HOST, "Host error")
 
 # Distinct, still-unmigrated Doctor-name writer remains on HOLD for native
 # cutover. This test does not claim its authority or activate its source.
-assert 'pxArgs(' in NAME
+assert '"doctor-name-set"' in NAME
+assert '.local/share/post-apollo-dev-runtime/bin/px' in NAME
 print(
     "HOSPITAL H1 DOCTOR LIST UI // PASS // native-only Doctor reads, "
     "no desktop fallback, failed backend not loaded, Doctor writes HOLD, "

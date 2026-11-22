@@ -79,7 +79,9 @@ jobs:
           assert "TemporaryDirectory" in test
           assert "H1_DISPOSABLE_STATE_DIR" in test
           assert "sha256sum --check" in workflow
-          assert "sudo install" not in workflow
-          assert "quickshell --reload" not in workflow
+          # Check execution steps, excluding this assertion block itself.
+          execution_steps = workflow.split("      - name: State isolation contract", 1)[0]
+          assert "sudo install" not in execution_steps
+          assert "quickshell --reload" not in execution_steps
           print("HOSPITAL H1 QML ISOLATION // PASS // fake reader in temporary directory only")
           PY

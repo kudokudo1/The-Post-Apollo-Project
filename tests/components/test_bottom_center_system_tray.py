@@ -142,7 +142,12 @@ assert 'text: "TRAY"' in tray and 'text: "NO ICONS"' in tray
 assert tray.count("GohuText {") >= 2
 assert "border.width: 1" in tray
 assert "border.color: accentColor" in tray
-assert "readonly property color accentColor:" in tray
+assert "readonly property color accentColor: Colors.orange" in tray
+# Orange is a persistent tray identity; hover/pressed state increases glow
+# energy instead of switching hue, including the registered icon silhouettes.
+assert "trayButtonPressed ? 0.82 : trayButtonHovered ? 0.7 : 0.55" in tray
+assert "trayButtonPressed ? 0.24 : trayButtonHovered ? 0.18 : 0.12" in tray
+assert "safeSource: trayIcon" in tray
 assert "readonly property bool trayButtonHovered: trayHoverHandler.hovered" in tray
 assert "HoverHandler {" in tray and "blocking: false" in tray
 assert "trayDock.trayButtonHovered =" not in tray

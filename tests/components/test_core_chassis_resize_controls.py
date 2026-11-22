@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 WINDOWS = (
     ("widgets/TimeW.qml", "timew", "stepWindowSize", "shrinkTimeButton",
-     "growTimeButton", "down", "up", 0, (432, 560, 700), (790, 840, 920)),
+     "growTimeButton", "down", "up", 0, (432, 560, 760), (790, 1020, 1345)),
     ("widgets/ApolloHubW.qml", "hub", "stepWindowSize", "shrinkHubButton",
      "growHubButton", "down", "up", 1, (860, 1000, 1200, 99999), (640, 700, 850, 99999)),
     ("widgets/GitW.qml", "root", "stepWindowSize", "shrinkGitButton",

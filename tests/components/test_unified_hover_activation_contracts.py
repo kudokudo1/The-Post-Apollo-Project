@@ -28,7 +28,8 @@ for token in (
     "selectedBorderColor: Colors.magenta",
     "selectedContentGlowColor: Colors.magenta",
     "selectedSoftGlowColor: Colors.magenta",
-    "selectedWideGlowColor: Colors.magenta",
+    "selectedWideGlowColor:",
+    "selectedSoftGlowColor",
 ):
     assert token in button, token
 

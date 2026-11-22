@@ -772,10 +772,6 @@ PanelWindow {
 
         Workspaces {}
 
-        // Tray // Keep immediately after Workspaces; the Camera module now
-        // supplies the white/blue visual identity formerly needed here.
-        Tray {}
-
         // Mediaplayer
 
         Mediaplayer {
@@ -1458,6 +1454,49 @@ PanelWindow {
                         keyboardOwnership.release("notifications");
                 }
             }
+        }
+    }
+
+    // ===== BOTTOM-CENTER SYSTEM TRAY =============================
+    // One existing SystemTray owner, moved out of the top-left dock row.
+    // Anchoring BOTH sides gives an output-wide centering plane, independent
+    // of the 50px top-bar margins and of the tray's changing item count.
+    // Only the Tray item takes pointer input; the transparent remainder
+    // cannot obstruct apps, Trash or Power.
+    PanelWindow {
+        id: bottomCenterTrayWindow
+        screen: shellRoot.screen
+
+        anchors {
+            top: false
+            bottom: true
+            left: true
+            right: true
+        }
+        margins {
+            left: 0
+            right: 0
+            bottom: 10
+        }
+
+        implicitHeight: 70
+        exclusiveZone: 0
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        focusable: false
+        color: "transparent"
+        surfaceFormat.opaque: false
+        visible: true
+
+        // Match the existing bottom utility button clearance: a 50px tray
+        // centered in 70px ends 20px above the physical output bottom.
+        Tray {
+            id: bottomCenteredTray
+            anchors.centerIn: parent
+        }
+
+        mask: Region {
+            item: bottomCenteredTray
         }
     }
 

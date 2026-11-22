@@ -1,0 +1,29 @@
+name: System tray bottom-center layout
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "modules/Tray.qml"
+      - "tests/components/test_bottom_center_system_tray.py"
+      - ".github/workflows/system-tray-bottom-center.yml"
+  push:
+    branches: [main]
+    paths:
+      - "shell.qml"
+      - "modules/Tray.qml"
+      - "tests/components/test_bottom_center_system_tray.py"
+      - ".github/workflows/system-tray-bottom-center.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-geometry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify single live tray, true horizontal center and masked input
+        run: python3 -B -I tests/components/test_bottom_center_system_tray.py
+      - name: Existing dock button grammar regression
+        run: python3 -B -I tests/components/test_dock_button_contracts.py

@@ -188,6 +188,28 @@ with tempfile.TemporaryDirectory(prefix="resize-button-qt-") as temp:
         QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, QPoint(45, 45))
         app.processEvents()
         assert window.property("downRequests") == 1
+
+        # The right-anchored Notifications hub grows LEFT and shrinks RIGHT.
+        # Reversal changes both delta and persistent orange/purple identity.
+        down.setProperty("direction", "left")
+        down.setProperty("available", True)
+        down.setProperty("reverseHorizontalGrowth", True)
+        up.setProperty("direction", "right")
+        up.setProperty("reverseHorizontalGrowth", True)
+        app.processEvents()
+        check_identity(down, "left", "⮜", 1, "#A46AFF")
+        check_identity(up, "right", "⮞", -1, "#ED981A")
+        QTest.mouseMove(window, QPoint(45, 45))
+        QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, QPoint(45, 45))
+        QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, QPoint(45, 45))
+        QTest.mouseMove(window, QPoint(124, 46))
+        QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, QPoint(124, 46))
+        QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, QPoint(124, 46))
+        app.processEvents()
+        assert window.property("downRequests") == 2
+        assert window.property("lastDownDelta") == 1
+        assert window.property("upRequests") == 2
+        assert window.property("lastUpDelta") == -1
     finally:
         window.close()
         window.deleteLater()

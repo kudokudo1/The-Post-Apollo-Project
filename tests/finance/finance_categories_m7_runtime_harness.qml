@@ -39,6 +39,16 @@ Window {
         copy.categories=[];
         fixture=copy;
     }
+    function overspentCoffeeFixture() {
+        var copy=JSON.parse(JSON.stringify(fixture));
+        copy.categories[1].availableCents=-625;
+        fixture=copy;
+    }
+    function invalidBalanceFixture() {
+        var copy=JSON.parse(JSON.stringify(fixture));
+        copy.categories[0].availableCents="not-a-number";
+        fixture=copy;
+    }
     function refreshFixture() {
         fixture=JSON.parse(JSON.stringify(fixture));
     }

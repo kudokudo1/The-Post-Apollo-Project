@@ -1,0 +1,32 @@
+name: TimeW Scope A fractional observation review (HOLD only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV2FractionalObservationReview.py'
+      - 'tests/timew/test_machine_v2_fractional_observation_review.py'
+      - 'docs/timew-scope-a-untrusted-fractional-observation-consumer.md'
+      - '.github/workflows/timew-scope-a-fractional-observation-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deny-only-untrusted-observation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Review exact values and timeout/unknown outcomes without authority
+        run: python3 -B -I tests/timew/test_machine_v2_fractional_observation_review.py
+      - name: Existing exact-value and V2 persistence refusal regressions
+        run: |
+          python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

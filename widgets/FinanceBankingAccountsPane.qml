@@ -22,6 +22,9 @@ Item {
     property bool manualTransferOpen: false
     property bool manualTransferArmed: false
     property string transferRemoveArmedId: ""
+    property var transferCorrectionCandidate: null
+    property bool transferCorrectionArmed: false
+    property string transferCorrectionDate: ""
     property int transferFromIndex: 0
     property int transferToIndex: 1
     property string manualTransferDate: ""
@@ -40,15 +43,20 @@ Item {
 
     onProviderIndexChanged: productIndex=0
     onManualTransferDateChanged: manualTransferArmed=false
+    onTransferCorrectionDateChanged: transferCorrectionArmed=false
     onSessionChanged: {
         manualTransferArmed=false;
         transferRemoveArmedId="";
+        transferCorrectionCandidate=null;
+        transferCorrectionArmed=false;
     }
     onViewChanged: {
         deleteArmed=false;
         clearDemoArmed=false;
         manualTransferArmed=false;
         transferRemoveArmedId="";
+        transferCorrectionCandidate=null;
+        transferCorrectionArmed=false;
         returnToTopRequested();
     }
     onSelectedIdChanged: {
@@ -129,6 +137,72 @@ Item {
         if(!result.ok){message=result.error;return false;}
         session=result.state;
         message="BOTH MANUAL TRANSFER ENTRIES REMOVED // NO BANK ACTION";
+        return true;
+    }
+    function chooseManualTransferCorrection(row) {
+        if(view!=="overview"||session.mode!=="manual"||!row
+           ||!pairedTransfers.ok||!pairedTransfers.rows.some(function(p){
+               return p.transferId===row.transferId
+                   &&p.fromAccountId===row.fromAccountId
+                   &&p.toAccountId===row.toAccountId
+                   &&p.date===row.date&&p.description===row.description
+                   &&p.amountCents===row.amountCents;
+           })) {
+            message="MANUAL TRANSFER CORRECTION UNAVAILABLE";
+            return false;
+        }
+        transferCorrectionCandidate={
+            transferId:row.transferId,
+            fromAccountId:row.fromAccountId,
+            toAccountId:row.toAccountId,
+            fromLabel:row.fromLabel,toLabel:row.toLabel,
+            date:row.date,description:row.description,amountCents:row.amountCents
+        };
+        transferCorrectionDate=row.date;
+        transferCorrectionAmount.text=(row.amountCents/100).toFixed(2);
+        transferCorrectionDescription.text=row.description;
+        transferCorrectionArmed=false;
+        transferRemoveArmedId="";
+        message="EDIT BOTH MANUAL TRANSFER LEGS // ACCOUNT ENDPOINTS LOCKED";
+        returnToTopRequested();
+        return true;
+    }
+    function cancelManualTransferCorrection() {
+        transferCorrectionCandidate=null;
+        transferCorrectionArmed=false;
+        transferCorrectionDate="";
+        transferCorrectionAmount.text="";
+        transferCorrectionDescription.text="";
+    }
+    function saveManualTransferCorrection() {
+        if(view!=="overview"||session.mode!=="manual"
+           ||!transferCorrectionCandidate||!pairedTransfers.ok) {
+            message="MANUAL TRANSFER CORRECTION UNAVAILABLE";
+            transferCorrectionArmed=false;
+            return false;
+        }
+        if(!transferCorrectionArmed) {
+            transferCorrectionArmed=true;
+            message="CLICK AGAIN TO CORRECT BOTH MANUAL TRANSFER ENTRIES";
+            return false;
+        }
+        transferCorrectionArmed=false;
+        const original=transferCorrectionCandidate;
+        const result=Accounts.correctManualTransfer(session,{
+            transferId:original.transferId,
+            fromAccountId:original.fromAccountId,
+            toAccountId:original.toAccountId,
+            expectedDate:original.date,
+            expectedDescription:original.description,
+            expectedAmountCents:original.amountCents,
+            date:transferCorrectionDate,
+            amountText:transferCorrectionAmount.text,
+            description:transferCorrectionDescription.text
+        });
+        if(!result.ok){message=result.error;return false;}
+        session=result.state;
+        cancelManualTransferCorrection();
+        message="BOTH MANUAL TRANSFER LEGS CORRECTED // NO BANK ACTION";
         return true;
     }
     function loadDemo() {
@@ -497,6 +571,119 @@ Item {
                     onLeftClicked: manager.recordManualTransfer()
                 }
             }
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: manager.view==="overview"
+                    &&manager.session.mode==="manual"
+                    &&manager.transferCorrectionCandidate!==null
+                GohuText {
+                    width: parent.width
+                    text: "CORRECT PAIRED MANUAL TRANSFER // BOTH LEGS // ACCOUNT ENDPOINTS LOCKED"
+                    font.pixelSize: 10
+                    font.bold: true
+                    color: Colors.magenta
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: manager.transferCorrectionCandidate
+                        ? "FROM "+manager.transferCorrectionCandidate.fromLabel
+                          +" TO "+manager.transferCorrectionCandidate.toLabel
+                          +" // ORIGINAL "+manager.transferCorrectionCandidate.date
+                          +" // "+Accounts.money(manager.transferCorrectionCandidate.amountCents)
+                        : ""
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CORRECT DATE // MONTH / DAY / YEAR"
+                    font.pixelSize: 9
+                    color: Colors.white
+                }
+                PostApolloDateStepper {
+                    width: parent.width
+                    dateValue: manager.transferCorrectionDate
+                    minDate: "1900-01-01"
+                    maxDate: "2100-12-31"
+                    useUtcToday: false
+                    showToday: true
+                    allowClear: false
+                    onDateEdited: function(isoDate) {
+                        manager.transferCorrectionDate=isoDate;
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CORRECT USD AMOUNT // POSITIVE NUMBER"
+                    font.pixelSize: 9
+                    color: Colors.white
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 29
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    clip: true
+                    TextInput {
+                        id: transferCorrectionAmount
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        font.pixelSize: 11
+                        color: Colors.white
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        onTextChanged: manager.transferCorrectionArmed=false
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CORRECT DESCRIPTION // SAME ON BOTH ENTRIES"
+                    font.pixelSize: 9
+                    color: Colors.white
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 29
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    clip: true
+                    TextInput {
+                        id: transferCorrectionDescription
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        maximumLength: 120
+                        font.pixelSize: 11
+                        color: Colors.white
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        onTextChanged: manager.transferCorrectionArmed=false
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 29
+                    label: manager.transferCorrectionArmed
+                        ? "CONFIRM CORRECT BOTH TRANSFER ENTRIES"
+                        : "SAVE PAIRED MANUAL TRANSFER CORRECTION // TWO CLICKS"
+                    labelPixelSize: 9
+                    accentColor: manager.transferCorrectionArmed
+                        ? Colors.orange : Colors.magenta
+                    onLeftClicked: manager.saveManualTransferCorrection()
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 28
+                    label: "CANCEL PAIRED TRANSFER CORRECTION"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    onLeftClicked: manager.cancelManualTransferCorrection()
+                }
+            }
             GohuText {
                 width: parent.width
                 visible: manager.session.mode==="manual"&&manager.pairedTransfers.ok
@@ -545,6 +732,14 @@ Item {
                             color: Colors.orange
                             textFormat: Text.PlainText
                             wrapMode: Text.WordWrap
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 29
+                            label: "CORRECT BOTH MANUAL TRANSFER ENTRIES"
+                            labelPixelSize: 9
+                            accentColor: Colors.cyan
+                            onLeftClicked: manager.chooseManualTransferCorrection(modelData)
                         }
                         ActionButton {
                             width: parent.width

@@ -9,6 +9,8 @@ on:
       - "scripts/finance/research_candidate_draft_preview.mjs"
       - "scripts/finance/verify_research_scratch_native_m9a.sh"
       - "tests/finance/fixtures/M9aResearchScratchNativeShell.qml"
+      - "tests/finance/test_research_m9a_scratch_contract.py"
+      - "tests/finance/test_research_m9_editor_contract.py"
       - ".github/workflows/finance-research-scratch-native-m9a.yml"
   workflow_dispatch:
 

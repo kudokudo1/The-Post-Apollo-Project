@@ -51,7 +51,7 @@ for marker in (
     "caseEditor.draftEvidenceSummary = data.fields.summary;",
     "caseEditor.draftEvidenceUrl = data.fields.url;",
     "caseEditor.draftSource = \"manual\";",
-    "data.caseRevision !== readService.revision",
+    "data.caseRevision !== selectedRevision",
     "data.candidateKey !== reviewKey",
     "draftService.clear();",
 ):

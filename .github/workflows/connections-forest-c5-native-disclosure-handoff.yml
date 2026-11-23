@@ -1,0 +1,91 @@
+name: Connections Forest C5 issuer-host handoff fixture (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5NativeDisclosureHandoffPreflight.py'
+      - 'tests/connections/test_connections_forest_c5_native_disclosure_handoff.py'
+      - 'docs/connections-forest-c5-native-disclosure-handoff-proposal.md'
+      - '.github/workflows/connections-forest-c5-native-disclosure-handoff.yml'
+      - 'services/connections/forest/ForestC5ProvisionalDisclosurePreflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-disclosure-fixture-cannot-issue-permission:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing C5 Ed25519 fixture verification dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile and enforce no issuer, local writer, model or output actuation
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5NativeDisclosureHandoffPreflight.py \
+            tests/connections/test_connections_forest_c5_native_disclosure_handoff.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('services/connections/forest/ForestC5NativeDisclosureHandoffPreflight.py').read_text()
+          for expected in (
+              'THREE_UNTRUSTED_NATIVE_HANDOFF_CLAIMS_UNKNOWN_HOLD',
+              'REVOKED_ACK_CLAIMS_IN_FLIGHT_OUTPUT',
+              'RECIPIENT_CLAIM_MISMATCH_',
+              'PERMIT_ID_REUSES_REQUEST_OR_COMMIT_GRANT',
+              'REVOCATION_WITHOUT_ADVANCING_GENERATION',
+              '"safeActions": []',
+              '"emitEvent": None',
+              '"emittedBytes": 0',
+              '"protectedTerminalReceiptAuthenticated": False',
+          ):
+              assert expected in source, expected
+          for forbidden in (
+              'sqlite3.connect(', 'socket.socket(', 'subprocess.',
+              'Ed25519PrivateKey', 'stream_chat(', 'requests.post(',
+              'os.system(', '"safeToEmitProvisionalText": True',
+              '"productionAuthority": True',
+          ):
+              assert forbidden not in source, forbidden
+          for owner in (
+              'scripts/forest/turn_bridge_b3.py',
+              'scripts/forest/local_terminal_outbox_b4f.py',
+              'scripts/forest/recovery_outbox_expectation_b4g.py',
+          ):
+              assert 'ForestC5NativeDisclosureHandoffPreflight' not in Path(owner).read_text()
+          print('FOREST_C5_NATIVE_CLAIMS_ONLY // AUTHORITY_HOLD')
+          PY
+      - name: 33 exact native handoff scope and revoke negative tests
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_native_disclosure_handoff.py' -v
+      - name: Preserve original disclosure candidate and V1 binding
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_provisional_disclosure_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_exact_session_v1_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_provisional_delta_disclosure.py' -v
+      - name: Preserve original Forest B4f B4g B4c invariants
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_local_terminal_outbox_b4f.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_recovery_expectation_b4g.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_fenced_commit_b4c.py' -v
+          echo 'DOC3_PROTECTED_NATIVE_ISSUER_NOT_IMPLEMENTED // PRODUCTION_HOLD'

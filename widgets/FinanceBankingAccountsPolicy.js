@@ -79,7 +79,7 @@ function validState(state) {
         if(names[key])return false;
         names[key]=true;
     }
-    var sums={};
+    var sums={},transfers=Object.create(null);
     for(var j=0;j<state.entries.length;j++) {
         var e=state.entries[j];
         if(!e||typeof e.id!=="string"||!/^(entry|demo-entry)-[1-9]\d*$/.test(e.id)
@@ -89,9 +89,29 @@ function validState(state) {
            ||Math.abs(e.amountCents)>MAX_CENTS||e.origin!==state.mode)
             return false;
         entryIds[e.id]=true;
+        if(e.transferId!==undefined||e.transferSide!==undefined) {
+            if(state.mode!=="manual"||typeof e.transferId!=="string"
+               ||!/^transfer-[1-9]\d*$/.test(e.transferId)
+               ||(e.transferSide!=="out"&&e.transferSide!=="in")
+               ||(e.transferSide==="out"&&e.amountCents>=0)
+               ||(e.transferSide==="in"&&e.amountCents<=0))
+                return false;
+            if(!transfers[e.transferId])transfers[e.transferId]={out:null,in:null};
+            if(transfers[e.transferId][e.transferSide])return false;
+            transfers[e.transferId][e.transferSide]=e;
+        }
         sums[e.accountId]=(sums[e.accountId]||0)+e.amountCents;
         if(!Number.isSafeInteger(sums[e.accountId])
            ||Math.abs(sums[e.accountId])>MAX_CENTS)return false;
+    }
+    for(var transferId in transfers) {
+        var pair=transfers[transferId];
+        if(!pair.in||!pair.out
+           ||pair.in.accountId===pair.out.accountId
+           ||pair.in.date!==pair.out.date
+           ||pair.in.description!==pair.out.description
+           ||pair.in.amountCents!==-pair.out.amountCents)
+            return false;
     }
     for(var id in ids) {
         var a=ids[id];
@@ -158,13 +178,107 @@ function addEntry(state,fields) {
     return validState(updated)?{ok:true,state:updated,entry:entry}
         :resultError("TRANSACTION EXCEEDS SESSION BALANCE/AMOUNT LIMIT");
 }
+// M4i // A transfer here only records TWO USER-DECLARED SESSION ENTRIES.
+// Never connect to a provider, send money, import statements, or classify
+// either side as verified income/spending. Pair invariants are in validState().
+function addManualTransfer(state,fields) {
+    if(!validState(state)||state.mode!=="manual")
+        return resultError("TWO MANUAL ACCOUNTS REQUIRED");
+    if(!fields||typeof fields.fromAccountId!=="string"
+       ||typeof fields.toAccountId!=="string"
+       ||fields.fromAccountId===fields.toAccountId)
+        return resultError("SELECT TWO DIFFERENT MANUAL ACCOUNTS");
+    if(state.entries.length>MAX_ENTRIES-2||state.nextId>999997)
+        return resultError("TWO FREE SESSION ENTRY SLOTS REQUIRED");
+    var from=state.accounts.find(function(a){return a.id===fields.fromAccountId;});
+    var to=state.accounts.find(function(a){return a.id===fields.toAccountId;});
+    if(!from||!to||from.origin!=="manual"||to.origin!=="manual")
+        return resultError("BOTH MANUAL ACCOUNTS MUST EXIST");
+    if(!dateValid(fields.date))return resultError("DATE MUST BE YYYY-MM-DD");
+    var cents=parseCents(fields.amountText,false);
+    if(cents===null||cents===0)return resultError("ENTER A POSITIVE TRANSFER AMOUNT");
+    var description=fields.description===""?"MANUAL TRANSFER"
+        :safeText(fields.description,120);
+    if(!description)return resultError("DESCRIPTION MAX 120 CHARACTERS");
+    var pairId="transfer-"+state.nextId;
+    var out={id:"entry-"+state.nextId,accountId:from.id,date:fields.date,
+        description:description,amountCents:-cents,origin:"manual",
+        transferId:pairId,transferSide:"out"};
+    var incoming={id:"entry-"+(state.nextId+1),accountId:to.id,date:fields.date,
+        description:description,amountCents:cents,origin:"manual",
+        transferId:pairId,transferSide:"in"};
+    var updated={mode:"manual",accounts:state.accounts.slice(),
+        entries:state.entries.concat([out,incoming]),nextId:state.nextId+2};
+    return validState(updated)?{ok:true,state:updated,transfer:{
+        transferId:pairId,fromAccountId:from.id,toAccountId:to.id,
+        date:fields.date,amountCents:cents,description:description}}
+        :resultError("MANUAL TRANSFER EXCEEDS SESSION AMOUNT LIMIT");
+}
+function transferPairs(state) {
+    if(!validState(state))return resultError("INVALID SESSION STATE");
+    var accounts=Object.create(null),pairs=Object.create(null),out=[];
+    for(var a=0;a<state.accounts.length;a++)
+        accounts[state.accounts[a].id]=state.accounts[a];
+    for(var i=0;i<state.entries.length;i++) {
+        var e=state.entries[i];
+        if(!e.transferId)continue;
+        if(!pairs[e.transferId])pairs[e.transferId]={};
+        pairs[e.transferId][e.transferSide]=e;
+    }
+    for(var id in pairs) {
+        var pair=pairs[id],from=accounts[pair.out.accountId],
+            to=accounts[pair.in.accountId];
+        out.push({transferId:id,fromAccountId:from.id,toAccountId:to.id,
+            fromLabel:from.nickname,toLabel:to.nickname,
+            fromProviderId:from.providerId,toProviderId:to.providerId,
+            date:pair.out.date,description:pair.out.description,
+            amountCents:pair.in.amountCents});
+    }
+    out.sort(function(a,b){return a.transferId>b.transferId?-1:1;});
+    return {ok:true,rows:out,connected:false,persisted:false};
+}
+function removeManualTransfer(state,fields) {
+    if(!validState(state)||state.mode!=="manual")
+        return resultError("MANUAL TRANSFER SESSION REQUIRED");
+    if(!fields||typeof fields.transferId!=="string"
+       ||!/^transfer-[1-9]\d*$/.test(fields.transferId))
+        return resultError("SELECT A VALID MANUAL TRANSFER PAIR");
+    var rows=transferPairs(state);
+    if(!rows.ok)return rows;
+    var selected=rows.rows.find(function(p){return p.transferId===fields.transferId;});
+    if(!selected)return resultError("MANUAL TRANSFER PAIR NOT FOUND");
+    if(selected.fromAccountId!==fields.fromAccountId
+       ||selected.toAccountId!==fields.toAccountId
+       ||selected.date!==fields.date
+       ||selected.description!==fields.description
+       ||selected.amountCents!==fields.amountCents)
+        return resultError("STALE MANUAL TRANSFER // RESELECT BEFORE REMOVING");
+    var entries=state.entries.filter(function(e){
+        return e.transferId!==selected.transferId;
+    });
+    if(entries.length!==state.entries.length-2)
+        return resultError("INVALID MANUAL TRANSFER PAIR");
+    var updated={mode:"manual",accounts:state.accounts.slice(),
+        entries:entries,nextId:state.nextId};
+    return validState(updated)?{ok:true,state:updated,removed:selected}
+        :resultError("MANUAL TRANSFER PAIR REMOVAL REFUSED");
+}
 function undoLastEntry(state) {
     if(!validState(state)||state.mode!=="manual"||state.entries.length===0)
         return resultError("NO MANUAL TRANSACTION TO UNDO");
     var removed=state.entries[state.entries.length-1];
+    var entries=state.entries.slice(0,-1);
+    if(removed.transferId) {
+        // Do not permit a one-sided rollback or a partial transfer pair.
+        var other=entries[entries.length-1];
+        if(!other||other.transferId!==removed.transferId)
+            return resultError("PAIRED TRANSFER // REMOVE BOTH FROM BANKING OVERVIEW");
+        entries=entries.slice(0,-1);
+    }
     var updated={mode:"manual",accounts:state.accounts.slice(),
-        entries:state.entries.slice(0,-1),nextId:state.nextId};
-    return {ok:true,state:updated,undone:removed};
+        entries:entries,nextId:state.nextId};
+    return validState(updated)?{ok:true,state:updated,undone:removed}
+        :resultError("LAST ENTRY UNDO WOULD BREAK A MANUAL TRANSFER PAIR");
 }
 // M4f // Correct user-entered entries without recycling IDs or changing
 // account ownership. Original values are required as an optimistic concurrency
@@ -180,6 +294,8 @@ function matchManualEntry(state,fields) {
     var entry=state.entries[index];
     if(entry.origin!=="manual"||entry.accountId!==fields.accountId)
         return resultError("MANUAL ACCOUNT/ENTRY MISMATCH");
+    if(entry.transferId)
+        return resultError("PAIRED TRANSFER // REMOVE BOTH FROM BANKING OVERVIEW");
     if(entry.date!==fields.expectedDate
        ||entry.description!==fields.expectedDescription
        ||entry.amountCents!==fields.expectedAmountCents)

@@ -44,8 +44,9 @@ assert menu.count("ModeButton {") == 1
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
 # Two safe CURSOR A/B samples and the Budget Simple/Advanced selector
 # extend the existing 20-control baseline. All real finance actions remain.
-# M8 adds exactly one read-only CANDIDATES tab in the existing Research strip.
-assert menu.count("ActionButton {") == 24
+# M8 adds one read-only CANDIDATES action; M2c adds one Simple-mode
+# read-only MOVE MONEY PREVIEW action without a writer or custom MouseArea.
+assert menu.count("ActionButton {") == 25
 assert menu.count('keyboardActivationSignal: "leftClicked"') >= 2
 assert 'property string selectorPreviewActive: "a"' in menu
 assert menu.count("ResizeButton {") == 2

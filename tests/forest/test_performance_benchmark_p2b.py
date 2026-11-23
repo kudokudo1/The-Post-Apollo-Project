@@ -58,6 +58,8 @@ class Handler(BaseHTTPRequestHandler):
     post_status = 200
     post_media = "application/x-ndjson"
     get_status = 200
+    fragment_stream = False
+    post_partial_headers = False
 
     def do_GET(self):
         type(self).calls.append(("GET", self.path))
@@ -83,11 +85,23 @@ class Handler(BaseHTTPRequestHandler):
         type(self).calls.append(("POST", self.path))
         data = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         type(self).post_payloads.append(data)
+        if type(self).post_partial_headers:
+            self.wfile.write(
+                b"HTTP/1.0 200 OK\r\nContent-Type: application/x-ndjson\r\n"
+            )
+            self.wfile.flush()
+            return
         self.send_response(type(self).post_status)
         self.send_header("Content-Type", type(self).post_media)
         self.end_headers()
         try:
-            self.wfile.write(type(self).post_body)
+            if type(self).fragment_stream:
+                body = type(self).post_body
+                for offset in range(0, len(body), 11):
+                    self.wfile.write(body[offset:offset + 11])
+                    self.wfile.flush()
+            else:
+                self.wfile.write(type(self).post_body)
         except (ConnectionResetError, BrokenPipeError):
             pass
 
@@ -123,6 +137,8 @@ class BenchmarkP2BTests(unittest.TestCase):
         Handler.post_status = 200
         Handler.post_media = "application/x-ndjson"
         Handler.get_status = 200
+        Handler.fragment_stream = False
+        Handler.post_partial_headers = False
         self.mem = patch.object(p0, "_host_memory_available_mib",
                                 return_value=8192)
         self.mem.start()
@@ -481,6 +497,47 @@ class BenchmarkP2BTests(unittest.TestCase):
             verified_free_accelerator_mib=0
         )
         self.assertEqual(result["status"], "COMPLETE")
+
+    def test_network_fragmentation_reassembles_valid_ndjson(self):
+        Handler.fragment_stream = True
+        result = self.run_one()
+        self.assertEqual(result["status"], "COMPLETE")
+        self.assertEqual(len(Handler.post_payloads), 1)
+        self.assertIsNotNone(result["first_visible_content_ms"])
+
+    def test_incomplete_response_headers_never_complete(self):
+        Handler.post_partial_headers = True
+        with self.assertRaises(bench.BenchmarkRefusal):
+            self.run_one()
+        self.assertEqual(len(Handler.post_payloads), 1)
+
+    def test_cpu_runtime_mismatch_is_refused_before_post(self):
+        Handler.ps_rows = [[resident(vram=200)], [resident(vram=200)]]
+        with self.assertRaisesRegex(
+            bench.BenchmarkRefusal, "RUNTIME_MISMATCH"
+        ):
+            self.run_one(expected_runtime="cpu",
+                         required_accelerator_mib=0,
+                         verified_free_accelerator_mib=0)
+        self.assertEqual(len(Handler.post_payloads), 0)
+
+    def test_residency_skip_is_distinct_from_refusal(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            status = bench.main([
+                "one", "--model", MODEL, "--scenario", "cold",
+                "--endpoint", self.endpoint, "--operator-approved",
+                "--capacity-reviewed", "--no-competing-inference",
+                "--required-host-mib", "1536",
+                "--required-accelerator-mib", "512",
+                "--verified-free-accelerator-mib", "1024",
+            ])
+        result = json.loads(out.getvalue())
+        self.assertEqual(status, 2)
+        self.assertEqual(result["status"], "SKIPPED")
+        self.assertEqual(result["reason"], "COLD_MODEL_ALREADY_RESIDENT")
+        self.assertFalse(result["inference_complete"])
+        self.assertEqual(len(Handler.post_payloads), 0)
 
     def test_cli_denial_is_json_and_never_networks(self):
         out = io.StringIO()

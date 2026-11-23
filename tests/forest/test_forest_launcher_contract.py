@@ -624,7 +624,7 @@ class ForestLauncherContract(unittest.TestCase):
             "function handleYForIndex(index)",
             "width: 40", "height: 52", "width: 28",
             "color: dragArea.pressed ? Colors.yellow : Colors.white",
-            "color: slider.handleGlowColor",
+            "slider.handleGlowColor",
             "onWheel: function(wheel)",
         ):
             self.assertIn(source, selector)

@@ -52,9 +52,11 @@ for token in (
     'Flickable {', 'Repeater {', 'NeonScrollBar {',
 ):
     assert token in shared_popup, token
-for token in ('ActionButton {', "˖", "⚕๋࣭", "⭑",
+for token in ('ActionButton {', "˖", "⚕", "✦", "⭑",
               'id: diagnosticsLeftStar', 'id: diagnosticsMedicalSymbol',
-              'id: diagnosticsRightStar', 'accentColor: Colors.orange',
+              'id: diagnosticsUpperStar', 'id: diagnosticsRightStar',
+              'accentColor: semanticColor',
+              'property color hoverSurfaceColor: Colors.orange',
               'contentGlowSource: diagnosticsMedicalSymbol',
               'signal toggleRequested()', 'onLeftClicked:'):
     assert token in shared_button, token

@@ -10,19 +10,21 @@ weather_adapter=(root/"widgets/weather/StationWeatherProviderDiagnostics.qml").r
 weather_policy=(root/"widgets/weather/StationProviderDiagnosticsPolicy.js").read_text()
 finance=(root/"widgets/FinanceW.qml").read_text()
 
-# The actual shared toggle is a tight three-item icon cluster. Each star has
-# its own immutable white paint; only the center medical glyph samples the
-# down-arrow's state color/glow. Canonical × and arrow numeric glow sizes stay.
+# The shared icon now has a plain medical staff plus THREE separate white
+# accents, rather than coloring the former combining diacritics orange.
+# Color order comes from TimeW RESYNC, not the resize/down control.
 for marker in (
     "ActionButton {", "property bool diagnosticsOpen: false",
-    "signal toggleRequested()", "˖", "⚕๋࣭", "⭑",
-    "id: diagnosticsArtwork", "id: diagnosticsSymbols",
-    "id: diagnosticsLeftStar", "id: diagnosticsMedicalSymbol",
-    "id: diagnosticsRightStar", "spacing: -2",
+    "signal toggleRequested()", "˖", "⚕", "✦", "⭑",
+    "id: diagnosticsArtwork", "id: diagnosticsLeftStar",
+    "id: diagnosticsMedicalSymbol", "id: diagnosticsUpperStar",
+    "id: diagnosticsRightStar", "anchors.rightMargin: -6",
     "contentGlowSource: diagnosticsMedicalSymbol",
     "selected: diagnosticsOpen",
-    "width: 59", "height: 32", 'label: ""',
-    "accentColor: Colors.orange",
+    "width: 38", "height: 32", 'label: ""',
+    "property color semanticColor: Colors.yellow",
+    "property color hoverSurfaceColor: Colors.orange",
+    "accentColor: semanticColor",
     "onLeftClicked: diagnosticButton.toggleRequested()",
     "contentGlowRadius: 7", "contentGlowSamples: 7",
     "contentGlowIdleOpacity: 0.34",
@@ -38,12 +40,14 @@ for marker in (
 ):
     assert marker in button, marker
 assert 'label: diagnosticsOpen ? "BACK" : "DIAG"' not in button
-assert button.count("color: Colors.white") == 2
+assert button.count("color: Colors.white") == 3
 assert "Text.StyledText" not in button
 assert "labelItem.textFormat" not in button
 assert "color: diagnosticButton.foregroundColor" in button
-assert button.count("textFormat: Text.PlainText") == 3
-assert "hoverFillColor: Colors.yellow" in button
+assert button.count("textFormat: Text.PlainText") == 4
+assert 'text: "⚕๋࣭"' not in button
+assert "hoverFillColor: hoverSurfaceColor" in button
+assert "selectedFillColor: hoverSurfaceColor" in button
 assert "hoverForegroundColor: accentColor" in button
 assert "hoverBorderColor: accentColor" in button
 assert "selectedForegroundColor: accentColor" in button

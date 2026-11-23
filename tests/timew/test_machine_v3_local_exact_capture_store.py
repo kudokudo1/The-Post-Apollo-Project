@@ -189,6 +189,75 @@ assert item['c5_spent_verified'] is False
               "local-only bit storage exact")
     check(len(store.for_checkpoint(CID)) == 1, "separate scope checked")
 
+    # Exact preservation is NOT corruption detection: two adjacent, valid
+    # IEEE-754 values are both legitimate local data to this untrusted store.
+    # A same-UID editor can substitute another valid number undetected.
+    altered = math.nextafter(92.5, math.inf)
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "UPDATE exact_captures SET y_bits=? WHERE id=?",
+            (format(current(y=altered).y_bits, "016x"), captured))
+    replaced = store.get(captured)
+    check(replaced["value"].y_bits == current(y=altered).y_bits,
+          "adjacent valid bit pattern is readable, not detected as tamper")
+    check(replaced["local_capture_only"] is True
+          and replaced["source_authenticated"] is False
+          and replaced["production_restore_allowed"] is False
+          and replaced["safe_actions"] == [],
+          "valid bit substitution grants no trust")
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "UPDATE exact_captures SET y_bits=? WHERE id=?",
+            (format(current().y_bits, "016x"), captured))
+    check(store.get(captured)["value"] == current(),
+          "restore original local test fixture")
+
+    # Construct forged *existing* v3 files with identical column names and
+    # user_version, but missing PK/UNIQUE or column NOT NULL restrictions.
+    # In particular: matching column names cannot establish immutability.
+    for variant in ("no_primary_key", "no_pair_unique",
+                    "no_constraints", "nullable_output"):
+        forged = Path(temp) / ("forged-" + variant) / "post-apollo" / "machine"
+        forged.mkdir(mode=0o700, parents=True)
+        forged_file = forged / DB_NAME
+        id_decl = ("id TEXT" if variant in ("no_primary_key", "no_constraints")
+                   else "id TEXT PRIMARY KEY")
+        output_decl = ("output_id TEXT" if variant == "nullable_output"
+                       else "output_id TEXT NOT NULL")
+        pair_unique = ("" if variant in ("no_pair_unique", "no_constraints")
+                       else ", UNIQUE(checkpoint_id,window_key)")
+        with sqlite3.connect(forged_file) as db:
+            db.execute("""CREATE TABLE exact_captures (
+                """ + id_decl + """,
+                checkpoint_id TEXT NOT NULL,
+                window_key TEXT NOT NULL,
+                app_id TEXT NOT NULL,
+                """ + output_decl + """,
+                workspace_id TEXT NOT NULL,
+                value_version INTEGER NOT NULL CHECK(value_version=1),
+                phase INTEGER NOT NULL CHECK(phase=2),
+                x_bits TEXT NOT NULL,
+                y_bits TEXT NOT NULL,
+                width_bits TEXT NOT NULL,
+                height_bits TEXT NOT NULL,
+                saved_at_utc TEXT NOT NULL
+                """ + pair_unique + ")")
+            db.execute("PRAGMA user_version=3")
+        os.chmod(forged_file, 0o600)
+        fake = LocalExactCaptureStore(forged_file)
+        reject(lambda fake=fake: fake.get(str(uuid.uuid4())),
+               "read refuses lookalike schema: " + variant)
+        reject(lambda fake=fake: fake.for_checkpoint(CID),
+               "list refuses lookalike schema: " + variant)
+        reject(lambda fake=fake: save(fake),
+               "write refuses lookalike schema: " + variant)
+        with sqlite3.connect(forged_file) as db:
+            check(db.execute("SELECT COUNT(*) FROM exact_captures")
+                  .fetchone()[0] == 0,
+                  "rejected lookalike schema left no snapshot: " + variant)
+            check(db.execute("PRAGMA user_version").fetchone()[0] == 3,
+                  "no accidental migration of crafted schema: " + variant)
+
     # Strict POSIX file/dir ownership and format validation. Disposable only.
     os.chmod(path, 0o644)
     reject(lambda: store.get(captured), "world-readable file")

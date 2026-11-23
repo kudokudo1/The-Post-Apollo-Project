@@ -72,6 +72,8 @@ Item {
         correctionDeleteArmed=false;
     }
     function chooseManualEntry(row) {
+        if(!row||typeof row.id!=="string"||typeof row.accountId!=="string")
+            return false;
         if(!details.ok||details.sectionKind!=="activity"
            ||manualSession.mode!=="manual"||!filteredActivity.ok
            ||!filteredActivity.rows.some(function(e){

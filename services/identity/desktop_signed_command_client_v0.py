@@ -13,6 +13,7 @@ authorization. Do not activate UI buttons using this client yet.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import os
 from pathlib import Path
 import secrets
@@ -37,6 +38,20 @@ class HostCommandObservation:
     request_id: str | None
     instance: str
     sequence: int
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptedWireFingerprint:
+    """Digest-only last *attempted* command, not a signed or trusted record.
+
+    This remains process-local, is not issuer evidence, and grants no retry.
+    A sendall failure may have delivered enough bytes for the host to act.
+    """
+
+    action: str
+    request_id_sha256: str | None
+    client_nonce_sha256: str
+    frame_sha256: str
 
 
 class SignedIdentityCommandClient:
@@ -78,6 +93,9 @@ class SignedIdentityCommandClient:
         # Local process observation only. A fresh client cannot prove that
         # an earlier process did not dispatch a command before crashing.
         self._last_wire_outcome = "UNOBSERVED"
+        # Kept through post-send faults and subsequent rejected local calls.
+        # Never persisted or accepted as independent issuer history.
+        self._last_attempted_wire: AttemptedWireFingerprint | None = None
 
     @property
     def last_wire_outcome(self) -> str:
@@ -87,6 +105,17 @@ class SignedIdentityCommandClient:
         permission. A signed frame can still report an uncertain host effect.
         """
         return self._last_wire_outcome
+
+    @property
+    def last_attempted_wire(self) -> AttemptedWireFingerprint | None:
+        """Most recent attempted sendall, not necessarily the current call.
+
+        This does NOT show whether bytes arrived, whether a command executed,
+        or whether any externally protected receipt/consent exists. New
+        client processes start with None; NO_SEND_ATTEMPT does not clear the
+        last attempted command fingerprint.
+        """
+        return self._last_attempted_wire
 
     @property
     def faulted(self) -> bool:
@@ -166,6 +195,20 @@ class SignedIdentityCommandClient:
                 if not self._trusted(peer):
                     raise ReceiptRejected("Untrusted installed native host or desktop seat")
                 conn.settimeout(remaining())
+                # Retain the exact attempted command identity BEFORE
+                # sendall, including when a partial send or lost ACK faults
+                # this client. Only bounded SHA-256 digests are exposed.
+                # A digest from this process is NOT protected custody or
+                # evidence of actual delivery / human consent.
+                self._last_attempted_wire = AttemptedWireFingerprint(
+                    action=action,
+                    request_id_sha256=(
+                        sha256(request_id.encode("ascii")).hexdigest()
+                        if request_id is not None else None
+                    ),
+                    client_nonce_sha256=sha256(nonce.encode("ascii")).hexdigest(),
+                    frame_sha256=sha256(wire).hexdigest(),
+                )
                 # Once a send is attempted, even a send failure cannot prove
                 # the native host did not receive enough bytes to act.
                 self._last_wire_outcome = "UNKNOWN_HOLD"

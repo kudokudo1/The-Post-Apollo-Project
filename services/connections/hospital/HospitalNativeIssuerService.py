@@ -289,6 +289,7 @@ def _polkit_approve(request, prepared, peer, seat):
             "--detail", "hospital-room-id", prepared["roomId"],
             "--detail", "hospital-action", action,
             "--detail", "hospital-graph", prepared["expectedDigest"],
+            "--detail", "hospital-request-nonce", prepared["requestNonce"],
             "--detail", "hospital-patient-id", prepared["patientId"],
             "--detail", "hospital-repository", prepared["repository"],
             "--detail", "hospital-revision", str(prepared["expectedRevision"]),

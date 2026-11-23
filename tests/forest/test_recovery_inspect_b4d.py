@@ -302,9 +302,14 @@ class ReadOnlyRecoveryTests(unittest.TestCase):
 
     def test_corrupted_local_reply_reference_is_integrity_hold(self):
         attempt = self.reserve()
+        # Foreign-key integrity is enabled. Simulate a logically invalid
+        # committed attempt pointing to an existing USER rather than an
+        # assistant reply; physical FK constraints remain intact.
+        user_turn_id = self.journal.turns(
+            "owner_a", self.session)[0]["turn_id"]
         self.db.execute(
             "UPDATE forest_attempts_b3 SET status='COMMITTED',"
-            "reply_turn_id='t_nonexistent' WHERE attempt_id=?", (attempt,))
+            "reply_turn_id=? WHERE attempt_id=?", (user_turn_id, attempt))
         self.db.commit()
         with self.assertRaisesRegex(recovery.RecoveryRefusal,
                                     "LOCAL_INTEGRITY_HOLD"):
@@ -331,9 +336,13 @@ class ReadOnlyRecoveryTests(unittest.TestCase):
 
     def test_fails_closed_if_attempt_row_is_malformed(self):
         attempt = self.reserve()
+        # An ABORTED attempt must not reference any reply, even an
+        # existing row satisfying SQLite's foreign-key constraint.
+        user_turn_id = self.journal.turns(
+            "owner_a", self.session)[0]["turn_id"]
         self.db.execute(
             "UPDATE forest_attempts_b3 SET status='ABORTED',"
-            "reply_turn_id='t_forged' WHERE attempt_id=?", (attempt,))
+            "reply_turn_id=? WHERE attempt_id=?", (user_turn_id, attempt))
         self.db.commit()
         with self.assertRaisesRegex(recovery.RecoveryRefusal,
                                     "LOCAL_INTEGRITY_HOLD"):

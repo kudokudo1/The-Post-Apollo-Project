@@ -4,6 +4,7 @@
 import {pathToFileURL} from "node:url";
 import {loadOptionalToken} from "./read_sec_price_context.mjs";
 import {dayNumber} from "./read_market_price_range.mjs";
+import {quotaFetcher} from "./market_shared_quota.mjs";
 
 export const MAX_RANGE_DAYS=180;
 export const MAX_RANGE_BARS=132;
@@ -97,7 +98,10 @@ export async function findCandidates(ticker,fetcher=fetch,
       method:"GET",redirect:"error",headers:{Accept:"application/json"},
       signal:AbortSignal.timeout(12000)
     });
-  }catch{fail("provider-unavailable");}
+  }catch(error){
+    if(error?.message==="local-quota-exhausted"
+        || error?.message==="local-quota-unavailable")throw error;
+    fail("provider-unavailable");}
   const raw=await responseJson(response,MAX_SEARCH_BYTES);
   return normalizeCandidates(raw,ticker,now());
 }
@@ -148,25 +152,31 @@ export async function readHistory(symbol,currency,from,to,fetcher=fetch,
       method:"GET",redirect:"error",headers:{Accept:"application/json"},
       signal:AbortSignal.timeout(12000)
     });
-  }catch{fail("provider-unavailable");}
+  }catch(error){
+    if(error?.message==="local-quota-exhausted"
+        || error?.message==="local-quota-unavailable")throw error;
+    fail("provider-unavailable");}
   const raw=await responseJson(response,MAX_HISTORY_BYTES);
   return normalizeHistory(raw,symbol,currency,from,to,now());
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
     const args=process.argv.slice(2);
+    const local=quotaFetcher("eodhd");
     const result=args[0]==="lookup" && args.length===2
-      ? await findCandidates(args[1])
+      ? await findCandidates(args[1],local.fetcher)
       : args[0]==="history" && args.length===5
-      ? await readHistory(args[1],args[2],args[3],args[4])
+      ? await readHistory(args[1],args[2],args[3],args[4],local.fetcher)
       : fail("invalid-command");
+    if(local.latest())result.localQuota=local.latest();
     process.stdout.write("FINANCE_GLOBAL_EODHD "+JSON.stringify(result)+"\n");
   }catch(error) {
     const known=new Set(["invalid-ticker","invalid-symbol","invalid-currency",
       "invalid-range","invalid-command","provider-key-required",
       "provider-key-invalid","provider-not-entitled","rate-limited",
       "provider-unavailable","provider-response-too-large","provider-invalid",
-      "invalid-price-data","token-unreadable","token-permissions","token-invalid"]);
+      "invalid-price-data","token-unreadable","token-permissions","token-invalid",
+      "local-quota-exhausted","local-quota-unavailable"]);
     const reason=known.has(error?.message)?error.message:"provider-failed";
     process.stdout.write("FINANCE_GLOBAL_EODHD_ERROR "+reason+"\n");
     process.exitCode=1;

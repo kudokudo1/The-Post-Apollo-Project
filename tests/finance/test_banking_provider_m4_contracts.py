@@ -43,8 +43,10 @@ assert '{ id: "banking", name: "Banking", icon: "₊˚⋆🏛⊹"' in finance
 
 assert 'FinanceBankingProviderPolicy.js' in provider
 assert 'property string sectionId: "home"' in provider
-assert 'onProviderIdChanged: sectionId="home"' in provider
-assert 'onSectionIdChanged: returnToTopRequested()' in provider
+assert 'onProviderIdChanged: {' in provider
+assert 'sectionId="home";' in provider
+assert 'onSectionIdChanged: {' in provider
+assert 'returnToTopRequested();' in provider
 assert 'signal returnToTopRequested()' in provider
 assert 'ProviderPolicy.build(' in provider
 assert 'signal accountRequested(string accountId)' in provider
@@ -71,8 +73,9 @@ assert 'account.balanceCents===null' in policy
 assert 'totalCents:accounts.length>0&&unknown===0?subtotal:null' in policy
 assert '"cashapp"' in accounts and '"paypal"' in accounts
 
-# Provider mini-apps must remain read-only projections of M3's source.
-# Restricted operations have labels, not clickable provider/payment commands.
+# Provider snapshots remain read-only projections of the M3 source.
+# M4b can request manual-entry changes via the existing M3 owner, but
+# restricted payment/trading/lending sections stay non-executable.
 for source in (provider,policy):
     for forbidden in (
         "Process {", "FileView {", "FileDialog {", "XMLHttpRequest", "fetch(",

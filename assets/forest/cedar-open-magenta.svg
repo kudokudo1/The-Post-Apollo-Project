@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><title>Cedar, Forest Tree glyph</title><desc>Line-only three-tier evergreen with green-to-orange bottom-origin gradient, for separate Omnitrix-green Forest glow.</desc>
+<g fill="none" stroke="#C74EC7" stroke-linejoin="round" stroke-linecap="round" stroke-width="2.5">
+  <path d="M24 4 C19 10 15 15 10 19 C14 21 17 21 20 20 Q24 24 28 20 C31 21 35 21 38 19 C33 15 29 9 24 4Z"/>
+  <path d="M16 19 C13 24 9 28 6 31 C11 33 15 33 19 32 Q24 36 29 32 C33 33 37 33 42 31 C39 27 35 23 32 19"/>
+  <path d="M13 32 C11 35 8 38 5 40 C10 42 15 42 20 41 Q24 44 28 41 C33 42 38 42 43 40 C40 38 37 35 35 32"/>
+  <path d="M21 42 L21 46 L27 46 L27 42"/>
+</g>
+<g fill="none" stroke="#C74EC7" stroke-width="1.65" stroke-linecap="round">
+  <path d="M24 11 L24 40 M24 18 L19 16 M24 18 L29 16 M24 30 L16 27 M24 30 L32 27 M24 39 L13 37 M24 39 L35 37"/>
+</g>
+</svg>

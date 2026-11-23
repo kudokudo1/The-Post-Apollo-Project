@@ -252,5 +252,14 @@ class RealProcessKillRecoveryTests(unittest.TestCase):
                          "issued")
 
 
+    def test_17_importing_test_process_cannot_kill_itself(self):
+        self.assertEqual(os.getpid(), M.IMPORT_PROCESS_PID)
+        with self.assertRaisesRegex(M.Refused, "FORKED_CHILD_REQUIRED"):
+            M.child_writer_sigkill_ci_only(
+                root=self.work, record_args=self.args, trap_point=M.TRAPS[0])
+        self.assertEqual(self.fresh_read()["developmentOnlyObservedState"],
+                         "issued")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

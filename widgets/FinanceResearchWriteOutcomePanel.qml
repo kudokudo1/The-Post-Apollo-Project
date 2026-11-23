@@ -16,9 +16,11 @@ Item {
     readonly property bool verifiedSave:
         !simulationOnly && phase === "acknowledged"
         && exactAcknowledgement && acknowledgedRevision >= 0
+    readonly property bool simulatedAck:
+        simulationOnly && phase === "acknowledged"
     readonly property bool unresolved:
         phase === "reviewRequired"
-        || (phase === "acknowledged" && !verifiedSave)
+        || (phase === "acknowledged" && !verifiedSave && !simulatedAck)
     readonly property string headline: {
         if (simulationOnly) {
             if (phase === "inFlight")
@@ -50,7 +52,7 @@ Item {
             return "KEEP THE DRAFT // RELOAD READ ONLY BEFORE ANY NEW ACTION";
         return "NO WRITE REQUEST WAS SENT";
     }
-    readonly property color tone: verifiedSave ? Colors.cyan
+    readonly property color tone: verifiedSave || simulatedAck ? Colors.cyan
         : unresolved || phase === "refused" ? Colors.red : Colors.orange
 
     implicitHeight: shell.height

@@ -313,7 +313,10 @@ class SplitStoreRollbackWitnessTests(unittest.TestCase):
                 p.join(timeout=5)
                 self.fail("witness writer hung")
             self.assertEqual(p.exitcode, -signal.SIGKILL)
-            self.assertFalse(recv.poll(0.1))
+            # A closed pipe becomes readable at EOF, but contains no ACK.
+            self.assertTrue(recv.poll(1))
+            with self.assertRaises(EOFError):
+                recv.recv()
             fresh = self._child_request(
                 _read_in_child, self.shadow, self.local_snap())
             self.assertEqual(fresh["result"]["relation"], M.MATCH)
@@ -349,7 +352,7 @@ class SplitStoreRollbackWitnessTests(unittest.TestCase):
     def test_22_root_mode_or_runner_mismatch_rejected(self):
         with mock.patch.dict(os.environ, {"RUNNER_ENVIRONMENT": "self-hosted"}):
             with self.assertRaisesRegex(M.Refused, "HOSTED_ROOT"):
-                self.observe()
+                M.compare_ci_only(self.shadow, local_snapshot=self.before)
         os.chmod(self.shadow, 0o755)
         try:
             with self.assertRaisesRegex(M.Refused, "UNSAFE_ROOT"):

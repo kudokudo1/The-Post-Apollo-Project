@@ -9,6 +9,7 @@ an authentic independently administered custodian. No writer/server is here.
 from __future__ import annotations
 
 import importlib.util
+import array
 import json
 import os
 from pathlib import Path
@@ -80,6 +81,22 @@ def _constant(_):
     _deny("C3E_WIRE_NONFINITE_JSON_REFUSED")
 
 
+def _discard_ancillary(ancillary):
+    """Close any passed SCM_RIGHTS descriptors before refusing the packet."""
+    if not ancillary:
+        return
+    for level, kind, payload in ancillary:
+        if level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS:
+            fds = array.array("i")
+            size = len(payload) - (len(payload) % fds.itemsize)
+            fds.frombytes(payload[:size])
+            for fd in fds:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+
+
 def _frame_decode(data):
     if type(data) is not bytes or len(data) < 6:
         _deny("C3E_WIRE_INVALID_FRAME_LENGTH")
@@ -120,11 +137,12 @@ def verify_one_denial_ci_only(receiver: socket.socket, *, request,
     if not data:
         raise UnknownAfterSend(
             "C3E_WIRE_PEER_CLOSED_WITHOUT_REPLY_UNKNOWN_HOLD_NO_AUTO_RETRY")
+    _discard_ancillary(ancillary)
     if flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC):
         _deny("C3E_WIRE_TRUNCATED_OR_UNEXPECTED_CONTROL_REFUSED")
     if ancillary:
-        # No ancillary credentials/fds are part of this test-only signed
-        # denial protocol. Unexpected descriptors must not be promoted.
+        # Unexpected SCM_RIGHTS were closed; no ancillary metadata is
+        # authenticated or part of this test-only signed denial contract.
         _deny("C3E_WIRE_UNEXPECTED_ANCILLARY_DATA_REFUSED")
     response = _frame_decode(data)
     try:

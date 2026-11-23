@@ -2607,10 +2607,19 @@ Row {
                     enabled: visible
                     width: Math.max(0, Math.min(478, parent.width - 16))
                     height: Math.max(0, Math.min(460, parent.height - 16))
-                    anchors.top: parent.top
-                    anchors.right: parent.right
-                    anchors.topMargin: 8
-                    anchors.rightMargin: 8
+                    // Anchor to the live header button, not an assumed
+                    // content corner. Keep the popup inside this work-area
+                    // if the chassis is resized or space is constrained.
+                    readonly property point dropFromButton:
+                        financeDiagnosticsButton.mapToItem(parent,
+                            financeDiagnosticsButton.width - width,
+                            financeDiagnosticsButton.height + 8)
+                    x: Math.max(8, Math.min(
+                           Math.max(8, parent.width - width - 8),
+                           dropFromButton.x))
+                    y: Math.max(8, Math.min(
+                           Math.max(8, parent.height - height - 8),
+                           dropFromButton.y))
 
                     heading: "FINANCE HEALTH // DIAGNOSTICS"
                     displayedState: root.feedStatus

@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "FinanceBankingAccountsPolicy.js" as Accounts
+import "FinanceBankingProviderPolicy.js" as ProviderPolicy
 
 // Banking M3: one-person manual account session; completely separate from
 // CSV M1/M2 and any provider/auth/Actual service. No file, Process or network.
@@ -8,8 +9,10 @@ Item {
     id: manager
     property bool active: false
     property var session: Accounts.emptyState()
-    property string view: "overview" // overview | detail
+    property string view: "overview" // overview | provider | detail
     property string selectedId: ""
+    property string selectedProviderId: ""
+    property string detailReturnView: "overview"
     property int providerIndex: 0
     property int productIndex: 0
     property string direction: "out"
@@ -51,6 +54,7 @@ Item {
         }
         session=res.state;
         selectedId=res.account.id;
+        detailReturnView="overview";
         createOpen=false;
         nicknameInput.text="";
         openingInput.text="";
@@ -90,9 +94,25 @@ Item {
     function showAccount(id) {
         if(!review.ok || !review.accounts.some(function(a){return a.id===id;}))
             return false;
+        detailReturnView="overview";
         selectedId=id;
         message="";
         view="detail";
+        return true;
+    }
+    function openProvider(id) {
+        if(!ProviderPolicy.isProviderId(id))return false;
+        selectedProviderId=id;
+        message="";
+        view="provider";
+        return true;
+    }
+    function showProviderAccount(id) {
+        if(!review.ok || !review.accounts.some(function(a){
+            return a.id===id && a.providerId===selectedProviderId;
+        }))return false;
+        if(!showAccount(id))return false;
+        detailReturnView="provider";
         return true;
     }
     function addTransaction() {
@@ -142,7 +162,7 @@ Item {
         selectedId="";
         deleteArmed=false;
         message="EMPTY MANUAL ACCOUNT REMOVED";
-        view="overview";
+        view=detailReturnView;
         return true;
     }
 
@@ -153,7 +173,8 @@ Item {
 
         GohuText {
             width: parent.width
-            text: "ACCOUNTS // MANUAL DIRECTORY"
+            text: manager.view==="provider" ? "ACCOUNTS // PROVIDER WORKSPACE"
+                : "ACCOUNTS // MANUAL DIRECTORY"
             font.pixelSize: 12
             font.bold: true
             color: Colors.magenta
@@ -210,6 +231,26 @@ Item {
                 color: Colors.white
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: "PROVIDER WORKSPACES // INDIVIDUAL POST-APOLLO MINI-APPS"
+                font.pixelSize: 10
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Repeater {
+                model: ProviderPolicy.providers()
+                delegate: ActionButton {
+                    required property var modelData
+                    width: layout.width
+                    height: 29
+                    label: "OPEN "+modelData.name.toUpperCase()+" WORKSPACE"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    onLeftClicked: manager.openProvider(modelData.id)
+                }
             }
             Row {
                 width: parent.width
@@ -395,7 +436,7 @@ Item {
         Column {
             width: parent.width
             spacing: 7
-            visible: manager.view==="detail"
+            visible: manager.view==="provider"
             ActionButton {
                 width: parent.width
                 height: 28
@@ -403,6 +444,30 @@ Item {
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 onLeftClicked: manager.view="overview"
+            }
+            FinanceBankingProviderPane {
+                width: parent.width
+                providerId: manager.selectedProviderId
+                accountSnapshot: manager.review
+                onAccountRequested: function(accountId) {
+                    manager.showProviderAccount(accountId);
+                }
+                onReturnToTopRequested: manager.returnToTopRequested()
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 7
+            visible: manager.view==="detail"
+            ActionButton {
+                width: parent.width
+                height: 28
+                label: manager.detailReturnView==="provider"
+                       ? "BACK TO PROVIDER WORKSPACE":"BACK TO ALL ACCOUNTS"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: manager.view=manager.detailReturnView
             }
             GohuText {
                 width: parent.width

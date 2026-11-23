@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4
 
 on:
   pull_request:
@@ -9,6 +9,10 @@ on:
       - 'widgets/FinanceW.qml'
       - 'widgets/FinanceBankingPane.qml'
       - 'widgets/FinanceBankingAccountsPane.qml'
+      - 'widgets/FinanceBankingProviderPane.qml'
+      - 'widgets/FinanceBankingProviderPolicy.js'
+      - 'tests/finance/test_banking_provider_m4.mjs'
+      - 'tests/finance/test_banking_provider_m4_contracts.py'
       - 'widgets/FinanceBankingAccountsPolicy.js'
       - 'tests/finance/test_banking_accounts_m3.mjs'
       - 'tests/finance/test_banking_accounts_m3_contracts.py'
@@ -29,6 +33,10 @@ on:
       - 'widgets/FinanceW.qml'
       - 'widgets/FinanceBankingPane.qml'
       - 'widgets/FinanceBankingAccountsPane.qml'
+      - 'widgets/FinanceBankingProviderPane.qml'
+      - 'widgets/FinanceBankingProviderPolicy.js'
+      - 'tests/finance/test_banking_provider_m4.mjs'
+      - 'tests/finance/test_banking_provider_m4_contracts.py'
       - 'widgets/FinanceBankingAccountsPolicy.js'
       - 'tests/finance/test_banking_accounts_m3.mjs'
       - 'tests/finance/test_banking_accounts_m3_contracts.py'
@@ -67,3 +75,7 @@ jobs:
         run: node tests/finance/test_banking_accounts_m3.mjs
       - name: Test Banking M3 account UI and authority contracts
         run: python3 tests/finance/test_banking_accounts_m3_contracts.py
+      - name: Test provider workspaces, account projections and restricted features
+        run: node tests/finance/test_banking_provider_m4.mjs
+      - name: Test Banking M4 provider screen and no-payment boundaries
+        run: python3 tests/finance/test_banking_provider_m4_contracts.py

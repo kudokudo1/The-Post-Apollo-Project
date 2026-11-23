@@ -134,10 +134,13 @@ def verify_one_denial_ci_only(receiver: socket.socket, *, request,
     except (TimeoutError, ConnectionError, OSError) as exc:
         raise UnknownAfterSend(
             "C3E_WIRE_NO_TERMINAL_ACK_UNKNOWN_HOLD_NO_AUTO_RETRY") from exc
+    # recvmsg() may return zero payload bytes WITH SCM_RIGHTS attached.
+    # Close received descriptors on every successful receive before ANY
+    # EOF/unknown, truncation, ancillary or signature refusal branch.
+    _discard_ancillary(ancillary)
     if not data:
         raise UnknownAfterSend(
             "C3E_WIRE_PEER_CLOSED_WITHOUT_REPLY_UNKNOWN_HOLD_NO_AUTO_RETRY")
-    _discard_ancillary(ancillary)
     if flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC):
         _deny("C3E_WIRE_TRUNCATED_OR_UNEXPECTED_CONTROL_REFUSED")
     if ancillary:

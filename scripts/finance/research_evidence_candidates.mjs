@@ -143,7 +143,7 @@ export function previewEvidenceCandidates({
     notice:"PREVIEW ONLY // NO AUTOMATIC SOURCE VERIFICATION OR STORAGE"
   };
 }
-export function prepareReviewedCandidateDraft(candidate,investigation) {
+export function prepareCandidateAttachDraft(candidate,investigation) {
   // This prepares a form value ONLY. It never grants permission or sends it.
   if(!isObj(candidate) || candidate.kind!=="sec-index"
     || candidate.eligibleForDraft!==true || candidate.reviewed!==false

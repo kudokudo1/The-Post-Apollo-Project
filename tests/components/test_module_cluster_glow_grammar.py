@@ -127,8 +127,8 @@ assert re.search(r"(?m)^\s*SafeDropShadow\s*\{", tray)
 assert not re.search(r"(?m)^\s*DropShadow\s*\{", tray)
 assert "safeSource: trayIcon" in tray
 assert "trayButtonMouse.containsMouse ? 0.95 : 0.75" in tray
-# Workspace-style semantics: each SNI-registered app gets a persistent
-# magenta active card/icon glow. The OUTER tray still uses the native-menu
+# Workspace-style semantics: only a compositor-visible window gets a
+# magenta active card/icon glow. The OUTER tray still uses native-menu
 # magenta, hover-orange, and idle-cyan colors.
 assert "trayMenuOpen ? Colors.magenta" in tray
 assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in tray
@@ -140,9 +140,10 @@ assert "safeSource: trayButtonBackground" in tray
 assert "id: trayButtonBackgroundGlow" in tray
 assert "id: trayActiveIconGlow" in tray
 assert tray.count("safeSource: trayIcon") == 2
-assert "trayButton.appRegistered ? Colors.magenta" in tray
-assert "readonly property bool cardEmphasized: trayButton.appRegistered" in tray
-assert "visible: trayButton.appRegistered" in tray
+assert "trayButton.appOnDesktop ? Colors.magenta" in tray
+assert "readonly property bool cardEmphasized: trayButton.appOnDesktop" in tray
+assert "visible: trayButton.appOnDesktop" in tray
+assert 'command: ["swaymsg", "-t", "get_tree", "-r"]' in tray
 assert "onOpened: trayDock.openMenuAnchor = trayNativeMenu" in tray
 assert "Component.onDestruction:" in tray
 # No phantom local toggle can precede a real system-tray activation.

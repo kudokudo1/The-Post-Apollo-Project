@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
-import Qt5Compat.GraphicalEffects
+import Qt5Compat.GraphicalEffects as Effects
 import "../components"
 
 // Forest-only gradient label. GohuText remains the source of text shaping,
@@ -58,7 +58,7 @@ Item {
         }
     }
 
-    OpacityMask {
+    Effects.OpacityMask {
         id: coloredText
         anchors.fill: parent
         source: radialInk

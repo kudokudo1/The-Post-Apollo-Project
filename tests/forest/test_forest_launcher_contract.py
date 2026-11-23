@@ -389,7 +389,16 @@ class ForestLauncherContract(unittest.TestCase):
 
         # The gradient is masked through the real GohuFont glyph and then
         # source-sampled by the pre-existing Tree and chat title glows.
-        self.assertIn("import Qt5Compat.GraphicalEffects", name)
+        # GraphicalEffects and QtQuick.Shapes both export RadialGradient,
+        # but only the Shapes type provides centerX/focalY. An unqualified
+        # import silently selects the wrong one and Quickshell refuses to load.
+        self.assertIn("import QtQuick.Shapes", name)
+        self.assertIn("import Qt5Compat.GraphicalEffects as Effects", name)
+        self.assertNotIn("import Qt5Compat.GraphicalEffects" + chr(10), name)
+        self.assertIn("Effects.OpacityMask {", name)
+        self.assertIn("focalY: centerY", name)
+        self.assertIn("import QtQuick.Shapes", ring)
+        self.assertNotIn("import Qt5Compat.GraphicalEffects", ring)
         self.assertIn("GohuText {", name)
         self.assertIn("text: root.text", name)
         self.assertIn("textFormat: Text.PlainText", name)

@@ -1,0 +1,40 @@
+name: Identity DOC 6 V5 deny-only native admission diagnostic
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/native_admission_diagnostic_v0.py'
+      - 'tests/identity/test_native_admission_diagnostic_v0.py'
+      - '.github/workflows/identity-doc6-native-admission-diagnostic-v0.yml'
+      - 'docs/identity-center-v5-native-admission-diagnostic-doc6.md'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/native_admission_diagnostic_v0.py'
+      - 'tests/identity/test_native_admission_diagnostic_v0.py'
+      - '.github/workflows/identity-doc6-native-admission-diagnostic-v0.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile deny-only diagnostic
+        run: |
+          python3 -m py_compile services/identity/native_admission_diagnostic_v0.py
+          python3 -m py_compile tests/identity/test_native_admission_diagnostic_v0.py
+      - name: Verify strict negative command admission
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_admission_diagnostic_v0.py' -v
+      - name: Verify original native adapter-only route still remains deny-only
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_adapter_only_call_path_v1.py' -v
+      - name: Preserve CPU++ hard offline Sign-In boundary
+        run: |
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs

@@ -80,7 +80,10 @@ def _canonical(doc) -> bytes:
 def _exact(sock: socket.socket, count: int):
     buf = bytearray()
     while len(buf) < count:
-        chunk = sock.recv(count - len(buf))
+        try:
+            chunk = sock.recv(count - len(buf))
+        except TimeoutError as exc:
+            raise Refused("C3E_IPC_READ_TIMEOUT_REFUSED") from exc
         if not chunk:
             _deny("C3E_IPC_TRUNCATED")
         buf.extend(chunk)

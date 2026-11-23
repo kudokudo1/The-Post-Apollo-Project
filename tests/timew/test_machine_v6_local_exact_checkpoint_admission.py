@@ -203,6 +203,14 @@ with tempfile.TemporaryDirectory(prefix="timew-m6-admission-") as temp:
                 **before_legacy["checkpoint"],
                 "counts": {"outputs": 1, "workspaces": 1, "windows": 3},
             }}), "count mismatch")
+        def broken_sqlite(_):
+            raise sqlite3.OperationalError("private absolute path must not leak")
+        def broken_filesystem(_):
+            raise OSError("private absolute path must not leak")
+        refused(lambda: call(exact, geometry_reader=broken_sqlite),
+                "read error refused without SQLite detail")
+        refused(lambda: call(exact, legacy_reader=broken_filesystem),
+                "read error refused without local path detail")
         check(not db.exists(), "invalid admission cannot create v3 DB")
 
         # Unsafe *existing* parent directories are a preflight blocker,

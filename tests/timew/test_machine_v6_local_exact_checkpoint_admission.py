@@ -124,6 +124,12 @@ with tempfile.TemporaryDirectory(prefix="timew-m6-admission-") as temp:
     prior = os.environ.get("XDG_DATA_HOME")
     os.environ["XDG_DATA_HOME"] = temp
     try:
+        # V1/V2 may create intermediate parents with ambient umask. The
+        # local v3 store correctly refuses a non-private post-apollo parent.
+        # Prepare a 0700 parent for the valid integration fixture, rather
+        # than weakening privacy checks or changing the legacy writer.
+        parent = Path(temp) / "post-apollo"
+        parent.mkdir(mode=0o700)
         old, geo = fixture()
         checkpoint = save_pair(old, geo)["checkpoint"]["id"]
         db = Path(temp) / "post-apollo" / "machine" / DB_NAME
@@ -198,6 +204,15 @@ with tempfile.TemporaryDirectory(prefix="timew-m6-admission-") as temp:
                 "counts": {"outputs": 1, "workspaces": 1, "windows": 3},
             }}), "count mismatch")
         check(not db.exists(), "invalid admission cannot create v3 DB")
+
+        # Unsafe *existing* parent directories are a preflight blocker,
+        # not permission to chmod a user's directories behind their back.
+        parent.chmod(0o755)
+        refused(lambda: call(), "world-readable intermediate parent refuses")
+        check(parent.stat().st_mode & 0o077 != 0,
+              "refusal did not silently fix local directory permissions")
+        check(not db.exists(), "unsafe parent left no v3 database")
+        parent.chmod(0o700)
 
         result = call()
         check(result["status"] == "LOCAL_EXACT_CAPTURE_RECORDED_UNTRUSTED",

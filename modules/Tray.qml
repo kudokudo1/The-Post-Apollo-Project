@@ -166,12 +166,24 @@ Rectangle {
                 color: "transparent"
 
                 clip: false
-                z: trayNativeMenu.visible ? 2 : 1
 
-                // A StatusNotifier item has no reliable "app window open"
-                // property. The actual native menu visibility is authoritative.
+                // A live SystemTray.items delegate represents an application
+                // registered with the independent StatusNotifier watcher.
+                // The registration survives pointer movement, native-menu
+                // closure, and Quickshell restarts. When the item unregisters,
+                // the delegate (and therefore its active state) disappears.
+                // This measures an open/running TRAY application, not a
+                // visible Sway window.
+                readonly property bool appRegistered:
+                    trayButton.modelData !== null
+                    && trayButton.modelData !== undefined
+
+                z: trayButton.appRegistered ? 2 : 1
+
+                // Match the Workspace active-over-hover precedence for
+                // each registered app: MAGENTA remains until unregister.
                 readonly property color iconAccentColor:
-                    trayNativeMenu.visible ? Colors.magenta
+                    trayButton.appRegistered ? Colors.magenta
                     : (trayButtonMouse.containsMouse || trayButtonMouse.pressed
                        ? Colors.orange : Colors.cyan)
 
@@ -183,11 +195,10 @@ Rectangle {
                 // ===== WORKSPACE-EXACT CARD LAYERS ==============
                 // Workspaces.qml uses a transparent inactive rectangle,
                 // a dark active rectangle, and a fully transparent larger
-                // sampled backing. The tray's "active" visual follows a
-                // real open native menu or direct pointer hover, not a
-                // guessed application-window state.
-                readonly property bool cardEmphasized:
-                    trayNativeMenu.visible || trayButtonMouse.containsMouse
+                // sampled backing. Keep the active card while the item's
+                // registered application lives, just like a focused
+                // Workspace keeps its card after the pointer leaves.
+                readonly property bool cardEmphasized: trayButton.appRegistered
 
                 Rectangle {
                     id: trayActiveButtonBackground
@@ -279,8 +290,7 @@ Rectangle {
                         radius: 14
                         samples: 15
                         z: 2
-                        visible: trayNativeMenu.visible
-                                 || trayButtonMouse.containsMouse
+                        visible: trayButton.appRegistered
                         opacity: trayButtonMouse.pressed ? 1.0
                                  : trayButtonMouse.containsMouse ? 0.95 : 0.75
                         color: trayButton.iconAccentColor
@@ -301,8 +311,9 @@ Rectangle {
                     anchor.edges: Edges.Top
                     anchor.gravity: Edges.Top
 
-                    // The MAGENTA state reflects the menu being displayed,
-                    // not just a click which the application may ignore.
+                    // The OUTER tray frame reflects this native menu's
+                    // visible state. Each app card separately reflects the
+                    // lifecycle of its StatusNotifier registration.
                     onOpened: trayDock.openMenuAnchor = trayNativeMenu
                     onClosed: {
                         if (trayDock.openMenuAnchor === trayNativeMenu)

@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // M10: all prices fictional, no external market provider or personal token.
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import vm from "node:vm";
+import {STOCK_SYMBOLS} from "../../scripts/finance/market_stock_catalog.mjs";
+import {SYMBOLS as SEC_SYMBOLS} from "../../scripts/finance/read_sec_price_context.mjs";
 import {dayNumber,validateRange,normalizePriceRange,loadPriceRange}
   from "../../scripts/finance/read_market_price_range.mjs";
 import {createMarketDataHub} from "../../scripts/finance/market_data_hub.mjs";
@@ -9,6 +13,26 @@ import {readOptionalRange} from "../../scripts/finance/read_market_price_range_o
 
 const cik="0000320193", msft="0000789019", nvidia="0001045810";
 const from="2026-09-01",to="2026-10-20",today="2026-10-24";
+// M16: provider range catalog is deliberately larger than SEC M5 coverage.
+const additional=[
+  ["0001018724","AMZN.US"],
+  ["0001318605","TSLA.US"],
+  ["0001652044","GOOGL.US"]
+];
+assert.deepEqual(Object.keys(SEC_SYMBOLS),
+  ["0000320193","0000789019","0001045810"]);
+assert.deepEqual(Object.keys(STOCK_SYMBOLS),
+  [...Object.keys(SEC_SYMBOLS),...additional.map(([cik])=>cik)]);
+for (const [company,symbol] of additional)
+  assert.equal(STOCK_SYMBOLS[company],symbol);
+assert.equal(SEC_SYMBOLS["0001318605"],undefined);
+// QML's local catalog and Node's enforced provider catalog must match exactly.
+const qmlCatalog=readFileSync(new URL(
+  "../../widgets/FinanceStockModePolicy.js",import.meta.url),"utf8");
+const qmlPolicy=vm.runInNewContext(qmlCatalog+"\n({stockItems,stockSymbols,stockSymbol})");
+assert.deepEqual(JSON.parse(JSON.stringify(qmlPolicy.stockSymbols())),STOCK_SYMBOLS);
+assert.equal(qmlPolicy.stockItems().length,6);
+assert.equal(qmlPolicy.stockSymbol("9999999999"),null);
 const rows=[
   {date:"2026-09-01",close:100,adjusted_close:99},
   {date:"2026-09-03",close:105,adjusted_close:104},
@@ -67,6 +91,32 @@ await assert.rejects(loadPriceRange(cik,"2026-02-30",to,
   async()=>{calls++;},async()=>null,today),/invalid-range/);
 assert.equal(calls,1);
 
+// New issuers must fail before any HTTP call without a private token,
+// and only use the exact symbol from the explicit allowlist when given one.
+let noTokenCalls=0, tokenCalls=0;
+for (const [company,symbol] of additional) {
+  assert.equal(validateRange(company,from,to,today).cik,company);
+  assert.equal(normalizePriceRange(rows,company,from,to,"now").symbol,symbol);
+  await assert.rejects(loadPriceRange(company,from,to,
+    async()=>{noTokenCalls++;throw new Error("must-not-contact");},
+    async()=>null,today),/provider-key-required/);
+  const withToken=await loadPriceRange(company,from,to,
+    async (url,options)=>{
+      tokenCalls++;
+      const parsed=new URL(url);
+      assert.equal(parsed.pathname,"/api/eod/"+symbol);
+      assert.equal(parsed.searchParams.get("api_token"),"FICTIONAL-TEST-TOKEN");
+      assert.equal(options.redirect,"error");
+      return {ok:true,headers:{get:()=>null},text:async()=>JSON.stringify(rows)};
+    },
+    async()=>"FICTIONAL-TEST-TOKEN",today);
+  assert.equal(withToken.symbol,symbol);
+  assert.equal(withToken.readOnly,true);
+}
+assert.equal(noTokenCalls,0);
+assert.equal(tokenCalls,3);
+assert.throws(()=>validateRange("9999999999",from,to,today),/invalid-range/);
+
 const fake=(company,start,end)=>({
   ...normalizePriceRange(rows,company,start,end,"2026-10-24T12:00:00Z")
 });
@@ -103,9 +153,17 @@ try {
   assert.equal(c.symbol,"MSFT.US");
   assert.equal(c.delivery.state,"FETCHED");
   assert.equal(upstream,2);
+  const added=await readOptionalRange("0001318605",from,to,options);
+  assert.equal(added.symbol,"TSLA.US");
+  assert.equal(added.delivery.via,"HUB");
+  assert.equal(added.delivery.state,"FETCHED");
+  assert.equal(upstream,3);
+  await assert.rejects(hub.getPriceContext({
+    cik:"0001318605",filingDate:to
+  }),/invalid-selection/);
   await assert.rejects(readOptionalRange(nvidia,from,to,options),/provider-key-required/);
   assert.equal(directs,0);
-  assert.equal(hub.health().cacheEntries,2);
+  assert.equal(hub.health().cacheEntries,3);
   // Original SEC date-context protocol remains routed separately.
   const base="http://127.0.0.1:"+port;
   const headers={"X-Post-Apollo-Client":"financew"};
@@ -123,5 +181,5 @@ const fallback=await readOptionalRange(cik,from,to,{
 });
 assert.equal(fallback.delivery.via,"DIRECT");
 assert.equal(directs,1);
-assert.equal(upstream,3); // 1 Apple + 1 MSFT + 1 NVDA denial
+assert.equal(upstream,4); // AAPL + MSFT + TSLA + NVDA denial
 console.log("Finance M10 historical ranges, provider gates, hub/cache/fallback fixtures: PASS");

@@ -51,7 +51,7 @@ jobs:
                            "stat.S_ISSOCK",
                            "os.chmod(path, 0o600",
                            "P.serve_one_ci_only(conn, boundary)",
-                           "P._write(conn, dict(P.REFUSAL))",
+                           "peer_pid != expected_connecting_pid or peer_uid != expected_uid",
                            '"originalMessageSenderAuthenticated": False',
                            "C3E_ACCEPTED_NO_ENROLLED_SOURCE_OR_PRODUCTION_AUTHORITY"):
               assert required in src, required

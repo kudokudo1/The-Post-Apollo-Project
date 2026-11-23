@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""28 fail-closed cutover tests. No NAS, SQLite, host, keys or signer created."""
+"""32 fail-closed cutover tests. No NAS, SQLite, host, keys or signer created."""
 from __future__ import annotations
 
 import hashlib
@@ -211,6 +211,53 @@ class CutoverNeverAuthorizesTests(unittest.TestCase):
         self.assertNotIn("trustedCurrentHeadSha256", result)
         self.assertNotIn("signedOperatorEnrollment", result)
         self.assertNotIn("remoteServiceConnection", result)
+
+
+    def test_29_omitted_old_root_roster_never_claims_real_custody(self):
+        # If the caller omits the old root, format checks cannot detect reuse.
+        # That must NEVER become independent-enrollment approval.
+        candidate = self.candidate_with(rootPublicKeySha256=self.old_root)
+        out = self.inspect(candidate=candidate,
+                           known_development_role_fingerprints=())
+        self.assertEqual(out["status"], M.HOLD)
+        self.assertIs(out["candidateFieldsConsistentInCI"], True)
+        for flag in M.DENIED:
+            self.assertIs(out[flag], False, flag)
+
+    def test_30_omitted_old_epoch_roster_never_claims_real_custody(self):
+        # Distinctness is only relative to known fixture data.
+        out = self.inspect(
+            candidate=self.candidate_with(newEpoch=self.old_epoch),
+            known_development_epochs=(),
+        )
+        self.assertEqual(out["status"], M.HOLD)
+        self.assertIs(out["operatorRootPinnedOutOfBand"], False)
+        self.assertIs(out["cutoverAuthorized"], False)
+
+    def test_31_missing_issued_nonce_inventory_does_not_allow_import(self):
+        # No old challenge inventory can prove no challenge existed.
+        self.refused(
+            "LOCAL_CHALLENGE_TRANSFER_FORBIDDEN",
+            candidate=self.candidate_with(
+                importedChallengeDigests=[sha("omitted-issued-nonce")]),
+            locally_issued_challenge_digests=(),
+        )
+
+    def test_32_no_local_inventory_still_cannot_claim_cutover(self):
+        out = self.inspect(
+            known_development_role_fingerprints=(),
+            known_development_epochs=(),
+            locally_issued_challenge_digests=(),
+        )
+        self.assertEqual(out["status"], M.HOLD)
+        self.assertEqual(
+            out["nextRequiredAction"],
+            "OPERATOR_ENROLL_INDEPENDENT_CUSTODIAN_SEPARATELY",
+        )
+        self.assertNotIn("approvedEnrollment", out)
+        self.assertNotIn("trustedCurrentHeadSha256", out)
+        for flag in M.DENIED:
+            self.assertIs(out[flag], False, flag)
 
 
 if __name__ == "__main__":

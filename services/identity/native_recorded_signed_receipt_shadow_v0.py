@@ -81,7 +81,9 @@ def inspect_recorded_signed_receipt(
         if original_request_id is not None:
             return _held("INVALID_ORIGINAL_REQUEST_ID")
     elif (type(original_request_id) is not str
-          or len(original_request_id) > 96
+          or not 16 <= len(original_request_id) <= 96
+          or any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+                 for c in original_request_id)
           or _digest(original_request_id) != original.request_digest):
         return _held("MISSING_OR_MISMATCHED_ORIGINAL_REQUEST_ID")
     if (type(recorded_frame) is not bytes

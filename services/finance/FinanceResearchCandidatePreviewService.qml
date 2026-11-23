@@ -171,8 +171,11 @@ Scope {
     function completeAttempt(force) {
         if (!processExited)
             return;
-        if (!force && (!stdoutFinished
-                || (processExitCode !== 0 && !stderrFinished)))
+        // A successful bridge may have no stderr; a refused bridge may
+        // have no stdout. Await only the output stream relevant to its code.
+        const requiredStreamFinished = processExitCode === 0
+            ? stdoutFinished : stderrFinished;
+        if (!force && !requiredStreamFinished)
             return;
         completionDeadline.stop();
 
@@ -180,8 +183,7 @@ Scope {
         const output = responseBuffer;
         const diagnostic = errorBuffer;
         const code = processExitCode;
-        const streamIncomplete = !stdoutFinished
-            || (code !== 0 && !stderrFinished);
+        const streamIncomplete = !requiredStreamFinished;
 
         responseBuffer = "";
         errorBuffer = "";

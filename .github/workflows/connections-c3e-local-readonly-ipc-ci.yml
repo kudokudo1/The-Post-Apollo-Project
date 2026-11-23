@@ -47,7 +47,7 @@ jobs:
                             '"credentialActionsEnabled": True'):
               assert forbidden not in code, forbidden
           for required in ("C3eStorageIndependentTrustBoundary.py",
-                           "serve_one_ci_only(", "S.PROTECTED_REQUIRED",
+                           "serve_one_ci_only(", "boundary.protected_required_status()",
                            "C3E_IPC_NO_REAL_SIGNIN_OR_PROTECTED_AUTHORITY",
                            '"CUSTODIAN_STATUS"', "MAX_FRAME = 4096"):
               assert required in code, required

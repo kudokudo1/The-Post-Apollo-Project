@@ -149,21 +149,30 @@ assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in
 assert "trayMenuOpen ? 0.72" in tray
 assert "trayMenuOpen ? 0.18" in tray
 assert "safeSource: trayIcon" in tray
-# Copy Workspaces' two backing layers, sampled backdrop shadow, and two
-# sampled icon shadows. A real rectangle remains visible behind each app.
+# Copy Workspaces' real construction, not a permanent bordered mini
+# card: 25×42 delegate, a 70% dark active layer, invisible oversized
+# backing and low-opacity sampled glow beneath the icon.
 for token in (
+    "implicitWidth: 25",
+    "implicitHeight: 42",
     "id: trayActiveButtonBackground",
-    "opacity: trayNativeMenu.visible ? 0.7 : 0.0",
+    "opacity: 0.7",
+    'color: trayButton.cardEmphasized ? Colors.dark : "transparent"',
     "id: trayButtonBackground",
-    "opacity: 0.68",
+    "width: parent.width + 6",
+    "height: parent.height + 5",
+    "opacity: trayButton.cardEmphasized ? 0.0 : 0.0",
     "id: trayButtonBackgroundGlow",
     "safeSource: trayButtonBackground",
+    "opacity: trayButton.cardEmphasized ? 0.2 : 0.0",
     "id: trayIconGlow",
     "id: trayActiveIconGlow",
     "color: Colors.cyan",
     "color: trayButton.iconAccentColor",
 ):
     assert token in tray, token
+assert 'border.color: trayButton.iconAccentColor' not in tray
+assert 'opacity: 0.68' not in tray
 assert "readonly property bool trayButtonHovered: trayHoverHandler.hovered" in tray
 assert "HoverHandler {" in tray and "blocking: false" in tray
 assert "trayDock.trayButtonHovered =" not in tray

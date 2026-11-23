@@ -11,6 +11,7 @@ Production admission and real command wiring are forbidden in this reference.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
@@ -20,8 +21,8 @@ from urllib.parse import quote
 
 SCHEMA = "post-apollo.identity.local-command-outcome-hold.test-v0"
 ACTIONS = frozenset(("BEGIN", "STATUS", "CANCEL", "RECOVER"))
-_ATTEMPT = re.compile(r"[0-9a-f]{32}\\Z", re.ASCII)
-_REQUEST = re.compile(r"[A-Za-z0-9_-]{8,128}\\Z", re.ASCII)
+_ATTEMPT = re.compile(r"[0-9a-f]{32}\Z", re.ASCII)
+_REQUEST = re.compile(r"[A-Za-z0-9_-]{8,128}\Z", re.ASCII)
 
 
 class OutcomeHoldRefused(ValueError):
@@ -129,7 +130,7 @@ class TestOnlyLocalOutcomeFence:
         digest = self._validate(
             attempt_id=attempt_id, action=action, request_id=request_id)
         try:
-            with self._connect(write=True) as db:
+            with closing(self._connect(write=True)) as db, db:
                 db.execute("BEGIN IMMEDIATE")
                 if not self._schema_ok(db):
                     raise OutcomeHoldRefused("Local hold schema missing or changed")
@@ -150,7 +151,7 @@ class TestOnlyLocalOutcomeFence:
     def inspect(self) -> LocalOutcomeHold:
         """Fail closed for missing, empty, malformed, rolled-back, or valid DB."""
         try:
-            with self._connect(write=False) as db:
+            with closing(self._connect(write=False)) as db:
                 if not self._schema_ok(db):
                     return self._held("UNTRUSTED_OR_INVALID_LOCAL_SCHEMA")
                 rows = db.execute(

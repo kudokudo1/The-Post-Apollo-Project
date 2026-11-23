@@ -209,7 +209,7 @@ class LocalWitnessSplitBrainTests(unittest.TestCase):
 
     def test_09_extra_authority_field_refused(self):
         forged = dict(self.observe(self.left), productionAuthority=True)
-        with self.assertRaisesRegex(M.Refused, "EXTRA_DIAGNOSTIC"):
+        with self.assertRaisesRegex(M.Refused, "STATUS_INJECTION"):
             self.compare(forged, self.observe(self.right))
 
     def test_10_missing_field_refused(self):
@@ -281,7 +281,9 @@ class LocalWitnessSplitBrainTests(unittest.TestCase):
         for candidate in (None, False, [], {}, "string"):
             with self.subTest(type=type(candidate).__name__):
                 with self.assertRaises(M.Refused):
-                    self.compare(candidate, self.observe(self.right))
+                    M.reconcile_ci_only(
+                        left_observation=candidate,
+                        right_observation=self.observe(self.right))
 
     def test_22_original_protected_c3e_still_refuses_shadow_local_adapter(self):
         protected = M.W.S.TrustBoundary(

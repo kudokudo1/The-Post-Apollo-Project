@@ -1,0 +1,93 @@
+name: Connections C3e storage-neutral trust boundary (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eStorageIndependentTrustBoundary.py'
+      - 'tests/connections/test_connections_c3e_storage_independent_trust_boundary.py'
+      - '.github/workflows/connections-c3e-storage-independent-trust-boundary-ci.yml'
+      - 'docs/connections-c3e-storage-independent-trust-boundary.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storage-neutral-test-and-protected-hold:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned CI signature parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Assert no service, network, signer or credential authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eStorageIndependentTrustBoundary.py \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("tests/connections/c3e_release_trust/C3eStorageIndependentTrustBoundary.py")
+          text = path.read_text()
+          broker = Path("services/connections/ConnectionsBroker.qml").read_text()
+          for forbidden in ("socket.socket(", "subprocess.run(", "Ed25519PrivateKey",
+                            "sqlite3.connect(", '"productionAuthority": True',
+                            '"credentialActionsEnabled": True'):
+              assert forbidden not in text, forbidden
+          for must in ("C3eLocalDevelopmentHistoryLedger.py",
+                       "C3E_STORAGE_PROTECTED_CUSTODIAN_HOLD_NO_FALLBACK",
+                       "C3E_STORAGE_NO_PROTECTED_AUTHORITY_OR_SIGNIN",
+                       "LOCAL_FIXTURE_VALID_NOT_INDEPENDENT_TRUST",
+                       "INDEPENDENT_CUSTODIAN_UNAVAILABLE_HOLD"):
+              assert must in text, must
+          import importlib.util, sys
+          spec = importlib.util.spec_from_file_location("c3e_storage_static_boundary", path)
+          boundary = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = boundary
+          spec.loader.exec_module(boundary)
+          for flag in ("trustedCurrentHeadVerified",
+                       "independentOneUseChallengeVerified",
+                       "protectedCustodianReachable",
+                       "hostAuthenticated", "productionAuthority",
+                       "canBeginSignIn", "credentialActionsEnabled"):
+              assert boundary.DENIED.get(flag) is False, flag
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_STORAGE_INTERFACE_ONLY // NO_NATIVE_OR_PROD_AUTHORITY")
+          PY
+      - name: 28 storage-switch, no-fallback and fixture attack cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py
+          echo "C3E_STORAGE_BOUNDARY_PASS // PROTECTED_MODE_ALWAYS_HOLD"
+      - name: Preserve original local ledger and signed role regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py \
+            tests/connections/test_connections_c3e_operator_witness_enrollment_preflight.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          do
+            sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+              "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_STORAGE_HOLD // NEVER_PROMOTE_LOCAL_TO_REMOTE_AUTHORITY"

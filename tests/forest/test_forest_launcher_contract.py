@@ -716,7 +716,8 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("property bool reasoningRailExpanded: false", view)
         self.assertIn("reasoningRailExpanded = false;", view)
         self.assertIn("y: root.reasoningRailExpanded", view)
-        self.assertIn("0 : Math.max(0, parent.height - height)", view)
+        # Expanded y=4 preserves the close cap's slider surround.
+        self.assertNotIn("0 : Math.max(0, parent.height - height)", view)
         self.assertIn("width: 40", view)
         self.assertIn("x: root.reasoningRailExpanded ? 4 : 0", view)
         self.assertIn("y: root.reasoningRailExpanded", view)

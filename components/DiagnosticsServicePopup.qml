@@ -20,10 +20,46 @@ Rectangle {
 
     signal closeRequested()
 
-    color: Colors.black
+    // Fully opaque local backing. The host separately dims/blocks the work
+    // area below this in-widget modal; no transparency is inherited here.
+    color: "#110319"
+    opacity: 1.0
     border.width: 1
     border.color: Colors.magenta
     clip: true
+
+    // Catch unused pointer events before they reach interactive widgets below
+    // the popup. The Flickable and its real close/scroll controls paint above
+    // this shield and keep their own input handlers.
+    MouseArea {
+        id: diagnosticsPointerShield
+        anchors.fill: parent
+        z: 0
+        acceptedButtons: Qt.AllButtons
+        preventStealing: true
+        onPressed: function(mouse) { mouse.accepted = true; }
+        onClicked: function(mouse) { mouse.accepted = true; }
+        onWheel: function(wheel) { wheel.accepted = true; }
+    }
+
+    // Own the *entire* popup's scroll wheel, including header, empty spaces
+    // and end-of-scroll. Never chain a wheel delta into the underlying Budget
+    // or Weather work area. No second Flickable or polling machinery.
+    WheelHandler {
+        id: diagnosticsWheelContainment
+        target: null
+        blocking: true
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: function(wheel) {
+            const delta = wheel.pixelDelta.y !== 0
+                ? -wheel.pixelDelta.y : -wheel.angleDelta.y / 120 * 42;
+            const limit = Math.max(0,
+                diagnosticsScroll.contentHeight - diagnosticsScroll.height);
+            diagnosticsScroll.contentY = Math.max(0,
+                Math.min(limit, diagnosticsScroll.contentY + delta));
+            wheel.accepted = true;
+        }
+    }
 
     function statusColor(state) {
         const value = String(state || "").toUpperCase();
@@ -41,6 +77,7 @@ Rectangle {
 
     Flickable {
         id: diagnosticsScroll
+        z: 1
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -51,7 +88,9 @@ Rectangle {
             id: detailBody
             x: 12
             y: 12
-            width: Math.max(0, diagnosticsScroll.width - 24)
+            // Keep the complete right-hand 16px star rail plus a clean gap
+            // outside text and service-row borders, even after resizing.
+            width: Math.max(0, diagnosticsScroll.width - 44)
             spacing: 11
 
             Row {
@@ -68,13 +107,11 @@ Rectangle {
                     textFormat: Text.PlainText
                     elide: Text.ElideRight
                 }
-                ActionButton {
+                // Use the canonical ×: same red glyph, border, three glow
+                // planes, and pointer/keyboard behavior as other menus.
+                CloseButton {
                     width: 34
-                    height: 30
-                    label: "×"
-                    labelPixelSize: 19
-                    accentColor: Colors.red
-                    onLeftClicked: diagnosticsPane.closeRequested()
+                    onCloseRequested: diagnosticsPane.closeRequested()
                 }
             }
 
@@ -190,9 +227,18 @@ Rectangle {
     }
 
     NeonScrollBar {
+        id: diagnosticsRail
         flickable: diagnosticsScroll
-        handleStyle: "star"
+        mountingParent: diagnosticsPane
         geometryHost: diagnosticsPane
+        geometryMode: "box"
+        handleStyle: "star"
+        // The title, × and cyan divider occupy the header. Do not draw
+        // the star over the close target or let the rail touch the frame.
+        boxTopInset: 68
+        boxBottomInset: 12
+        rightInset: 8
+        z: 3
         visible: scrollable
     }
 }

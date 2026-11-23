@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Shapes as Shapes
 
 Rectangle {
     id: slider
@@ -8,6 +9,12 @@ Rectangle {
     property int currentIndex: -1
     property color accentColor: Colors.cyan
     property color handleColor: Colors.white
+    // Opt-in palette only: Git/Hospital and every existing consumer keep
+    // their white hardware thumb and current interaction behavior.
+    property bool handleGradientEnabled: false
+    property color handleGradientBaseColor: handleColor
+    property color handleGradientAccentColor: accentColor
+    property bool handleGradientTopRight: false
     property color handleGlowColor: Colors.magenta
     property color activityGlowColor: Colors.magenta
     property var activityPoints: []
@@ -500,6 +507,27 @@ Rectangle {
                 }
 
                 color: slider.accentColor
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop {
+                        position: 0.0
+                        color: slider.handleGradientEnabled
+                               ? slider.handleGradientAccentColor
+                               : slider.accentColor
+                    }
+                    GradientStop {
+                        position: 0.2
+                        color: slider.handleGradientEnabled
+                               ? slider.handleGradientAccentColor
+                               : slider.accentColor
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: slider.handleGradientEnabled
+                               ? slider.handleGradientBaseColor
+                               : slider.accentColor
+                    }
+                }
                 opacity: (slider.numericMode || slider.count > 0)
                     ? 0.48 : 0.14
             }
@@ -622,11 +650,56 @@ Rectangle {
                     : slider.handleYForIndex(slider.displayedIndex)
 
                 scale: dragArea.pressed ? 0.97 : 1.0
-                color: dragArea.pressed ? Colors.yellow : Colors.white
+                // Preserve the canonical yellow pressed hardware state.
+                // Idle Forest sliders may opt into Tree-gradient color ink.
+                color: dragArea.pressed ? Colors.yellow
+                    : slider.handleGradientEnabled
+                    ? slider.handleGradientBaseColor : slider.handleColor
                 border.width: 1
-                border.color: dragArea.pressed
-                              ? Colors.orange
-                              : Colors.white
+                border.color: dragArea.pressed ? Colors.orange
+                    : slider.handleGradientEnabled
+                    ? slider.handleGradientBaseColor : slider.handleColor
+
+                Shapes.Shape {
+                    id: thumbGradientInk
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    visible: slider.handleGradientEnabled && !dragArea.pressed
+
+                    Shapes.ShapePath {
+                        strokeWidth: -1
+                        fillGradient: Shapes.RadialGradient {
+                            centerX: slider.handleGradientTopRight
+                                ? thumbGradientInk.width : 0
+                            centerY: 0
+                            centerRadius: Math.max(
+                                28, thumbGradientInk.width * 1.1)
+                            focalX: centerX
+                            focalY: centerY
+                            GradientStop {
+                                position: 0.0
+                                color: slider.handleGradientAccentColor
+                            }
+                            GradientStop {
+                                position: 0.2
+                                color: slider.handleGradientAccentColor
+                            }
+                            GradientStop {
+                                position: 1.0
+                                color: slider.handleGradientBaseColor
+                            }
+                        }
+
+                        startX: 0; startY: 0
+                        PathLine { x: thumbGradientInk.width; y: 0 }
+                        PathLine {
+                            x: thumbGradientInk.width
+                            y: thumbGradientInk.height
+                        }
+                        PathLine { x: 0; y: thumbGradientInk.height }
+                        PathLine { x: 0; y: 0 }
+                    }
+                }
 
                 Rectangle {
                     anchors {

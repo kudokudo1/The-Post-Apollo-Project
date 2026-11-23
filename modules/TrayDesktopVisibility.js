@@ -84,6 +84,14 @@ function trayAppKeys(item) {
     add(item.id);
     add(item.title);
 
+    // The operator's live D-Bus and Sway reads verified this exact pair:
+    // SNI Id "vesktop_status_icon_1" -> Sway app_id "dev.vencord.Vesktop".
+    // Normalize underscores first, then attach ONLY the observed identity;
+    // do not infer that "Discord", arbitrary titles or other numbered
+    // notifier IDs identify the same visible desktop application.
+    if (ids.indexOf("vesktop.status.icon.1") >= 0)
+        add("dev.vencord.vesktop");
+
     // Known verified desktop entry vs tray IDs which legitimately differ.
     // Keep Vesktop/Discord distinct: one running Discord app must not light
     // the other application's tray card by accident.

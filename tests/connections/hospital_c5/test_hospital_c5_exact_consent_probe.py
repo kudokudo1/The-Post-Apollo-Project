@@ -233,7 +233,7 @@ class C5H3UntrustedEvidence(unittest.TestCase):
         self.assertFalse(result["claimMatchesReview"])
         self.assert_hold(result)
 
-    def test_16b_duplicate_json_claim_fields_refused(self):
+    def test_16_duplicate_json_claim_fields_refused(self):
         raw = C.canonical(self.claim()).replace(
             b'"action":', b'"action":"RESTORE","action":', 1)
         with self.assertRaises(C.Refused):

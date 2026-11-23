@@ -131,6 +131,15 @@ PanelWindow {
         }
     }
 
+    FinanceServices.FinanceCategoryGroupWriteService {
+        id: financeCategoryGroupWrite
+        onSaved: {
+            financeCategoriesPane.clearGroupDraft();
+            if(root.menuOpen)
+                financeBudget.refresh();
+        }
+    }
+
     readonly property bool hasBudgetFeed:
         selectedMainMode === "budget" && selectedBudgetSubMode === "budget"
     // NO FEED for reserved/unimplemented pages. LIVE means an authenticated
@@ -214,7 +223,9 @@ PanelWindow {
                 || financeWrite.state==="pending"
                 || financeWrite.state==="uncertain"
                 || financeCategoryWrite.state==="pending"
-                || financeCategoryWrite.state==="uncertain")
+                || financeCategoryWrite.state==="uncertain"
+                || financeCategoryGroupWrite.state==="pending"
+                || financeCategoryGroupWrite.state==="uncertain")
             return false;
         budgetSection=section;
         budgetScroll.contentY=0;
@@ -1922,6 +1933,31 @@ FinanceCategoriesPane {
     snapshot: financeBudget.snapshot
     writeState: financeCategoryWrite.state
     writeMessage: financeCategoryWrite.message
+    groupWriteState: financeCategoryGroupWrite.state
+    groupWriteMessage: financeCategoryGroupWrite.message
+    externalWriteBusy: financeWrite.state==="pending"
+        || financeWrite.state==="uncertain"
+        || financeAllocationWrite.state==="pending"
+        || financeAllocationWrite.state==="uncertain"
+        || financeFundingWrite.state==="pending"
+        || financeFundingWrite.state==="uncertain"
+    onGroupSaveRequested: function(payload) {
+        if(financeBudget.state==="ready" && financeBudget.snapshot
+                && payload
+                && payload.sourceKey===financeBudget.snapshot.sourceKey
+                && payload.month===financeBudget.snapshot.month
+                && financeCategoryGroupWrite.state!=="pending"
+                && financeCategoryGroupWrite.state!=="uncertain"
+                && financeCategoryWrite.state!=="pending"
+                && financeCategoryWrite.state!=="uncertain"
+                && financeWrite.state!=="pending"
+                && financeWrite.state!=="uncertain"
+                && financeAllocationWrite.state!=="pending"
+                && financeAllocationWrite.state!=="uncertain"
+                && financeFundingWrite.state!=="pending"
+                && financeFundingWrite.state!=="uncertain")
+            financeCategoryGroupWrite.submit(payload);
+    }
     onSaveRequested: function(payload) {
         if(financeBudget.state==="ready" && financeBudget.snapshot
                 && payload
@@ -1929,6 +1965,8 @@ FinanceCategoriesPane {
                 && payload.month===financeBudget.snapshot.month
                 && financeCategoryWrite.state!=="pending"
                 && financeCategoryWrite.state!=="uncertain"
+                && financeCategoryGroupWrite.state!=="pending"
+                && financeCategoryGroupWrite.state!=="uncertain"
                 && financeWrite.state!=="pending"
                 && financeWrite.state!=="uncertain"
                 && financeAllocationWrite.state!=="pending"

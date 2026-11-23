@@ -1018,3 +1018,38 @@ fresh readback.
 a separate UI confirmation integration milestone. Real write authorization,
 operator desktop configuration, and deletion/reparenting require distinct
 operator approval. This change does not modify the live machine.
+
+
+## FinanceW Categories M6 // Staged category-group confirmation
+
+The expense-group controls in **Finance → Budget → Budget → CATEGORIES**
+now follow **PREVIEW GROUP → ARM GROUP SAVE → CONFIRM GROUP SAVE**. A new
+`FinanceCategoryGroupWriteService.qml` bridge sends one exact JSON command
+over process stdin to M5's separately authorized
+`write_category_group.mjs` worker.
+
+**No operator write permit is provisioned by this milestone.** With the
+`category-group-writes-enabled` file absent, pressing CONFIRM returns
+**GROUP WRITES LOCKED // OPERATOR ACTIVATION REQUIRED** without mutation.
+This confirmation UI is not itself authority to modify an Actual budget.
+
+Edits to the group name, any refreshed budget snapshot, a changed source
+or month, or selection of another group invalidate the confirmation. The
+request is submitted only once. A pending or uncertain group writer blocks
+navigation away from the Budget subsection and any further Categories edits;
+its success closes the group draft and refreshes the authenticated snapshot.
+Any unexpected failure becomes **GROUP REFUSED OR UNCERTAIN** and requires
+manual Actual/journal inspection, never automatic retry.
+
+Group submission is refused while other FinanceW financial writers are
+pending or uncertain, and existing category-name confirmation now checks
+for group-writer activity too. No group delete, move/reparent, income-group
+mutation or hidden permission setup is provided. Existing category
+create/rename and spreadsheet **EDIT SET** remain unchanged.
+
+**Verification boundary:** CI contracts, M5 fictional/disposable writer
+tests and GitHub review are not equivalent to live Quickshell acceptance.
+Because this UI activates a previously dormant financial writer path when
+the operator independently creates its permit, a focused Nurse 2 security
+review is appropriate before merge. Real financial write activation and
+local machine changes remain separately operator-approved.

@@ -19,7 +19,7 @@ Item {
     property bool previewVisible: false
     property bool approvalArmed: false
     property bool submitted: false
-    // M4: expense-group management is PREVIEW ONLY, separate from M3 writes.
+    // M6: expense groups keep their own confirmation state and write bridge.
     property string groupDraftMode: "" // "", "create", "rename"
     property string groupDraftId: ""
     property string groupSourceAtOpen: ""
@@ -27,11 +27,18 @@ Item {
     property string groupOriginalNameAtOpen: ""
     property string groupDraftName: ""
     property bool groupPreviewVisible: false
+    property bool groupApprovalArmed: false
+    property bool groupSubmitted: false
+    property string groupWriteState: "idle"
+    property string groupWriteMessage: ""
+    property bool externalWriteBusy: false
     property string writeState: "idle"
     property string writeMessage: ""
     signal editBudgetRequested(var category)
     signal saveRequested(var payload)
+    signal groupSaveRequested(var payload)
     readonly property bool busy: writeState==="pending" || writeState==="uncertain"
+        || groupWriteState==="pending" || groupWriteState==="uncertain"
 
     readonly property var categories: snapshot && Array.isArray(snapshot.categories)
         ? snapshot.categories : []
@@ -55,8 +62,17 @@ Item {
         snapshot,openMode,selectedCategoryId,selectedGroupId,draftName)
     readonly property var groupPlan: GroupPlan.previewGroupPlan(
         snapshot,groupDraftMode,groupDraftId,groupDraftName)
+    readonly property bool groupProposalEligible: groupPreviewVisible
+        && !!groupPlan && groupPlan.ok && !busy && !externalWriteBusy
+        && !groupSubmitted
+        && snapshot && snapshot.readOnly===true
+        && groupPlan.sourceKey===groupSourceAtOpen
+        && groupPlan.sourceKey===snapshot.sourceKey
+        && groupPlan.month===groupMonthAtOpen
+        && groupPlan.month===snapshot.month
     readonly property bool proposalEligible: previewVisible && !!plan && plan.ok
-        && !busy && !submitted && snapshot && snapshot.readOnly===true
+        && !busy && !externalWriteBusy
+        && !submitted && snapshot && snapshot.readOnly===true
         && plan.sourceKey===sourceAtOpen
         && plan.sourceKey===snapshot.sourceKey
         && plan.month===monthAtOpen && plan.month===snapshot.month
@@ -67,12 +83,28 @@ Item {
     function clearGroupDraft(){
         if(busy)return false;
         groupPreviewVisible=false;
+        groupApprovalArmed=false;
+        groupSubmitted=false;
         groupDraftMode="";
         groupDraftId="";
         groupSourceAtOpen="";
         groupMonthAtOpen="";
         groupOriginalNameAtOpen="";
         groupDraftName="";
+        return true;
+    }
+    function requestGroupSave(){
+        if(!groupProposalEligible || !groupApprovalArmed)return false;
+        let requestId="";
+        for(let i=0;i<32;i++)
+            requestId+=Math.floor(Math.random()*16).toString(16);
+        groupSubmitted=true;
+        groupSaveRequested({
+            mode:groupPlan.mode, requestId:requestId,
+            sourceKey:groupPlan.sourceKey, month:groupPlan.month,
+            groupId:groupPlan.groupId, expectedName:groupPlan.originalName,
+            proposedName:groupPlan.proposedName
+        });
         return true;
     }
     function beginCreateGroup(){
@@ -166,9 +198,13 @@ Item {
         previewVisible=false;
         approvalArmed=false;
     }
-    onGroupDraftNameChanged: groupPreviewVisible=false
+    onGroupDraftNameChanged: {
+        groupPreviewVisible=false;
+        groupApprovalArmed=false;
+    }
     onSnapshotChanged: {
         approvalArmed=false;
+        groupApprovalArmed=false;
         if(groupDraftMode) {
             if(!snapshot || snapshot.sourceKey!==groupSourceAtOpen
                     || snapshot.month!==groupMonthAtOpen) {
@@ -410,7 +446,7 @@ Item {
             }
         }
 
-        // M4 group management has no submit signal, save button, or writer.
+        // M6 group confirmation uses M5's separate, operator-gated writer.
         Row {
             id: groupHeader
             width: parent.width
@@ -495,13 +531,16 @@ Item {
                     accentColor: Colors.orange
                     trackLabelGlowLocally: true
                     available: categoryPane.groupPlan.ok
-                        && !categoryPane.busy
+                        && !categoryPane.busy && !categoryPane.groupSubmitted
                         && categoryPane.groupSourceAtOpen
                             ===categoryPane.snapshot.sourceKey
                         && categoryPane.groupMonthAtOpen
                             ===categoryPane.snapshot.month
-                    onLeftClicked: categoryPane.groupPreviewVisible=
-                        categoryPane.groupPlan.ok
+                    onLeftClicked: {
+                        categoryPane.groupApprovalArmed=false;
+                        categoryPane.groupPreviewVisible=
+                            categoryPane.groupPlan.ok;
+                    }
                 }
                 ActionButton {
                     width: (parent.width-6)/2
@@ -514,10 +553,30 @@ Item {
                     onLeftClicked: categoryPane.clearGroupDraft()
                 }
             }
+            ActionButton {
+                width: parent.width
+                height: 29
+                label: categoryPane.groupSubmitted ? "GROUP REQUEST SUBMITTED"
+                    : categoryPane.groupApprovalArmed
+                        ? "CONFIRM GROUP SAVE" : "ARM GROUP SAVE"
+                labelPixelSize: 10
+                accentColor: categoryPane.groupApprovalArmed
+                    ? Colors.magenta : Colors.orange
+                trackLabelGlowLocally: true
+                available: categoryPane.groupProposalEligible
+                onLeftClicked: {
+                    if(categoryPane.groupProposalEligible) {
+                        if(!categoryPane.groupApprovalArmed)
+                            categoryPane.groupApprovalArmed=true;
+                        else
+                            categoryPane.requestGroupSave();
+                    }
+                }
+            }
             GohuText {
                 width: parent.width
                 text: categoryPane.groupPlan.ok
-                    ? "GROUP PREVIEW AVAILABLE // NO SAVE"
+                    ? "GROUP PREVIEW VALID // EXPLICIT CONFIRMATION REQUIRED"
                     : categoryPane.groupPlan.reason
                 color: categoryPane.groupPlan.ok ? Colors.cyan : Colors.orange
                 font.pixelSize: 9
@@ -540,7 +599,20 @@ Item {
             GohuText {
                 width: parent.width
                 visible: categoryPane.groupPreviewVisible
-                text: "PREVIEW ONLY // GROUP NOT SAVED IN ACTUAL"
+                text: categoryPane.groupSubmitted
+                    ? "GROUP SAVE REQUEST SENT // CHECK WRITER STATUS"
+                    : "NOT SAVED // ACTUAL GROUP UNCHANGED"
+                color: Colors.orange
+                font.pixelSize: 9
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: categoryPane.groupWriteState==="pending"
+                    || categoryPane.groupWriteState==="blocked"
+                    || categoryPane.groupWriteState==="uncertain"
+                text: categoryPane.groupWriteMessage
                 color: Colors.orange
                 font.pixelSize: 9
                 textFormat: Text.PlainText

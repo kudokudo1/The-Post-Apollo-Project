@@ -82,12 +82,20 @@ class CapacityP2CTests(unittest.TestCase):
         Handler.models = [{"name": MODEL, "size": 1000000000}]
         Handler.resident = []
         Handler.version = {"version": "0.32.14"}
-        for item in (
+        # Fake the host for observer tests, but do NOT shadow the exact
+        # helper functions under test in the dedicated CPU/GPU cases.
+        patches = [
             patch.object(p0, "_host_memory_available_mib", return_value=2280),
             patch.object(p0.os, "cpu_count", return_value=16),
-            patch.object(p2c, "_process_affinity_threads", return_value=8),
-            patch.object(p2c, "_gpu_devices", return_value=[]),
-        ):
+        ]
+        if not self._testMethodName.startswith("test_affinity_"):
+            patches.append(patch.object(
+                p2c, "_process_affinity_threads", return_value=8
+            ))
+        if not (self._testMethodName.startswith("test_gpu_")
+                or self._testMethodName.startswith("test_multiple_cards_")):
+            patches.append(patch.object(p2c, "_gpu_devices", return_value=[]))
+        for item in patches:
             item.start()
             self.addCleanup(item.stop)
 

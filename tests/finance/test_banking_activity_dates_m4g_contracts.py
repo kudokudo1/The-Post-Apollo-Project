@@ -51,7 +51,7 @@ for phrase in (
     'providerPane.filteredActivity.error',
     'providerPane.filteredActivity.totalMatches',
     'providerPane.filteredActivity.pageCount',
-    'onManualCorrectionRequested: function(draft)' if False else 'signal manualCorrectionRequested(var draft)',
+    'signal manualCorrectionRequested(var draft)',
     'signal manualDeletionRequested(var draft)',
     'FinanceBankingOfficialHandoff {'
 ):

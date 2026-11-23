@@ -12,6 +12,7 @@ const popup = from("components/DiagnosticsServicePopup.qml");
 const toggle = from("components/DiagnosticsDockButton.qml");
 const close = from("components/CloseButton.qml");
 const resize = from("components/ResizeButton.qml");
+const resync = from("components/ReloadButton.qml");
 const finance = from("widgets/FinanceW.qml");
 const weather = from("widgets/weather/WeatherStationW.qml");
 
@@ -40,56 +41,68 @@ for (const key of [
         "diagnostic glow differs from shared arrow for " + key);
 }
 
-// The composite shares a centered Row but paints each glyph separately.
-// White stars must never inherit the medical glyph's hover or pressed color.
+// The screenshot exposed the old Unicode combining marks: they inherited the
+// medical icon's orange/yellow instead of being white. The new component uses
+// separate WHITE Text for every ornament and a plain medical staff.
 assert.match(toggle, /id:\s*diagnosticsArtwork[\s\S]*?anchors\.centerIn:\s*parent/);
-assert.match(toggle, /id:\s*diagnosticsSymbols[\s\S]*?spacing:\s*-2/);
 function glyphBody(id) {
     const start = toggle.indexOf("id: " + id);
-    assert.ok(start >= 0, "missing composite glyph " + id);
-    const end = toggle.indexOf("\n            }", start);
+    assert.ok(start >= 0, "missing actual glyph: " + id);
+    const end = toggle.indexOf("\n        }", start);
     assert.ok(end > start);
     return toggle.slice(start, end);
 }
 const left = glyphBody("diagnosticsLeftStar");
 const medical = glyphBody("diagnosticsMedicalSymbol");
+const upper = glyphBody("diagnosticsUpperStar");
 const right = glyphBody("diagnosticsRightStar");
 assert.match(left, /text:\s*"˖"/);
-assert.match(medical, /text:\s*"⚕๋࣭"/);
+assert.match(medical, /text:\s*"⚕"/);
+assert.match(upper, /text:\s*"✦"/);
 assert.match(right, /text:\s*"⭑"/);
-for (const part of [left,right]) {
+for (const part of [left, upper, right]) {
     assert.match(part, /color:\s*Colors\.white/);
+    assert.match(part, /textFormat:\s*Text\.PlainText/);
     assert.doesNotMatch(part, /diagnosticButton\.foregroundColor|accentColor/);
 }
 assert.match(medical, /color:\s*diagnosticButton\.foregroundColor/);
+assert.doesNotMatch(toggle, /text:\s*"⚕๋࣭"/);
+assert.equal((toggle.match(/color:\s*Colors\.white/g) || []).length, 3,
+    "all three accents, not only the two outer stars, remain white");
 assert.match(toggle, /contentGlowSource:\s*diagnosticsMedicalSymbol/);
 assert.match(toggle, /label:\s*""/);
-assert.doesNotMatch(toggle, /Text\.StyledText|<font/);
 assert.match(toggle, /selected:\s*diagnosticsOpen/);
-assert.equal((toggle.match(/color:\s*Colors\.white/g) || []).length, 2,
-    "both decorative stars keep white paint in all button states");
+assert.match(toggle, /width:\s*38/);
+assert.match(toggle, /height:\s*32/);
+assert.match(toggle, /anchors\.rightMargin:\s*-6/);
+assert.doesNotMatch(toggle, /id:\s*diagnosticsSymbols|spacing:\s*-2|Text\.StyledText/);
 
-// Downward ResizeButton's semantic accent is orange. Its yellow hover
-// surface must not be paired with an invisible yellow medical glyph.
-// Check actual source color recipes, not only numeric glow intensity.
-assert.match(resize, /property color decreaseAccentColor:\s*Colors\.orange/);
-assert.match(toggle, /accentColor:\s*Colors\.orange/);
+// Follow TimeW's observed RESYNC button, not ResizeButton. Check the real
+// color expressions on ALL planes, and separately keep ×/arrow glow strength.
+assert.match(resync, /property color semanticColor:\s*Colors\.yellow/);
+assert.match(resync, /property color hoverSurfaceColor:\s*Colors\.orange/);
+assert.match(toggle, /property color semanticColor:\s*Colors\.yellow/);
+assert.match(toggle, /property color hoverSurfaceColor:\s*Colors\.orange/);
 for (const key of [
-    "idleFillColor","hoverFillColor","pressedFillColor","selectedFillColor",
+    "accentColor", "idleFillColor","hoverFillColor","pressedFillColor",
+    "selectedFillColor","keyboardSelectedFillColor",
     "idleForegroundColor","hoverForegroundColor","pressedForegroundColor",
-    "selectedForegroundColor","idleBorderColor","hoverBorderColor",
-    "pressedBorderColor","selectedBorderColor","idleContentGlowColor",
-    "hoverContentGlowColor","pressedContentGlowColor",
-    "selectedContentGlowColor","idleSoftGlowColor","hoverSoftGlowColor",
-    "pressedSoftGlowColor","selectedSoftGlowColor","idleWideGlowColor",
-    "hoverWideGlowColor","pressedWideGlowColor","selectedWideGlowColor"
+    "selectedForegroundColor","keyboardSelectedForegroundColor",
+    "idleBorderColor","hoverBorderColor","pressedBorderColor",
+    "selectedBorderColor","keyboardSelectedBorderColor",
+    "idleContentGlowColor","hoverContentGlowColor","pressedContentGlowColor",
+    "selectedContentGlowColor","keyboardSelectedContentGlowColor",
+    "idleSoftGlowColor","hoverSoftGlowColor","pressedSoftGlowColor",
+    "selectedSoftGlowColor","keyboardSelectedSoftGlowColor",
+    "idleWideGlowColor","hoverWideGlowColor","pressedWideGlowColor",
+    "selectedWideGlowColor","keyboardSelectedWideGlowColor"
 ]) {
-    const re = new RegExp("^\\s*" + key + ":\\s*([^\\n]+)", "m");
-    const expected = resize.match(re);
-    const actual = toggle.match(re);
-    assert.ok(expected && actual, "missing down-arrow color recipe " + key);
+    const expression = new RegExp("^\\s*" + key + ":\\s*([^\\n]+)", "m");
+    const expected = resync.match(expression);
+    const actual = toggle.match(expression);
+    assert.ok(expected && actual, "missing TimeW RESYNC recipe " + key);
     assert.equal(actual[1].trim(),expected[1].trim(),
-        "diagnostics does not match down-arrow state " + key);
+        "diagnostics differs from RESYNC at " + key);
 }
 
 assert.match(popup, /id:\s*diagnosticsPointerShield/);

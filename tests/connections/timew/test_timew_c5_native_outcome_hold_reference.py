@@ -167,7 +167,7 @@ class NativeOutcomeHoldTests(unittest.TestCase):
 
     def test_revocation_before_spend_blocks_spend(self):
         self.assertEqual(
-            self.evaluate(("C5_REVOKE_REQUESTED", SPENT)),
+            self.evaluate(("C5_REVOKE_REQUESTED", SPENT), ledger="ACTIVE"),
             "DUPLICATE_OR_REVOKED_SPEND_HOLD")
 
     def test_lost_ack_after_dispatch_stays_unknown(self):

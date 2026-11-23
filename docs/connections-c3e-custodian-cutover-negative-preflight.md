@@ -33,7 +33,7 @@ Its job is to reject *obvious unsafe cutover shapes*:
 
 A well-formed candidate only produces `CUTOVER_HOLD_NO_INDEPENDENT_TRUST` with `candidateFieldsConsistentInCI: true`, an explicitly *audit-only* digest of the local test head/sequence, and **every** protected-custody, host, consent and production authorization flag **false**.
 
-The candidate's metadata is test-only. **A syntactically different public key or history head does not prove that a separate administrator controls the key or that a database cannot roll back.** These tests know only the fake local identities listed in the fixture; they cannot prove the inventory is exhaustive. The supplied candidate fields, host and epoch are caller-controlled. This is **not** the real future custodian's wire schema, a root-enrollment proof or a migration mechanism.
+The candidate's metadata is test-only. **A syntactically different public key or history head does not prove that a separate administrator controls the key or that a database cannot roll back.** These tests know only the fake local identities listed in the fixture; they cannot prove the inventory is exhaustive. Four explicit incomplete-inventory tests also show that omitted local signer/epoch/challenge records may escape *format-based* overlap detection, yet never yield protected custody, a trusted head, consent or cutover authority. The supplied candidate fields, host and epoch are caller-controlled. This is **not** the real future custodian's wire schema, a root-enrollment proof or a migration mechanism.
 
 ## HOW TO USE
 
@@ -45,7 +45,7 @@ For later independent cutover, a separately approved custodian must generate and
 
 ## VERIFY
 
-This milestone's new test suite contains 28 rejection and diagnostic cases including root/history alias, old head/epoch/nonce migration, purpose confusion, forged authority fields, malformed hashes, bool-as-counter, non-ASCII host, and unavailable protected authorization. The workflow also reruns the existing 28-case storage boundary, 28-case local ledger, and 24+22+22+20 signed history/enrollment/AF/Z tests. It retains the static `ConnectionsBroker.qml` credential-action disabled assertion.
+This milestone's new test suite contains 32 rejection and diagnostic cases including root/history alias, old head/epoch/nonce migration, purpose confusion, forged authority fields, malformed hashes, bool-as-counter, non-ASCII host, and unavailable protected authorization. The workflow also reruns the existing 28-case storage boundary, 28-case local ledger, and 24+22+22+20 signed history/enrollment/AF/Z tests. It retains the static `ConnectionsBroker.qml` credential-action disabled assertion.
 
 No new production service, signing helper or privileged native interface is present. A passing source-only test cannot certify an NAS computer, service authentication, independent root or antirollback storage.
 

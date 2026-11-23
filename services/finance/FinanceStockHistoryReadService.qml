@@ -39,7 +39,7 @@ Scope {
     readonly property var activeWindow: StockModePolicy.selectWindow(
         displayMode, dayDate, startDate, endDate, dateOffset(0))
     readonly property bool validSelection: activeWindow !== null
-        && ["0000320193","0000789019","0001045810"].indexOf(selectedCik) >= 0
+        && StockModePolicy.stockSymbol(selectedCik) !== null
 
     function dateOffset(days) {
         const day = new Date();
@@ -63,7 +63,7 @@ Scope {
         if (!monitoring) clear();
     }
     function selectIssuer(cik) {
-        if (["0000320193","0000789019","0001045810"].indexOf(cik) < 0)
+        if (StockModePolicy.stockSymbol(cik) === null)
             return false;
         if (selectedCik !== cik) {
             selectedCik = cik;
@@ -197,7 +197,9 @@ Scope {
                 state=["provider-key-required","demo-not-authorized"].indexOf(reason)>=0
                     ? "setup" : "failed";
                 message=reason==="provider-key-required"
-                    ? "NVIDIA PRICE HISTORY REQUIRES A PROVIDER KEY"
+                    ? (selectedCik==="0001045810"
+                        ? "NVIDIA PRICE HISTORY REQUIRES A PROVIDER KEY"
+                        : "PROVIDER KEY REQUIRED FOR "+StockModePolicy.stockSymbol(selectedCik))
                     : reason==="demo-not-authorized"
                     ? "MICROSOFT DEMO ACCESS DENIED // PROVIDER KEY REQUIRED"
                     : reason==="invalid-range"
@@ -210,8 +212,7 @@ Scope {
             if(line.indexOf("FINANCE_STOCK_RANGE ")!==0)continue;
             try {
                 const data=JSON.parse(line.slice("FINANCE_STOCK_RANGE ".length));
-                const symbols={"0000320193":"AAPL.US",
-                    "0000789019":"MSFT.US","0001045810":"NVDA.US"};
+                const symbols=StockModePolicy.stockSymbols();
                 if(!data || data.schemaVersion!==1 || data.source!=="eodhd-eod"
                     || data.readOnly!==true || data.cik!==selectedCik
                     || data.symbol!==symbols[selectedCik]

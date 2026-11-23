@@ -1,0 +1,40 @@
+name: TimeW M5 stored-view local fractional preview (read-only HOLD)
+
+on:
+  pull_request:
+    paths:
+      - 'widgets/TimeW.qml'
+      - 'services/time/MachineV3LocalPreviewUiRead.py'
+      - 'services/time/MachineV3LocalPreviewPolicy.js'
+      - 'tests/timew/test_machine_v5_local_preview_ui_bridge.py'
+      - 'tests/timew/test_machine_v5_local_preview_policy.cjs'
+      - 'docs/timew-m5-stored-local-preview-ui.md'
+      - '.github/workflows/timew-m5-stored-local-preview-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-stored-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: UI reader only reads one local checkpoint after explicit request
+        run: python3 -B -I tests/timew/test_machine_v5_local_preview_ui_bridge.py
+      - name: Pure QML JS validator rejects forged authority and stale selections
+        run: node tests/timew/test_machine_v5_local_preview_policy.cjs
+      - name: Preserve M4/M3 local preview and legacy geometry contracts
+        run: |
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_preview.py
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_store.py
+          python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py
+          python3 -B -I tests/timew/test_machine_v2_fractional_observation_review.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

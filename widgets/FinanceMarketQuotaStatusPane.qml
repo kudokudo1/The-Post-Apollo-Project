@@ -91,6 +91,7 @@ Rectangle {
             ActionButton {
                 width: body.width
                 height: 30
+                objectName: "marketQuotaRefreshButton"
                 label: localQuota.loading ? "READING LOCAL STATUS"
                     : "REFRESH LOCAL STATUS"
                 labelPixelSize: 10

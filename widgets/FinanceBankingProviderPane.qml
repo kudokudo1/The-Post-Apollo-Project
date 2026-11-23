@@ -678,6 +678,151 @@ Item {
                 wrapMode: Text.WordWrap
             }
         }
+        Column {
+            width: parent.width
+            spacing: 6
+            visible: providerPane.details.ok
+                &&providerPane.details.sectionKind==="activity"
+                &&providerPane.manualSession.mode==="manual"
+                &&providerPane.correctionCandidate!==null
+            GohuText {
+                width: parent.width
+                text: "CORRECT MANUAL ENTRY // SESSION ONLY // ACCOUNT ID IS LOCKED"
+                font.pixelSize: 10
+                font.bold: true
+                color: Colors.magenta
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: providerPane.correctionCandidate
+                    ? "SELECTED "+providerPane.correctionCandidate.entryId
+                      +" // ORIGINAL "+providerPane.correctionCandidate.expectedDate
+                      +" // "+ProviderPolicy.money(providerPane.correctionCandidate.expectedAmountCents)
+                    : ""
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 28
+                label: providerPane.correctionDirection==="out"
+                       ? "CORRECTION DIRECTION // MONEY OUT":"CORRECTION DIRECTION // MONEY IN"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: {
+                    providerPane.correctionDirection=
+                        providerPane.correctionDirection==="out"?"in":"out";
+                    providerPane.correctionDeleteArmed=false;
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "CORRECT DATE // YYYY-MM-DD"
+                font.pixelSize: 9
+                color: Colors.white
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: editDate
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "CORRECT DESCRIPTION"
+                font.pixelSize: 9
+                color: Colors.white
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: editDescription
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    maximumLength: 120
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "CORRECT USD AMOUNT // POSITIVE NUMBER"
+                font.pixelSize: 9
+                color: Colors.white
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: editAmount
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                }
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                label: "SAVE MANUAL ENTRY CORRECTION"
+                labelPixelSize: 9
+                accentColor: Colors.omnitrix
+                onLeftClicked: providerPane.requestCorrection()
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                label: providerPane.correctionDeleteArmed
+                       ? "CONFIRM DELETE ORIGINAL MANUAL ENTRY"
+                       : "DELETE SELECTED MANUAL ENTRY // TWO CLICKS"
+                labelPixelSize: 9
+                accentColor: providerPane.correctionDeleteArmed?Colors.red:Colors.orange
+                onLeftClicked: providerPane.requestDeletion()
+            }
+            GohuText {
+                width: parent.width
+                text: providerPane.correctionDeleteArmed
+                    ? "SECOND CLICK PERMANENTLY REMOVES THIS ENTRY FROM THE CURRENT UNSAVED SESSION"
+                    : "DELETE CANNOT BE UNDONE; CORRECTION REPLACES ONLY THIS USER-ENTERED RECORD"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 27
+                label: "CANCEL MANUAL CORRECTION"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: providerPane.clearSelectedEntry()
+            }
+        }
         GohuText {
             width: parent.width
             visible: providerPane.details.ok
@@ -722,6 +867,15 @@ Item {
                         color: Colors.white
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 28
+                        visible: providerPane.manualSession.mode==="manual"
+                        label: "CORRECT / REMOVE THIS MANUAL ENTRY"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        onLeftClicked: providerPane.chooseManualEntry(modelData)
                     }
                 }
             }

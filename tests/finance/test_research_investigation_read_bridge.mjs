@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { Readable } from "node:stream";
 import fs from "node:fs";
 import os from "node:os";
@@ -64,6 +64,36 @@ try {
   response=cli(REQUEST);
   assert.equal(response.status,0,response.stderr);
   assert.deepEqual(JSON.parse(response.stdout.slice(RESULT_PREFIX.length)),expected);
+  // Quickshell writes a newline to an open stdin pipe; it does not have to
+  // send EOF. Verify the CLI finishes while its parent still holds stdin open.
+  const child = spawn(process.execPath,[script],{
+    env:{...process.env,XDG_DATA_HOME:base},stdio:["pipe","pipe","pipe"]
+  });
+  let pipeOutput = "";
+  let pipeError = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", chunk => { pipeOutput += chunk; });
+  child.stderr.on("data", chunk => { pipeError += chunk; });
+  let deadline;
+  const childClosed = new Promise((resolve,reject) => {
+    child.on("error",reject);
+    child.on("close",resolve);
+  });
+  child.stdin.write(REQUEST); // Intentionally do not call end().
+  const exitCode = await Promise.race([
+    childClosed,
+    new Promise((_,reject) => {
+      deadline=setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error("Read bridge waited for EOF instead of newline"));
+      },2500);
+    })
+  ]);
+  clearTimeout(deadline);
+  child.stdin.destroy();
+  assert.equal(exitCode,0,pipeError);
+  assert.deepEqual(JSON.parse(pipeOutput.slice(RESULT_PREFIX.length)),expected);
   assert.equal(fs.statSync(file).mode & 0o077,0);
   fs.writeFileSync(file,"{bad JSON",{mode:0o600});
   response=cli(REQUEST);

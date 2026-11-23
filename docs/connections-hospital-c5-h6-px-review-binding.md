@@ -46,7 +46,7 @@ fixture, self-signed agent or Polkit zero exit may bypass it.
 
 ## HOW TO USE
 
-GitHub-only: the C5-H6 workflow checks the 9 focused Polkit details cases,
+GitHub-only: the C5-H6 workflow checks the 8 focused Polkit details cases,
 the expanded no-authority v2 review digest/claim matrix, and source-only
 ordering. Inherited C5-H2/H4 and shared Connections workflows remain
 separate regression gates. No workstation installation or Hospital action.

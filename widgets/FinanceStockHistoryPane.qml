@@ -8,7 +8,13 @@ Item {
     id: stocks
     property var stockFeed: null
     property bool discoveryOpen: false
-    onVisibleChanged: { if (!visible) discoveryOpen = false; }
+    property bool quotaOpen: false
+    onVisibleChanged: {
+        if (!visible) {
+            discoveryOpen = false;
+            quotaOpen = false;
+        }
+    }
     readonly property var snapshot: stockFeed && stockFeed.ready
         ? stockFeed.snapshot : null
     readonly property var priceBars: snapshot && Array.isArray(snapshot.bars)
@@ -56,13 +62,32 @@ Item {
         id: discoveryToggle
         anchors.top: parent.top
         anchors.topMargin: 6
-        anchors.right: parent.right
+        anchors.right: quotaToggle.left
+        anchors.rightMargin: 6
         width: 121
         height: 28
         label: "GLOBAL SEARCH"
         labelPixelSize: 9
         accentColor: Colors.magenta
-        onLeftClicked: stocks.discoveryOpen = true
+        onLeftClicked: {
+            stocks.quotaOpen = false;
+            stocks.discoveryOpen = true;
+        }
+    }
+    ActionButton {
+        id: quotaToggle
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        anchors.right: parent.right
+        width: 112
+        height: 28
+        label: "QUOTA STATUS"
+        labelPixelSize: 9
+        accentColor: Colors.orange
+        onLeftClicked: {
+            stocks.discoveryOpen = false;
+            stocks.quotaOpen = true;
+        }
     }
     Grid {
         id: issuers
@@ -537,6 +562,16 @@ Item {
             && stocks.stockFeed && stocks.stockFeed.monitoring
         z: 20
         onExitRequested: stocks.discoveryOpen = false
+    }
+
+    FinanceMarketQuotaStatusPane {
+        id: localQuotaStatus
+        anchors.fill: parent
+        visible: stocks.quotaOpen
+        active: stocks.quotaOpen && stocks.visible
+            && stocks.stockFeed && stocks.stockFeed.monitoring
+        z: 25
+        onExitRequested: stocks.quotaOpen = false
     }
 
     // Finance uses the ordinary bar, not the Git/Hospital star family.

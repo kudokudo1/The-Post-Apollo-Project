@@ -51,12 +51,17 @@ jobs:
                        "LOCAL_FIXTURE_VALID_NOT_INDEPENDENT_TRUST",
                        "INDEPENDENT_CUSTODIAN_UNAVAILABLE_HOLD"):
               assert must in text, must
+          import importlib.util, sys
+          spec = importlib.util.spec_from_file_location("c3e_storage_static_boundary", path)
+          boundary = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = boundary
+          spec.loader.exec_module(boundary)
           for flag in ("trustedCurrentHeadVerified",
                        "independentOneUseChallengeVerified",
                        "protectedCustodianReachable",
                        "hostAuthenticated", "productionAuthority",
                        "canBeginSignIn", "credentialActionsEnabled"):
-              assert '"'+flag+'": False' in text, flag
+              assert boundary.DENIED.get(flag) is False, flag
           assert "readonly property bool credentialActionsEnabled: false" in broker
           print("C3E_STORAGE_INTERFACE_ONLY // NO_NATIVE_OR_PROD_AUTHORITY")
           PY

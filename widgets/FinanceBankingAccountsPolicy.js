@@ -239,6 +239,49 @@ function transferPairs(state) {
     });
     return {ok:true,rows:out,connected:false,persisted:false};
 }
+// M4j // Correct BOTH legs in one new session snapshot. A pair's original
+// account endpoints, date, memo and amount are optimistic preconditions.
+// Neither leg ID nor transfer identity can be replaced by this operation.
+// A correction is a local bookkeeping amendment, never an actual payment.
+function correctManualTransfer(state,fields) {
+    if(!validState(state)||state.mode!=="manual")
+        return resultError("MANUAL TRANSFER SESSION REQUIRED");
+    if(!fields||typeof fields.transferId!=="string"
+       ||!/^transfer-[1-9]\\d*$/.test(fields.transferId))
+        return resultError("SELECT A VALID MANUAL TRANSFER PAIR");
+    var list=transferPairs(state);
+    if(!list.ok)return list;
+    var selected=list.rows.find(function(p){return p.transferId===fields.transferId;});
+    if(!selected)return resultError("MANUAL TRANSFER PAIR NOT FOUND");
+    if(selected.fromAccountId!==fields.fromAccountId
+       ||selected.toAccountId!==fields.toAccountId
+       ||selected.date!==fields.expectedDate
+       ||selected.description!==fields.expectedDescription
+       ||selected.amountCents!==fields.expectedAmountCents)
+        return resultError("STALE MANUAL TRANSFER // RESELECT BEFORE CORRECTION");
+    if(!dateValid(fields.date))return resultError("DATE MUST BE YYYY-MM-DD");
+    var cents=parseCents(fields.amountText,false);
+    if(cents===null||cents===0)
+        return resultError("ENTER A POSITIVE TRANSFER AMOUNT");
+    var memo=fields.description===""?"MANUAL TRANSFER"
+        :safeText(fields.description,120);
+    if(!memo)return resultError("DESCRIPTION MAX 120 CHARACTERS");
+    var changedCount=0,entries=state.entries.map(function(e) {
+        if(e.transferId!==selected.transferId)return e;
+        changedCount++;
+        return {id:e.id,accountId:e.accountId,date:fields.date,
+            description:memo,amountCents:e.transferSide==="out"?-cents:cents,
+            origin:"manual",transferId:e.transferId,transferSide:e.transferSide};
+    });
+    if(changedCount!==2)return resultError("INCOMPLETE MANUAL TRANSFER PAIR");
+    var updated={mode:"manual",accounts:state.accounts.slice(),
+        entries:entries,nextId:state.nextId};
+    return validState(updated)?{ok:true,state:updated,corrected:{
+        transferId:selected.transferId,fromAccountId:selected.fromAccountId,
+        toAccountId:selected.toAccountId,date:fields.date,
+        description:memo,amountCents:cents}}
+        :resultError("CORRECTION EXCEEDS SESSION AMOUNT LIMIT");
+}
 function removeManualTransfer(state,fields) {
     if(!validState(state)||state.mode!=="manual")
         return resultError("MANUAL TRANSFER SESSION REQUIRED");

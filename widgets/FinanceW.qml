@@ -2454,10 +2454,14 @@ Row {
                         anchors.top: parent.top
                         anchors.topMargin: 4
                         anchors.left: parent.left
+                        width: parent.width
                         height: 32
                         spacing: 6
+                        readonly property real tabAvailableWidth:
+                            Math.max(0, width - spacing * 2)
                         ActionButton {
-                            width: 120
+                            width: Math.min(120, Math.floor(
+                                researchToolStrip.tabAvailableWidth * 0.37))
                             height: 28
                             label: "SOURCE CRAWL"
                             labelPixelSize: 9
@@ -2466,7 +2470,8 @@ Row {
                             onLeftClicked: root.researchTool = "crawl"
                         }
                         ActionButton {
-                            width: 92
+                            width: Math.min(92, Math.floor(
+                                researchToolStrip.tabAvailableWidth * 0.28))
                             height: 28
                             label: "SEC EDGAR"
                             labelPixelSize: 9
@@ -2475,7 +2480,8 @@ Row {
                             onLeftClicked: root.researchTool = "sec"
                         }
                         ActionButton {
-                            width: 109
+                            width: Math.min(109, Math.floor(
+                                researchToolStrip.tabAvailableWidth * 0.34))
                             height: 28
                             label: "CANDIDATES"
                             labelPixelSize: 9

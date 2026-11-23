@@ -1076,3 +1076,28 @@ network operation, or shared FinanceW component is modified here.**
 Node fixture tests and source contracts cover the new refusal cases.
 Live Quickshell appearance and financial-write activation remain separate
 acceptance boundaries.
+
+
+## FinanceW Categories M8 // Search clarity and truthful empty states
+
+The existing **Finance → Budget → Budget → CATEGORIES** local filter now
+has an explicit **SEARCH CATEGORIES / GROUPS** prompt, a **CLEAR SEARCH**
+action, and a **SHOWING N / TOTAL CATEGORIES** readout.
+
+Filtering is case-insensitive by category or group name, and never
+modifies the authenticated Actual snapshot. The zero-results message
+distinguishes:
+
+- **NO SEARCH MATCHES // CLEAR SEARCH** for an active query.
+- **NO CATEGORIES IN THIS BUDGET** for a valid empty budget.
+- **LOAD A BUDGET TO VIEW CATEGORIES** when there is no authenticated,
+  read-only source.
+
+The search and clear controls are local presentation state only.
+There is **no change to group/category creation, renaming, Actual API,
+financial writers, operator permits, recovery journals, or FinanceW
+shared navigation**. The existing headless Qt fixture tests exercise
+filter changes and all three empty/source cases on the real Categories
+pane, without a Quickshell runtime or financial writer.
+
+GitHub CI smoke is not the same as operator live desktop acceptance.

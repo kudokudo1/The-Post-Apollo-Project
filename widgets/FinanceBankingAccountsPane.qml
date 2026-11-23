@@ -264,6 +264,10 @@ Item {
             message="ONLY THE MOST RECENT SESSION TRANSACTION CAN BE UNDONE HERE";
             return false;
         }
+        if(session.entries[session.entries.length-1].transferId) {
+            message="PAIRED MANUAL TRANSFER // REMOVE BOTH VIA ACCOUNTS OVERVIEW TWO-CLICK CONTROL";
+            return false;
+        }
         const res=Accounts.undoLastEntry(session);
         if(!res.ok){message=res.error;return false;}
         session=res.state;
@@ -1020,6 +1024,15 @@ Item {
                             text: modelData.description
                             font.pixelSize: 9
                             color: Colors.white
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!modelData.transferId
+                            text: "PAIRED MANUAL TRANSFER // NOT VERIFIED INCOME OR SPENDING"
+                            font.pixelSize: 9
+                            color: Colors.orange
                             textFormat: Text.PlainText
                             wrapMode: Text.WordWrap
                         }

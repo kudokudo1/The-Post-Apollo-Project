@@ -28,7 +28,8 @@ Item {
         ? providerAccounts[activityAccountIndex-1].id : ""
     readonly property var filteredActivity: Journal.project(
         details,manualSession,{direction:activityDirection,
-            accountId:activityAccountId,query:activitySearch.text,page:activityPageIndex})
+            accountId:activityAccountId,query:activitySearch.text,page:activityPageIndex,
+            fromDate:activityFromDate.text,toDate:activityToDate.text})
     signal accountRequested(string accountId)
     signal manualEntryRequested(var draft)
     signal manualCorrectionRequested(var draft)
@@ -41,12 +42,16 @@ Item {
         activityAccountIndex=0;
         activityPageIndex=0;
         entryAccountIndex=0;
+        activityFromDate.text="";
+        activityToDate.text="";
         clearSelectedEntry();
     }
     onSectionIdChanged: {
         activityDirection="all";
         activityAccountIndex=0;
         activityPageIndex=0;
+        activityFromDate.text="";
+        activityToDate.text="";
         clearSelectedEntry();
         returnToTopRequested();
     }
@@ -498,6 +503,89 @@ Item {
             }
             GohuText {
                 width: parent.width
+                text: "SESSION DATE RANGE // INCLUSIVE // YYYY-MM-DD // BLANK MEANS NO LIMIT"
+                font.pixelSize: 9
+                color: Colors.white
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Row {
+                width: parent.width
+                spacing: 5
+                Rectangle {
+                    width: (parent.width-5)/2
+                    height: 29
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    clip: true
+                    TextInput {
+                        id: activityFromDate
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        font.pixelSize: 11
+                        color: Colors.white
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        maximumLength: 10
+                        onTextChanged: {
+                            providerPane.activityPageIndex=0;
+                            providerPane.clearSelectedEntry();
+                        }
+                    }
+                }
+                Rectangle {
+                    width: (parent.width-5)/2
+                    height: 29
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    clip: true
+                    TextInput {
+                        id: activityToDate
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        font.pixelSize: 11
+                        color: Colors.white
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        maximumLength: 10
+                        onTextChanged: {
+                            providerPane.activityPageIndex=0;
+                            providerPane.clearSelectedEntry();
+                        }
+                    }
+                }
+            }
+            Row {
+                width: parent.width
+                spacing: 5
+                GohuText {
+                    width: (parent.width-5)/2
+                    text: "FROM DATE (OPTIONAL)"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    textFormat: Text.PlainText
+                }
+                GohuText {
+                    width: (parent.width-5)/2
+                    text: "TO DATE (OPTIONAL)"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    textFormat: Text.PlainText
+                }
+            }
+            ActionButton {
+                width: parent.width
+                height: 28
+                label: "CLEAR ACTIVITY DATE RANGE"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: {
+                    activityFromDate.text="";
+                    activityToDate.text="";
+                }
+            }
+            GohuText {
+                width: parent.width
                 text: "SEARCH SESSION DESCRIPTION OR MANUAL ACCOUNT NICKNAME"
                 font.pixelSize: 9
                 color: Colors.white
@@ -535,7 +623,32 @@ Item {
                       +" / "+providerPane.filteredActivity.pageCount
                       +" // SHOWING "+providerPane.filteredActivity.from
                       +"-"+providerPane.filteredActivity.to
-                    : "SESSION ACTIVITY UNAVAILABLE"
+                    : providerPane.filteredActivity.error
+                      ? providerPane.filteredActivity.error
+                      : "SESSION ACTIVITY UNAVAILABLE"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
+                text: "FILTERED SESSION MONEY IN "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedInCents)
+                    +" // MONEY OUT "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedOutCents)
+                    +" // NET "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedNetCents)
+                font.pixelSize: 10
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
+                text: "THESE ARE USER-ENTERED MONEY MOVEMENTS // NOT VERIFIED INCOME OR SPENDING"
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText

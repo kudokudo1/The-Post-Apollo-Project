@@ -90,8 +90,8 @@ Item {
         correctionDeleteArmed=false;
     }
     function chooseManualEntry(row) {
-        if(!row||typeof row.id!=="string"||typeof row.accountId!=="string")
-            return false;
+        if(!row||typeof row.id!=="string"||typeof row.accountId!=="string"
+           ||row.transferId)return false;
         if(!details.ok||details.sectionKind!=="activity"
            ||manualSession.mode!=="manual"||!filteredActivity.ok
            ||!filteredActivity.rows.some(function(e){
@@ -1048,10 +1048,20 @@ Item {
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
                     }
+                    GohuText {
+                        width: parent.width
+                        visible: modelData.transferId!==""
+                        text: "PAIRED MANUAL TRANSFER // NOT INCOME OR SPENDING // REMOVE BOTH SIDES FROM BANKING ACCOUNTS OVERVIEW"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
                     ActionButton {
                         width: parent.width
                         height: 28
                         visible: providerPane.manualSession.mode==="manual"
+                            &&modelData.transferId===""
                         label: "CORRECT / REMOVE THIS MANUAL ENTRY"
                         labelPixelSize: 9
                         accentColor: Colors.magenta

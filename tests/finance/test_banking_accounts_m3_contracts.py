@@ -55,7 +55,9 @@ assert 'BALANCE UNKNOWN' in view
 assert 'FICTIONAL COMBINED TOTAL' in view
 assert 'NOT SAVED' in view and 'NO BANK CONNECTION' in view
 assert view.count("ActionButton {") >= 10
-assert view.count("TextInput {") == 9  # original five + M4i transfer and M4j correction amount/description
+assert view.count("TextInput {") == 11  # M3 five + M4i two + M4j two + M4l account correction two
+assert "id: accountCorrectionNickname" in view
+assert "id: accountCorrectionOpening" in view
 assert 'id: manualTransferAmount' in view
 assert 'id: manualTransferDescription' in view
 assert "Text.PlainText" in view

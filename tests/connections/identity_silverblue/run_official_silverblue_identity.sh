@@ -91,6 +91,7 @@ service_probe_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue
 # C4b guest runs this read-only observer against its actual installed service
 # before rollback; this NEVER enrolls/attests an external trust root.
 c3eag_kernel_observer_payload="$(base64 -w0 "$repo/tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py")"
+c3eah_combined_observer_payload="$(base64 -w0 "$repo/tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py")"
 # Static verifier code only. No private key or runtime release-signing seed
 # is transferred to the offline ISO, RPM or GitHub artifact.
 receipt_binding_payload="$(base64 -w0 "$repo/tests/connections/identity_silverblue/runtime_receipt_binding_ci.py")"
@@ -147,6 +148,24 @@ base64 -d >/usr/local/libexec/postapollo-id-ci-release-candidate.py <<'C4B_RELEA
 $release_candidate_payload
 C4B_RELEASE_VERIFIER
 chmod 0444 /usr/local/libexec/postapollo-id-ci-release-candidate.py
+# Stage unchanged C3e-AH, C3e-AG and release parser in a disposable
+# source-shaped tree so the original C3e-AH relative import contract works.
+# No private key, installed production service or protected source edits.
+install -d -m 0755 /usr/local/libexec/postapollo-id-ci-existing/tests/connections/c3e_release_trust
+install -d -m 0755 /usr/local/libexec/postapollo-id-ci-existing/services/identity
+base64 -d >/usr/local/libexec/postapollo-id-ci-existing/tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py <<'C4B_ORIGINAL_C3EAG'
+$c3eag_kernel_observer_payload
+C4B_ORIGINAL_C3EAG
+base64 -d >/usr/local/libexec/postapollo-id-ci-existing/tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py <<'C4B_ORIGINAL_C3EAH'
+$c3eah_combined_observer_payload
+C4B_ORIGINAL_C3EAH
+base64 -d >/usr/local/libexec/postapollo-id-ci-existing/services/identity/silverblue_release_candidate_v1.py <<'C4B_ORIGINAL_RELEASE_PARSER'
+$release_candidate_payload
+C4B_ORIGINAL_RELEASE_PARSER
+chmod 0444 \
+  /usr/local/libexec/postapollo-id-ci-existing/tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py \
+  /usr/local/libexec/postapollo-id-ci-existing/tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py \
+  /usr/local/libexec/postapollo-id-ci-existing/services/identity/silverblue_release_candidate_v1.py
 cat > /etc/systemd/system/postapollo-id-ci-cycle.service <<'C4B_ID_BOOT_UNIT'
 [Unit]
 Description=Disposable C4b Identity Silverblue RPM/rollback lifecycle
@@ -413,6 +432,7 @@ for evidence in \
   'C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY' \
   'C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED' \
   'C4B_ID_PASS // REAL_C3EAG_RUNNING_GATEWAY_KERNEL_SNAPSHOT' \
+  'C4B_ID_PASS // REAL_C3EAH_SIGNED_RELEASE_RUNNING_GATEWAY_JOIN_DIAGNOSTIC_ONLY' \
   'C4B_ID_PASS // REAL_C3EAG_MUTATED_KERNEL_AND_SCRIPT_PINS_REFUSED' \
   'C4B_ID_PASS // DEDICATED_SELINUX_MODULE_REMOVED_AFTER_SERVICE_STOP' \
   'C4B_ID_PASS // REAL_RUNNING_IDENTITY_DENY_ONLY_SERVICE_CLEANUP' \

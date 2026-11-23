@@ -12,6 +12,7 @@ const FIGI=/^BBG[A-Z0-9]{9}$/;
 function fail(code){throw new Error(code);}
 export function validateSearch(query,cursor="") {
   if(typeof query!=="string" || typeof cursor!=="string")fail("invalid-query");
+  if (/[\x00-\x1f\x7f]/u.test(query))fail("invalid-query");
   const text=query.trim().replace(/\s+/gu," ");
   if(text.length<2 || text.length>QUERY_MAX
       || text.split(" ").length>12 || /[\x00-\x1f\x7f]/u.test(text))

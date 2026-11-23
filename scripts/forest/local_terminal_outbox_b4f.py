@@ -181,9 +181,9 @@ class ForestLocalTerminalOutboxInspector:
                 "FROM forest_local_terminal_events_b4f AS e "
                 "JOIN forest_attempts_b3 AS a ON a.attempt_id=e.attempt_id "
                 "JOIN forest_sessions AS s ON s.session_id=a.session_id "
-                "WHERE e.attempt_id=? AND e.owner_key=? AND e.session_id=? "
-                "AND a.owner_key=? AND a.session_id=? AND s.owner_key=?",
-                (attempt_id, owner, session_id, owner, session_id, owner),
+                "WHERE e.attempt_id=? AND a.owner_key=? "
+                "AND a.session_id=? AND s.owner_key=?",
+                (attempt_id, owner, session_id, owner),
             ).fetchone()
         except sqlite3.Error as exc:
             raise OutboxRefusal("LOCAL_OUTBOX_UNAVAILABLE") from exc

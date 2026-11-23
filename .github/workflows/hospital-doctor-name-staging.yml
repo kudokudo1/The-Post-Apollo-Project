@@ -58,7 +58,7 @@ jobs:
           assert "HospitalProtectedDoctorNameService {" not in host
           assert "HospitalDoctorNameService {" in host
           assert '"doctor-name-set"' in legacy
-          assert "PRODUCTION: HOLD" in contract
+          assert "**PRODUCTION:** HOLD" in contract
           print(
               "HOSPITAL H1 PROTECTED NAME STAGING // PASS // "
               "candidate cannot write; legacy host unchanged; no live activation"

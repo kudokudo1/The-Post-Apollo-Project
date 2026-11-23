@@ -22,6 +22,13 @@ const UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const validUtc = v => typeof v === "string" && UTC.test(v)
   && !Number.isNaN(Date.parse(v));
+// Scrapy's Python datetime.now(timezone.utc).isoformat() emits
+// e.g. "2026-11-23T14:42:00.123456+00:00", while the SEC read bridge
+// emits JS Date.toISOString() with "Z" and millisecond precision.
+// Both are valid timestamp formats; neither is an authenticated source.
+const CRAWL_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+const validCrawlTime = v => typeof v === "string" && CRAWL_ISO.test(v)
+  && !Number.isNaN(Date.parse(v));
 function safeHttps(value,host,max=1000) {
   if(typeof value!=="string" || value.length>max) return null;
   try {
@@ -76,7 +83,7 @@ function validateCrawl(snapshot) {
       || typeof page.title!=="string" || page.title.trim()!==page.title
       || page.title.length===0 || page.title.length>150
       || typeof page.snippet!=="string" || page.snippet.length>450
-      || !validUtc(page.observedAt) || !Array.isArray(page.links)
+      || !validCrawlTime(page.observedAt) || !Array.isArray(page.links)
       || page.links.length>32 || seen.has(page.url)
       || !page.links.every(link=>
         safeHttps(link,"quotes.toscrape.com")===link))

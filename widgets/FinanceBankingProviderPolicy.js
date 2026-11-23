@@ -58,6 +58,17 @@ function money(cents) {
     if(!Number.isSafeInteger(cents))return "UNKNOWN";
     return (cents<0?"-$":"$")+(Math.abs(cents)/100).toFixed(2);
 }
+// Reusable newest-first ordering. M3 entry IDs use an increasing numeric
+// suffix; plain lexical order would put entry-9 after entry-10 incorrectly.
+function compareSessionActivity(a,b) {
+    if(a.date!==b.date)return a.date>b.date?-1:1;
+    var am=/-([1-9][0-9]*)$/.exec(a.id||"");
+    var bm=/-([1-9][0-9]*)$/.exec(b.id||"");
+    var ai=am?Number(am[1]):null, bi=bm?Number(bm[1]):null;
+    if(Number.isSafeInteger(ai)&&Number.isSafeInteger(bi)&&ai!==bi)
+        return bi-ai;
+    return a.id<b.id?1:a.id>b.id?-1:0;
+}
 function build(providerId,snapshot,sectionId) {
     var provider=lookup(providerId);
     if(!provider)return {ok:false,error:"UNKNOWN PROVIDER"};
@@ -109,10 +120,7 @@ function build(providerId,snapshot,sectionId) {
                 description:entry.description,amountCents:entry.amountCents});
         }
     }
-    activity.sort(function(a,b){
-        if(a.date===b.date)return a.id<b.id?1:a.id>b.id?-1:0;
-        return a.date>b.date?-1:1;
-    });
+    activity.sort(compareSessionActivity);
     var listed=selected.kind==="product"
         ?accounts.filter(function(a){return a.productId===selected.productId;})
         :(selected.kind==="accounts"?accounts:[]);
@@ -140,10 +148,7 @@ function build(providerId,snapshot,sectionId) {
     if(!Number.isSafeInteger(viewIn)||!Number.isSafeInteger(viewOut)
        ||!Number.isSafeInteger(viewCount)||!Number.isSafeInteger(viewSubtotal))
         return {ok:false,error:"INVALID SESSION MOVEMENT TOTAL"};
-    preview.sort(function(a,b){
-        if(a.date===b.date)return a.id<b.id?1:a.id>b.id?-1:0;
-        return a.date>b.date?-1:1;
-    });
+    preview.sort(compareSessionActivity);
     var mode=snapshot.mode==="demo"?"FICTIONAL DEMO"
          :snapshot.mode==="manual"?"MANUAL SESSION":"NO MANUAL ACCOUNTS";
     var access=selected.kind==="restricted"?"PROVIDER AUTHORIZATION REQUIRED"

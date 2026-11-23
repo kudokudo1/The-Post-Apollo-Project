@@ -7,6 +7,7 @@ import "../services/finance" as FinanceServices
 Rectangle {
     id: priceView
     property bool active: false
+    property bool alphaOpen: false
     signal exitRequested()
     color: Colors.black
     border.color: Colors.cyan
@@ -20,7 +21,10 @@ Rectangle {
     }
     function inspectInstrument(item) {
         const ok=priceFeed.chooseIdentity(item);
-        if (ok) viewport.contentY=0;
+        if (ok) {
+            alphaOpen=false;
+            viewport.contentY=0;
+        }
         return ok;
     }
     GohuText {
@@ -58,7 +62,8 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        text: "FREE EODHD KEY // 20 CALLS/DAY SHARED // 1-YEAR EOD DEPTH"
+        text: "EODHD FREE 20/DAY // THIS WIDGET'S UTC ATTEMPTS "
+            +priceFeed.requestsThisRuntime+"/20 (NOT ACCOUNT BALANCE)"
         color: Colors.orange
         font.pixelSize: 9
         wrapMode: Text.WordWrap
@@ -103,7 +108,29 @@ Rectangle {
             }
             GohuText {
                 width: parent.width
-                text: "1 // SEARCH PROVIDER LISTINGS (FREE KEY REQUIRED)"
+                text: "SECOND FREE PROVIDER // INDEPENDENT 25/DAY KEY"
+                color: Colors.orange
+                font.pixelSize: 9
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 30
+                label: "ALPHA VANTAGE // FREE PRICE OPTIONS"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                available: priceView.active && !!priceFeed.identity
+                onLeftClicked: {
+                    if (!priceView.active || !priceFeed.identity) return;
+                    priceView.alphaOpen=true;
+                    if (!alphaPane.inspectInstrument(priceFeed.identity))
+                        priceView.alphaOpen=false;
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "1 // EODHD LISTINGS (SEPARATE FREE KEY REQUIRED)"
                 color: Colors.cyan
                 font.pixelSize: 10
             }
@@ -335,7 +362,16 @@ Rectangle {
         }
     }
     onActiveChanged: {
+        if (!active) alphaOpen=false;
         if (active && priceFeed.ready) historyChart.requestPaint();
+    }
+    FinanceAlphaVantageFreePane {
+        id: alphaPane
+        anchors.fill: parent
+        visible: priceView.alphaOpen
+        active: priceView.active && priceView.alphaOpen
+        z: 30
+        onExitRequested: priceView.alphaOpen=false
     }
     NeonScrollBar {
         id: priceScrollBar

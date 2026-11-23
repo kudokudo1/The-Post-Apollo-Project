@@ -145,6 +145,32 @@ Item {
         message="PROVIDER MANUAL ACTIVITY SAVED IN SESSION // NO FINANCIAL ACTION";
         return true;
     }
+    function changeProviderEntry(draft,remove) {
+        // All edits/deletes remain owned by M3's one manual session writer.
+        // Provider names are display labels, never authority to move money.
+        if(view!=="provider"||providerMiniApp.sectionId!=="activity"
+           ||session.mode!=="manual"||!draft
+           ||draft.providerId!==selectedProviderId) {
+            message="MANUAL CORRECTION UNAVAILABLE";
+            return false;
+        }
+        var owner=session.accounts.find(function(a) {
+            return a.id===draft.accountId && a.providerId===selectedProviderId;
+        });
+        var record=session.entries.find(function(e){return e.id===draft.entryId;});
+        if(!owner||!record||record.accountId!==owner.id||record.origin!=="manual") {
+            message="ENTRY DOES NOT BELONG TO THIS MANUAL PROVIDER ACCOUNT";
+            return false;
+        }
+        const res=remove ? Accounts.deleteEntry(session,draft)
+                         : Accounts.correctEntry(session,draft);
+        if(!res.ok){message=res.error;return false;}
+        session=res.state;
+        message=remove
+            ? "MANUAL SESSION ENTRY DELETED // NO BANK RECORD CHANGED"
+            : "MANUAL SESSION ENTRY CORRECTED // NO BANK RECORD CHANGED";
+        return true;
+    }
     function addTransaction() {
         const res=Accounts.addEntry(session,{
             accountId:selectedId,
@@ -488,6 +514,14 @@ Item {
                 onManualEntryRequested: function(draft) {
                     if(manager.addProviderTransaction(draft))
                         providerMiniApp.clearAfterEntry();
+                }
+                onManualCorrectionRequested: function(draft) {
+                    if(manager.changeProviderEntry(draft,false))
+                        providerMiniApp.clearSelectedEntry();
+                }
+                onManualDeletionRequested: function(draft) {
+                    if(manager.changeProviderEntry(draft,true))
+                        providerMiniApp.clearSelectedEntry();
                 }
                 onReturnToTopRequested: manager.returnToTopRequested()
             }

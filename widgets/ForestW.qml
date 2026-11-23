@@ -977,7 +977,10 @@ PanelWindow {
                 anchors.bottom: promptRow.top
                 anchors.bottomMargin: 8
                 anchors.left: parent.left
-                anchors.right: parent.right
+                // Keep the session placeholder clear of the reasoning rail;
+                // the rail owns a narrow vertical strip on chat's right edge.
+                anchors.right: reasoningRailHost.left
+                anchors.rightMargin: 8
                 clip: true
 
                 Column {
@@ -1014,13 +1017,81 @@ PanelWindow {
                     }
                 }
             }
+            // The established Post-Apollo IndexRail runs the full usable
+            // chat height, below the green header divider and to the same
+            // lower baseline as the message field and SEND. HIGH is at top
+            // and NONE at bottom. This is only a local Tree preference.
+            Item {
+                id: reasoningRailHost
+                z: 12
+                anchors.top: chatDivider.bottom
+                anchors.topMargin: 7
+                anchors.bottom: promptRow.bottom
+                anchors.right: parent.right
+                anchors.rightMargin: 7
+                width: 46
+
+                // Track geometry mirrors the shared IndexRail's own
+                // 34px top / 10px bottom insets and snap-handle dimensions.
+                readonly property real trackHeight:
+                    Math.max(0, height - 44)
+                readonly property real handleHeight:
+                    Math.max(30, Math.min(58, trackHeight / 4 * 2))
+                function detentCenterY(index) {
+                    const travel = Math.max(0, trackHeight - handleHeight);
+                    return 34 + handleHeight / 2
+                        + travel * Math.max(0, Math.min(3, index)) / 3;
+                }
+
+                IndexRail {
+                    id: reasoningIndexRail
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 24
+                    count: 4
+                    // IndexRail 0 is at top; Forest's step 3 is HIGH.
+                    currentIndex: 3 - root.selectedReasoningStep
+                    accentColor: Colors.cyan
+                    sideLabel: "THINK"
+                    enabledRail: root.menuOpen
+                    Accessible.name: "Forest reasoning level"
+                    Accessible.description:
+                        "Local Tree preference only; not connected to inference."
+                    onIndexRequested: function(index) {
+                        if (root.menuOpen)
+                            root.chooseTreeReasoningStep(3 - index);
+                    }
+                }
+
+                Repeater {
+                    model: ["HIGH", "MED", "LOW", "NONE"]
+                    delegate: GohuText {
+                        required property int index
+                        required property string modelData
+                        anchors.left: reasoningIndexRail.right
+                        anchors.leftMargin: 2
+                        width: reasoningRailHost.width
+                               - reasoningIndexRail.width - 2
+                        height: 15
+                        y: reasoningRailHost.detentCenterY(index) - height / 2
+                        text: modelData
+                        font.pixelSize: 8
+                        color: index === reasoningIndexRail.currentIndex
+                               ? Colors.magenta : Colors.cyan
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
+
             Item {
                 id: promptRow
                 z: 40
                 anchors.left: parent.left
                 anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 12
+                anchors.right: reasoningRailHost.left
+                anchors.rightMargin: 4
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 13
                 height: 40
@@ -1102,8 +1173,8 @@ PanelWindow {
                     // supplies recorder custody, consent and stop behavior.
                     VoiceToTextButton {
                         id: voiceToTextButton
-                        anchors.right: reasoningStepDial.left
-                        anchors.rightMargin: 3
+                        anchors.right: modelPickerButton.left
+                        anchors.rightMargin: 4
                         anchors.top: parent.top
                         anchors.topMargin: 4
                         anchors.bottom: parent.bottom
@@ -1128,23 +1199,6 @@ PanelWindow {
                         // No onToggleRequested: protected voice service unavailable.
                     }
 
-
-                    // Snap-only reasoning selector between the speaking
-                    // mouth and fruit icon. NONE/LOW/MED/HIGH are local
-                    // preferences, not verified model reasoning capabilities.
-                    ForestReasoningDial {
-                        id: reasoningStepDial
-                        anchors.right: modelPickerButton.left
-                        anchors.rightMargin: 3
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 34
-                        height: 34
-                        stepIndex: root.selectedReasoningStep
-                        interactive: root.menuOpen
-                        onStepRequested: function(step) {
-                            root.chooseTreeReasoningStep(step);
-                        }
-                    }
 
                     // Match Forest's ordinary DockButton state grammar: green
                     // fruit identity and perimeter when idle/hovered, magenta

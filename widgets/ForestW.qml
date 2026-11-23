@@ -433,16 +433,17 @@ PanelWindow {
                         contentGlowEnabled: false
                         // The original DockButton supplies fill, pointer,
                         // sampled glows and semantic state transitions. The
-                        // local 1px ring is the only visible border ink;
-                        // it changes with the resolved button foreground,
-                        // while its accent retains the Tree's corner identity.
+                        // local 1px ring is the only visible border ink.
+                        // The corner accent is idle-only; energized states
+                        // become solid orange or magenta like DockButton.
                         border.width: 0
                         Accessible.name: modelData.name + " Tree"
                         ForestCornerGradientBorder {
                             id: treeGradientBorder
                             anchors.fill: parent
                             baseColor: treeRow.foregroundColor
-                            accentColor: modelData.gradientAccentColor
+                            accentColor: treeRow.energized
+                                ? treeRow.foregroundColor : modelData.gradientAccentColor
                             accentTopRight: modelData.gradientTopRight
                             z: 4
                         }
@@ -499,7 +500,8 @@ PanelWindow {
                                 pixelSize: 12
                                 bold: true
                                 baseColor: treeRow.foregroundColor
-                                accentColor: modelData.gradientAccentColor
+                                accentColor: treeRow.energized
+                                    ? treeRow.foregroundColor : modelData.gradientAccentColor
                                 accentTopRight: modelData.gradientTopRight
                             }
                             TextHashGlow {
@@ -606,36 +608,32 @@ PanelWindow {
                     }
                 }
 
-                ForestGradientName {
+                // The chat title is informational, not a selected button:
+                // show the whole Tree identity in its solid base color even
+                // while that Tree's selector is open-magenta on yellow.
+                GohuText {
                     id: chatHeading
                     anchors.left: chatTreeIconHost.right
                     anchors.leftMargin: 8
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    height: 27
                     text: root.activeTree.name + " // CHAT"
-                    pixelSize: 15
-                    bold: true
-                    baseColor: root.selectedTreeButton
-                        ? root.selectedTreeButton.foregroundColor
-                        : root.activeTree.identityColor
-                    accentColor: root.activeTree.gradientAccentColor
-                    accentTopRight: root.activeTree.gradientTopRight
+                    color: root.activeTree.identityColor
+                    font.pixelSize: 15
+                    font.bold: true
+                    elide: Text.ElideRight
                 }
-                // Sample the rendered chat title itself, using the selected
-                // Tree button's existing name-glow palette and opacity.
-                // Keep it a sibling source to avoid a separate ghost glyph.
+                // The title keeps its independent Tree Spiritual Glow; it
+                // does not inherit the active selector's magenta open state.
                 TextHashGlow {
                     id: chatHeadingGlow
                     safeSource: chatHeading
                     requestedVisible: root.menuOpen
-                    foregroundColor: chatHeading.baseColor
-                    preferredGlowColor: root.selectedTreeButton
-                        ? root.selectedTreeButton.contentGlowColor : Colors.magenta
+                    foregroundColor: chatHeading.color
+                    preferredGlowColor: root.activeTree.spiritualIdleGlowColor
                     radius: 7
                     samples: 13
-                    opacity: root.selectedTreeButton
-                        ? root.selectedTreeButton.contentGlowOpacity : 0.82
+                    opacity: 0.82
                     z: -1
                 }
             }

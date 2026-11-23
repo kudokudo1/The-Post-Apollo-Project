@@ -62,7 +62,7 @@ for service in (
         assert f'{service}.state === "{state}"' in guard, (service, state)
 
 transition = qml.split("function selectBudgetExperience(next)",1)[1].split(
-    "function selectBudgetSection(section)",1)[0]
+    "// Unified lower-submode keys",1)[0]
 for required in (
     'next !== "simple" && next !== "advanced"',
     "if (next === budgetExperienceMode) return true;",

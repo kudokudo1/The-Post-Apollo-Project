@@ -19,11 +19,18 @@ Item {
     property bool createOpen: false
     property bool deleteArmed: false
     property bool clearDemoArmed: false
+    property bool manualTransferOpen: false
+    property bool manualTransferArmed: false
+    property string transferRemoveArmedId: ""
+    property int transferFromIndex: 0
+    property int transferToIndex: 1
+    property string manualTransferDate: ""
     property string message: ""
     readonly property var providerChoices: Accounts.providers()
     readonly property var selectedProvider: providerChoices[providerIndex]
     readonly property var productChoices: selectedProvider.products
     readonly property var review: Accounts.snapshot(session)
+    readonly property var pairedTransfers: Accounts.transferPairs(session)
     readonly property var selected: review.ok
         ? review.accounts.find(function(a){return a.id===selectedId;}) || null : null
 
@@ -32,9 +39,16 @@ Item {
     implicitHeight: layout.implicitHeight
 
     onProviderIndexChanged: productIndex=0
+    onManualTransferDateChanged: manualTransferArmed=false
+    onSessionChanged: {
+        manualTransferArmed=false;
+        transferRemoveArmedId="";
+    }
     onViewChanged: {
         deleteArmed=false;
         clearDemoArmed=false;
+        manualTransferArmed=false;
+        transferRemoveArmedId="";
         returnToTopRequested();
     }
     onSelectedIdChanged: {
@@ -60,6 +74,61 @@ Item {
         openingInput.text="";
         message="MANUAL ACCOUNT CREATED // NOT CONNECTED // SESSION ONLY";
         view="detail";
+        return true;
+    }
+    function recordManualTransfer() {
+        // No provider APIs: this writes two paired manual session records only.
+        if(view!=="overview"||session.mode!=="manual"||!manualTransferOpen
+           ||!review.ok||review.accounts.length<2) {
+            message="TWO MANUAL ACCOUNTS REQUIRED";
+            manualTransferArmed=false;
+            return false;
+        }
+        if(!manualTransferArmed) {
+            manualTransferArmed=true;
+            message="CONFIRM SECOND CLICK // TWO MANUAL ENTRIES // NO MONEY MOVES";
+            return false;
+        }
+        manualTransferArmed=false;
+        var from=review.accounts[transferFromIndex],
+            to=review.accounts[transferToIndex];
+        const result=Accounts.addManualTransfer(session,{
+            fromAccountId:from?from.id:"",
+            toAccountId:to?to.id:"",
+            date:manualTransferDate,
+            amountText:manualTransferAmount.text,
+            description:manualTransferDescription.text
+        });
+        if(!result.ok){message=result.error;return false;}
+        session=result.state;
+        manualTransferAmount.text="";
+        manualTransferDescription.text="";
+        message="PAIRED MANUAL TRANSFER RECORDED // TWO ENTRIES // NO BANK ACTION";
+        return true;
+    }
+    function removeManualTransferPair(row) {
+        if(view!=="overview"||session.mode!=="manual"||!row
+           ||!pairedTransfers.ok||!pairedTransfers.rows.some(function(p){
+               return p.transferId===row.transferId
+                   &&p.fromAccountId===row.fromAccountId
+                   &&p.toAccountId===row.toAccountId
+                   &&p.amountCents===row.amountCents
+                   &&p.date===row.date&&p.description===row.description;
+           })) {
+            message="MANUAL TRANSFER PAIR UNAVAILABLE";
+            transferRemoveArmedId="";
+            return false;
+        }
+        if(transferRemoveArmedId!==row.transferId) {
+            transferRemoveArmedId=row.transferId;
+            message="CLICK AGAIN TO REMOVE BOTH MANUAL TRANSFER ENTRIES";
+            return false;
+        }
+        transferRemoveArmedId="";
+        const result=Accounts.removeManualTransfer(session,row);
+        if(!result.ok){message=result.error;return false;}
+        session=result.state;
+        message="BOTH MANUAL TRANSFER ENTRIES REMOVED // NO BANK ACTION";
         return true;
     }
     function loadDemo() {
@@ -287,6 +356,197 @@ Item {
                 color: Colors.white
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 30
+                label: manager.manualTransferOpen
+                    ? "CLOSE PAIRED MANUAL TRANSFER ENTRY"
+                    : "RECORD PAIRED MANUAL TRANSFER // NO MONEY MOVES"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                available: manager.session.mode==="manual"
+                    &&manager.review.ok&&manager.review.accounts.length>=2
+                onLeftClicked: {
+                    manager.manualTransferOpen=!manager.manualTransferOpen;
+                    manager.manualTransferArmed=false;
+                    manager.transferRemoveArmedId="";
+                }
+            }
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: manager.manualTransferOpen
+                    &&manager.session.mode==="manual"
+                    &&manager.review.ok&&manager.review.accounts.length>=2
+                GohuText {
+                    width: parent.width
+                    text: "MANUAL SESSION BOOKKEEPING ONLY // TWO LINKED ENTRIES // NEVER SENDS MONEY"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 29
+                    label: manager.review.accounts.length>manager.transferFromIndex
+                        ? "FROM // "+manager.review.accounts[manager.transferFromIndex].nickname
+                        : "FROM // SELECT ACCOUNT"
+                    labelPixelSize: 9
+                    accentColor: Colors.orange
+                    onLeftClicked: {
+                        manager.transferFromIndex=(manager.transferFromIndex+1)%manager.review.accounts.length;
+                        manager.manualTransferArmed=false;
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 29
+                    label: manager.review.accounts.length>manager.transferToIndex
+                        ? "TO // "+manager.review.accounts[manager.transferToIndex].nickname
+                        : "TO // SELECT ACCOUNT"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    onLeftClicked: {
+                        manager.transferToIndex=(manager.transferToIndex+1)%manager.review.accounts.length;
+                        manager.manualTransferArmed=false;
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "MANUAL TRANSFER DATE // MONTH / DAY / YEAR"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                }
+                PostApolloDateStepper {
+                    width: parent.width
+                    dateValue: manager.manualTransferDate
+                    minDate: "1900-01-01"
+                    maxDate: "2100-12-31"
+                    useUtcToday: false
+                    showToday: true
+                    allowClear: true
+                    onDateEdited: function(isoDate) {
+                        manager.manualTransferDate=isoDate;
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "MANUAL TRANSFER USD AMOUNT // POSITIVE"
+                    font.pixelSize: 9
+                    color: Colors.white
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 29
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    clip: true
+                    TextInput {
+                        id: manualTransferAmount
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        font.pixelSize: 11
+                        color: Colors.white
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        onTextChanged: manager.manualTransferArmed=false
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "DESCRIPTION // OPTIONAL // SAME ON BOTH ENTRIES"
+                    font.pixelSize: 9
+                    color: Colors.white
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 29
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    clip: true
+                    TextInput {
+                        id: manualTransferDescription
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        maximumLength: 120
+                        font.pixelSize: 11
+                        color: Colors.white
+                        selectByMouse: true
+                        activeFocusOnPress: true
+                        onTextChanged: manager.manualTransferArmed=false
+                    }
+                }
+                ActionButton {
+                    width: parent.width
+                    height: 30
+                    label: manager.manualTransferArmed
+                        ? "CONFIRM RECORD TWO MANUAL ENTRIES"
+                        : "RECORD PAIRED MANUAL TRANSFER // TWO CLICKS"
+                    labelPixelSize: 9
+                    accentColor: manager.manualTransferArmed?Colors.orange:Colors.magenta
+                    onLeftClicked: manager.recordManualTransfer()
+                }
+            }
+            GohuText {
+                width: parent.width
+                visible: manager.session.mode==="manual"&&manager.pairedTransfers.ok
+                    &&manager.pairedTransfers.rows.length>0
+                text: "RECORDED MANUAL TRANSFER PAIRS // REMOVE BOTH SIDES TOGETHER"
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Repeater {
+                model: manager.pairedTransfers.ok
+                    ? manager.pairedTransfers.rows:[]
+                delegate: Rectangle {
+                    id: transferPairCard
+                    required property var modelData
+                    width: layout.width
+                    height: pairDetails.implicitHeight+12
+                    color: Colors.black
+                    border.color: Colors.cyan
+                    border.width: 1
+                    Column {
+                        id: pairDetails
+                        x: 6
+                        y: 6
+                        width: transferPairCard.width-12
+                        spacing: 5
+                        GohuText {
+                            width: parent.width
+                            text: modelData.date+" // "
+                                +Accounts.money(modelData.amountCents)
+                                +" // "+modelData.fromLabel+" TO "+modelData.toLabel
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: modelData.description
+                                +" // DECLARED MANUAL TRANSFER // NOT VERIFIED"
+                            font.pixelSize: 9
+                            color: Colors.orange
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                        }
+                        ActionButton {
+                            width: parent.width
+                            height: 29
+                            label: manager.transferRemoveArmedId===modelData.transferId
+                                ? "CONFIRM REMOVE BOTH MANUAL TRANSFER ENTRIES"
+                                : "REMOVE PAIRED MANUAL TRANSFER // TWO CLICKS"
+                            labelPixelSize: 9
+                            accentColor: Colors.magenta
+                            onLeftClicked: manager.removeManualTransferPair(modelData)
+                        }
+                    }
+                }
             }
             GohuText {
                 width: parent.width

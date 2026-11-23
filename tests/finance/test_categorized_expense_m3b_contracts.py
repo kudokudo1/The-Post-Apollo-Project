@@ -41,7 +41,7 @@ assert 'action:"transaction:create-categorized-expense"' in writer
 for code in (writer,old):
     assert 'join(homedir(),".local","state","financew","operations")' in code or (
         'join(homedir(), ".local", "state", "financew", "operations")' in code)
-    assert 'join(' in code and '"write-lock"' in code
+    assert 'join(' in code and '".write-lock"' in code
     assert '"wx",0o600' in code
     assert "recovery-needed" in code
     assert 'status!=="committed"' in code or 'status !== "committed"' in code

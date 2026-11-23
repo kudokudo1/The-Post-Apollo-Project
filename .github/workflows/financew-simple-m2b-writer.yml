@@ -1,0 +1,64 @@
+name: FinanceW Simple M2b dormant envelope writer safety
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/envelope_move_guard.mjs"
+      - "scripts/finance/write_envelope_move.mjs"
+      - "tests/finance/test_envelope_move_guard_m2b.mjs"
+      - "tests/finance/test_envelope_move_cli_recovery_m2b.mjs"
+      - "tests/finance/test_envelope_move_m2b_contracts.py"
+      - "tests/finance/fixtures/envelope_move_cli_register.mjs"
+      - "tests/finance/fixtures/envelope_move_cli_loader.mjs"
+      - "tests/finance/fixtures/envelope_move_cli_actual_stub.mjs"
+      - ".github/workflows/financew-simple-m2b-writer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/finance/envelope_move_guard.mjs"
+      - "scripts/finance/write_envelope_move.mjs"
+      - "tests/finance/test_envelope_move_guard_m2b.mjs"
+      - "tests/finance/test_envelope_move_cli_recovery_m2b.mjs"
+      - "tests/finance/test_envelope_move_m2b_contracts.py"
+      - "tests/finance/fixtures/envelope_move_cli_register.mjs"
+      - "tests/finance/fixtures/envelope_move_cli_loader.mjs"
+      - "tests/finance/fixtures/envelope_move_cli_actual_stub.mjs"
+      - ".github/workflows/financew-simple-m2b-writer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  command-policy:
+    name: M2b paired command preflight and partial-failure tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax and pure preflight/uncertain execution
+        run: |
+          node --check scripts/finance/envelope_move_guard.mjs
+          node --check scripts/finance/write_envelope_move.mjs
+          node --test tests/finance/test_envelope_move_guard_m2b.mjs
+      - name: Dormant authority / guarded-journal source contract
+        run: python3 -B tests/finance/test_envelope_move_m2b_contracts.py
+      - name: M2a preview conservation compatibility
+        run: node --test tests/finance/test_finance_envelope_move_plan_m2a.mjs
+
+  isolated-cli:
+    name: M2b CLI fictional journal, interrupted pair and cross-writer recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fictional ledger: no Actual package or network
+        run: |
+          node --check tests/finance/fixtures/envelope_move_cli_actual_stub.mjs
+          node --test tests/finance/test_envelope_move_cli_recovery_m2b.mjs

@@ -1103,11 +1103,17 @@ PanelWindow {
                     // sampling the moving cup could leave a second-looking
                     // red ghost when the close cap animates/resizes.
                     // The host samples all four stars plus the cup together.
+                    // Match the model fruit's sampled ornament glow recipe.
+                    // One stable content-host source lights the cup and all
+                    // four stars; no second artwork shadow is introduced.
+                    contentGlowEnabled: true
                     contentGlowSource: contentItem
-                    contentGlowRadius: 6
-                    contentGlowSamples: 9
-                    contentGlowIdleOpacity: 0.45
-                    contentGlowHoverOpacity: 0.66
+                    contentGlowRadius: 14
+                    contentGlowSamples: 15
+                    contentGlowIdleOpacity: 0.75
+                    contentGlowHoverOpacity: 0.95
+                    // A black pressed glyph must not retain a bright ghost.
+                    contentGlowPressedOpacity: 0.0
 
                     // Four physically separate white ornaments. Previously
                     // the top/bottom combining marks were inside the gradient
@@ -1117,52 +1123,89 @@ PanelWindow {
                     Item {
                         id: coffeeGlyph
                         anchors.centerIn: parent
-                        width: root.reasoningRailExpanded ? 30 : 36
-                        height: root.reasoningRailExpanded ? 28 : 34
+                        width: root.reasoningRailExpanded ? 28 : 36
+                        height: root.reasoningRailExpanded ? 24 : 34
                         // Idle remains white. Hover adopts the same solid
                         // accent as the cup's active corner (Tree color
                         // when compact, red when used as the close cap).
                         // Red close press keeps the full artwork black.
                         readonly property color starInk:
-                            root.reasoningRailExpanded && reasoningCoffeeButton.pressed
-                                ? Colors.black
-                                : reasoningCoffeeButton.hovered
-                                  ? (root.reasoningRailExpanded
-                                      ? Colors.red
-                                      : root.activeTree.gradientAccentColor)
-                                  : Colors.white
+                            reasoningCoffeeButton.pressed ? Colors.black
+                            : reasoningCoffeeButton.hovered
+                              ? (root.reasoningRailExpanded
+                                  ? Colors.red
+                                  : root.activeTree.gradientAccentColor)
+                              : Colors.white
+
+                        // A restrained Tree-colored inner hot spot behind
+                        // the upper center of the button. Unlike an extra
+                        // DropShadow, this cannot double the cup silhouette.
+                        Rectangle {
+                            id: coffeeInnerGlow
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.verticalCenterOffset:
+                                root.reasoningRailExpanded ? -3 : -4
+                            width: root.reasoningRailExpanded ? 22 : 27
+                            height: root.reasoningRailExpanded ? 12 : 17
+                            radius: width / 2
+                            visible: !reasoningCoffeeButton.pressed
+                            opacity: reasoningCoffeeButton.hovered ? 0.29 : 0.19
+                            gradient: Gradient {
+                                orientation: Gradient.Vertical
+                                GradientStop {
+                                    position: 0.0
+                                    color: root.activeTree.iconIdleGlowColor
+                                }
+                                GradientStop {
+                                    position: 0.58
+                                    color: Qt.rgba(
+                                        root.activeTree.iconIdleGlowColor.r,
+                                        root.activeTree.iconIdleGlowColor.g,
+                                        root.activeTree.iconIdleGlowColor.b, 0.32)
+                                }
+                                GradientStop {
+                                    position: 1.0
+                                    color: "transparent"
+                                }
+                            }
+                        }
 
                         // The cup is the only gradient-filled text.
                         ForestGradientName {
                             id: coffeeGradientGlyph
                             anchors.centerIn: parent
-                            width: 29
+                            width: root.reasoningRailExpanded ? 19 : 29
                             height: parent.height
+                            anchors.verticalCenterOffset:
+                                root.reasoningRailExpanded ? 3 : 0
                             text: "☕︎"
                             gradientText: text
-                            pixelSize: 26
+                            // The inset 32px red cap cannot fit a 26px cup
+                            // AND ornaments. Its 18px cup has a real margin.
+                            pixelSize: root.reasoningRailExpanded ? 18 : 26
                             bold: false
                             horizontalAlignment: Text.AlignHCenter
-                            baseColor: root.reasoningRailExpanded
-                                ? (reasoningCoffeeButton.pressed
-                                    ? Colors.black : Colors.red)
-                                : root.activeTree.identityColor
-                            accentColor: root.reasoningRailExpanded
-                                ? (reasoningCoffeeButton.pressed
-                                    ? Colors.black : Colors.red)
-                                : root.activeTree.gradientAccentColor
+                            baseColor: reasoningCoffeeButton.pressed
+                                ? Colors.black
+                                : root.reasoningRailExpanded
+                                  ? Colors.red : root.activeTree.identityColor
+                            accentColor: reasoningCoffeeButton.pressed
+                                ? Colors.black
+                                : root.reasoningRailExpanded
+                                  ? Colors.red : root.activeTree.gradientAccentColor
                             accentTopRight: root.activeTree.gradientTopRight
                         }
                         GohuText {
                             id: coffeeLeftStar
                             anchors.left: parent.left
-                            anchors.leftMargin: 2
+                            anchors.leftMargin: root.reasoningRailExpanded ? 0 : 2
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 7
-                            height: 11
+                            width: root.reasoningRailExpanded ? 5 : 7
+                            height: root.reasoningRailExpanded ? 9 : 11
                             text: "⊹"
                             textFormat: Text.PlainText
-                            font.pixelSize: 11
+                            font.pixelSize: root.reasoningRailExpanded ? 7 : 11
                             color: coffeeGlyph.starInk
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -1170,13 +1213,13 @@ PanelWindow {
                         GohuText {
                             id: coffeeRightStar
                             anchors.right: parent.right
-                            anchors.rightMargin: 2
+                            anchors.rightMargin: root.reasoningRailExpanded ? 0 : 2
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 7
-                            height: 11
+                            width: root.reasoningRailExpanded ? 5 : 7
+                            height: root.reasoningRailExpanded ? 9 : 11
                             text: "⭑"
                             textFormat: Text.PlainText
-                            font.pixelSize: 10
+                            font.pixelSize: root.reasoningRailExpanded ? 7 : 10
                             color: coffeeGlyph.starInk
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -1184,13 +1227,14 @@ PanelWindow {
                         GohuText {
                             id: coffeeTopStar
                             anchors.horizontalCenter: parent.horizontalCenter
-                            // Pull the top mark 3px toward the cup.
-                            y: 2
-                            width: 8
-                            height: 10
+                            // Clear the smaller red cup rather than
+                            // rendering on top of it.
+                            y: root.reasoningRailExpanded ? -2 : 2
+                            width: root.reasoningRailExpanded ? 6 : 8
+                            height: root.reasoningRailExpanded ? 7 : 10
                             text: "✦"
                             textFormat: Text.PlainText
-                            font.pixelSize: 9
+                            font.pixelSize: root.reasoningRailExpanded ? 7 : 9
                             color: coffeeGlyph.starInk
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -1198,14 +1242,14 @@ PanelWindow {
                         GohuText {
                             id: coffeeBottomRightStar
                             anchors.right: parent.right
-                            anchors.rightMargin: 8
+                            anchors.rightMargin: root.reasoningRailExpanded ? 0 : 8
                             anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 4
-                            width: 8
-                            height: 8
+                            anchors.bottomMargin: root.reasoningRailExpanded ? 0 : 4
+                            width: root.reasoningRailExpanded ? 5 : 8
+                            height: root.reasoningRailExpanded ? 6 : 8
                             text: "⋆"
                             textFormat: Text.PlainText
-                            font.pixelSize: 9
+                            font.pixelSize: root.reasoningRailExpanded ? 6 : 9
                             color: coffeeGlyph.starInk
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter

@@ -154,6 +154,15 @@ PanelWindow {
              : secService.loading ? "READING"
              : secService.state === "failed" ? "ERROR"
              : secService.state === "ready" ? "SNAPSHOT" : "NO FEED")
+        : selectedMainMode === "research" && researchTool === "candidates"
+          ? (!menuOpen ? "IDLE"
+             : candidateHost.previewState === "loading" ? "READING"
+             : candidateHost.previewState === "failed" ? "ERROR"
+             : candidateHost.previewState === "ready"
+               && candidateHost.previewResult
+               && (candidateHost.previewResult.secPresent
+                   || candidateHost.previewResult.demoPresent)
+               ? "SNAPSHOT" : "NO FEED")
         : selectedMainMode === "research"
           ? (!menuOpen ? "IDLE"
              : crawlService.loading ? "READING"
@@ -2445,10 +2454,14 @@ Row {
                         anchors.top: parent.top
                         anchors.topMargin: 4
                         anchors.left: parent.left
+                        width: parent.width
                         height: 32
                         spacing: 6
+                        readonly property real tabAvailableWidth:
+                            Math.max(0, width - spacing * 2)
                         ActionButton {
-                            width: 120
+                            width: Math.min(120, Math.floor(
+                                researchToolStrip.tabAvailableWidth * 0.37))
                             height: 28
                             label: "SOURCE CRAWL"
                             labelPixelSize: 9
@@ -2457,13 +2470,24 @@ Row {
                             onLeftClicked: root.researchTool = "crawl"
                         }
                         ActionButton {
-                            width: 92
+                            width: Math.min(92, Math.floor(
+                                researchToolStrip.tabAvailableWidth * 0.28))
                             height: 28
                             label: "SEC EDGAR"
                             labelPixelSize: 9
                             accentColor: Colors.orange
                             selected: root.researchTool === "sec"
                             onLeftClicked: root.researchTool = "sec"
+                        }
+                        ActionButton {
+                            width: Math.min(109, Math.floor(
+                                researchToolStrip.tabAvailableWidth * 0.34))
+                            height: 28
+                            label: "CANDIDATES"
+                            labelPixelSize: 9
+                            accentColor: Colors.magenta
+                            selected: root.researchTool === "candidates"
+                            onLeftClicked: root.researchTool = "candidates"
                         }
                     }
                     FinanceResearchCrawlPane {
@@ -2485,6 +2509,21 @@ Row {
                         secFeed: secService
                         documentFeed: secDocumentService
                         priceFeed: secPriceService
+                    }
+                    // M8 exposes M7 using existing owner snapshots only.
+                    // No new SEC/Crawl process and no Research write route.
+                    FinanceResearchEvidenceCandidatePreviewHost {
+                        id: candidateHost
+                        anchors.top: researchToolStrip.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        visible: root.researchTool === "candidates"
+                        active: root.menuOpen
+                            && root.selectedMainMode === "research"
+                            && root.researchTool === "candidates"
+                        secFeed: secService
+                        crawlFeed: crawlService
                     }
                 }
 

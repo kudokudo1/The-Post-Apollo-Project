@@ -5,6 +5,7 @@ import "../services/finance" as FinanceServices
 // M21 status only. Never launches provider APIs, reserves quota or resets DB.
 Rectangle {
     id: quotaPane
+    objectName: "marketQuotaRealPane"
     property bool active: false
     signal exitRequested()
     color: Colors.black

@@ -1,0 +1,95 @@
+name: Connections Forest C5 authority boundary and unsigned-session HOLD
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5AuthorityBoundary.py'
+      - 'tests/connections/test_connections_forest_c5_authority_boundary.py'
+      - 'docs/connections-forest-c5-storage-independent-authority-boundary.md'
+      - '.github/workflows/connections-forest-c5-authority-boundary-ci.yml'
+      - 'services/connections/forest/ForestC5SignedEvidencePreflight.py'
+      - 'services/connections/forest/ForestC5TerminalReceiptPreflight.py'
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/host_admission_b4a.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protected-forest-c5-unavailable:
+    name: Forest C5 no local fallback and signed session gap
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable cryptographic test dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Static no backend/actuation guard and Python compile
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5AuthorityBoundary.py \
+            tests/connections/test_connections_forest_c5_authority_boundary.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('services/connections/forest/ForestC5AuthorityBoundary.py').read_text()
+          for required in (
+              'MODE_PROTECTED', 'MODE_REFERENCE',
+              'INDEPENDENT_FOREST_CUSTODIAN_UNAVAILABLE_HOLD',
+              'PROTECTED_MODE_REFUSES_UNTRUSTED_REFERENCE_INSPECTION',
+              'INDEPENDENT_CUSTODIAN_REQUIRED_NO_LOCAL_FALLBACK',
+              '"forestSessionIdentitySigned": False',
+              '"signedIntentMissingForestSessionId": True',
+              'MappingProxyType', 'BINDING_FIELDS',
+              'def acquire_commit_permit(', 'def request_revocation(',
+          ):
+              assert required in src, required
+          for forbidden in (
+              'Ed25519PrivateKey', 'sqlite3.connect(', 'subprocess.run(',
+              'socket.bind(', 'socket.connect(', 'os.open(',
+              'C3eStorageIndependentTrustBoundary',
+              '"productionAuthority": True',
+              '"c5RevocationFenceSettled": True',
+              '"forestSessionIdentitySigned": True',
+          ):
+              assert forbidden not in src, forbidden
+          for path in ('scripts/forest/host_admission_b4a.py',
+                       'scripts/forest/turn_bridge_b3.py'):
+              assert 'ForestC5AuthorityBoundary' not in Path(path).read_text()
+          print('FOREST_C5_AUTHORITY_BOUNDARY // NO_LOCAL_FALLBACK_OR_PRODUCTION_AUTHORITY')
+          PY
+      - name: Twenty storage-independent Forest C5 refusal and session-binding tests
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_authority_boundary.py' -v
+      - name: Retain 86 earlier Forest C5 receipt/custody/role/fence regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_writer_custody_claim_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_terminal_receipt_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_signed_role_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_contract_interop.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_host_precommit_b4b.py' -v
+      - name: Retain Forest backend 15 synthetic B4c two-phase consumer regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_fenced_commit_b4c.py' -v
+          echo 'FOREST_C5_AUTHORITY_SOURCE_ONLY // PRODUCTION_HOLD'

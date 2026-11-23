@@ -34,7 +34,7 @@ ActionButton {
             id: diagnosticsLeftStar
             text: "˖"
             textFormat: Text.PlainText
-            color: Colors.white
+            color: diagnosticButton.diagnosticsOpen ? Colors.magenta : Colors.white
             font.pixelSize: 14
             anchors.right: diagnosticsMedicalSymbol.left
             // Pull the actual ink toward the staff despite fallback bearings.
@@ -46,7 +46,7 @@ ActionButton {
             id: diagnosticsUpperStar
             text: "✦"
             textFormat: Text.PlainText
-            color: Colors.white
+            color: diagnosticButton.diagnosticsOpen ? Colors.magenta : Colors.white
             font.pixelSize: 8
             anchors.left: diagnosticsMedicalSymbol.right
             anchors.leftMargin: -6
@@ -57,7 +57,7 @@ ActionButton {
             id: diagnosticsRightStar
             text: "⭑"
             textFormat: Text.PlainText
-            color: Colors.white
+            color: diagnosticButton.diagnosticsOpen ? Colors.magenta : Colors.white
             font.pixelSize: 10
             anchors.left: diagnosticsMedicalSymbol.right
             anchors.leftMargin: -4
@@ -72,6 +72,9 @@ ActionButton {
     trackLabelGlowLocally: true
 
     selected: diagnosticsOpen
+    // Selection is an actual OPEN/activated button: yellow fill with
+    // magenta ink, stars, border and every sampled/outer glow plane.
+    // Closed idle/hover/pressed keep the TimeW RESYNC order unchanged.
     // Match TimeW's actual RESYNC / ReloadButton color order:
     // YELLOW semantic icon/border/glows; ORANGE hover/selected surface.
     property color semanticColor: Colors.yellow
@@ -84,19 +87,19 @@ ActionButton {
     idleFillColor: Colors.black
     hoverFillColor: hoverSurfaceColor
     pressedFillColor: accentColor
-    selectedFillColor: hoverSurfaceColor
+    selectedFillColor: Colors.yellow
     keyboardSelectedFillColor: hoverSurfaceColor
 
     idleForegroundColor: accentColor
     hoverForegroundColor: accentColor
     pressedForegroundColor: Colors.black
-    selectedForegroundColor: accentColor
+    selectedForegroundColor: Colors.magenta
     keyboardSelectedForegroundColor: accentColor
 
     idleBorderColor: accentColor
     hoverBorderColor: accentColor
     pressedBorderColor: Colors.black
-    selectedBorderColor: accentColor
+    selectedBorderColor: Colors.magenta
     keyboardSelectedBorderColor: accentColor
     idleBorderWidth: 1
     hoverBorderWidth: 1
@@ -108,7 +111,7 @@ ActionButton {
     idleContentGlowColor: accentColor
     hoverContentGlowColor: accentColor
     pressedContentGlowColor: accentColor
-    selectedContentGlowColor: accentColor
+    selectedContentGlowColor: Colors.magenta
     keyboardSelectedContentGlowColor: accentColor
     contentGlowRadius: 7
     contentGlowSamples: 7
@@ -124,7 +127,7 @@ ActionButton {
     idleSoftGlowColor: accentColor
     hoverSoftGlowColor: accentColor
     pressedSoftGlowColor: accentColor
-    selectedSoftGlowColor: accentColor
+    selectedSoftGlowColor: Colors.magenta
     keyboardSelectedSoftGlowColor: accentColor
     softGlowIdleOpacity: 0.48
     softGlowHoverOpacity: 0.70
@@ -137,7 +140,7 @@ ActionButton {
     idleWideGlowColor: accentColor
     hoverWideGlowColor: accentColor
     pressedWideGlowColor: accentColor
-    selectedWideGlowColor: accentColor
+    selectedWideGlowColor: Colors.magenta
     keyboardSelectedWideGlowColor: accentColor
     wideGlowIdleOpacity: 0.22
     wideGlowHoverOpacity: 0.32

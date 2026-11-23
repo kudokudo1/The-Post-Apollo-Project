@@ -18,6 +18,8 @@ Item {
     property string direction: "out"
     property bool createOpen: false
     property bool deleteArmed: false
+    property var accountCorrectionCandidate: null
+    property bool accountCorrectionArmed: false
     property bool clearDemoArmed: false
     property bool manualTransferOpen: false
     property bool manualTransferArmed: false
@@ -45,12 +47,16 @@ Item {
     onManualTransferDateChanged: manualTransferArmed=false
     onTransferCorrectionDateChanged: transferCorrectionArmed=false
     onSessionChanged: {
+        accountCorrectionCandidate=null;
+        accountCorrectionArmed=false;
         manualTransferArmed=false;
         transferRemoveArmedId="";
         transferCorrectionCandidate=null;
         transferCorrectionArmed=false;
     }
     onViewChanged: {
+        accountCorrectionCandidate=null;
+        accountCorrectionArmed=false;
         deleteArmed=false;
         clearDemoArmed=false;
         manualTransferArmed=false;
@@ -60,6 +66,8 @@ Item {
         returnToTopRequested();
     }
     onSelectedIdChanged: {
+        accountCorrectionCandidate=null;
+        accountCorrectionArmed=false;
         deleteArmed=false;
         direction="out";
     }
@@ -346,6 +354,62 @@ Item {
         if(!res.ok){message=res.error;return false;}
         session=res.state;
         message="LAST MANUAL TRANSACTION UNDONE // NO BANK DATA CHANGED";
+        return true;
+    }
+    function chooseAccountCorrection() {
+        if(view!=="detail"||session.mode!=="manual"||!selected
+           ||selected.origin!=="manual") {
+            message="MANUAL ACCOUNT CORRECTION UNAVAILABLE";
+            return false;
+        }
+        accountCorrectionCandidate={
+            accountId:selected.id,providerId:selected.providerId,
+            productId:selected.productId,nickname:selected.nickname,
+            openingCents:selected.openingCents
+        };
+        accountCorrectionNickname.text=selected.nickname;
+        accountCorrectionOpening.text=selected.openingCents===null?""
+            :(selected.openingCents/100).toFixed(2);
+        accountCorrectionArmed=false;
+        deleteArmed=false;
+        message="EDIT MANUAL LABEL/OPENING ESTIMATE // PROVIDER AND ACCOUNT ID LOCKED";
+        returnToTopRequested();
+        return true;
+    }
+    function cancelAccountCorrection() {
+        accountCorrectionCandidate=null;
+        accountCorrectionArmed=false;
+        accountCorrectionNickname.text="";
+        accountCorrectionOpening.text="";
+    }
+    function saveAccountCorrection() {
+        if(view!=="detail"||session.mode!=="manual"
+           ||!accountCorrectionCandidate
+           ||selectedId!==accountCorrectionCandidate.accountId) {
+            message="MANUAL ACCOUNT CORRECTION UNAVAILABLE";
+            accountCorrectionArmed=false;
+            return false;
+        }
+        if(!accountCorrectionArmed) {
+            accountCorrectionArmed=true;
+            message="CLICK AGAIN TO CORRECT THE MANUAL ACCOUNT ESTIMATE";
+            return false;
+        }
+        accountCorrectionArmed=false;
+        const original=accountCorrectionCandidate;
+        const res=Accounts.correctAccountDetails(session,{
+            accountId:original.accountId,
+            expectedProviderId:original.providerId,
+            expectedProductId:original.productId,
+            expectedNickname:original.nickname,
+            expectedOpeningCents:original.openingCents,
+            nickname:accountCorrectionNickname.text,
+            openingText:accountCorrectionOpening.text
+        });
+        if(!res.ok){message=res.error;return false;}
+        session=res.state;
+        cancelAccountCorrection();
+        message="MANUAL ACCOUNT LABEL/OPENING ESTIMATE CORRECTED // NO BANK DATA CHANGED";
         return true;
     }
     function removeCurrent() {
@@ -1087,6 +1151,114 @@ Item {
                 color: Colors.white
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
+            }
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: manager.session.mode==="manual"
+                         &&manager.selected!==null
+                ActionButton {
+                    width: parent.width
+                    height: 29
+                    label: manager.accountCorrectionCandidate
+                        ? "CLOSE MANUAL ACCOUNT CORRECTION"
+                        : "CORRECT MANUAL ACCOUNT LABEL / OPENING ESTIMATE"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    onLeftClicked: {
+                        if(manager.accountCorrectionCandidate)manager.cancelAccountCorrection();
+                        else manager.chooseAccountCorrection();
+                    }
+                }
+                Column {
+                    width: parent.width
+                    spacing: 6
+                    visible: manager.accountCorrectionCandidate!==null
+                    GohuText {
+                        width: parent.width
+                        text: "ACCOUNT ID, PROVIDER, PRODUCT AND EXISTING TRANSACTIONS STAY LOCKED"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "CORRECT ACCOUNT NICKNAME // MAX 42"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 29
+                        color: Colors.black
+                        border.color: Colors.cyan
+                        clip: true
+                        TextInput {
+                            id: accountCorrectionNickname
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            font.pixelSize: 11
+                            color: Colors.white
+                            maximumLength: 42
+                            selectByMouse: true
+                            activeFocusOnPress: true
+                            onTextChanged: manager.accountCorrectionArmed=false
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "CORRECT OPENING USD ESTIMATE // BLANK MEANS UNKNOWN, ZERO IS 0.00"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 29
+                        color: Colors.black
+                        border.color: Colors.cyan
+                        clip: true
+                        TextInput {
+                            id: accountCorrectionOpening
+                            anchors.fill: parent
+                            anchors.margins: 5
+                            font.pixelSize: 11
+                            color: Colors.white
+                            selectByMouse: true
+                            activeFocusOnPress: true
+                            onTextChanged: manager.accountCorrectionArmed=false
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "OPENING ESTIMATE IS USER-ENTERED // NOT A BANK STATEMENT OR NEW TRANSACTION"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 29
+                        label: manager.accountCorrectionArmed
+                            ? "CONFIRM MANUAL ACCOUNT CORRECTION"
+                            : "SAVE ACCOUNT CORRECTION // TWO CLICKS"
+                        labelPixelSize: 9
+                        accentColor: manager.accountCorrectionArmed
+                            ? Colors.orange : Colors.magenta
+                        onLeftClicked: manager.saveAccountCorrection()
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 28
+                        label: "CANCEL MANUAL ACCOUNT CORRECTION"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        onLeftClicked: manager.cancelAccountCorrection()
+                    }
+                }
             }
             Column {
                 width: parent.width

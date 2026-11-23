@@ -2145,6 +2145,8 @@ PanelWindow {
     onMenuOpenChanged: {
         if (!menuOpen) {
             machineInvalidateV2Review();
+            // M5 local preview must not survive close/reopen unchanged.
+            machineInvalidateM5Preview();
             universalFavoritesOpen = false;
             dismissWorldSearchPopup();
             closeConverterDropdowns();
@@ -2168,6 +2170,9 @@ PanelWindow {
     onSelectedModeChanged: {
         if (selectedMode !== "machine")
             machineInvalidateV2Review();
+        // Keep M5's display invalidation in the shared mode lifecycle.
+        if (selectedMode !== "machine")
+            machineInvalidateM5Preview();
         if (resyncPopupOpen)
             dismissResyncPopup();
         if (selectedMode !== "clock")

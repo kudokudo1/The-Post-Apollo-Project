@@ -17,6 +17,8 @@ on:
       - 'tests/finance/test_post_apollo_date_stepper_contracts.py'
       - 'tests/finance/test_banking_manual_transfer_pairs_m4i.mjs'
       - 'tests/finance/test_banking_manual_transfer_pairs_m4i_contracts.py'
+      - 'tests/finance/test_banking_transfer_aware_activity_m4i.mjs'
+      - 'tests/finance/test_banking_transfer_aware_activity_m4i_contracts.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -65,6 +67,8 @@ on:
       - 'tests/finance/test_post_apollo_date_stepper_contracts.py'
       - 'tests/finance/test_banking_manual_transfer_pairs_m4i.mjs'
       - 'tests/finance/test_banking_manual_transfer_pairs_m4i_contracts.py'
+      - 'tests/finance/test_banking_transfer_aware_activity_m4i.mjs'
+      - 'tests/finance/test_banking_transfer_aware_activity_m4i_contracts.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -163,3 +167,7 @@ jobs:
         run: node tests/finance/test_banking_manual_transfer_pairs_m4i.mjs
       - name: Test M4i transfer pair UI and no-payment source contracts
         run: python3 tests/finance/test_banking_manual_transfer_pairs_m4i_contracts.py
+      - name: Test M4i declared transfer versus unlinked activity reconciliation
+        run: node tests/finance/test_banking_transfer_aware_activity_m4i.mjs
+      - name: Test M4i transfer-aware account movement source and authority contracts
+        run: python3 tests/finance/test_banking_transfer_aware_activity_m4i_contracts.py

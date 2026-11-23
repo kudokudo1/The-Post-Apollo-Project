@@ -7,6 +7,11 @@ import Quickshell.Io
 Scope {
     id: globalPrice
     property bool monitoring: false
+    // Local, in-memory UTC request starts only. Other EODHD clients/hosts
+    // and actual provider billing are not observed or inferred here.
+    property string quotaUtcDay: ""
+    property int requestsThisRuntime: 0
+    readonly property int advertisedFreeDailyAllowance: 20
     property string state: "idle"
     property string message: "CHOOSE AN OPENFIGI RESULT, THEN FIND EODHD LISTINGS."
     property var identity: null
@@ -24,6 +29,19 @@ Scope {
     readonly property bool loading: state==="looking" || state==="loading"
     readonly property bool ready: state==="ready" && snapshot!==null
 
+    function freeAttemptAllowed() {
+        const utcDay=dateOffset(0);
+        if (quotaUtcDay!==utcDay) {
+            quotaUtcDay=utcDay;
+            requestsThisRuntime=0;
+        }
+        if (requestsThisRuntime>=advertisedFreeDailyAllowance) {
+            state="quota";
+            message="LOCAL EODHD PANEL LIMIT REACHED // NO AUTOMATIC REQUEST";
+            return false;
+        }
+        return true;
+    }
     function clear() {
         identity=null;
         candidates=[];
@@ -62,6 +80,7 @@ Scope {
         if (!monitoring || loading || reader.running || !identity
                 || !/^[A-Z0-9][A-Z0-9_.-]{0,29}$/.test(identity.ticker))
             return false;
+        if (!freeAttemptAllowed()) return false;
         requestedOp="lookup";
         requestedIdentity=identity.figi;
         requestedTicker=identity.ticker;
@@ -72,6 +91,7 @@ Scope {
         snapshot=null;
         state="looking";
         message="SEARCHING EODHD STOCK LISTINGS // ONE FREE-PLAN API CALL.";
+        requestsThisRuntime++;
         reader.exec(["/usr/bin/env","node",
             Quickshell.shellPath("scripts/finance/read_global_eodhd_history.mjs"),
             "lookup",identity.ticker]);
@@ -117,6 +137,7 @@ Scope {
         if (!monitoring || loading || reader.running || !identity
                 || !selectedListing || !(state==="selected" || state==="ready"))
             return false;
+        if (!freeAttemptAllowed()) return false;
         requestedOp="history";
         requestedIdentity=identity.figi;
         requestedSymbol=selectedListing.symbol;
@@ -126,6 +147,7 @@ Scope {
         snapshot=null;
         state="loading";
         message="READING EODHD DAILY CLOSES // ONE FREE-PLAN API CALL.";
+        requestsThisRuntime++;
         reader.exec(["/usr/bin/env","node",
             Quickshell.shellPath("scripts/finance/read_global_eodhd_history.mjs"),
             "history",requestedSymbol,requestedCurrency,requestedFrom,requestedTo]);

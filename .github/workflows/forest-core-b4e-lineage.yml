@@ -1,0 +1,35 @@
+name: Forest Core B4e Local Recovery Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'scripts/forest/RECOVERY_LINEAGE_B4E.md'
+      - 'tests/forest/test_recovery_lineage_b4e.py'
+      - '.github/workflows/forest-core-b4e-lineage.yml'
+  push:
+    paths:
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'scripts/forest/RECOVERY_LINEAGE_B4E.md'
+      - 'tests/forest/test_recovery_lineage_b4e.py'
+      - '.github/workflows/forest-core-b4e-lineage.yml'
+
+jobs:
+  local-lineage-synthetic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: B4e adversarial original-turn and model lineage
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_lineage_b4e.py' -v
+      - name: B4d read-only recovery regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_inspect_b4d.py' -v
+      - name: B3 durable no-retry regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a host policy regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: B4b pre-commit regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_precommit_b4b.py' -v
+      - name: B4c permit/receipt regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_fenced_commit_b4c.py' -v
+      - name: Python source compilation
+        run: python3 -m py_compile scripts/forest/recovery_inspect_b4d.py tests/forest/test_recovery_lineage_b4e.py

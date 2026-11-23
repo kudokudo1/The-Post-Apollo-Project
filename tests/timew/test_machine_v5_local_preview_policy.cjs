@@ -182,5 +182,107 @@ for (const forbidden of [
 ])
   check(!request.includes(forbidden), "button never writes or restores: " + forbidden);
 
+// M5 lifecycle acceptance guard: evaluate the actual QML handler bodies in
+// isolation. A selected checkpoint can stay the same while MACHINE is hidden,
+// so key equality alone is insufficient to guarantee fresh preview data.
+function between(start, end) {
+  check(ui.split(start).length === 2 && ui.split(end).length === 2,
+        "unique QML lifecycle anchor: " + start);
+  return ui.split(start)[1].split(end)[0];
+}
+const invalidateBody = between(
+  "    function machineInvalidateM5Preview() {",
+  "    function machineRequestM5Preview()"
+);
+const menuBody = between("    onMenuOpenChanged: {",
+                         "    onSelectedModeChanged: {");
+const modeBody = between("    onSelectedModeChanged: {",
+                         "    onStandardKeysAvailableChanged: {");
+check(menuBody.includes("if (!menuOpen)")
+      && menuBody.includes("machineInvalidateM5Preview();"),
+      "closing window explicitly invalidates M5");
+check(modeBody.includes('if (selectedMode !== "machine")')
+      && modeBody.includes("machineInvalidateM5Preview();"),
+      "leaving MACHINE explicitly invalidates M5");
+check(!menuBody.includes("machineM5PreviewProcess.exec(")
+      && !modeBody.includes("machineM5PreviewProcess.exec("),
+      "mode changes and open/close never auto-read local data");
+
+// Construct a synthetic UI context; this runs the QML JavaScript navigation
+// handlers, NOT Quickshell, a window manager, or the operator's desktop.
+const lifecycle = vm.createContext({
+  menuOpen: true, selectedMode: "machine",
+  machineM5PreviewKey: cid,
+  machineM5PreviewResult: {count:1, entries:[clone(entry)]},
+  machineM5PreviewIndex: 1,
+  machineM5PreviewStatus: "LOCAL FRACTIONAL CAPTURES // 1 // UNTRUSTED",
+  machineM5PreviewBusy: true,
+  resyncPopupOpen: false,
+  universalFavoritesOpen: true,
+  machineInvalidateV2Review(){},
+  dismissWorldSearchPopup(){},
+  closeConverterDropdowns(){},
+  dismissResyncPopup(){},
+  refreshStopwatch(){},
+  refreshCountdowns(){},
+  refreshWorldClock(){},
+  loadWorldZoneCatalog(){},
+  restoreKeyboardFocus(){},
+  TimeSettings: {checkOnClockOpened(){}},
+  Qt: {callLater(){}}
+});
+vm.runInContext(
+  "function machineInvalidateM5Preview() {" + invalidateBody
+  + "\nfunction menuChanged() {" + menuBody
+  + "\nfunction modeChanged() {" + modeBody,
+  lifecycle, {filename: "TimeW.qml-nav-lifecycle"}
+);
+
+// An in-flight local read must be invalidated on mode exit even if the
+// selected checkpoint is unchanged and STORED remains open.
+lifecycle.selectedMode = "clock";
+vm.runInContext("modeChanged()", lifecycle);
+check(lifecycle.machineM5PreviewKey === "", "mode exit clears key");
+check(lifecycle.machineM5PreviewResult === null, "mode exit clears rows");
+check(lifecycle.machineM5PreviewIndex === 0, "mode exit resets paging");
+check(lifecycle.machineM5PreviewStatus === "LOCAL PREVIEW NOT RUN // READ ONLY",
+      "mode exit resets user-visible status");
+check(lifecycle.machineM5PreviewBusy === true,
+      "mode exit does not forge a child-process exit");
+lifecycle.selectedMode = "machine";
+vm.runInContext("modeChanged()", lifecycle);
+check(lifecycle.machineM5PreviewKey === ""
+      && lifecycle.machineM5PreviewResult === null,
+      "re-entering MACHINE does not resurrect an old result");
+
+// Also test a completed preview that was not in-flight. Closing and
+// reopening must clear it without touching local storage or re-reading.
+lifecycle.machineM5PreviewBusy = false;
+lifecycle.machineM5PreviewKey = cid;
+lifecycle.machineM5PreviewResult = {count:1, entries:[clone(entry)]};
+lifecycle.machineM5PreviewIndex = 1;
+lifecycle.machineM5PreviewStatus = "LOCAL FRACTIONAL CAPTURES // 1 // UNTRUSTED";
+lifecycle.menuOpen = false;
+vm.runInContext("menuChanged()", lifecycle);
+check(lifecycle.machineM5PreviewKey === ""
+      && lifecycle.machineM5PreviewResult === null,
+      "closing TimeW clears a completed preview");
+check(lifecycle.machineM5PreviewStatus === "LOCAL PREVIEW NOT RUN // READ ONLY",
+      "closing TimeW resets status");
+lifecycle.menuOpen = true;
+vm.runInContext("menuChanged()", lifecycle);
+check(lifecycle.machineM5PreviewKey === ""
+      && lifecycle.machineM5PreviewResult === null,
+      "reopening TimeW requires a new explicit click");
+
+// Stale process output is still independently denied by the existing
+// selected-mode, open-view and empty-key guards in onStreamFinished.
+const m5Process = between("        id: machineM5PreviewProcess",
+                          "    // An explicit, one-shot V2 review");
+check(m5Process.includes('timew.selectedMode !== "machine"')
+      && m5Process.includes('timew.machineM5PreviewKey === ""')
+      && m5Process.includes('timew.machineM5PreviewKey !== timew.machineSavedItem.id'),
+      "late child output cannot refill an invalidated navigation state");
+
 console.log("TIMEW M5 PREVIEW DISPLAY POLICY // " + checks
             + " deny-only checks PASS; NO NATIVE RESTORE AUTHORITY");

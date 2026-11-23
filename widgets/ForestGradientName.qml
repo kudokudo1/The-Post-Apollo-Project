@@ -10,19 +10,34 @@ Item {
     id: root
 
     property string text: ""
+    // By default size the accent to the displayed name. A heading can
+    // include a suffix (// CHAT) without letting it shift Maple's
+    // top-right red accent away from the Tree name.
+    property string gradientText: text
     property color baseColor: "#DCF3FA"
     property color accentColor: "#EE76B2"
     property bool accentTopRight: false
     property int pixelSize: 12
     property bool bold: true
 
-    // Text.implicitWidth is measured from the actual GohuFont text, not
-    // the available button width. For long names the source Text elides,
-    // so constrain the gradient anchor to the visible glyph span.
+    // Use the natural GohuFont width of the *Tree name* (not the
+    // surrounding button, and not any // CHAT suffix). Clamp to what
+    // actually fits if the label elides on a narrow display.
     readonly property real visibleGlyphWidth:
-        Math.max(1, Math.min(width, inkMask.implicitWidth))
+        Math.max(1, Math.min(width, gradientMeasure.implicitWidth))
+    // A slightly stronger accent than the previous 0.42, kept
+    // proportional so CHERRY, MAPLE and CEDAR are not overwhelmed.
     readonly property real accentRadius:
-        Math.max(16, visibleGlyphWidth * 0.42)
+        Math.max(19, visibleGlyphWidth * 0.58)
+
+    GohuText {
+        id: gradientMeasure
+        text: root.gradientText
+        textFormat: Text.PlainText
+        font.pixelSize: root.pixelSize
+        font.bold: root.bold
+        visible: false
+    }
 
     GohuText {
         id: inkMask
@@ -46,7 +61,9 @@ Item {
             strokeWidth: -1
             fillGradient: RadialGradient {
                 centerX: root.accentTopRight ? root.visibleGlyphWidth : 0
-                centerY: 0
+                // The old y=0 put the accent above the actual glyphs,
+                // especially hiding MAPLE's red top-right tint.
+                centerY: root.height * 0.36
                 centerRadius: root.accentRadius
                 focalX: centerX
                 focalY: centerY

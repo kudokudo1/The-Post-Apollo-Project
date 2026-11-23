@@ -18,6 +18,8 @@ NeonScrollBar 1.0 NeonScrollBar.qml
 NeonScrollPaneV2 1.0 NeonScrollPaneV2.qml
 DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
+DiagnosticsDockButton 1.0 DiagnosticsDockButton.qml
+DiagnosticsServicePopup 1.0 DiagnosticsServicePopup.qml
 VoiceToTextButton 1.0 VoiceToTextButton.qml
 AskSendButton 1.0 AskSendButton.qml
 CloseButton 1.0 CloseButton.qml

@@ -112,11 +112,64 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         assert len(category_rows()) == 2
         assert prop(clear[0], "available") is False
 
+        # M9: overspent-only is a read-only attention filter. A negative
+        # available balance, not a category's name or budget size, controls it.
+        attention = matching_items("categoryOverspentOnlyAction")
+        assert len(attention) == 1
+        assert prop(pane, "overspentCount") == 0
+        assert prop(attention[0], "selected") is False
+        assert prop(attention[0], "label") == "OVERSPENT ONLY // 0"
+
+        invoke(pane, "toggleOverspentFilter")
+        assert prop(pane, "onlyOverspent") is True
+        assert prop(attention[0], "selected") is True
+        assert len(category_rows()) == 0
+        assert prop(empty[0], "text") == "NO OVERSPENT CATEGORIES THIS MONTH"
+
+        invoke(root, "overspentCoffeeFixture")
+        assert prop(pane, "onlyOverspent") is True
+        assert prop(pane, "overspentCount") == 1
+        assert len(category_rows()) == 1
+        assert prop(attention[0], "label") == "OVERSPENT ONLY // 1"
+
+        setprop(pane, "filterText", "Rent")
+        assert len(category_rows()) == 0
+        assert prop(empty[0], "text") == (
+            "NO OVERSPENT SEARCH MATCHES // CLEAR SEARCH OR FILTER"
+        )
+        invoke(pane, "clearCategorySearch")
+        assert prop(pane, "filterText") == ""
+        assert prop(pane, "onlyOverspent") is True
+        assert len(category_rows()) == 1
+
+        # Malformed or nonnumeric balance values do not become overspent.
+        invoke(root, "invalidBalanceFixture")
+        assert prop(pane, "overspentCount") == 0
+        assert len(category_rows()) == 0
+        invoke(pane, "toggleOverspentFilter")
+        assert prop(pane, "onlyOverspent") is False
+        assert len(category_rows()) == 2
+
+        # A same-source refresh preserves filter intent; changing the month
+        # or losing the source resets it so another budget is not obscured.
+        invoke(root, "overspentCoffeeFixture")
+        invoke(pane, "toggleOverspentFilter")
+        setprop(pane, "filterText", "wants")
+        invoke(root, "refreshFixture")
+        assert prop(pane, "onlyOverspent") is True
+        assert prop(pane, "filterText") == "wants"
+        assert len(category_rows()) == 1
+        invoke(root, "switchMonth")
+        assert prop(pane, "onlyOverspent") is False
+        assert prop(pane, "filterText") == ""
+        assert len(category_rows()) == 2
+
         invoke(root, "emptyCategoriesFixture")
         assert len(category_rows()) == 0
         assert prop(summary[0], "text") == "SHOWING 0 / 0 CATEGORIES"
         assert prop(empty[0], "text") == "NO CATEGORIES IN THIS BUDGET"
         invoke(root, "noBudgetFixture")
+        assert prop(attention[0], "available") is False
         assert len(category_rows()) == 0
         assert prop(summary[0], "text") == "CATEGORIES // NO AUTHENTICATED BUDGET"
         assert prop(empty[0], "text") == "LOAD A BUDGET TO VIEW CATEGORIES"
@@ -218,7 +271,7 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         setprop(pane, "groupDraftName", "Housing")
         assert prop(pane, "groupProposalEligible") is False
 
-        print("FinanceW Categories M8 real-pane Qt search/lifecycle/count smoke: PASS")
+        print("FinanceW Categories M9 real-pane Qt overspent/search/lifecycle smoke: PASS")
     finally:
         root.close()
         root.deleteLater()

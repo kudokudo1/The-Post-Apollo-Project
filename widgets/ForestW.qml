@@ -108,47 +108,52 @@ PanelWindow {
     // Tree names are presentation identities independent of trusted models.
     // Preserve the approved 48px artwork: Cherry/Maple vectors; Cedar and
     // Macintosh vectors; Bristlecone's operator-edited 48px pixel artwork.
-    // Roles for new Trees are deliberately unassigned, not fabricated.
+    // Tree roles are operator-assigned presentation labels, not new host permissions.
     readonly property var treeSlots: [
         {
-            name: "CHERRY", role: "GENERAL COORDINATOR",
+            name: "CHERRY", role: "GENERAL // ASSISTANT",
             iconPath: "../assets/forest/cherry-outline.svg",
             hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
             openIconPath: "../assets/forest/cherry-open-magenta.svg",
             identityColor: Colors.white,
-            iconIdleGlowColor: Colors.magenta, spiritualIdleGlowColor: Colors.magenta
+            iconIdleGlowColor: Colors.magenta, spiritualIdleGlowColor: Colors.magenta,
+            gradientAccentColor: "#EE76B2", gradientTopRight: false
         },
         {
-            name: "MAPLE", role: "FILES & ORGANIZATION",
+            name: "MAPLE", role: "FILES // ORGANIZATION",
             iconPath: "../assets/forest/maple-outline.svg",
             hoverIconPath: "../assets/forest/maple-hover-orange.svg",
             openIconPath: "../assets/forest/maple-open-magenta.svg",
             identityColor: Colors.orange,
-            iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red
+            iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red,
+            gradientAccentColor: "#C7482F", gradientTopRight: true
         },
         {
-            name: "BRISTLECONE PINE", role: "ROLE // NOT ASSIGNED",
+            name: "BRISTLECONE PINE", role: "TREEWRITE // CODER",
             iconPath: "../assets/forest/bristlecone-pine.png",
             hoverIconPath: "../assets/forest/bristlecone-hover-orange.png",
             openIconPath: "../assets/forest/bristlecone-open-magenta.png",
             identityColor: Colors.white,
-            iconIdleGlowColor: Colors.orange, spiritualIdleGlowColor: Colors.green
+            iconIdleGlowColor: Colors.orange, spiritualIdleGlowColor: Colors.green,
+            gradientAccentColor: Colors.green, gradientTopRight: false
         },
         {
-            name: "CEDAR", role: "ROLE // NOT ASSIGNED",
+            name: "CEDAR", role: "SECURITY // PROTECTION",
             iconPath: "../assets/forest/cedar-outline.svg",
             hoverIconPath: "../assets/forest/cedar-hover-orange.svg",
             openIconPath: "../assets/forest/cedar-open-magenta.svg",
             identityColor: Colors.green,
-            iconIdleGlowColor: Colors.orange, spiritualIdleGlowColor: Colors.orange
+            iconIdleGlowColor: Colors.orange, spiritualIdleGlowColor: Colors.orange,
+            gradientAccentColor: Colors.orange, gradientTopRight: false
         },
         {
-            name: "MACINTOSH", role: "ROLE // NOT ASSIGNED",
+            name: "MACINTOSH", role: "TECH // SUPPORT",
             iconPath: "../assets/forest/macintosh-outline.svg",
             hoverIconPath: "../assets/forest/macintosh-hover-orange.svg",
             openIconPath: "../assets/forest/macintosh-open-magenta.svg",
             identityColor: Colors.green,
-            iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red
+            iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red,
+            gradientAccentColor: Colors.red, gradientTopRight: false
         }
     ]
     readonly property var activeTree: treeSlots[selectedTreeIndex]
@@ -426,10 +431,21 @@ PanelWindow {
                         // DockButton owns the two perimeter halos; separate
                         // text and icon samples avoid duplicate full-row glow.
                         contentGlowEnabled: false
-                        border.width: 1
-                        border.color: treeRow.open || treeRow.pressed || treeRow.hovered
-                            ? treeRow.dockGlowColor : treeRow.iconIdentityColor
+                        // The original DockButton supplies fill, pointer,
+                        // sampled glows and semantic state transitions. The
+                        // local 1px ring is the only visible border ink;
+                        // it changes with the resolved button foreground,
+                        // while its accent retains the Tree's corner identity.
+                        border.width: 0
                         Accessible.name: modelData.name + " Tree"
+                        ForestCornerGradientBorder {
+                            id: treeGradientBorder
+                            anchors.fill: parent
+                            baseColor: treeRow.foregroundColor
+                            accentColor: modelData.gradientAccentColor
+                            accentTopRight: modelData.gradientTopRight
+                            z: 4
+                        }
                         onLeftClicked: root.selectedTreeIndex = index
 
                         Item {
@@ -472,17 +488,19 @@ PanelWindow {
                                 z: -1
                             }
 
-                            GohuText {
+                            ForestGradientName {
                                 id: treeName
                                 anchors.left: treeGlyph.right
                                 anchors.leftMargin: 6
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
+                                height: 26
                                 text: modelData.name
-                                font.pixelSize: 12
-                                font.bold: true
-                                elide: Text.ElideRight
-                                color: treeRow.foregroundColor
+                                pixelSize: 12
+                                bold: true
+                                baseColor: treeRow.foregroundColor
+                                accentColor: modelData.gradientAccentColor
+                                accentTopRight: modelData.gradientTopRight
                             }
                             TextHashGlow {
                                 id: treeNameGlow
@@ -588,18 +606,21 @@ PanelWindow {
                     }
                 }
 
-                GohuText {
+                ForestGradientName {
                     id: chatHeading
                     anchors.left: chatTreeIconHost.right
                     anchors.leftMargin: 8
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
+                    height: 27
                     text: root.activeTree.name + " // CHAT"
-                    color: root.selectedTreeButton
-                        ? root.selectedTreeButton.foregroundColor : Colors.magenta
-                    font.pixelSize: 15
-                    font.bold: true
-                    elide: Text.ElideRight
+                    pixelSize: 15
+                    bold: true
+                    baseColor: root.selectedTreeButton
+                        ? root.selectedTreeButton.foregroundColor
+                        : root.activeTree.identityColor
+                    accentColor: root.activeTree.gradientAccentColor
+                    accentTopRight: root.activeTree.gradientTopRight
                 }
                 // Sample the rendered chat title itself, using the selected
                 // Tree button's existing name-glow palette and opacity.
@@ -608,7 +629,7 @@ PanelWindow {
                     id: chatHeadingGlow
                     safeSource: chatHeading
                     requestedVisible: root.menuOpen
-                    foregroundColor: chatHeading.color
+                    foregroundColor: chatHeading.baseColor
                     preferredGlowColor: root.selectedTreeButton
                         ? root.selectedTreeButton.contentGlowColor : Colors.magenta
                     radius: 7

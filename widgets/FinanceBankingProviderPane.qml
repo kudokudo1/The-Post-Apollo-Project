@@ -638,6 +638,43 @@ Item {
             GohuText {
                 width: parent.width
                 visible: providerPane.filteredActivity.ok
+                text: "OF THE FILTERED MOVEMENT // DECLARED TRANSFERS "
+                    +providerPane.filteredActivity.matchedTransferCount+" LEGS"
+                    +" // IN "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedTransferInCents)
+                    +" // OUT "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedTransferOutCents)
+                font.pixelSize: 9
+                color: Colors.magenta
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
+                text: "UNLINKED MANUAL/DEMO ENTRIES "
+                    +providerPane.filteredActivity.matchedUnlinkedCount
+                    +" // IN "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedUnlinkedInCents)
+                    +" // OUT "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedUnlinkedOutCents)
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
+                text: "DECLARED TRANSFERS ARE NOT NEW INCOME OR SPENDING // UNLINKED ENTRIES ARE ALSO UNVERIFIED"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
                 text: "THESE ARE USER-ENTERED MONEY MOVEMENTS // NOT VERIFIED INCOME OR SPENDING"
                 font.pixelSize: 9
                 color: Colors.orange
@@ -705,6 +742,26 @@ Item {
                                     +" // NET "+ProviderPolicy.money(modelData.matchedNetCents)
                                 font.pixelSize: 9
                                 color: Colors.cyan
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "DECLARED TRANSFER LEGS "+modelData.transferCount
+                                    +" // IN "+ProviderPolicy.money(modelData.transferInCents)
+                                    +" // OUT "+ProviderPolicy.money(modelData.transferOutCents)
+                                font.pixelSize: 9
+                                color: Colors.magenta
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "UNLINKED ENTRIES "+modelData.unlinkedCount
+                                    +" // IN "+ProviderPolicy.money(modelData.unlinkedInCents)
+                                    +" // OUT "+ProviderPolicy.money(modelData.unlinkedOutCents)
+                                font.pixelSize: 9
+                                color: Colors.orange
                                 textFormat: Text.PlainText
                                 wrapMode: Text.WordWrap
                             }

@@ -15,6 +15,8 @@ Scope {
     property var candidatePreview: null
     property string requestFrame: ""
     property string responseBuffer: ""
+    property string errorBuffer: ""
+    readonly property string processErrorPrefix: "FINANCE_RESEARCH_CANDIDATES_ERROR "
     property int generation: 0
     property int submittedGeneration: -1
     readonly property bool loading: state === "loading"
@@ -49,6 +51,7 @@ Scope {
         submittedGeneration = generation;
         requestFrame = frame;
         responseBuffer = "";
+        errorBuffer = "";
         candidatePreview = null;
         state = "loading";
         message = "VALIDATING CURRENT SOURCE SNAPSHOTS // READ ONLY";
@@ -135,6 +138,24 @@ Scope {
         return true;
     }
 
+    // Only the bridge's fixed, allowlisted codes may reach UI/logs.
+    // Never surface raw stderr, URLs, titles, SEC contact, or snapshots.
+    function refusalCode(exitCode, response, diagnostic) {
+        if (exitCode !== 0) {
+            const allowed = /^(INVALID_FRAME|INVALID_REQUEST|INVALID_SOURCE_SNAPSHOT|INVALID_RESULT|RESULT_TOO_LARGE|PREVIEW_UNAVAILABLE|INVALID_ARGUMENTS)$/;
+            const raw = String(diagnostic || "").trim();
+            if (raw.indexOf(processErrorPrefix) === 0) {
+                const code = raw.slice(processErrorPrefix.length);
+                if (allowed.test(code))
+                    return code;
+            }
+            return "PROCESS_FAILED";
+        }
+        if (!response || response.length === 0)
+            return "EMPTY_RESULT_STREAM";
+        return "INVALID_RESULT_STREAM";
+    }
+
     Process {
         id: worker
         stdinEnabled: true
@@ -149,20 +170,27 @@ Scope {
         stdout: StdioCollector {
             onStreamFinished: candidateService.responseBuffer = text
         }
+        stderr: StdioCollector {
+            onStreamFinished: candidateService.errorBuffer = text
+        }
         onExited: function(exitCode, exitStatus) {
             Qt.callLater(function() {
                 const fresh = candidateService.monitoring
                     && candidateService.submittedGeneration
                        === candidateService.generation;
                 const output = candidateService.responseBuffer;
+                const diagnostic = candidateService.errorBuffer;
                 candidateService.responseBuffer = "";
+                candidateService.errorBuffer = "";
                 candidateService.requestFrame = "";
                 if (!fresh) return;
                 if (!candidateService.acceptResponse(output, exitCode)) {
+                    const code = candidateService.refusalCode(
+                        exitCode, output, diagnostic);
                     candidateService.candidatePreview = null;
                     candidateService.state = "failed";
-                    candidateService.message =
-                        "PREVIEW REFUSED // RECHECK SOURCE SNAPSHOTS";
+                    candidateService.message = "PREVIEW REFUSED // " + code;
+                    console.warn("FINANCE_RESEARCH_PREVIEW_REFUSED // " + code);
                 }
             });
         }

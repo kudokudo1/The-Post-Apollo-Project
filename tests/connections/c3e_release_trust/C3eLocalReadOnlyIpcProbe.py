@@ -176,10 +176,10 @@ def serve_one_ci_only(sock: socket.socket, boundary: S.TrustBoundary):
         _deny("C3E_IPC_ORIGINAL_BOUNDARY_REQUIRED")
     sock.settimeout(3.0)
     try:
-        request = _read(sock)
         try:
+            request = _read(sock)
             answer = _route(boundary, request)
-        except (Refused, S.Refused, S.L.Refused) as exc:
+        except (Refused, S.Refused, S.L.Refused):
             answer = dict(REFUSAL)
         _write(sock, answer)
     finally:

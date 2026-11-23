@@ -13,6 +13,7 @@ Scope {
     property var candidates: []
     property var selectedListing: null
     property var snapshot: null
+    property var sharedQuota: null // Durable local readers only, not API balance.
     property int presetDays: 30
     property string quotaUtcDay: ""
     property int requestsThisRuntime: 0
@@ -52,6 +53,7 @@ Scope {
         candidates=[];
         selectedListing=null;
         snapshot=null;
+        sharedQuota=null;
         state="idle";
         message="FIND ALPHA VANTAGE STOCK LISTINGS MANUALLY.";
         requestedOp="";
@@ -94,6 +96,7 @@ Scope {
         candidates=[];
         selectedListing=null;
         snapshot=null;
+        sharedQuota=null;
         state="looking";
         message="SEARCHING ALPHA VANTAGE // 1 FREE KEY REQUEST.";
         requestsThisRuntime++;
@@ -140,6 +143,7 @@ Scope {
         requestedTo=dayOffset(0);
         requestedFrom=dayOffset(-(presetDays-1));
         snapshot=null;
+        sharedQuota=null;
         state="loading";
         message="READING ALPHA VANTAGE COMPACT DAILY HISTORY // RAW CLOSE.";
         requestsThisRuntime++;
@@ -166,7 +170,11 @@ Scope {
                 state=["provider-key-required","provider-key-invalid","token-invalid",
                     "token-permissions","token-unreadable"].includes(error)
                     ? "setup":"failed";
-                message=error==="provider-key-required"
+                message=error==="local-quota-exhausted"
+                    ? "SHARED LOCAL ALPHA BUDGET EXHAUSTED // NO PROVIDER REQUEST"
+                    : error==="local-quota-unavailable"
+                    ? "LOCAL QUOTA STORAGE UNSAFE OR UNAVAILABLE // REQUEST BLOCKED"
+                    : error==="provider-key-required"
                     ? "FREE ALPHA VANTAGE KEY REQUIRED // NO PAID PLAN"
                     : error==="provider-rate-or-entitlement"
                     ? "ALPHA VANTAGE QUOTA OR FREE-TIER RESTRICTION"
@@ -183,6 +191,14 @@ Scope {
             try {
                 const data=JSON.parse(line.slice("FINANCE_ALPHA_FREE ".length));
                 if(!data || data.schemaVersion!==1 || data.readOnly!==true
+                    || !data.localQuota || data.localQuota.schemaVersion!==1
+                    || data.localQuota.scope!=="post-apollo-market-local-v1"
+                    || data.localQuota.provider!=="alpha-vantage"
+                    || data.localQuota.limit!==25
+                    || !Number.isInteger(data.localQuota.reserved)
+                    || data.localQuota.reserved<1 || data.localQuota.reserved>25
+                    || data.localQuota.notAccountBalance!==true
+                    || !validDate(data.localQuota.utcDay)
                     || typeof data.retrievedAt!=="string"
                     || !Number.isFinite(Date.parse(data.retrievedAt)))
                     throw new Error("invalid-response");
@@ -205,6 +221,7 @@ Scope {
                                 && x.matchedOpenFigi===false;
                         }))throw new Error("invalid-symbol-results");
                     candidates=data.items;
+                    sharedQuota=data.localQuota;
                     state="candidates";
                     message=candidates.length
                         ? "CHOOSE EXACT LISTING // SOURCE SYMBOL NOT FIGI VERIFIED"
@@ -242,6 +259,7 @@ Scope {
                         || (data.changePct!==null && !Number.isFinite(data.changePct)))
                         throw new Error("invalid-price-data");
                     snapshot=data;
+                    sharedQuota=data.localQuota;
                     state="ready";
                     message=data.bars.length
                         ? "ALPHA VANTAGE RAW DAILY CLOSES // NOT LIVE QUOTES"

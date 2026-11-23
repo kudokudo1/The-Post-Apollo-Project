@@ -18,6 +18,8 @@ Scope {
     property var candidates: []
     property var selectedListing: null
     property var snapshot: null
+    // Last successfully reserved durable local budget, not account balance.
+    property var sharedQuota: null
     property int presetDays: 30
     property string requestedOp: ""
     property string requestedIdentity: ""
@@ -47,6 +49,7 @@ Scope {
         candidates=[];
         selectedListing=null;
         snapshot=null;
+        sharedQuota=null;
         state="idle";
         message="CHOOSE AN OPENFIGI RESULT, THEN FIND EODHD LISTINGS.";
         requestedOp="";
@@ -89,6 +92,7 @@ Scope {
         candidates=[];
         selectedListing=null;
         snapshot=null;
+        sharedQuota=null;
         state="looking";
         message="SEARCHING EODHD STOCK LISTINGS // ONE FREE-PLAN API CALL.";
         requestsThisRuntime++;
@@ -145,6 +149,7 @@ Scope {
         requestedTo=dateOffset(0);
         requestedFrom=dateOffset(-(presetDays-1));
         snapshot=null;
+        sharedQuota=null;
         state="loading";
         message="READING EODHD DAILY CLOSES // ONE FREE-PLAN API CALL.";
         requestsThisRuntime++;
@@ -171,7 +176,11 @@ Scope {
                 state=["provider-key-required","token-unreadable","token-permissions",
                     "token-invalid","provider-key-invalid"].includes(code)
                     ? "setup" : "failed";
-                message=code==="provider-key-required"
+                message=code==="local-quota-exhausted"
+                    ? "SHARED LOCAL EODHD BUDGET EXHAUSTED // NO PROVIDER REQUEST"
+                    : code==="local-quota-unavailable"
+                    ? "LOCAL QUOTA STORAGE UNSAFE OR UNAVAILABLE // REQUEST BLOCKED"
+                    : code==="provider-key-required"
                     ? "FREE EODHD ACCOUNT KEY REQUIRED // PAID PLAN NOT REQUIRED"
                     : code==="provider-not-entitled"
                     ? "EODHD DOES NOT PROVIDE THIS LISTING ON CURRENT PLAN"
@@ -186,6 +195,14 @@ Scope {
             try {
                 const data=JSON.parse(line.slice("FINANCE_GLOBAL_EODHD ".length));
                 if(!data || data.schemaVersion!==1 || data.readOnly!==true
+                        || !data.localQuota || data.localQuota.schemaVersion!==1
+                        || data.localQuota.scope!=="post-apollo-market-local-v1"
+                        || data.localQuota.provider!=="eodhd"
+                        || data.localQuota.limit!==20
+                        || !Number.isInteger(data.localQuota.reserved)
+                        || data.localQuota.reserved<1 || data.localQuota.reserved>20
+                        || data.localQuota.notAccountBalance!==true
+                        || !validDate(data.localQuota.utcDay)
                         || typeof data.retrievedAt!=="string"
                         || !Number.isFinite(Date.parse(data.retrievedAt)))
                     throw new Error("invalid-header");
@@ -205,6 +222,7 @@ Scope {
                                     && (x.isin===null || typeof x.isin==="string");
                             })) throw new Error("invalid-search");
                     candidates=data.items;
+                    sharedQuota=data.localQuota;
                     state="candidates";
                     message=candidates.length
                         ? "VERIFY NAME / COUNTRY / EXCHANGE // CHOOSE ONE LISTING"
@@ -236,6 +254,7 @@ Scope {
                             || (data.changePct!==null && !Number.isFinite(data.changePct)))
                         throw new Error("invalid-history");
                     snapshot=data;
+                    sharedQuota=data.localQuota;
                     state="ready";
                     message=data.bars.length
                         ? "HISTORICAL EOD CLOSES // NOT LIVE // SOURCE EODHD"

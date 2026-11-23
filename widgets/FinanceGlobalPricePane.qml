@@ -62,8 +62,12 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        text: "EODHD FREE 20/DAY // THIS WIDGET'S UTC ATTEMPTS "
+        text: "EODHD FREE 20/DAY // PANEL ATTEMPTS "
             +priceFeed.requestsThisRuntime+"/20 (NOT ACCOUNT BALANCE)"
+            +(priceFeed.sharedQuota
+                ? "\nLOCAL SHARED RESERVED "+priceFeed.sharedQuota.reserved
+                    +"/"+priceFeed.sharedQuota.limit+" // "+priceFeed.sharedQuota.utcDay
+                : "\nLOCAL SHARED RESERVATION NOT YET READ")
         color: Colors.orange
         font.pixelSize: 9
         wrapMode: Text.WordWrap

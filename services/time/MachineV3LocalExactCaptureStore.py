@@ -137,14 +137,51 @@ def _ensure_file(path):
 
 
 def _table_schema(conn):
+    """Refuse a lookalike v3 table missing its immutable capture constraints.
+
+    Column names alone cannot prove a PRIMARY KEY or a pair-wise UNIQUE.
+    Inspect SQLite's declared columns and autoindexes on every open, for
+    existing as well as new files. This is local-data consistency checking,
+    NOT independently protected anti-rollback or same-UID tamper evidence.
+    """
     rows = conn.execute("PRAGMA table_info(exact_captures)").fetchall()
     if tuple(row["name"] for row in rows) != COLUMNS:
         _refuse()
+    for row in rows:
+        name = row["name"]
+        integer = name in ("value_version", "phase")
+        if (row["type"] != ("INTEGER" if integer else "TEXT")
+                or row["pk"] != (1 if name == "id" else 0)
+                or row["notnull"] != (0 if name == "id" else 1)):
+            _refuse()
     names = conn.execute(
         "SELECT name, type FROM sqlite_master WHERE name=?",
         (TABLE,)
     ).fetchall()
     if len(names) != 1 or names[0]["type"] != "table":
+        _refuse()
+
+    # Require full, non-partial SQLite-enforced constraints, not an index
+    # name or merely a row-count check. The implicit rowid is NOT sufficient.
+    required = {
+        ("pk", ("id",)),
+        ("u", ("checkpoint_id", "window_key")),
+    }
+    found = set()
+    for index in conn.execute("PRAGMA index_list(exact_captures)"):
+        if index["unique"] != 1 or index["partial"] != 0:
+            continue
+        columns = conn.execute(
+            'SELECT seqno, cid, name, coll, "key" FROM pragma_index_xinfo(?)',
+            (index["name"],)
+        ).fetchall()
+        keys = [column for column in columns if column["key"] == 1]
+        if any(column["cid"] < 0 or column["coll"] != "BINARY"
+               for column in keys):
+            continue
+        found.add((index["origin"], tuple(
+            column["name"] for column in keys)))
+    if not required.issubset(found):
         _refuse()
 
 
@@ -279,6 +316,14 @@ class LocalExactCaptureStore:
             conn.execute("BEGIN IMMEDIATE")
             count = conn.execute("SELECT COUNT(*) FROM exact_captures").fetchone()[0]
             if count >= MAX_RECORDS:
+                _refuse()
+            # Also enforce duplicate refusal inside the write transaction,
+            # instead of relying solely on the DB's checked unique index.
+            if conn.execute(
+                """SELECT 1 FROM exact_captures
+                   WHERE checkpoint_id=? AND window_key=? LIMIT 1""",
+                (checkpoint, window)
+            ).fetchone() is not None:
                 _refuse()
             conn.execute("""INSERT INTO exact_captures
                 (id,checkpoint_id,window_key,app_id,output_id,workspace_id,

@@ -1,0 +1,24 @@
+name: Connections TimeW C5 read-only recovery plan (non-authorizing)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/TimeWC5ReadOnlyRecoveryPlanReference.py"
+      - "tests/connections/timew/test_timew_c5_readonly_recovery_plan_reference.py"
+      - "docs/connections/timew-c5-readonly-original-operation-recovery.md"
+      - ".github/workflows/connections-timew-c5-readonly-recovery-plan-ci.yml"
+  workflow_dispatch:
+jobs:
+  recovery-query-intents:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original-operation read-only recovery query intents
+        run: python3 -B -I tests/connections/timew/test_timew_c5_readonly_recovery_plan_reference.py
+      - name: Existing exact original review shadow negative acceptance
+        run: python3 -B -I tests/connections/timew/test_timew_c5_review_shadow_reference.py
+      - name: Existing C5 provider-neutral current-head rejection
+        run: python3 -B -I tests/connections/timew/test_timew_c5_custodian_boundary_reference.py
+      - name: Existing native timeout and lost-ack uncertainty negative acceptance
+        run: python3 -B -I tests/connections/timew/test_timew_c5_native_outcome_hold_reference.py

@@ -7,6 +7,10 @@ Item {
     id: draft
     signal saveRequested(var payload)
     signal draftSaveRequested(var payload)
+    // M3c UI-only. A category preview never contributes to saveRequested.
+    signal categoryPreviewRequested(var candidate)
+    property bool allowCategoryPreview: false
+    property bool categoryPreviewArmed: false
     property string localDraftId: ""
     property string draftStoreState: "idle"
     property string draftStoreMessage: ""
@@ -121,7 +125,7 @@ Item {
     function requestDraftSave() {
         // Incomplete dates, descriptions, and amounts are allowed for drafts.
         // This never goes through the Actual transaction writer.
-        if (editing || draftStoreState !== "ready"
+        if (editing || categoryPreviewArmed || draftStoreState !== "ready"
                 || localPending || savePending || !accountId
                 || !/^[a-f0-9]{64}$/.test(sourceKey))
             return false;
@@ -152,7 +156,9 @@ Item {
     }
 
     function requestCommit() {
-        if (!reviewed || validationError !== "" || !requestId
+        // Fail closed: a displayed/planned category CANNOT be silently
+        // dropped by the existing category-free D9 transaction writer.
+        if (!reviewed || categoryPreviewArmed || validationError !== "" || !requestId
                 || savePending || saveState === "uncertain")
             return false;
         const payload = {
@@ -170,6 +176,29 @@ Item {
             payload.original = original;
         }
         saveRequested(payload);
+        return true;
+    }
+
+    function requestCategoryPreview() {
+        if (!open || !allowCategoryPreview || editing || direction !== "expense"
+                || validationError !== "" || !requestId || savePending
+                || saveState === "uncertain")
+            return false;
+        reviewed = false;
+        categoryPreviewRequested({
+            action:"create",direction:"expense",editing:false,
+            sourceKey:sourceKey,month:selectedMonth,
+            accountId:accountId,date:dateText,
+            description:payeeText.trim(),amountCents:signedAmountCents
+        });
+        return true;
+    }
+
+    function discardCategoryPreview() {
+        if (!open || savePending || !categoryPreviewArmed)
+            return false;
+        categoryPreviewArmed = false;
+        reviewed = false;
         return true;
     }
 
@@ -202,6 +231,7 @@ Item {
     function clear() {
         open = false;
         reviewed = false;
+        categoryPreviewArmed = false;
         editing = false;
         localDraftId = "";
         editingId = "";
@@ -339,6 +369,46 @@ Item {
             }
         }
 
+        ActionButton {
+            trackLabelGlowLocally: true
+            objectName: "draftCategoryPreviewLauncher"
+            width: parent.width
+            height: 28
+            visible: draft.allowCategoryPreview && !draft.editing
+                     && draft.direction === "expense"
+            accentColor: Colors.cyan
+            label: "CATEGORY // PREVIEW ONLY"
+            labelPixelSize: 10
+            available: draft.open && !draft.validationError
+                && !draft.savePending && draft.saveState !== "uncertain"
+            onLeftClicked: draft.requestCategoryPreview()
+        }
+        GohuText {
+            objectName: "draftCategoryPreviewWarning"
+            width: parent.width
+            visible: draft.allowCategoryPreview
+                && !draft.editing && draft.direction === "expense"
+            text: draft.categoryPreviewArmed
+                ? "CATEGORY PLAN NOT SAVED // CONFIRM SAVE BLOCKED"
+                : "EXISTING CONFIRM SAVE WRITES AN UNCATEGORIZED EXPENSE"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        ActionButton {
+            trackLabelGlowLocally: true
+            objectName: "draftDiscardCategoryPlan"
+            width: parent.width
+            height: 28
+            visible: draft.categoryPreviewArmed
+            accentColor: Colors.orange
+            label: "DISCARD CATEGORY PLAN // UNCATEGORIZED"
+            labelPixelSize: 9
+            available: draft.open && !draft.savePending
+            onLeftClicked: draft.discardCategoryPreview()
+        }
+
         GohuText {
             width: parent.width
             text: draft.reviewed
@@ -374,6 +444,7 @@ Item {
                 accentColor: Colors.omnitrix
                 label: draft.reviewed ? "CONFIRM SAVE" : "PREVIEW"
                 available: !draft.validationError && !draft.savePending
+                           && !draft.categoryPreviewArmed
                            && draft.saveState !== "uncertain"
                 onLeftClicked: {
                     if (draft.reviewed)
@@ -402,6 +473,7 @@ Item {
             label: draft.localDraftId ? "UPDATE DRAFT" : "SAVE DRAFT"
             labelPixelSize: 10
             available: !draft.editing && draft.draftStoreState === "ready"
+                       && !draft.categoryPreviewArmed
                        && !draft.localPending && !draft.savePending
                        && draft.accounts && draft.accounts.length > 0
             onLeftClicked: draft.requestDraftSave()

@@ -2,9 +2,9 @@ import QtQuick
 import "../components"
 import "../services/finance/FinanceExpenseCategoryPreview.js" as ExpenseRules
 
-// M3a // isolated categorization PREVIEW ONLY. No save/request signal.
-// Not mounted in FinanceW until a category-aware transaction writer is
-// independently reviewed and the UX clearly distinguishes preview/save.
+// M3c // mounted categorization PREVIEW ONLY. No save/request signal.
+// The real transaction Save stays category-free and is explicitly blocked
+// while a category plan is active. M3b writer remains disconnected.
 Item {
     id: expense
     objectName: "expenseCategoryPreviewPane"

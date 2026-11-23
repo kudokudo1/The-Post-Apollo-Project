@@ -121,6 +121,7 @@ PanelWindow {
         id: financeWrite
         onSaved: {
             transactionDraftPane.clear();
+            expenseCategoryPreviewPane.clear();
             if (root.menuOpen)
                 financeBudget.refresh();
         }
@@ -485,8 +486,10 @@ PanelWindow {
     Connections {
         target: root
         function onSelectedMainModeChanged() {
-            if(root.selectedMainMode!=="budget")
+            if(root.selectedMainMode!=="budget") {
                 envelopeMovePreviewPane.clear();
+                expenseCategoryPreviewPane.clear();
+            }
             financeContentKeys.reset();
             Qt.callLater(function() {
                 if(financeContentKeys.navigationActive)
@@ -494,8 +497,10 @@ PanelWindow {
             });
         }
         function onSelectedBudgetSubModeChanged() {
-            if(root.selectedBudgetSubMode!=="budget")
+            if(root.selectedBudgetSubMode!=="budget") {
                 envelopeMovePreviewPane.clear();
+                expenseCategoryPreviewPane.clear();
+            }
             financeContentKeys.reset();
             Qt.callLater(function() {
                 if(financeContentKeys.navigationActive)
@@ -505,6 +510,8 @@ PanelWindow {
         function onBudgetSectionChanged() {
             if(root.budgetSection!=="budget")
                 envelopeMovePreviewPane.clear();
+            if(root.budgetSection!=="transactions")
+                expenseCategoryPreviewPane.clear();
             financeContentKeys.reset();
             Qt.callLater(function() {
                 if(financeContentKeys.navigationActive)
@@ -580,6 +587,7 @@ PanelWindow {
             diagnosticsOpen = false;
             transactionDraftPane.clear();
             envelopeMovePreviewPane.clear();
+            expenseCategoryPreviewPane.clear();
         }
     }
     onKeyboardActiveChanged: {
@@ -2246,13 +2254,58 @@ Row {
                                            ? financeBudget.snapshot.sourceKey : ""
                                 saveState: financeWrite.state
                                 saveMessage: financeWrite.message
+                                allowCategoryPreview: root.budgetExperienceMode==="simple"
                                 draftStoreState: financeDrafts.state
                                 draftStoreMessage: financeDrafts.message
                                 onDraftSaveRequested: function(payload) {
                                     financeDrafts.upsert(payload);
                                 }
+                                onCategoryPreviewRequested: function(candidate) {
+                                    if(root.menuOpen && root.selectedMainMode==="budget"
+                                            && root.selectedBudgetSubMode==="budget"
+                                            && root.budgetExperienceMode==="simple"
+                                            && root.budgetSection==="transactions"
+                                            && financeBudget.state==="ready"
+                                            && !financeBudget.loading
+                                            && financeBudget.snapshot
+                                            && financeWrite.state!=="pending"
+                                            && financeWrite.state!=="uncertain"
+                                            && !transactionDraftPane.editing
+                                            && candidate
+                                            && candidate.sourceKey===financeBudget.snapshot.sourceKey
+                                            && candidate.month===financeBudget.snapshot.month
+                                            && expenseCategoryPreviewPane.begin(candidate)) {
+                                        transactionDraftPane.categoryPreviewArmed=true;
+                                    }
+                                }
                                 onSaveRequested: function(payload) {
-                                    financeWrite.submit(payload);
+                                    // M3c is UI ONLY: never silently drop a
+                                    // previewed category into the old D9 writer.
+                                    if(!transactionDraftPane.categoryPreviewArmed)
+                                        financeWrite.submit(payload);
+                                }
+                            }
+
+                            FinanceExpenseCategoryPreviewPane {
+                                id: expenseCategoryPreviewPane
+                                objectName: "financeBudgetExpenseCategoryPreview"
+                                width: parent.width
+                                snapshot: financeBudget.snapshot
+                            }
+                            Connections {
+                                target: transactionDraftPane
+                                function onDateTextChanged() { expenseCategoryPreviewPane.clear(); }
+                                function onPayeeTextChanged() { expenseCategoryPreviewPane.clear(); }
+                                function onAmountTextChanged() { expenseCategoryPreviewPane.clear(); }
+                                function onDirectionChanged() { expenseCategoryPreviewPane.clear(); }
+                                function onAccountIndexChanged() { expenseCategoryPreviewPane.clear(); }
+                                function onEditingChanged() { expenseCategoryPreviewPane.clear(); }
+                                function onOpenChanged() {
+                                    if(!transactionDraftPane.open)expenseCategoryPreviewPane.clear();
+                                }
+                                function onCategoryPreviewArmedChanged() {
+                                    if(!transactionDraftPane.categoryPreviewArmed)
+                                        expenseCategoryPreviewPane.clear();
                                 }
                             }
 

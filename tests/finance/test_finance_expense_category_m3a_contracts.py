@@ -9,9 +9,9 @@ menu=(root/"widgets/FinanceW.qml").read_text()
 draft=(root/"widgets/FinanceTransactionDraftPane.qml").read_text()
 guard=(root/"scripts/finance/transaction_guard.mjs").read_text()
 
-# The M3a proposal must stay dormant while the existing transaction writer
-# has NO categoryId in its accepted command. Never offer false persistence.
-assert "FinanceExpenseCategoryPreviewPane {" not in menu
+# M3c mounts M3a once but never connects the categorized-expense writer.
+# Existing transaction Save still has NO categoryId.
+assert menu.count("FinanceExpenseCategoryPreviewPane {") == 1
 assert "FinanceExpenseCategoryPreviewPane {" not in draft
 assert 'objectName: "expenseCategoryPreviewPane"' in pane
 assert 'objectName: "expenseCategoryPicker"' in pane
@@ -65,4 +65,4 @@ assert 'category: ' not in guard
 assert "addTransactions(cmd.accountId" in guard
 assert 'saveRequested(payload);' in draft
 assert 'financeWrite.submit(payload);' in menu
-print("FinanceW Simple M3a dormant expense category/no-writer contracts: PASS")
+print("FinanceW Simple M3a/M3c mounted expense preview/no-writer contracts: PASS")

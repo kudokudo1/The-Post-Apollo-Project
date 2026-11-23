@@ -15,9 +15,9 @@ action_blocks = re.findall(
     r"trackLabelGlowLocally:\s*true",
     pane,
 )
-assert pane.count("ActionButton {") == 5
-assert len(action_blocks) == 5, (
-    "All five staged draft controls need reactive label/glow alignment"
+assert pane.count("ActionButton {") == 7
+assert len(action_blocks) == 7, (
+    "All seven staged draft controls need reactive label/glow alignment"
 )
 new_button = menu[menu.index("id: newTransactionDraft"):
                   menu.index("onLeftClicked: transactionDraftPane.begin()")]

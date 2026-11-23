@@ -1,0 +1,44 @@
+name: Connections C4b raw challenge evidence candidate (deny-only CI)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/c4b_raw_challenge_evidence_candidate_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_raw_challenge_evidence_candidate_ci.py'
+      - '.github/workflows/connections-c4b-raw-challenge-evidence-candidate-ci.yml'
+      - 'docs/connections-c4b-gateway-evidence-producer-contract.md'
+      - 'tests/connections/identity_silverblue/verify_controller_challenge_ci.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  raw-challenge-denial-mapping:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact existing receipt verifier dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Check original C4b signed gateway nonce path with raw challenge inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/c4b_raw_challenge_evidence_candidate_ci.py \
+            tests/connections/identity_silverblue/test_c4b_raw_challenge_evidence_candidate_ci.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_raw_challenge_evidence_candidate_ci.py
+          echo "C4B_EVIDENCE_HOLD // RAW_32_BYTE_CHALLENGE_NEVER_GRANTS_HOST_AUTH"
+      - name: Preserve original signed denial security behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          echo "C4B_EVIDENCE_HOLD // ORIGINAL_DENIAL_VERIFIER_UNCHANGED"

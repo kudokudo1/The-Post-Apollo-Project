@@ -1075,18 +1075,12 @@ PanelWindow {
 
                 // Inspect the live provider owners without adding another
                 // source or hijacking the existing header status indicator.
-                ActionButton {
+                DiagnosticsDockButton {
                     id: providerDiagnosticsButton
-                    width: 59
-                    height: 32
-                    label: weatherStation.providerDiagnosticsOpen
-                           ? "BACK" : "DIAG"
-                    labelPixelSize: 11
-                    contentPadding: 4
-                    accentColor: Colors.yellow
+                    diagnosticsOpen: weatherStation.providerDiagnosticsOpen
                     available: weatherStation.menuOpen
                                && !weatherStation.contextTerminalRequested
-                    onLeftClicked:
+                    onToggleRequested:
                         weatherStation.providerDiagnosticsOpen =
                             !weatherStation.providerDiagnosticsOpen
                 }

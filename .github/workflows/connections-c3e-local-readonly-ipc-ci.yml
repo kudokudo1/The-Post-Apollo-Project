@@ -55,7 +55,7 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in broker
           print("C3E_IPC_CI_ONLY // NO_NATIVE_LISTENER_OR_CREDENTIAL_ACTIONS")
           PY
-      - name: Run 28 malicious real AF_UNIX forked-process tests
+      - name: Run 46 malicious real AF_UNIX forked-process tests
         shell: bash
         run: |
           set -euo pipefail

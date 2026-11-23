@@ -32,12 +32,13 @@ Even a real separate child process shares the parent host's administrative and b
 
 ## VERIFY // Source and native process failure checks
 
-The new 28-case CI matrix checks:
+The expanded 46-case CI matrix checks:
 - separate forked child reads current disposable test head and issuance/consumption state without promotion;
 - protected-mode status reports HOLD while protected-mode reads refuse, with no fallback to local SQLite;
 - all returned authority flags remain false and there is no production admission endpoint;
 - exact schema and operation, bounded frame size, no duplicate fields, no NaN, no extra fields, malformed JSON, invalid challenge hex and unknown local challenge are rejected;
-- 4-byte length split across multiple writes is reassembled correctly, with a single reply followed by child socket closure;
+- 4-byte length split across multiple writes is reassembled correctly, with a single reply followed by child socket closure, including half-closed incomplete frames and incomplete frames left open until the child read timeout;
+- **strict backend-result allowlists** for each diagnostic operation: a local snapshot, local challenge outcome or protected-HOLD status can carry only its expected fields; unexpected top-level/nested grant claims, missing denial flags, type-confused counters, malformed heads, wrong mode/status/source and inconsistent challenge states are refused and replaced with a fixed deny-only reply;
 - inherited 32-case migration cutover, 28-case storage boundary, 28-case SQLite ledger and 24+22+22+20 original C3e signed-history/enrollment/AF/Z test suites remain intact.
 
 GitHub Actions must confirm the exact PR head and independent Nurse 2 reviews must assess it **before** any operator-authorized merge. The existing RPM regression runs separately and must not be confused with a real NAS service.

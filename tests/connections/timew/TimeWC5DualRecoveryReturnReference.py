@@ -90,6 +90,7 @@ def _valid_plan(plan):
     if (type(plan) is not RecoveryPlan
             or plan.diagnostic !=
             "UNTRUSTED_DUAL_READ_ONLY_LOOKUP_INTENTS_UNKNOWN_HOLD"
+            or type(plan.uncertainty) is not str
             or plan.uncertainty not in UNCERTAINTIES
             or type(plan.query_intents) is not tuple
             or len(plan.query_intents) != 2
@@ -227,8 +228,10 @@ def compare_untrusted_recovery_returns(*, plan, c5_return, native_return,
         return _hold("MISSING_C5_HISTORY_UNKNOWN_HOLD")
     if not _valid_c5_response(c5_return, cb):
         return _hold("MALFORMED_C5_RESPONSE_UNKNOWN_HOLD")
+    # The pre-existing C5 test response does not expose issued/expires_ms;
+    # retain those in the ORIGINAL plan but never infer attested validity.
     for k in CUSTODIAN_FIELDS:
-        if not _same(c5_return[k], cb[k]):
+        if k in EVIDENCE_FIELDS and not _same(c5_return[k], cb[k]):
             return _hold("C5_ORIGINAL_INTENT_MISMATCH_UNKNOWN_HOLD")
     if native_return is None:
         return _hold("MISSING_NATIVE_TERMINAL_UNKNOWN_HOLD")

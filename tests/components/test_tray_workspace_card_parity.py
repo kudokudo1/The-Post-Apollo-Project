@@ -15,7 +15,7 @@ tray = (ROOT / "modules/Tray.qml").read_text(encoding="utf-8")
 def block(source: str, ident: str) -> str:
     """Get the complete QML object containing a unique id, honoring braces."""
     matches = list(re.finditer(
-        rf"(?m)^\\s*id:\\s*{re.escape(ident)}\\s*$", source))
+        rf"(?m)^\s*id:\s*{re.escape(ident)}\s*$", source))
     assert len(matches) == 1, (ident, "expected exactly one owner")
     position = matches[0].start()
     start = source.rfind("{", 0, position)

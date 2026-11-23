@@ -339,6 +339,63 @@ class LocalExactCaptureStore:
         finally:
             conn.close()
 
+    def save_many(self, *, checkpoint_id, captures):
+        """Atomically store one complete caller-supplied local CURRENT set.
+
+        Refuse replacing or extending a checkpoint that already has any v3
+        records. Validate the *entire* candidate before touching SQLite.
+        This is ordinary untrusted data: no live source, C5, or Restore.
+        """
+        checkpoint = _id(checkpoint_id, version=4)
+        if type(captures) not in (list, tuple) or not 1 <= len(captures) <= MAX_RECORDS:
+            _refuse()
+        prepared, seen = [], set()
+        stamp = datetime.now(timezone.utc).isoformat()
+        for item in captures:
+            if (type(item) is not dict or set(item) != {
+                    "window_key", "app_id", "output_id", "workspace_id", "value"}):
+                _refuse()
+            window = _id(item["window_key"])
+            if window in seen:
+                _refuse()
+            seen.add(window)
+            app = _text(item["app_id"])
+            output = _text(item["output_id"])
+            workspace = _text(item["workspace_id"])
+            bits = _capture_value(item["value"])
+            prepared.append((
+                str(uuid.uuid4()), checkpoint, window, app, output,
+                workspace, VALUE_VERSION, PHASE_CURRENT, *bits, stamp,
+            ))
+
+        conn = self._connect(True)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute(
+                "SELECT COUNT(*) FROM exact_captures"
+            ).fetchone()[0]
+            if current + len(prepared) > MAX_RECORDS:
+                _refuse()
+            if conn.execute(
+                "SELECT 1 FROM exact_captures WHERE checkpoint_id=? LIMIT 1",
+                (checkpoint,)
+            ).fetchone() is not None:
+                _refuse()
+            conn.executemany(
+                """INSERT INTO exact_captures
+                   (id,checkpoint_id,window_key,app_id,output_id,workspace_id,
+                    value_version,phase,x_bits,y_bits,width_bits,height_bits,saved_at_utc)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                prepared,
+            )
+            conn.commit()
+            return [row[0] for row in prepared]
+        except (sqlite3.Error, LocalCaptureRefused):
+            conn.rollback()
+            _refuse()
+        finally:
+            conn.close()
+
     def get(self, capture_id):
         identifier = _id(capture_id, version=4)
         conn = self._connect(False)

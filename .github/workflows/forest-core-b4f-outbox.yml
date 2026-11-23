@@ -1,0 +1,39 @@
+name: Forest Core B4f Synthetic Local Terminal Outbox
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/local_terminal_outbox_b4f.py'
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/LOCAL_TERMINAL_OUTBOX_B4F.md'
+      - 'tests/forest/test_local_terminal_outbox_b4f.py'
+      - '.github/workflows/forest-core-b4f-outbox.yml'
+  push:
+    paths:
+      - 'scripts/forest/local_terminal_outbox_b4f.py'
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/LOCAL_TERMINAL_OUTBOX_B4F.md'
+      - 'tests/forest/test_local_terminal_outbox_b4f.py'
+      - '.github/workflows/forest-core-b4f-outbox.yml'
+
+jobs:
+  synthetic-transactional-outbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: New B4f atomic local terminal events and rollback tests
+        run: python3 -m unittest discover -s tests/forest -p 'test_local_terminal_outbox_b4f.py' -v
+      - name: B4e original turn and reply lineage regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_lineage_b4e.py' -v
+      - name: B4d read-only local recovery regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_inspect_b4d.py' -v
+      - name: B3 durable turn and no-retry regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a host admission regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: B4b precommit authorization regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_precommit_b4b.py' -v
+      - name: B4c held permit and lost acknowledgement regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_fenced_commit_b4c.py' -v
+      - name: Python compilation
+        run: python3 -m py_compile scripts/forest/local_terminal_outbox_b4f.py scripts/forest/turn_bridge_b3.py tests/forest/test_local_terminal_outbox_b4f.py

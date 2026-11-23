@@ -166,6 +166,56 @@ function undoLastEntry(state) {
         entries:state.entries.slice(0,-1),nextId:state.nextId};
     return {ok:true,state:updated,undone:removed};
 }
+// M4f // Correct user-entered entries without recycling IDs or changing
+// account ownership. Original values are required as an optimistic concurrency
+// check so a stale editor cannot silently replace another edit.
+function matchManualEntry(state,fields) {
+    if(!validState(state)||state.mode!=="manual")
+        return resultError("MANUAL SESSION REQUIRED");
+    if(!fields||typeof fields.entryId!=="string"
+       ||typeof fields.accountId!=="string")
+        return resultError("SELECT A MANUAL ENTRY");
+    var index=state.entries.findIndex(function(e){return e.id===fields.entryId;});
+    if(index<0)return resultError("MANUAL ENTRY NOT FOUND");
+    var entry=state.entries[index];
+    if(entry.origin!=="manual"||entry.accountId!==fields.accountId)
+        return resultError("MANUAL ACCOUNT/ENTRY MISMATCH");
+    if(entry.date!==fields.expectedDate
+       ||entry.description!==fields.expectedDescription
+       ||entry.amountCents!==fields.expectedAmountCents)
+        return resultError("STALE MANUAL ENTRY // RESELECT BEFORE CHANGING");
+    return {ok:true,index:index,entry:entry};
+}
+function correctEntry(state,fields) {
+    var match=matchManualEntry(state,fields);
+    if(!match.ok)return match;
+    if(!dateValid(fields.date))return resultError("DATE MUST BE YYYY-MM-DD");
+    var description=safeText(fields.description,120);
+    if(!description)return resultError("DESCRIPTION REQUIRED (MAX 120 CHARACTERS)");
+    if(fields.direction!=="in"&&fields.direction!=="out")
+        return resultError("SELECT MONEY IN OR MONEY OUT");
+    var cents=parseCents(fields.amountText,false);
+    if(cents===null||cents===0)return resultError("ENTER A POSITIVE AMOUNT");
+    var fixed={id:match.entry.id,accountId:match.entry.accountId,
+        date:fields.date,description:description,
+        amountCents:fields.direction==="out"?-cents:cents,origin:"manual"};
+    var entries=state.entries.slice();
+    entries[match.index]=fixed;
+    var updated={mode:"manual",accounts:state.accounts.slice(),
+        entries:entries,nextId:state.nextId};
+    return validState(updated)?{ok:true,state:updated,corrected:fixed}
+        :resultError("CORRECTION EXCEEDS SESSION BALANCE/AMOUNT LIMIT");
+}
+function deleteEntry(state,fields) {
+    var match=matchManualEntry(state,fields);
+    if(!match.ok)return match;
+    var entries=state.entries.slice();
+    entries.splice(match.index,1);
+    var updated={mode:"manual",accounts:state.accounts.slice(),
+        entries:entries,nextId:state.nextId};
+    return validState(updated)?{ok:true,state:updated,deleted:match.entry}
+        :resultError("ENTRY COULD NOT BE REMOVED");
+}
 function sampleDemo() {
     var state={mode:"demo",nextId:20,accounts:[
         {id:"demo-1",providerId:"cashapp",productId:"cash-balance",

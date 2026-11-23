@@ -78,7 +78,8 @@ Scope {
         return true;
     }
     function chooseListing(row) {
-        if (!monitoring || reader.running || state!=="candidates"
+        if (!monitoring || reader.running
+                || !["candidates","selected","ready","failed"].includes(state)
                 || !row || !candidates.some(function(x) {
                     return x.symbol===row.symbol
                         && x.name===row.name && x.currency===row.currency

@@ -14,6 +14,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 from PySide6.QtCore import QObject, QMetaObject, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
+from PySide6.QtQuick import QQuickItem
 
 
 app = QGuiApplication([])
@@ -53,12 +54,28 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         pane = root.findChild(QObject, "actualCategoriesPane")
         assert pane is not None, "real Categories pane was not instantiated"
 
+        def visual_descendants(item):
+            found = []
+            for child in item.childItems():
+                found.append(child)
+                found.extend(visual_descendants(child))
+            return found
+
+        def matching_items(name):
+            return [item for item in visual_descendants(pane)
+                    if item.objectName() == name]
+
         def group_labels():
             return sorted(str(prop(x, "text")) for x in
-                pane.findChildren(QObject, "categoryGroupCountLabel"))
+                          matching_items("categoryGroupCountLabel"))
 
         def rename_actions():
-            return pane.findChildren(QObject, "categoryGroupRenameAction")
+            return matching_items("categoryGroupRenameAction")
+
+        print("Qt fixture groups:", str(prop(pane, "groups"))[:500],
+              "visual children:", len(visual_descendants(pane)),
+              "label nodes:", len(matching_items("categoryGroupCountLabel")),
+              flush=True)
 
         assert group_labels() == [
             "Empty // 0 CATEGORIES", "Needs // 1 CATEGORIES",

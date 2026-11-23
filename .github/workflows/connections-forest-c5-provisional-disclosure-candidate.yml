@@ -1,0 +1,84 @@
+name: Connections Forest C5 separate provisional disclosure candidate (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - "services/connections/forest/ForestC5ProvisionalDisclosurePreflight.py"
+      - "tests/connections/test_connections_forest_c5_provisional_disclosure_preflight.py"
+      - "docs/connections-forest-c5-provisional-disclosure-candidate.md"
+      - ".github/workflows/connections-forest-c5-provisional-disclosure-candidate.yml"
+      - "services/connections/forest/ForestC5ExactSessionV1Preflight.py"
+      - "scripts/forest/turn_bridge_b3.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provisional-candidate-is-not-permission:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing C5 V1 Ed25519 verification dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile and deny native actuation
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5ProvisionalDisclosurePreflight.py \
+            tests/connections/test_connections_forest_c5_provisional_disclosure_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path("services/connections/forest/ForestC5ProvisionalDisclosurePreflight.py").read_text()
+          for expected in (
+              'DISCLOSE_PROVISIONAL',
+              'CANDIDATE_MATCHES_ORIGINAL_SCOPE_NO_PROTECTED_PERMISSION_HOLD',
+              'UNTRUSTED_DELTA_SUPPRESSED_NO_C5_DISCLOSURE_PERMISSION_HOLD',
+              '"safeToEmitProvisionalText": False',
+              '"c5ProvisionalDisclosureCurrentRevocationVerified": False',
+              '"emitEvent": None', '"emittedBytes": 0',
+              '"safeToCommitForestReply": False',
+          ):
+              assert expected in src, expected
+          for forbidden in (
+              'sqlite3.connect(', 'socket.socket(', 'subprocess.',
+              'requests.post(', 'httpx.', 'Ed25519PrivateKey',
+              'os.system(', 'stream_chat(',
+              '"safeToEmitProvisionalText": True',
+              '"safeToCommitForestReply": True',
+          ):
+              assert forbidden not in src, forbidden
+          for owner_file in (
+              "scripts/forest/turn_bridge_b3.py",
+              "scripts/forest/local_terminal_outbox_b4f.py",
+              "scripts/forest/recovery_outbox_expectation_b4g.py",
+          ):
+              assert "ForestC5ProvisionalDisclosurePreflight" not in Path(owner_file).read_text()
+          print("C5_DISCLOSURE_CANDIDATE_SOURCE_ONLY // NO_PERMISSION_ISSUANCE")
+          PY
+      - name: 26 adversarial candidate and real B3 DELTA drop tests
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_provisional_disclosure_preflight.py' -v
+      - name: Preserve existing V1 and Forest B4f, B4g, B4c contracts
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_exact_session_v1_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_local_terminal_outbox_b4f.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_recovery_expectation_b4g.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_fenced_commit_b4c.py' -v
+          echo 'C5_DISCLOSURE_CANDIDATE_IS_UNTRUSTED // FOREST_PRODUCTION_HOLD'

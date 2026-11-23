@@ -58,8 +58,12 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        text: "25/DAY FREE // LOCAL PANEL ATTEMPTS "
+        text: "25/DAY FREE // PANEL ATTEMPTS "
             +av.requestsThisRuntime+"/25 (NOT ACCOUNT REMAINING)"
+            +(av.sharedQuota
+                ? "\nLOCAL SHARED RESERVED "+av.sharedQuota.reserved
+                    +"/"+av.sharedQuota.limit+" // "+av.sharedQuota.utcDay
+                : "\nLOCAL SHARED RESERVATION NOT YET READ")
         textFormat: Text.PlainText
         color: Colors.orange
         font.pixelSize: 9

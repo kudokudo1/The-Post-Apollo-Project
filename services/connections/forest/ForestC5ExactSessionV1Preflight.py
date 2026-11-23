@@ -9,6 +9,7 @@ This module is NOT installed, and every returned authority flag is False.
 from __future__ import annotations
 
 import hashlib
+from types import MappingProxyType
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -25,14 +26,14 @@ INTENT_FIELDS = S.INTENT_FIELDS | frozenset(("sessionId",))
 ROLE_FIELDS = S.RECORD_FIELDS
 RECEIPT_FIELDS = R.RECEIPT_FIELDS | frozenset(("sessionId",))
 # Keep role/audience distinct from any C3e Sign-In, Hospital or TimeW grant.
-NO_AUTHORITY = {
+NO_AUTHORITY = MappingProxyType({
     **A.NO_AUTHORITY,
     "v1SignerRootsIndependentlyEnrolled": False,
     "v1SessionFromOriginalWriterAuthenticated": False,
     "v1WriterTerminalOutcomeProven": False,
     "v1IndependentJournalFloorVerified": False,
     "v1NativeRevocationAndDisclosureVerified": False,
-}
+})
 
 
 class V1Hold(ValueError):

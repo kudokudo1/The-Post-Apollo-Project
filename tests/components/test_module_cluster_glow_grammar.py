@@ -139,6 +139,10 @@ assert "id: trayButtonBackground" in tray
 assert "safeSource: trayButtonBackground" in tray
 assert "id: trayButtonBackgroundGlow" in tray
 assert "id: trayActiveIconGlow" in tray
+# Both sampled halos must be magenta on a visible app. Leaving cyan behind
+# magenta over the same icon can visually desaturate toward white.
+assert "color: trayButton.appOnDesktop ? Colors.magenta : Colors.cyan" in tray
+assert "color: Colors.cyan" not in tray
 assert tray.count("safeSource: trayIcon") == 2
 assert "trayButton.appOnDesktop ? Colors.magenta" in tray
 assert "readonly property bool cardEmphasized: trayButton.appOnDesktop" in tray

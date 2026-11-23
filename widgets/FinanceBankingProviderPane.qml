@@ -180,6 +180,42 @@ Item {
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
         }
+        Column {
+            width: parent.width
+            spacing: 5
+            visible: providerPane.details.ok
+                &&(providerPane.details.sectionKind==="accounts"
+                    ||providerPane.details.sectionKind==="product")
+                &&providerPane.details.visibleAccounts.length>0
+            GohuText {
+                width: parent.width
+                text: "CASH ACCOUNTS // SESSION MONEY MOVEMENT"
+                font.pixelSize: 10
+                font.bold: true
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: "MONEY IN "+ProviderPolicy.money(providerPane.details.visibleMovementInCents)
+                    +" // MONEY OUT "+ProviderPolicy.money(providerPane.details.visibleMovementOutCents)
+                    +" // NET "+ProviderPolicy.money(providerPane.details.visibleMovementNetCents)
+                font.pixelSize: 10
+                color: Colors.white
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: providerPane.details.visibleTransactionCount
+                    +" MANUAL/DEMO ENTRIES IN THIS SESSION // NOT VERIFIED INCOME, SPENDING OR TRANSFERS"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+        }
         Repeater {
             model: providerPane.details.ok?providerPane.details.visibleAccounts:[]
             delegate: Rectangle {
@@ -218,6 +254,16 @@ Item {
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
                     }
+                    GohuText {
+                        width: parent.width
+                        text: "SESSION IN "+ProviderPolicy.money(modelData.creditsCents)
+                            +" // OUT "+ProviderPolicy.money(modelData.debitsCents)
+                            +" // "+modelData.transactionCount+" ENTRIES"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
                     ActionButton {
                         width: parent.width
                         height: 28
@@ -227,6 +273,55 @@ Item {
                         onLeftClicked: providerPane.accountRequested(modelData.id)
                     }
                 }
+            }
+        }
+        Column {
+            width: parent.width
+            spacing: 5
+            visible: providerPane.details.ok
+                &&(providerPane.details.sectionKind==="accounts"
+                    ||providerPane.details.sectionKind==="product")
+                &&providerPane.details.visibleAccounts.length>0
+            GohuText {
+                width: parent.width
+                text: "RECENT SESSION ACTIVITY // UP TO 4 ENTRIES"
+                font.pixelSize: 10
+                font.bold: true
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.details.visibleRecent.length===0
+                text: "NO MANUAL OR FICTIONAL ACTIVITY RECORDED FOR THESE CASH ACCOUNTS"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Repeater {
+                model: providerPane.details.visibleRecent
+                delegate: GohuText {
+                    required property var modelData
+                    width: providerContent.width
+                    text: modelData.date+" // "+modelData.nickname
+                        +" // "+ProviderPolicy.money(modelData.amountCents)
+                        +" // "+modelData.description
+                    font.pixelSize: 9
+                    color: modelData.amountCents<0?Colors.orange:Colors.omnitrix
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.details.visibleRecentOmitted
+                text: "MORE OR OLDER ENTRIES EXIST // OPEN ACTIVITY TO INSPECT RECENT SESSION RECORDS"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
             }
         }
         Column {

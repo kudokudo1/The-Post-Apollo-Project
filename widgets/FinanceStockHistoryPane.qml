@@ -24,6 +24,10 @@ Item {
     readonly property var dayResult: dayMode && snapshot
         ? StockModePolicy.daySession(snapshot, stockFeed.dayDate) : null
     property int selectedPointIndex: -1
+    // M30: a private in-memory pin, tied to the exact loaded snapshot object.
+    // Never save a bare index across range, issuer, date or mode transitions.
+    property int pinnedPointIndex: -1
+    property var pinnedSnapshot: null
     // M28: local session-only display choice; never changes provider readers.
     property bool showAverages: false
     readonly property var inspectedPoint: !dayMode
@@ -49,6 +53,33 @@ Item {
         && selectedPointIndex >= 0
         ? RangeAnalysisPolicy.compareSelectedToLast(snapshot, selectedPointIndex)
         : null
+    readonly property bool pinValid: !dayMode && rangeAnalysis !== null
+        && pinnedSnapshot !== null && pinnedSnapshot === snapshot
+        && pinnedPointIndex >= 0 && pinnedPointIndex < priceBars.length
+    readonly property var pinnedPoint: pinValid
+        ? ChartPointPolicy.selectedBar(priceBars, pinnedPointIndex) : null
+    readonly property var pinnedPairComparison: pinValid
+        && selectedPointIndex >= 0
+        && selectedPointIndex !== pinnedPointIndex
+        ? RangeAnalysisPolicy.comparePinnedRangeSessions(
+            snapshot, pinnedPointIndex, selectedPointIndex) : null
+
+    function clearPinnedComparison() {
+        pinnedPointIndex = -1;
+        pinnedSnapshot = null;
+    }
+    function pinCurrentPoint() {
+        if (dayMode || rangeAnalysis === null || inspectedPoint === null)
+            return;
+        pinnedSnapshot = snapshot;
+        pinnedPointIndex = selectedPointIndex;
+    }
+    onSnapshotChanged: clearPinnedComparison()
+    onRangeAnalysisChanged: {
+        if (rangeAnalysis === null) clearPinnedComparison();
+    }
+    onPinnedPointIndexChanged: priceCanvas.requestPaint()
+    onPinValidChanged: priceCanvas.requestPaint()
 
     function inspectChartPoint(x, y) {
         if (dayMode || !snapshot || priceBars.length < 2
@@ -61,10 +92,12 @@ Item {
     }
     onPriceBarsChanged: {
         selectedPointIndex = -1;
+        clearPinnedComparison();
         priceCanvas.requestPaint();
     }
     onDayModeChanged: {
         selectedPointIndex = -1;
+        clearPinnedComparison();
         priceCanvas.requestPaint();
     }
     onSelectedPointIndexChanged: priceCanvas.requestPaint()
@@ -591,6 +624,24 @@ Item {
                                 ctx.fill();
                             }
                         }
+                        // Pinned A survives deselecting B, but never survives
+                        // changing the underlying loaded RANGE or DAY mode.
+                        if (stocks.pinnedPoint !== null) {
+                            const p = ChartPointPolicy.pointAt(
+                                bars, width, height, stocks.pinnedPointIndex);
+                            if (p) {
+                                ctx.beginPath();
+                                ctx.moveTo(p.x,0);
+                                ctx.lineTo(p.x,height);
+                                ctx.strokeStyle="#F2D24D";
+                                ctx.lineWidth=1;
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.arc(p.x,p.y,3.5,0,Math.PI*2);
+                                ctx.fillStyle="#F2D24D";
+                                ctx.fill();
+                            }
+                        }
                         if (stocks.inspectedPoint !== null) {
                             const point = ChartPointPolicy.pointAt(
                                 bars, width, height, stocks.selectedPointIndex);
@@ -681,7 +732,7 @@ Item {
             GohuText {
                 width: parent.width
                 visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED"
+                text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9
@@ -732,6 +783,93 @@ Item {
                             + "\nOBSERVED SESSION STEPS "
                             + stocks.selectedCloseComparison.sessionSteps
                             + "\nNOT A LIVE QUOTE // NO NEW REQUEST")
+                        : ""
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 11
+                    color: Colors.white
+                }
+            }
+            Row {
+                id: pinnedActions
+                objectName: "marketPinnedSessionActions"
+                width: parent.width
+                visible: !stocks.dayMode && stocks.rangeAnalysis !== null
+                    && (stocks.inspectedPoint !== null || stocks.pinValid)
+                height: visible ? 30 : 0
+                spacing: 8
+                ActionButton {
+                    objectName: "marketPinSessionButton"
+                    visible: stocks.inspectedPoint !== null
+                    width: 132
+                    height: 29
+                    label: "PIN AS A"
+                    labelPixelSize: 10
+                    accentColor: Colors.orange
+                    available: visible && stocks.rangeAnalysis !== null
+                    onLeftClicked: stocks.pinCurrentPoint()
+                }
+                ActionButton {
+                    objectName: "marketClearPinButton"
+                    visible: stocks.pinValid
+                    width: 116
+                    height: 29
+                    label: "CLEAR PIN A"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    available: stocks.pinValid
+                    onLeftClicked: stocks.clearPinnedComparison()
+                }
+            }
+            GohuText {
+                objectName: "marketPinnedSessionHint"
+                width: parent.width
+                visible: stocks.pinValid
+                text: stocks.pinnedPoint
+                    ? ("PINNED A // " + stocks.pinnedPoint.date + " // $"
+                        + stocks.pinnedPoint.price.toFixed(2)
+                        + "\nCLICK ANOTHER CHART CLOSE TO CHOOSE B. "
+                        + "YELLOW = PINNED A // ORANGE = SELECTED B.")
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.orange
+            }
+            Rectangle {
+                objectName: "marketPinnedPairComparisonPanel"
+                width: parent.width
+                visible: stocks.pinnedPairComparison !== null
+                height: visible ? pinnedPairText.implicitHeight + 22 : 0
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                GohuText {
+                    id: pinnedPairText
+                    objectName: "marketPinnedPairComparisonText"
+                    anchors.top: parent.top
+                    anchors.topMargin: 9
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    text: stocks.pinnedPairComparison
+                        ? ("PINNED A VS SELECTED B // "
+                            + stocks.pinnedPairComparison.priceBasis
+                            + "\nA " + stocks.pinnedPairComparison.start.date
+                            + " // $" + stocks.pinnedPairComparison.start.price.toFixed(2)
+                            + "\nB " + stocks.pinnedPairComparison.end.date
+                            + " // $" + stocks.pinnedPairComparison.end.price.toFixed(2)
+                            + "\nB MINUS A // "
+                            + (stocks.pinnedPairComparison.deltaPrice < 0 ? "-$" : "+$")
+                            + Math.abs(stocks.pinnedPairComparison.deltaPrice).toFixed(2)
+                            + " // "
+                            + (stocks.pinnedPairComparison.deltaPct > 0 ? "+" : "")
+                            + stocks.pinnedPairComparison.deltaPct.toFixed(2) + "%"
+                            + "\nOBSERVED SESSION STEPS "
+                            + stocks.pinnedPairComparison.observedSteps
+                            + " // " + stocks.pinnedPairComparison.order
+                            + "\nLOADED CLOSES ONLY // NO NEW REQUEST")
                         : ""
                     textFormat: Text.PlainText
                     wrapMode: Text.WordWrap

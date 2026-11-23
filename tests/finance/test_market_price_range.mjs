@@ -199,3 +199,5 @@ await import("./test_market_m26_range_analysis.mjs");
 await import("./test_market_m28_moving_averages.mjs");
 // M29: descriptive historical SMA 5-vs-20 side changes, no new API.
 await import("./test_market_m29_sma_relationship.mjs");
+// M30: pin A, select B, compare two already-loaded historical closes.
+await import("./test_market_m30_two_point_compare.mjs");

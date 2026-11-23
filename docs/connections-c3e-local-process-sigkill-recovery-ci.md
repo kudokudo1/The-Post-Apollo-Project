@@ -24,7 +24,7 @@ A deliberate backup/restore attack copies the pre-commit development database, k
 
 Every recovery report uses `LOCAL_PROCESS_CRASH_OBSERVATION_NOT_PROTECTED_SETTLEMENT`, recommends `HOLD_NO_AUTOMATIC_RETRY_INDEPENDENT_CUSTODIAN_REQUIRED`, and requires all original C3e admission, signer, host, C5, credential, production, externally current history, terminal receipt, noncommit proof and safe retry flags to be **false**.
 
-This test-specific wrapper is not a frozen future NAS protocol or production crash-injection hook. It is never installed or imported by a live service.
+This test-specific wrapper is not a frozen future NAS protocol or production crash-injection hook. It is never installed or imported by a live service. The destructive SIGKILL trap additionally checks that the helper runs in a forked child, not the importing test process, so accidental direct calls fail closed.
 
 ## HOW TO USE
 
@@ -41,7 +41,7 @@ No existing C3e writer, IPC, root verifier, C4b installed gateway, C5 consent, F
 
 ## VERIFY
 
-Sixteen new hostile/positive-development tests cover actual kill before/after `COMMIT`, re-opening from another process, local issued-versus-consumed observations, replay refusal after an unrolled-back commit, deliberate full-DB restore/replay despite a previously committed transaction, permanent false authority fields, hosted-CI guard and production-recovery refusal. Tests do **not** treat a locally `issued` challenge as proof that some separate protected command never ran.
+Seventeen new hostile/positive-development tests cover actual kill before/after `COMMIT`, re-opening from another process, local issued-versus-consumed observations, replay refusal after an unrolled-back commit, deliberate full-DB restore/replay despite a previously committed transaction, permanent false authority fields, hosted-CI guard and production-recovery refusal. Tests do **not** treat a locally `issued` challenge as proof that some separate protected command never ran.
 
 The dedicated workflow also reruns the merged **30 IPC non-settlement +20 Linux peer-origin +46 local IPC +32 cutover +28 storage-independent +28 SQLite ledger +24 signed-history +22 enrollment +22 AF +20 release Z = 272 inherited tests**, plus Grammar, root-pinned admission and fake RPM guest workflows on the same exact PR head. Only after exact-head checks and independent Nurse 2 review can this test-only milestone be considered a scoped source/CI PASS.
 

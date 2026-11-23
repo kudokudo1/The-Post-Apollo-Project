@@ -277,22 +277,17 @@ class NativeIssuerSecurity(unittest.TestCase):
                     self.request,self.nonce,self.policy,self.now)
             self.prepared[field]=old
 
-    def test_31_native_step_sequenced_actual_polkit_px_writer_and_signing(self):
-        """Exercise the real orchestration with OS-boundaries mocked for CI."""
+    def test_31_native_step_polkit_success_still_refuses_without_trusted_consent(self):
+        """Actual native orchestration cannot turn a mocked Polkit PASS into a grant."""
         peer=(4321,1000,1000,54321)
         calls=[]
-        class FakeClient:
-            pass
-        client=FakeClient()
         prepared=C.canonical(self.prepared)
         def writer(policy,data):
             calls.append(("writer",data["kind"]))
             if data["kind"]=="prepare":
                 self.assertEqual(data["requestNonce"],self.nonce)
                 return prepared
-            self.assertEqual(data["kind"],"commit")
-            self.assertIn('"signature":',data["signedGrant"])
-            return C.canonical(self.receipt(data["signedGrant"].encode("ascii")))
+            self.fail("PX COMMIT must never be reached without trusted consent")
         def polkit(request,prepared,peer,seat):
             calls.append(("polkit",request["action"]))
         with patch.object(S,"_peer",return_value=peer), \
@@ -303,13 +298,15 @@ class NativeIssuerSecurity(unittest.TestCase):
              patch.object(S,"_polkit_approve",side_effect=polkit), \
              patch.object(C,"host_fingerprint",return_value="c"*64), \
              patch.object(C,"read_policy",return_value=self.policy), \
-             patch.object(C,"load_installed_key",return_value=self.key), \
+             patch.object(C,"load_installed_key") as key, \
+             patch.object(C,"sign_px_grant") as sign, \
              patch.object(S.os,"urandom",side_effect=lambda n:bytes(range(n))):
-            # _native_step generates its own nonce before calling PX.
-            out=S._native_step(client,self.policy)
-        self.assertEqual(out["status"],"COMMITTED")
-        self.assertEqual(calls,[("writer","prepare"),("polkit","TRASH"),
-                                ("writer","commit")])
+            with self.assertRaisesRegex(
+                    C.Refused,"INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE"):
+                S._native_step(object(),self.policy)
+        key.assert_not_called()
+        sign.assert_not_called()
+        self.assertEqual(calls,[("writer","prepare"),("polkit","TRASH")])
 
     def test_32_native_wrong_operator_refused_before_polkit(self):
         with patch.object(S,"_peer",return_value=(1234,1001,1001,10)),\

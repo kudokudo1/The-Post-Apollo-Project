@@ -189,3 +189,5 @@ await import("./test_openfigi_stock_search.mjs");
 await import("./test_global_free_price_bridge.mjs");
 // M19: second free global provider and local request-quota regression.
 await import("./test_alpha_vantage_free.mjs");
+// M20: durable, cross-process local-only reservation guard and adversarial tests.
+await import("./test_market_shared_quota.mjs");

@@ -109,8 +109,11 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("preferredGlowColor: treeRow.resolvedIconGlowColor", view)
         self.assertIn("hoverForegroundColor: Colors.orange", view)
         self.assertIn("pressedForegroundColor: Colors.magenta", view)
-        self.assertIn("border.color: treeRow.open || treeRow.pressed || treeRow.hovered", view)
-        self.assertIn("? treeRow.dockGlowColor : treeRow.iconIdentityColor", view)
+        self.assertIn("id: treeGradientBorder", view)
+        self.assertIn("border.width: 0", view)
+        self.assertIn("baseColor: treeRow.foregroundColor", view)
+        self.assertIn("accentColor: modelData.gradientAccentColor", view)
+        self.assertIn("accentTopRight: modelData.gradientTopRight", view)
         self.assertIn("color: treeRow.foregroundColor", view)
         self.assertIn("id: treeNameGlow", view)
         self.assertIn("safeSource: treeName", view)
@@ -227,13 +230,18 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn('property var selectedTreeModels: ["", "", "", "", ""]', view)
         self.assertIn('text: "TREES // " + String(root.treeSlots.length).padStart(2, "0")', view)
         tree_profiles = (
-            ("CHERRY", "cherry-outline.svg", "white", "magenta", "magenta"),
-            ("MAPLE", "maple-outline.svg", "orange", "red", "red"),
-            ("BRISTLECONE PINE", "bristlecone-pine.png", "white", "orange", "green"),
-            ("CEDAR", "cedar-outline.svg", "green", "orange", "orange"),
-            ("MACINTOSH", "macintosh-outline.svg", "green", "red", "red"),
+            ("CHERRY", "cherry-outline.svg", "GENERAL // ASSISTANT",
+             "white", "magenta", "magenta", '"#EE76B2"', False),
+            ("MAPLE", "maple-outline.svg", "FILES // ORGANIZATION",
+             "orange", "red", "red", '"#C7482F"', True),
+            ("BRISTLECONE PINE", "bristlecone-pine.png", "TREEWRITE // CODER",
+             "white", "orange", "green", "Colors.green", False),
+            ("CEDAR", "cedar-outline.svg", "SECURITY // PROTECTION",
+             "green", "orange", "orange", "Colors.orange", False),
+            ("MACINTOSH", "macintosh-outline.svg", "TECH // SUPPORT",
+             "green", "red", "red", "Colors.red", False),
         )
-        for name, asset, foreground, icon_glow, spiritual_glow in tree_profiles:
+        for name, asset, role, foreground, icon_glow, spiritual_glow, accent, right in tree_profiles:
             with self.subTest(tree=name):
                 self.assertEqual(view.count('name: "' + name + '", role:'), 1)
                 self.assertIn('iconPath: "../assets/forest/' + asset + '"', view)
@@ -242,11 +250,11 @@ class ForestLauncherContract(unittest.TestCase):
                 self.assertIn('identityColor: Colors.' + foreground, block)
                 self.assertIn('iconIdleGlowColor: Colors.' + icon_glow, block)
                 self.assertIn('spiritualIdleGlowColor: Colors.' + spiritual_glow, block)
+                self.assertIn('gradientAccentColor: ' + accent, block)
+                self.assertIn('gradientTopRight: ' +
+                              ('true' if right else 'false'), block)
+                self.assertIn('"' + role + '"', block)
                 self.assertTrue((ROOT / "assets/forest" / asset).is_file())
-        for name in ("BRISTLECONE PINE", "CEDAR", "MACINTOSH"):
-            block = view.split('name: "' + name + '", role:', 1)[1].split(
-                '        }', 1)[0]
-            self.assertIn('"ROLE // NOT ASSIGNED"', block)
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property var activeChatSessions: []", view)
         self.assertIn("source: Qt.resolvedUrl(root.activeTree.iconPath)", view)
@@ -269,8 +277,8 @@ class ForestLauncherContract(unittest.TestCase):
                       glyph_block)
         self.assertIn("preferredGlowColor: treeRow.contentGlowColor", name_block)
         self.assertIn("foregroundColor: treeRow.foregroundColor", name_block)
-        self.assertIn("? treeRow.dockGlowColor : treeRow.iconIdentityColor",
-                      tree_block)
+        self.assertIn("border.width: 0", tree_block)
+        self.assertIn("id: treeGradientBorder", tree_block)
         # The selected Tree title continues to use the resolved button glow,
         # while the preview icon keeps the icon's independent idle hue.
         self.assertIn("root.selectedTreeButton.contentGlowColor", view)
@@ -342,6 +350,60 @@ class ForestLauncherContract(unittest.TestCase):
                 self.assertNotIn(el.tag, {ns + "image", ns + "foreignObject",
                                           ns + "script", ns + "filter", ns + "mask"})
 
+    def test_tree_corner_gradients_reuse_identity_and_resolved_state(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        ring = (ROOT / "widgets/ForestCornerGradientBorder.qml").read_text()
+        name = (ROOT / "widgets/ForestGradientName.qml").read_text()
+
+        self.assertEqual(view.count("ForestCornerGradientBorder {"), 1)
+        self.assertEqual(view.count("ForestGradientName {"), 2)
+        self.assertIn("baseColor: treeRow.foregroundColor", view)
+        self.assertIn("accentColor: modelData.gradientAccentColor", view)
+        self.assertIn("accentTopRight: modelData.gradientTopRight", view)
+        self.assertIn("text: modelData.name", view)
+        self.assertIn('text: root.activeTree.name + " // CHAT"', view)
+        self.assertIn("accentColor: root.activeTree.gradientAccentColor", view)
+        self.assertIn("accentTopRight: root.activeTree.gradientTopRight", view)
+        self.assertIn("root.selectedTreeButton.foregroundColor", view)
+        self.assertIn("safeSource: treeName", view)
+        self.assertIn("safeSource: chatHeading", view)
+        self.assertIn("foregroundColor: chatHeading.baseColor", view)
+        self.assertIn("root.selectedTreeButton.contentGlowColor", view)
+        self.assertIn("root.selectedTreeButton.contentGlowOpacity", view)
+
+        # The corner border is an even-odd 1px ring, not a filled overlay.
+        # It retains the existing yellow open fill and shared button input.
+        self.assertIn("import QtQuick.Shapes", ring)
+        self.assertIn("fillRule: ShapePath.OddEvenFill", ring)
+        self.assertIn("PathMove { x: root.lineWidth; y: root.lineWidth }", ring)
+        self.assertIn("strokeWidth: -1", ring)
+        self.assertIn("fillGradient: RadialGradient {", ring)
+        self.assertIn("centerX: root.accentTopRight ? root.width : 0", ring)
+        self.assertIn("color: root.accentColor", ring)
+        self.assertIn("color: root.baseColor", ring)
+        self.assertNotIn("MouseArea {", ring)
+        self.assertNotIn("Process {", ring)
+        self.assertNotIn("ShaderEffect {", ring)
+        self.assertIn("border.width: 0", view)
+        self.assertIn("open: index === root.selectedTreeIndex", view)
+
+        # The gradient is masked through the real GohuFont glyph and then
+        # source-sampled by the pre-existing Tree and chat title glows.
+        self.assertIn("import Qt5Compat.GraphicalEffects", name)
+        self.assertIn("GohuText {", name)
+        self.assertIn("text: root.text", name)
+        self.assertIn("textFormat: Text.PlainText", name)
+        self.assertIn("elide: Text.ElideRight", name)
+        self.assertIn("OpacityMask {", name)
+        self.assertIn("source: radialInk", name)
+        self.assertIn("maskSource: inkMask", name)
+        self.assertIn("fillGradient: RadialGradient {", name)
+        self.assertIn("centerX: root.accentTopRight ? root.width : 0", name)
+        self.assertIn("color: root.accentColor", name)
+        self.assertIn("color: root.baseColor", name)
+        self.assertNotIn("MouseArea {", name)
+        self.assertNotIn("Process {", name)
+
     def test_header_rescan_reuses_reload_without_host_activation(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         reload_button = (ROOT / "components/ReloadButton.qml").read_text()
@@ -381,7 +443,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("treeSelectorRepeater.itemAt(selectedTreeIndex)", view)
         self.assertIn("id: chatHeadingGlow", view)
         self.assertIn("safeSource: chatHeading", view)
-        self.assertIn("foregroundColor: chatHeading.color", view)
+        self.assertIn("foregroundColor: chatHeading.baseColor", view)
         self.assertIn("root.selectedTreeButton.foregroundColor", view)
         self.assertIn("root.selectedTreeButton.contentGlowColor", view)
         self.assertIn("root.selectedTreeButton.contentGlowOpacity", view)

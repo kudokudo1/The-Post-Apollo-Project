@@ -1,4 +1,4 @@
-name: FinanceW Market M26 loaded-range movement statistics
+name: FinanceW Market M26-M27 loaded range and selected close comparisons
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - "tests/finance/test_market_m26_range_analysis.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
+      - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "tests/finance/test_market_m26_range_analysis.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
+      - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   workflow_dispatch:
 
@@ -25,7 +27,7 @@ permissions:
 
 jobs:
   loaded-range-analysis:
-    name: Derived daily closes and chronological drawdown; no provider calls
+    name: Loaded range movement + selected-to-last close; no provider calls
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -33,7 +35,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Pure Market M26 range movement, malformed source and UI contracts
+      - name: Pure Market M26-M27 range movement/selected compare, malformed source and UI contracts
         run: node tests/finance/test_market_m26_range_analysis.mjs
-      - name: Existing M10-M26 Market price-range regression chain
+      - name: Existing M10-M27 Market price-range regression chain
         run: node tests/finance/test_market_price_range.mjs

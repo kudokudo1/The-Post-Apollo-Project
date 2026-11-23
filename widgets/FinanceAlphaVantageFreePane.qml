@@ -111,7 +111,6 @@ Rectangle {
                 labelPixelSize: 10
                 accentColor: Colors.cyan
                 available: avPane.active && !!av.identity && !av.loading
-                    && av.remainingRuntimeAllowance>0
                 onLeftClicked: {
                     if(av.lookup())avScroll.contentY=0;
                 }
@@ -244,7 +243,7 @@ Rectangle {
                 labelPixelSize: 9
                 accentColor: Colors.magenta
                 available: avPane.active && !!av.selectedListing
-                    && !av.loading && av.remainingRuntimeAllowance>0
+                    && !av.loading
                 onLeftClicked: av.loadHistory()
             }
             GohuText {

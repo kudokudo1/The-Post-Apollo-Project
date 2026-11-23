@@ -113,6 +113,25 @@ Item {
         }
         GohuText {
             width: parent.width
+            visible: providerPane.details.ok && providerPane.details.sectionKind==="product"
+            text: providerPane.details.visibleBalanceCents!==null
+                ? (providerPane.accountSnapshot.mode==="demo"
+                   ? "FICTIONAL SELECTED PRODUCT BALANCE // ":"MANUAL SELECTED PRODUCT ESTIMATE // ")
+                   +ProviderPolicy.money(providerPane.details.visibleBalanceCents)
+                : providerPane.details.visibleAccounts.length===0
+                  ? "NO MANUAL ACCOUNT MATCHES THIS PRODUCT"
+                  : "SELECTED PRODUCT HAS UNKNOWN BALANCE // KNOWN SUBTOTAL "
+                    +ProviderPolicy.money(providerPane.details.visibleKnownBalanceSubtotalCents)
+                    +" // "+providerPane.details.visibleUnknownBalanceCount+" UNKNOWN"
+            font.pixelSize: 10
+            font.bold: true
+            color: providerPane.details.visibleBalanceCents===null
+                ? Colors.orange:Colors.omnitrix
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
             text: "CASH ACCOUNTS ONLY // STOCKS, CREDIT AND BORROWING ARE NOT INCLUDED IN CASH TOTALS"
             font.pixelSize: 9
             color: Colors.orange

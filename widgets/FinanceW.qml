@@ -1935,6 +1935,12 @@ FinanceCategoriesPane {
     writeMessage: financeCategoryWrite.message
     groupWriteState: financeCategoryGroupWrite.state
     groupWriteMessage: financeCategoryGroupWrite.message
+    externalWriteBusy: financeWrite.state==="pending"
+        || financeWrite.state==="uncertain"
+        || financeAllocationWrite.state==="pending"
+        || financeAllocationWrite.state==="uncertain"
+        || financeFundingWrite.state==="pending"
+        || financeFundingWrite.state==="uncertain"
     onGroupSaveRequested: function(payload) {
         if(financeBudget.state==="ready" && financeBudget.snapshot
                 && payload

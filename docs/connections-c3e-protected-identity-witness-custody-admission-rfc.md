@@ -9,6 +9,8 @@
 
 This is a **decision and implementation interface**, not an enrollment, a real signed authority, an enabled service, a new wire protocol, or a proposed relaxation of the existing fail-closed application.
 
+**OPERATOR DEVELOPMENT DIRECTION (ACCEPTED):** Build a **Local Development Ledger** first, using SQLite and disposable test keys on existing hardware, then move to an **Independent Trust Custodian** on separately protected NAS/other Post-Apollo computing infrastructure when available. This selects the *development sequence only*. It does **not** approve local records as real production authority, a final custodian machine or root, migration cutover, or Sign-In activation. The concrete storage, roles, cutover, rejection tests and recovery plan are documented in [Local Development Ledger → Independent Trust Custodian migration plan](./connections-c3e-local-development-to-independent-custodian-migration.md).
+
 ## IMPLEMENTATION // The missing property
 
 An Ed25519 signature proves that some holder of a private key signed exact bytes. A release manifest, a kernel/process snapshot, a signed denial receipt, and a signed history link can each be internally consistent while still being **self-issued by the same compromised guest**.
@@ -22,7 +24,7 @@ The existing concrete evidence is deliberately narrower:
 
 **Missing:** a separately administered, operator-enrolled source of trust, with authoritative currently retained signing-root/revocation state, host/release/receipt-key binding, challenge issuance and one-use consumption, and rollback-resistant witness history.
 
-## DECISIONS // Operator and appointed custodian must select before native write code
+## DECISIONS // Local test-ledger development can proceed; authority-bearing native code still requires custodial approval
 
 | Decision | Candidate | Trade-off / status |
 | --- | --- | --- |
@@ -30,7 +32,7 @@ The existing concrete evidence is deliberately narrower:
 | **B · TPM-anchored local history** | Independently enrolled sealed key plus monotonic/rollback-resistant reference and locally persisted proof | **Evaluate, not assumed.** Must show actual hardware-backed antirollback, bounded wear/counter behavior, provisioning/ownership, migration, recovery after TPM reset/replace, revocation, and proof that a host root compromise cannot simply present an old valid current-state claim. |
 | **C · Independently administered append-only authority** | A distinct protected service/host and operator-held enrollment authority with authoritative per-host history/nonce state, possibly self-hosted | **Recommended to evaluate first, not selected.** Strongest separation from guest snapshots if truly distinct in credentials, administration, backups and recovery domain. Requires availability, authenticated transport, lifecycle/backup and incident-recovery plan. No paid service is inherently required. |
 
-**Required operator answers:** identify the custodian/person or protected service owner; select the independently administered authority/failure domain; approve initial enrollment root fingerprint verification ceremony and immutable role scope; choose durable history/challenge persistence and recovery policy; name authorized signed service/release, seat policy, and root rotation/revocation. The operator's decision must be recorded by an actual owner (ACCEPT / REVISE / HOLD). A CI fixture, a conversation decision proposal, or an implicit default is not enrollment.
+**For the eventual protected production authority, required operator answers:** identify the custodian/person or protected service owner; select the independently administered authority/failure domain; approve initial enrollment root fingerprint verification ceremony and immutable role scope; choose durable history/challenge persistence and recovery policy; name authorized signed service/release, seat policy, and root rotation/revocation. The operator's decision must be recorded by an actual owner (ACCEPT / REVISE / HOLD). A CI fixture, a conversation decision proposal, or an implicit default is not enrollment.
 
 ## Protected trust/bootstrap lifecycle // proposed, version to be chosen by owners
 
@@ -64,7 +66,7 @@ An enrolled root cannot make a measurement true by signature alone. Real runtime
 
 - **Operator / appointed custody owner:** record a selected custody option and who can provision, rotate, revoke, backup and recover root/history material, with distinct authorization and release procedures.
 - **DOC 2 / C4b:** supply the agreed read-only actual signed-guest runtime observation and fresh receipt-key evidence, maintaining its own official Silverblue two-reboot rollback tests. Do not add a second C3e guest script or ship private keys in RPM artifacts.
-- **DOC 1 / C3e:** after custody and producer contracts are accepted, implement a **new scoped read-only admission client** in C3e-owned files that obtains independently current protected trust state and ties it to C4b's genuine evidence. It must fail closed until all required authorities exist. No rewriting existing C3e-AF/Z or C4b-owned transport by default.
+- **DOC 1 / C3e:** under the operator's staged-development direction, a **development-only local ledger and storage-independent read-only verifier interface** may be prepared using disposable keys and explicit no-authority outcomes. After the real custodian and producer contracts are accepted, implement a **new scoped protected admission client** that obtains independently current trust state and binds C4b's genuine evidence. It must fail closed until all required authorities exist. No rewriting existing C3e-AF/Z or C4b-owned transport by default.
 - **Nurse 2:** independently review exact-head source, current custodian/producer trust, attack fixtures and native negative evidence. **Operator:** retains separate merge, installation and production acceptance.
 
 There is intentionally **no setup command** here. This file creates no signer, root pin, machine service, DB, socket, credential, package, user approval, or native command. Runtime hosts and production policy remain unchanged.
@@ -84,7 +86,7 @@ A future source PR must provide real, isolated runtime evidence rather than only
 
 ## WATCH OUT FOR
 
-The operator has **not** approved any of the candidate architectures, selected a real signer/custodian, verified live Hospital registration, or authorized a local machine write or service activation. Do not label the proposed wire phases as approved protocol, use a caller's Ed25519 key as an operator-enrolled root, or treat a signed `UNAVAILABLE` as success. No protected authority-bearing implementation begins merely because this RFC is merged.
+The operator has **accepted a local-development-first, independently-custodied-later roadmap** but has **not** selected an independently trusted production custodian, enrolled a real signer, verified live Hospital registration, or authorized a local machine write or service activation. Do not label the proposed wire phases as approved protocol, use a caller's Ed25519 key as an operator-enrolled root, or treat a signed `UNAVAILABLE` as success. No protected authority-bearing implementation begins merely because this RFC is merged.
 
 Do not combine Hospital D4 original-request custody or TimeW selected-window/consent with this Identity-specific purpose. Their independent owners must adopt any compatible shared custody architecture explicitly, not automatically inherit Identity signer roles.
 
@@ -93,6 +95,8 @@ Do not combine Hospital D4 original-request custody or TimeW selected-window/con
 - [x] Reinspect Syntagma AGENTS and Hospital/authority protocol, C3e/C4b existing source and issue #2018.
 - [x] Verify #2192 source and independent retrospective review; identify the real missing custody and native binding.
 - [x] Draft C3e-only operator decision, protected trust lifecycle, receipt-origin contract and native attack matrix.
+- [x] Record operator's local test-ledger → independent NAS/other-computer custodian development direction and explicit migration gate.
+- [ ] Implement fixture-only local ledger and pluggable read-only verifier interface under its own reviewed development milestone; do not enable production authority.
 - [ ] Independent DOC 2 / Identity owner assessment of producer and release/seat evidence shape.
 - [ ] Named operator-authorized independent root/history/challenge custodian selects ACCEPT / REVISE / HOLD.
 - [ ] Nurse 2 review of this proposal / future source and exact-head checks.
@@ -100,8 +104,8 @@ Do not combine Hospital D4 original-request custody or TimeW selected-window/con
 
 ## NEXT
 
-Record the operator/authorized custodian's choice and key enrollment + recovery requirements on [C4b/C3e issue #2018](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2018), cross-link [C3e owner ledger #2119](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2119), and obtain DOC 2's signed installed-host proof acceptance on its own C4b resources. Do not proceed from an unselected assumption to native privilege. If custody remains HOLD, continue only isolated read-only diagnostics without manufacturing a new synthetic issuer.
+Use the [staged local-to-independent migration plan](./connections-c3e-local-development-to-independent-custodian-migration.md) for development-only ledger and future cutover criteria. Record the eventual operator/authorized custodian's *production* choice and key enrollment + recovery requirements on [C4b/C3e issue #2018](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2018), cross-link [C3e owner ledger #2119](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2119), and obtain DOC 2's signed installed-host proof acceptance on its own C4b resources. Do not proceed from an unselected assumption to native privilege. If custody remains HOLD, continue only isolated read-only diagnostics without manufacturing a new synthetic issuer.
 
 ## DECISIONS
 
-This file is a **proposal**, with Option C recommended for evaluation, not selected. C3e code ownership and concurrent workers remain unchanged. No local machine edits, live key provisioning, production sign-in, auto-merge or final user acceptance are implied.
+The operator has selected **Local Development Ledger first → Independent Trust Custodian later** as the intended development sequence. This document still presents competing **production custody** architectures; a specific independently protected NAS/host, custodian, key enrollment and recovery mechanism have not been selected or accepted. C3e code ownership and concurrent workers remain unchanged. No local machine edits, live key provisioning, production sign-in, auto-merge or final acceptance of the real trust service are implied.

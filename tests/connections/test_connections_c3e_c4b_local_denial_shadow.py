@@ -68,8 +68,9 @@ class LocalChallengeAndSignedDenialTests(unittest.TestCase):
             "schema": LEGACY_RECEIPT_SCHEMA, "state": "UNAVAILABLE",
             "requestId": None,
         }) + b"\n"
+        request_id = None if action == "BEGIN" else "CI_NO_LOGIN_REQUEST_01234567"
         frame = ReceiptIssuer(self.signer).seal(
-            action, None, nonce, body)
+            action, request_id, nonce, body)
         return (M.E.C4B.PROOF_PREFIX + b"pub=" +
                 base64.urlsafe_b64encode(self.pub).rstrip(b"=") +
                 b" frame=" +

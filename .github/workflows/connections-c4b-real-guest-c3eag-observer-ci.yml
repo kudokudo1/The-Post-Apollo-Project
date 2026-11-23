@@ -6,6 +6,7 @@ on:
       - 'tests/connections/identity_silverblue/guest_identity_service_probe.sh'
       - 'tests/connections/identity_silverblue/run_official_silverblue_identity.sh'
       - 'tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py'
+      - 'tests/connections/identity_silverblue/runtime_receipt_binding_ci.py'
       - '.github/workflows/connections-identity-silverblue-real-boot.yml'
       - '.github/workflows/connections-c4b-real-guest-c3eag-observer-ci.yml'
       - 'docs/connections-c4b-real-guest-c3eag-observer-ci.md'
@@ -33,6 +34,8 @@ jobs:
           bash -n tests/connections/identity_silverblue/guest_identity_service_probe.sh
           python3 -B -m py_compile \
             tests/connections/c3e_release_trust/C3eAGIdentityKernelObserver.py \
+            tests/connections/c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py \
+            tests/connections/identity_silverblue/runtime_receipt_binding_ci.py \
             tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py
           python3 -B tests/connections/identity_silverblue/test_c4b_real_c3eag_guest_integration_ci.py
           python3 - <<'PY'

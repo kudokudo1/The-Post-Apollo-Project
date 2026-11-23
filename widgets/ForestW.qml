@@ -1024,6 +1024,7 @@ PanelWindow {
             Item {
                 id: reasoningRailHost
                 z: 12
+                enabled: root.menuOpen
                 anchors.top: chatDivider.bottom
                 anchors.topMargin: 7
                 anchors.bottom: promptRow.bottom

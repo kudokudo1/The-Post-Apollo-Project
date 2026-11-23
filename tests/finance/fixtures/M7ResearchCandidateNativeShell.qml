@@ -8,6 +8,7 @@ ShellRoot {
     id: root
     property bool sent: false
     property bool checkedReady: false
+    property bool submittedInvalidSource: false
     property bool finished: false
     property int ticks: 0
 
@@ -153,6 +154,23 @@ ShellRoot {
                     root.fail("STALE_SOURCE_PREVIEW_NOT_CLEARED");
                     return;
                 }
+                if (!root.submittedInvalidSource) {
+                    root.submittedInvalidSource = true;
+                    if (!host.buildPreview())
+                        root.fail("INVALID_SOURCE_PREVIEW_NOT_DISPATCHED");
+                    return;
+                }
+            }
+            if (root.submittedInvalidSource
+                    && host.previewState === "failed") {
+                if (host.previewResult !== null
+                        || host.previewMessage !==
+                            "PREVIEW REFUSED // INVALID_SOURCE_SNAPSHOT") {
+                    root.fail("UNSAFE_OR_AMBIGUOUS_FAILURE // "
+                              + host.previewMessage);
+                    return;
+                }
+                console.log("M7_NATIVE_CHECK // BOUNDED_FAILURE_CODE");
                 root.pass();
             }
         }

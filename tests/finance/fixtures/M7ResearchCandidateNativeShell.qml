@@ -168,7 +168,7 @@ ShellRoot {
                     && host.previewState === "failed") {
                 if (host.previewResult !== null
                         || host.previewMessage !==
-                            "PREVIEW REFUSED // INVALID_SOURCE_SNAPSHOT") {
+                            "PREVIEW REFUSED // INVALID_SEC_SNAPSHOT") {
                     root.fail("UNSAFE_OR_AMBIGUOUS_FAILURE // "
                               + host.previewMessage);
                     return;

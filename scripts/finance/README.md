@@ -1126,3 +1126,28 @@ the category preview source contract. Existing Actual API, journal,
 permits, root FinanceW navigation and M6 writer security boundary
 remain untouched. Headless Qt checks do not establish live desktop
 acceptance, and M6's independent security review remains outstanding.
+
+
+## FinanceW Categories M10 // Lowest available first
+
+**Finance → Budget → Budget → CATEGORIES** now offers
+**LOWEST AVAILABLE FIRST** next to **OVERSPENT ONLY**.
+
+The selected sort ranks the current, authenticated category snapshot by
+ascending `availableCents`: negative available amounts appear before zero
+and positive amounts, and categories closest to exhausting their available
+balance appear above larger balances. Equal numeric amounts retain their
+original snapshot order. Absent, malformed or non-finite available values
+are placed **after** valid values, again retaining source order.
+
+Search and OVERSPENT ONLY continue to filter the same displayed rows;
+turning the sort off restores snapshot order without writing to Actual.
+The sort stays selected after same-source/month refresh. Switching source
+or month, or losing authenticated data, clears this view preference alongside
+M9's other local filters. An unauthenticated budget cannot activate the sort.
+
+All sorting happens in local QML using a copied view array. No Actual API,
+category/group writer, consent or permit, journal, transaction history,
+snapshot data, or shared FinanceW navigation is modified. Headless Qt tests
+use fictional read-only data, and **do not** stand in for an operator's
+eventual live desktop/negative-category acceptance.

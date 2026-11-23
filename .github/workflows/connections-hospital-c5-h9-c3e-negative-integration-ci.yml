@@ -1,0 +1,76 @@
+name: Connections DOC 4 C5-H9 original C3e packet plus Hospital consent HOLD
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/hospital_c5/HospitalC5H9C3eNegativeIntegration.py'
+      - 'tests/connections/hospital_c5/test_hospital_c5h9_c3e_negative_integration.py'
+      - '.github/workflows/connections-hospital-c5-h9-c3e-negative-integration-ci.yml'
+      - 'docs/connections-hospital-c5-h9-c3e-protected-nonadmission.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-c3e-kernel-and-hospital-hold:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pinned test-only Python dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Fail if source shadow gets imported into real Hospital issuer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/hospital_c5/HospitalC5H9C3eNegativeIntegration.py \
+            tests/connections/hospital_c5/test_hospital_c5h9_c3e_negative_integration.py
+          python3 - <<'PY'
+          from pathlib import Path
+          ci = Path("tests/connections/hospital_c5/HospitalC5H9C3eNegativeIntegration.py").read_text()
+          tests = Path("tests/connections/hospital_c5/test_hospital_c5h9_c3e_negative_integration.py").read_text()
+          issuer = Path("services/connections/hospital/HospitalNativeIssuerService.py").read_text()
+          assert "C3eIdentityPacketOriginNonAdmissionCI.py" in ci
+          assert "HospitalC5ExactConsentProbe.py" in ci
+          assert "ORIGINAL_H4" in tests
+          assert "HospitalC5H9C3eNegativeIntegration" not in issuer
+          assert "C3eIdentityPacketOriginNonAdmissionCI" not in issuer
+          assert 'C.deny("INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE")' in issuer
+          assert "_require_independent_room_consent(request, prepared, peer, first_seat)" in issuer
+          assert issuer.index("_require_independent_room_consent(request, prepared, peer, first_seat)") < issuer.index("key = C.load_installed_key()")
+          assert 'C.deny("C5H9_NO_ENROLLED_HUMAN_CONSENT_OR_INDEPENDENT_CUSTODIAN")' in ci
+          assert "sqlite3.connect(" not in ci
+          assert "socket.socket(" not in ci
+          assert "sign_px_grant(" not in ci
+          assert "load_installed_key(" not in ci
+          print("C5H9_IMPORT_FENCE // NATIVE_HOSPITAL_HARD_HOLD")
+          PY
+      - name: 21 original C3e kernel to C5 protected HOLD integration cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B -I \
+            tests/connections/hospital_c5/test_hospital_c5h9_c3e_negative_integration.py
+          echo "C5H9_REAL_C3E_PACKET_AND_HOSPITAL_NATIVE_CONSENT // HOLD"
+      - name: Inherited actual kernel and Hospital consent hard-stop regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_identity_packet_origin_nonadmission.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_exact_consent_probe.py
+          echo "C5H9_INHERITED_C3E_HOSPITAL_HOLD_PASS"

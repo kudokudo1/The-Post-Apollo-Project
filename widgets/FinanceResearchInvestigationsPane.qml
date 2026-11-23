@@ -120,22 +120,22 @@ Item {
                     accentColor: Colors.magenta
                     onLeftClicked: pane.showNewForm = !pane.showNewForm
                 }
-                ActionButton {
-                    width: 115
-                    height: 28
-                    label: "DISCARD SCRATCH"
-                    labelPixelSize: 9
-                    accentColor: Colors.red
-                    visible: pane.scratchEnabled && pane.scratchId !== ""
-                    available: visible
-                    onLeftClicked: pane.discardScratchRequested()
-                }
                 GohuText {
                     text: "CASES " + pane.investigations.length
                     font.pixelSize: 10
                     color: Colors.white
                     anchors.verticalCenter: parent.verticalCenter
                 }
+            }
+            ActionButton {
+                width: 115
+                height: 28
+                label: "DISCARD SCRATCH"
+                labelPixelSize: 9
+                accentColor: Colors.red
+                visible: pane.scratchEnabled && pane.scratchId !== ""
+                available: visible
+                onLeftClicked: pane.discardScratchRequested()
             }
             Rectangle {
                 width: parent.width

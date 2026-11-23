@@ -110,19 +110,24 @@ class ForestHostAdmission:
                  bridge: ForestTurnBridge, *,
                  clock_ms: Callable[[], int],
                  verified_peer: Callable[[KernelPeer, int], VerifiedCaller | None],
-                 approved_intent: Callable[[VerifiedCaller, str, str, str | None, int], bool]):
+                 approved_intent: Callable[[VerifiedCaller, str, str, str | None, int], bool],
+                 synthetic_fence_factory: Callable | None = None):
         if (type(journal) is not ForestSessionJournal
                 or type(bridge) is not ForestTurnBridge
                 or bridge.journal is not journal
                 or not all(map(callable, (clock_ms, verified_peer, approved_intent)))):
             raise AdmissionRefusal("HOST_DEPENDENCY_MISSING")
+        if synthetic_fence_factory is not None and not callable(synthetic_fence_factory):
+            raise AdmissionRefusal("HOST_DEPENDENCY_MISSING")
+        self._synthetic_fence = synthetic_fence_factory
         self._journal = journal
         self._bridge = bridge
         self._clock = clock_ms
         self._verify = verified_peer
         self._approve = approved_intent
 
-    def _authorize(self, peer: KernelPeer, intent: dict) -> VerifiedCaller:
+    def _authorize(self, peer: KernelPeer, intent: dict, *,
+                   operation: str | None = None) -> VerifiedCaller:
         if (type(peer) is not KernelPeer
                 or any(type(value) is not int for value in
                        (peer.pid, peer.uid, peer.gid))
@@ -152,7 +157,7 @@ class ForestHostAdmission:
             raise AdmissionRefusal("CALLER_UNVERIFIED") from exc
         try:
             permitted = self._approve(
-                principal, intent["action"], intent["sessionId"],
+                principal, operation or intent["action"], intent["sessionId"],
                 intent.get("model"), now)
         except Exception as exc:
             raise AdmissionRefusal("POLICY_UNAVAILABLE") from exc
@@ -194,13 +199,28 @@ class ForestHostAdmission:
         intent = decode_intent(wire)
         if intent["action"] != "GENERATE":
             raise AdmissionRefusal("INVALID_ACTION")
-        principal = self._authorize(peer, intent)
+        # In B4c fixture mode the policy sees two distinct phases.
+        # B4b's GENERATE path remains unchanged without a fence factory.
+        fenced = self._synthetic_fence is not None
+        principal = self._authorize(
+            peer, intent, operation="PREPARE_GENERATE" if fenced else None)
+
+        def fence_factory(binding):
+            # Host-owned fixture injection, never a client-supplied grant.
+            if (binding.owner_key != principal.owner_key
+                    or binding.session_id != intent["sessionId"]
+                    or binding.request_id != intent["requestId"]
+                    or binding.model_key != intent["model"]
+                    or binding.expected_revision != intent["expectedRevision"]):
+                raise AdmissionRefusal("FENCE_BINDING_MISMATCH")
+            return self._synthetic_fence(principal, binding)
 
         def pre_commit_check() -> bool:
             # Always ask the host again, never reuse the earlier approval.
             # The returned owner/PID/UID must still match the reserved turn.
             # Real host must reobserve live PID/seat and signature state.
-            fresh = self._authorize(peer, intent)
+            fresh = self._authorize(
+                peer, intent, operation="COMMIT_GENERATE" if fenced else None)
             return (fresh.owner_key == principal.owner_key
                     and fresh.peer_pid == principal.peer_pid
                     and fresh.peer_uid == principal.peer_uid)
@@ -212,6 +232,8 @@ class ForestHostAdmission:
                 expected_revision=intent["expectedRevision"],
                 model=intent["model"],
                 pre_commit=pre_commit_check,
+                fence_factory=fence_factory if fenced else None,
+                fence_request_id=intent["requestId"] if fenced else None,
             )
             try:
                 for event in with_stream:

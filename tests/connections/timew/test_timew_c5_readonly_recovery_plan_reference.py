@@ -1,7 +1,6 @@
 """DOC 5 recovery lookup INTENT generation: source-only hostile tests."""
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import FrozenInstanceError
 import math
 from pathlib import Path
@@ -17,6 +16,9 @@ from TimeWC5ReadOnlyRecoveryPlanReference import (  # noqa: E402
 from test_timew_c5_review_shadow_reference import (  # noqa: E402
     _value, original_fixture,
 )
+
+
+_UNSET = object()
 
 
 class RecoveryPlans(unittest.TestCase):
@@ -35,9 +37,9 @@ class RecoveryPlans(unittest.TestCase):
             self.assertIs(getattr(result, key), False, key)
         self.assertEqual(result.safe_actions, ())
 
-    def evaluate(self, *, original=None, cause="C5_SPENT_REPLY_LOST"):
+    def evaluate(self, *, original=_UNSET, cause="C5_SPENT_REPLY_LOST"):
         out = prepare_unknown_recovery_intents(
-            original=self.original if original is None else original,
+            original=self.original if original is _UNSET else original,
             uncertainty=cause,
         )
         self.check_no_authority(out)

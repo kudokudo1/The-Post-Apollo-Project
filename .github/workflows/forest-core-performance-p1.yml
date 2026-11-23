@@ -1,0 +1,31 @@
+name: Forest Core Performance P1 Pure Governor
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/resource_governor_p1.py'
+      - 'scripts/forest/PERFORMANCE_GOVERNOR_P1.md'
+      - 'tests/forest/test_resource_governor_p1.py'
+      - '.github/workflows/forest-core-performance-p1.yml'
+  push:
+    paths:
+      - 'scripts/forest/resource_governor_p1.py'
+      - 'scripts/forest/PERFORMANCE_GOVERNOR_P1.md'
+      - 'tests/forest/test_resource_governor_p1.py'
+      - '.github/workflows/forest-core-performance-p1.yml'
+
+jobs:
+  synthetic-pure-governor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P1 pure synthetic policy and security matrix
+        run: python3 -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - name: P0 read-only snapshot regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - name: B0 local inventory compatibility
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_inventory.py' -v
+      - name: B2 local stream boundary compatibility
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_chat_transport.py' -v
+      - name: Python syntax
+        run: python3 -m py_compile scripts/forest/resource_governor_p1.py tests/forest/test_resource_governor_p1.py

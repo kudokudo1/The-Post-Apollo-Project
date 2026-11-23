@@ -208,7 +208,8 @@ Rectangle {
                     clip: false
                     z: -1
                     color: Colors.dark
-                    opacity: 0.0
+                    // Keep the Workspace's explicit invisible state layer.
+                    opacity: trayButton.cardEmphasized ? 0.0 : 0.0
                 }
 
                 SafeDropShadow {

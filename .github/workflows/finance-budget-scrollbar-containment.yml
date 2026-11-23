@@ -6,6 +6,10 @@ on:
     paths:
       - "widgets/FinanceW.qml"
       - "widgets/FinanceEnvelopeMovePreviewPane.qml"
+      - "widgets/FinanceExpenseCategoryPreviewPane.qml"
+      - "services/finance/FinanceExpenseCategoryPreview.js"
+      - "tests/finance/test_finance_expense_category_m3a_qt_runtime.py"
+      - "tests/finance/finance_expense_category_m3a_runtime_harness.qml"
       - "tests/finance/test_finance_envelope_move_m2a_qt_runtime.py"
       - "tests/finance/finance_envelope_move_m2a_runtime_harness.qml"
       - "widgets/FinanceBudgetScrollRail.qml"
@@ -17,6 +21,10 @@ on:
     paths:
       - "widgets/FinanceW.qml"
       - "widgets/FinanceEnvelopeMovePreviewPane.qml"
+      - "widgets/FinanceExpenseCategoryPreviewPane.qml"
+      - "services/finance/FinanceExpenseCategoryPreview.js"
+      - "tests/finance/test_finance_expense_category_m3a_qt_runtime.py"
+      - "tests/finance/finance_expense_category_m3a_runtime_harness.qml"
       - "tests/finance/test_finance_envelope_move_m2a_qt_runtime.py"
       - "tests/finance/finance_envelope_move_m2a_runtime_harness.qml"
       - "widgets/FinanceBudgetScrollRail.qml"
@@ -60,3 +68,5 @@ jobs:
         run: python tests/components/test_finance_budget_scrollbar_qt_runtime.py
       - name: Exercise actual envelope move preview QML with fictional budget
         run: python tests/finance/test_finance_envelope_move_m2a_qt_runtime.py
+      - name: Exercise actual expense category preview QML with fictional budget
+        run: python tests/finance/test_finance_expense_category_m3a_qt_runtime.py

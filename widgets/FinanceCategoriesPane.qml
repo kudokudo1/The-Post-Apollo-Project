@@ -216,11 +216,14 @@ Item {
                 clearGroupDraft();
             } else {
                 groupPreviewVisible=false;
+                // onSnapshotChanged may run before the derived groups
+                // binding recalculates. Inspect the incoming source directly.
                 if(groupDraftMode==="rename"
-                        && !groups.some(function(g){
-                            return g && g.id===groupDraftId
-                                && g.name===groupOriginalNameAtOpen;
-                        }))clearGroupDraft();
+                        && !(Array.isArray(snapshot.categoryGroups)
+                            && snapshot.categoryGroups.some(function(g){
+                                return g && g.id===groupDraftId
+                                    && g.name===groupOriginalNameAtOpen;
+                            })))clearGroupDraft();
             }
         }
         if(!openMode)return;
@@ -230,11 +233,14 @@ Item {
         } else {
             // A same-source refresh is not approval. Re-preview current data.
             previewVisible=false;
-            if(openMode==="rename" && !categories.some(function(c){
-                return c && c.id===selectedCategoryId
-                    && c.groupId===selectedGroupId
-                    && c.name===originalNameAtOpen;
-            }))clearDraft();
+            // Read the incoming categories directly for the same reason.
+            if(openMode==="rename"
+                    && !(Array.isArray(snapshot.categories)
+                        && snapshot.categories.some(function(c){
+                            return c && c.id===selectedCategoryId
+                                && c.groupId===selectedGroupId
+                                && c.name===originalNameAtOpen;
+                        })))clearDraft();
         }
     }
     onVisibleChanged: if(!visible)clearDraft()

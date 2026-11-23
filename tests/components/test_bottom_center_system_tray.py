@@ -161,7 +161,7 @@ for token in (
     "id: trayButtonBackground",
     "width: parent.width + 6",
     "height: parent.height + 5",
-    "opacity: 0.0",
+    "opacity: trayButton.cardEmphasized ? 0.0 : 0.0",
     "id: trayButtonBackgroundGlow",
     "safeSource: trayButtonBackground",
     "opacity: trayButton.cardEmphasized ? 0.2 : 0.0",

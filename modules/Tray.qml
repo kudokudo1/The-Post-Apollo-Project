@@ -5,6 +5,7 @@ import Quickshell.Services.SystemTray
 import Quickshell.I3
 import Quickshell.Io
 import "TrayDesktopVisibility.js" as DesktopVisibility
+import "TrayWindowReadJoin.js" as WindowReadJoin
 import qs.services.social
 import "../components"
 import QtQuick.Effects
@@ -53,6 +54,41 @@ Rectangle {
     // one bounded read-only get_tree is coalesced for changes. No polling.
     property var visibleDesktopKeys: []
     property bool windowTreeDirty: false
+    property var windowTreeRead: WindowReadJoin.freshRead()
+    property bool windowTreePublished: true
+    // Non-sensitive diagnostics: reason and key count only. Never log a
+    // window title, browser URL or raw Sway tree.
+    property string windowTreeReadStatus: "unread"
+    property int windowTreeVisibleKeyCount: 0
+    property int windowTreeVisibleWindowCount: 0
+
+    function publishWindowTreeIfReady() {
+        if (windowTreePublished)
+            return false;
+        const result = WindowReadJoin.outcome(windowTreeRead);
+        if (!result.ready)
+            return false;
+
+        // A failed/empty read is NOT evidence that an app is visible.
+        const inspected = result.success
+            ? DesktopVisibility.inspectVisibleWindowTree(result.stdout)
+            : {valid:false, reason:result.reason, keys:[], windowCount:0};
+        const keys = inspected.valid ? inspected.keys : [];
+        visibleDesktopKeys = keys;
+        windowTreeVisibleKeyCount = keys.length;
+        windowTreeVisibleWindowCount = inspected.windowCount;
+        windowTreeReadStatus = inspected.reason;
+        windowTreePublished = true;
+        windowTreeTimeout.stop();
+
+        if (windowTreeReadStatus !== "ok")
+            console.warn("Tray visible-window read:", windowTreeReadStatus);
+        if (windowTreeDirty) {
+            windowTreeDirty = false;
+            desktopWindowRefresh.restart();
+        }
+        return true;
+    }
 
     Component.onCompleted: desktopWindowRefresh.start()
 
@@ -66,10 +102,32 @@ Rectangle {
         interval: 120
         repeat: false
         onTriggered: {
-            if (desktopWindowTree.running)
+            if (desktopWindowTree.running || !trayDock.windowTreePublished)
                 trayDock.windowTreeDirty = true;
             else
                 desktopWindowTree.running = true;
+        }
+    }
+
+    // The collector and Process.exited may report in either order. Only
+    // publish after both signals; bound a missing callback without polling.
+    Timer {
+        id: windowTreeTimeout
+        interval: 3500
+        repeat: false
+        onTriggered: {
+            if (!trayDock.windowTreePublished) {
+                trayDock.visibleDesktopKeys = [];
+                trayDock.windowTreeVisibleKeyCount = 0;
+                trayDock.windowTreeVisibleWindowCount = 0;
+                trayDock.windowTreeReadStatus = "collector-timeout";
+                trayDock.windowTreePublished = true;
+                console.warn("Tray visible-window read: collector-timeout");
+                if (trayDock.windowTreeDirty) {
+                    trayDock.windowTreeDirty = false;
+                    desktopWindowRefresh.restart();
+                }
+            }
         }
     }
 
@@ -77,18 +135,26 @@ Rectangle {
         id: desktopWindowTree
         command: ["swaymsg", "-t", "get_tree", "-r"]
         running: false
-        stdout: StdioCollector { id: desktopWindowTreeOutput }
-        onExited: function(exitCode, exitStatus) {
-            // Failed, incomplete or malformed data must never leave a
-            // background application highlighted from a stale snapshot.
-            trayDock.visibleDesktopKeys = exitCode === 0
-                ? DesktopVisibility.visibleWindowKeysFromTree(
-                    desktopWindowTreeOutput.text)
-                : [];
-            if (trayDock.windowTreeDirty) {
-                trayDock.windowTreeDirty = false;
-                desktopWindowRefresh.restart();
+
+        onStarted: {
+            trayDock.windowTreeRead = WindowReadJoin.freshRead();
+            trayDock.windowTreePublished = false;
+            windowTreeTimeout.restart();
+        }
+
+        stdout: StdioCollector {
+            id: desktopWindowTreeOutput
+            onStreamFinished: {
+                trayDock.windowTreeRead = WindowReadJoin.withStdout(
+                    trayDock.windowTreeRead, this.text);
+                trayDock.publishWindowTreeIfReady();
             }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            trayDock.windowTreeRead = WindowReadJoin.withExit(
+                trayDock.windowTreeRead, exitCode);
+            trayDock.publishWindowTreeIfReady();
         }
     }
 

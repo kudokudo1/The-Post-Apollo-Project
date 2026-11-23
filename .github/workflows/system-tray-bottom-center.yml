@@ -9,7 +9,9 @@ on:
       - "tests/components/test_tray_workspace_card_parity.py"
       - "tests/components/test_tray_native_context_menu.cjs"
       - "tests/components/test_tray_desktop_window_visibility.cjs"
+      - "tests/components/test_tray_window_read_join.cjs"
       - "modules/TrayDesktopVisibility.js"
+      - "modules/TrayWindowReadJoin.js"
       - "tests/components/test_tray_native_qapplication.py"
       - ".github/workflows/system-tray-bottom-center.yml"
   push:
@@ -21,7 +23,9 @@ on:
       - "tests/components/test_tray_workspace_card_parity.py"
       - "tests/components/test_tray_native_context_menu.cjs"
       - "tests/components/test_tray_desktop_window_visibility.cjs"
+      - "tests/components/test_tray_window_read_join.cjs"
       - "modules/TrayDesktopVisibility.js"
+      - "modules/TrayWindowReadJoin.js"
       - "tests/components/test_tray_native_qapplication.py"
       - ".github/workflows/system-tray-bottom-center.yml"
 
@@ -41,6 +45,8 @@ jobs:
         run: python3 -B -I tests/components/test_tray_workspace_card_parity.py
       - name: Verify desktop-visible Sway window app matching
         run: node tests/components/test_tray_desktop_window_visibility.cjs
+      - name: Verify two-signal Sway stdout completion and actual QML publish behavior
+        run: node tests/components/test_tray_window_read_join.cjs
       - name: Execute real native tray menu dispatch and color-state logic
         run: node tests/components/test_tray_native_context_menu.cjs
       - name: Existing dock button grammar regression

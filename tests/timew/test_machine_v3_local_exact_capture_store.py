@@ -140,7 +140,7 @@ assert item['c5_spent_verified'] is False
     reject(lambda: save(store, output_id=""), "empty output refused")
     reject(lambda: save(store, app_id="x" * 129), "oversized app id refused")
     reject(lambda: save(store, window_key="not-uuid"), "invalid window ID")
-    reject(lambda: save(store, checkpoint_id=WINDOW),
+    reject(lambda: save(store, checkpoint_id=str(uuid.uuid5(uuid.NAMESPACE_URL, 'not-v4'))),
            "wrong checkpoint UUID version")
     reject(lambda: save(store, workspace_id=True), "nonstring workspace refused")
     reject(lambda: save(store, operation_id="forbidden"),

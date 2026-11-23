@@ -122,6 +122,12 @@ PanelWindow {
         }
     ]
     readonly property var activeTree: treeSlots[selectedTreeIndex]
+    // Resolve the actually selected DockButton once so the chat heading
+    // follows the Tree name's real foreground/content-glow state.
+    // Repeater.count makes delegate creation reactive at initial startup.
+    readonly property var selectedTreeButton:
+        treeSelectorRepeater.count > selectedTreeIndex
+        ? treeSelectorRepeater.itemAt(selectedTreeIndex) : null
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9
     readonly property int bottomScreenGap: 8
@@ -245,7 +251,7 @@ PanelWindow {
             }
             ResizeButton {
                 id: expandButton
-                anchors.right: headerRescanButton.left
+                anchors.right: headerStatusControls.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
                 direction: "up"
@@ -255,58 +261,69 @@ PanelWindow {
                 }
             }
 
-            // Shared ordinary reload control. One deliberate click makes a
-            // read-only B0 local model inventory refresh; no chat/audio host,
-            // session creation or recurring timer is activated.
-            ReloadButton {
-                id: headerRescanButton
-                anchors.right: liveIndicator.left
-                anchors.rightMargin: 7
-                anchors.verticalCenter: parent.verticalCenter
-                interactive: root.menuOpen && !localInventory.scanning
-                Accessible.name: localInventory.scanning
-                    ? "Forest model inventory scan in progress"
-                    : "Rescan local Ollama model inventory (read-only)"
-                onReloadRequested: {
-                    if (!root.menuOpen || localInventory.scanning)
-                        return;
-                    root.pendingModelScan = "";
-                    root.lastScannedModel = "";
-                    root.lastModelScanResult = "";
-                    localInventory.scanModels();
-                }
-            }
-
-            // LIVE is the Quickshell workspace state, not AI connectivity.
-            // Ollama/Hermes still say NOT CONNECTED in the chat body.
-            Rectangle {
-                id: liveIndicator
+            // Keep Rescan and LIVE in one anchored status cluster. Unlike
+            // two independent header anchors, this makes their left-to-right
+            // order and fixed 7px separation explicit across all sizes.
+            Item {
+                id: headerStatusControls
                 anchors.right: closeButton.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
-                width: 60
-                height: 25
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.green
-                Accessible.name: "Forest workspace live; AI engine not connected"
+                width: headerRescanButton.width + 7 + liveIndicator.width
+                height: 32
 
-                Rectangle {
+                // Shared ordinary reload control. One deliberate click makes
+                // a read-only B0 local model inventory refresh. No chat/audio
+                // host, session creation or recurring timer is activated.
+                ReloadButton {
+                    id: headerRescanButton
                     anchors.left: parent.left
-                    anchors.leftMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 6
-                    height: 6
-                    radius: 3
-                    color: Colors.green
+                    interactive: root.menuOpen && !localInventory.scanning
+                    Accessible.name: localInventory.scanning
+                        ? "Forest model inventory scan in progress"
+                        : "Rescan local Ollama model inventory (read-only)"
+                    onReloadRequested: {
+                        if (!root.menuOpen || localInventory.scanning)
+                            return;
+                        root.pendingModelScan = "";
+                        root.lastScannedModel = "";
+                        root.lastModelScanResult = "";
+                        localInventory.scanModels();
+                    }
                 }
-                GohuText {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 8
+
+                // LIVE describes only the Quickshell workspace, not Ollama
+                // or Hermes connectivity. It is always RIGHT of Rescan.
+                Rectangle {
+                    id: liveIndicator
+                    anchors.left: headerRescanButton.right
+                    anchors.leftMargin: 7
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "LIVE"
-                    font.pixelSize: 11
-                    color: Colors.green
+                    width: 60
+                    height: 25
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+                    Accessible.name: "Forest workspace live; AI engine not connected"
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 6
+                        height: 6
+                        radius: 3
+                        color: Colors.green
+                    }
+                    GohuText {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "LIVE"
+                        font.pixelSize: 11
+                        color: Colors.green
+                    }
                 }
             }
 
@@ -354,6 +371,7 @@ PanelWindow {
                 anchors.rightMargin: 9
                 spacing: 7
                 Repeater {
+                    id: treeSelectorRepeater
                     model: root.treeSlots
                     DockButton {
                         id: treeRow
@@ -551,9 +569,27 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.activeTree.name + " // CHAT"
-                    color: Colors.magenta
+                    color: root.selectedTreeButton
+                        ? root.selectedTreeButton.foregroundColor : Colors.magenta
                     font.pixelSize: 15
+                    font.bold: true
                     elide: Text.ElideRight
+                }
+                // Sample the rendered chat title itself, using the selected
+                // Tree button's existing name-glow palette and opacity.
+                // Keep it a sibling source to avoid a separate ghost glyph.
+                TextHashGlow {
+                    id: chatHeadingGlow
+                    safeSource: chatHeading
+                    requestedVisible: root.menuOpen
+                    foregroundColor: chatHeading.color
+                    preferredGlowColor: root.selectedTreeButton
+                        ? root.selectedTreeButton.contentGlowColor : Colors.magenta
+                    radius: 7
+                    samples: 13
+                    opacity: root.selectedTreeButton
+                        ? root.selectedTreeButton.contentGlowOpacity : 0.82
+                    z: -1
                 }
             }
             GohuText {

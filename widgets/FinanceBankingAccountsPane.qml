@@ -452,6 +452,7 @@ Item {
                 onAccountRequested: function(accountId) {
                     manager.showProviderAccount(accountId);
                 }
+                onReturnToTopRequested: manager.returnToTopRequested()
             }
         }
 

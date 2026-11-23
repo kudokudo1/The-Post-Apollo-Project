@@ -1,0 +1,60 @@
+name: Connections DOC 4 C5-H5 Hospital entrypoint inventory HOLD
+
+on:
+  pull_request:
+    paths:
+      - 'services/hospital/**'
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/hospital_c5/HospitalC5H5EntrypointAudit.py'
+      - 'tests/connections/hospital_c5/test_hospital_c5h5_entrypoint_audit.py'
+      - '.github/workflows/connections-hospital-c5-h5-entrypoint-ci.yml'
+      - 'docs/connections-hospital-c5-h5-entrypoint-inventory.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app-px-source-caller-inventory:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout current application source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout separately owned exact PX Hospital draft snapshot (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: kudokudo1/The-Post-Apollo-Dev-Exp
+          ref: 7ea86895503f60a126824835401f75f97bf4aa02
+          path: px-h1-source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Source-only scan and hostile mutation routing tests
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/hospital_c5/HospitalC5H5EntrypointAudit.py \
+            tests/connections/hospital_c5/test_hospital_c5h5_entrypoint_audit.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h5_entrypoint_audit.py
+          python3 -B -I - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('tests/connections/hospital_c5').resolve()))
+          import HospitalC5H5EntrypointAudit as audit
+          app, px = audit.collect_sources(Path('.'), Path('px-h1-source'))
+          result = audit.audit_texts(app, px)
+          print(json.dumps(result, sort_keys=True))
+          assert result["legacyDesktopPxServiceCount"] == 21
+          assert result["nativeHospitalUiServiceCount"] == 3
+          assert result["allWriterCompatibilityVerified"] is False
+          assert result["allLegacyProcessesFenced"] is False
+          assert result["productionAuthorized"] is False
+          assert result["safeActions"] == []
+          print('DOC4_C5H5_HOLD // KNOWN_LEGACY_WRITER_ROUTES_UNMIGRATED_NO_PRODUCTION_AUTHORITY')
+          PY

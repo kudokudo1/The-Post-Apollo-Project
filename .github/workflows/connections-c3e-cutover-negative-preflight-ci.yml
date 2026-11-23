@@ -1,0 +1,81 @@
+name: Connections C3e local-to-custodian cutover negative (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eCustodianCutoverNegativePreflight.py'
+      - 'tests/connections/test_connections_c3e_custodian_cutover_negative.py'
+      - '.github/workflows/connections-c3e-cutover-negative-preflight-ci.yml'
+      - 'docs/connections-c3e-custodian-cutover-negative-preflight.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reject-local-to-protected-promotion:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin existing C3e signature dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify pure negative preflight never adds service or authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eCustodianCutoverNegativePreflight.py \
+            tests/connections/test_connections_c3e_custodian_cutover_negative.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eCustodianCutoverNegativePreflight.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for forbidden in ("sqlite3.connect(", "socket.socket(", "subprocess.run(",
+                            "Ed25519PrivateKey", '"productionAuthority": True',
+                            '"credentialActionsEnabled": True'):
+              assert forbidden not in source, forbidden
+          for required in ("C3eStorageIndependentTrustBoundary.py",
+                           "C3E_CUTOVER_LOCAL_HEAD_CANNOT_BECOME_GENESIS",
+                           "C3E_CUTOVER_LOCAL_CHALLENGE_TRANSFER_FORBIDDEN",
+                           "C3E_CUTOVER_NO_PROTECTED_AUTHORITY_OR_OPERATOR_ACTIVATION",
+                           '"cutoverAuthorized": False',
+                           '"localHistoryPromotedToAuthority": False'):
+              assert required in source, required
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_CUTOVER_CI_ONLY // NO_PRODUCTION_AUTHORITY")
+          PY
+      - name: 28 candidate format and old-state promotion rejection tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/test_connections_c3e_custodian_cutover_negative.py
+          echo "C3E_CUTOVER_NEGATIVE_ONLY // NO_ROOT_OR_HISTORY_CUTOVER"
+      - name: Preserve merged storage boundary and signed-history regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          for test in \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py \
+            tests/connections/test_connections_c3e_operator_witness_enrollment_preflight.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          do
+            sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+              "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_CUTOVER_HOLD // FIXTURE_KEYS_AND_HISTORY_NOT_REMOTE_TRUST"

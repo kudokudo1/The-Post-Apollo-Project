@@ -9,6 +9,9 @@ Item {
     id: categoryPane
     property var snapshot: null
     property string filterText: ""
+    property bool onlyOverspent: false
+    property string filterSourceAtOpen: ""
+    property string filterMonthAtOpen: ""
     property string openMode: "" // "", "create", "rename"
     property string sourceAtOpen: ""
     property string monthAtOpen: ""
@@ -44,6 +47,10 @@ Item {
         ? snapshot.categories : []
     readonly property var groups: snapshot && Array.isArray(snapshot.categoryGroups)
         ? snapshot.categoryGroups : []
+    readonly property int overspentCount: categories.filter(function(c) {
+        return c && typeof c.availableCents==="number"
+            && Number.isFinite(c.availableCents) && c.availableCents<0;
+    }).length
     readonly property var chosenGroup: {
         const rows=groups.filter(function(g) {
             return g && g.id===selectedGroupId;
@@ -52,10 +59,13 @@ Item {
     }
     readonly property var displayed: {
         const needle=filterText.trim().toLowerCase();
-        if(!needle)return categories;
         return categories.filter(function(c){
-            return c && (String(c.name||"").toLowerCase().indexOf(needle)>=0
-                 || String(c.group||"").toLowerCase().indexOf(needle)>=0);
+            if(!c)return false;
+            if(onlyOverspent && !(typeof c.availableCents==="number"
+                    && Number.isFinite(c.availableCents)
+                    && c.availableCents<0))return false;
+            return !needle || String(c.name||"").toLowerCase().indexOf(needle)>=0
+                || String(c.group||"").toLowerCase().indexOf(needle)>=0;
         });
     }
     readonly property var plan: CategoryPlan.previewCategoryPlan(
@@ -83,6 +93,11 @@ Item {
     function clearCategorySearch(){
         if(!filterText.length)return false;
         filterText="";
+        return true;
+    }
+    function toggleOverspentFilter(){
+        if(!snapshot || snapshot.readOnly!==true)return false;
+        onlyOverspent=!onlyOverspent;
         return true;
     }
     function clearGroupDraft(){
@@ -213,6 +228,18 @@ Item {
         groupApprovalArmed=false;
     }
     onSnapshotChanged: {
+        const incomingSource=snapshot && snapshot.readOnly===true
+            ? String(snapshot.sourceKey||"") : "";
+        const incomingMonth=snapshot && snapshot.readOnly===true
+            ? String(snapshot.month||"") : "";
+        // The attention/search view belongs to one source and month.
+        // A refresh of that same snapshot may retain the visible filters.
+        if(incomingSource!==filterSourceAtOpen || incomingMonth!==filterMonthAtOpen){
+            filterText="";
+            onlyOverspent=false;
+            filterSourceAtOpen=incomingSource;
+            filterMonthAtOpen=incomingMonth;
+        }
         approvalArmed=false;
         groupApprovalArmed=false;
         if(groupDraftMode) {
@@ -730,6 +757,34 @@ Item {
                 onLeftClicked: categoryPane.clearCategorySearch()
             }
         }
+        Row {
+            id: categoryAttentionBar
+            width: parent.width
+            spacing: 6
+            ActionButton {
+                objectName: "categoryOverspentOnlyAction"
+                width: 177
+                height: 28
+                label: "OVERSPENT ONLY // "+categoryPane.overspentCount
+                labelPixelSize: 9
+                accentColor: Colors.orange
+                trackLabelGlowLocally: true
+                selected: categoryPane.onlyOverspent
+                available: !!categoryPane.snapshot
+                    && categoryPane.snapshot.readOnly===true
+                onLeftClicked: categoryPane.toggleOverspentFilter()
+            }
+            GohuText {
+                width: parent.width-183
+                height: 28
+                text: "NEGATIVE AVAILABLE BALANCE"
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+        }
         GohuText {
             objectName: "categorySearchSummary"
             width: parent.width
@@ -811,9 +866,17 @@ Item {
             text: !categoryPane.snapshot
                 || categoryPane.snapshot.readOnly!==true
                 ? "LOAD A BUDGET TO VIEW CATEGORIES"
-                : categoryPane.filterText.trim().length>0
-                    ? "NO SEARCH MATCHES // CLEAR SEARCH"
-                    : "NO CATEGORIES IN THIS BUDGET"
+                : categoryPane.categories.length===0
+                    ? "NO CATEGORIES IN THIS BUDGET"
+                    : categoryPane.onlyOverspent
+                        && categoryPane.overspentCount===0
+                        ? "NO OVERSPENT CATEGORIES THIS MONTH"
+                        : categoryPane.onlyOverspent
+                            && categoryPane.filterText.trim().length>0
+                            ? "NO OVERSPENT SEARCH MATCHES // CLEAR SEARCH OR FILTER"
+                            : categoryPane.filterText.trim().length>0
+                                ? "NO SEARCH MATCHES // CLEAR SEARCH"
+                                : "NO CATEGORIES IN THIS BUDGET"
             font.pixelSize: 9
             color: Colors.cyan
             textFormat: Text.PlainText

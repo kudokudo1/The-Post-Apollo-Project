@@ -1058,8 +1058,23 @@ PanelWindow {
                     // SelectorSlider index 0 is the top HIGH position.
                     currentIndex: 3 - root.selectedReasoningStep
                     optionLabels: ["HIGH", "MED", "LOW", "NONE"]
-                    accentColor: Colors.cyan
-                    handleGlowColor: Colors.magenta
+                    // Each Tree owns its native identity/base, corner
+                    // accent and spiritual/icon glow. Only this Forest
+                    // instance opts into the shared gradient thumb skin.
+                    accentColor: root.activeTree.identityColor
+                    handleColor: root.activeTree.identityColor
+                    handleGradientEnabled: true
+                    handleGradientBaseColor: root.activeTree.identityColor
+                    handleGradientAccentColor:
+                        root.activeTree.gradientAccentColor
+                    handleGradientTopRight:
+                        root.activeTree.gradientTopRight
+                    handleGlowColor:
+                        root.activeTree.spiritualIdleGlowColor
+                    activityGlowColor: root.activeTree.iconIdleGlowColor
+                    // The Forest corner ring below supplies the gradient
+                    // outline instead of a second solid outer border.
+                    border.color: "transparent"
                     sideLabel: "THINK"
                     enabledSlider: root.menuOpen
                     Accessible.name: "Forest reasoning level"
@@ -1071,9 +1086,20 @@ PanelWindow {
                     }
                 }
 
+                // Same Forest 1px radial border ink as the Tree buttons.
+                // This is visual-only and does not intercept slider input.
+                ForestCornerGradientBorder {
+                    anchors.fill: reasoningSelectorSlider
+                    lineWidth: 1
+                    baseColor: root.activeTree.identityColor
+                    accentColor: root.activeTree.gradientAccentColor
+                    accentTopRight: root.activeTree.gradientTopRight
+                    z: 20
+                }
+
                 Repeater {
                     model: ["HIGH", "MED", "LOW", "NONE"]
-                    delegate: GohuText {
+                    delegate: Item {
                         required property int index
                         required property string modelData
                         anchors.right: reasoningSelectorSlider.left
@@ -1081,13 +1107,30 @@ PanelWindow {
                         width: 28
                         height: 15
                         y: reasoningRailHost.detentCenterY(index) - height / 2
-                        text: modelData
-                        font.pixelSize: 8
-                        horizontalAlignment: Text.AlignRight
-                        color: index === reasoningSelectorSlider.currentIndex
-                               ? Colors.magenta : Colors.cyan
-                        elide: Text.ElideRight
-                        verticalAlignment: Text.AlignVCenter
+
+                        ForestGradientName {
+                            id: reasoningLevelInk
+                            anchors.fill: parent
+                            text: modelData
+                            gradientText: modelData
+                            pixelSize: 8
+                            bold: false
+                            baseColor: root.activeTree.identityColor
+                            accentColor: root.activeTree.gradientAccentColor
+                            accentTopRight: root.activeTree.gradientTopRight
+                        }
+                        TextHashGlow {
+                            safeSource: reasoningLevelInk
+                            requestedVisible: root.menuOpen
+                                && index === reasoningSelectorSlider.currentIndex
+                            foregroundColor: root.activeTree.identityColor
+                            preferredGlowColor:
+                                root.activeTree.spiritualIdleGlowColor
+                            radius: 4
+                            samples: 9
+                            opacity: 0.78
+                            z: -1
+                        }
                     }
                 }
             }

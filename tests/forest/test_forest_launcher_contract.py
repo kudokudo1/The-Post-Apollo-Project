@@ -355,8 +355,8 @@ class ForestLauncherContract(unittest.TestCase):
         ring = (ROOT / "widgets/ForestCornerGradientBorder.qml").read_text()
         name = (ROOT / "widgets/ForestGradientName.qml").read_text()
 
-        self.assertEqual(view.count("ForestCornerGradientBorder {"), 1)
-        self.assertEqual(view.count("ForestGradientName {"), 3)
+        self.assertEqual(view.count("ForestCornerGradientBorder {"), 2)
+        self.assertEqual(view.count("ForestGradientName {"), 4)
         self.assertIn("baseColor: treeRow.foregroundColor", view)
         self.assertEqual(view.count("accentColor: treeRow.energized"), 3)
         self.assertEqual(view.count("? treeRow.foregroundColor : modelData.gradientAccentColor"), 3)
@@ -575,8 +575,8 @@ class ForestLauncherContract(unittest.TestCase):
         git = (ROOT / "widgets/GitW.qml").read_text()
         hospital = (ROOT / "widgets/HospitalW.qml").read_text()
 
-        # The selector is the same shared hardware used by Git/Hospital.
-        # Forest remains the only changed owner; shared source is unchanged.
+        # The actual shared hardware stays the same in Git/Hospital.
+        # Its new gradient skin is opt-in; only Forest turns it on.
         self.assertEqual(view.count("SelectorSlider {"), 1)
         self.assertEqual(view.count("IndexRail {"), 0)
         self.assertIn("SelectorSlider {", git)
@@ -605,8 +605,26 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("anchors.right: reasoningSelectorSlider.left", view)
         self.assertIn("reasoningRailHost.detentCenterY(index)", view)
         self.assertIn('sideLabel: "THINK"', view)
-        self.assertIn("accentColor: Colors.cyan", view)
-        self.assertIn("handleGlowColor: Colors.magenta", view)
+        self.assertIn("accentColor: root.activeTree.identityColor", view)
+        self.assertIn("handleColor: root.activeTree.identityColor", view)
+        self.assertIn("handleGradientEnabled: true", view)
+        self.assertIn("handleGradientBaseColor: root.activeTree.identityColor", view)
+        self.assertIn("handleGradientAccentColor:", view)
+        self.assertIn("root.activeTree.gradientAccentColor", view)
+        self.assertIn("handleGradientTopRight:", view)
+        self.assertIn("root.activeTree.gradientTopRight", view)
+        self.assertIn("handleGlowColor:", view)
+        self.assertIn("root.activeTree.spiritualIdleGlowColor", view)
+        self.assertIn("activityGlowColor: root.activeTree.iconIdleGlowColor", view)
+        self.assertIn('border.color: "transparent"', view)
+        self.assertIn("anchors.fill: reasoningSelectorSlider", view)
+        self.assertIn("lineWidth: 1", view)
+        self.assertIn("id: reasoningLevelInk", view)
+        self.assertIn("gradientText: modelData", view)
+        self.assertIn("pixelSize: 8", view)
+        self.assertIn("safeSource: reasoningLevelInk", view)
+        self.assertIn("index === reasoningSelectorSlider.currentIndex", view)
+        self.assertIn("preferredGlowColor:", view)
         self.assertIn("enabledSlider: root.menuOpen", view)
         self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
         self.assertIn("steps[selectedTreeIndex] = step", view)
@@ -623,11 +641,35 @@ class ForestLauncherContract(unittest.TestCase):
             "Math.round(fraction * (count - 1))",
             "function handleYForIndex(index)",
             "width: 40", "height: 52", "width: 28",
-            "color: dragArea.pressed ? Colors.yellow : Colors.white",
+            "color: dragArea.pressed ? Colors.yellow",
             "slider.handleGlowColor",
             "onWheel: function(wheel)",
         ):
             self.assertIn(source, selector)
+
+        # Legacy Git/Hospital sliders are unchanged at runtime: the
+        # gradient overlay is disabled by default. Forest binds a live
+        # Tree-colored skin, including matching top-left radial direction.
+        self.assertIn("import QtQuick.Shapes as Shapes", selector)
+        self.assertIn("property bool handleGradientEnabled: false", selector)
+        self.assertIn("property color handleGradientBaseColor: handleColor", selector)
+        self.assertIn("property color handleGradientAccentColor: accentColor", selector)
+        self.assertIn("property bool handleGradientTopRight: false", selector)
+        self.assertIn("id: thumbGradientInk", selector)
+        self.assertIn("visible: slider.handleGradientEnabled && !dragArea.pressed", selector)
+        self.assertIn("fillGradient: Shapes.RadialGradient {", selector)
+        self.assertIn("slider.handleGradientAccentColor", selector)
+        self.assertIn("slider.handleGradientBaseColor", selector)
+        self.assertIn("slider.handleGradientTopRight", selector)
+        self.assertIn("orientation: Gradient.Vertical", selector)
+        self.assertIn("slider.handleGradientEnabled", selector)
+        self.assertIn("dragArea.pressed ? Colors.yellow", selector)
+        self.assertNotIn("handleGradientEnabled: true", git)
+        self.assertNotIn("handleGradientEnabled: true", hospital)
+        self.assertEqual(view.count("ForestCornerGradientBorder {"), 2)
+        self.assertEqual(view.count("ForestGradientName {"), 4)
+        self.assertIn('gradientAccentColor: "#C7482F", gradientTopRight: false',
+                      view)
 
         # The top is HIGH; the bottom is NONE, matching both the bound
         # currentIndex and the four fixed Gohu labels.

@@ -1,0 +1,48 @@
+name: FinanceW Market M24 disposable populated-ledger real-QML fixture
+
+on:
+  pull_request:
+    paths:
+      - "tests/finance/finance_market_m24_populated_visual_harness.qml"
+      - "tests/finance/test_market_m24_populated_visual.py"
+      - "scripts/finance/MARKET_M24_POPULATED_QT_FIXTURE_README.md"
+      - ".github/workflows/financew-market-m24-populated-qt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tests/finance/finance_market_m24_populated_visual_harness.qml"
+      - "tests/finance/test_market_m24_populated_visual.py"
+      - "scripts/finance/MARKET_M24_POPULATED_QT_FIXTURE_README.md"
+      - ".github/workflows/financew-market-m24-populated-qt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  populated-market-qt-fixture:
+    name: Real QML pane, disposable M20 SQLite + M21 status, no Quickshell execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QML_DISABLE_DISK_CACHE: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Headless Qt libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install PySide6 only in disposable CI runner
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Exercise temp SQLite populated quota in actual QML pane
+        run: python3 -B tests/finance/test_market_m24_populated_visual.py --ci
+      - name: Verify detached native Qt visual window open and close
+        run: python3 -B tests/finance/test_market_m24_populated_visual.py --visual-smoke
+      - name: Repeat M21 no-write SQLite regression
+        run: python3 -B tests/finance/test_market_quota_status.py

@@ -435,6 +435,46 @@ Item {
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
             }
+            GohuText {
+                width: parent.width
+                text: "SESSION TRANSFER RECONCILIATION // ALL MANUAL ACCOUNTS"
+                font.pixelSize: 10
+                font.bold: true
+                color: Colors.magenta
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: manager.review.transferPairCount+" DECLARED TRANSFER PAIRS"
+                    +" // "+manager.review.transferLegCount+" LINKED ENTRIES"
+                    +" // MOVED "+Accounts.money(manager.review.transferVolumeCents)
+                    +" // LINKED NET "+Accounts.money(manager.review.transferNetCents)
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: manager.review.unlinkedCount+" UNLINKED SESSION ENTRIES"
+                    +" // IN "+Accounts.money(manager.review.unlinkedInCents)
+                    +" // OUT "+Accounts.money(manager.review.unlinkedOutCents)
+                    +" // NET "+Accounts.money(manager.review.unlinkedNetCents)
+                font.pixelSize: 9
+                color: Colors.white
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: "DECLARED TRANSFERS CANCEL ONLY ACROSS THE COMPLETE SESSION"
+                    +" // UNLINKED IS NOT VERIFIED INCOME OR SPENDING"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
             ActionButton {
                 width: parent.width
                 height: 30

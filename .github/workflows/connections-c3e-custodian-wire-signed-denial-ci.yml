@@ -51,10 +51,17 @@ jobs:
                            "HOLD_UNENROLLED_TEST_KEY_NO_TERMINAL_SETTLEMENT",
                            "C3E_WIRE_NO_INDEPENDENT_CUSTODIAN_OR_PRODUCTION_SIGNIN"):
               assert required in s, required
+          # The old implementation leaked a received SCM_RIGHTS fd when
+          # recvmsg() returned an empty payload. Keep cleanup ordered
+          # immediately after recvmsg and before the EOF refusal.
+          assert s.index("    _discard_ancillary(ancillary)\n    if not data:") > s.index("receiver.recvmsg(MAX_PACKET + 1, 512)")
+          tests=Path("tests/connections/test_connections_c3e_custodian_wire_signed_denial.py").read_text()
+          assert "test_31_empty_packet_with_real_scm_rights_closes_fd_before_unknown" in tests
+          assert "test_32_linux_empty_seqpacket_actually_delivers_rights" in tests
           assert "readonly property bool credentialActionsEnabled: false" in b
           print("C3E_SIGNED_WIRE_CI // NO_PROTECTED_CUSTODIAN")
           PY
-      - name: 30 real separate-process signed-denial, EOF, SIGKILL and FD negative cases
+      - name: 32 real signed-denial and empty-payload SCM_RIGHTS cleanup cases
         shell: bash
         run: |
           set -euo pipefail

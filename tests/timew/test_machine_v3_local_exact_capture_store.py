@@ -34,11 +34,11 @@ def check(value, label):
     checks += 1
 
 
-def reject(call, label):
+def reject(call, label, expected=LocalCaptureRefused):
     global checks
     try:
         call()
-    except LocalCaptureRefused:
+    except expected:
         checks += 1
     else:
         raise AssertionError(label + " improperly accepted")
@@ -144,7 +144,7 @@ assert item['c5_spent_verified'] is False
            "wrong checkpoint UUID version")
     reject(lambda: save(store, workspace_id=True), "nonstring workspace refused")
     reject(lambda: save(store, operation_id="forbidden"),
-           "refuse injected authorization field")
+           "refuse injected authorization field", expected=TypeError)
 
     # 128 distinct fractional samples are separate local data, not trusted.
     for i in range(128):

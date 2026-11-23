@@ -304,6 +304,51 @@ class SignedNativeCommandTests(unittest.TestCase):
         self.assertEqual(self.base.factory_calls, 0)
         self.assertEqual(len(fake.timeouts), 6)
 
+    def test_complete_receipt_after_deadline_never_updates_client_state(self):
+        # A complete frame received just before expiry is not enough if
+        # signature verification itself crosses the total deadline.
+        class TimelyBytesLateVerification:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def settimeout(self, _):
+                return None
+
+            def connect(self, _):
+                return None
+
+            def sendall(self, _):
+                return None
+
+            def recv(self, _):
+                return b"completed-frame\\n"
+
+        peer = KernelPeer(os.getpid(), os.geteuid(), os.getegid())
+        apparently_valid = {
+            "state": "REQUESTED",
+            "requestId": "TEST_HOST_REQUEST_0001",
+            "hostInstance": "TEST_HOST_INSTANCE_0001",
+            "sequence": 1,
+        }
+        with patch("desktop_signed_command_client_v0.socket.socket",
+                   return_value=TimelyBytesLateVerification()), \
+             patch("desktop_signed_command_client_v0._peer",
+                   return_value=peer), \
+             patch("desktop_signed_command_client_v0.verify_receipt",
+                   return_value=apparently_valid), \
+             patch("desktop_signed_command_client_v0.time.monotonic",
+                   side_effect=[0.0, 0.1, 0.2, 0.3, 2.1]):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertTrue(self.client.faulted)
+        self.assertIsNone(self.client._request_id)
+        self.assertIsNone(self.client._instance)
+        self.assertEqual(self.client._sequence, 0)
+        self.assertEqual(self.base.factory_calls, 0)
+
     def test_signer_failure_revokes_host_instead_of_orphan_login(self):
         # Existing gateway bound socket and signed mode. Fail signing after
         # successful side-effect-bearing host BEGIN.

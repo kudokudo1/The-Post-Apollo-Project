@@ -144,3 +144,58 @@ function movingAverageSeries(snapshot) {
         noProviderCalls:true
     };
 }
+
+// M29: descriptive relationship between already-loaded SMA5 and SMA20.
+// An observed SIDE CHANGE means the first later non-equal average is on the
+// opposite side of the earlier non-equal average, potentially across ties.
+// Never call this a price crossing, recommendation, or intraday event.
+function movingAverageRelationship(snapshot) {
+    const moving = movingAverageSeries(snapshot);
+    if (!moving) return null;
+    if (moving.sessions < 20) {
+        return {
+            state:"insufficient", sessions:moving.sessions, requiredSessions:20,
+            source:"loaded-eodhd-range-only", readOnly:true, noProviderCalls:true
+        };
+    }
+    let previousDefinite = null;
+    let aboveChanges = 0, belowChanges = 0, lastChange = null;
+    let latestSide = "EQUAL";
+    for (let i=19; i<moving.sessions; i++) {
+        const five = moving.sma5[i-4], twenty = moving.sma20[i-19];
+        if (!five || !twenty || five.index !== i || twenty.index !== i
+                || five.date !== twenty.date) return null;
+        const spread = five.price - twenty.price;
+        const epsilon = Math.max(five.price, twenty.price) * 1e-10;
+        const side = Math.abs(spread) <= epsilon ? "EQUAL"
+            : spread > 0 ? "ABOVE" : "BELOW";
+        latestSide = side;
+        if (side !== "EQUAL") {
+            if (previousDefinite !== null && side !== previousDefinite) {
+                if (side === "ABOVE") aboveChanges++;
+                else belowChanges++;
+                lastChange = {date:five.date,index:i,direction:side};
+            }
+            previousDefinite = side;
+        }
+    }
+    const spread = moving.latest5 - moving.latest20;
+    const spreadPct = spread / moving.latest20 * 100;
+    if (!Number.isFinite(spread) || !Number.isFinite(spreadPct))
+        return null;
+    return {
+        state:"ready",
+        sessions:moving.sessions,
+        latestDate:snapshot.bars[snapshot.bars.length-1].date,
+        latestSide:latestSide,
+        spreadPrice:latestSide === "EQUAL" ? 0 : Math.round(spread*100)/100,
+        spreadPct:latestSide === "EQUAL" ? 0 : roundPct(spreadPct),
+        sideChanges:aboveChanges+belowChanges,
+        movedAbove:aboveChanges, movedBelow:belowChanges,
+        lastChange:lastChange,
+        priceBasis:moving.priceBasis,
+        source:"loaded-eodhd-range-only",
+        readOnly:true,
+        noProviderCalls:true
+    };
+}

@@ -124,3 +124,39 @@ test("M4 group policy does not mutate Actual, disk or permissions",()=>{
     assert.equal(groupSource.includes(method),false,method);
   }
 });
+
+test("M7 ambiguous group identities refuse previews for both modes",()=>{
+  const conflicted={...snapshot,categoryGroups:[
+    {id:"needs",name:"Needs"},{id:"needs",name:"Alternate"},
+    {id:"wants",name:"Wants"}
+  ]};
+  for(const [mode,id] of [["create",""],["rename","needs"]]){
+    const result=previewGroup(conflicted,mode,id,"Fresh label");
+    assert.equal(result.ok,false);
+    assert.equal(result.reason,"AMBIGUOUS GROUP IDS // REFRESH");
+  }
+  assert.equal(previewGroup(snapshot,"create","","Fresh label").ok,true);
+});
+test("M7 Income group is not a rename target even when erroneously listed",()=>{
+  const incoming={...snapshot,categoryGroups:[
+    ...snapshot.categoryGroups,{id:"income-1",name:"Income",is_income:true}
+  ]};
+  const result=previewGroup(incoming,"rename","income-1","Personal income");
+  assert.equal(result.ok,false);
+  assert.equal(result.reason,"INCOME GROUP CANNOT BE RENAMED");
+  assert.equal(previewGroup(incoming,"create","","Household supplies").ok,true);
+});
+test("M7 malformed group metadata and stale source refuse before approval",()=>{
+  const malformed={...snapshot,categoryGroups:[{
+    id:"needs",name:"Needs",is_income:"false"
+  }]};
+  const invalid=previewGroup(malformed,"create","","New expense");
+  assert.equal(invalid.ok,false);
+  assert.equal(invalid.reason,"UNTRUSTED GROUP LIST");
+  const changed={...snapshot,month:"2026-11",sourceKey:"b".repeat(64)};
+  assert.equal(previewGroup(changed,"rename","needs","Essentials").ok,true);
+  assert.equal(previewGroup({...changed,sourceKey:"broken"},"rename",
+    "needs","Essentials").ok,false);
+  assert.equal(previewGroup({...changed,month:"2026-13"},"create",
+    "","Essentials").ok,false);
+});

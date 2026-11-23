@@ -54,7 +54,7 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in broker
           print("C3E_CUTOVER_CI_ONLY // NO_PRODUCTION_AUTHORITY")
           PY
-      - name: 28 candidate format and old-state promotion rejection tests
+      - name: 32 candidate, incomplete-inventory and old-state rejection tests
         shell: bash
         run: |
           set -euo pipefail

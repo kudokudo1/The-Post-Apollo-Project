@@ -1,0 +1,41 @@
+name: Forest Core B4g Synthetic Outbox Expectation
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/recovery_outbox_expectation_b4g.py'
+      - 'scripts/forest/RECOVERY_EXPECTATION_B4G.md'
+      - 'tests/forest/test_recovery_expectation_b4g.py'
+      - '.github/workflows/forest-core-b4g-expectation.yml'
+  push:
+    paths:
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/recovery_outbox_expectation_b4g.py'
+      - 'scripts/forest/RECOVERY_EXPECTATION_B4G.md'
+      - 'tests/forest/test_recovery_expectation_b4g.py'
+      - '.github/workflows/forest-core-b4g-expectation.yml'
+
+jobs:
+  synthetic-recovery-classification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: B4g attempt-marker and missing-event tests
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_expectation_b4g.py' -v
+      - name: B4f terminal outbox regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_local_terminal_outbox_b4f.py' -v
+      - name: B4e lineage regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_lineage_b4e.py' -v
+      - name: B4d recovery regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_inspect_b4d.py' -v
+      - name: B3 writer regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a admission regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: B4b precommit regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_precommit_b4b.py' -v
+      - name: B4c held-permit regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_fenced_commit_b4c.py' -v
+      - name: Compile Forest B3 and B4g
+        run: python3 -m py_compile scripts/forest/turn_bridge_b3.py scripts/forest/recovery_outbox_expectation_b4g.py tests/forest/test_recovery_expectation_b4g.py

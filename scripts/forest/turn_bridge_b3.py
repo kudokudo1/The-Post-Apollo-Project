@@ -38,6 +38,9 @@ CREATE TABLE forest_attempts_b3 (
     owner_key TEXT NOT NULL,
     expected_revision INTEGER NOT NULL,
     model_key TEXT NOT NULL,
+    outbox_expectation_b4g TEXT CHECK(
+        outbox_expectation_b4g IS NULL OR
+        outbox_expectation_b4g='OUTBOX_EXPECTED_V1'),
     status TEXT NOT NULL
         CHECK(status IN ('RESERVED','COMMITTED','ABORTED')),
     reply_turn_id TEXT REFERENCES forest_turns(turn_id),
@@ -48,6 +51,8 @@ CREATE TABLE forest_attempts_b3 (
 CREATE UNIQUE INDEX forest_attempts_b3_one_live
 ON forest_attempts_b3(session_id) WHERE status = 'RESERVED';
 """
+
+OUTBOX_EXPECTATION_B4G = "OUTBOX_EXPECTED_V1"  # Synthetic marker, NOT C5 evidence.
 
 
 class BridgeRefusal(Exception):
@@ -96,18 +101,31 @@ class ForestTurnBridge:
     def __init__(self, journal: ForestSessionJournal, *,
                  clock_ms: Callable[[], int],
                  streamer: Callable = stream_chat,
-                 synthetic_terminal_outbox: bool = False):
+                 synthetic_terminal_outbox: bool = False,
+                 synthetic_outbox_expectation_b4g: bool = False):
         if not isinstance(journal, ForestSessionJournal):
             raise BridgeRefusal("INVALID_JOURNAL")
         if (not callable(clock_ms) or not callable(streamer)
-                or type(synthetic_terminal_outbox) is not bool):
+                or type(synthetic_terminal_outbox) is not bool
+                or type(synthetic_outbox_expectation_b4g) is not bool):
             raise BridgeRefusal("INVALID_DEPENDENCY")
+        if synthetic_outbox_expectation_b4g and not synthetic_terminal_outbox:
+            raise BridgeRefusal("OUTBOX_EXPECTATION_REQUIRES_OUTBOX")
         self._synthetic_terminal_outbox = synthetic_terminal_outbox
+        self._synthetic_outbox_expectation_b4g = synthetic_outbox_expectation_b4g
         if synthetic_terminal_outbox:
             try:
                 require_local_outbox(journal.db)
             except OutboxRefusal as exc:
                 raise BridgeRefusal("LOCAL_OUTBOX_UNAVAILABLE") from exc
+        if synthetic_outbox_expectation_b4g:
+            try:
+                cols = {c[1] for c in journal.db.execute(
+                    "PRAGMA table_info(forest_attempts_b3)")}
+            except sqlite3.Error as exc:
+                raise BridgeRefusal("OUTBOX_EXPECTATION_SCHEMA_UNAVAILABLE") from exc
+            if "outbox_expectation_b4g" not in cols:
+                raise BridgeRefusal("OUTBOX_EXPECTATION_SCHEMA_MISSING")
         self.journal = journal
         self.db = journal.db
         self.clock_ms = clock_ms
@@ -150,14 +168,21 @@ class ForestTurnBridge:
             _messages(messages)
             user_turn_id = rows[0][0]
             try:
+                # B4g: store the expectation in the SAME INSERT as the
+                # original reservation. A missing marker never proves legacy.
+                fields = ("attempt_id,session_id,user_turn_id,owner_key,"
+                          "expected_revision,model_key,status,reply_turn_id,"
+                          "created_at_ms,updated_at_ms")
+                values = "?,?,?,?,?,?,'RESERVED',NULL,?,?"
+                params = (attempt_id, session_id, user_turn_id, owner,
+                          revision, model, now, now)
+                if self._synthetic_outbox_expectation_b4g:
+                    fields += ",outbox_expectation_b4g"
+                    values += ",?"
+                    params += (OUTBOX_EXPECTATION_B4G,)
                 self.db.execute(
-                    "INSERT INTO forest_attempts_b3 "
-                    "(attempt_id,session_id,user_turn_id,owner_key,"
-                    "expected_revision,model_key,status,reply_turn_id,"
-                    "created_at_ms,updated_at_ms) "
-                    "VALUES (?,?,?,?,?,?,'RESERVED',NULL,?,?)",
-                    (attempt_id, session_id, user_turn_id, owner,
-                     revision, model, now, now),
+                    "INSERT INTO forest_attempts_b3 (" + fields +
+                    ") VALUES (" + values + ")", params,
                 )
             except sqlite3.IntegrityError as exc:
                 raise BridgeRefusal("ATTEMPT_ALREADY_EXISTS") from exc

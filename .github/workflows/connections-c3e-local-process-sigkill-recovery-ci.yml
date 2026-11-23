@@ -1,0 +1,88 @@
+name: Connections C3e actual local writer SIGKILL and recovery (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eLocalProcessSigkillRecoveryCI.py'
+      - 'tests/connections/test_connections_c3e_local_process_sigkill_recovery.py'
+      - '.github/workflows/connections-c3e-local-process-sigkill-recovery-ci.yml'
+      - 'docs/connections-c3e-local-process-sigkill-recovery-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-local-process-crash-never-protected-trust:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin existing synthetic C3e verifier dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify strictly disposable SIGKILL trap and no extra writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eLocalProcessSigkillRecoveryCI.py \
+            tests/connections/test_connections_c3e_local_process_sigkill_recovery.py
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/connections/c3e_release_trust/C3eLocalProcessSigkillRecoveryCI.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for forbidden in ("sqlite3.connect(", "socket.socket(", "subprocess.run(",
+                            "Ed25519PrivateKey", '"productionAuthority": True',
+                            '"credentialActionsEnabled": True',
+                            '"safeToRetry": True'):
+              assert forbidden not in code, forbidden
+          for needed in ("C3eLocalDevelopmentHistoryLedger.py",
+                         "signal.SIGKILL", "os.kill(os.getpid()",
+                         "L._hosted_ci_root(root)", "AFTER_SQLITE_COMMIT_BEFORE_ACK",
+                         "AFTER_META_UPDATE_BEFORE_COMMIT",
+                         '"safeToRetry": False',
+                         "C3E_REAL_SIGKILL_NO_PROTECTED_HISTORY_OR_RECOVERY_AUTHORITY"):
+              assert needed in code, needed
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_ACTUAL_SIGKILL_DISPOSABLE_ONLY // NO_PRODUCTION_AUTHORITY")
+          PY
+      - name: 16 real forked-process SIGKILL, crash recovery and local rollback tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_local_process_sigkill_recovery.py
+          echo "C3E_REAL_PROCESS_SIGKILL // LOCAL_ONLY_ROLLBACK_AND_RECOVERY_PROOF"
+      - name: Preserve existing local ledger, IPC, cutover and signed history tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/test_connections_c3e_custodian_cutover_negative.py
+          python3 -B -I tests/connections/test_connections_c3e_ipc_receipt_non_evidence.py
+          for test in \
+            tests/connections/test_connections_c3e_unix_peer_credentials_negative.py \
+            tests/connections/test_connections_c3e_local_readonly_ipc.py \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py \
+            tests/connections/test_connections_c3e_operator_witness_enrollment_preflight.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          do
+            sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+              "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_REAL_PROCESS_CRASH_HOLD // INDEPENDENT_CUSTODIAN_STILL_ABSENT"

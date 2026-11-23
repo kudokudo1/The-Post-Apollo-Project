@@ -1180,8 +1180,8 @@ PanelWindow {
                     }
                 }
 
-                // The shared ASK/SEND component is displayed as SEND for Forest,
-                // Intercom. It owns visual states only, never provider calls.
+                // The shared Hospital ASK/SEND component is labeled SEND
+                // in Forest. It owns presentation, never provider calls.
                 AskSendButton {
                     id: forestAskSendButton
                     anchors.right: parent.right

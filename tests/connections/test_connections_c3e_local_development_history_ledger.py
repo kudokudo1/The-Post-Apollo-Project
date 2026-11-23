@@ -230,7 +230,7 @@ class LocalHistoryLedgerTests(unittest.TestCase):
 
     def test_21_local_ledger_disabled_without_hosted_runner(self):
         with mock.patch.dict(os.environ, {"RUNNER_ENVIRONMENT": "self-hosted"}):
-            with self.assertRaises(M.R.Refused):
+            with self.assertRaisesRegex(M.Refused, "HOSTED_DISPOSABLE_RUNNER_REQUIRED"):
                 M.DevelopmentLedger(self.work)
 
     def test_22_bad_boolean_clock_or_ttl_refused(self):

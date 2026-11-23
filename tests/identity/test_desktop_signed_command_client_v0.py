@@ -349,6 +349,85 @@ class SignedNativeCommandTests(unittest.TestCase):
         self.assertEqual(self.client._sequence, 0)
         self.assertEqual(self.base.factory_calls, 0)
 
+    def test_local_status_cancel_recover_refusals_all_mark_no_send(self):
+        # These three commands are rejected without any host-issued request.
+        # Earlier client telemetry must not imply this call got a signed reply.
+        for action in (self.client.status, self.client.cancel, self.client.recover):
+            with self.subTest(action=action.__name__):
+                with self.assertRaises(ReceiptRejected):
+                    action()
+                self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+                self.assertFalse(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 0)
+        self.assertEqual(self.base.urls, [])
+
+    def test_duplicate_begin_resets_previous_signed_frame_marker(self):
+        original = self.client.begin()
+        self.assertEqual(original.phase, "REQUESTED")
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertFalse(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+
+    def test_recover_while_pending_marks_no_send_without_host_change(self):
+        original = self.client.begin()
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        with self.assertRaises(ReceiptRejected):
+            self.client.recover()
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+        self.assertFalse(self.client.faulted)
+        # A later valid STATUS still uses the existing host-issued request.
+        self.assertEqual(self.client.status().request_id, original.request_id)
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+
+    def test_cancel_after_cancelled_marks_no_send_not_old_signed_status(self):
+        self.client.begin()
+        self.assertEqual(self.client.cancel().phase, "CANCELLED")
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        with self.assertRaises(ReceiptRejected):
+            self.client.cancel()
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertFalse(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+
+    def test_nonce_collision_pre_send_fault_has_no_wire_attempt(self):
+        repeated = secrets.token_urlsafe(32)
+        self.client._nonces.add(repeated)
+        with patch("desktop_signed_command_client_v0.secrets.token_urlsafe",
+                   return_value=repeated):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 0)
+        self.assertEqual(self.base.urls, [])
+
+    def test_ambiguous_send_stays_unknown_after_faulted_retry_denials(self):
+        # A lost signed response after the real fake-browser BEGIN is not
+        # overwritten by later local refusals of BEGIN/STATUS/CANCEL/RECOVER.
+        with patch("desktop_signed_command_client_v0.verify_receipt",
+                   side_effect=ReceiptRejected("signed reply unavailable")):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+        for action in (self.client.begin, self.client.status,
+                       self.client.cancel, self.client.recover):
+            with self.subTest(action=action.__name__):
+                with self.assertRaises(ReceiptRejected):
+                    action()
+                self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+
     def test_transport_marker_pre_send_refusal_has_no_dispatch_evidence(self):
         self.assertEqual(self.client.last_wire_outcome, "UNOBSERVED")
         self.accept_server = False

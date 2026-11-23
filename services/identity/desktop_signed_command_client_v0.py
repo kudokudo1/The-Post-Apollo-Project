@@ -123,7 +123,13 @@ class SignedIdentityCommandClient:
 
     def _transact(self, action: str) -> HostCommandObservation:
         if self._faulted:
+            # Preserve the outcome of the last actual transport attempt,
+            # especially UNKNOWN_HOLD. A denied retry is NOT reconciliation.
             raise ReceiptRejected("Native command client is faulted")
+        # Each non-faulted call begins with zero attempted wire bytes, even if
+        # local action/phase/nonce validation rejects it before socket setup.
+        # This is per-client diagnostic telemetry, never a retry authority.
+        self._last_wire_outcome = "NO_SEND_ATTEMPT"
         request_id = None if action == "BEGIN" else self._request_id
         if action == "BEGIN":
             if self._begin_consumed or self._request_id is not None:
@@ -144,7 +150,6 @@ class SignedIdentityCommandClient:
         # One total budget for connect, send, and every response fragment.
         # Socket idle timeouts alone allow a slow peer to drip bytes forever.
         deadline = time.monotonic() + 2.0
-        self._last_wire_outcome = "NO_SEND_ATTEMPT"
 
         def remaining() -> float:
             left = deadline - time.monotonic()

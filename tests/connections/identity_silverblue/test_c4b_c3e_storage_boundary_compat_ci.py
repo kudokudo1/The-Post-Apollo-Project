@@ -126,15 +126,18 @@ class C4bC3eHoldCompatibility(unittest.TestCase):
         with mock.patch.object(B.C3E.L, "connect", side_effect=AssertionError("LOCAL_DB_USED")):
             self.assert_hold(self.inspect())
         protected = B.C3E.TrustBoundary(required_mode=B.C3E.PROTECTED_REQUIRED)
-        for operation, args in (
-            ("read_current_snapshot", ()),
-            ("issue_challenge", ()),
-            ("commit_signed_history", ()),
-            ("lookup_terminal_outcome", (b"\x00" * 32,)),
+        for operation, args, kwargs in (
+            ("read_current_snapshot", (), {}),
+            ("issue_challenge", (), {
+                "host": "ci-test-host", "release_epoch": 1,
+                "release_seq": 1, "now_ms": 1000, "ttl_ms": 2000,
+            }),
+            ("commit_signed_history", (), {}),
+            ("lookup_terminal_outcome", (b"\x00" * 32,), {}),
         ):
             with self.subTest(operation=operation):
                 with self.assertRaisesRegex(B.C3E.Refused, "HOLD_NO_FALLBACK"):
-                    getattr(protected, operation)(*args)
+                    getattr(protected, operation)(*args, **kwargs)
 
     def test_12_fake_remote_local_adapter_refused(self):
         class Fake:

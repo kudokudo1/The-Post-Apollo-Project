@@ -44,6 +44,40 @@ assert.deepEqual(draft,{
   notice:"UNSAVED DRAFT // SEC INDEX ONLY // FILING NOT INSPECTED"
 });
 assert.equal(Object.hasOwn(draft,"action"),false,"No executable attach command");
+
+// M9a: the operator may have zero saved cases. A valid temporary case can
+// still prepare fields; no collection change or storage operation occurs.
+const scratch={
+  schemaVersion:1,id:"scratch_session_1",title:"Temporary filing review",
+  question:"What does this SEC index entry show?",
+  createdAt:now,updatedAt:now,evidence:[]
+};
+const beforeScratch=JSON.stringify(scratch);
+const scratchRequest={...request,investigation:scratch,caseRevision:0};
+const scratchResponse=prepareUnsavedCitation(
+  JSON.stringify(scratchRequest)+"\n");
+const scratchDraft=JSON.parse(scratchResponse.slice(RESULT_PREFIX.length));
+assert.equal(scratchDraft.investigationId,scratch.id);
+assert.equal(scratchDraft.caseRevision,0);
+assert.equal(scratchDraft.readOnly,true);
+assert.equal(scratchDraft.preparedOnly,true);
+assert.equal(scratchDraft.fields.source,"manual");
+assert.equal(scratchDraft.fields.reviewed,false);
+assert.equal(scratchDraft.fields.url,candidate.url);
+assert.equal(JSON.stringify(scratch),beforeScratch);
+assert.equal(Object.hasOwn(scratchDraft,"action"),false);
+assert.equal(Object.hasOwn(scratchDraft,"storePath"),false);
+for(const bad of [
+  {...scratch,title:" "},
+  {...scratch,question:""},
+  {...scratch,id:"../escape"},
+  {...scratch,updatedAt:"not a timestamp"},
+  {...scratch,evidence: Array.from({length:41},()=>({}))}
+]) assert.throws(()=>prepareUnsavedCitation(JSON.stringify({
+  ...scratchRequest,investigation:bad
+})+"\n"),e=>e instanceof DraftPreviewRefusal
+  && e.message==="INVALID_CANDIDATE_DRAFT");
+
 assert.ok(Buffer.byteLength(response,"utf8")<5500);
 assert.deepEqual(await readDraftFrame(Readable.from([
   Buffer.from(frame.slice(0,21)),Buffer.from(frame.slice(21))

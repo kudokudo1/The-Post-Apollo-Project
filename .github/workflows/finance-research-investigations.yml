@@ -37,6 +37,7 @@ on:
       - "tests/finance/test_research_candidate_preview_bridge.mjs"
       - "tests/finance/test_research_candidate_draft_preview.mjs"
       - "tests/finance/test_research_m9_editor_contract.py"
+      - "tests/finance/test_research_m9a_scratch_contract.py"
       - "tests/finance/test_research_candidate_picker_contract.py"
       - "tests/finance/test_research_m8_navigation_contract.py"
       - "tests/finance/test_research_write_outcome_panel_contract.py"
@@ -80,6 +81,7 @@ on:
       - "tests/finance/test_research_candidate_preview_bridge.mjs"
       - "tests/finance/test_research_candidate_draft_preview.mjs"
       - "tests/finance/test_research_m9_editor_contract.py"
+      - "tests/finance/test_research_m9a_scratch_contract.py"
       - "tests/finance/test_research_candidate_picker_contract.py"
       - "tests/finance/test_research_m8_navigation_contract.py"
       - "tests/finance/test_research_write_outcome_panel_contract.py"
@@ -152,3 +154,5 @@ jobs:
         run: python3 -B tests/finance/test_research_m8_navigation_contract.py
       - name: M9 existing editor unsaved citation-draft contract
         run: python3 -B tests/finance/test_research_m9_editor_contract.py
+      - name: M9a in-memory scratch case and hard writer HOLD contract
+        run: python3 -B tests/finance/test_research_m9a_scratch_contract.py

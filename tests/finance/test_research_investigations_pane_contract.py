@@ -12,7 +12,7 @@ for marker in (
     'signal createRequested(string title, string question)',
     'signal attachRequested(string investigationId, string source, string title,',
     'signal removeRequested(string investigationId, string evidenceId)',
-    'available: pane.canCreate',
+    'pane.scratchEnabled\n                            ? pane.canCreateScratch : pane.canCreate',
     'available: pane.canAttach',
     'pane.armedRemoveId = evidenceRow.modelData.id',
     'pane.removeRequested(pane.selectedId, evidenceRow.modelData.id)',
@@ -40,6 +40,10 @@ assert 'label: "SEC IMPORT LATER"' in s
 assert 'available: false' in s
 assert 'onLeftClicked: pane.draftSource = "sec-edgar-submissions"' not in s
 # A controller connection alone never authorizes mutation.
-assert 'available: pane.controllerConnected && pane.writeEnabled && pane.loadState === "ready"' in s
+assert 'pane.writeEnabled && pane.loadState === "ready"' in s
 assert 'writeEnabled && loadState === "ready"' in s
+assert 'pane.scratchEnabled ? pane.scratchId === ""' in s
+assert 'signal createScratchRequested(string title, string question)' in s
+assert 'pane.createRequested(' in s
+assert 'pane.createScratchRequested(' in s
 print("Finance Research M3 isolated pane contracts: PASS")

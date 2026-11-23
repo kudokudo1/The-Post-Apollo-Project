@@ -232,7 +232,9 @@ def mount(app, temp, snapshots):
     assert all((pane, service, refresh, back)), (
         "Real M21 QML pane/service/buttons were not mounted"
     )
-    return engine, root, pane, service, refresh, back
+    # Keep QQmlComponent referenced: in PySide6 its disposal may own/delete
+    # the QML root even while the QWindow Python wrapper still exists.
+    return engine, component, root, pane, service, refresh, back
 
 
 def pump(app):
@@ -346,7 +348,7 @@ def main():
         if not PATH.is_file():
             raise RuntimeError("M24 QML harness missing")
         app = QGuiApplication([])
-        engine, root, pane, service, refresh, back = mount(
+        engine, component, root, pane, service, refresh, back = mount(
             app, temp, snapshots
         )
         try:
@@ -374,6 +376,7 @@ def main():
         finally:
             root.close()
             root.deleteLater()
+            component.deleteLater()
             engine.deleteLater()
             pump(app)
 

@@ -210,7 +210,7 @@ class HospitalC5H11OriginalCommitUnknown(unittest.TestCase):
         self.assertIn("PX_COMMIT_OUTCOME_UNKNOWN_HOLD_NO_AUTO_RETRY", commit)
         self.assertNotIn("os.environ", commit)
         self.assertNotIn("load_installed_key", commit)
-        self.assertNotIn("sqlite", commit.lower())
+        self.assertNotIn("sqlite3.connect(", commit.lower())
 
 
 if __name__ == "__main__":

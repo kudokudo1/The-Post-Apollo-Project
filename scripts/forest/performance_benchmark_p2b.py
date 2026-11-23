@@ -266,11 +266,12 @@ def benchmark_one(
         free_ram = before["host_mem_available_mib"]
         if type(free_ram) is not int or free_ram < ram + HEADROOM_MIB:
             raise BenchmarkRefusal("HOST_CAPACITY_NOT_ESTABLISHED")
-        if pre_resident is not None and (
-                expected_runtime == "gpu"
-                and (pre_resident["vram_bytes_reported"] is None
-                     or pre_resident["vram_bytes_reported"] == 0)):
-            raise BenchmarkRefusal("RUNTIME_MISMATCH")
+        if pre_resident is not None:
+            observed_vram = pre_resident["vram_bytes_reported"]
+            if (observed_vram is None
+                    or (expected_runtime == "gpu" and observed_vram == 0)
+                    or (expected_runtime == "cpu" and observed_vram != 0)):
+                raise BenchmarkRefusal("RUNTIME_MISMATCH")
     except (InventoryFailure, ProbeFailure) as exc:
         raise BenchmarkRefusal("PREFLIGHT_UNAVAILABLE") from exc
     measurements = _stream_one(host=host, port=port, model=model)
@@ -312,7 +313,11 @@ def benchmark_one(
 
 def refusal(code):
     return {
-        "schema": SCHEMA, "status": "REFUSED", "reason": code,
+        "schema": SCHEMA,
+        "status": ("SKIPPED" if code in (
+            "COLD_MODEL_ALREADY_RESIDENT", "WARM_MODEL_NOT_RESIDENT"
+        ) else "REFUSED"),
+        "reason": code,
         "c5_authority": "NOT_EVALUATED",
         "permission_granted": False, "production_authority": False,
         "inference_complete": False,

@@ -1,0 +1,73 @@
+name: Connections TimeW C5 two genuine kernel packets remain non-authorizing (CI only)
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/timew/TimeWC5KernelObservedRecoveryCI.py'
+      - 'tests/connections/timew/test_timew_c5_kernel_observed_recovery_ci.py'
+      - '.github/workflows/connections-timew-c5-kernel-readonly-recovery-ci.yml'
+      - 'docs/connections/timew-c5-kernel-observed-readonly-recovery-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-kernel-packets-no-c5-auth:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile DOC 5 only, verify existing kernel observer source unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/timew/TimeWC5KernelObservedRecoveryCI.py \
+            tests/connections/timew/test_timew_c5_kernel_observed_recovery_ci.py
+          python3 - <<'PY'
+          from pathlib import Path
+          code=Path("tests/connections/timew/TimeWC5KernelObservedRecoveryCI.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          forbidden=("socket.socket(", "sqlite3.connect(", "subprocess.run(",
+                     "Ed25519PrivateKey", "recvmsg(", ".send(",
+                     "grant_spent = True", "production_authorized=True")
+          for key in forbidden:
+              assert key not in code, key
+          for key in ("ConnectionsTimeWNativePacketObservation.py",
+                      "K.inspect_one_untrusted_packet(receiver)",
+                      "compare_untrusted_recovery_returns(",
+                      "KERNEL_OBSERVED_UNENROLLED_TWO_RETURNS_UNKNOWN_HOLD",
+                      "native_action_allowed: bool = False",
+                      "production_authorized: bool = False"):
+              assert key in code, key
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("DOC5_C5_KERNEL_READONLY // NO_PRODUCTION_AUTHORITY")
+          PY
+      - name: Real two Linux kernel packet observations and hostile UNKNOWN tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B -I \
+            tests/connections/timew/test_timew_c5_kernel_observed_recovery_ci.py
+          echo "DOC5_C5_KERNEL_READONLY // TWO_ORIGINALS_STILL_NOT_ENROLLED"
+      - name: Inherited C5 dual returns and original-operation read-only recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/timew/test_timew_c5_dual_recovery_return_reference.py
+          python3 -B -I tests/connections/timew/test_timew_c5_readonly_recovery_plan_reference.py
+          python3 -B -I tests/connections/timew/test_timew_c5_custodian_boundary_reference.py
+          python3 -B -I tests/connections/timew/test_timew_c5_native_outcome_hold_reference.py
+      - name: Inherited original Linux TimeW kernel packet observer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/test_connections_c3e_timew_native_packet_observer.py
+          echo "DOC5_C5_KERNEL_READONLY // NO_RETRY_OR_NATIVE_RESTORE"

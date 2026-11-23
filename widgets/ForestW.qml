@@ -977,10 +977,10 @@ PanelWindow {
                 anchors.bottom: promptRow.top
                 anchors.bottomMargin: 8
                 anchors.left: parent.left
-                // Keep the session placeholder clear of the reasoning rail;
-                // the rail owns a narrow vertical strip on chat's right edge.
+                // Reserve a label gutter left of the hardware slider;
+                // neither labels nor thumb overlap active chat content.
                 anchors.right: reasoningRailHost.left
-                anchors.rightMargin: 8
+                anchors.rightMargin: 35
                 clip: true
 
                 Column {
@@ -1017,10 +1017,10 @@ PanelWindow {
                     }
                 }
             }
-            // The established Post-Apollo IndexRail runs the full usable
-            // chat height, below the green header divider and to the same
-            // lower baseline as the message field and SEND. HIGH is at top
-            // and NONE at bottom. This is only a local Tree preference.
+            // Use the actual Post-Apollo SelectorSlider as in Git/Hospital,
+            // not the slimmer IndexRail. Keep the full usable chat height,
+            // below the green divider to the message/SEND lower baseline.
+            // The slider changes only the local Tree reasoning preference.
             Item {
                 id: reasoningRailHost
                 z: 12
@@ -1032,30 +1032,36 @@ PanelWindow {
                 anchors.rightMargin: 7
                 width: 46
 
-                // Track geometry mirrors the shared IndexRail's own
-                // 34px top / 10px bottom insets and snap-handle dimensions.
+                // SelectorSlider has a 38px top inset, 26px bottom inset
+                // and a 52px thumb in its INDEX profile. Match its actual
+                // physical detent centers for the external Gohu labels.
                 readonly property real trackHeight:
-                    Math.max(0, height - 44)
-                readonly property real handleHeight:
-                    Math.max(30, Math.min(58, trackHeight / 4 * 2))
+                    Math.max(0, height - 64)
+                readonly property real handleHeight: 52
                 function detentCenterY(index) {
                     const travel = Math.max(0, trackHeight - handleHeight);
-                    return 34 + handleHeight / 2
+                    return 38 + handleHeight / 2
                         + travel * Math.max(0, Math.min(3, index)) / 3;
                 }
 
-                IndexRail {
-                    id: reasoningIndexRail
+                SelectorSlider {
+                    id: reasoningSelectorSlider
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    width: 24
+                    width: 40
+                    selectorProfile: "index"
+                    // Git's legacy INDEX interaction snaps to integer stops;
+                    // Hospital can opt into release-preview separately.
+                    indexInteraction: "legacy"
                     count: 4
-                    // IndexRail 0 is at top; Forest's step 3 is HIGH.
+                    // SelectorSlider index 0 is the top HIGH position.
                     currentIndex: 3 - root.selectedReasoningStep
+                    optionLabels: ["HIGH", "MED", "LOW", "NONE"]
                     accentColor: Colors.cyan
+                    handleGlowColor: Colors.magenta
                     sideLabel: "THINK"
-                    enabledRail: root.menuOpen
+                    enabledSlider: root.menuOpen
                     Accessible.name: "Forest reasoning level"
                     Accessible.description:
                         "Local Tree preference only; not connected to inference."
@@ -1070,15 +1076,15 @@ PanelWindow {
                     delegate: GohuText {
                         required property int index
                         required property string modelData
-                        anchors.left: reasoningIndexRail.right
-                        anchors.leftMargin: 2
-                        width: reasoningRailHost.width
-                               - reasoningIndexRail.width - 2
+                        anchors.right: reasoningSelectorSlider.left
+                        anchors.rightMargin: 3
+                        width: 28
                         height: 15
                         y: reasoningRailHost.detentCenterY(index) - height / 2
                         text: modelData
                         font.pixelSize: 8
-                        color: index === reasoningIndexRail.currentIndex
+                        horizontalAlignment: Text.AlignRight
+                        color: index === reasoningSelectorSlider.currentIndex
                                ? Colors.magenta : Colors.cyan
                         elide: Text.ElideRight
                         verticalAlignment: Text.AlignVCenter

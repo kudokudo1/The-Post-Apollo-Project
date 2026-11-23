@@ -551,7 +551,7 @@ class ForestLauncherContract(unittest.TestCase):
             box = prompt - send - 6
             mic = max(28, min(34, round(box * 0.16)))
             # Removing the tiny dial restores prompt width even with the
-            # 46px shared IndexRail reserved along the right of the chat.
+            # 46px shared SelectorSlider host reserved at the chat right.
             local_draft = box - 11 - 6 - mic - 4 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
@@ -569,57 +569,68 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("height: 1\n            color: Colors.cyan", rail)
         self.assertNotIn("width: 1\n        color: Colors.cyan", rail)
 
-    def test_reasoning_index_rail_uses_shared_control_and_local_only_state(self):
+    def test_reasoning_selector_slider_uses_git_hospital_shared_control(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
-        rail = (ROOT / "components/IndexRail.qml").read_text()
+        selector = (ROOT / "components/SelectorSlider.qml").read_text()
         git = (ROOT / "widgets/GitW.qml").read_text()
         hospital = (ROOT / "widgets/HospitalW.qml").read_text()
 
-        # Forest uses the actual shared IndexRail; Git/Hospital retain
-        # their own established SelectorSlider, without shared mutation.
-        self.assertEqual(view.count("IndexRail {"), 1)
+        # The selector is the same shared hardware used by Git/Hospital.
+        # Forest remains the only changed owner; shared source is unchanged.
+        self.assertEqual(view.count("SelectorSlider {"), 1)
+        self.assertEqual(view.count("IndexRail {"), 0)
         self.assertIn("SelectorSlider {", git)
         self.assertIn("SelectorSlider {", hospital)
         self.assertNotIn("ForestReasoningDial {", view)
-        self.assertNotIn("id: reasoningStepDial", view)
         self.assertFalse((ROOT / "widgets/ForestReasoningDial.qml").exists())
         self.assertFalse((ROOT / "widgets/ForestReasoningDialPolicy.js").exists())
+
         self.assertIn("id: reasoningRailHost", view)
-        self.assertIn("id: reasoningIndexRail", view)
+        self.assertIn("id: reasoningSelectorSlider", view)
         self.assertIn("enabled: root.menuOpen", view)
         self.assertIn("anchors.top: chatDivider.bottom", view)
         self.assertIn("anchors.bottom: promptRow.bottom", view)
         self.assertIn("anchors.right: parent.right", view)
         self.assertIn("anchors.right: reasoningRailHost.left", view)
-        self.assertIn("anchors.rightMargin: 4", view)
-        self.assertIn("width: 46", view)
-        self.assertIn("width: 24", view)
+        self.assertIn("anchors.rightMargin: 35", view)  # labels clear chat
+        self.assertIn("width: 46", view)                 # composer unchanged
+        self.assertIn("width: 40", view)                 # real slider width
+        self.assertIn('selectorProfile: "index"', view)
+        self.assertIn('indexInteraction: "legacy"', view)
         self.assertIn("count: 4", view)
         self.assertIn("currentIndex: 3 - root.selectedReasoningStep", view)
         self.assertIn("root.chooseTreeReasoningStep(3 - index);", view)
+        self.assertIn('optionLabels: ["HIGH", "MED", "LOW", "NONE"]', view)
         self.assertIn('model: ["HIGH", "MED", "LOW", "NONE"]', view)
+        self.assertIn("anchors.right: reasoningSelectorSlider.left", view)
         self.assertIn("reasoningRailHost.detentCenterY(index)", view)
         self.assertIn('sideLabel: "THINK"', view)
         self.assertIn("accentColor: Colors.cyan", view)
+        self.assertIn("handleGlowColor: Colors.magenta", view)
+        self.assertIn("enabledSlider: root.menuOpen", view)
         self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
         self.assertIn("steps[selectedTreeIndex] = step", view)
         self.assertIn("selectedTreeReasoningSteps = steps", view)
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
-        self.assertNotRegex(view, r"(?m)^\\s*onPrimaryRequested\\s*:")
-        self.assertNotRegex(view, r"(?m)^\\s*onToggleRequested\\s*:")
+        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
 
+        # These markers come from the real SelectorSlider implementation.
         for source in (
             "property int count: 0", "property int currentIndex: -1",
             "signal indexRequested(int index)", "function indexFromHandleY(handleY)",
             "Math.round(fraction * (count - 1))",
-            "y: rail.handleYForIndex()", "color: Colors.magenta",
-            "RectangularShadow {", "onWheel: function(wheel)",
+            "function handleYForIndex(index)",
+            "width: 40", "height: 52", "width: 28",
+            "color: dragArea.pressed ? Colors.yellow : Colors.white",
+            "slider.handleGlowColor",
+            "onWheel: function(wheel)",
         ):
-            self.assertIn(source, rail)
+            self.assertIn(source, selector)
 
-        # The rail top is HIGH, and its bottom is NONE. Both the mapped
-        # requested level and the Gohu label land at the same detent.
+        # The top is HIGH; the bottom is NONE, matching both the bound
+        # currentIndex and the four fixed Gohu labels.
         levels = ["NONE", "LOW", "MED", "HIGH"]
         labels_top_to_bottom = ["HIGH", "MED", "LOW", "NONE"]
         for rail_index, label in enumerate(labels_top_to_bottom):
@@ -627,15 +638,15 @@ class ForestLauncherContract(unittest.TestCase):
             self.assertEqual(levels[step], label)
             self.assertEqual(3 - step, rail_index)
         for height in (190, 245, 310):
-            track_height = height - 44
-            handle_height = max(30, min(58, track_height / 4 * 2))
+            track_height = height - 64  # SelectorSlider top 38 / bottom 26
+            handle_height = 52
             travel = max(0, track_height - handle_height)
             self.assertGreater(travel, 0)
-            centers = [34 + handle_height / 2 + travel * i / 3
+            centers = [38 + handle_height / 2 + travel * i / 3
                        for i in range(4)]
             self.assertEqual(centers, sorted(centers))
-            self.assertGreaterEqual(centers[0], 34)
-            self.assertLessEqual(centers[-1], height - 10)
+            self.assertGreaterEqual(centers[0], 38)
+            self.assertLessEqual(centers[-1], height - 26)
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
@@ -674,7 +685,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("ForestReasoningDial {", inside)
         self.assertNotIn("id: reasoningStepDial", inside)
         self.assertIn("anchors.right: modelPickerButton.left", inside)
-        self.assertIn("id: reasoningIndexRail", view)
+        self.assertIn("id: reasoningSelectorSlider", view)
         self.assertIn("anchors.right: reasoningRailHost.left", view)
         self.assertIn("readonly property color promptBorderColor:", inside)
         self.assertIn("forestPromptInput.activeFocus ? Colors.magenta", inside)
@@ -749,7 +760,7 @@ class ForestLauncherContract(unittest.TestCase):
             box = row - send - 6
             mic = max(28, min(34, round(box * 0.16)))
             # Removing the tiny dial restores prompt width even with the
-            # 46px shared IndexRail reserved along the right of the chat.
+            # 46px shared SelectorSlider host reserved at the chat right.
             local_draft = box - 11 - 6 - mic - 4 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 

@@ -230,9 +230,20 @@ class RealProcessCustodianWireDenialTests(unittest.TestCase):
             self.run_one(request=req)
 
     def test_13_cross_purpose_request_refused(self):
+        # Query validation occurs BEFORE recv. No sender should be started
+        # or forced to complete a write after the receiver already refused.
         req = dict(self.request, purpose="postapollo.timew.restore")
-        with self.assertRaises(M.C.Refused):
-            self.run_one(request=req)
+        receiver, sender = socket.socketpair(
+            socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        try:
+            receiver.settimeout(0.1)
+            with self.assertRaises(M.C.Refused):
+                M.verify_one_denial_ci_only(
+                    receiver, request=req,
+                    prior_test_public_key=self.pub)
+        finally:
+            receiver.close()
+            sender.close()
 
     def test_14_resigned_cross_purpose_response_refused(self):
         with self.assertRaisesRegex(M.Refused, "ORIGINAL_SIGNED_CANDIDATE"):

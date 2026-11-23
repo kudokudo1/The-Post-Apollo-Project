@@ -94,7 +94,7 @@ const qml = fs.readFileSync(
     path.resolve(__dirname,"../../modules/Tray.qml"),"utf8");
 assert.match(qml,/I3IpcListener\s*\{\s*subscriptions:\s*\["window", "workspace", "output"\]/);
 assert.match(qml,/command:\s*\["swaymsg", "-t", "get_tree", "-r"\]/);
-assert.match(qml,/DesktopVisibility\.visibleWindowKeysFromTree\(/);
+assert.match(qml,/DesktopVisibility\.inspectVisibleWindowTree\(/);
 assert.match(qml,/DesktopVisibility\.hasVisibleDesktopWindow\(/);
 assert.match(qml,/readonly property bool cardEmphasized:\s*trayButton\.appOnDesktop/);
 assert.match(qml,/visible:\s*trayButton\.appOnDesktop/);

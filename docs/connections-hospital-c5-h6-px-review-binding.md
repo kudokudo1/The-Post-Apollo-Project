@@ -59,8 +59,8 @@ separate regression gates. No workstation installation or Hospital action.
 - Changed source deadline, removed writer instance, cross-writer forged
   claim, old v1 claim, unknown authority fields or forged approval cannot
   grant authority.
-- Two formerly duplicated test-method names are made distinct so the
-  pre-issuance display check and duplicate-JSON check both execute.
+- The five new adverse cases extend the existing 23 independently named
+  tests to 28; the two prior `test_16_*` methods were already distinct.
 - The normal issuer still receives its nonce from native `os.urandom`,
   and the protected writer must echo it and bind its own instance in
   `COMMIT`; this PR does not change source writer/schema validation.

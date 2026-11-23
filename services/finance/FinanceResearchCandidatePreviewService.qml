@@ -171,7 +171,8 @@ Scope {
     function completeAttempt(force) {
         if (!processExited)
             return;
-        if (!force && (!stdoutFinished || !stderrFinished))
+        if (!force && (!stdoutFinished
+                || (processExitCode !== 0 && !stderrFinished)))
             return;
         completionDeadline.stop();
 
@@ -179,7 +180,8 @@ Scope {
         const output = responseBuffer;
         const diagnostic = errorBuffer;
         const code = processExitCode;
-        const streamIncomplete = !stdoutFinished || !stderrFinished;
+        const streamIncomplete = !stdoutFinished
+            || (code !== 0 && !stderrFinished);
 
         responseBuffer = "";
         errorBuffer = "";

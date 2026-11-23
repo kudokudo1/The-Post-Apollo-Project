@@ -1,0 +1,85 @@
+name: Connections C3e cloned local witnesses cannot establish consensus (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eSplitBrainWitnessDisputeCI.py'
+      - 'tests/connections/test_connections_c3e_split_brain_witness_dispute.py'
+      - '.github/workflows/connections-c3e-local-split-brain-witness-ci.yml'
+      - 'docs/connections-c3e-local-split-brain-witness-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-protected-consensus-from-cloned-local-witnesses:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin existing disposable C3e Ed25519 fixture dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Refuse new SQL writer, network transport, credential authority or trusted winner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eSplitBrainWitnessDisputeCI.py \
+            tests/connections/test_connections_c3e_split_brain_witness_dispute.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("tests/connections/c3e_release_trust/C3eSplitBrainWitnessDisputeCI.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for forbidden in ("sqlite3.connect(", "socket.socket(", "subprocess.run(",
+                            "Ed25519PrivateKey", '"safeToRetry": True',
+                            '"productionSignInAllowed": True',
+                            '"independentHistoryForkResolved": True'):
+              assert forbidden not in src, forbidden
+          for needed in ("C3eSplitStoreRollbackWitnessCI.py",
+                         "COMPETING_EQUAL_SEQUENCE_DIFFERENT_HEADS_UNKNOWN_HOLD",
+                         "MATCHING_UNENROLLED_LOCAL_HEADS_STILL_UNKNOWN_HOLD",
+                         "C3E_SPLIT_BRAIN_CANNOT_PICK_PROTECTED_WINNER_FROM_LOCAL_COPIES",
+                         '"winner": None',
+                         '"safeActions": []',
+                         '"safeToRetry": False'):
+              assert needed in src, needed
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_SPLIT_BRAIN_LOCAL_CI // NO_CONSENSUS_OR_SIGNIN")
+          PY
+      - name: 22 cloned forked witness and untrusted report negative cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_split_brain_witness_dispute.py
+          echo "C3E_SPLIT_BRAIN_CLONED_LOCAL_WITNESSES // NO_WINNER"
+      - name: Preserve existing split-store, cutover and signed-denial proof gaps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/test_connections_c3e_custodian_cutover_negative.py
+          python3 -B -I tests/connections/test_connections_c3e_ipc_receipt_non_evidence.py
+          for test in \
+            tests/connections/test_connections_c3e_split_store_rollback_witness.py \
+            tests/connections/test_connections_c3e_c4b_local_denial_shadow.py \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py
+          do
+            sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+              "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_SPLIT_BRAIN_HOLD // EXTERNAL_ENROLLED_ARBITER_MISSING"

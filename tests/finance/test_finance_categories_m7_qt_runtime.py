@@ -112,6 +112,55 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         assert len(category_rows()) == 2
         assert prop(clear[0], "available") is False
 
+        # M10: sort only the displayed view, never the underlying snapshot.
+        # Invalid balances go last, and ties preserve source order.
+        sorter = matching_items("categoryLowestAvailableAction")
+        assert len(sorter) == 1
+        assert prop(sorter[0], "available") is True
+        assert prop(sorter[0], "selected") is False
+
+        def displayed_ids():
+            value = prop(pane, "displayed")
+            return [row["id"] for row in value.toVariant()]
+
+        assert displayed_ids() == ["rent", "coffee"]
+        invoke(pane, "toggleLowestAvailableSort")
+        assert prop(sorter[0], "selected") is True
+        assert displayed_ids() == ["coffee", "rent"]
+
+        setprop(pane, "filterText", "RENT")
+        assert displayed_ids() == ["rent"]
+        invoke(pane, "clearCategorySearch")
+        invoke(root, "mixedAvailableBalanceFixture")
+        assert displayed_ids() == [
+            "overdrawn", "coffee", "groceries", "rent", "unknown"
+        ], displayed_ids()
+        assert prop(pane, "overspentCount") == 1
+
+        invoke(pane, "toggleOverspentFilter")
+        assert displayed_ids() == ["overdrawn"]
+        invoke(pane, "toggleOverspentFilter")
+        assert displayed_ids() == [
+            "overdrawn", "coffee", "groceries", "rent", "unknown"
+        ]
+        invoke(root, "refreshFixture")
+        assert prop(pane, "lowestAvailableFirst") is True
+        assert displayed_ids()[0] == "overdrawn"
+        invoke(root, "switchMonth")
+        assert prop(pane, "lowestAvailableFirst") is False
+        assert displayed_ids() == [
+            "rent", "coffee", "groceries", "overdrawn", "unknown"
+        ]
+        invoke(root, "resetFixture")
+        assert displayed_ids() == ["rent", "coffee"]
+        invoke(pane, "toggleLowestAvailableSort")
+        assert displayed_ids() == ["coffee", "rent"]
+        invoke(root, "noBudgetFixture")
+        assert prop(sorter[0], "available") is False
+        assert prop(pane, "lowestAvailableFirst") is False
+        invoke(root, "resetFixture")
+        assert displayed_ids() == ["rent", "coffee"]
+
         # M9: overspent-only is a read-only attention filter. A negative
         # available balance, not a category's name or budget size, controls it.
         attention = matching_items("categoryOverspentOnlyAction")
@@ -271,7 +320,7 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         setprop(pane, "groupDraftName", "Housing")
         assert prop(pane, "groupProposalEligible") is False
 
-        print("FinanceW Categories M9 real-pane Qt overspent/search/lifecycle smoke: PASS")
+        print("FinanceW Categories M10 real-pane Qt sorting/overspent/search lifecycle: PASS")
     finally:
         root.close()
         root.deleteLater()

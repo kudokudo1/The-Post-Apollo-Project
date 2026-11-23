@@ -10,6 +10,7 @@ Item {
     property var snapshot: null
     property string filterText: ""
     property bool onlyOverspent: false
+    property bool lowestAvailableFirst: false
     property string filterSourceAtOpen: ""
     property string filterMonthAtOpen: ""
     property string openMode: "" // "", "create", "rename"
@@ -59,7 +60,7 @@ Item {
     }
     readonly property var displayed: {
         const needle=filterText.trim().toLowerCase();
-        return categories.filter(function(c){
+        const matches=categories.filter(function(c){
             if(!c)return false;
             if(onlyOverspent && !(typeof c.availableCents==="number"
                     && Number.isFinite(c.availableCents)
@@ -67,6 +68,22 @@ Item {
             return !needle || String(c.name||"").toLowerCase().indexOf(needle)>=0
                 || String(c.group||"").toLowerCase().indexOf(needle)>=0;
         });
+        if(!lowestAvailableFirst)return matches;
+        // Preserve source order for equal amounts; untrusted balances go last.
+        // Sorting a view never mutates the authenticated snapshot array.
+        return matches.map(function(category,index){
+            return {category:category,index:index};
+        }).sort(function(a,b){
+            const validA=typeof a.category.availableCents==="number"
+                && Number.isFinite(a.category.availableCents);
+            const validB=typeof b.category.availableCents==="number"
+                && Number.isFinite(b.category.availableCents);
+            if(validA!==validB)return validA ? -1 : 1;
+            if(!validA)return a.index-b.index;
+            if(a.category.availableCents===b.category.availableCents)
+                return a.index-b.index;
+            return a.category.availableCents < b.category.availableCents ? -1 : 1;
+        }).map(function(entry){return entry.category;});
     }
     readonly property var plan: CategoryPlan.previewCategoryPlan(
         snapshot,openMode,selectedCategoryId,selectedGroupId,draftName)
@@ -98,6 +115,11 @@ Item {
     function toggleOverspentFilter(){
         if(!snapshot || snapshot.readOnly!==true)return false;
         onlyOverspent=!onlyOverspent;
+        return true;
+    }
+    function toggleLowestAvailableSort(){
+        if(!snapshot || snapshot.readOnly!==true)return false;
+        lowestAvailableFirst=!lowestAvailableFirst;
         return true;
     }
     function clearGroupDraft(){
@@ -237,6 +259,7 @@ Item {
         if(incomingSource!==filterSourceAtOpen || incomingMonth!==filterMonthAtOpen){
             filterText="";
             onlyOverspent=false;
+            lowestAvailableFirst=false;
             filterSourceAtOpen=incomingSource;
             filterMonthAtOpen=incomingMonth;
         }
@@ -763,7 +786,7 @@ Item {
             spacing: 6
             ActionButton {
                 objectName: "categoryOverspentOnlyAction"
-                width: 177
+                width: (parent.width-6)/2
                 height: 28
                 label: "OVERSPENT ONLY // "+categoryPane.overspentCount
                 labelPixelSize: 9
@@ -774,15 +797,18 @@ Item {
                     && categoryPane.snapshot.readOnly===true
                 onLeftClicked: categoryPane.toggleOverspentFilter()
             }
-            GohuText {
-                width: parent.width-183
+            ActionButton {
+                objectName: "categoryLowestAvailableAction"
+                width: (parent.width-6)/2
                 height: 28
-                text: "NEGATIVE AVAILABLE BALANCE"
-                font.pixelSize: 9
-                color: Colors.cyan
-                textFormat: Text.PlainText
-                verticalAlignment: Text.AlignVCenter
-                elide: Text.ElideRight
+                label: "LOWEST AVAILABLE FIRST"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                trackLabelGlowLocally: true
+                selected: categoryPane.lowestAvailableFirst
+                available: !!categoryPane.snapshot
+                    && categoryPane.snapshot.readOnly===true
+                onLeftClicked: categoryPane.toggleLowestAvailableSort()
             }
         }
         GohuText {

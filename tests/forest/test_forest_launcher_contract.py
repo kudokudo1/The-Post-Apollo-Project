@@ -218,6 +218,66 @@ class ForestLauncherContract(unittest.TestCase):
                          "url(#maple-vertical-stroke)")
         self.assertGreaterEqual(contour.attrib["d"].count("C"), 8)
 
+    def test_header_rescan_reuses_reload_without_host_activation(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        reload_button = (ROOT / "components/ReloadButton.qml").read_text()
+        self.assertIn("ReloadButton {", view)
+        self.assertIn("id: headerRescanButton", view)
+        self.assertIn("anchors.right: headerRescanButton.left", view)
+        self.assertIn("anchors.right: liveIndicator.left", view)
+        self.assertIn("interactive: root.menuOpen && !localInventory.scanning", view)
+        self.assertIn("onReloadRequested: {", view)
+        block = view.split("id: headerRescanButton", 1)[1].split(
+            "// LIVE is the Quickshell workspace state", 1)[0]
+        self.assertIn("localInventory.scanModels();", block)
+        self.assertIn('root.pendingModelScan = "";', block)
+        self.assertNotIn("session", block.lower().replace("model inventory scan in progress", ""))
+        self.assertIn('label: "⟳"', reload_button)
+
+    def test_tree_chat_header_shows_active_icon_and_glow(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        self.assertIn("id: chatHeadingRow", view)
+        self.assertIn("id: activeChatTreeIcon", view)
+        self.assertIn("source: Qt.resolvedUrl(root.activeTree.iconPath)", view)
+        self.assertIn("safeSource: activeChatTreeIcon", view)
+        self.assertIn("? Colors.magenta : Colors.red", view)
+        self.assertIn('text: root.activeTree.name + " // CHAT"', view)
+        self.assertIn("anchors.top: chatHeadingRow.bottom", view)
+        self.assertNotIn("anchors.top: chatHeading.bottom", view)
+
+    def test_forest_chat_list_uses_social_rail_recipe_without_fake_sessions(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        rail = (ROOT / "widgets/ForestChatList.qml").read_text()
+        social = (ROOT / "widgets/messanger/ContactList.qml").read_text()
+        self.assertIn("readonly property var activeChatSessions: []", view)
+        self.assertIn("id: activeChatRail", view)
+        self.assertIn("hostConnected: root.chatHostTrusted", view)
+        self.assertIn("sessions: root.activeChatSessions", view)
+        self.assertIn("anchors.left: activeChatRail.right", view)
+        self.assertIn("width: root.chatListWidth", view)
+        self.assertIn("visible: width > 0", view)
+        self.assertIn("frameWidth >= 800 ? 184 : frameWidth >= 680 ? 148 : 0", view)
+        for required in ("ListView {", "NeonScrollBar {",
+                         'handleStyle: "star"', "accountForContentOrigin: true"):
+            self.assertIn(required, social)
+            self.assertIn(required, rail)
+        self.assertIn("model: chatListRoot.hostConnected ? chatListRoot.sessions : []", rail)
+        self.assertIn('"NO ACTIVE CHATS', rail)
+        self.assertIn("TRUSTED CHAT HOST NOT CONNECTED", rail)
+        self.assertIn("textFormat: Text.PlainText", rail)
+        self.assertNotIn("ContactList {", view)
+        self.assertNotIn("Process {", rail)
+        self.assertNotIn("MouseArea {", rail)
+        # With the rail visible, the existing locked composer stays usable.
+        for frame_width in (680, 800, 930):
+            side = min(204, max(144, round(frame_width * 0.31)))
+            rail_width = 184 if frame_width >= 800 else 148
+            prompt = frame_width - side - rail_width - 24
+            mic = max(32, min(42, round(prompt * 0.12)))
+            send = max(54, min(86, round(prompt * 0.21)))
+            placeholder = prompt - mic - send - 51 - 3 * 6
+            self.assertGreaterEqual(placeholder, 100)
+
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         voice = (ROOT / "components/VoiceToTextButton.qml").read_text()

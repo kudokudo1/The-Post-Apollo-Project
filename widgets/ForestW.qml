@@ -15,6 +15,9 @@ PanelWindow {
     // Until protected Forest host adapters exist both controls fail closed.
     readonly property bool voiceHostTrusted: false
     readonly property bool chatHostTrusted: false
+    // No session provider is authorized yet. Do not synthesize active chats
+    // from Tree names, model inventory, or the LIVE workspace indicator.
+    readonly property var activeChatSessions: []
     property real dockCenterX: 0
     // Read-only reference solely for Git's fullscreen size cap.
     property var gitFullscreenReference: null
@@ -144,6 +147,10 @@ PanelWindow {
     readonly property int frameHeight: chassisFrame.height
     readonly property int sideWidth:
         Math.min(204, Math.max(144, Math.round(frameWidth * 0.31)))
+    // Social-style chat list rail sits between Trees and live chat. On
+    // narrow screens leave the locked chat/composer a usable minimum width.
+    readonly property int chatListWidth:
+        frameWidth >= 800 ? 184 : frameWidth >= 680 ? 148 : 0
 
     function toggle() { menuOpen = !menuOpen; }
     function expandChassis() { chassisLevel = ForestSizing.step(chassisLevel, 1); }
@@ -238,13 +245,35 @@ PanelWindow {
             }
             ResizeButton {
                 id: expandButton
-                anchors.right: liveIndicator.left
+                anchors.right: headerRescanButton.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
                 direction: "up"
                 available: root.chassisLevel < ForestSizing.stages.length - 1
                 onResizeRequested: function(delta) {
                     if (delta === 1) root.expandChassis();
+                }
+            }
+
+            // Shared ordinary reload control. One deliberate click makes a
+            // read-only B0 local model inventory refresh; no chat/audio host,
+            // session creation or recurring timer is activated.
+            ReloadButton {
+                id: headerRescanButton
+                anchors.right: liveIndicator.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                interactive: root.menuOpen && !localInventory.scanning
+                Accessible.name: localInventory.scanning
+                    ? "Forest model inventory scan in progress"
+                    : "Rescan local Ollama model inventory (read-only)"
+                onReloadRequested: {
+                    if (!root.menuOpen || localInventory.scanning)
+                        return;
+                    root.pendingModelScan = "";
+                    root.lastScannedModel = "";
+                    root.lastModelScanResult = "";
+                    localInventory.scanModels();
                 }
             }
 
@@ -455,22 +484,77 @@ PanelWindow {
             }
         }
 
+        // Social ContactList's visual recipe, not its account/provider
+        // implementation. This Forest-owned rail uses the same ListView +
+        // NeonScrollBar family and stays empty until a trusted session host.
+        ForestChatList {
+            id: activeChatRail
+            anchors.left: treePane.right
+            anchors.top: header.bottom
+            anchors.bottom: footer.top
+            width: root.chatListWidth
+            visible: width > 0
+            hostConnected: root.chatHostTrusted
+            sessions: root.activeChatSessions
+        }
+
         Item {
             id: chatPane
-            anchors.left: treePane.right
+            anchors.left: activeChatRail.right
             anchors.right: parent.right
             anchors.top: header.bottom
             anchors.bottom: footer.top
 
-            GohuText {
-                id: chatHeading
+            Item {
+                id: chatHeadingRow
                 anchors.top: parent.top
+                anchors.topMargin: 9
                 anchors.left: parent.left
                 anchors.leftMargin: 14
-                anchors.topMargin: 14
-                text: root.activeTree.name + " // CHAT"
-                color: Colors.magenta
-                font.pixelSize: 15
+                anchors.right: parent.right
+                anchors.rightMargin: 85
+                height: 27
+
+                Item {
+                    id: chatTreeIconHost
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 25
+                    height: 25
+
+                    Image {
+                        id: activeChatTreeIcon
+                        anchors.fill: parent
+                        source: Qt.resolvedUrl(root.activeTree.iconPath)
+                        sourceSize: Qt.size(64, 64)
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+                    TextHashGlow {
+                        safeSource: activeChatTreeIcon
+                        requestedVisible: root.menuOpen
+                        foregroundColor: root.selectedTreeIndex === 0
+                            ? Colors.white : Colors.orange
+                        preferredGlowColor: root.selectedTreeIndex === 0
+                            ? Colors.magenta : Colors.red
+                        radius: 8
+                        samples: 17
+                        opacity: 0.82
+                        z: -1
+                    }
+                }
+
+                GohuText {
+                    id: chatHeading
+                    anchors.left: chatTreeIconHost.right
+                    anchors.leftMargin: 8
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.activeTree.name + " // CHAT"
+                    color: Colors.magenta
+                    font.pixelSize: 15
+                    elide: Text.ElideRight
+                }
             }
             GohuText {
                 anchors.right: parent.right
@@ -483,8 +567,8 @@ PanelWindow {
             }
             Rectangle {
                 id: chatDivider
-                anchors.top: chatHeading.bottom
-                anchors.topMargin: 12
+                anchors.top: chatHeadingRow.bottom
+                anchors.topMargin: 8
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 1

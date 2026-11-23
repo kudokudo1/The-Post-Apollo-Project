@@ -122,7 +122,15 @@ with tempfile.TemporaryDirectory() as temp:
     assert data["items"][0]["advisory_state"] == "appears_at_origin"
     assert data["items"][0]["app_id"] == "kitty"
     assert "before" not in data["items"][0]
-    assert "PRIVATE" not in str(data) and "777" not in str(data)
+    # The operation UUID was already checked above; its random digits can
+    # legitimately contain "777". Exclude ONLY that verified identifier
+    # from the raw fixture PID-leak scan, never the returned metadata fields.
+    redaction_view = copy.deepcopy(data)
+    redaction_view["items"][0]["operation_id"] = "REDACTED_VERIFIED_ID"
+    assert "PRIVATE" not in str(redaction_view)
+    assert "777" not in str(redaction_view)
+    assert "pid" not in redaction_view["items"][0]
+    assert "title" not in redaction_view["items"][0]
     assert journal.get(operation_id)["phase"] == "prepared"
     journal.mark_dispatching(operation_id)
     data = review_interruptions(journal=journal, read_runner=Fake("2").read)

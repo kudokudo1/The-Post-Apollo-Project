@@ -1,0 +1,52 @@
+name: TimeW Scope A exact logical geometry values (source only)
+
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV2ExactLogicalGeometry.py'
+      - 'tests/timew/test_machine_v2_exact_logical_geometry.py'
+      - 'docs/timew-machine-v2-exact-native-fractional-value-lane.md'
+      - '.github/workflows/timew-scope-a-exact-fractional-values.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-fractional-values-no-native-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify exact binary64 fractions, strict phase and forged values
+        run: python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py
+      - name: Preserve existing integer-only checkpoint and crash journal
+        run: |
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py
+      - name: Ensure this additive value type is not wired to live Restore
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          new = Path('services/time/MachineV2ExactLogicalGeometry.py').read_text()
+          forbidden = [
+              'import socket', 'import subprocess', 'import sqlite3',
+              'swaymsg', 'Ed25519PrivateKey', 'command_runner',
+              'def main(', 'if __name__',
+          ]
+          for marker in forbidden:
+              assert marker not in new, marker
+          for file in (
+              Path('widgets/TimeW.qml'),
+              Path('services/time/MachineGeometryStoreV2.py'),
+              Path('services/time/MachineV2GeometryJournal.py'),
+              Path('services/time/MachineV2FloatingPilot.py'),
+          ):
+              assert 'MachineV2ExactLogicalGeometry' not in file.read_text(), file
+          print('TIMEW FRACTIONAL VALUES: imported-only; no native authority or live consumer')
+          PY

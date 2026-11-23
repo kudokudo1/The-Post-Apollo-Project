@@ -223,6 +223,14 @@ class C5H3UntrustedEvidence(unittest.TestCase):
                 c.update(shownAt=shown, confirmedAt=confirmed)
                 self.assertFalse(self.probe(c)["claimMatchesReview"])
 
+    def test_16_claimed_display_before_challenge_issued_never_matches(self):
+        c = self.claim()
+        c["shownAt"] = self.now - 1
+        c["confirmedAt"] = self.now + 1
+        result = self.probe(c)
+        self.assertFalse(result["claimMatchesReview"])
+        self.assert_hold(result)
+
     def test_16_duplicate_json_claim_fields_refused(self):
         raw = C.canonical(self.claim()).replace(
             b'"action":', b'"action":"RESTORE","action":', 1)

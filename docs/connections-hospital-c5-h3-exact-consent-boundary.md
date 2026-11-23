@@ -29,7 +29,7 @@ after Polkit and the one-use PX commit protocol.
 A **separate test-only** C5-H3 reference constructs canonical review bytes
 covering: purpose, action, Room, Patient, repository, revision, graph
 SHA-256, PX request nonce, real-issuer-asserted operator UID, login1
-seat, bound host, retention policy generation, expiry and permanent
+seat, bound host, retention policy generation, issue time, expiry and permanent
 preservation/no-Burn restriction.
 
 It computes a domain-separated SHA-256 review digest for interoperability
@@ -61,8 +61,8 @@ are used by this test. Native Room mutation remains disabled.
 
 - Existing DOC 4 test now checks that structured Polkit details include
   the PX-generated nonce and change when a new prepared request is used.
-- New 22-test hostile suite exercises source eligibility, changed Room/
-  revision/graph/nonce/host/seat/UID, policy epoch, expiry, withheld
+- New 23-test hostile suite exercises source eligibility, changed Room/
+  revision/graph/nonce/host/seat/UID, policy epoch, issuance time, expiry, withheld
   confirmation, fake release, noncanonical/duplicate JSON, altered digest,
   and absolute no-authority flags.
 - The inherited C5-H2 source and signature suites must still pass. This

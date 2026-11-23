@@ -31,6 +31,7 @@ Item {
     readonly property bool canReload: controllerConnected
         && loadState !== "loading"
     signal previewRequested()
+    signal reviewRequested(string candidateKey)
 
     onCandidatePreviewChanged: {
         // A source refresh or issuer switch invalidates old keys.
@@ -243,6 +244,21 @@ Item {
                         font.pixelSize: 9
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
+                    }
+                    ActionButton {
+                        width: Math.min(190, parent.width)
+                        height: 30
+                        label: "REVIEW IN CASE EDITOR"
+                        labelPixelSize: 9
+                        accentColor: Colors.cyan
+                        visible: picker.selectedCandidate !== null
+                            && picker.selectedCandidate.kind === "sec-index"
+                        available: picker.controllerConnected
+                            && picker.loadState === "ready"
+                            && picker.selectedCandidate !== null
+                            && picker.selectedCandidate.eligibleForDraft === true
+                        onLeftClicked: picker.reviewRequested(
+                            picker.selectedKey)
                     }
                 }
             }

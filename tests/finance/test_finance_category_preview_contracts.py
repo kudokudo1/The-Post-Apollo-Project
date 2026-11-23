@@ -105,6 +105,29 @@ for forbidden in (
 ):
     assert forbidden not in group_plan, forbidden
 
+# M7 category-group clarity uses the authenticated category->group IDs only.
+# It adds no writer, no authorization, and no shared FinanceW routing.
+for expected in (
+    'AMBIGUOUS GROUP IDS // REFRESH',
+    'INCOME GROUP CANNOT BE RENAMED',
+    'other.id===g.id',
+    'current.is_income===true',
+):
+    assert expected in group_plan, expected
+
+for expected in (
+    'row.is_income===true',
+    'g.id===row.id',
+    'g.name===row.name',
+    'groupRow.modelData.name+" // "',
+    'categoryPane.categories.filter(function(c)',
+    'c.groupId===groupRow.modelData.id;',
+    ').length+" CATEGORIES"',
+    'groupRow.modelData.is_income!==true',
+    'g.id===groupRow.modelData.id;',
+):
+    assert expected in pane, expected
+
 # M6 adds a separately gated service; group proposal policy remains pure.
 assert 'signal groupSaveRequested(var payload)' in pane
 assert 'FinanceCategoryGroupWriteService' not in pane

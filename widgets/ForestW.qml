@@ -788,18 +788,18 @@ PanelWindow {
                         Accessible.name: "Scan local Ollama models, read-only"
                         GohuText {
                             anchors.centerIn: parent
-                            text: localInventory.scanning ? "..." : "SCAN ALL"
+                            text: localInventory.scanning || modelResidency.scanning ? "..." : "SCAN ALL"
                             color: Colors.cyan
                             font.pixelSize: 9
                         }
                         MouseArea {
                             anchors.fill: parent
-                            enabled: !localInventory.scanning
+                            enabled: !localInventory.scanning && !modelResidency.scanning
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onClicked: {
                                 root.lastScannedModel = "";
                                 root.lastModelScanResult = "";
-                                localInventory.scanModels();
+                                root.refreshLocalModelEvidence();
                             }
                         }
                     }
@@ -917,7 +917,7 @@ PanelWindow {
                             }
                             MouseArea {
                                 anchors.fill: parent
-                                enabled: !localInventory.scanning
+                                enabled: !localInventory.scanning && !modelResidency.scanning
                                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onClicked: root.scanModel(modelEntry.modelName)
                             }
@@ -952,14 +952,24 @@ PanelWindow {
                             Rectangle {
                                 width: (modelStatusBar.width - 6) / 3
                                 height: parent.height
+                                readonly property string observedState:
+                                    ResidencyPolicy.modelState(
+                                        modelResidency.status,
+                                        modelResidency.models, modelEntry.modelName)
+                                readonly property color observedColor:
+                                    observedState === "LOADED" ? Colors.green
+                                    : observedState === "NOT_LOADED"
+                                        ? Colors.orange : Colors.cyan
                                 color: Colors.dark
                                 border.width: 1
-                                border.color: Colors.orange
+                                border.color: observedColor
                                 GohuText {
                                     anchors.centerIn: parent
-                                    text: "LIVE ?"
+                                    text: parent.observedState === "LOADED" ? "LOADED"
+                                        : parent.observedState === "NOT_LOADED" ? "IDLE"
+                                        : "LIVE ?"
                                     font.pixelSize: 9
-                                    color: Colors.orange
+                                    color: parent.observedColor
                                 }
                             }
                             Rectangle {
@@ -1007,7 +1017,7 @@ PanelWindow {
                     elide: Text.ElideRight
                     text: root.lastScannedModel
                         ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
-                        : "SCAN = INVENTORY ONLY // LIVE & ACCESS UNVERIFIED"
+                        : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"
                 }
             }
             // Compact empty-session state remains below the chat heading.

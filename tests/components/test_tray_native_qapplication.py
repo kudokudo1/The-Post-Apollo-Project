@@ -30,6 +30,7 @@ assert "isLutrisTrayItem" in tray
 assert "isDiscordTrayItem" in tray
 assert "SocialTrayBridge.requestDiscordActivation();" in tray
 assert "trayButton.modelData.activate();" in tray
-assert "Process {" not in tray
+assert tray.count("Process {") == 1
+assert 'command: ["swaymsg", "-t", "get_tree", "-r"]' in tray
 assert "WlrLayershell" not in tray
 print("Tray native QtWidgets menu backend / existing item action boundary: PASS")

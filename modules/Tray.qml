@@ -2,6 +2,9 @@ import QtQuick
 import Quickshell
 import QtQuick.Layouts
 import Quickshell.Services.SystemTray
+import Quickshell.I3
+import Quickshell.Io
+import "TrayDesktopVisibility.js" as DesktopVisibility
 import qs.services.social
 import "../components"
 import QtQuick.Effects
@@ -43,6 +46,51 @@ Rectangle {
     readonly property color accentColor:
         trayMenuOpen ? Colors.magenta
         : (trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan)
+
+    // Sway is the authority for a window being VISIBLE on an active desktop.
+    // StatusNotifier registration only decides which icons exist in the row.
+    // The IPC subscription reuses Quickshell.I3's existing event connection;
+    // one bounded read-only get_tree is coalesced for changes. No polling.
+    property var visibleDesktopKeys: []
+    property bool windowTreeDirty: false
+
+    Component.onCompleted: desktopWindowRefresh.start()
+
+    I3IpcListener {
+        subscriptions: ["window", "workspace", "output"]
+        onIpcEvent: desktopWindowRefresh.restart()
+    }
+
+    Timer {
+        id: desktopWindowRefresh
+        interval: 120
+        repeat: false
+        onTriggered: {
+            if (desktopWindowTree.running)
+                trayDock.windowTreeDirty = true;
+            else
+                desktopWindowTree.running = true;
+        }
+    }
+
+    Process {
+        id: desktopWindowTree
+        command: ["swaymsg", "-t", "get_tree", "-r"]
+        running: false
+        stdout: StdioCollector { id: desktopWindowTreeOutput }
+        onExited: function(exitCode, exitStatus) {
+            // Failed, incomplete or malformed data must never leave a
+            // background application highlighted from a stale snapshot.
+            trayDock.visibleDesktopKeys = exitCode === 0
+                ? DesktopVisibility.visibleWindowKeysFromTree(
+                    desktopWindowTreeOutput.text)
+                : [];
+            if (trayDock.windowTreeDirty) {
+                trayDock.windowTreeDirty = false;
+                desktopWindowRefresh.restart();
+            }
+        }
+    }
 
     // Exact application identity, never a substring match on a random tray
     // tooltip. Other applications retain their own native tray activation.
@@ -167,23 +215,19 @@ Rectangle {
 
                 clip: false
 
-                // A live SystemTray.items delegate represents an application
-                // registered with the independent StatusNotifier watcher.
-                // The registration survives pointer movement, native-menu
-                // closure, and Quickshell restarts. When the item unregisters,
-                // the delegate (and therefore its active state) disappears.
-                // This measures an open/running TRAY application, not a
-                // visible Sway window.
-                readonly property bool appRegistered:
-                    trayButton.modelData !== null
-                    && trayButton.modelData !== undefined
+                // An item may remain registered when the program is
+                // minimized, hidden in a scratchpad or on another workspace.
+                // Only an actual Sway visible-window snapshot sets MAGENTA.
+                readonly property bool appOnDesktop:
+                    DesktopVisibility.hasVisibleDesktopWindow(
+                        trayButton.modelData, trayDock.visibleDesktopKeys)
 
-                z: trayButton.appRegistered ? 2 : 1
+                z: trayButton.appOnDesktop ? 2 : 1
 
-                // Match the Workspace active-over-hover precedence for
-                // each registered app: MAGENTA remains until unregister.
+                // Workspace rule: a truly visible app stays MAGENTA even
+                // when the pointer leaves; hidden apps hover ORANGE.
                 readonly property color iconAccentColor:
-                    trayButton.appRegistered ? Colors.magenta
+                    trayButton.appOnDesktop ? Colors.magenta
                     : (trayButtonMouse.containsMouse || trayButtonMouse.pressed
                        ? Colors.orange : Colors.cyan)
 
@@ -193,12 +237,10 @@ Rectangle {
                 }
 
                 // ===== WORKSPACE-EXACT CARD LAYERS ==============
-                // Workspaces.qml uses a transparent inactive rectangle,
-                // a dark active rectangle, and a fully transparent larger
-                // sampled backing. Keep the active card while the item's
-                // registered application lives, just like a focused
-                // Workspace keeps its card after the pointer leaves.
-                readonly property bool cardEmphasized: trayButton.appRegistered
+                // Match Workspaces.qml's real dark active card. A card
+                // shows only when this app has a VISIBLE desktop window.
+                // Registered background applications keep only their icon.
+                readonly property bool cardEmphasized: trayButton.appOnDesktop
 
                 Rectangle {
                     id: trayActiveButtonBackground
@@ -290,7 +332,7 @@ Rectangle {
                         radius: 14
                         samples: 15
                         z: 2
-                        visible: trayButton.appRegistered
+                        visible: trayButton.appOnDesktop
                         opacity: trayButtonMouse.pressed ? 1.0
                                  : trayButtonMouse.containsMouse ? 0.95 : 0.75
                         color: trayButton.iconAccentColor
@@ -312,8 +354,8 @@ Rectangle {
                     anchor.gravity: Edges.Top
 
                     // The OUTER tray frame reflects this native menu's
-                    // visible state. Each app card separately reflects the
-                    // lifecycle of its StatusNotifier registration.
+                    // visible state. Each app card independently tracks
+                    // its corresponding actually visible Sway window.
                     onOpened: trayDock.openMenuAnchor = trayNativeMenu
                     onClosed: {
                         if (trayDock.openMenuAnchor === trayNativeMenu)

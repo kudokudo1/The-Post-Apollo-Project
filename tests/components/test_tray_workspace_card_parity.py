@@ -52,8 +52,8 @@ assert "implicitHeight: 42" in tray
 assert 'color: "transparent"' in block(tray, "trayButton")
 
 # The real active background matches Workspace, including the transparent
-# inactive state. Its predicate is an app's durable SNI registration, not
-# pointer hover or temporary native menu visibility.
+# inactive state. Its predicate is a truly VISIBLE Sway window, not SNI
+# registration, pointer hover or temporary native menu visibility.
 w_active, t_active = check_workspace_parity(
     "workspacesIsActiveButtonBackground", "trayActiveButtonBackground",
     [("width", "parent.width"), ("height", "parent.height"),
@@ -101,18 +101,21 @@ for workspace_id, tray_id in (
     assert "workspacesButtonMouse.containsMouse ? 0.95" in a
     assert "trayButtonMouse.containsMouse ? 0.95" in b
 
-# The tray still uses app-provided artwork and app-owned menus. Each SNI
-# delegate remains magenta/active while registered, even after mouse exit.
-# No Sway process or fabricated per-app window-open flag is introduced.
+# The tray still uses app-provided artwork and app-owned menus. Cards stay
+# active only for compositor-visible windows on an active desktop.
+# Read-only Sway IPC is permitted; do not add any Sway command dispatch.
 assert "source: trayButton.modelData.icon" in tray
 assert "model: SystemTray.items" in tray
 assert "menu: trayButton.modelData.menu" in tray
 assert "onOpened: trayDock.openMenuAnchor = trayNativeMenu" in tray
-assert 'trayButton.appRegistered ? Colors.magenta' in tray
-assert 'readonly property bool cardEmphasized: trayButton.appRegistered' in tray
-assert 'visible: trayButton.appRegistered' in tray
+assert 'trayButton.appOnDesktop ? Colors.magenta' in tray
+assert 'readonly property bool cardEmphasized: trayButton.appOnDesktop' in tray
+assert 'visible: trayButton.appOnDesktop' in tray
+assert 'DesktopVisibility.hasVisibleDesktopWindow(' in tray
 assert "trayButtonMouse.containsMouse" in tray
 assert "SocialTrayBridge.requestDiscordActivation();" in tray
 assert "trayButton.modelData.activate();" in tray
-assert "Process {" not in tray
+assert tray.count("Process {") == 1
+assert 'command: ["swaymsg", "-t", "get_tree", "-r"]' in tray
+assert "I3IpcListener {" in tray
 print("Tray ↔ Workspace exact card geometry, backing and dual sampled glows: PASS")

@@ -86,19 +86,39 @@ const colorStart = "readonly property color accentColor:";
 assert.equal(source.split(colorStart).length - 1, 1);
 const expression = source.split(colorStart,2)[1].split("\n\n",1)[0];
 const Colors = {cyan:"#00ffff",magenta:"#ff00ff",orange:"#ff9900"};
-function accent(pressed, hovered) {
+function accent(pressed, hovered, menuOpen) {
     return vm.runInNewContext("(" + expression + ")", {
-        trayButtonPressed:pressed, trayButtonHovered:hovered, Colors
+        trayButtonPressed:pressed, trayButtonHovered:hovered,
+        trayMenuOpen:menuOpen, Colors
     });
 }
-assert.equal(accent(false,false),Colors.orange);
-assert.equal(accent(false,true),Colors.orange);
-assert.equal(accent(true,true),Colors.orange);
-assert.equal(accent(true,false),Colors.orange);
-assert.match(source,/opacity: trayButtonPressed \? 0\.82 : trayButtonHovered \? 0\.7 : 0\.55/);
-assert.match(source,/opacity: trayButtonPressed \? 0\.24 : trayButtonHovered \? 0\.18 : 0\.12/);
+assert.equal(accent(false,false,false),Colors.cyan,"idle tray cyan");
+assert.equal(accent(false,true,false),Colors.orange,"hovered tray orange");
+assert.equal(accent(true,false,false),Colors.orange,"pressed tray orange");
+assert.equal(accent(false,false,true),Colors.magenta,"native menu open magenta");
+assert.equal(accent(true,true,true),Colors.magenta,"open beats hovering and press");
+
+const iconColorStart = "readonly property color iconAccentColor:";
+assert.equal(source.split(iconColorStart).length - 1,1);
+const iconExpression = source.split(iconColorStart,2)[1].split("\n\n",1)[0];
+function iconAccent(hovered, pressed, menuOpen) {
+    return vm.runInNewContext("(" + iconExpression + ")", {
+        trayButtonMouse:{containsMouse:hovered,pressed:pressed},
+        trayNativeMenu:{visible:menuOpen}, Colors
+    });
+}
+assert.equal(iconAccent(false,false,false),Colors.cyan);
+assert.equal(iconAccent(true,false,false),Colors.orange);
+assert.equal(iconAccent(false,true,false),Colors.orange);
+assert.equal(iconAccent(false,false,true),Colors.magenta);
+assert.equal(iconAccent(true,true,true),Colors.magenta);
+assert.match(source,/trayMenuOpen \? 0\.72/);
+assert.match(source,/trayMenuOpen \? 0\.18/);
+assert.match(source,/onOpened: trayDock\.openMenuAnchor = trayNativeMenu/);
+assert.match(source,/onClosed:\s*\{\s*if \(trayDock\.openMenuAnchor === trayNativeMenu\)/);
+assert.match(source,/Component\.onDestruction:\s*\{\s*if \(trayDock\.openMenuAnchor === trayNativeMenu\)/);
 assert.match(source,/border\.color:\s*accentColor/);
-assert.equal((source.match(/color: trayDock\.accentColor/g)||[]).length,5);
+assert.equal((source.match(/color: trayDock\.accentColor/g)||[]).length,4);
 assert.match(source,/HoverHandler\s*\{\s*id:\s*trayHoverHandler\s*blocking:\s*false/);
 assert.match(source,/readonly property bool trayButtonHovered:\s*trayHoverHandler\.hovered/);
 assert.doesNotMatch(source,/trayDock\.trayButtonHovered\s*=/);
@@ -107,4 +127,4 @@ assert.match(source,/QsMenuAnchor\s*\{[\s\S]*?menu:\s*trayButton\.modelData\.men
 assert.match(source,/anchor\.item:\s*trayButton/);
 assert.match(source,/anchor\.edges:\s*Edges\.Top/);
 assert.match(source,/anchor\.gravity:\s*Edges\.Top/);
-console.log("Tray native menu click dispatch and unified glow accent: PASS");
+console.log("Tray native-menu click dispatch, cyan/orange/magenta precedence and layered glows: PASS");

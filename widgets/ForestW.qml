@@ -1170,8 +1170,12 @@ PanelWindow {
                 SelectorSlider {
                     id: reasoningSelectorSlider
                     anchors.left: parent.left
-                    anchors.top: reasoningCoffeeButton.bottom
-                    anchors.topMargin: 4
+                    // Keep a stable full-height rail geometry while
+                    // the coffee button animates upward. Anchoring directly
+                    // to its moving bottom can make the rail negative-height
+                    // during the first expansion frame.
+                    anchors.top: parent.top
+                    anchors.topMargin: 44
                     anchors.bottom: parent.bottom
                     width: 40
                     z: 10

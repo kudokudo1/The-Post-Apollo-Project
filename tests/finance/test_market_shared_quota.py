@@ -40,7 +40,6 @@ with tempfile.TemporaryDirectory(prefix="finance-m20-quota-") as directory:
                   lambda: reserve("eodhd", utc_day=day, database=db))
     assert reserve("alpha-vantage", utc_day=day, database=db)["reserved"] == 1
     assert reserve("eodhd", utc_day=previous, database=db)["reserved"] == 1
-    assert reserve("eodhd", utc_day=day, database=db) if False else True
     assert_raises(ValueError, lambda: reserve("unknown", utc_day=day, database=db))
     assert_raises(ValueError, lambda: reserve("eodhd", utc_day="2026-02-30", database=db))
 

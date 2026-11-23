@@ -546,12 +546,13 @@ class ForestLauncherContract(unittest.TestCase):
         for frame_width in (680, 800, 930):
             side = min(204, max(144, round(frame_width * 0.31)))
             rail_width = 184 if frame_width >= 800 else 148
-            prompt = frame_width - side - rail_width - 24
+            prompt = frame_width - side - rail_width - 12 - 4 - 46 - 7
             send = max(54, min(86, round(prompt * 0.21)))
             box = prompt - send - 6
             mic = max(28, min(34, round(box * 0.16)))
-            # Text, mic, 30px dial and model fruit all fit inside the box.
-            local_draft = box - 11 - 6 - mic - 3 - 34 - 3 - 39 - 4
+            # Removing the tiny dial restores prompt width even with the
+            # 46px shared IndexRail reserved along the right of the chat.
+            local_draft = box - 11 - 6 - mic - 4 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
     def test_forest_section_dividers_use_grassy_green(self):
@@ -568,122 +569,73 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("height: 1\n            color: Colors.cyan", rail)
         self.assertNotIn("width: 1\n        color: Colors.cyan", rail)
 
-    def test_reasoning_dial_detents_dead_zone_and_local_only_custody(self):
+    def test_reasoning_index_rail_uses_shared_control_and_local_only_state(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
-        dial = (ROOT / "widgets/ForestReasoningDial.qml").read_text()
-        policy = (ROOT / "widgets/ForestReasoningDialPolicy.js").read_text()
-        self.assertEqual(view.count("ForestReasoningDial {"), 1)
-        self.assertIn("id: reasoningStepDial", view)
-        self.assertIn("anchors.right: reasoningStepDial.left", view)
-        self.assertIn("anchors.right: modelPickerButton.left", view)
-        self.assertIn("width: 34", view)
-        self.assertIn("stepIndex: root.selectedReasoningStep", view)
-        self.assertIn("root.chooseTreeReasoningStep(step);", view)
+        rail = (ROOT / "components/IndexRail.qml").read_text()
+        git = (ROOT / "widgets/GitW.qml").read_text()
+        hospital = (ROOT / "widgets/HospitalW.qml").read_text()
+
+        # Forest uses the actual shared IndexRail; Git/Hospital retain
+        # their own established SelectorSlider, without shared mutation.
+        self.assertEqual(view.count("IndexRail {"), 1)
+        self.assertIn("SelectorSlider {", git)
+        self.assertIn("SelectorSlider {", hospital)
+        self.assertNotIn("ForestReasoningDial {", view)
+        self.assertNotIn("id: reasoningStepDial", view)
+        self.assertFalse((ROOT / "widgets/ForestReasoningDial.qml").exists())
+        self.assertFalse((ROOT / "widgets/ForestReasoningDialPolicy.js").exists())
+        self.assertIn("id: reasoningRailHost", view)
+        self.assertIn("id: reasoningIndexRail", view)
+        self.assertIn("enabled: root.menuOpen", view)
+        self.assertIn("anchors.top: chatDivider.bottom", view)
+        self.assertIn("anchors.bottom: promptRow.bottom", view)
+        self.assertIn("anchors.right: parent.right", view)
+        self.assertIn("anchors.right: reasoningRailHost.left", view)
+        self.assertIn("anchors.rightMargin: 4", view)
+        self.assertIn("width: 46", view)
+        self.assertIn("width: 24", view)
+        self.assertIn("count: 4", view)
+        self.assertIn("currentIndex: 3 - root.selectedReasoningStep", view)
+        self.assertIn("root.chooseTreeReasoningStep(3 - index);", view)
+        self.assertIn('model: ["HIGH", "MED", "LOW", "NONE"]', view)
+        self.assertIn("reasoningRailHost.detentCenterY(index)", view)
+        self.assertIn('sideLabel: "THINK"', view)
+        self.assertIn("accentColor: Colors.cyan", view)
         self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
         self.assertIn("steps[selectedTreeIndex] = step", view)
         self.assertIn("selectedTreeReasoningSteps = steps", view)
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
-        self.assertNotIn("ReasoningPolicy", view)  # no inference adapter coupling
-        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
-        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
+        self.assertNotRegex(view, r"(?m)^\\s*onPrimaryRequested\\s*:")
+        self.assertNotRegex(view, r"(?m)^\\s*onToggleRequested\\s*:")
 
-        self.assertIn('import "ForestReasoningDialPolicy.js" as ReasoningPolicy', dial)
-        self.assertIn('import "../components"', dial)
-        self.assertIn("GohuText {", dial)
-        # This is the ORIGINAL shared 3D raised hardware SelectorDial,
-        # NOT a flat reimplementation of its ring, pointer or layers.
-        hardware = (ROOT / "components/SelectorDial.qml").read_text()
-        self.assertEqual(dial.count("SelectorDial {"), 1)
-        self.assertIn("id: sharedHardwareDial", dial)
-        self.assertIn("selectorMode: \"continuous\"", dial)
-        self.assertIn("arcSweepAngle: 345", dial)
-        self.assertIn("minimumValue: 0", dial)
-        self.assertIn("maximumValue: 3", dial)
-        self.assertIn("currentValue: root.stepIndex", dial)
-        self.assertIn("snapContinuousToStep: true", dial)
-        self.assertIn("numericDetentInterval: 1", dial)
-        self.assertIn("numericReferenceValues: [0, 1, 2, 3]", dial)
-        self.assertIn('options: ["NONE", "LOW", "MED", "HIGH"]', dial)
-        self.assertIn('readoutText: ""', dial)
-        self.assertIn("sharedHardwareDial.requestNumericValue(next);", dial)
-        self.assertIn("onValueRequested: function(value)", dial)
-        self.assertIn("root.stepRequested(next);", dial)
-        self.assertIn("hardwareScale", dial)
-        self.assertIn("transform: Scale {", dial)
-        self.assertIn("xScale: root.hardwareScale", dial)
-        self.assertIn("yScale: root.hardwareScale", dial)
-        self.assertIn("width: 34", dial)
-        self.assertIn("height: 34", dial)
-        self.assertIn("GohuText {", dial)
-        self.assertIn("border.color: root.activeFocus ? Colors.blue : Colors.cyan", dial)
-        self.assertIn("onPressed: function(mouse)", dial)
-        self.assertIn("onPositionChanged: function(mouse)", dial)
-        self.assertIn("onWheel: function(wheel)", dial)
-        self.assertIn("wheel.accepted = true", dial)
-        self.assertIn("ReasoningPolicy.stepFromPoint(", dial)
-        self.assertIn("Keys.onRightPressed:", dial)
-        self.assertIn("Keys.onLeftPressed:", dial)
-        self.assertNotIn("id: dialBody", dial)
-        self.assertNotIn("rotation: root.snappedAngle", dial)
-        self.assertNotIn("Process {", dial)
-        self.assertNotIn("Quickshell.execDetached", dial)
-        for shared_contract in (
-            "id: modeBody", "id: centerStatusRing", "id: selectorHandle",
-            "id: outerInteractionRing", "id: selectorHead",
-            "function requestNumericValue(value)",
-            "function steppedValue(value)",
-            "snapContinuousToStep",
+        for source in (
+            "property int count: 0", "property int currentIndex: -1",
+            "signal indexRequested(int index)", "function indexFromHandleY(handleY)",
+            "Math.round(fraction * (count - 1))",
+            "y: rail.handleYForIndex()", "color: Colors.magenta",
+            "RectangularShadow {", "onWheel: function(wheel)",
         ):
-            self.assertIn(shared_contract, hardware)
+            self.assertIn(source, rail)
 
-        self.assertIn('var labels = ["NONE", "LOW", "MED", "HIGH"]', policy)
-        self.assertIn("var deadHalfAngle = 7.5", policy)
-        self.assertIn("var arcStart = 180 + deadHalfAngle", policy)
-        self.assertIn("var arcEnd = 540 - deadHalfAngle", policy)
-        self.assertIn("function stepFromPoint(", policy)
-        self.assertIn("return -1;", policy)
-        # Execute the actual QML JavaScript policy, not just a Python copy.
-        script = r"""
-const fs = require("fs"), vm = require("vm");
-const data = fs.readFileSync(process.argv[1], "utf8");
-const ctx = {};
-vm.createContext(ctx);
-vm.runInContext(data, ctx);
-const assert = require("assert");
-assert.deepStrictEqual(Array.from(ctx.labels), ["NONE","LOW","MED","HIGH"]);
-assert.strictEqual(ctx.arcEnd - ctx.arcStart, 345);
-// QtQuick's right-zero angles are Forest top-zero angles minus 90.
-// Compare against the shared SelectorDial's default 345-degree sweep.
-assert.strictEqual(ctx.arcStart - 90, 97.5);
-assert.strictEqual(ctx.arcEnd - 90, 442.5);
-assert.deepStrictEqual([0,1,2,3].map(ctx.angleForStep),
-                       [187.5,302.5,417.5,532.5]);
-for (const a of [173,175,180,185,187])
-    assert.strictEqual(ctx.stepFromAngle(a), -1);
-for (const a of [187.5,302.5,417.5,532.5])
-    assert.strictEqual(ctx.stepFromAngle(a),
-        [187.5,302.5,417.5,532.5].indexOf(a));
-for (const a of [-180,540])
-    assert.strictEqual(ctx.stepFromAngle(a), -1);
-for (const value of [-500,0,0.49,0.51,2.3,3,999])
-    assert.ok(Number.isInteger(ctx.clampStep(value)));
-assert.strictEqual(ctx.stepFromPoint(17,32,34,34), -1);
-assert.strictEqual(ctx.stepFromPoint(17,17,34,34), -1);
-for (let i = 0; i < 4; i++) {
-    const angle = (ctx.angleForStep(i) % 360) * Math.PI / 180;
-    const x = 17 + 16 * Math.sin(angle);
-    const y = 17 - 16 * Math.cos(angle);
-    assert.strictEqual(ctx.stepFromPoint(x,y,34,34), i);
-}
-"""
-        result = subprocess.run(
-            ["node", "-e", script,
-             str(ROOT / "widgets/ForestReasoningDialPolicy.js")],
-            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=10)
-        self.assertEqual(result.returncode, 0,
-                         result.stdout + result.stderr)
+        # The rail top is HIGH, and its bottom is NONE. Both the mapped
+        # requested level and the Gohu label land at the same detent.
+        levels = ["NONE", "LOW", "MED", "HIGH"]
+        labels_top_to_bottom = ["HIGH", "MED", "LOW", "NONE"]
+        for rail_index, label in enumerate(labels_top_to_bottom):
+            step = 3 - rail_index
+            self.assertEqual(levels[step], label)
+            self.assertEqual(3 - step, rail_index)
+        for height in (190, 245, 310):
+            track_height = height - 44
+            handle_height = max(30, min(58, track_height / 4 * 2))
+            travel = max(0, track_height - handle_height)
+            self.assertGreater(travel, 0)
+            centers = [34 + handle_height / 2 + travel * i / 3
+                       for i in range(4)]
+            self.assertEqual(centers, sorted(centers))
+            self.assertGreaterEqual(centers[0], 34)
+            self.assertLessEqual(centers[-1], height - 10)
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
@@ -719,10 +671,11 @@ for (let i = 0; i < 4; i++) {
         self.assertIn("DockButton {", inside)
         self.assertIn("id: modelPickerButton", inside)
         self.assertIn("anchors.right: modelPickerButton.left", inside)
-        self.assertIn("ForestReasoningDial {", inside)
-        self.assertIn("id: reasoningStepDial", inside)
-        self.assertIn("anchors.right: reasoningStepDial.left", inside)
+        self.assertNotIn("ForestReasoningDial {", inside)
+        self.assertNotIn("id: reasoningStepDial", inside)
         self.assertIn("anchors.right: modelPickerButton.left", inside)
+        self.assertIn("id: reasoningIndexRail", view)
+        self.assertIn("anchors.right: reasoningRailHost.left", view)
         self.assertIn("readonly property color promptBorderColor:", inside)
         self.assertIn("forestPromptInput.activeFocus ? Colors.magenta", inside)
         self.assertIn(": promptHover.hovered ? Colors.orange : Colors.cyan", inside)
@@ -790,12 +743,14 @@ for (let i = 0; i < 4; i++) {
         # First three stages retain 930px width; only the fourth expands.
         for frame_width in (930, 930, 930, 1884):
             side = min(204, max(144, round(frame_width * 0.31)))
-            row = frame_width - side - 24
+            rail_width = 184 if frame_width >= 800 else 148
+            row = frame_width - side - rail_width - 12 - 4 - 46 - 7
             send = max(54, min(86, round(row * 0.21)))
             box = row - send - 6
             mic = max(28, min(34, round(box * 0.16)))
-            # Text, mic, 30px dial and model fruit all fit inside the box.
-            local_draft = box - 11 - 6 - mic - 3 - 34 - 3 - 39 - 4
+            # Removing the tiny dial restores prompt width even with the
+            # 46px shared IndexRail reserved along the right of the chat.
+            local_draft = box - 11 - 6 - mic - 4 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
     def test_b0_inventory_ui_is_explicit_and_fail_closed(self):

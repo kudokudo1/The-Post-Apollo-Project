@@ -1,0 +1,65 @@
+name: Connections DOC 4 C5-H10 native ancillary fd cleanup and consent HOLD
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/hospital_c5/test_hospital_c5h10_ancillary_fd_cleanup.py'
+      - '.github/workflows/connections-hospital-c5-h10-ancillary-fd-ci.yml'
+      - 'docs/connections-hospital-c5-h10-ancillary-fd-cleanup.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hospital-issuer-fd-leak-refusal:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pinned disposable Python verifier dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Require no runtime trust promotion, and compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          python3 -B -m py_compile \
+            services/connections/hospital/HospitalNativeIssuerService.py \
+            tests/connections/hospital_c5/test_hospital_c5h10_ancillary_fd_cleanup.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("services/connections/hospital/HospitalNativeIssuerService.py").read_text()
+          receiver = source[source.index("def _packet_recv(sock, *, expected_sender):"):]
+          step = source[source.index("def _native_step(client, policy):"):]
+          assert "_discard_unexpected_native_rights(ancillary)" in receiver
+          assert "socket.MSG_CMSG_CLOEXEC" in receiver
+          assert receiver.index("_discard_unexpected_native_rights(ancillary)") < receiver.index("flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC)")
+          assert 'C.deny("INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE")' in source
+          assert step.index("_require_independent_room_consent(request, prepared, peer, first_seat)") < step.index("key = C.load_installed_key()")
+          assert step.index("key = C.load_installed_key()") < step.index('"kind": "commit"')
+          for name in ("HospitalC5ExactConsentProbe", "HospitalC5H9C3eNegativeIntegration", "operatorConfirmed", "allow_untrusted"):
+              assert name not in source
+          print("C5H10_NATIVE_ISSUER // NO_TEST_AGENT_OR_SIGNING_PROMOTION")
+          PY
+      - name: 20 genuine Linux SCM_RIGHTS and malformed-control denial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h10_ancillary_fd_cleanup.py
+          echo "C5H10_NATIVE_RIGHTS_DISPOSAL // NO_OPEN_FD_LEAK"
+      - name: Inherited C5-H4 hard stop, H7 sender, H6 detail regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h7_producer_origin.py
+          python3 -B -I tests/connections/test_connections_hospital_doc4_consent_details.py
+          echo "C5H10_INHERITED_HOSPITAL_NATIVE_CREDENTIALS_HOLD // PASS"

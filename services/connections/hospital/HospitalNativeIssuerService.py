@@ -15,6 +15,7 @@ confirmation, a user SQLite path, a fake reviewer or test keys is allowed.
 """
 from __future__ import annotations
 
+import array
 import asyncio
 import hashlib
 import os
@@ -204,26 +205,68 @@ def _socket_root_path(path, owner_uid, *, socket_mode=True):
         C.deny("UNTRUSTED_IPC_SOCKET_OWNER_OR_MODE")
     return st
 
-def _packet_recv(sock, *, expected_sender):
-    """Require actual SCM_CREDENTIALS on EVERY message, not only SO_PEERCRED.
+def _discard_unexpected_native_rights(ancillary):
+    """Close every received SCM_RIGHTS descriptor before ANY packet refusal.
 
-    A socket fd may be passed to another process. Peer identity fixed when
-    connected is insufficient to prove which process sent this packet.
+    recvmsg() may install a new fd in a privileged issuer even for a packet
+    we later reject because its credentials or length are wrong. Discard all
+    delivered rights, including earlier valid descriptors in a malformed
+    control record. Linux closes rights withheld by MSG_CTRUNC itself.
+    """
+    saw_rights = False
+    malformed_or_close_failed = False
+    for level, kind, raw in ancillary:
+        if level != socket.SOL_SOCKET or kind != socket.SCM_RIGHTS:
+            continue
+        saw_rights = True
+        handles = array.array("i")
+        complete = len(raw) // handles.itemsize * handles.itemsize
+        handles.frombytes(raw[:complete])
+        if complete != len(raw):
+            malformed_or_close_failed = True
+        for fd in handles:
+            if fd < 0:
+                malformed_or_close_failed = True
+                continue
+            try:
+                os.close(fd)
+            except OSError:
+                malformed_or_close_failed = True
+    if malformed_or_close_failed:
+        C.deny("UNEXPECTED_NATIVE_RIGHTS_MALFORMED_OR_CLOSE_FAILED")
+    if saw_rights:
+        C.deny("UNEXPECTED_NATIVE_RIGHTS_CLOSED")
+
+
+def _packet_recv(sock, *, expected_sender):
+    """Require kernel packet sender identity and reject ancillary fd imports.
+
+    A connected Unix socket may be inherited by a different sender process.
+    Per-packet SCM_CREDENTIALS is mandatory. File descriptors from untrusted
+    SCM_RIGHTS are never accepted or left open, even after a truncated packet.
     """
     if (type(expected_sender) is not tuple or len(expected_sender) != 3
             or any(type(v) is not int for v in expected_sender)):
         C.deny("UNPINNED_PACKET_SENDER")
+    if not hasattr(socket, "MSG_CMSG_CLOEXEC"):
+        C.deny("NATIVE_RECEIVED_FD_CLOSE_ON_EXEC_UNAVAILABLE")
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
     data, ancillary, flags, addr = sock.recvmsg(
-        MAX_IPC + 1, socket.CMSG_SPACE(struct.calcsize("3i")))
-    if flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC) or not data or len(data) > MAX_IPC:
+        MAX_IPC + 1,
+        socket.CMSG_SPACE(struct.calcsize("3i"))
+        + socket.CMSG_SPACE(16 * array.array("i").itemsize),
+        socket.MSG_CMSG_CLOEXEC)
+    # This MUST precede MSG_CTRUNC, missing-credentials and all other denials.
+    _discard_unexpected_native_rights(ancillary)
+    if (flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC)
+            or addr or not data or len(data) > MAX_IPC):
         C.deny("BOUNDED_NATIVE_PACKET_REFUSED")
-    credentials = [
-        struct.unpack("3i", value[:struct.calcsize("3i")])
-        for level, kind, value in ancillary
-        if level == socket.SOL_SOCKET and kind == socket.SCM_CREDENTIALS
-        and len(value) == struct.calcsize("3i")
-    ]
+    credentials = []
+    for level, kind, value in ancillary:
+        if (level != socket.SOL_SOCKET or kind != socket.SCM_CREDENTIALS
+                or len(value) != struct.calcsize("3i")):
+            C.deny("UNEXPECTED_NATIVE_CONTROL_MESSAGE")
+        credentials.append(struct.unpack("3i", value))
     if len(credentials) != 1 or credentials[0] != expected_sender:
         C.deny("PACKET_SENDER_DIFFERS_FROM_PINNED_SOCKET_PEER")
     return data

@@ -6,6 +6,7 @@ import {join} from "node:path";
 import {pathToFileURL} from "node:url";
 import {loadOptionalToken} from "./read_sec_price_context.mjs";
 import {dayNumber} from "./read_market_price_range.mjs";
+import {quotaFetcher} from "./market_shared_quota.mjs";
 
 export const ALPHA_TOKEN_FILE=join(homedir(),".local","share",
   "post-apollo","finance-market","alpha-vantage-token.txt");
@@ -60,7 +61,10 @@ async function request(params,fetcher=fetch,
       method:"GET",redirect:"error",headers:{Accept:"application/json"},
       signal:AbortSignal.timeout(12000)
     });
-  }catch{fail("provider-unavailable");}
+  }catch(error){
+    if(error?.message==="local-quota-exhausted"
+        || error?.message==="local-quota-unavailable")throw error;
+    fail("provider-unavailable");}
   if(response?.status===429)fail("provider-rate-or-entitlement");
   if(response?.status===401)fail("provider-key-invalid");
   if(response?.status===402 || response?.status===403)
@@ -165,11 +169,13 @@ export async function loadAlphaDaily(symbol,currency,from,to,
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
     const args=process.argv.slice(2);
+    const local=quotaFetcher("alpha-vantage");
     const result=args[0]==="lookup" && args.length===2
-      ? await searchAlpha(args[1])
+      ? await searchAlpha(args[1],local.fetcher)
       : args[0]==="history" && args.length===5
-      ? await loadAlphaDaily(args[1],args[2],args[3],args[4])
+      ? await loadAlphaDaily(args[1],args[2],args[3],args[4],local.fetcher)
       : fail("invalid-command");
+    if(local.latest())result.localQuota=local.latest();
     process.stdout.write("FINANCE_ALPHA_FREE "+JSON.stringify(result)+"\n");
   }catch(error) {
     const allowed=new Set(["invalid-ticker","invalid-symbol","invalid-currency",
@@ -177,7 +183,8 @@ if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
       "provider-key-invalid","provider-not-entitled","provider-unavailable",
       "provider-rate-or-entitlement","provider-symbol-unavailable",
       "provider-response-too-large","provider-invalid","token-unreadable",
-      "token-permissions","token-invalid"]);
+      "token-permissions","token-invalid",
+      "local-quota-exhausted","local-quota-unavailable"]);
     const code=allowed.has(error?.message)?error.message:"provider-failed";
     process.stdout.write("FINANCE_ALPHA_FREE_ERROR "+code+"\n");
     process.exitCode=1;

@@ -24,6 +24,8 @@ Item {
     readonly property var dayResult: dayMode && snapshot
         ? StockModePolicy.daySession(snapshot, stockFeed.dayDate) : null
     property int selectedPointIndex: -1
+    // M28: local session-only display choice; never changes provider readers.
+    property bool showAverages: false
     readonly property var inspectedPoint: !dayMode
         ? ChartPointPolicy.selectedBar(priceBars, selectedPointIndex) : null
     // M26: recompute locally only from the current, loaded RANGE snapshot.
@@ -33,6 +35,11 @@ Item {
         && snapshot.from === stockFeed.startDate
         && snapshot.to === stockFeed.endDate
         ? RangeAnalysisPolicy.summarizeRange(snapshot) : null
+    readonly property var averageOverlay: !dayMode && showAverages
+        && priceBars.length >= 5 && rangeAnalysis !== null
+        ? RangeAnalysisPolicy.movingAverageSeries(snapshot) : null
+    onShowAveragesChanged: priceCanvas.requestPaint()
+    onAverageOverlayChanged: priceCanvas.requestPaint()
     // M27: selected chart session to LAST LOADED range session, never now.
     // Follows existing point/issuer/date invalidation and spends no API call.
     readonly property var selectedCloseComparison: rangeAnalysis !== null
@@ -498,6 +505,20 @@ Item {
                     if (stocks.stockFeed) stocks.stockFeed.returnToRange();
                 }
             }
+            ActionButton {
+                id: averageToggle
+                objectName: "marketMovingAverageToggle"
+                visible: !stocks.dayMode && stocks.rangeAnalysis !== null
+                    && stocks.priceBars.length >= 5
+                width: 180
+                height: visible ? 30 : 0
+                label: stocks.showAverages ? "HIDE 5/20 SMA" : "SHOW 5/20 SMA"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                selected: stocks.showAverages
+                available: visible
+                onLeftClicked: stocks.showAverages = !stocks.showAverages
+            }
             Rectangle {
                 width: parent.width
                 height: visible ? 174 : 0
@@ -531,6 +552,28 @@ Item {
                         ctx.strokeStyle = "#55CFCA";
                         ctx.lineWidth = 1.6;
                         ctx.stroke();
+
+                        // M28: optional trailing closing-session SMA overlays.
+                        // Share the same x/y scale as cyan prices; no new source.
+                        const moving = stocks.averageOverlay;
+                        if (moving) {
+                            const drawAverage = function(points,color) {
+                                if (!points || points.length < 1) return;
+                                ctx.beginPath();
+                                for (let k=0;k<points.length;k++) {
+                                    const a=points[k];
+                                    const x=a.index*(width-1)/(bars.length-1);
+                                    const y=(height-1)-(a.price-low)/spread*(height-1);
+                                    if (k===0) ctx.moveTo(x,y);
+                                    else ctx.lineTo(x,y);
+                                }
+                                ctx.strokeStyle=color;
+                                ctx.lineWidth=2;
+                                ctx.stroke();
+                            };
+                            drawAverage(moving.sma5,"#ED981A");
+                            drawAverage(moving.sma20,"#D8CAFF");
+                        }
 
                         // Small windows keep every point visible; long histories
                         // remain legible without painting 132 overlapping dots.
@@ -576,9 +619,30 @@ Item {
                 }
             }
             GohuText {
+                objectName: "marketMovingAverageSummary"
+                width: parent.width
+                visible: stocks.averageOverlay !== null
+                text: stocks.averageOverlay
+                    ? ("TRAILING SESSION AVERAGES // "
+                        + stocks.averageOverlay.priceBasis
+                        + "\nORANGE SMA 5 // $"
+                        + stocks.averageOverlay.latest5.toFixed(2)
+                        + "\nLILAC SMA 20 // "
+                        + (stocks.averageOverlay.latest20 === null
+                            ? "N/A // NEED 20 LOADED SESSIONS"
+                            : "$" + stocks.averageOverlay.latest20.toFixed(2))
+                        + "\nLOADED SESSIONS ONLY // NO NEW REQUEST"
+                        + "\nNOT A LIVE QUOTE OR TRADE SIGNAL")
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.orange
+            }
+            GohuText {
                 width: parent.width
                 visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE = SELECTED"
+                text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

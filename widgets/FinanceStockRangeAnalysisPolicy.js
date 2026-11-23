@@ -109,3 +109,38 @@ function compareSelectedToLast(snapshot, index) {
         readOnly:true
     };
 }
+
+// M28: simple *trailing* averages of actual loaded trading-session closes.
+// These are never intraday highs/lows, predictions, or extrapolated quotes.
+// M26 validates 1-132 chronological source bars and a single price basis.
+function movingAverageSeries(snapshot) {
+    const valid = summarizeRange(snapshot);
+    if (!valid) return null;
+    const rows = snapshot.bars;
+    function trail(period) {
+        let total = 0;
+        const points = [];
+        for (let i=0; i<rows.length; i++) {
+            total += rows[i].price;
+            if (i >= period) total -= rows[i-period].price;
+            if (i >= period - 1) {
+                const avg = total / period;
+                if (!Number.isFinite(avg) || avg <= 0) return null;
+                points.push({index:i, date:rows[i].date, price:avg});
+            }
+        }
+        return points;
+    }
+    const five = trail(5), twenty = trail(20);
+    if (!five || !twenty) return null;
+    return {
+        sma5:five, sma20:twenty,
+        latest5:five.length ? five[five.length - 1].price : null,
+        latest20:twenty.length ? twenty[twenty.length - 1].price : null,
+        sessions:rows.length,
+        priceBasis:valid.priceBasis,
+        source:"loaded-eodhd-range-only",
+        readOnly:true,
+        noProviderCalls:true
+    };
+}

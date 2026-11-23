@@ -547,10 +547,25 @@ class ForestLauncherContract(unittest.TestCase):
             side = min(204, max(144, round(frame_width * 0.31)))
             rail_width = 184 if frame_width >= 800 else 148
             prompt = frame_width - side - rail_width - 24
-            mic = max(32, min(42, round(prompt * 0.12)))
             send = max(54, min(86, round(prompt * 0.21)))
-            placeholder = prompt - mic - send - 51 - 3 * 6
-            self.assertGreaterEqual(placeholder, 100)
+            box = prompt - send - 6
+            mic = max(28, min(34, round(box * 0.16)))
+            local_draft = box - 9 - 6 - mic - 4 - 39 - 4
+            self.assertGreaterEqual(local_draft, 100)
+
+    def test_forest_section_dividers_use_grassy_green(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        rail = (ROOT / "widgets/ForestChatList.qml").read_text()
+        # Only 1px section dividers change; individual status colors and
+        # product-specific button borders retain their established grammar.
+        self.assertEqual(view.count("height: 1\\n                color: Colors.green"), 3)
+        self.assertEqual(view.count("width: 1\\n                color: Colors.green"), 1)
+        self.assertNotIn("height: 1\\n                color: Colors.cyan", view)
+        self.assertNotIn("width: 1\\n                color: Colors.cyan", view)
+        self.assertIn("height: 1\\n            color: Colors.green", rail)
+        self.assertIn("width: 1\\n        color: Colors.green", rail)
+        self.assertNotIn("height: 1\\n            color: Colors.cyan", rail)
+        self.assertNotIn("width: 1\\n        color: Colors.cyan", rail)
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
@@ -577,19 +592,45 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("property alias contentItem: contentHost", button)
         self.assertIn("id: forestAskSendButton", view)
         self.assertIn("id: modelPickerButton", view)
+        # Prompt is the outer magenta text field; both controls are nested
+        # inside it. The SEND control is an adjacent sibling, not an input.
+        inside = view.split("id: sendGate", 1)[1].split(
+            "id: forestAskSendButton", 1)[0]
+        self.assertIn("id: forestPromptInput", inside)
+        self.assertIn("VoiceToTextButton {", inside)
+        self.assertIn("DockButton {", inside)
+        self.assertIn("id: modelPickerButton", inside)
+        self.assertIn("anchors.right: modelPickerButton.left", inside)
+        self.assertIn("border.color: Colors.magenta", inside)
+        self.assertIn("font.family: \"GohuFont 11 Nerd Font Mono\"", inside)
+        self.assertIn("font.pixelSize: 11", inside)
+        self.assertIn("color: Colors.magenta", inside)
+        self.assertIn("selectionColor: Colors.magenta", inside)
+        self.assertIn("selectedTextColor: Colors.black", inside)
+        self.assertIn("cursorDelegate: Rectangle {", inside)
+        self.assertIn("width: 2", inside)
+        self.assertIn("color: Colors.orange", inside)
+        self.assertIn("enabled: root.menuOpen", inside)
+        self.assertIn("In-memory draft only.", inside)
+        self.assertIn("anchors.left: forestPromptInput.left", inside)
+        self.assertIn("forestPromptInput.text.length === 0", inside)
+        self.assertIn("if (forestPromptInput)", view)
+        self.assertIn("forestPromptInput.clear();", view)
+        self.assertNotRegex(view, r"(?m)^\s*onAccepted\s*:")
         self.assertIn("anchors.right: voiceToTextButton.left", view)
         self.assertIn("anchors.right: forestAskSendButton.left", view)
         self.assertIn("anchors.right: modelPickerButton.left", view)
+        self.assertIn("anchors.right: parent.right", view)
         self.assertIn("available: root.voiceHostTrusted && !processing", view)
         self.assertIn("enabledAction: root.chatHostTrusted", view)
         self.assertIn("backendReady: root.voiceHostTrusted", view)
         self.assertIn("busy: false", view)
         self.assertIn("recording: false", view)
         self.assertIn("allowSecondaryAction: false", view)
-        self.assertIn('askLabel: "ASK"', view)
+        self.assertIn('askLabel: "SEND"', view)
         self.assertIn('sendLabel: "SEND"', view)
         self.assertIn("VOICE LOCKED // TRUSTED FOREST AUDIO HOST NOT CONNECTED", view)
-        self.assertIn("ASK LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED", view)
+        self.assertIn("SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED", view)
         self.assertIn("SEND LOCKED // HOST NOT CONNECTED", view)
         self.assertIn("SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED", view)
         self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
@@ -611,10 +652,11 @@ class ForestLauncherContract(unittest.TestCase):
         for frame_width in (930, 930, 930, 1884):
             side = min(204, max(144, round(frame_width * 0.31)))
             row = frame_width - side - 24
-            mic = max(32, min(42, round(row * 0.12)))
             send = max(54, min(86, round(row * 0.21)))
-            placeholder = row - mic - send - 51 - 3 * 6
-            self.assertGreaterEqual(placeholder, 100)
+            box = row - send - 6
+            mic = max(28, min(34, round(box * 0.16)))
+            local_draft = box - 9 - 6 - mic - 4 - 39 - 4
+            self.assertGreaterEqual(local_draft, 100)
 
     def test_b0_inventory_ui_is_explicit_and_fail_closed(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()

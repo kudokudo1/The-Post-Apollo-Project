@@ -64,6 +64,9 @@ assert.equal(checking.visibleTransactionCount,3);
 assert.equal(checking.visibleMovementInCents,20000);
 assert.equal(checking.visibleMovementOutCents,6125);
 assert.equal(checking.visibleMovementNetCents,13875);
+assert.equal(checking.visibleKnownBalanceSubtotalCents,23875);
+assert.equal(checking.visibleBalanceCents,23875);
+assert.equal(checking.visibleUnknownBalanceCount,0);
 assert.equal(checking.visibleRecent.length,3);
 assert.equal(checking.visibleRecent.every(x=>x.accountId===chChecking),true);
 assert.equal(checking.totalCents,null,"Whole provider unknown, even when one checking account is known");
@@ -74,6 +77,8 @@ assert.equal(savings.visibleAccounts[0].id,chSavings);
 assert.equal(savings.visibleMovementInCents,5000);
 assert.equal(savings.visibleMovementOutCents,0);
 assert.equal(savings.visibleTransactionCount,1);
+assert.equal(savings.visibleBalanceCents,null);
+assert.equal(savings.visibleUnknownBalanceCount,1);
 assert.equal(savings.visibleRecent[0].description,"manual transfer in");
 
 const caHome=Provider.build("cashapp",snapshot,"home");
@@ -92,6 +97,7 @@ assert.equal(payWallet.visibleMovementOutCents,0);
 assert.equal(payWallet.visibleTransactionCount,1);
 assert.equal(payWallet.visibleRecent[0].accountId,pp);
 assert.equal(payWallet.totalCents,8000);
+assert.equal(payWallet.visibleBalanceCents,8000);
 
 const bank=Provider.build("bank",snapshot,"home");
 assert.equal(bank.visibleAccounts.length,0);

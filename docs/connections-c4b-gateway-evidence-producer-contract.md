@@ -44,6 +44,26 @@ This is NOT a real installed gateway evidence transport. A valid test result mea
 
 An independent custodian could send raw bytes to the guest, but merely presenting those bytes through guest-controlled storage cannot prove independent issuer custody. A guest-root actor can replay local bytes and restore local state. A local public key is not an enrolled host or receipt-signing key. Do not promote signed UNAVAILABLE to a terminal protected COMMITTED receipt. Never ship disposable CI test code in the installed Silverblue RPM.
 
+## DOC 2 real-guest boot continuity extension (new separate CI milestone)
+
+The official **disposable Fedora Silverblue guest** now also pins the
+kernel's \`/proc/sys/kernel/random/boot_id\` while the installed gateway is
+running. It reads and validates a 36-character UUID directly from procfs,
+rechecks the same observed boot before and after **all four** actual
+signed-denial actions and through the existing release/kernel observations,
+and refuses a deliberately substituted expected boot pin. The host-side KVM
+runner requires the new unique PASS marker before accepting the full
+two-reboot rollback cycle. Fast source-contract tests check that guard's
+placement and exact marker; real GitHub KVM must independently pass.
+
+**Limit:** This is guest-local boot-lifetime continuity, not an
+operator-enrolled host fingerprint, trusted remote witness, approved release,
+active unlocked human seat, independently issued/spent challenge, signed
+terminal outcome or production Sign-In. The boot UUID is neither a secret nor
+a trust anchor; no UUID is exported to GitHub logs. The existing guest
+signing root remains disposable, all authorization flags stay false, and no
+production package or native service source is modified.
+
 ## NEXT / DECISIONS
 
 - DOC 1 and the protected-custodian owner review the proposed semantic envelope, especially challenge encoding, exact target host/release/seat, authenticated measurement origin and no-local-fallback boundary.

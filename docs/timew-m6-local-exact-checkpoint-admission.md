@@ -16,6 +16,8 @@ The additive module services/time/MachineV3LocalCheckpointAdmission.py validates
 
 The existing local M3 store gains the narrowly scoped save_many(checkpoint_id, captures) method. It validates all proposed records *before* opening SQLite. Inside a single BEGIN IMMEDIATE transaction it checks total capacity, rejects any existing v3 row for that checkpoint rather than silently extending a partial set, inserts all rows and commits once. Failed later inserts roll back earlier inserts; no partial successful window set. The old single-window save() remains unchanged; existing v3 format and legacy V1/V2 formats remain unchanged.
 
+**Permission preflight:** the existing V1/V2 writer and the strict v3 store can disagree about intermediate-directory permissions. A legacy-created `post-apollo` ancestor can inherit a permissive umask and be refused by v3's `0700` parent requirement. M6 deliberately **does not chmod or repair** any existing directory behind the operator's back. Disposable CI precreates a private `0700` parent and explicitly verifies that an unsafe `0755` parent is rejected without modification. A future approved host installation must inspect/resolve that preflight separately; a completed V1/V2 SAVE must not be reattempted automatically if v3 admission refuses.
+
 The response is explicitly **LOCAL_EXACT_CAPTURE_RECORDED_UNTRUSTED**. No protected source/seat/operator selection, C5 SPENT, native receipt, confirmed frame, actionable Restore, retry or undo flags are produced. Neither ordinary SQLite nor its digest can detect a valid-bit substitution by the same user.
 
 ## How to use

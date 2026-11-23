@@ -49,6 +49,24 @@ Window {
         copy.categories[0].availableCents="not-a-number";
         fixture=copy;
     }
+    function mixedAvailableBalanceFixture() {
+        var copy=original();
+        copy.categories[0].availableCents=2500;
+        copy.categories[1].availableCents=1000;
+        copy.categories.push({
+            id:"groceries",name:"Groceries",group:"Needs",groupId:"needs",
+            budgetedCents:5000,availableCents:1000
+        });
+        copy.categories.push({
+            id:"overdrawn",name:"Overdrawn",group:"Wants",groupId:"wants",
+            budgetedCents:2500,availableCents:-250
+        });
+        copy.categories.push({
+            id:"unknown",name:"Unknown",group:"Empty",groupId:"empty",
+            budgetedCents:0,availableCents:"not-a-number"
+        });
+        fixture=copy;
+    }
     function refreshFixture() {
         fixture=JSON.parse(JSON.stringify(fixture));
     }

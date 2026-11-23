@@ -1,0 +1,37 @@
+name: Forest Core Performance P2C Read-Only Capacity
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/performance_capacity_p2c.py'
+      - 'scripts/forest/PERFORMANCE_CAPACITY_P2C.md'
+      - 'tests/forest/test_performance_capacity_p2c.py'
+      - '.github/workflows/forest-core-performance-p2c.yml'
+  push:
+    paths:
+      - 'scripts/forest/performance_capacity_p2c.py'
+      - 'scripts/forest/PERFORMANCE_CAPACITY_P2C.md'
+      - 'tests/forest/test_performance_capacity_p2c.py'
+      - '.github/workflows/forest-core-performance-p2c.yml'
+
+jobs:
+  readonly-disposable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P2C fake provider and sysfs tests
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_capacity_p2c.py' -v
+      - name: P2B fake-Ollama benchmark regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_benchmark_p2b.py' -v
+      - name: P1 pure governor regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - name: P0 observer regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - name: B0 inventory regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_inventory.py' -v
+      - name: B2 stream regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_chat_transport.py' -v
+      - name: C5 provisional disclosure regression
+        run: python3 -m unittest discover -s tests/connections -p 'test_connections_forest_c5_provisional_disclosure_preflight.py' -v
+      - name: Syntax compilation
+        run: python3 -m py_compile scripts/forest/performance_capacity_p2c.py tests/forest/test_performance_capacity_p2c.py

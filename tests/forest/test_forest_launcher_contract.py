@@ -759,18 +759,32 @@ class ForestLauncherContract(unittest.TestCase):
         for glyph in ('⊹', '⭑', '✦', '⋆'):
             self.assertIn('text: "' + glyph + '"', view)
         self.assertIn("root.reasoningRailExpanded && reasoningCoffeeButton.pressed", view)
-        self.assertIn("? Colors.black : Colors.white", view)
+        self.assertIn("? Colors.black", view)
+        self.assertIn(": reasoningCoffeeButton.hovered", view)
+        self.assertIn("? Colors.red", view)
+        self.assertIn(": root.activeTree.gradientAccentColor", view)
+        self.assertIn(": Colors.white", view)
         # Star ink, cup base/accent, and compact border-overlay gating.
         self.assertEqual(view.count("reasoningCoffeeButton.pressed"), 4)
-        self.assertIn("contentGlowSource: coffeeGradientGlyph", view)
+        # Sampling the stable ActionButton host avoids a second-looking
+        # cup ghost while the red cap changes size and position. The
+        # source includes the cup and every independently drawn star.
+        self.assertIn("contentGlowSource: contentItem", view)
+        self.assertNotIn("contentGlowSource: coffeeGradientGlyph", view)
+        self.assertIn("contentGlowRadius: 6", view)
+        self.assertIn("contentGlowIdleOpacity: 0.45", view)
+        self.assertIn("contentGlowHoverOpacity: 0.66", view)
+        self.assertIn("property alias contentItem: contentHost", action)
+        self.assertIn("contentGlowSource: contentItem", view)
         self.assertIn("width: root.reasoningRailExpanded ? 30 : 36", view)
         self.assertIn("height: root.reasoningRailExpanded ? 28 : 34", view)
         self.assertIn("width: 29", view)
         self.assertIn("pixelSize: 26", view)
-        self.assertIn("y: -1", view)  # top white star raised by one pixel
+        self.assertIn("y: 2", view)  # top star closer to cup
         self.assertIn("anchors.leftMargin: 2", view)
         self.assertIn("anchors.rightMargin: 2", view)
-        self.assertIn("anchors.rightMargin: 5", view)
+        self.assertIn("anchors.rightMargin: 8", view)
+        self.assertIn("anchors.bottomMargin: 4", view)
         self.assertIn("horizontalAlignment: Text.AlignHCenter", view)
         self.assertIn("root.activeTree.gradientAccentColor", view)
         self.assertIn("root.activeTree.gradientTopRight", view)
@@ -786,12 +800,15 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("? Colors.red : root.activeTree.spiritualIdleGlowColor", view)
         self.assertIn("wideGlowEnabled: root.reasoningRailExpanded", view)
         for prop in ("hoverForegroundColor", "hoverBorderColor",
-                     "hoverContentGlowColor", "hoverSoftGlowColor",
-                     "hoverWideGlowColor"):
+                     "hoverSoftGlowColor", "hoverWideGlowColor"):
             self.assertIn(prop + ": root.reasoningRailExpanded", view)
         self.assertEqual(
             view.count("? Colors.red : root.activeTree.gradientAccentColor"),
-            5)
+            4)
+        # Tree icon glow, not one generic red shadow or a cup-only mask.
+        self.assertIn("idleContentGlowColor: root.activeTree.iconIdleGlowColor", view)
+        self.assertIn("hoverContentGlowColor: root.activeTree.iconIdleGlowColor", view)
+        self.assertIn("pressedContentGlowColor: root.activeTree.iconIdleGlowColor", view)
         self.assertIn("&& !reasoningCoffeeButton.hovered", view)
         self.assertIn("&& !reasoningCoffeeButton.pressed", view)
         # Compact uses accent-hued hover and red-close uses red hover.

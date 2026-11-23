@@ -20,7 +20,7 @@ DOMAIN = b"postapollo.hospital.c5h3.exact-room-review.v1\x00"
 REVIEW_FIELDS = frozenset({
     "schema", "purpose", "action", "roomId", "patientId", "repository",
     "expectedRevision", "expectedDigest", "requestNonce", "operatorUid",
-    "seatId", "hostId", "policyGeneration", "expiresAt",
+    "seatId", "hostId", "policyGeneration", "issuedAt", "expiresAt",
     "retentionApproved", "legalHold", "originalPreserved", "burnAllowed",
 })
 CLAIM_FIELDS = frozenset({
@@ -79,6 +79,7 @@ def build_review(request, prepared, policy, *, operator_uid, seat_id, host_id, n
         "seatId": seat_id,
         "hostId": host_id,
         "policyGeneration": state["policyGeneration"],
+        "issuedAt": now,
         "expiresAt": state["expiresAt"],
         "retentionApproved": True,
         "legalHold": False,
@@ -133,7 +134,7 @@ def inspect_untrusted_claim(reference, claim_raw, *, now):
         and claim["hostId"] == review["hostId"]
         and claim["claimedVisible"] is True
         and claim["claimedConfirmed"] is True
-        and claim["shownAt"] <= claim["confirmedAt"] <= now
+        and review["issuedAt"] <= claim["shownAt"] <= claim["confirmedAt"] <= now
         and claim["confirmedAt"] < review["expiresAt"]
         and now < review["expiresAt"]
     )

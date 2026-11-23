@@ -128,6 +128,27 @@ for expected in (
 ):
     assert expected in pane, expected
 
+# M8 category search must be a pure local view/filter with explicit states.
+# No new source process, financial writer, or permission gate.
+for expected in (
+    'function clearCategorySearch()',
+    'filterText="";',
+    'objectName: "categorySearchInput"',
+    'objectName: "categoryClearSearchAction"',
+    'label: "CLEAR SEARCH"',
+    'available: categoryPane.filterText.length>0',
+    'onLeftClicked: categoryPane.clearCategorySearch()',
+    'text: "SEARCH CATEGORIES / GROUPS"',
+    'objectName: "categorySearchSummary"',
+    '"SHOWING "+categoryPane.displayed.length+" / "',
+    'objectName: "categoryFilteredRow"',
+    'objectName: "categorySearchEmptyState"',
+    'NO SEARCH MATCHES // CLEAR SEARCH',
+    'NO CATEGORIES IN THIS BUDGET',
+    'LOAD A BUDGET TO VIEW CATEGORIES',
+):
+    assert expected in pane, expected
+
 # M6 adds a separately gated service; group proposal policy remains pure.
 assert 'signal groupSaveRequested(var payload)' in pane
 assert 'FinanceCategoryGroupWriteService' not in pane

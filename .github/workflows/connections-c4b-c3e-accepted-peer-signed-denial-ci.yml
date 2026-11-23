@@ -1,0 +1,54 @@
+name: Connections C4b accepted AF_UNIX peer plus signed-denial nonpromotion (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/test_c4b_c3e_accepted_peer_signed_denial_ci.py'
+      - '.github/workflows/connections-c4b-c3e-accepted-peer-signed-denial-ci.yml'
+      - 'docs/connections-c4b-c3e-accepted-peer-signed-denial-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-denial-with-real-inherited-peer-still-hold:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin existing disposable Ed25519 receipt dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile new integration test and preserve Sign-In disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile tests/connections/identity_silverblue/test_c4b_c3e_accepted_peer_signed_denial_ci.py
+          grep -Fq 'readonly property bool credentialActionsEnabled: false' services/connections/ConnectionsBroker.qml
+          echo "C4B_C3E_SENDER_ORIGIN_CI // NO_PRODUCTION_SIGNIN"
+      - name: Actual accepted Linux socket and same-challenge signed denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/identity_silverblue/test_c4b_c3e_accepted_peer_signed_denial_ci.py
+          echo "C4B_C3E_SENDER_ORIGIN_CI // SAME_CHALLENGE_ONLY_DIAGNOSTIC_HOLD"
+      - name: Original DOC 1 accepted peer and DOC 2 signed-denial regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B tests/connections/test_connections_c3e_accepted_unix_readonly_peer.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_raw_challenge_evidence_candidate_ci.py
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          echo "C4B_C3E_PEER_AND_DENIAL // STILL_NO_INDEPENDENT_CUSTODY_OR_SENDER_TRUST"

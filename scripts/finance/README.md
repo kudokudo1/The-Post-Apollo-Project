@@ -1101,3 +1101,28 @@ filter changes and all three empty/source cases on the real Categories
 pane, without a Quickshell runtime or financial writer.
 
 GitHub CI smoke is not the same as operator live desktop acceptance.
+
+
+## FinanceW Categories M9 // Overspent attention filter
+
+In **Finance → Budget → Budget → CATEGORIES**, **OVERSPENT ONLY** narrows
+the existing read-only category list to categories with a *finite numeric*
+negative `availableCents` balance in the authenticated snapshot. This is
+the same negative-available rule used by the category row highlight; it is
+not a financial forecast or a separate liability calculation. The control
+shows the total overspent category count and uses the existing selected
+button state. Category-name/group-name search still works simultaneously.
+
+Empty states distinguish **NO OVERSPENT CATEGORIES THIS MONTH** from
+**NO OVERSPENT SEARCH MATCHES // CLEAR SEARCH OR FILTER**. CLEAR SEARCH
+only removes the text search; toggling OVERSPENT ONLY switches the
+attention filter. Same-source/month refresh preserves filter choices;
+changing source/month or losing an authenticated budget clears both to
+avoid mistaking a previous budget's filters for the current view.
+
+This milestone has **no financial write or authorization effects**.
+It changes only Categories presentation, fictional Qt fixtures/tests and
+the category preview source contract. Existing Actual API, journal,
+permits, root FinanceW navigation and M6 writer security boundary
+remain untouched. Headless Qt checks do not establish live desktop
+acceptance, and M6's independent security review remains outstanding.

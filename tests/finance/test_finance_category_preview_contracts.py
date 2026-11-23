@@ -149,6 +149,18 @@ for expected in (
 ):
     assert expected in pane, expected
 
+# M9 view-only attention filters; existing write boundaries remain unchanged.
+for needle in (
+    'property bool onlyOverspent: false',
+    'readonly property int overspentCount:',
+    'function toggleOverspentFilter()',
+    'objectName: "categoryOverspentOnlyAction"',
+    'selected: categoryPane.onlyOverspent',
+    'NO OVERSPENT CATEGORIES THIS MONTH',
+    'NO OVERSPENT SEARCH MATCHES // CLEAR SEARCH OR FILTER',
+):
+    assert needle in pane, needle
+
 # M6 adds a separately gated service; group proposal policy remains pure.
 assert 'signal groupSaveRequested(var payload)' in pane
 assert 'FinanceCategoryGroupWriteService' not in pane

@@ -23,12 +23,12 @@ sys.path.insert(0, str(ROOT / "services/connections/hospital"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import HospitalNativeIssuerCore as C
 import HospitalNativeIssuerService as S
-from test_hospital_c5_native_consent_hard_hold import NativeConsentHardHold
+import test_hospital_c5_native_consent_hard_hold as H4
 
 
 class HospitalC5H11OriginalCommitUnknown(unittest.TestCase):
     def setUp(self):
-        fixture = NativeConsentHardHold("test_02_valid_trash_and_polkit_success_still_hold")
+        fixture = H4.NativeConsentHardHold("test_02_valid_trash_and_polkit_success_still_hold")
         fixture.setUp()
         self.request = fixture.request
         self.prepared = fixture.prepared

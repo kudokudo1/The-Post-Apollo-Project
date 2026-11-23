@@ -6,7 +6,26 @@ import "../services/finance" as FinanceServices
 Rectangle {
     id: discovery
     property bool active: false
+    property bool priceOptionsOpen: false
     signal exitRequested()
+    onActiveChanged: {
+        if (!active) priceOptionsOpen = false;
+    }
+    function inspectPrice(item) {
+        if (!active || finder.loading || !finder.ready || !item
+                || !finder.snapshot.items.some(function(row) {
+                    return row.figi===item.figi
+                        && row.ticker===item.ticker
+                        && row.exchCode===item.exchCode
+                        && row.name===item.name;
+                })) return false;
+        priceOptionsOpen=true;
+        if (!globalPrices.inspectInstrument(item)) {
+            priceOptionsOpen=false;
+            return false;
+        }
+        return true;
+    }
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
@@ -182,7 +201,7 @@ Rectangle {
                 delegate: Rectangle {
                     required property var modelData
                     width: results.width
-                    height: 76
+                    height: 105
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.cyan
@@ -224,9 +243,31 @@ Rectangle {
                         font.pixelSize: 9
                         elide: Text.ElideRight
                     }
+                    ActionButton {
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 5
+                        anchors.right: parent.right
+                        anchors.rightMargin: 7
+                        width: 132
+                        height: 25
+                        label: "PRICE OPTIONS"
+                        labelPixelSize: 9
+                        accentColor: Colors.magenta
+                        available: discovery.active && finder.ready
+                            && !finder.loading
+                        onLeftClicked: discovery.inspectPrice(modelData)
+                    }
                 }
             }
         }
+    }
+    FinanceGlobalPricePane {
+        id: globalPrices
+        anchors.fill: parent
+        visible: discovery.priceOptionsOpen
+        active: discovery.active && discovery.priceOptionsOpen
+        z: 30
+        onExitRequested: discovery.priceOptionsOpen = false
     }
     NeonScrollBar {
         id: discoveryScrollBar
@@ -244,7 +285,7 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        text: "IDENTITIES ONLY // NO PRICE FEED LINKED // FREE SEARCH LIMIT 5/MIN"
+        text: "OPENFIGI IDENTITIES // PRICE OPTIONS USE OPTIONAL FREE EODHD KEY"
         textFormat: Text.PlainText
         font.pixelSize: 9
         color: Colors.orange

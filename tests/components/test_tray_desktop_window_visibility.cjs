@@ -75,8 +75,8 @@ assert.equal(visible(tray.lutris,tabbed),true);
 const sameName = list(root(output(ws("4", wayland("fake-lutris-app",true)))));
 assert.equal(visible(tray.lutris,sameName),false,
     "substring of a different app ID must not match Lutris");
-assert.equal(visible({id:"discord",title:"Discord"},list(
-    root(output(ws("5",wayland("vesktop",true))))),false,
+const onlyVesktop = list(root(output(ws("5",wayland("vesktop",true)))));
+assert.equal(visible({id:"discord",title:"Discord"},onlyVesktop),false,
     "Discord and Vesktop are separate identities");
 
 assert.deepEqual(list("invalid JSON"),[]);

@@ -1,0 +1,19 @@
+name: Connections TimeW C5 store custody attacks (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/**"
+      - "docs/connections/timew-c5-store-custody-attack-matrix.md"
+      - ".github/workflows/connections-timew-c5-store-custody-attacks.yml"
+  workflow_dispatch:
+jobs:
+  store-attack-matrix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Same-UID rollback and corrupt file negative tests
+        run: python3 -B -I tests/connections/timew/test_timew_c5_store_custody_attacks.py
+      - name: Disposable root-owned file vs distinct Linux UID
+        run: sudo -n python3 -B -I tests/connections/timew/test_timew_c5_store_custody_attacks.py

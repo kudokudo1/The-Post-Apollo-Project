@@ -5,6 +5,7 @@ import "../services/finance" as FinanceServices
 // M21 status only. Never launches provider APIs, reserves quota or resets DB.
 Rectangle {
     id: quotaPane
+    objectName: "marketQuotaRealPane"
     property bool active: false
     signal exitRequested()
     color: Colors.black
@@ -34,6 +35,7 @@ Rectangle {
     }
     ActionButton {
         id: backButton
+        objectName: "marketQuotaBackButton"
         anchors.top: parent.top
         anchors.topMargin: 6
         anchors.right: parent.right
@@ -89,6 +91,7 @@ Rectangle {
             ActionButton {
                 width: body.width
                 height: 30
+                objectName: "marketQuotaRefreshButton"
                 label: localQuota.loading ? "READING LOCAL STATUS"
                     : "REFRESH LOCAL STATUS"
                 labelPixelSize: 10
@@ -150,6 +153,7 @@ Rectangle {
                         }
                         GohuText {
                             id: number
+                            objectName: "marketQuotaReservedLabel"
                             anchors.top: providerTitle.bottom
                             anchors.topMargin: 7
                             anchors.left: providerTitle.left

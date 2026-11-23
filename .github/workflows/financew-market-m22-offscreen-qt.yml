@@ -1,0 +1,44 @@
+name: FinanceW Market M22 actual quota pane offscreen Qt smoke
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceMarketQuotaStatusPane.qml"
+      - "services/finance/FinanceMarketQuotaStatusService.qml"
+      - "tests/finance/test_finance_market_m22_qt_runtime.py"
+      - "tests/finance/finance_market_m22_quota_runtime_harness.qml"
+      - ".github/workflows/financew-market-m22-offscreen-qt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/FinanceMarketQuotaStatusPane.qml"
+      - "services/finance/FinanceMarketQuotaStatusService.qml"
+      - "tests/finance/test_finance_market_m22_qt_runtime.py"
+      - "tests/finance/finance_market_m22_quota_runtime_harness.qml"
+      - ".github/workflows/financew-market-m22-offscreen-qt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  market-quota-real-qml:
+    name: Real quota pane offscreen Qt; fake no-network Quickshell
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install headless Qt prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install pinned-range PySide6 bindings
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Actual quota pane + service offscreen UI acceptance harness
+        run: python tests/finance/test_finance_market_m22_qt_runtime.py

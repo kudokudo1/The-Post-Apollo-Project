@@ -1,0 +1,22 @@
+name: Connections TimeW C5 exact review shadow (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/**"
+      - "services/time/MachineV2ExactLogicalGeometry.py"
+      - "docs/connections/timew-c5-exact-review-shadow.md"
+      - ".github/workflows/connections-timew-c5-review-shadow-ci.yml"
+  workflow_dispatch:
+jobs:
+  review-shadow:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact original and presented intent review shadow
+        run: python3 -B -I tests/connections/timew/test_timew_c5_review_shadow_reference.py
+      - name: Inherited DOC 5 storage-independent recovery refusal
+        run: python3 -B -I tests/connections/timew/test_timew_c5_custodian_boundary_reference.py
+      - name: Inherited TimeW binary64 value-only validation
+        run: python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py

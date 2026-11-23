@@ -24,7 +24,7 @@ assert 'transactionCount:txCount' in policy
 assert 'recentWindowCount:projection.activity.length' in policy
 assert 'hasOlderEntries:projection.transactionCount>projection.activity.length' in policy
 
-assert 'readonly property var filteredActivity: ProviderPolicy.filterRecentActivity(' in pane
+assert 'readonly property var filteredActivity: Journal.project(' in pane
 assert 'property string activityDirection: "all"' in pane
 assert 'property int activityAccountIndex: 0' in pane
 assert 'property int entryAccountIndex: 0' in pane
@@ -44,10 +44,11 @@ assert 'onLeftClicked: providerPane.activityDirection="in"' in pane
 assert 'onLeftClicked: providerPane.activityDirection="out"' in pane
 assert 'FILTER ACCOUNT // ALL' in pane
 assert 'maximumLength: 64' in pane
-assert 'SEARCH RECENT DESCRIPTION OR MANUAL ACCOUNT NICKNAME' in pane
-assert 'RECENT MANUAL/DEMO ACTIVITY // FILTERS APPLY TO AT MOST 24 RECENT ENTRIES' in pane
-assert 'OLDER ACTIVITY NOT INCLUDED' in pane
-assert 'NO RECENT ACTIVITY MATCHES THESE FILTERS' in pane
+assert 'SEARCH SESSION DESCRIPTION OR MANUAL ACCOUNT NICKNAME' in pane
+assert 'COMPLETE CURRENT MANUAL SESSION' not in pane  # label is built by isolated journal policy
+assert 'providerPane.filteredActivity.scope' in pane
+assert 'PROVIDER SESSION ENTRIES // PAGE ' in pane
+assert 'NO SESSION ACTIVITY MATCHES THESE FILTERS' in pane
 assert 'model: providerPane.filteredActivity.ok?providerPane.filteredActivity.rows:[]' in pane
 assert 'QUICK MANUAL ENTRY // UPDATES ONLY THIS SESSION // DOES NOT MOVE MONEY' in pane
 assert 'ADD PROVIDER MANUAL ACTIVITY' in pane

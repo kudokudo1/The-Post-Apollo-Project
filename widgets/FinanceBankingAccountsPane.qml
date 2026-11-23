@@ -480,6 +480,7 @@ Item {
                 width: parent.width
                 providerId: manager.selectedProviderId
                 accountSnapshot: manager.review
+                manualSession: manager.session
                 feedback: manager.message
                 onAccountRequested: function(accountId) {
                     manager.showProviderAccount(accountId);

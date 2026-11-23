@@ -383,8 +383,11 @@ Rectangle {
 
                         opacity: trayButtonMouse.pressed ? 1.0 : trayButtonMouse.containsMouse ? 0.95 : 0.75
 
-                        // As on Workspaces, cyan remains the base image aura.
-                        color: Colors.cyan
+                        // The base aura must not stay cyan under an
+                        // active magenta aura: overlapping cyan + magenta
+                        // can wash the glow toward white. Both icon halos
+                        // use magenta while the app window is visible.
+                        color: trayButton.appOnDesktop ? Colors.magenta : Colors.cyan
 
                         transparentBorder: true
                     }

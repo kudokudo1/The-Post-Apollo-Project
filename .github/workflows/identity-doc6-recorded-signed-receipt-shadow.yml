@@ -1,0 +1,47 @@
+name: Identity DOC 6 recorded signed receipt shadow (HOLD)
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/native_recorded_signed_receipt_shadow_v0.py'
+      - 'tests/identity/test_native_recorded_signed_receipt_shadow_v0.py'
+      - '.github/workflows/identity-doc6-recorded-signed-receipt-shadow.yml'
+      - 'docs/identity-center-recorded-signed-receipt-shadow-doc6.md'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/native_recorded_signed_receipt_shadow_v0.py'
+      - 'tests/identity/test_native_recorded_signed_receipt_shadow_v0.py'
+      - '.github/workflows/identity-doc6-recorded-signed-receipt-shadow.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  recorded-signed-receipt-shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing approved cryptography primitive
+        run: python3 -m pip install cryptography==46.0.4
+      - name: Compile read-only recorded signed receipt shadow
+        run: |
+          python3 -m py_compile services/identity/native_recorded_signed_receipt_shadow_v0.py
+          python3 -m py_compile tests/identity/test_native_recorded_signed_receipt_shadow_v0.py
+      - name: Reject unsigned, substituted and stale receipts; deny even signed valid status
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_recorded_signed_receipt_shadow_v0.py' -v
+      - name: Preserve one-query original outcome candidate shadow
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_outcome_candidate_shadow_v0.py' -v
+      - name: Preserve local crash/rollback and admission diagnostic refusals
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_local_command_outcome_hold_reference_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_native_admission_diagnostic_v0.py' -v
+      - name: Preserve adapter-only and CPU++ offline Sign-In
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_native_adapter_only_call_path_v1.py' -v
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs

@@ -131,7 +131,7 @@ PanelWindow {
     // Tree roles are operator-assigned presentation labels, not new host permissions.
     readonly property var treeSlots: [
         {
-            name: "CHERRY", role: "GENERAL // ASSISTANT",
+            name: "CHERRY", sessionKey: "CHERRY", role: "GENERAL // ASSISTANT",
             iconPath: "../assets/forest/cherry-outline.svg",
             hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
             openIconPath: "../assets/forest/cherry-open-magenta.svg",
@@ -140,7 +140,7 @@ PanelWindow {
             gradientAccentColor: "#EE76B2", gradientTopRight: false
         },
         {
-            name: "MAPLE", role: "FILES // ORGANIZATION",
+            name: "MAPLE", sessionKey: "MAPLE", role: "FILES // ORGANIZATION",
             iconPath: "../assets/forest/maple-outline.svg",
             hoverIconPath: "../assets/forest/maple-hover-orange.svg",
             openIconPath: "../assets/forest/maple-open-magenta.svg",
@@ -150,7 +150,7 @@ PanelWindow {
             gradientAccentColor: "#C7482F", gradientTopRight: false
         },
         {
-            name: "BRISTLECONE PINE", role: "TREEWRITE // CODER",
+            name: "BRISTLECONE PINE", sessionKey: "BRISTLECONE_PINE", role: "TREEWRITE // CODER",
             iconPath: "../assets/forest/bristlecone-pine.png",
             hoverIconPath: "../assets/forest/bristlecone-hover-orange.png",
             openIconPath: "../assets/forest/bristlecone-open-magenta.png",
@@ -159,7 +159,7 @@ PanelWindow {
             gradientAccentColor: Colors.green, gradientTopRight: false
         },
         {
-            name: "CEDAR", role: "SECURITY // PROTECTION",
+            name: "CEDAR", sessionKey: "CEDAR", role: "SECURITY // PROTECTION",
             iconPath: "../assets/forest/cedar-outline.svg",
             hoverIconPath: "../assets/forest/cedar-hover-orange.svg",
             openIconPath: "../assets/forest/cedar-open-magenta.svg",
@@ -168,7 +168,7 @@ PanelWindow {
             gradientAccentColor: Colors.orange, gradientTopRight: false
         },
         {
-            name: "MACINTOSH", role: "TECH // SUPPORT",
+            name: "MACINTOSH", sessionKey: "MACINTOSH", role: "TECH // SUPPORT",
             iconPath: "../assets/forest/macintosh-outline.svg",
             hoverIconPath: "../assets/forest/macintosh-hover-orange.svg",
             openIconPath: "../assets/forest/macintosh-open-magenta.svg",
@@ -592,6 +592,12 @@ PanelWindow {
             visible: width > 0
             hostConnected: root.chatHostTrusted
             sessions: root.activeChatSessions
+            // Presentation key only; Forest Core must approve canonical Tree
+            // scope before ever supplying protected session metadata.
+            treeKey: root.activeTree.sessionKey
+            inventoryStatus: localInventory.status
+            discoveredModels: localInventory.modelCount
+            selectedModel: root.selectedLocalModel
         }
 
         Item {

@@ -1,0 +1,41 @@
+name: Identity DOC 6 local outcome HOLD negative reference
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/local_command_outcome_hold_reference_v0.py'
+      - 'tests/identity/test_local_command_outcome_hold_reference_v0.py'
+      - '.github/workflows/identity-doc6-local-outcome-hold-reference.yml'
+      - 'docs/identity-center-local-outcome-hold-reference-doc6.md'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/local_command_outcome_hold_reference_v0.py'
+      - 'tests/identity/test_local_command_outcome_hold_reference_v0.py'
+      - '.github/workflows/identity-doc6-local-outcome-hold-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  local-hold-negative:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile DOC 6 local test-only HOLD reference
+        run: |
+          python3 -m py_compile services/identity/local_command_outcome_hold_reference_v0.py
+          python3 -m py_compile tests/identity/test_local_command_outcome_hold_reference_v0.py
+      - name: Verify crash, rollback, process restart and concurrent local reservation refusal
+        run: python3 -m unittest discover -s tests/identity -p 'test_local_command_outcome_hold_reference_v0.py' -v
+      - name: Preserve deny-only native admission diagnostic
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_admission_diagnostic_v0.py' -v
+      - name: Preserve Identity client adapter-only and CPU++ offline policy
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_native_adapter_only_call_path_v1.py' -v
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs

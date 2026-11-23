@@ -52,11 +52,15 @@ def _send_child(sender, receiver, data, behavior):
             os.kill(os.getpid(), signal.SIGKILL)
         if behavior == "close_before":
             return
-        if behavior == "with_fd":
+        if behavior in ("with_fd", "empty_with_fd"):
             fd = os.open("/dev/null", os.O_RDONLY)
             try:
-                sender.sendmsg([data], [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
-                                         array.array("i", [fd]))])
+                # Linux may deliver SCM_RIGHTS despite sendmsg() returning
+                # zero bytes for an empty SOCK_SEQPACKET payload.
+                sender.sendmsg(
+                    [b"" if behavior == "empty_with_fd" else data],
+                    [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
+                      array.array("i", [fd]))])
             finally:
                 os.close(fd)
         else:
@@ -294,6 +298,57 @@ class RealProcessCustodianWireDenialTests(unittest.TestCase):
         with self.assertRaisesRegex(M.Refused, "UNEXPECTED_ANCILLARY"):
             self.run_one(behavior="with_fd")
         self.assertEqual(len(os.listdir("/proc/self/fd")), before)
+
+    def test_31_empty_packet_with_real_scm_rights_closes_fd_before_unknown(self):
+        # Regression for Nurse 2 review #6030516865: empty recvmsg data
+        # can still carry a kernel-delivered SCM_RIGHTS descriptor. No
+        # signature or EOF branch may bypass imported-FD disposal.
+        before = set(os.listdir("/proc/self/fd"))
+        for _ in range(2):
+            with self.assertRaisesRegex(
+                M.UnknownAfterSend, "UNKNOWN_HOLD_NO_AUTO_RETRY"
+            ):
+                self.run_one(behavior="empty_with_fd", raw=b"")
+            self.assertEqual(
+                set(os.listdir("/proc/self/fd")), before,
+                "empty SCM_RIGHTS packet leaked an imported descriptor")
+
+    def test_32_linux_empty_seqpacket_actually_delivers_rights(self):
+        # Prove the kernel stimulus is real; an EOF-only simulation would
+        # allow an ineffective leak regression to go green.
+        receiver, sender = socket.socketpair(
+            socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        fd = os.open("/dev/null", os.O_RDONLY)
+        before_receive = set(os.listdir("/proc/self/fd"))
+        ancillary = []
+        try:
+            sent = sender.sendmsg(
+                [b""], [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
+                          array.array("i", [fd]))])
+            self.assertEqual(sent, 0)
+            receiver.settimeout(1.0)
+            data, ancillary, flags, _ = receiver.recvmsg(M.MAX_PACKET + 1, 512)
+            self.assertEqual(data, b"")
+            self.assertFalse(flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC))
+            rights = []
+            for level, kind, payload in ancillary:
+                if level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS:
+                    copied = array.array("i")
+                    copied.frombytes(
+                        payload[:len(payload) - len(payload) % copied.itemsize])
+                    rights.extend(copied)
+            self.assertEqual(len(rights), 1)
+            self.assertEqual(os.fstat(rights[0]).st_mode,
+                             os.fstat(fd).st_mode)
+        finally:
+            M._discard_ancillary(ancillary)
+            os.close(fd)
+            receiver.close()
+            sender.close()
+        self.assertEqual(
+            set(os.listdir("/proc/self/fd")),
+            before_receive - {str(fd)},
+            "kernel reproduction leaked an imported descriptor")
 
     def test_25_stream_socket_is_not_exact_packet_connection(self):
         a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)

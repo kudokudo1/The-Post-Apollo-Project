@@ -39,6 +39,21 @@ Window {
         fixture=clone;
     }
     function dropSource(){fixture=null;}
+    function invalidateSourceKey(){
+        var clone=original();
+        clone.sourceKey="invalid";
+        fixture=clone;
+    }
+    function invalidateSourceMonth(){
+        var clone=original();
+        clone.month="2026-13";
+        fixture=clone;
+    }
+    function invalidateUnassigned(){
+        var clone=original();
+        clone.toBudgetCents="4000";
+        fixture=clone;
+    }
 
     FinanceWidgets.FinanceEnvelopeMovePreviewPane {
         id: movePane

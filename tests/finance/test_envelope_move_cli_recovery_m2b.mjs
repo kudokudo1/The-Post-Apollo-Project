@@ -101,7 +101,8 @@ test("fixture writes exactly two categories once with private committed receipt"
     assert.equal(record.action,"allocation:move-envelope");
     assert.equal(statSync(path).mode & 0o077,0);
     for(const forbidden of [fromId,toId,sourceKey,
-                            "2550","17450","7550","14000","2500"]) {
+                            "moveCents","fromCategoryId","toCategoryId",
+                            "expectedFromBudgetedCents"]) {
       assert.ok(!readFileSync(path,"utf8").includes(forbidden),forbidden);
     }
     outcome(invoke(f,cmd()),"blocked:operation-already-attempted",1);

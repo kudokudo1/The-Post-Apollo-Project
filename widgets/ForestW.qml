@@ -1022,9 +1022,9 @@ PanelWindow {
                 }
             }
             // One coffee ActionButton owns both compact and expanded
-            // states. In compact mode it sits at the composer baseline;
-            // when open it rises under the chat divider and becomes the
-            // red close control without changing its icon.
+            // states. The expanded slider fills the SAME rail host:
+            // its reserved 38px top header IS the red coffee close cap,
+            // not a separate button floating above the bar.
             Item {
                 id: reasoningRailHost
                 z: 12
@@ -1042,7 +1042,7 @@ PanelWindow {
                     y: root.reasoningRailExpanded
                        ? 0 : Math.max(0, parent.height - height)
                     width: 40
-                    height: 40
+                    height: root.reasoningRailExpanded ? 38 : 40
                     z: 40
                     radius: 0
                     acceptedButtons: Qt.LeftButton
@@ -1094,15 +1094,20 @@ PanelWindow {
                     idleWideGlowColor: Colors.red
                     hoverWideGlowColor: Colors.red
                     pressedWideGlowColor: Colors.red
-                    contentGlowSource: coffeeGlyph
+                    // Source the larger centered cup, not the entire
+                    // ornament box. Stars remain plain white.
+                    contentGlowSource: coffeeGradientGlyph
                     contentGlowRadius: 7
                     contentGlowSamples: 9
 
+                    // Fixed 40px optical cluster: cup occupies the center
+                    // 30px, stars flank it symmetrically. The gradient mask
+                    // now supports true centered glyph shaping.
                     Item {
                         id: coffeeGlyph
                         anchors.centerIn: parent
-                        width: 36
-                        height: 30
+                        width: 40
+                        height: 36
 
                         GohuText {
                             anchors.left: parent.left
@@ -1111,7 +1116,7 @@ PanelWindow {
                             height: parent.height
                             text: "⊹"
                             textFormat: Text.PlainText
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                             color: Colors.white
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
@@ -1120,12 +1125,13 @@ PanelWindow {
                             id: coffeeGradientGlyph
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 23
+                            width: 30
                             height: parent.height
                             text: "☕︎๋࣭"
                             gradientText: text
-                            pixelSize: 18
+                            pixelSize: 26
                             bold: false
+                            horizontalAlignment: Text.AlignHCenter
                             baseColor: root.reasoningRailExpanded
                                 ? Colors.red : root.activeTree.identityColor
                             accentColor: root.reasoningRailExpanded
@@ -1135,7 +1141,7 @@ PanelWindow {
                         GohuText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 9
+                            width: 8
                             height: parent.height
                             text: "⭑"
                             textFormat: Text.PlainText
@@ -1147,6 +1153,12 @@ PanelWindow {
                     }
 
                     Behavior on y {
+                        NumberAnimation {
+                            duration: 170
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                    Behavior on height {
                         NumberAnimation {
                             duration: 170
                             easing.type: Easing.OutQuad
@@ -1170,12 +1182,11 @@ PanelWindow {
                 SelectorSlider {
                     id: reasoningSelectorSlider
                     anchors.left: parent.left
-                    // Keep a stable full-height rail geometry while
-                    // the coffee button animates upward. Anchoring directly
-                    // to its moving bottom can make the rail negative-height
-                    // during the first expansion frame.
+                    // The selector fills the whole host. Its built-in
+                    // 38px top ruler/label area is replaced by the coffee
+                    // ActionButton's red close cap at y=0. No spacer or
+                    // distinct close-button row sits above the rail.
                     anchors.top: parent.top
-                    anchors.topMargin: 44
                     anchors.bottom: parent.bottom
                     width: 40
                     z: 10
@@ -1200,7 +1211,7 @@ PanelWindow {
                         root.activeTree.spiritualIdleGlowColor
                     activityGlowColor: root.activeTree.iconIdleGlowColor
                     border.color: "transparent"
-                    sideLabel: "THINK"
+                    sideLabel: ""
                     enabledSlider: root.menuOpen && root.reasoningRailExpanded
                     Accessible.name: "Forest reasoning level"
                     Accessible.description:
@@ -1228,13 +1239,14 @@ PanelWindow {
                     anchors.horizontalCenter: reasoningSelectorSlider.horizontalCenter
                     anchors.bottom: reasoningSelectorSlider.bottom
                     anchors.bottomMargin: 6
-                    width: reasoningSelectorSlider.width - 4
+                    width: reasoningSelectorSlider.width
                     height: 16
                     text: ["HIGH", "MED", "LOW", "NONE"][
                         reasoningSelectorSlider.currentIndex] || "NONE"
                     gradientText: text
-                    pixelSize: 9
+                    pixelSize: 10
                     bold: true
+                    horizontalAlignment: Text.AlignHCenter
                     baseColor: root.activeTree.identityColor
                     accentColor: root.activeTree.gradientAccentColor
                     accentTopRight: root.activeTree.gradientTopRight

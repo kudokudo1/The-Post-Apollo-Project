@@ -18,6 +18,9 @@ Item {
     property bool accentTopRight: false
     property int pixelSize: 12
     property bool bold: true
+    // Default preserves existing left-aligned Tree titles. Small centered
+    // controls (coffee glyph and selector footer) opt in explicitly.
+    property int horizontalAlignment: Text.AlignLeft
 
     // Use the actual GohuFont width of gradientText, including suffixes
     // when provided. Clamp to the visible label span on narrow screens.
@@ -27,6 +30,11 @@ Item {
     // proportional so CHERRY, MAPLE and CEDAR are not overwhelmed.
     readonly property real accentRadius:
         Math.max(19, visibleGlyphWidth * 0.58)
+    readonly property real glyphOffsetX:
+        horizontalAlignment === Text.AlignHCenter
+            ? Math.max(0, (width - visibleGlyphWidth) / 2)
+            : horizontalAlignment === Text.AlignRight
+              ? Math.max(0, width - visibleGlyphWidth) : 0
 
     GohuText {
         id: gradientMeasure
@@ -45,6 +53,7 @@ Item {
         font.pixelSize: root.pixelSize
         font.bold: root.bold
         color: "white"
+        horizontalAlignment: root.horizontalAlignment
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
         visible: false
@@ -58,7 +67,8 @@ Item {
         ShapePath {
             strokeWidth: -1
             fillGradient: RadialGradient {
-                centerX: root.accentTopRight ? root.visibleGlyphWidth : 0
+                centerX: root.glyphOffsetX
+                    + (root.accentTopRight ? root.visibleGlyphWidth : 0)
                 // The old y=0 put the accent above the actual glyphs,
                 // especially hiding MAPLE's red top-right tint.
                 centerY: root.height * 0.36

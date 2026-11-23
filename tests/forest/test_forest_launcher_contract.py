@@ -444,7 +444,12 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("source: radialInk", name)
         self.assertIn("maskSource: inkMask", name)
         self.assertIn("fillGradient: RadialGradient {", name)
-        self.assertIn("centerX: root.accentTopRight ? root.visibleGlyphWidth : 0", name)
+        self.assertIn("centerX: root.glyphOffsetX", name)
+        self.assertIn("+ (root.accentTopRight ? root.visibleGlyphWidth : 0)", name)
+        self.assertIn("property int horizontalAlignment: Text.AlignLeft", name)
+        self.assertIn("horizontalAlignment: root.horizontalAlignment", name)
+        self.assertIn("horizontalAlignment === Text.AlignHCenter", name)
+        self.assertIn("(width - visibleGlyphWidth) / 2", name)
         self.assertIn("GradientStop { position: 0.0; color: root.accentColor }", name)
         self.assertIn("GradientStop { position: 1.0; color: root.baseColor }", name)
         # Maple has red accent anchored to the upper-left and orange
@@ -602,12 +607,14 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("root.chooseTreeReasoningStep(3 - index);", view)
         self.assertIn('optionLabels: ["HIGH", "MED", "LOW", "NONE"]', view)
         self.assertIn('text: ["HIGH", "MED", "LOW", "NONE"][', view)
-        self.assertIn("anchors.topMargin: 44", view)
+        self.assertNotIn("anchors.topMargin: 44", view)
         self.assertNotIn("anchors.top: reasoningCoffeeButton.bottom", view)
         self.assertIn("anchors.bottom: reasoningSelectorSlider.bottom", view)
+        self.assertIn("anchors.top: parent.top", view)
         self.assertIn("showIndexReadout: false", view)
         self.assertNotIn("reasoningRailHost.detentCenterY(", view)
-        self.assertIn('sideLabel: "THINK"', view)
+        self.assertIn('sideLabel: ""', view)
+        self.assertNotIn('sideLabel: "THINK"', view)
         self.assertIn("accentColor: root.activeTree.identityColor", view)
         self.assertIn("handleColor: root.activeTree.identityColor", view)
         self.assertIn("handleGradientEnabled: true", view)
@@ -685,9 +692,9 @@ class ForestLauncherContract(unittest.TestCase):
             self.assertEqual(levels[step], label)
             self.assertEqual(3 - step, rail_index)
         for height in (190, 245, 310):
-            # Expanded SelectorSlider begins below the 40px coffee
-            # close button and its 4px gap; the last stop remains visible.
-            slider_height = height - 40 - 4
+            # Slider uses the entire host. Its built-in top 38px cap
+            # is shared with coffee, with no separate 44px header row.
+            slider_height = height
             track_height = slider_height - 64
             handle_height = 52
             travel = max(0, track_height - handle_height)
@@ -711,8 +718,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("y: root.reasoningRailExpanded", view)
         self.assertIn("0 : Math.max(0, parent.height - height)", view)
         self.assertIn("width: 40", view)
-        self.assertIn("height: 40", view)
+        self.assertIn("height: root.reasoningRailExpanded ? 38 : 40", view)
         self.assertIn("Behavior on y {", view)
+        self.assertIn("Behavior on height {", view)
         self.assertIn("duration: 170", view)
         self.assertIn("onLeftClicked:", view)
         self.assertIn(
@@ -722,10 +730,12 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("visible: root.reasoningRailExpanded", view)
         self.assertIn("enabledSlider: root.menuOpen && root.reasoningRailExpanded", view)
         self.assertIn("if (root.menuOpen && root.reasoningRailExpanded)", view)
-        self.assertIn("anchors.topMargin: 44", view)
+        self.assertNotIn("anchors.topMargin: 44", view)
         self.assertNotIn("anchors.top: reasoningCoffeeButton.bottom", view)
+        self.assertIn("anchors.top: parent.top", view)
         self.assertIn("anchors.bottom: parent.bottom", view)
-        self.assertIn("anchors.topMargin: 4", view)
+        self.assertIn('sideLabel: ""', view)
+        self.assertNotIn('sideLabel: "THINK"', view)
 
         # The same coffee artwork stays in the button during both states.
         self.assertIn("id: coffeeGlyph", view)
@@ -733,7 +743,11 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn('text: "☕︎๋࣭"', view)
         self.assertIn('text: "⭑"', view)
         self.assertIn("id: coffeeGradientGlyph", view)
-        self.assertIn("contentGlowSource: coffeeGlyph", view)
+        self.assertIn("contentGlowSource: coffeeGradientGlyph", view)
+        self.assertIn("width: 40", view)  # centered overall ornament
+        self.assertIn("width: 30", view)  # wide cup ink mask
+        self.assertIn("pixelSize: 26", view)  # cup larger than both stars
+        self.assertIn("horizontalAlignment: Text.AlignHCenter", view)
         self.assertIn("color: Colors.white", view)
         self.assertIn("root.activeTree.gradientAccentColor", view)
         self.assertIn("root.activeTree.gradientTopRight", view)
@@ -755,6 +769,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("showIndexReadout: false", view)
         self.assertIn('text: ["HIGH", "MED", "LOW", "NONE"][', view)
         self.assertIn("anchors.bottom: reasoningSelectorSlider.bottom", view)
+        self.assertIn("anchors.horizontalCenter: reasoningSelectorSlider.horizontalCenter", view)
+        self.assertIn("width: reasoningSelectorSlider.width", view)
+        self.assertIn("horizontalAlignment: Text.AlignHCenter", view)
         self.assertNotIn('model: ["HIGH", "MED", "LOW", "NONE"]', view)
         self.assertNotIn("reasoningRailHost.detentCenterY(", view)
         self.assertIn("currentIndex: 3 - root.selectedReasoningStep", view)

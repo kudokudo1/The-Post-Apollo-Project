@@ -12,6 +12,7 @@ on:
       - "widgets/FinanceW.qml"
       - "tests/weather/test_weather_provider_diagnostics_integration_m6c.py"
       - "tests/components/test_shared_diagnostics_weather_finance.py"
+      - "tests/components/test_shared_diagnostics_modal_interaction.cjs"
       - ".github/workflows/shared-diagnostics-weather-finance.yml"
   push:
     branches: [main]
@@ -25,6 +26,7 @@ on:
       - "widgets/FinanceW.qml"
       - "tests/weather/test_weather_provider_diagnostics_integration_m6c.py"
       - "tests/components/test_shared_diagnostics_weather_finance.py"
+      - "tests/components/test_shared_diagnostics_modal_interaction.cjs"
       - ".github/workflows/shared-diagnostics-weather-finance.yml"
   workflow_dispatch:
 
@@ -41,6 +43,8 @@ jobs:
         run: python3 -B tests/components/test_shared_diagnostics_qmldir.py
       - name: Verify shared dock button, popup and real service-state wiring
         run: python3 -B tests/components/test_shared_diagnostics_weather_finance.py
+      - name: Execute modal wheel containment and check canonical glow geometry
+        run: node tests/components/test_shared_diagnostics_modal_interaction.cjs
       - name: Preserve Weather provider state policy
         run: node tests/weather/test_weather_provider_diagnostics_m6c.cjs
       - name: Preserve Weather M6c single-owner / Escape / popup contract

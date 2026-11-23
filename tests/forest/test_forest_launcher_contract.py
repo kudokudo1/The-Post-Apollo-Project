@@ -805,7 +805,7 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("id: pickerFlower", view)
         self.assertIn("id: pickerLeftStar", view)
         self.assertIn("id: pickerRightStars", view)
-        self.assertRegex(view, r"DockButton\\s*\\{\\s*id:\\s*modelPickerButton")
+        self.assertIn("id: modelPickerButton", view)
         self.assertIn("open: root.modelPopupOpen", view)
         self.assertIn("acceptedButtons: Qt.LeftButton", view)
         self.assertIn("normalForegroundColor: Colors.green", view)

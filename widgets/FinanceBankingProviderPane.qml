@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "FinanceBankingProviderPolicy.js" as ProviderPolicy
+import "FinanceBankingSessionJournalPolicy.js" as Journal
 
 // Banking M4: provider-specific Post-Apollo navigation over M3 manual/demo
 // snapshots only. Restricted features are informative, never actionable.
@@ -8,10 +9,12 @@ Item {
     id: providerPane
     property string providerId: ""
     property var accountSnapshot: ({ok:false})
+    property var manualSession: ({mode:"empty",accounts:[],entries:[]})
     property string sectionId: "home"
     property string feedback: ""
     property string activityDirection: "all" // all | in | out
     property int activityAccountIndex: 0 // 0 = all; 1..N = provider account
+    property int activityPageIndex: 0
     property int entryAccountIndex: 0
     property string entryDirection: "out" // out | in
     readonly property var details: ProviderPolicy.build(
@@ -20,8 +23,9 @@ Item {
     readonly property string activityAccountId: activityAccountIndex>0
         &&activityAccountIndex<=providerAccounts.length
         ? providerAccounts[activityAccountIndex-1].id : ""
-    readonly property var filteredActivity: ProviderPolicy.filterRecentActivity(
-        details,{direction:activityDirection,accountId:activityAccountId,query:activitySearch.text})
+    readonly property var filteredActivity: Journal.project(
+        details,manualSession,{direction:activityDirection,
+            accountId:activityAccountId,query:activitySearch.text,page:activityPageIndex})
     signal accountRequested(string accountId)
     signal manualEntryRequested(var draft)
     signal returnToTopRequested()
@@ -30,13 +34,18 @@ Item {
     onProviderIdChanged: {
         sectionId="home";
         activityAccountIndex=0;
+        activityPageIndex=0;
         entryAccountIndex=0;
     }
     onSectionIdChanged: {
         activityDirection="all";
         activityAccountIndex=0;
+        activityPageIndex=0;
         returnToTopRequested();
     }
+    onActivityDirectionChanged: activityPageIndex=0
+    onActivityAccountIndexChanged: activityPageIndex=0
+    onManualSessionChanged: activityPageIndex=0
     function clearAfterEntry() {
         quickDescription.text="";
         quickAmount.text="";
@@ -358,7 +367,9 @@ Item {
                      &&providerPane.details.sectionKind==="activity"
             GohuText {
                 width: parent.width
-                text: "RECENT MANUAL/DEMO ACTIVITY // FILTERS APPLY TO AT MOST 24 RECENT ENTRIES"
+                text: providerPane.filteredActivity.ok
+                    ? providerPane.filteredActivity.scope+" // UP TO 300 SESSION ENTRIES"
+                    : "SESSION ACTIVITY UNAVAILABLE"
                 font.pixelSize: 9
                 color: Colors.cyan
                 textFormat: Text.PlainText
@@ -410,7 +421,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "SEARCH RECENT DESCRIPTION OR MANUAL ACCOUNT NICKNAME"
+                text: "SEARCH SESSION DESCRIPTION OR MANUAL ACCOUNT NICKNAME"
                 font.pixelSize: 9
                 color: Colors.white
                 textFormat: Text.PlainText
@@ -431,16 +442,20 @@ Item {
                     selectByMouse: true
                     activeFocusOnPress: true
                     maximumLength: 64
+                    onTextChanged: providerPane.activityPageIndex=0
                 }
             }
             GohuText {
                 width: parent.width
                 text: providerPane.filteredActivity.ok
-                    ? "MATCHES "+providerPane.filteredActivity.shownCount
-                      +" / RECENT WINDOW "+providerPane.filteredActivity.recentWindowCount
-                      +(providerPane.filteredActivity.hasOlderEntries
-                        ? " // OLDER ACTIVITY NOT INCLUDED":"")
-                    : "ACTIVITY FILTER UNAVAILABLE"
+                    ? "MATCHES "+providerPane.filteredActivity.totalMatches
+                      +" / "+providerPane.filteredActivity.providerSessionCount
+                      +" PROVIDER SESSION ENTRIES // PAGE "
+                      +(providerPane.filteredActivity.pageIndex+1)
+                      +" / "+providerPane.filteredActivity.pageCount
+                      +" // SHOWING "+providerPane.filteredActivity.from
+                      +"-"+providerPane.filteredActivity.to
+                    : "SESSION ACTIVITY UNAVAILABLE"
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText
@@ -591,7 +606,7 @@ Item {
                      &&providerPane.details.sectionKind==="activity"
                      &&providerPane.filteredActivity.ok
                      &&providerPane.filteredActivity.rows.length===0
-            text: "NO RECENT ACTIVITY MATCHES THESE FILTERS"
+            text: "NO SESSION ACTIVITY MATCHES THESE FILTERS"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText
@@ -630,6 +645,40 @@ Item {
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
                     }
+                }
+            }
+        }
+        Row {
+            width: parent.width
+            spacing: 5
+            visible: providerPane.details.ok
+                     && providerPane.details.sectionKind==="activity"
+                     && providerPane.filteredActivity.ok
+            ActionButton {
+                width: (parent.width-5)/2
+                height: 29
+                label: "PREVIOUS PAGE"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                available: providerPane.filteredActivity.pageIndex>0
+                onLeftClicked: {
+                    providerPane.activityPageIndex=
+                        Math.max(0,providerPane.filteredActivity.pageIndex-1);
+                    providerPane.returnToTopRequested();
+                }
+            }
+            ActionButton {
+                width: (parent.width-5)/2
+                height: 29
+                label: "NEXT PAGE"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                available: providerPane.filteredActivity.pageIndex+1
+                           <providerPane.filteredActivity.pageCount
+                onLeftClicked: {
+                    providerPane.activityPageIndex=
+                        providerPane.filteredActivity.pageIndex+1;
+                    providerPane.returnToTopRequested();
                 }
             }
         }

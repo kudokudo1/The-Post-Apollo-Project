@@ -1,0 +1,46 @@
+name: Connections DOC 4 C5-H3 Hospital exact consent challenge boundary
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/test_connections_hospital_doc4_consent_details.py'
+      - 'tests/connections/hospital_c5/**'
+      - '.github/workflows/connections-hospital-c5-h3-exact-consent-ci.yml'
+      - 'docs/connections-hospital-c5-h3-exact-consent-boundary.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hospital-c5h3-no-authority-reference:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic-source-only cryptography dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Exact nonce forwarding and no-authority claim matrix
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest -v tests/connections/test_connections_hospital_doc4_consent_details.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_exact_consent_probe.py
+          python3 -B - <<'PY'
+          from pathlib import Path
+          service=Path('services/connections/hospital/HospitalNativeIssuerService.py').read_text()
+          assert '"hospital-request-nonce", prepared["requestNonce"]' in service
+          assert 'C.validate_prepared(' in service
+          assert '_polkit_approve(request, prepared, peer, first_seat)' in service
+          assert 'C.load_installed_key()' in service
+          assert 'HospitalC5ExactConsentProbe' not in service
+          assert '--consent-override' not in service
+          assert 'POST_APOLLO_CI' not in service
+          print('DOC4_C5H3_HOLD // NO_INSTALLED_HUMAN_ATTESTATION_OR_APPROVED_SIGNING')
+          PY

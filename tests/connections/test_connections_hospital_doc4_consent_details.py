@@ -28,6 +28,7 @@ class HospitalC5ConsentDetails(unittest.TestCase):
             "repository": "kudokudo1/The-Post-Apollo-Project",
             "expectedRevision": 37,
             "expectedDigest": "9" * 64,
+            "requestNonce": C.b64(bytes(range(32))),
         }
         self.peer = (12345, 1000, 1000, 98765)
         self.seat = "logind-seat0-c2"
@@ -75,6 +76,7 @@ class HospitalC5ConsentDetails(unittest.TestCase):
             "hospital-room-id": "hospital-room-04",
             "hospital-action": "TRASH",
             "hospital-graph": "9" * 64,
+            "hospital-request-nonce": C.b64(bytes(range(32))),
             "hospital-patient-id": "patient-04",
             "hospital-repository": "kudokudo1/The-Post-Apollo-Project",
             "hospital-revision": "37",
@@ -104,6 +106,18 @@ class HospitalC5ConsentDetails(unittest.TestCase):
         self.assertEqual(details["hospital-room-id"], "hospital-room-04")
         self.assertEqual(details["hospital-revision"], "37")
         self.assertEqual(details["hospital-retention"], "PRESERVE_ORIGINAL_NO_BURN")
+
+    def test_request_nonce_is_per_operation_and_not_a_desktop_claim(self):
+        _, first = self.invoke("TRASH")
+        replacement = C.b64(bytes(range(31, -1, -1)))
+        self.prepared["requestNonce"] = replacement
+        _, second = self.invoke("TRASH")
+        self.assertNotEqual(
+            first["hospital-request-nonce"],
+            second["hospital-request-nonce"],
+        )
+        self.assertEqual(second["hospital-request-nonce"], replacement)
+        self.assertEqual(second["hospital-room-id"], first["hospital-room-id"])
 
     def test_nonzero_polkit_result_refuses_even_with_exact_details(self):
         _, details = self.invoke("TRASH", code=1)

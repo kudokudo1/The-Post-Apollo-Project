@@ -1,0 +1,98 @@
+name: Connections Forest C5 V1 exact-session role and terminal receipt (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5ExactSessionV1Preflight.py'
+      - 'tests/connections/test_connections_forest_c5_exact_session_v1_preflight.py'
+      - 'docs/connections-forest-c5-exact-session-v1-preflight.md'
+      - '.github/workflows/connections-forest-c5-exact-session-v1-preflight.yml'
+      - 'services/connections/forest/ForestC5SignedEvidencePreflight.py'
+      - 'services/connections/forest/ForestC5TerminalReceiptPreflight.py'
+      - 'services/connections/forest/ForestC5AuthorityBoundary.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  v1-session-claims-still-unauthorized:
+    name: Three roles and exact session never grant Forest commit/settlement
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable signature test dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Python compile and no signer/prod/DB activation gate
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5ExactSessionV1Preflight.py \
+            tests/connections/test_connections_forest_c5_exact_session_v1_preflight.py
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('services/connections/forest/ForestC5ExactSessionV1Preflight.py').read_text()
+          for required in (
+              'INTENT_SCHEMA_V1', 'RECEIPT_SCHEMA_V1', 'ROLE_SCHEMA_V1',
+              'frozenset(("sessionId",))', 'S._parse_exact(',
+              '"safeActions": []', 'NO_AUTHORITY', '"claimedForestBindingCallerControlled": True',
+              '"v1WriterTerminalOutcomeProven": False',
+              '"v1SessionFromOriginalWriterAuthenticated": False',
+              'Ed25519PublicKey', '_signature(',
+          ):
+              assert required in src, required
+          for forbidden in (
+              'Ed25519PrivateKey', 'sqlite3.connect(', 'subprocess.run(',
+              'socket.bind(', 'socket.connect(', 'os.open(',
+              '"productionAuthority": True',
+              '"terminalOutcomeAuthenticated": True',
+              '"forestDatabaseCommitAllowed": True',
+              '"c5RevocationFenceSettled": True',
+          ):
+              assert forbidden not in src, forbidden
+          for path in (
+              'scripts/forest/host_admission_b4a.py',
+              'scripts/forest/turn_bridge_b3.py',
+              'services/connections/forest/ForestC5SignedEvidencePreflight.py',
+              'services/connections/forest/ForestC5TerminalReceiptPreflight.py',
+          ):
+              assert 'ForestC5ExactSessionV1Preflight' not in Path(path).read_text()
+          print('FOREST_C5_V1_ONLY_FIXTURE_CONSISTENCY // NO_NATIVE_AUTHORITY_OR_SETTLEMENT')
+          PY
+      - name: Twenty new V1 exact-session negative and signed role tests
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_exact_session_v1_preflight.py' -v
+      - name: Preserve DOC3 denial boundary and all previous C5 negative suites
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_authority_boundary.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_writer_custody_claim_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_terminal_receipt_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_signed_role_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_contract_interop.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_b4c_fence_reference.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_host_precommit_b4b.py' -v
+      - name: Preserve 15 Forest-owner B4c held-permit consumer regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_fenced_commit_b4c.py' -v
+          echo 'FOREST_C5_V1_SOURCE_ONLY // PRODUCTION_HOLD'

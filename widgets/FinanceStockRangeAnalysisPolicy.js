@@ -81,3 +81,31 @@ function summarizeRange(snapshot) {
         noProviderCalls:true, readOnly:true
     };
 }
+
+ 
+// M27: compare the user-selected ACTUAL closing session with the last close
+// in the SAME already loaded/validated range. No network, storage or state.
+// "Steps" counts observed sessions, not intervening calendar days.
+function compareSelectedToLast(snapshot, index) {
+    const summary = summarizeRange(snapshot);
+    if (!summary || !Number.isInteger(index)
+            || index < 0 || index >= snapshot.bars.length)
+        return null;
+    const a = snapshot.bars[index];
+    const b = snapshot.bars[snapshot.bars.length - 1];
+    const difference = b.price - a.price;
+    const relative = (b.price / a.price - 1) * 100;
+    if (!Number.isFinite(difference) || !Number.isFinite(relative))
+        return null;
+    return {
+        selected:{date:a.date,price:a.price},
+        last:{date:b.date,price:b.price},
+        deltaPrice:Math.round(difference * 100) / 100,
+        deltaPct:roundPct(relative),
+        sessionSteps:snapshot.bars.length - index - 1,
+        priceBasis:summary.priceBasis,
+        source:"loaded-eodhd-range-only",
+        noProviderCalls:true,
+        readOnly:true
+    };
+}

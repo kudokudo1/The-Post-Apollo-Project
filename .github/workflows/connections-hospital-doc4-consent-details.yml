@@ -1,0 +1,33 @@
+name: Connections C5 DOC4 Hospital consent detail source contract
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/test_connections_hospital_doc4_consent_details.py'
+      - '.github/workflows/connections-hospital-doc4-consent-details.yml'
+      - 'docs/connections-hospital-doc4-consent-details.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c5-doc4-source-only-detail-contract:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned source-only dependencies
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Exact structured native Polkit details and refusal checks
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest -v tests/connections/test_connections_hospital_doc4_consent_details.py
+          echo 'HOSPITAL_C5_DOC4 // SOURCE_DETAILS_ONLY_NO_HUMAN_ATTESTATION'

@@ -74,7 +74,7 @@ const second=await searchStocks("ibm",first.next,fake,()=>"2026-11-22T15:05:00Z"
 assert.equal(second.next,"");
 assert.equal(second.cursor,cursor);
 assert.equal(count,2);
-await assert.rejects(searchStocks("?", "?command",fake),/invalid-cursor/);
+await assert.rejects(searchStocks("ibm", "?command",fake),/invalid-cursor/);
 assert.equal(count,2); // refusal before network
 await assert.rejects(searchStocks("ibm","",async()=>
   ({ok:false,status:429})),/rate-limited/);

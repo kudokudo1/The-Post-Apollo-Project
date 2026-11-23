@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k + M4l
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k + M4l + M4m
 
 on:
   pull_request:
@@ -25,6 +25,8 @@ on:
       - 'tests/finance/test_banking_session_reconciliation_m4k_contracts.py'
       - 'tests/finance/test_banking_account_details_corrections_m4l.mjs'
       - 'tests/finance/test_banking_account_details_corrections_m4l_contracts.py'
+      - 'tests/finance/test_banking_readable_history_m4m.mjs'
+      - 'tests/finance/test_banking_readable_history_m4m_contracts.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -81,6 +83,8 @@ on:
       - 'tests/finance/test_banking_session_reconciliation_m4k_contracts.py'
       - 'tests/finance/test_banking_account_details_corrections_m4l.mjs'
       - 'tests/finance/test_banking_account_details_corrections_m4l_contracts.py'
+      - 'tests/finance/test_banking_readable_history_m4m.mjs'
+      - 'tests/finance/test_banking_readable_history_m4m_contracts.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -195,3 +199,7 @@ jobs:
         run: node tests/finance/test_banking_account_details_corrections_m4l.mjs
       - name: Test M4l two-click account editor and no-bank-authority contracts
         run: python3 tests/finance/test_banking_account_details_corrections_m4l_contracts.py
+      - name: Test M4m recent-3/full-12 preview and ledger identity continuity
+        run: node tests/finance/test_banking_readable_history_m4m.mjs
+      - name: Test M4m readable history QML and no-write provider navigation contracts
+        run: python3 tests/finance/test_banking_readable_history_m4m_contracts.py

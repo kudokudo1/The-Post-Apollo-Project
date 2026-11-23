@@ -1,0 +1,66 @@
+name: Hospital H1 / Protected Doctor Name Intent Staging
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalDoctorNameIntentPolicy.js"
+      - "services/hospital/HospitalProtectedDoctorNameService.qml"
+      - "services/hospital/HospitalDoctorNameService.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_doctor_name_protected_staging.js"
+      - "docs/hospital-h1-protected-doctor-name-interface.md"
+      - ".github/workflows/hospital-doctor-name-staging.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/hospital/HospitalDoctorNameIntentPolicy.js"
+      - "services/hospital/HospitalProtectedDoctorNameService.qml"
+      - "services/hospital/HospitalDoctorNameService.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_doctor_name_protected_staging.js"
+      - "docs/hospital-h1-protected-doctor-name-interface.md"
+      - ".github/workflows/hospital-doctor-name-staging.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  name-intent-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exercise actual proposed Doctor name QML methods and intent policy
+        run: node tests/hospital/test_doctor_name_protected_staging.js
+      - name: Refuse backend privilege claims and accidental UI cutover
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          base = Path("services/hospital")
+          policy = (base / "HospitalDoctorNameIntentPolicy.js").read_text()
+          candidate = (base / "HospitalProtectedDoctorNameService.qml").read_text()
+          legacy = (base / "HospitalDoctorNameService.qml").read_text()
+          host = Path("widgets/HospitalW.qml").read_text()
+          contract = Path("docs/hospital-h1-protected-doctor-name-interface.md").read_text()
+
+          assert "function prepareNameIntent(" in policy
+          assert "readonly property bool protectedNameWritesReady: false" in candidate
+          assert "PROTECTED DOCTOR NAME ISSUER NOT ENROLLED" in candidate
+          assert "Process {" not in candidate
+          assert "StdioCollector" not in candidate
+          assert "px-hospital-store" not in candidate
+          assert "store-command" not in candidate
+          assert "doctor-put" not in candidate
+          assert "hospital-room-read" not in candidate
+          assert "HospitalProtectedDoctorNameService {" not in host
+          assert "HospitalDoctorNameService {" in host
+          assert '"doctor-name-set"' in legacy
+          assert "**PRODUCTION:** HOLD" in contract
+          print(
+              "HOSPITAL H1 PROTECTED NAME STAGING // PASS // "
+              "candidate cannot write; legacy host unchanged; no live activation"
+          )
+          PY

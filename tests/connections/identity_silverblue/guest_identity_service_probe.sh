@@ -375,28 +375,6 @@ print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SI
 # Its root is minted in this isolated guest, NOT externally enrolled.
 # A substituted controller/public key must be explicitly refused.
 check_origin("before signed-runtime-key binding")
-bound=rehearse_guest_local_ci_only(
-    actual_runtime_receipt_public=key.public_bytes(Encoding.Raw,PublicFormat.Raw),
-    verified_actions=("BEGIN","STATUS","CANCEL","RECOVER"),
-    signed_rpm_archive=Path(
-        "/var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm"
-    ),
-)
-for name in ("operatorEnrollmentRootCustodyVerified",
-             "independentlySignedRemoteHostWitnessVerified",
-             "installedHostAuthenticated", "externalChallengeIssuerVerified",
-             "externalRollbackResistanceVerified", "c5HumanConsentVerified",
-             "hostAuthenticated", "canBeginSignIn",
-             "credentialActionsEnabled", "productionAuthority"):
-    if bound.get(name) is not False:
-        raise RuntimeError("guest binding tried to grant authority: "+name)
-check_origin("after signed-runtime-key binding")
-# Existing C3e-AG has never run against the actual official Silverblue guest.
-# This is the real systemd MainPID while it is still active, not a fake
-# Ubuntu process or post-rollback guest-authored provenance record.
-# The SHA pins are measured from already RPM-verified installed guest bytes:
-# these are local diagnostic consistency pins, NOT an independently pinned
-# operator manifest or authenticated cross-machine release policy.
 real_guest_expected={
     "pid":pid,
     "startTicks":pinned_start,
@@ -410,6 +388,31 @@ real_guest_expected={
     "cgroup":expected_cgroup,
     "selinux":expected_lsm,
 }
+bound=rehearse_guest_local_ci_only(
+    actual_runtime_receipt_public=key.public_bytes(Encoding.Raw,PublicFormat.Raw),
+    verified_actions=("BEGIN","STATUS","CANCEL","RECOVER"),
+    signed_rpm_archive=Path(
+        "/var/lib/postapollo-id-ci-assets/identity-silverblue-ci.rpm"
+    ),
+    expected_process=real_guest_expected,
+)
+for name in ("operatorEnrollmentRootCustodyVerified",
+             "independentlySignedRemoteHostWitnessVerified",
+             "installedHostAuthenticated", "externalChallengeIssuerVerified",
+             "externalRollbackResistanceVerified", "c5HumanConsentVerified",
+             "hostAuthenticated", "canBeginSignIn",
+             "credentialActionsEnabled", "productionAuthority"):
+    if bound.get(name) is not False:
+        raise RuntimeError("guest binding tried to grant authority: "+name)
+if bound.get("realC3eAHReleaseAndKernelJoinedOnlyInDisposableCI") is not True:
+    raise RuntimeError("original C3e-AH same-live-process diagnostic missing")
+check_origin("after signed-runtime-key binding")
+# Existing C3e-AG has never run against the actual official Silverblue guest.
+# This is the real systemd MainPID while it is still active, not a fake
+# Ubuntu process or post-rollback guest-authored provenance record.
+# The SHA pins are measured from already RPM-verified installed guest bytes:
+# these are local diagnostic consistency pins, NOT an independently pinned
+# operator manifest or authenticated cross-machine release policy.
 observed=C3EAG.observe_ci_only(
     expected=real_guest_expected,mode="c4b-guest-candidate")
 if (observed.get("observedC4bGuestCandidateNotAttested") is not True
@@ -436,6 +439,7 @@ for field,bad in (
         raise RuntimeError("C3eAG accepted substituted kernel or script pin: "+field)
 check_origin("after C3eAG real guest observation and refusals")
 print("C4B_ID_PASS // REAL_C3EAG_MUTATED_KERNEL_AND_SCRIPT_PINS_REFUSED")
+print("C4B_ID_PASS // REAL_C3EAH_SIGNED_RELEASE_RUNNING_GATEWAY_JOIN_DIAGNOSTIC_ONLY")
 print("C4B_ID_PASS // GUEST_LOCAL_RELEASE_BOUND_TO_ACTUAL_GATEWAY_RECEIPT_KEY")
 print("C4B_ID_PASS // SUBSTITUTE_RECEIPT_PUBLIC_KEY_EXPLICITLY_REFUSED")
 PY

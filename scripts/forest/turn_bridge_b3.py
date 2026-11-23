@@ -447,5 +447,8 @@ class ForestTurnBridge:
                 # the original RESERVED row also blocks automatic replay.
                 try:
                     self._abort(reserved)
-                except (sqlite3.Error, JournalRefusal):
+                except (sqlite3.Error, JournalRefusal, BridgeRefusal):
+                    # A failing local outbox ABORT must not replace the
+                    # original stream/authorization failure. RESERVED still
+                    # blocks any automatic repeat of the same user turn.
                     pass

@@ -146,6 +146,48 @@ function addAccount(state,fields) {
     return validState(updated)?{ok:true,state:updated,account:account}
         :resultError("ACCOUNT NOT ADDED // INVALID RESULT");
 }
+// M4l // Correct only a user's current manual-session account label and
+// estimated opening amount. Account identity, provider/product type, linked
+// transfer endpoints, transactions and monotonically increasing IDs never move.
+// Blank opening is UNKNOWN, not zero. No bank statements are updated.
+function correctAccountDetails(state,fields) {
+    if(!validState(state)||state.mode!=="manual")
+        return resultError("MANUAL ACCOUNT SESSION REQUIRED");
+    if(!fields||typeof fields.accountId!=="string")
+        return resultError("SELECT AN EXISTING MANUAL ACCOUNT");
+    var original=state.accounts.find(function(a){return a.id===fields.accountId;});
+    if(!original||original.origin!=="manual")
+        return resultError("MANUAL ACCOUNT NOT FOUND");
+    if(original.providerId!==fields.expectedProviderId
+       ||original.productId!==fields.expectedProductId
+       ||original.nickname!==fields.expectedNickname
+       ||original.openingCents!==fields.expectedOpeningCents)
+        return resultError("STALE MANUAL ACCOUNT // RESELECT BEFORE CORRECTION");
+    var nickname=safeText(fields.nickname,42);
+    if(!nickname)return resultError("ACCOUNT NICKNAME REQUIRED (MAX 42 CHARACTERS)");
+    if(state.accounts.some(function(a){return a.id!==original.id
+           &&a.providerId===original.providerId
+           &&a.nickname.toLowerCase()===nickname.toLowerCase();}))
+        return resultError("NICKNAME ALREADY USED FOR THIS PROVIDER");
+    if(typeof fields.openingText!=="string")
+        return resultError("OPENING BALANCE FORMAT INVALID");
+    var opening=null;
+    if(fields.openingText.trim()!=="") {
+        opening=parseCents(fields.openingText,true);
+        if(opening===null)
+            return resultError("OPENING BALANCE FORMAT INVALID");
+    }
+    var changed={id:original.id,providerId:original.providerId,
+        productId:original.productId,nickname:nickname,
+        openingCents:opening,origin:"manual"};
+    var accounts=state.accounts.map(function(a){
+        return a.id===original.id?changed:a;
+    });
+    var updated={mode:"manual",accounts:accounts,
+        entries:state.entries.slice(),nextId:state.nextId};
+    return validState(updated)?{ok:true,state:updated,account:changed}
+        :resultError("CORRECTION EXCEEDS ACCOUNT BALANCE/AMOUNT LIMIT");
+}
 function removeEmptyAccount(state,accountId) {
     if(!validState(state)||state.mode!=="manual")
         return resultError("MANUAL ACCOUNT REQUIRED");

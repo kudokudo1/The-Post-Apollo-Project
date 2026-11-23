@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 import tempfile
 
@@ -75,6 +76,40 @@ with tempfile.TemporaryDirectory(prefix="finance-m20-quota-") as directory:
     assert actual == 20
     assert reserve("alpha-vantage", utc_day=day,
                    database=simultaneous)["reserved"] == 1
+
+    # Independent Python PROCESSES, not just independent thread connections:
+    # pre-reserve 17 then let eight child processes race for the final three.
+    multiprocess = Path(directory) / "multiprocess.sqlite3"
+    for _ in range(17):
+        reserve("eodhd", utc_day=day, database=multiprocess)
+    python_source = """
+import sys
+sys.path.insert(0, sys.argv[2])
+from market_shared_quota import reserve, QuotaExhausted
+try:
+    print(reserve("eodhd", utc_day="2026-11-23", database=sys.argv[1])["reserved"])
+except QuotaExhausted:
+    print("EXHAUSTED")
+"""
+    module_dir = str(Path(__file__).resolve().parents[2] / "scripts" / "finance")
+
+    def child_process(_):
+        result = subprocess.run(
+            [sys.executable, "-c", python_source, str(multiprocess), module_dir],
+            capture_output=True, text=True, check=True, timeout=12,
+        )
+        return result.stdout.strip()
+
+    with ThreadPoolExecutor(max_workers=8) as workers:
+        child_results = list(workers.map(child_process, range(8)))
+    assert sorted(int(x) for x in child_results if x != "EXHAUSTED") \
+        == [18, 19, 20], child_results
+    assert child_results.count("EXHAUSTED") == 5
+    with sqlite3.connect(multiprocess) as con:
+        count = con.execute(
+            "SELECT reserved FROM quota_attempts WHERE provider='eodhd'"
+        ).fetchone()[0]
+    assert count == 20
 
     # Broken SQLite must fail closed; no pretend allowance.
     damaged = Path(directory) / "not-db.sqlite3"

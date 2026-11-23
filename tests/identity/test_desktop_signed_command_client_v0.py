@@ -428,6 +428,175 @@ class SignedNativeCommandTests(unittest.TestCase):
         self.assertEqual(self.base.factory_calls, 1)
         self.assertEqual(len(self.base.urls), 1)
 
+    def test_new_client_has_no_attempted_wire_fingerprint(self):
+        self.assertIsNone(self.client.last_attempted_wire)
+        self.assertIsNone(self._client().last_attempted_wire)
+        self.assertEqual(self.client.last_wire_outcome, "UNOBSERVED")
+
+    def test_real_begin_fingerprint_matches_exact_original_request(self):
+        from hashlib import sha256
+        captured = []
+        actual = build_request
+
+        def capture(action, rid, nonce):
+            wire = actual(action, rid, nonce)
+            captured.append((action, rid, nonce, wire))
+            return wire
+
+        with patch("desktop_signed_command_client_v0.build_request",
+                   side_effect=capture):
+            result = self.client.begin()
+        self.assertEqual(result.phase, "REQUESTED")
+        self.assertEqual(len(captured), 1)
+        action, rid, nonce, wire = captured[0]
+        fingerprint = self.client.last_attempted_wire
+        self.assertEqual(fingerprint.action, action)
+        self.assertEqual(action, "BEGIN")
+        self.assertIsNone(rid)
+        self.assertIsNone(fingerprint.request_id_sha256)
+        self.assertEqual(
+            fingerprint.client_nonce_sha256,
+            sha256(nonce.encode("ascii")).hexdigest())
+        self.assertEqual(fingerprint.frame_sha256, sha256(wire).hexdigest())
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertEqual(self.base.factory_calls, 1)
+
+    def test_real_status_fingerprint_binds_original_host_request(self):
+        from hashlib import sha256
+        self.assertEqual(self.client.begin().phase, "REQUESTED")
+        first = self.client.last_attempted_wire
+        request_id = self.client._request_id
+        captured = []
+        actual = build_request
+
+        def capture(action, rid, nonce):
+            wire = actual(action, rid, nonce)
+            captured.append((action, rid, nonce, wire))
+            return wire
+
+        with patch("desktop_signed_command_client_v0.build_request",
+                   side_effect=capture):
+            self.assertEqual(self.client.status().phase, "PENDING")
+        action, rid, nonce, wire = captured[0]
+        new = self.client.last_attempted_wire
+        self.assertEqual(action, "STATUS")
+        self.assertEqual(rid, request_id)
+        self.assertEqual(new.action, "STATUS")
+        self.assertEqual(new.request_id_sha256,
+                         sha256(request_id.encode("ascii")).hexdigest())
+        self.assertEqual(new.client_nonce_sha256,
+                         sha256(nonce.encode("ascii")).hexdigest())
+        self.assertEqual(new.frame_sha256, sha256(wire).hexdigest())
+        self.assertNotEqual(new.frame_sha256, first.frame_sha256)
+        self.assertEqual(self.base.factory_calls, 1)
+
+    def test_denied_duplicate_begin_preserves_last_attempt_pointer(self):
+        self.assertEqual(self.client.begin().phase, "REQUESTED")
+        fingerprint = self.client.last_attempted_wire
+        self.assertIsNotNone(fingerprint)
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertIs(self.client.last_attempted_wire, fingerprint)
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+
+    def test_pre_send_host_refusal_creates_no_attempt_pointer(self):
+        self.accept_server = False
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertIsNone(self.client.last_attempted_wire)
+        self.assertEqual(self.base.factory_calls, 0)
+
+    def test_partial_send_exception_retains_original_wire_digest(self):
+        from hashlib import sha256
+        sent = []
+
+        class PartialSend:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def settimeout(self, _):
+                pass
+
+            def connect(self, _):
+                pass
+
+            def sendall(self, wire):
+                sent.append(wire)
+                raise BrokenPipeError("maybe partial transmission")
+
+        peer = KernelPeer(os.getpid(), os.geteuid(), os.getegid())
+        with patch("desktop_signed_command_client_v0.socket.socket",
+                   return_value=PartialSend()), \\
+             patch("desktop_signed_command_client_v0._peer",
+                   return_value=peer):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(len(sent), 1)
+        trace = self.client.last_attempted_wire
+        self.assertIsNotNone(trace)
+        self.assertEqual(trace.action, "BEGIN")
+        self.assertIsNone(trace.request_id_sha256)
+        self.assertEqual(trace.frame_sha256, sha256(sent[0]).hexdigest())
+        self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        self.assertTrue(self.client.faulted)
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        self.assertIs(self.client.last_attempted_wire, trace)
+
+    def test_real_lost_receipt_keeps_exact_attempt_fingerprint(self):
+        from hashlib import sha256
+        captured = []
+        actual = build_request
+
+        def capture(action, rid, nonce):
+            wire = actual(action, rid, nonce)
+            captured.append((nonce, wire))
+            return wire
+
+        with patch("desktop_signed_command_client_v0.build_request",
+                   side_effect=capture), \\
+             patch("desktop_signed_command_client_v0.verify_receipt",
+                   side_effect=ReceiptRejected("lost response")):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(len(captured), 1)
+        nonce, wire = captured[0]
+        trace = self.client.last_attempted_wire
+        self.assertEqual(trace.client_nonce_sha256,
+                         sha256(nonce.encode("ascii")).hexdigest())
+        self.assertEqual(trace.frame_sha256, sha256(wire).hexdigest())
+        self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+        for operation in (self.client.begin, self.client.status,
+                          self.client.cancel, self.client.recover):
+            with self.assertRaises(ReceiptRejected):
+                operation()
+            self.assertIs(self.client.last_attempted_wire, trace)
+            self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        self.assertIsNone(self._client().last_attempted_wire)
+
+    def test_fingerprint_is_immutable_and_not_authorization(self):
+        from dataclasses import FrozenInstanceError
+        self.client.begin()
+        trace = self.client.last_attempted_wire
+        with self.assertRaises(FrozenInstanceError):
+            trace.action = "RECOVER"
+        for forbidden in ("safe_to_retry", "can_begin_sign_in",
+                          "production_authority", "consent_verified",
+                          "host_authenticated", "signed_receipt",
+                          "raw_wire", "raw_nonce", "request_id"):
+            self.assertFalse(hasattr(trace, forbidden), forbidden)
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertFalse(hasattr(self.client, "safe_to_retry"))
+
     def test_transport_marker_pre_send_refusal_has_no_dispatch_evidence(self):
         self.assertEqual(self.client.last_wire_outcome, "UNOBSERVED")
         self.accept_server = False

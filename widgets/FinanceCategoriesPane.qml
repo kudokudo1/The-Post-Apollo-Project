@@ -633,6 +633,7 @@ Item {
                 height: 28
                 spacing: 5
                 GohuText {
+                    objectName: "categoryGroupCountLabel"
                     width: parent.width - renameGroupButton.width - 5
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
@@ -649,6 +650,7 @@ Item {
                 }
                 ActionButton {
                     id: renameGroupButton
+                    objectName: "categoryGroupRenameAction"
                     width: 104
                     height: 26
                     label: "RENAME GROUP"

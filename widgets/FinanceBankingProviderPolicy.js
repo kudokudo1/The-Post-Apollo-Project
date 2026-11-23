@@ -120,8 +120,11 @@ function build(providerId,snapshot,sectionId) {
     // or a debit as an expense. Totals include the whole current M3 session;
     // the displayed recent list is deliberately a small, partial preview.
     var viewIn=0,viewOut=0,viewCount=0,preview=[],older=false;
+    var viewKnown=0,viewUnknown=0,viewSubtotal=0;
     for(var n=0;n<listed.length;n++){
         var selectedAccount=listed[n];
+        if(selectedAccount.balanceCents===null)viewUnknown++;
+        else {viewKnown++;viewSubtotal+=selectedAccount.balanceCents;}
         viewIn+=selectedAccount.creditsCents;
         viewOut+=selectedAccount.debitsCents;
         viewCount+=selectedAccount.transactionCount;
@@ -135,7 +138,7 @@ function build(providerId,snapshot,sectionId) {
         }
     }
     if(!Number.isSafeInteger(viewIn)||!Number.isSafeInteger(viewOut)
-       ||!Number.isSafeInteger(viewCount))
+       ||!Number.isSafeInteger(viewCount)||!Number.isSafeInteger(viewSubtotal))
         return {ok:false,error:"INVALID SESSION MOVEMENT TOTAL"};
     preview.sort(function(a,b){
         if(a.date===b.date)return a.id<b.id?1:a.id>b.id?-1:0;
@@ -154,6 +157,9 @@ function build(providerId,snapshot,sectionId) {
         unknownCount:unknown,knownSubtotalCents:subtotal,
         totalCents:accounts.length>0&&unknown===0?subtotal:null,
         transactionCount:txCount,visibleAccounts:listed,allAccounts:accounts,
+        visibleKnownBalanceCount:viewKnown,visibleUnknownBalanceCount:viewUnknown,
+        visibleKnownBalanceSubtotalCents:viewSubtotal,
+        visibleBalanceCents:listed.length>0&&viewUnknown===0?viewSubtotal:null,
         visibleMovementInCents:viewIn,visibleMovementOutCents:viewOut,
         visibleMovementNetCents:viewIn-viewOut,visibleTransactionCount:viewCount,
         visibleRecent:preview.slice(0,4),

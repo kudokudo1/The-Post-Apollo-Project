@@ -142,20 +142,20 @@ assert 'text: "TRAY"' in tray and 'text: "NO ICONS"' in tray
 assert tray.count("GohuText {") >= 2
 assert "border.width: 1" in tray
 assert "border.color: accentColor" in tray
-# The outer tray tracks actual native menu visibility. Individual app
-# cards separately track durable StatusNotifier registration.
+# The outer tray tracks native menu visibility. Individual cards track
+# truly desktop-visible Sway windows, not tray registration alone.
 assert "readonly property bool trayMenuOpen:" in tray
 assert "trayMenuOpen ? Colors.magenta" in tray
 assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in tray
 assert "trayMenuOpen ? 0.72" in tray
 assert "trayMenuOpen ? 0.18" in tray
 assert "safeSource: trayIcon" in tray
-assert "readonly property bool appRegistered:" in tray
-assert "trayButton.modelData !== null" in tray
-assert "trayButton.modelData !== undefined" in tray
-assert "readonly property bool cardEmphasized: trayButton.appRegistered" in tray
-assert "visible: trayButton.appRegistered" in tray
-assert "trayButton.appRegistered ? Colors.magenta" in tray
+assert "readonly property bool appOnDesktop:" in tray
+assert "DesktopVisibility.hasVisibleDesktopWindow(" in tray
+assert "trayDock.visibleDesktopKeys" in tray
+assert "readonly property bool cardEmphasized: trayButton.appOnDesktop" in tray
+assert "visible: trayButton.appOnDesktop" in tray
+assert "trayButton.appOnDesktop ? Colors.magenta" in tray
 # Copy Workspaces' real construction, not a permanent bordered mini
 # card: 25×42 delegate, a 70% dark active layer, invisible oversized
 # backing and low-opacity sampled glow beneath the icon.
@@ -199,10 +199,14 @@ assert "anchors.fill: parent\n        anchors.margins: 4" not in tray
 assert "bottom: 10" in trash
 assert "bottom: 10" in power
 
-# Only visual placement changed. Preserve exact Discord bridge, real external
-# item activation and native item repeater. No second tray service/process.
+# Preserve exact Discord bridge, native activation and item repeater.
+# The ONE new Sway process is strictly a read-only get_tree snapshot,
+# driven by Quickshell's built-in event subscriber rather than polling.
 assert "model: SystemTray.items" in tray
 assert "SocialTrayBridge.requestDiscordActivation();" in tray
 assert "trayButton.modelData.activate();" in tray
-assert "Process {" not in tray
+assert tray.count("Process {") == 1
+assert 'command: ["swaymsg", "-t", "get_tree", "-r"]' in tray
+assert 'subscriptions: ["window", "workspace", "output"]' in tray
+assert "desktopWindowRefresh.restart()" in tray
 print("System tray true output center, empty-state, fullscreen z-order and input safety: PASS")

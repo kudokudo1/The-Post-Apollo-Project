@@ -106,7 +106,11 @@ for forbidden in (
     'category-group-writes-enabled', 'api.', 'Qt.openUrlExternally',
 ):
     assert forbidden not in pane, forbidden
-    assert forbidden not in service, forbidden
+    if forbidden != 'Process {':
+        assert forbidden not in service, forbidden
+
+# The isolated service owns exactly one guarded process; the UI owns none.
+assert service.count('Process {') == 1
 
 for forbidden in (
     'createCategoryGroup(', 'updateCategoryGroup(', 'deleteCategoryGroup(',

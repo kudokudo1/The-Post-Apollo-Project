@@ -57,7 +57,7 @@ for requirement in (
     "model: providerPane.details.visibleRecent",
     "MORE OR OLDER ENTRIES EXIST",
     "OPEN ACCOUNT DETAILS",
-    "OPEN THE OFFICIAL PROVIDER APP FOR REAL ACTIONS",
+    "USE THE OFFICIAL SERVICE FOR REAL ACTIONS",
     "NO VERIFIED BALANCES, PAYMENTS, CARDS, STOCKS OR LOANS"
 ):
     assert requirement in pane, requirement

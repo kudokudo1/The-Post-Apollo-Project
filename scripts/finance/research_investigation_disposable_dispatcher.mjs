@@ -8,7 +8,16 @@ import { run, Refusal } from "./research_investigation_store.mjs";
 
 const MAX_COMMAND_BYTES = 8192;
 const PREFIX = "FINANCE_RESEARCH_STORE_RESULT ";
-const mutationActions = new Set(["create", "attach", "remove"]);
+const allowedFields = Object.freeze({
+  create:["action","expectedRevision","id","title","question","timestamp"],
+  attach:["action","expectedRevision","investigationId","evidence","timestamp"],
+  remove:["action","expectedRevision","investigationId","evidenceId","timestamp"]
+});
+function exactFields(value, keys) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length
+    && keys.every(key => Object.prototype.hasOwnProperty.call(value,key));
+}
 const refusal = () => ({exitCode:1,stdout:"",stderr:"DISPOSABLE_TEST_REFUSAL"});
 
 export class DisposableResearchDispatcher {
@@ -35,8 +44,10 @@ export class DisposableResearchDispatcher {
         || frame.indexOf("\n") !== frame.length-1) return refusal();
     let command;
     try { command = JSON.parse(frame); } catch { return refusal(); }
-    if (!command || typeof command !== "object" || Array.isArray(command)
-        || !mutationActions.has(command.action)) return refusal();
+    if (!command || !Object.prototype.hasOwnProperty.call(allowedFields,command.action)
+        || !exactFields(command,allowedFields[command.action])
+        || !Number.isSafeInteger(command.expectedRevision)
+        || command.expectedRevision < 0) return refusal();
     this.#dispatches += 1;
     try {
       // M2 performs its ordinary locks/revision checks, *but only* on a fresh

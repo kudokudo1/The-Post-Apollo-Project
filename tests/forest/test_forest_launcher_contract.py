@@ -558,14 +558,14 @@ class ForestLauncherContract(unittest.TestCase):
         rail = (ROOT / "widgets/ForestChatList.qml").read_text()
         # Only 1px section dividers change; individual status colors and
         # product-specific button borders retain their established grammar.
-        self.assertEqual(view.count("height: 1\\n                color: Colors.green"), 3)
-        self.assertEqual(view.count("width: 1\\n                color: Colors.green"), 1)
-        self.assertNotIn("height: 1\\n                color: Colors.cyan", view)
-        self.assertNotIn("width: 1\\n                color: Colors.cyan", view)
-        self.assertIn("height: 1\\n            color: Colors.green", rail)
-        self.assertIn("width: 1\\n        color: Colors.green", rail)
-        self.assertNotIn("height: 1\\n            color: Colors.cyan", rail)
-        self.assertNotIn("width: 1\\n        color: Colors.cyan", rail)
+        self.assertEqual(view.count("height: 1\n                color: Colors.green"), 3)
+        self.assertEqual(view.count("width: 1\n                color: Colors.green"), 1)
+        self.assertNotIn("height: 1\n                color: Colors.cyan", view)
+        self.assertNotIn("width: 1\n                color: Colors.cyan", view)
+        self.assertIn("height: 1\n            color: Colors.green", rail)
+        self.assertIn("width: 1\n        color: Colors.green", rail)
+        self.assertNotIn("height: 1\n            color: Colors.cyan", rail)
+        self.assertNotIn("width: 1\n        color: Colors.cyan", rail)
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
@@ -805,7 +805,7 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("id: pickerFlower", view)
         self.assertIn("id: pickerLeftStar", view)
         self.assertIn("id: pickerRightStars", view)
-        self.assertIn("DockButton {\n                    id: modelPickerButton", view)
+        self.assertRegex(view, r"DockButton\\s*\\{\\s*id:\\s*modelPickerButton")
         self.assertIn("open: root.modelPopupOpen", view)
         self.assertIn("acceptedButtons: Qt.LeftButton", view)
         self.assertIn("normalForegroundColor: Colors.green", view)

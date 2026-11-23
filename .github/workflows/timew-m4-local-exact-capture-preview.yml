@@ -1,0 +1,34 @@
+name: TimeW M4 local fractional capture preview (read-only HOLD)
+
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3LocalExactCapturePreview.py'
+      - 'tests/timew/test_machine_v3_local_exact_capture_preview.py'
+      - 'docs/timew-m4-readonly-local-exact-capture-preview.md'
+      - '.github/workflows/timew-m4-local-exact-capture-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-preview-no-action:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify explicit-path checkpoint-only read-only M4 preview
+        run: python3 -B -I tests/timew/test_machine_v3_local_exact_capture_preview.py
+      - name: Preserve M3 exact local storage and historical integer-only v2
+        run: |
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_store.py
+          python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py
+          python3 -B -I tests/timew/test_machine_v2_fractional_observation_review.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

@@ -78,8 +78,12 @@ PanelWindow {
         }
     }
     onMenuOpenChanged: {
-        if (!menuOpen)
+        if (!menuOpen) {
             modelPopupOpen = false;
+            // Local-only drafts never outlive the displayed Forest session.
+            if (forestPromptInput)
+                forestPromptInput.clear();
+        }
     }
     ForestInventoryAdapter {
         id: localInventory
@@ -376,7 +380,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 1
-                color: Colors.cyan
+                color: Colors.green
             }
         }
 
@@ -556,7 +560,7 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: 1
-                color: Colors.cyan
+                color: Colors.green
             }
         }
 
@@ -667,7 +671,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 1
-                color: Colors.cyan
+                color: Colors.green
             }
 
             // The prompt-adjacent flower button owns this selector. The popup
@@ -1009,68 +1013,178 @@ PanelWindow {
                 anchors.bottomMargin: 13
                 height: 40
 
-                // A disabled prompt placeholder; the B1-B4 trusted session
-                // host has not been connected, so no editable draft or SEND.
+                // Local-only, unsubmitted draft. No provider/session/transport
+                // ownership has been authorized; SEND and voice remain gated.
                 Rectangle {
                     id: sendGate
                     anchors.left: parent.left
-                    anchors.right: voiceToTextButton.left
+                    anchors.right: forestAskSendButton.left
                     anchors.rightMargin: 6
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     color: Colors.dark
                     border.width: 1
-                    border.color: Colors.cyan
-                    opacity: 0.65
+                    border.color: Colors.magenta
+
+                    TextInput {
+                        id: forestPromptInput
+                        anchors.left: parent.left
+                        anchors.leftMargin: 9
+                        anchors.right: voiceToTextButton.left
+                        anchors.rightMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 26
+                        enabled: root.menuOpen
+                        clip: true
+                        selectByMouse: true
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 11
+                        color: Colors.magenta
+                        selectionColor: Colors.magenta
+                        selectedTextColor: Colors.black
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            color: Colors.orange
+                        }
+                        Accessible.name: "Forest local draft text input"
+                        Accessible.description:
+                            "In-memory draft only. SEND is locked until a trusted Forest chat host is connected."
+                        // Intentionally no onAccepted / transport / history.
+                    }
                     GohuText {
-                        anchors.centerIn: parent
-                        width: Math.max(0, parent.width - 12)
+                        anchors.left: forestPromptInput.left
+                        anchors.right: forestPromptInput.right
+                        anchors.verticalCenter: forestPromptInput.verticalCenter
+                        visible: forestPromptInput.text.length === 0
+                                 && !forestPromptInput.activeFocus
                         text: root.frameHeight < 540
                             ? "SEND LOCKED // HOST NOT CONNECTED"
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
-                        color: Colors.white
+                        color: Colors.magenta
+                        opacity: 0.74
                         font.pixelSize: 9
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                    }
+
+                    // Shared Hospital-derived presentation component. Reusing a
+                    // button does not import or start Hospital's mic service.
+                    // Disabled until a separately reviewed Forest voice host
+                    // supplies recorder custody, consent and stop behavior.
+                    VoiceToTextButton {
+                        id: voiceToTextButton
+                        anchors.right: modelPickerButton.left
+                        anchors.rightMargin: 4
+                        anchors.top: parent.top
+                        anchors.topMargin: 4
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 4
+                        width: Math.max(28, Math.min(34,
+                            Math.round(sendGate.width * 0.16)))
+                        idleAccent: Colors.omnitrix
+                        // The talking-mouth text is centered dynamically as this
+                        // button resizes. Sampling the glyph directly can leave
+                        // a stale DropShadow origin when that center moves.
+                        // Sample ActionButton's anchored contentHost instead:
+                        // the same glyph still glows, but both source and glow
+                        // keep a resize-stable (0, 0) origin in contentLayer.
+                        glyphGlowEnabled: true
+                        contentGlowSource: contentItem
+                        backendReady: root.voiceHostTrusted
+                        busy: false
+                        processing: false
+                        available: root.voiceHostTrusted && !processing
+                        Accessible.name:
+                            "VOICE LOCKED // TRUSTED FOREST AUDIO HOST NOT CONNECTED"
+                        // No onToggleRequested: protected voice service unavailable.
+                    }
+
+
+                    // Match Forest's ordinary DockButton state grammar: green
+                    // fruit identity and perimeter when idle/hovered, magenta
+                    // foreground + border + glow on open, yellow selected fill.
+                    // The shared control owns the hover/pressed/open transitions
+                    // and its teardown-safe source-sampled artwork glow.
+                    DockButton {
+                        id: modelPickerButton
+                        anchors.right: parent.right
+                        anchors.rightMargin: 4
+                        anchors.top: parent.top
+                        anchors.topMargin: 4
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 4
+                        width: 39
+                        radius: 0
+                        acceptedButtons: Qt.LeftButton
+                        open: root.modelPopupOpen
+                        Accessible.name: "Open Forest model selector"
+
+                        normalForegroundColor: Colors.green
+                        hoverForegroundColor: Colors.green
+                        pressedForegroundColor: Colors.green
+                        openForegroundColor: Colors.magenta
+
+                        normalDockGlowColor: Colors.green
+                        hoverDockGlowColor: Colors.green
+                        pressedDockGlowColor: Colors.green
+                        openGlowColor: Colors.magenta
+
+                        normalContentGlowColor: Colors.green
+                        hoverContentGlowColor: Colors.green
+                        pressedContentGlowColor: Colors.green
+                        contentGlowSource: pickerFlower
+                        trackArtworkGlowLocally: true
+
+                        // Border follows the same resolved color as flower/glow.
+                        border.width: 1
+                        border.color: dockGlowColor
+
+                        // Forest dock precedent: white idle/hover ornaments,
+                        // magenta together with the flower when open.
+                        readonly property color pickerStarColor:
+                            modelPickerButton.open ? Colors.magenta : Colors.white
+
+                        Item {
+                            id: modelPickerArt
+                            anchors.centerIn: parent
+                            width: 34
+                            height: 30
+
+                            GohuText {
+                                id: pickerLeftStar
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                text: "⊹"
+                                textFormat: Text.PlainText
+                                font.pixelSize: 14
+                                color: modelPickerButton.pickerStarColor
+                            }
+                            GohuText {
+                                id: pickerFlower
+                                anchors.centerIn: parent
+                                text: "❦︎๋࣭"
+                                textFormat: Text.PlainText
+                                font.pixelSize: 19
+                                color: modelPickerButton.foregroundColor
+                            }
+                            GohuText {
+                                id: pickerRightStars
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                text: "⭑"
+                                textFormat: Text.PlainText
+                                font.pixelSize: 13
+                                color: modelPickerButton.pickerStarColor
+                            }
+                        }
+                        onLeftClicked: root.modelPopupOpen = !root.modelPopupOpen
                     }
                 }
 
-                // Shared Hospital-derived presentation component. Reusing a
-                // button does not import or start Hospital's mic service.
-                // Disabled until a separately reviewed Forest voice host
-                // supplies recorder custody, consent and stop behavior.
-                VoiceToTextButton {
-                    id: voiceToTextButton
-                    anchors.right: forestAskSendButton.left
-                    anchors.rightMargin: 6
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: Math.max(32, Math.min(42,
-                        Math.round(promptRow.width * 0.12)))
-                    idleAccent: Colors.omnitrix
-                    // The talking-mouth text is centered dynamically as this
-                    // button resizes. Sampling the glyph directly can leave
-                    // a stale DropShadow origin when that center moves.
-                    // Sample ActionButton's anchored contentHost instead:
-                    // the same glyph still glows, but both source and glow
-                    // keep a resize-stable (0, 0) origin in contentLayer.
-                    glyphGlowEnabled: true
-                    contentGlowSource: contentItem
-                    backendReady: root.voiceHostTrusted
-                    busy: false
-                    processing: false
-                    available: root.voiceHostTrusted && !processing
-                    Accessible.name:
-                        "VOICE LOCKED // TRUSTED FOREST AUDIO HOST NOT CONNECTED"
-                    // No onToggleRequested: protected voice service unavailable.
-                }
-
-                // The same ASK/SEND component used by Hospital Reception and
+                // The shared ASK/SEND component is displayed as SEND for Forest,
                 // Intercom. It owns visual states only, never provider calls.
                 AskSendButton {
                     id: forestAskSendButton
-                    anchors.right: modelPickerButton.left
-                    anchors.rightMargin: 6
+                    anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: Math.max(54, Math.min(86,
@@ -1080,91 +1194,15 @@ PanelWindow {
                     processing: false
                     idleAccent: Colors.green
                     recordingAccent: Colors.magenta
-                    askLabel: "ASK"
+                    askLabel: "SEND"
                     sendLabel: "SEND"
                     allowSecondaryAction: false
                     Accessible.name:
-                        "ASK LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
+                        "SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
                     // No onPrimaryRequested/onSecondaryRequested:
                     // a selected B0 model is not an authorized session.
                 }
 
-                // Match Forest's ordinary DockButton state grammar: green
-                // fruit identity and perimeter when idle/hovered, magenta
-                // foreground + border + glow on open, yellow selected fill.
-                // The shared control owns the hover/pressed/open transitions
-                // and its teardown-safe source-sampled artwork glow.
-                DockButton {
-                    id: modelPickerButton
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: 51
-                    radius: 0
-                    acceptedButtons: Qt.LeftButton
-                    open: root.modelPopupOpen
-                    Accessible.name: "Open Forest model selector"
-
-                    normalForegroundColor: Colors.green
-                    hoverForegroundColor: Colors.green
-                    pressedForegroundColor: Colors.green
-                    openForegroundColor: Colors.magenta
-
-                    normalDockGlowColor: Colors.green
-                    hoverDockGlowColor: Colors.green
-                    pressedDockGlowColor: Colors.green
-                    openGlowColor: Colors.magenta
-
-                    normalContentGlowColor: Colors.green
-                    hoverContentGlowColor: Colors.green
-                    pressedContentGlowColor: Colors.green
-                    contentGlowSource: pickerFlower
-                    trackArtworkGlowLocally: true
-
-                    // Border follows the same resolved color as flower/glow.
-                    border.width: 1
-                    border.color: dockGlowColor
-
-                    // Forest dock precedent: white idle/hover ornaments,
-                    // magenta together with the flower when open.
-                    readonly property color pickerStarColor:
-                        modelPickerButton.open ? Colors.magenta : Colors.white
-
-                    Item {
-                        id: modelPickerArt
-                        anchors.centerIn: parent
-                        width: 46
-                        height: 36
-
-                        GohuText {
-                            id: pickerLeftStar
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            text: "⊹"
-                            textFormat: Text.PlainText
-                            font.pixelSize: 14
-                            color: modelPickerButton.pickerStarColor
-                        }
-                        GohuText {
-                            id: pickerFlower
-                            anchors.centerIn: parent
-                            text: "❦︎๋࣭"
-                            textFormat: Text.PlainText
-                            font.pixelSize: 21
-                            color: modelPickerButton.foregroundColor
-                        }
-                        GohuText {
-                            id: pickerRightStars
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            text: "⭑"
-                            textFormat: Text.PlainText
-                            font.pixelSize: 13
-                            color: modelPickerButton.pickerStarColor
-                        }
-                    }
-                    onLeftClicked: root.modelPopupOpen = !root.modelPopupOpen
-                }
             }
         }
 
@@ -1180,7 +1218,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 1
-                color: Colors.cyan
+                color: Colors.green
             }
             GohuText {
                 anchors.left: parent.left

@@ -10,6 +10,8 @@ Item {
     property string statusMessage: "INTERFACE PREVIEW // STORAGE NOT CONNECTED"
     property bool controllerConnected: false
     property bool writeEnabled: false
+    property bool scratchEnabled: false // optional in-memory workflow, never writer authority
+    property string scratchId: ""
     property string selectedId: ""
     property string draftTitle: ""
     property string draftQuestion: ""
@@ -30,6 +32,10 @@ Item {
     readonly property bool canCreate: controllerConnected && writeEnabled && loadState === "ready"
         && draftTitle.trim().length > 0 && draftTitle.length <= 160
         && draftQuestion.trim().length > 0 && draftQuestion.length <= 1000
+    readonly property bool canCreateScratch: scratchEnabled && controllerConnected
+        && scratchId === ""
+        && draftTitle.trim().length > 0 && draftTitle.trim().length <= 160
+        && draftQuestion.trim().length > 0 && draftQuestion.trim().length <= 1000
     readonly property bool canAttach: controllerConnected && writeEnabled && loadState === "ready"
         && selectedInvestigation !== null
         && draftEvidenceTitle.trim().length > 0 && draftEvidenceTitle.length <= 160
@@ -37,6 +43,8 @@ Item {
         && /^https:\/\/[^\s]+$/.test(draftEvidenceUrl)
     signal loadRequested()
     signal createRequested(string title, string question)
+    signal createScratchRequested(string title, string question)
+    signal discardScratchRequested()
     signal attachRequested(string investigationId, string source, string title,
                            string summary, string url)
     signal removeRequested(string investigationId, string evidenceId)
@@ -102,11 +110,25 @@ Item {
                 ActionButton {
                     width: 100
                     height: 28
-                    label: pane.showNewForm ? "CANCEL NEW" : "NEW CASE"
+                    label: pane.scratchEnabled
+                        ? (pane.showNewForm ? "CANCEL" : "NEW SCRATCH")
+                        : (pane.showNewForm ? "CANCEL NEW" : "NEW CASE")
                     labelPixelSize: 9
-                    available: pane.controllerConnected && pane.writeEnabled && pane.loadState === "ready"
+                    available: pane.controllerConnected
+                        && (pane.scratchEnabled ? pane.scratchId === ""
+                            : pane.writeEnabled && pane.loadState === "ready")
                     accentColor: Colors.magenta
                     onLeftClicked: pane.showNewForm = !pane.showNewForm
+                }
+                ActionButton {
+                    width: 115
+                    height: 28
+                    label: "DISCARD SCRATCH"
+                    labelPixelSize: 9
+                    accentColor: Colors.red
+                    visible: pane.scratchEnabled && pane.scratchId !== ""
+                    available: visible
+                    onLeftClicked: pane.discardScratchRequested()
                 }
                 GohuText {
                     text: "CASES " + pane.investigations.length
@@ -129,7 +151,9 @@ Item {
                     width: parent.width - 16
                     spacing: 7
                     GohuText {
-                        text: "NEW INVESTIGATION"
+                        text: pane.scratchEnabled
+                            ? "SCRATCH INVESTIGATION // MEMORY ONLY"
+                            : "NEW INVESTIGATION"
                         color: Colors.magenta
                         font.pixelSize: 11
                     }
@@ -172,12 +196,20 @@ Item {
                     ActionButton {
                         width: 115
                         height: 29
-                        label: "CREATE CASE"
+                        label: pane.scratchEnabled ? "CREATE SCRATCH" : "CREATE CASE"
                         accentColor: Colors.magenta
-                        available: pane.canCreate
+                        available: pane.scratchEnabled
+                            ? pane.canCreateScratch : pane.canCreate
                         onLeftClicked: {
-                            // Only the controller may close/clear this form after a verified save.
-                            pane.createRequested(pane.draftTitle.trim(), pane.draftQuestion.trim());
+                            if (pane.scratchEnabled) {
+                                // This signal is local only; never route to createRequested.
+                                pane.createScratchRequested(
+                                    pane.draftTitle.trim(), pane.draftQuestion.trim());
+                            } else {
+                                // Only a verified writer could clear the persistent form.
+                                pane.createRequested(
+                                    pane.draftTitle.trim(), pane.draftQuestion.trim());
+                            }
                         }
                     }
                 }
@@ -199,7 +231,9 @@ Item {
                         width: parent.width - 18
                         spacing: 7
                         GohuText {
-                            text: "SAVED INVESTIGATIONS"
+                            text: pane.scratchId !== ""
+                                ? "INVESTIGATIONS // SCRATCH UNSAVED"
+                                : "SAVED INVESTIGATIONS"
                             color: Colors.cyan
                             font.pixelSize: 11
                             font.bold: true
@@ -207,7 +241,9 @@ Item {
                         GohuText {
                             visible: pane.investigations.length === 0
                             width: parent.width
-                            text: "NO INVESTIGATIONS LOADED"
+                            text: pane.scratchEnabled
+                                ? "NO CASES YET // USE NEW SCRATCH"
+                                : "NO INVESTIGATIONS LOADED"
                             color: Colors.orange
                             font.pixelSize: 10
                         }
@@ -217,7 +253,9 @@ Item {
                                 required property var modelData
                                 width: casesList.width
                                 height: 37
-                                label: modelData.title
+                                label: modelData.id === pane.scratchId
+                                    ? "[UNSAVED] " + modelData.title
+                                    : modelData.title
                                 labelItem.textFormat: Text.PlainText
                                 labelPixelSize: 10
                                 selected: pane.selectedId === modelData.id
@@ -239,7 +277,11 @@ Item {
                         spacing: 8
                         GohuText {
                             width: parent.width
-                            text: pane.selectedInvestigation ? pane.selectedInvestigation.title : "SELECT AN INVESTIGATION"
+                            text: pane.selectedInvestigation
+                                ? (pane.selectedId === pane.scratchId
+                                   ? "SCRATCH // UNSAVED // " : "")
+                                  + pane.selectedInvestigation.title
+                                : "SELECT AN INVESTIGATION"
                             color: Colors.magenta
                             font.pixelSize: 11
                             font.bold: true
@@ -399,7 +441,10 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "PREVIEW IS READ-ONLY UNTIL A REVIEWED CONTROLLER ENABLES WRITES // MANUAL LINKS ARE NOT VERIFIED SEC FEED RESULTS"
+                text: pane.scratchEnabled
+                    ? "MEMORY ONLY // BACK OR LEAVING RESEARCH DISCARDS SCRATCH AND DRAFT. "
+                      + "ATTACH SOURCE REMAINS DISABLED // SEC INDEX IS NOT VERIFIED CONTENT."
+                    : "PREVIEW IS READ-ONLY UNTIL A REVIEWED CONTROLLER ENABLES WRITES // MANUAL LINKS ARE NOT VERIFIED SEC FEED RESULTS"
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText

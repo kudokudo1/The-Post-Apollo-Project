@@ -1,4 +1,4 @@
-name: FinanceW Market M26-M29 loaded range statistics and SMA relationships
+name: FinanceW Market M26-M30 historical range analyses and pin comparisons
 
 on:
   pull_request:
@@ -8,11 +8,13 @@ on:
       - "tests/finance/test_market_m26_range_analysis.mjs"
       - "tests/finance/test_market_m28_moving_averages.mjs"
       - "tests/finance/test_market_m29_sma_relationship.mjs"
+      - "tests/finance/test_market_m30_two_point_compare.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
       - "scripts/finance/MARKET_M28_SMA_OVERLAYS_README.md"
       - "scripts/finance/MARKET_M29_SMA_RELATIONSHIP_README.md"
+      - "scripts/finance/MARKET_M30_TWO_POINT_COMPARE_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   push:
     branches: [main]
@@ -22,11 +24,13 @@ on:
       - "tests/finance/test_market_m26_range_analysis.mjs"
       - "tests/finance/test_market_m28_moving_averages.mjs"
       - "tests/finance/test_market_m29_sma_relationship.mjs"
+      - "tests/finance/test_market_m30_two_point_compare.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
       - "scripts/finance/MARKET_M28_SMA_OVERLAYS_README.md"
       - "scripts/finance/MARKET_M29_SMA_RELATIONSHIP_README.md"
+      - "scripts/finance/MARKET_M30_TWO_POINT_COMPARE_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   workflow_dispatch:
 
@@ -35,7 +39,7 @@ permissions:
 
 jobs:
   loaded-range-analysis:
-    name: Loaded range and historical SMA 5/20 relationship; no provider calls
+    name: Loaded historical range, SMA and two-point comparison; no provider calls
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -45,5 +49,5 @@ jobs:
           node-version: "22"
       - name: Pure Market M26-M27 range movement/selected compare and malformed data
         run: node tests/finance/test_market_m26_range_analysis.mjs
-      - name: Existing M10-M29 Market price-range regression chain
+      - name: Existing M10-M30 Market price-range regression chain
         run: node tests/finance/test_market_price_range.mjs

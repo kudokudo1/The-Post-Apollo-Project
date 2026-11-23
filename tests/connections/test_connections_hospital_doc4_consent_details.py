@@ -29,6 +29,9 @@ class HospitalC5ConsentDetails(unittest.TestCase):
             "expectedRevision": 37,
             "expectedDigest": "9" * 64,
             "requestNonce": C.b64(bytes(range(32))),
+            "writerInstance": "protected-px-001",
+            "policyGeneration": 9,
+            "expiresAt": 1700000028,
         }
         self.peer = (12345, 1000, 1000, 98765)
         self.seat = "logind-seat0-c2"
@@ -77,6 +80,9 @@ class HospitalC5ConsentDetails(unittest.TestCase):
             "hospital-action": "TRASH",
             "hospital-graph": "9" * 64,
             "hospital-request-nonce": C.b64(bytes(range(32))),
+            "hospital-writer-instance": "protected-px-001",
+            "hospital-policy-generation": "9",
+            "hospital-review-expires-at": "1700000028",
             "hospital-patient-id": "patient-04",
             "hospital-repository": "kudokudo1/The-Post-Apollo-Project",
             "hospital-revision": "37",
@@ -118,6 +124,29 @@ class HospitalC5ConsentDetails(unittest.TestCase):
         )
         self.assertEqual(second["hospital-request-nonce"], replacement)
         self.assertEqual(second["hospital-room-id"], first["hospital-room-id"])
+
+    def test_writer_instance_rotates_without_changing_room_or_nonce(self):
+        _, first = self.invoke("TRASH")
+        self.prepared["writerInstance"] = "protected-px-002"
+        _, second = self.invoke("TRASH")
+        self.assertNotEqual(first["hospital-writer-instance"],
+                            second["hospital-writer-instance"])
+        self.assertEqual(second["hospital-writer-instance"], "protected-px-002")
+        self.assertEqual(second["hospital-request-nonce"],
+                         first["hospital-request-nonce"])
+        self.assertEqual(second["hospital-room-id"], first["hospital-room-id"])
+
+    def test_policy_generation_and_expiry_are_explicit_protected_details(self):
+        _, first = self.invoke("TRASH")
+        self.prepared["policyGeneration"] = 10
+        self.prepared["expiresAt"] = 1700000040
+        _, second = self.invoke("TRASH")
+        self.assertNotEqual(first["hospital-policy-generation"],
+                            second["hospital-policy-generation"])
+        self.assertNotEqual(first["hospital-review-expires-at"],
+                            second["hospital-review-expires-at"])
+        self.assertEqual(second["hospital-policy-generation"], "10")
+        self.assertEqual(second["hospital-review-expires-at"], "1700000040")
 
     def test_nonzero_polkit_result_refuses_even_with_exact_details(self):
         _, details = self.invoke("TRASH", code=1)

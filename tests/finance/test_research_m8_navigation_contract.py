@@ -41,7 +41,27 @@ for marker in (
 assert finance.count('FinanceResearchEvidenceCandidatePreviewHost {') == 1
 assert finance.count('label: "CANDIDATES"') == 1
 assert finance.count('id: researchToolStrip') == 1
-assert 'width: 109' in finance, "Compact Research strip must remain bounded"
+# Compact 9:16 FinanceW gives Research much less than full frame width.
+# The three tab controls must all fit, while their original maxima remain.
+for marker in (
+    "width: parent.width",
+    "readonly property real tabAvailableWidth:",
+    "Math.max(0, width - spacing * 2)",
+    "researchToolStrip.tabAvailableWidth * 0.37",
+    "researchToolStrip.tabAvailableWidth * 0.28",
+    "researchToolStrip.tabAvailableWidth * 0.34",
+):
+    assert marker in finance, marker
+for compact_content_width in (220, 260, 280, 300, 432):
+    available = max(0, compact_content_width - 12)
+    widths = (
+        min(120, int(available * 0.37)),
+        min(92, int(available * 0.28)),
+        min(109, int(available * 0.34)),
+    )
+    assert sum(widths) + 12 <= compact_content_width, (
+        compact_content_width, widths
+    )
 assert 'anchors.top: researchToolStrip.bottom' in finance
 
 # The Finance header reports the candidate preview's own status, not a fake

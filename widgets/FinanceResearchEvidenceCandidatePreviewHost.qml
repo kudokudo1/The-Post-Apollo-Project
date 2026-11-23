@@ -26,6 +26,13 @@ Item {
     readonly property string draftState: draftService.state
     readonly property string draftMessage: draftService.message
     readonly property var draftResult: draftService.preparedDraft
+    readonly property string caseReadState: readService.state
+    readonly property string editorCaseId: caseEditor.selectedId
+    readonly property string editorDraftTitle: caseEditor.draftEvidenceTitle
+    readonly property string editorDraftUrl: caseEditor.draftEvidenceUrl
+    readonly property string editorDraftSummary: caseEditor.draftEvidenceSummary
+    readonly property bool writerEnabled: caseEditor.writeEnabled
+    function loadCases() { return readService.load(); }
 
     function resetEditorDraft() {
         caseEditor.draftSource = "manual";

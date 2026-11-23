@@ -52,6 +52,10 @@ Item {
     }
     function begin(draft) {
         if(!sourceReady || !draft || choices.length===0)return false;
+        // Reject an edited, income, stale or invalid transaction BEFORE
+        // offering a picker. The missing category is expected at this point.
+        const gate=ExpenseRules.previewExpenseCategory(snapshot,draft,"");
+        if(gate.reason!=="SELECT AN EXPENSE ENVELOPE")return false;
         clear();
         // Own a detached candidate. An in-progress input change will require
         // explicit new preview rather than silently reusing a stale plan.

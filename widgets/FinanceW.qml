@@ -2527,7 +2527,27 @@ Row {
                     }
                 }
 
-                // Weather's actual in-widget DIAG popup, generalized.
+                // The diagnostic popup is a modal inspector, not a
+                // transparent decoration over live Budget editors. Dim and
+                // intercept the entire work area before it reaches underlying
+                // controls, even when the pointer is outside the pane.
+                Rectangle {
+                    id: financeDiagnosticsBackdrop
+                    anchors.fill: parent
+                    z: 89
+                    visible: root.menuOpen && root.diagnosticsOpen
+                    color: Qt.rgba(Colors.black.r, Colors.black.g,
+                                   Colors.black.b, 0.90)
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.AllButtons
+                        preventStealing: true
+                        onPressed: function(mouse) { mouse.accepted = true; }
+                        onWheel: function(wheel) { wheel.accepted = true; }
+                    }
+                }
+
+                // Weather's actual in-widget diagnostics popup, generalized.
                 // This overlays the active work area; it cannot launch a
                 // provider, create a new PanelWindow, or submit a finance write.
                 DiagnosticsServicePopup {

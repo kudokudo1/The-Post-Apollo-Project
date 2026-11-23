@@ -28,9 +28,32 @@ function xwayland(className, show) {
 
 const tray = {
     vesktop:{id:"dev.vencord.vesktop",title:"Vesktop"},
+    // Exact live SNI identities captured on the operator's desktop.
+    vesktopSni:{id:"vesktop_status_icon_1",title:""},
     lutris:{id:"net_lutris_Lutris",title:"Lutris"},
+    lutrisSni:{id:"net.lutris.Lutris",title:"Lutris"},
     unrelated:{id:"another.application",title:"Something else"}
 };
+
+// Reproduce the exact observed Sway transition and D-Bus identity without
+// supplying a fabricated title such as "Vesktop" to help matching.
+const reportedVisible = list(root(output(
+    ws("1", wayland("dev.vencord.Vesktop",true)))));
+const reportedHidden = list(root(output(
+    ws("1", wayland("dev.vencord.Vesktop",false)))));
+assert.equal(visible(tray.vesktopSni,reportedVisible),true,
+    "real Vesktop SNI Id resolves the visible Wayland window's app_id");
+assert.equal(visible(tray.vesktopSni,reportedHidden),false,
+    "registered but hidden Vesktop has no active card");
+assert.equal(visible(tray.vesktopSni,[]),false);
+assert.equal(visible({id:"vesktop_status_icon_2",title:""},reportedVisible),false,
+    "never infer other numbered SNI identities without evidence");
+assert.equal(visible({id:"vesktop_status_icon_1_other",title:""},reportedVisible),false,
+    "do not use prefix/substring matching");
+assert.equal(visible({id:"discord",title:"Discord"},reportedVisible),false,
+    "Discord tray registration is not automatically Vesktop");
+assert.equal(visible(tray.lutrisSni,reportedVisible),false,
+    "real Lutris ID must not match Vesktop");
 
 const onDesktop = list(root(output(
     ws("1", wayland("vesktop",true), wayland("lutris",false)))));
@@ -87,6 +110,8 @@ assert.equal(visible(tray.lutris,[]),false);
 assert.equal(visible(null,onDesktop),false);
 assert.equal(visible(tray.vesktop,["dev.vencord.vesktop"]),true);
 assert.equal(visible(tray.lutris,["net.lutris.lutris"]),true);
+assert.equal(visible(tray.lutrisSni,["net.lutris.lutris"]),true,
+    "observed Lutris SNI ID still matches exact XWayland/desktop identity");
 
 // Event routing must be read-only and use an event subscription, not
 // a continuously polling timer or privileged window action.

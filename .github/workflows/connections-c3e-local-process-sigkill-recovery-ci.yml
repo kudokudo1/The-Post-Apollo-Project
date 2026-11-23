@@ -50,12 +50,13 @@ jobs:
                          "L._hosted_ci_root(root)", "AFTER_SQLITE_COMMIT_BEFORE_ACK",
                          "AFTER_META_UPDATE_BEFORE_COMMIT",
                          '"safeToRetry": False',
-                         "C3E_REAL_SIGKILL_NO_PROTECTED_HISTORY_OR_RECOVERY_AUTHORITY"):
+                         "C3E_REAL_SIGKILL_NO_PROTECTED_HISTORY_OR_RECOVERY_AUTHORITY",
+                         "C3E_REAL_SIGKILL_FORKED_CHILD_REQUIRED"):
               assert needed in code, needed
           assert "readonly property bool credentialActionsEnabled: false" in broker
           print("C3E_ACTUAL_SIGKILL_DISPOSABLE_ONLY // NO_PRODUCTION_AUTHORITY")
           PY
-      - name: 16 real forked-process SIGKILL, crash recovery and local rollback tests
+      - name: 17 real forked-process SIGKILL, crash recovery and local rollback tests
         shell: bash
         run: |
           set -euo pipefail

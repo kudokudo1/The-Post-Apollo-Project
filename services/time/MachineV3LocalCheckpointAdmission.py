@@ -12,6 +12,7 @@ No UI/CLI, implicit path, import-time I/O, Sway command or background work.
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -124,6 +125,7 @@ def admit_checkpoint(*, checkpoint_id, observations, store,
             "safe_actions": [],
         }
     except (AdmissionRefused, LocalCaptureRefused, StoreError,
-            GeometryStoreError, ValueError, TypeError, KeyError,
-            OverflowError):
+            GeometryStoreError, sqlite3.Error, OSError, ValueError,
+            TypeError, KeyError, OverflowError):
+        # Never forward private SQLite/file-system diagnostics to a future UI.
         _refuse()

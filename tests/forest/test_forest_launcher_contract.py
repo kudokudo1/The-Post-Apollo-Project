@@ -550,7 +550,8 @@ class ForestLauncherContract(unittest.TestCase):
             send = max(54, min(86, round(prompt * 0.21)))
             box = prompt - send - 6
             mic = max(28, min(34, round(box * 0.16)))
-            local_draft = box - 9 - 6 - mic - 4 - 39 - 4
+            # Text, mic, 30px dial and model fruit all fit inside the box.
+            local_draft = box - 11 - 6 - mic - 3 - 30 - 3 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
     def test_forest_section_dividers_use_grassy_green(self):
@@ -566,6 +567,85 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("width: 1\n        color: Colors.green", rail)
         self.assertNotIn("height: 1\n            color: Colors.cyan", rail)
         self.assertNotIn("width: 1\n        color: Colors.cyan", rail)
+
+    def test_reasoning_dial_detents_dead_zone_and_local_only_custody(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        dial = (ROOT / "widgets/ForestReasoningDial.qml").read_text()
+        policy = (ROOT / "widgets/ForestReasoningDialPolicy.js").read_text()
+        self.assertEqual(view.count("ForestReasoningDial {"), 1)
+        self.assertIn("id: reasoningStepDial", view)
+        self.assertIn("anchors.right: reasoningStepDial.left", view)
+        self.assertIn("anchors.right: modelPickerButton.left", view)
+        self.assertIn("width: 30", view)
+        self.assertIn("stepIndex: root.selectedReasoningStep", view)
+        self.assertIn("root.chooseTreeReasoningStep(step);", view)
+        self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
+        self.assertIn("steps[selectedTreeIndex] = step", view)
+        self.assertIn("selectedTreeReasoningSteps = steps", view)
+        self.assertIn("readonly property bool chatHostTrusted: false", view)
+        self.assertIn("readonly property bool voiceHostTrusted: false", view)
+        self.assertNotIn("ReasoningPolicy", view)  # no inference adapter coupling
+        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
+
+        self.assertIn('import "ForestReasoningDialPolicy.js" as ReasoningPolicy', dial)
+        self.assertIn('import "../components"', dial)
+        self.assertIn("GohuText {", dial)
+        self.assertIn("color: Colors.cyan", dial)
+        self.assertIn("border.color: root.activeFocus ? Colors.blue : Colors.cyan", dial)
+        self.assertIn("rotation: root.snappedAngle", dial)
+        self.assertIn("onPressed: function(mouse)", dial)
+        self.assertIn("onPositionChanged: function(mouse)", dial)
+        self.assertIn("onWheel: function(wheel)", dial)
+        self.assertIn("Keys.onRightPressed:", dial)
+        self.assertIn("Keys.onLeftPressed:", dial)
+        self.assertIn("stepRequested(next)", dial)
+        self.assertNotIn("Process {", dial)
+        self.assertNotIn("Quickshell.execDetached", dial)
+
+        self.assertIn('var labels = ["NONE", "LOW", "MED", "HIGH"]', policy)
+        self.assertIn("var deadHalfAngle = 7.5", policy)
+        self.assertIn("var arcStart = 180 + deadHalfAngle", policy)
+        self.assertIn("var arcEnd = 540 - deadHalfAngle", policy)
+        self.assertIn("function stepFromPoint(", policy)
+        self.assertIn("return -1;", policy)
+        # Execute the actual QML JavaScript policy, not just a Python copy.
+        script = r"""
+const fs = require("fs"), vm = require("vm");
+const data = fs.readFileSync(process.argv[1], "utf8");
+const ctx = {};
+vm.createContext(ctx);
+vm.runInContext(data, ctx);
+const assert = require("assert");
+assert.deepStrictEqual(Array.from(ctx.labels), ["NONE","LOW","MED","HIGH"]);
+assert.strictEqual(ctx.arcEnd - ctx.arcStart, 345);
+assert.deepStrictEqual([0,1,2,3].map(ctx.angleForStep),
+                       [187.5,302.5,417.5,532.5]);
+for (const a of [173,175,180,185,187])
+    assert.strictEqual(ctx.stepFromAngle(a), -1);
+for (const a of [187.5,302.5,417.5,532.5])
+    assert.strictEqual(ctx.stepFromAngle(a),
+        [187.5,302.5,417.5,532.5].indexOf(a));
+for (const a of [-180,540])
+    assert.strictEqual(ctx.stepFromAngle(a), -1);
+for (const value of [-500,0,0.49,0.51,2.3,3,999])
+    assert.ok(Number.isInteger(ctx.clampStep(value)));
+assert.strictEqual(ctx.stepFromPoint(15,29,30,30), -1);
+assert.strictEqual(ctx.stepFromPoint(15,15,30,30), -1);
+for (let i = 0; i < 4; i++) {
+    const angle = (ctx.angleForStep(i) % 360) * Math.PI / 180;
+    const x = 15 + 14 * Math.sin(angle);
+    const y = 15 - 14 * Math.cos(angle);
+    assert.strictEqual(ctx.stepFromPoint(x,y,30,30), i);
+}
+"""
+        result = subprocess.run(
+            ["node", "-e", script,
+             str(ROOT / "widgets/ForestReasoningDialPolicy.js")],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=10)
+        self.assertEqual(result.returncode, 0,
+                         result.stdout + result.stderr)
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
@@ -600,6 +680,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("VoiceToTextButton {", inside)
         self.assertIn("DockButton {", inside)
         self.assertIn("id: modelPickerButton", inside)
+        self.assertIn("anchors.right: modelPickerButton.left", inside)
+        self.assertIn("ForestReasoningDial {", inside)
+        self.assertIn("id: reasoningStepDial", inside)
+        self.assertIn("anchors.right: reasoningStepDial.left", inside)
         self.assertIn("anchors.right: modelPickerButton.left", inside)
         self.assertIn("readonly property color promptBorderColor:", inside)
         self.assertIn("forestPromptInput.activeFocus ? Colors.magenta", inside)
@@ -672,7 +756,8 @@ class ForestLauncherContract(unittest.TestCase):
             send = max(54, min(86, round(row * 0.21)))
             box = row - send - 6
             mic = max(28, min(34, round(box * 0.16)))
-            local_draft = box - 9 - 6 - mic - 4 - 39 - 4
+            # Text, mic, 30px dial and model fruit all fit inside the box.
+            local_draft = box - 11 - 6 - mic - 3 - 30 - 3 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
     def test_b0_inventory_ui_is_explicit_and_fail_closed(self):

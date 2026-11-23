@@ -26,6 +26,18 @@ PanelWindow {
     // One explicit model choice per Tree. Inventory refreshes never silently
     // switch either Tree to the first returned model.
     property var selectedTreeModels: ["", "", "", "", ""]
+    // Per-Tree local visual preference only. No Ollama/Hermes transport
+    // consumes this setting while the trusted Forest host is disconnected.
+    property var selectedTreeReasoningSteps: [0, 0, 0, 0, 0]
+    readonly property int selectedReasoningStep:
+        selectedTreeReasoningSteps[selectedTreeIndex] || 0
+    function chooseTreeReasoningStep(step) {
+        if (!Number.isInteger(step) || step < 0 || step > 3)
+            return;
+        const steps = selectedTreeReasoningSteps.slice();
+        steps[selectedTreeIndex] = step;
+        selectedTreeReasoningSteps = steps;
+    }
     property bool modelPopupOpen: false
     property string pendingModelScan: ""
     property string lastScannedModel: ""
@@ -1043,7 +1055,7 @@ PanelWindow {
                         anchors.left: parent.left
                         anchors.leftMargin: 11
                         anchors.right: voiceToTextButton.left
-                        anchors.rightMargin: 8
+                        anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
                         height: parent.height - 8
                         verticalAlignment: TextInput.AlignVCenter
@@ -1090,8 +1102,8 @@ PanelWindow {
                     // supplies recorder custody, consent and stop behavior.
                     VoiceToTextButton {
                         id: voiceToTextButton
-                        anchors.right: modelPickerButton.left
-                        anchors.rightMargin: 4
+                        anchors.right: reasoningStepDial.left
+                        anchors.rightMargin: 3
                         anchors.top: parent.top
                         anchors.topMargin: 4
                         anchors.bottom: parent.bottom
@@ -1116,6 +1128,23 @@ PanelWindow {
                         // No onToggleRequested: protected voice service unavailable.
                     }
 
+
+                    // Snap-only reasoning selector between the speaking
+                    // mouth and fruit icon. NONE/LOW/MED/HIGH are local
+                    // preferences, not verified model reasoning capabilities.
+                    ForestReasoningDial {
+                        id: reasoningStepDial
+                        anchors.right: modelPickerButton.left
+                        anchors.rightMargin: 3
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 30
+                        height: 30
+                        stepIndex: root.selectedReasoningStep
+                        interactive: root.menuOpen
+                        onStepRequested: function(step) {
+                            root.chooseTreeReasoningStep(step);
+                        }
+                    }
 
                     // Match Forest's ordinary DockButton state grammar: green
                     // fruit identity and perimeter when idle/hovered, magenta

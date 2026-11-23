@@ -7,6 +7,7 @@ Rectangle {
     id: quotaPane
     objectName: "marketQuotaRealPane"
     property bool active: false
+    // M25: compact layouts keep all quota semantics visible without clipped copy.
     signal exitRequested()
     color: Colors.black
     border.width: 1
@@ -26,11 +27,11 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: backButton.left
         anchors.rightMargin: 5
-        text: "FREE PRICE API // LOCAL QUOTA STATUS"
+        text: "LOCAL FREE API // QUOTA STATUS"
         textFormat: Text.PlainText
         color: Colors.cyan
         font.bold: true
-        font.pixelSize: 12
+        font.pixelSize: 13
         elide: Text.ElideRight
     }
     ActionButton {
@@ -40,10 +41,10 @@ Rectangle {
         anchors.topMargin: 6
         anchors.right: parent.right
         anchors.rightMargin: 9
-        width: 98
-        height: 29
+        width: 112
+        height: 32
         label: "BACK TO STOCKS"
-        labelPixelSize: 9
+        labelPixelSize: 10
         accentColor: Colors.magenta
         onLeftClicked: quotaPane.exitRequested()
     }
@@ -55,17 +56,17 @@ Rectangle {
         anchors.leftMargin: 10
         anchors.right: parent.right
         anchors.rightMargin: 10
-        text: "POST-APOLLO'S TWO GLOBAL PRICE READERS ONLY // "
+        text: "TWO LOCAL PRICE READERS ONLY // "
             +"NOT ACCOUNT BALANCE // NO API CALLS // NO QUOTA RESET"
         textFormat: Text.PlainText
         color: Colors.orange
         wrapMode: Text.WordWrap
-        font.pixelSize: 9
+        font.pixelSize: 10
     }
     Flickable {
         id: scroll
         anchors.top: title.bottom
-        anchors.topMargin: 13
+        anchors.topMargin: 10
         anchors.left: parent.left
         anchors.leftMargin: 9
         anchors.right: parent.right
@@ -79,22 +80,22 @@ Rectangle {
         Column {
             id: body
             width: Math.max(0,scroll.width-20)
-            spacing: 11
+            spacing: 12
             GohuText {
                 width: parent.width
-                text: "READS THE LOCAL SQLite LEDGER // NEVER CONTACTS EODHD OR ALPHA"
+                text: "LOCAL SQLITE RESERVATIONS // NO PROVIDER REQUESTS"
                 textFormat: Text.PlainText
                 color: Colors.orange
                 wrapMode: Text.WordWrap
-                font.pixelSize: 9
+                font.pixelSize: 11
             }
             ActionButton {
                 width: body.width
-                height: 30
+                height: 34
                 objectName: "marketQuotaRefreshButton"
                 label: localQuota.loading ? "READING LOCAL STATUS"
                     : "REFRESH LOCAL STATUS"
-                labelPixelSize: 10
+                labelPixelSize: 11
                 accentColor: Colors.cyan
                 available: quotaPane.active && !localQuota.loading
                 onLeftClicked: localQuota.refresh()
@@ -104,7 +105,7 @@ Rectangle {
                 text: localQuota.message
                 textFormat: Text.PlainText
                 color: localQuota.unknown ? Colors.orange : Colors.cyan
-                font.pixelSize: 10
+                font.pixelSize: 12
                 wrapMode: Text.WordWrap
             }
             GohuText {
@@ -115,13 +116,14 @@ Rectangle {
                     : "NO LOCAL QUOTA SNAPSHOT LOADED"
                 textFormat: Text.PlainText
                 color: Colors.white
-                font.pixelSize: 10
+                font.pixelSize: 11
                 wrapMode: Text.WordWrap
             }
             Grid {
                 id: grid
+                objectName: "marketQuotaProviderGrid"
                 width: body.width
-                columns: width >= 500 ? 2 : 1
+                columns: width >= 560 ? 2 : 1
                 rowSpacing: 8
                 columnSpacing: 8
                 Repeater {
@@ -130,9 +132,10 @@ Rectangle {
                         {provider:"alpha-vantage",limit:25,reserved:null,recordState:"unknown"}
                     ]
                     delegate: Rectangle {
+                        objectName: "marketQuotaProviderCard"
                         required property var modelData
                         width: Math.max(0,(grid.width - (grid.columns-1)*8)/grid.columns)
-                        height: 112
+                        height: 142
                         color: Colors.dark
                         border.width: 1
                         border.color: modelData.recordState==="known"
@@ -147,7 +150,7 @@ Rectangle {
                             anchors.rightMargin: 9
                             text: modelData.provider==="eodhd" ? "EODHD" : "ALPHA VANTAGE"
                             textFormat: Text.PlainText
-                            font.pixelSize: 12
+                            font.pixelSize: 13
                             font.bold: true
                             color: Colors.cyan
                         }
@@ -165,7 +168,7 @@ Rectangle {
                             textFormat: Text.PlainText
                             color: modelData.recordState==="known" ? Colors.white
                                 : Colors.orange
-                            font.pixelSize: 10
+                            font.pixelSize: 12
                         }
                         Rectangle {
                             id: barBackground
@@ -173,7 +176,7 @@ Rectangle {
                             anchors.topMargin: 8
                             anchors.left: number.left
                             anchors.right: number.right
-                            height: 8
+                            height: 10
                             color: Colors.black
                             border.width: 1
                             border.color: Colors.cyan
@@ -194,14 +197,15 @@ Rectangle {
                             anchors.topMargin: 5
                             anchors.left: number.left
                             anchors.right: number.right
+                            objectName: "marketQuotaProviderContext"
                             text: modelData.recordState==="known"
                                 ? ("LOCAL UNRESERVED "+(modelData.limit-modelData.reserved)
                                     +" // OTHER APP USE UNKNOWN")
                                 : "NO USAGE CONCLUSION // NO ZERO ASSUMED"
                             textFormat: Text.PlainText
                             color: Colors.orange
-                            font.pixelSize: 9
-                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
                         }
                     }
                 }
@@ -209,21 +213,20 @@ Rectangle {
             GohuText {
                 width: body.width
                 text: "ZERO LOCAL RESERVED DOES NOT MEAN ZERO PROVIDER USAGE. "
-                    +"THE LEGACY SIX-STOCK READER, OTHER DEVICES AND OUTSIDE "
-                    +"REQUESTS ARE NOT INCLUDED."
+                    +"LEGACY SIX-STOCK READER, OTHER DEVICES AND OUTSIDE "
+                    +"REQUESTS ARE EXCLUDED."
                 textFormat: Text.PlainText
                 color: Colors.orange
-                font.pixelSize: 10
+                font.pixelSize: 11
                 wrapMode: Text.WordWrap
             }
             GohuText {
                 width: body.width
-                text: "IF THE LEDGER IS MISSING, BUSY OR UNTRUSTED, "
-                    +"STATUS REMAINS UNKNOWN. THIS SCREEN NEVER CREATES, "
-                    +"RESETS OR REPAIRS THE DATABASE. PRESS REFRESH TO RECHECK."
+                text: "MISSING, BUSY OR UNTRUSTED LEDGER = UNKNOWN. "
+                    +"NO DATABASE CREATE, RESET OR REPAIR. REFRESH TO RECHECK."
                 textFormat: Text.PlainText
                 color: Colors.white
-                font.pixelSize: 9
+                font.pixelSize: 11
                 wrapMode: Text.WordWrap
             }
         }

@@ -1,0 +1,38 @@
+name: Finance Research M7 native candidate picker smoke
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceResearchEvidenceCandidatePicker.qml"
+      - "widgets/FinanceResearchEvidenceCandidatePreviewHost.qml"
+      - "services/finance/FinanceResearchCandidatePreviewService.qml"
+      - "scripts/finance/research_candidate_preview_bridge.mjs"
+      - "scripts/finance/research_evidence_candidates.mjs"
+      - "scripts/finance/verify_research_candidate_native_m7.sh"
+      - "tests/finance/fixtures/M7ResearchCandidateNativeShell.qml"
+      - ".github/workflows/finance-research-candidate-native-m7.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-picker:
+    name: M7 isolated real Quickshell, read-only IPC and source invalidation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
+    steps:
+      - name: Install isolated Fedora Quickshell, QML, Node and virtual display
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Load actual Research picker in disposable Quickshell
+        run: bash scripts/finance/verify_research_candidate_native_m7.sh

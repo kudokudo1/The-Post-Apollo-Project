@@ -90,7 +90,9 @@ if ! grep -F 'M7_NATIVE_CHECK // CANDIDATES_FROM_NODE_VALIDATED' "$log"     || !
   exit 1
 fi
 grep -F 'M9_NATIVE_CHECK // EXISTING_CASE_EDITOR_PREFILLED_UNSAVED' "$log"
-if ! cmp -s "$case_dir/investigations.json" "$work/original-case.json"; then
+case_hash="$(sha256sum "$case_dir/investigations.json")"
+original_hash="$(sha256sum "$work/original-case.json")"
+if [ "${case_hash%% *}" != "${original_hash%% *}" ]; then
   echo "M9_NATIVE_FAIL // synthetic case changed" >&2
   exit 1
 fi

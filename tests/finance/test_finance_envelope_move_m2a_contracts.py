@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FinanceW Simple M2a dormant envelope move preview authority contract."""
+"""FinanceW Simple M2a/M2c envelope move preview authority contract."""
 from pathlib import Path
 
 root=Path(__file__).resolve().parents[2]
@@ -8,8 +8,8 @@ rules=(root/"services/finance/FinanceEnvelopeMovePlan.js").read_text()
 main=(root/"widgets/FinanceW.qml").read_text()
 writer=(root/"scripts/finance/write_allocation.mjs").read_text()
 
-# M2a is intentionally NOT added to FinanceW while M1 root is in review.
-assert "FinanceEnvelopeMovePreviewPane {" not in main
+# M2c mounts the same M2a view-only preview once, still without a writer.
+assert main.count("FinanceEnvelopeMovePreviewPane {") == 1
 assert 'import "../services/finance/FinanceEnvelopeMovePlan.js" as MoveRules' in pane
 assert "MoveRules.previewEnvelopeMove(snapshot,fromCategoryId," in pane
 assert 'objectName: "envelopeMovePreviewPane"' in pane
@@ -23,7 +23,7 @@ assert "onSnapshotChanged: clear()" in pane
 assert "onFromCategoryIdChanged: invalidatePreview()" in pane
 assert "onToCategoryIdChanged: invalidatePreview()" in pane
 assert "onAmountTextChanged: invalidatePreview()" in pane
-assert "FINANCIAL WRITER NOT IMPLEMENTED" in pane
+assert "PREVIEW ONLY // NO CHANGES SAVED // WRITER NOT CONNECTED" in pane
 assert "NOT A BANK TRANSFER" in pane
 assert "signal saveRequested" not in pane
 assert "signal moveRequested" not in pane
@@ -68,4 +68,4 @@ for code in (pane,rules):
 assert 'action:"allocation:set-amount"' in writer
 assert 'executeAllocation({' in writer
 assert 'setBudgetAmount(' not in pane
-print("FinanceW Simple M2a dormant preview/no-writer contracts: PASS")
+print("FinanceW Simple M2a/M2c mounted preview/no-writer contracts: PASS")

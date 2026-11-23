@@ -758,38 +758,70 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("id: coffeeBottomRightStar", view)
         for glyph in ('⊹', '⭑', '✦', '⋆'):
             self.assertIn('text: "' + glyph + '"', view)
-        self.assertIn("root.reasoningRailExpanded && reasoningCoffeeButton.pressed", view)
+        # Pressing EITHER the normal button or the red close cap makes
+        # the cup and every star BLACK, including their sampled glow.
+        self.assertIn("readonly property color starInk:", view)
+        self.assertIn("reasoningCoffeeButton.pressed ? Colors.black", view)
+        self.assertNotIn("root.reasoningRailExpanded && reasoningCoffeeButton.pressed", view)
         self.assertIn("? Colors.black", view)
         self.assertIn(": reasoningCoffeeButton.hovered", view)
         self.assertIn("? Colors.red", view)
         self.assertIn(": root.activeTree.gradientAccentColor", view)
         self.assertIn(": Colors.white", view)
         # Star ink, cup base/accent, and compact border-overlay gating.
-        self.assertEqual(view.count("reasoningCoffeeButton.pressed"), 4)
+        self.assertEqual(view.count("reasoningCoffeeButton.pressed"), 5)
         # Sampling the stable ActionButton host avoids a second-looking
         # cup ghost while the red cap changes size and position. The
         # source includes the cup and every independently drawn star.
         self.assertIn("contentGlowSource: contentItem", view)
         self.assertNotIn("contentGlowSource: coffeeGradientGlyph", view)
-        self.assertIn("contentGlowRadius: 6", view)
-        self.assertIn("contentGlowIdleOpacity: 0.45", view)
-        self.assertIn("contentGlowHoverOpacity: 0.66", view)
+        # Same 14px / 15-sample icon recipe as the model-fruit button.
+        dock = (ROOT / "components/DockButton.qml").read_text()
+        self.assertIn("property real contentGlowIdleRadius: 14", dock)
+        self.assertIn("property int contentGlowIdleSamples: 15", dock)
+        self.assertIn("contentGlowEnabled: true", view)
+        self.assertIn("contentGlowRadius: 14", view)
+        self.assertIn("contentGlowSamples: 15", view)
+        self.assertIn("contentGlowIdleOpacity: 0.75", view)
+        self.assertIn("contentGlowHoverOpacity: 0.95", view)
+        self.assertIn("contentGlowPressedOpacity: 0.0", view)
+        self.assertIn("id: coffeeInnerGlow", view)
+        self.assertIn("root.activeTree.iconIdleGlowColor", view)
+        self.assertIn("anchors.verticalCenterOffset:", view)
+        self.assertIn("reasoningCoffeeButton.hovered ? 0.29 : 0.19", view)
+        self.assertIn("visible: !reasoningCoffeeButton.pressed", view)
+        self.assertIn("gradient: Gradient {", view)
         self.assertIn("property alias contentItem: contentHost", action)
         self.assertIn("contentGlowSource: contentItem", view)
-        self.assertIn("width: root.reasoningRailExpanded ? 30 : 36", view)
-        self.assertIn("height: root.reasoningRailExpanded ? 28 : 34", view)
-        self.assertIn("width: 29", view)
-        self.assertIn("pixelSize: 26", view)
-        self.assertIn("y: 2", view)  # top star closer to cup
-        self.assertIn("anchors.leftMargin: 2", view)
-        self.assertIn("anchors.rightMargin: 2", view)
-        self.assertIn("anchors.rightMargin: 8", view)
-        self.assertIn("anchors.bottomMargin: 4", view)
+        self.assertIn("width: root.reasoningRailExpanded ? 28 : 36", view)
+        self.assertIn("height: root.reasoningRailExpanded ? 24 : 34", view)
+        self.assertIn("width: root.reasoningRailExpanded ? 18 : 29", view)
+        self.assertIn("pixelSize: root.reasoningRailExpanded ? 17 : 26", view)
+        self.assertIn("anchors.verticalCenterOffset:", view)
+        self.assertIn("root.reasoningRailExpanded ? 3 : 0", view)
+        self.assertIn("y: root.reasoningRailExpanded ? -2 : 2", view)
+        self.assertIn("anchors.leftMargin: root.reasoningRailExpanded ? 0 : 2", view)
+        self.assertIn("anchors.rightMargin: root.reasoningRailExpanded ? 0 : 2", view)
+        self.assertIn("anchors.rightMargin: root.reasoningRailExpanded ? 0 : 8", view)
+        self.assertIn("anchors.bottomMargin: root.reasoningRailExpanded ? 0 : 4", view)
+        self.assertIn("width: root.reasoningRailExpanded ? 5 : 7", view)
+        self.assertIn("width: root.reasoningRailExpanded ? 5 : 8", view)
+        # In the smaller 28px ornament frame, the 18px cup slot starts
+        # at x=5 and ends at x=23; left/right star slots are disjoint.
+        compact_red_ornament_width = 28
+        compact_red_cup_width = 18
+        compact_red_star_width = 5
+        cup_left = (compact_red_ornament_width - compact_red_cup_width) / 2
+        self.assertEqual(cup_left, compact_red_star_width)
+        self.assertEqual(cup_left + compact_red_cup_width,
+                         compact_red_ornament_width - compact_red_star_width)
         self.assertIn("horizontalAlignment: Text.AlignHCenter", view)
         self.assertIn("root.activeTree.gradientAccentColor", view)
         self.assertIn("root.activeTree.gradientTopRight", view)
         self.assertIn("reasoningCoffeeButton.pressed", view)
-        self.assertIn("? Colors.black : Colors.red", view)
+        self.assertIn("baseColor: reasoningCoffeeButton.pressed", view)
+        self.assertIn("accentColor: reasoningCoffeeButton.pressed", view)
+        self.assertIn("? Colors.black", view)
         # Expanded state follows the actual standard red CloseButton
         # identity without substituting an × for coffee.
         self.assertIn('idleForegroundColor: Colors.red', close)

@@ -540,7 +540,7 @@ class ForestLauncherContract(unittest.TestCase):
                          'handleStyle: "star"', "accountForContentOrigin: true"):
             self.assertIn(required, social)
             self.assertIn(required, rail)
-        self.assertIn("model: chatListRoot.hostConnected ? chatListRoot.sessions : []", rail)
+        self.assertIn("model: chatListRoot.hostConnected ? chatListRoot.visibleSessions : []", rail)
         self.assertIn('"NO ACTIVE CHATS', rail)
         self.assertIn("TRUSTED CHAT HOST NOT CONNECTED", rail)
         self.assertIn("textFormat: Text.PlainText", rail)

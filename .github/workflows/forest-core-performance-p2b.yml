@@ -1,0 +1,35 @@
+name: Forest Core Performance P2B Bounded Benchmark
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/performance_benchmark_p2b.py'
+      - 'scripts/forest/PERFORMANCE_BENCHMARK_P2B.md'
+      - 'tests/forest/test_performance_benchmark_p2b.py'
+      - '.github/workflows/forest-core-performance-p2b.yml'
+  push:
+    paths:
+      - 'scripts/forest/performance_benchmark_p2b.py'
+      - 'scripts/forest/PERFORMANCE_BENCHMARK_P2B.md'
+      - 'tests/forest/test_performance_benchmark_p2b.py'
+      - '.github/workflows/forest-core-performance-p2b.yml'
+
+jobs:
+  fake-loopback-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P2B one-shot synthetic fake-loopback negative matrix
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_benchmark_p2b.py' -v
+      - name: P1 pure governor regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - name: P0 read-only observer regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - name: B0 local-only inventory regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_inventory.py' -v
+      - name: B2 local streaming regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_chat_transport.py' -v
+      - name: C5 provisional disclosure deny-only regression
+        run: python3 -m unittest discover -s tests/connections -p 'test_connections_forest_c5_provisional_disclosure_preflight.py' -v
+      - name: Python syntax
+        run: python3 -m py_compile scripts/forest/performance_benchmark_p2b.py tests/forest/test_performance_benchmark_p2b.py

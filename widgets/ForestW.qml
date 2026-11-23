@@ -1103,16 +1103,16 @@ PanelWindow {
                     // sampling the moving cup could leave a second-looking
                     // red ghost when the close cap animates/resizes.
                     // The host samples all four stars plus the cup together.
-                    // Match the model fruit's sampled ornament glow recipe.
-                    // One stable content-host source lights the cup and all
-                    // four stars; no second artwork shadow is introduced.
+                    // Keep a restrained, silhouette-following glyph glow.
+                    // The diffuse *front* wash uses the existing HaloGlow
+                    // primitive on a separate, non-sampled sibling plane.
                     contentGlowEnabled: true
                     contentGlowSource: contentItem
-                    contentGlowRadius: 14
-                    contentGlowSamples: 15
-                    contentGlowIdleOpacity: 0.75
-                    contentGlowHoverOpacity: 0.95
-                    // A black pressed glyph must not retain a bright ghost.
+                    contentGlowRadius: 7
+                    contentGlowSamples: 7
+                    contentGlowIdleOpacity: 0.34
+                    contentGlowHoverOpacity: 0.72
+                    // A black pressed glyph must not retain a colored ghost.
                     contentGlowPressedOpacity: 0.0
 
                     // Four physically separate white ornaments. Previously
@@ -1136,40 +1136,6 @@ PanelWindow {
                                   ? Colors.red
                                   : root.activeTree.gradientAccentColor)
                               : Colors.white
-
-                        // A restrained Tree-colored inner hot spot behind
-                        // the upper center of the button. Unlike an extra
-                        // DropShadow, this cannot double the cup silhouette.
-                        Rectangle {
-                            id: coffeeInnerGlow
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.verticalCenterOffset:
-                                root.reasoningRailExpanded ? -3 : -4
-                            width: root.reasoningRailExpanded ? 22 : 27
-                            height: root.reasoningRailExpanded ? 12 : 17
-                            radius: width / 2
-                            visible: !reasoningCoffeeButton.pressed
-                            opacity: reasoningCoffeeButton.hovered ? 0.29 : 0.19
-                            gradient: Gradient {
-                                orientation: Gradient.Vertical
-                                GradientStop {
-                                    position: 0.0
-                                    color: root.activeTree.iconIdleGlowColor
-                                }
-                                GradientStop {
-                                    position: 0.58
-                                    color: Qt.rgba(
-                                        root.activeTree.iconIdleGlowColor.r,
-                                        root.activeTree.iconIdleGlowColor.g,
-                                        root.activeTree.iconIdleGlowColor.b, 0.32)
-                                }
-                                GradientStop {
-                                    position: 1.0
-                                    color: "transparent"
-                                }
-                            }
-                        }
 
                         // The cup is the only gradient-filled text.
                         ForestGradientName {
@@ -1280,6 +1246,23 @@ PanelWindow {
                             easing.type: Easing.OutQuad
                         }
                     }
+                }
+
+                // Post-Apollo's existing front-layer rectangular wash.
+                // Unlike coffeeInnerGlow this is NOT a filled ellipse and
+                // is deliberately NOT parented inside contentItem (which
+                // ActionButton samples for the independent glyph shadow).
+                // This is the same 10px / .07-.09 wide-wash family used
+                // on DockButton / model fruit, now in the Tree's icon hue.
+                HaloGlow {
+                    id: coffeeFrontWash
+                    anchors.fill: reasoningCoffeeButton
+                    z: 42
+                    spread: 10
+                    color: root.activeTree.iconIdleGlowColor
+                    glowEnabled: root.menuOpen
+                        && !reasoningCoffeeButton.pressed
+                    baseOpacity: reasoningCoffeeButton.hovered ? 0.09 : 0.07
                 }
 
                 // The same Forest border gradient used on Tree buttons

@@ -1,8 +1,39 @@
 // ForestW P0 Ollama residency projection. Read-only, not "running inference".
 // All values are provider-reported OBSERVATIONS from one explicit scan.
 // They are never Forest generation, C5 permission or chat-host authority.
+function _nonnegativeSafe(value) {
+    return typeof value === "number" && isFinite(value) && value >= 0
+        && Math.floor(value) === value && value <= Number.MAX_SAFE_INTEGER;
+}
+function _positiveSafe(value) {
+    return _nonnegativeSafe(value) && value > 0;
+}
+function _mib(value) {
+    return value === null ? "?" : (value / 1048576).toFixed(1);
+}
+// Read-only selected model diagnostic using the SAME P0 snapshot as LIVE.
+// "VRAM reported" is Ollama's reported resident bytes, not free VRAM.
+function modelProfile(status, records, selectedName) {
+    var empty = {state:"UNKNOWN", sizeMiB:"?", vramMiB:"?", context:"?"};
+    if (typeof selectedName !== "string" || !selectedName
+            || status !== "OBSERVED" || !Array.isArray(records))
+        return empty;
+    for (var i=0;i<records.length;i++) {
+        var row = records[i];
+        if (row && row.model === selectedName)
+            return {
+                state:"LOADED",
+                sizeMiB:_mib(row.size_bytes_reported),
+                vramMiB:_mib(row.vram_bytes_reported),
+                context:row.context_length_reported === null
+                    ? "?" : String(row.context_length_reported)
+            };
+    }
+    return {state:"NOT_LOADED", sizeMiB:"?", vramMiB:"?", context:"?"};
+}
+
 function parseSnapshot(raw) {
-    var bad = {valid:false,status:"UNAVAILABLE",reason:"INVALID_RESPONSE",models:[]};
+    var bad = {valid:false,status:"UNAVAILABLE",reason:"INVALID_RESPONSE",models:[],records:[]};
     if (typeof raw !== "string" || raw.length < 2 || raw.length > 1048576)
         return bad;
     var value;
@@ -22,7 +53,7 @@ function parseSnapshot(raw) {
                 || typeof value.reason !== "string"
                 || !/^[A-Z0-9_]{1,64}$/.test(value.reason))
             return bad;
-        return {valid:true,status:"UNAVAILABLE",reason:value.reason,models:[]};
+        return {valid:true,status:"UNAVAILABLE",reason:value.reason,models:[],records:[]};
     }
     if (value.status !== "OBSERVED" || value.provider !== "ollama"
             || typeof value.version !== "string"
@@ -31,17 +62,30 @@ function parseSnapshot(raw) {
         return bad;
     var seen = Object.create(null);
     var names = [];
+    var records = [];
     for (var i=0; i<value.resident_models.length; i++) {
         var item=value.resident_models[i];
         if (!item || typeof item !== "object" || Array.isArray(item)
                 || typeof item.model !== "string"
                 || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(item.model)
-                || seen[item.model])
+                || seen[item.model]
+                || !_nonnegativeSafe(item.size_bytes_reported)
+                || (item.vram_bytes_reported !== null
+                    && !_nonnegativeSafe(item.vram_bytes_reported))
+                || (item.context_length_reported !== null
+                    && !_positiveSafe(item.context_length_reported)))
             return bad;
         seen[item.model] = true;
         names.push(item.model);
+        // Only P0's bounded, non-private metrics. Never infer capacity or GPU execution.
+        records.push({
+            model:item.model,
+            size_bytes_reported:item.size_bytes_reported,
+            vram_bytes_reported:item.vram_bytes_reported,
+            context_length_reported:item.context_length_reported
+        });
     }
-    return {valid:true,status:"OBSERVED",reason:"",models:names};
+    return {valid:true,status:"OBSERVED",reason:"",models:names,records:records};
 }
 
 function modelState(status, residentModels, selectedName) {
@@ -59,18 +103,18 @@ function modelState(status, residentModels, selectedName) {
 function beginScan() {
     return {
         stdoutSeen:false,stderrSeen:false,exitSeen:false,
-        stagedStatus:"",stagedReason:"",stagedModels:[],
+        stagedStatus:"",stagedReason:"",stagedModels:[],stagedRecords:[],
         exitCode:-999,exitStatus:-999,error:"",
-        complete:false,status:"CHECKING",reason:"",models:[]
+        complete:false,status:"CHECKING",reason:"",models:[],records:[]
     };
 }
 function clone(s) {
     return {
         stdoutSeen:s.stdoutSeen,stderrSeen:s.stderrSeen,exitSeen:s.exitSeen,
         stagedStatus:s.stagedStatus,stagedReason:s.stagedReason,
-        stagedModels:s.stagedModels,exitCode:s.exitCode,
+        stagedModels:s.stagedModels,stagedRecords:s.stagedRecords,exitCode:s.exitCode,
         exitStatus:s.exitStatus,error:s.error,complete:s.complete,
-        status:s.status,reason:s.reason,models:s.models
+        status:s.status,reason:s.reason,models:s.models,records:s.records
     };
 }
 function finish(s) {
@@ -82,17 +126,21 @@ function finish(s) {
         s.status="OBSERVED";
         s.reason="";
         s.models=s.stagedModels;
+        s.records=s.stagedRecords;
     } else if (!s.error && s.exitStatus === 0
             && s.stagedStatus === "UNAVAILABLE" && s.exitCode === 2) {
         s.status="UNAVAILABLE";
         s.reason=s.stagedReason;
         s.models=[];
+        s.records=[];
     } else {
         s.status="UNAVAILABLE";
         s.reason=s.error || "BACKEND_EXIT";
         s.models=[];
+        s.records=[];
     }
     s.stagedModels=[];
+    s.stagedRecords=[];
     return s;
 }
 function captureStdout(s,raw) {
@@ -103,7 +151,7 @@ function captureStdout(s,raw) {
         n.stdoutSeen=true;
         var parsed=parseSnapshot(raw);
         if (!parsed.valid) n.error="INVALID_RESPONSE";
-        else {n.stagedStatus=parsed.status;n.stagedReason=parsed.reason;n.stagedModels=parsed.models;}
+        else {n.stagedStatus=parsed.status;n.stagedReason=parsed.reason;n.stagedModels=parsed.models;n.stagedRecords=parsed.records;}
     }
     return finish(n);
 }

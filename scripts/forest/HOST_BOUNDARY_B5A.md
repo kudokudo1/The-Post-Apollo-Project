@@ -20,10 +20,17 @@ The existing B1 sessions(owner) queries all Trees and applies LIMIT 100
 before a renderer filters one Tree. That can suppress a selected Tree's
 sessions if 100 newer sessions belong to another Tree.
 
-The new list_disposable_tree_fixture accepts an already-open SQLite
-in-memory B1 fixture ONLY. It explicitly rejects disk-backed databases,
-attached files, active transactions, missing schema, and malformed
-syntactic owner/Tree labels. It binds owner and Tree and state OPEN
+new_disposable_memory_fixture() creates the only accepted B5a SQLite
+connection with a literal sqlite3.connect(":memory:") and registers that
+exact handle in a weak fixture registry. The read function now refuses
+all caller-created connections, even an external :memory: database or
+the same SQLite subclass without factory registration. It additionally
+checks for attached databases, active transactions, missing B1 schema,
+and malformed syntactic owner/Tree labels. In particular,
+sqlite3.connect("") has an empty PRAGMA database_list filename but is
+a potentially disk-backed temporary database. It now fails closed.
+Same-interpreter code can still corrupt the registry, so this is
+disposable construction provenance, NOT independently protected custody. It binds owner and Tree and state OPEN
 **inside one SQL SELECT before the LIMIT**. A 101st authorized-scope
 candidate makes the entire fixture refuse, rather than falsely claiming
 a complete 100-row snapshot. It validates exact seven metadata fields,
@@ -63,8 +70,10 @@ No desktop UI change. Run disposable tests from the repo root:
     python3 -m unittest discover -s tests/forest -p 'test_host_boundary_fixture_b5a.py' -v
 
 No CLI that enumerates native user sessions or posts to Ollama is added.
-Do not point this module at live personal storage, wrap it as an
-authenticated host, or connect fixture rows to ForestW.
+Disposable tests call new_disposable_memory_fixture() and explicitly
+bootstrap synthetic B1 on the resulting connection. Do not open or pass
+private files, wrap it as an authenticated host, or send fixture rows
+to ForestW.
 
 ## VERIFY
 
@@ -76,7 +85,9 @@ database, user seat, message write, model response or OS sender is used.
 Negative tests establish:
 - per-owner, per-Tree and OPEN state SQL pre-LIMIT filtering;
 - no truncated 100-row snapshots and no title/body/owner leakage;
-- refusal of disk-backed DB, attached DB, active transaction;
+- negative sqlite3.connect("") temporary-database regression and
+  refusal of external :memory:, forged-subclass, closed and attached
+  database connections plus active transactions;
 - malformed or overlong titles/time fields and byte cap;
 - hold-only egress, invalid forged positive fields, UTF-8 budget,
   irrevocable local revoke and no false native-fence ACK.
@@ -86,8 +97,11 @@ trusted original process, authenticated issuer or protected revocation.
 
 ## WATCH OUT FOR
 
-The query fixture is **deliberately in-memory only**, so it is not the
-approved native LIST_SESSIONS provider. For actual protected storage,
+The query fixture is **module-constructed with literal :memory:** and
+refuses arbitrary SQLite handles. The weak registry is only fixture
+bookkeeping and does not authenticate in-process hostile code or
+prove private storage custody. It is not the approved native
+LIST_SESSIONS provider. For actual protected storage,
 the separately enrolled native Forest host must choose a trusted user
 database and canonical Tree scope from independent custody evidence.
 DOC 3 must authorize LIST_SESSIONS separately from READ_SESSION,
@@ -106,7 +120,9 @@ request from fenced ACK. Already submitted bytes cannot be recalled.
 
 - [x] Source scope aligned to Forest Core issue #2161
 - [x] No change to B1/B3/B4/C5/ForestW existing behavior
-- [x] Source-only in-memory DB and drop-only egress
+- [x] Module-owned :memory: connection construction, no external DB
+- [x] Blank-filename temporary SQLite DB regression refused
+- [x] Zero-output provisional egress unchanged
 - [ ] Exact-head CI and independent Forest Nurse 2 review before merge
 - [ ] Operator merge/final acceptance
 - [ ] Forest-specific native original-host identity/custody from DOC 1/2

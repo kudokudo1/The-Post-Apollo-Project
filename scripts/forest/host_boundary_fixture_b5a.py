@@ -1,15 +1,18 @@
 """Forest Core B5a // disposable host boundary mechanics, never authority.
 
-This module deliberately cannot open an on-disk SQLite database, authenticate
-a process, send text to a socket, issue C5 consent or activate ForestW.
-It models two source-only seams: B1 owner+Tree bounded listing and a blocked
-provisional B3 egress observation. Its output is NOT a trusted UI wire.
+This module opens only its own disposable :memory: SQLite fixtures; it does
+not open live user files, authenticate a process, send output to a socket,
+issue C5 consent or activate ForestW. Arbitrary SQLite connections are
+refused, including blank-name temporary databases. In-process fixture
+provenance is NOT protected identity or authenticated private-data custody.
+Its output is NOT a trusted UI wire.
 """
 from __future__ import annotations
 
 import json
 import re
 import sqlite3
+import weakref
 
 from session_journal_v0 import MAX_PAGE, SCHEMA_VERSION, _key
 
@@ -35,14 +38,35 @@ class HostFixtureHold(Exception):
         self.code = code
 
 
-def _fixture_db(db):
-    """Only a single, already-open in-memory B1 fixture is even inspectable.
+class _OwnedMemoryFixtureConnection(sqlite3.Connection):
+    """Weak-referenceable SQLite fixture handle, never a security identity."""
 
-    This is NOT authentic custody: callers can fabricate these objects.
-    No live on-disk DB or attached file is accepted, even for tests.
+
+# PRAGMA database_list is insufficient to identify in-memory databases:
+# sqlite3.connect("") may also report a blank main filename while using disk.
+# Membership records only exact handles from this module's controlled factory.
+# Code in the same Python interpreter can subvert this fixture registry; it is
+# not a production isolation, trust or authentication boundary.
+_OWNED_MEMORY_FIXTURES = weakref.WeakSet()
+
+
+def new_disposable_memory_fixture():
+    """Construct B5a's disposable SQLite fixture; caller bootstraps B1."""
+    db = sqlite3.connect(":memory:", factory=_OwnedMemoryFixtureConnection)
+    _OWNED_MEMORY_FIXTURES.add(db)
+    return db
+
+
+def _fixture_db(db):
+    """Inspect ONLY a registered module-created :memory: B1 fixture.
+
+    Registration is synthetic provenance, NOT authenticated database custody.
     """
-    if type(db) is not sqlite3.Connection:
+    if not isinstance(db, sqlite3.Connection):
         raise HostFixtureHold("FIXTURE_DB_REQUIRED")
+    if (type(db) is not _OwnedMemoryFixtureConnection
+            or db not in _OWNED_MEMORY_FIXTURES):
+        raise HostFixtureHold("UNREGISTERED_MEMORY_FIXTURE")
     try:
         if db.in_transaction:
             raise HostFixtureHold("ACTIVE_TRANSACTION")

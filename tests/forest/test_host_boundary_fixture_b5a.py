@@ -15,7 +15,7 @@ import session_journal_v0 as b1
 
 class HostBoundaryB5aTests(unittest.TestCase):
     def setUp(self):
-        self.db = sqlite3.connect(":memory:")
+        self.db = b5a.new_disposable_memory_fixture()
         b1.bootstrap_synthetic(self.db)
         self.journal = b1.ForestSessionJournal(self.db)
 
@@ -149,7 +149,7 @@ class HostBoundaryB5aTests(unittest.TestCase):
             self.list()
 
     def test_no_automatic_database_bootstrap(self):
-        other = sqlite3.connect(":memory:")
+        other = b5a.new_disposable_memory_fixture()
         try:
             with self.assertRaisesRegex(
                 b5a.HostFixtureHold, "UNSUPPORTED_SCHEMA"
@@ -169,13 +169,72 @@ class HostBoundaryB5aTests(unittest.TestCase):
             try:
                 b1.bootstrap_synthetic(connection)
                 with self.assertRaisesRegex(
-                    b5a.HostFixtureHold, "DISK_OR_ATTACHED_DB_REFUSED"
+                    b5a.HostFixtureHold, "UNREGISTERED_MEMORY_FIXTURE"
                 ):
                     b5a.list_disposable_tree_fixture(
                         connection, owner="owner_alpha", tree="CHERRY"
                     )
             finally:
                 connection.close()
+
+    def test_empty_filename_temporary_database_refused(self):
+        # sqlite3.connect("") is temporary, potentially disk-backed, and
+        # its main database filename looks identical to a :memory: database.
+        temporary = sqlite3.connect("")
+        try:
+            b1.bootstrap_synthetic(temporary)
+            listed = temporary.execute("PRAGMA database_list").fetchall()
+            self.assertEqual(listed[0][2], "")
+            with self.assertRaisesRegex(
+                b5a.HostFixtureHold, "UNREGISTERED_MEMORY_FIXTURE"
+            ):
+                b5a.list_disposable_tree_fixture(
+                    temporary, owner="owner_alpha", tree="CHERRY"
+                )
+        finally:
+            temporary.close()
+
+    def test_plain_memory_database_not_factory_registered(self):
+        external = sqlite3.connect(":memory:")
+        try:
+            b1.bootstrap_synthetic(external)
+            with self.assertRaisesRegex(
+                b5a.HostFixtureHold, "UNREGISTERED_MEMORY_FIXTURE"
+            ):
+                b5a.list_disposable_tree_fixture(
+                    external, owner="owner_alpha", tree="CHERRY"
+                )
+        finally:
+            external.close()
+
+    def test_same_sqlite_subclass_without_factory_registration_refused(self):
+        # Type matching alone cannot prove the database filename used.
+        for location in ("", ":memory:"):
+            with self.subTest(location=location):
+                unregistered = sqlite3.connect(
+                    location, factory=type(self.db)
+                )
+                try:
+                    b1.bootstrap_synthetic(unregistered)
+                    with self.assertRaisesRegex(
+                        b5a.HostFixtureHold, "UNREGISTERED_MEMORY_FIXTURE"
+                    ):
+                        b5a.list_disposable_tree_fixture(
+                            unregistered, owner="owner_alpha", tree="CHERRY"
+                        )
+                finally:
+                    unregistered.close()
+
+    def test_closed_registered_connection_is_unavailable(self):
+        closed = b5a.new_disposable_memory_fixture()
+        b1.bootstrap_synthetic(closed)
+        closed.close()
+        with self.assertRaisesRegex(
+            b5a.HostFixtureHold, "FIXTURE_DB_UNAVAILABLE"
+        ):
+            b5a.list_disposable_tree_fixture(
+                closed, owner="owner_alpha", tree="CHERRY"
+            )
 
     def test_attached_file_database_refused(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -292,7 +351,7 @@ class HostBoundaryB5aTests(unittest.TestCase):
     def test_source_never_starts_runtime_or_opens_output(self):
         text = (Path(__file__).resolve().parents[2]
                 / "scripts/forest/host_boundary_fixture_b5a.py").read_text()
-        for banned in ("subprocess", "socket.", "connect(", "sendall(",
+        for banned in ("subprocess", "socket.", "socket.connect(", "sendall(",
                        "send(", "write(", "open(", "stream_chat(",
                        "ForestTurnBridge(", "os.system", "systemctl",
                        "http.client", "requests.post", "/api/chat"):

@@ -551,7 +551,7 @@ class ForestLauncherContract(unittest.TestCase):
             box = prompt - send - 6
             mic = max(28, min(34, round(box * 0.16)))
             # Text, mic, 30px dial and model fruit all fit inside the box.
-            local_draft = box - 11 - 6 - mic - 3 - 30 - 3 - 39 - 4
+            local_draft = box - 11 - 6 - mic - 3 - 34 - 3 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
     def test_forest_section_dividers_use_grassy_green(self):
@@ -576,7 +576,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("id: reasoningStepDial", view)
         self.assertIn("anchors.right: reasoningStepDial.left", view)
         self.assertIn("anchors.right: modelPickerButton.left", view)
-        self.assertIn("width: 30", view)
+        self.assertIn("width: 34", view)
         self.assertIn("stepIndex: root.selectedReasoningStep", view)
         self.assertIn("root.chooseTreeReasoningStep(step);", view)
         self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
@@ -591,17 +591,51 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn('import "ForestReasoningDialPolicy.js" as ReasoningPolicy', dial)
         self.assertIn('import "../components"', dial)
         self.assertIn("GohuText {", dial)
-        self.assertIn("color: Colors.cyan", dial)
+        # This is the ORIGINAL shared 3D raised hardware SelectorDial,
+        # NOT a flat reimplementation of its ring, pointer or layers.
+        hardware = (ROOT / "components/SelectorDial.qml").read_text()
+        self.assertEqual(dial.count("SelectorDial {"), 1)
+        self.assertIn("id: sharedHardwareDial", dial)
+        self.assertIn("selectorMode: \"continuous\"", dial)
+        self.assertIn("arcSweepAngle: 345", dial)
+        self.assertIn("minimumValue: 0", dial)
+        self.assertIn("maximumValue: 3", dial)
+        self.assertIn("currentValue: root.stepIndex", dial)
+        self.assertIn("snapContinuousToStep: true", dial)
+        self.assertIn("numericDetentInterval: 1", dial)
+        self.assertIn("numericReferenceValues: [0, 1, 2, 3]", dial)
+        self.assertIn('options: ["NONE", "LOW", "MED", "HIGH"]', dial)
+        self.assertIn('readoutText: ""', dial)
+        self.assertIn("sharedHardwareDial.requestNumericValue(next);", dial)
+        self.assertIn("onValueRequested: function(value)", dial)
+        self.assertIn("root.stepRequested(next);", dial)
+        self.assertIn("hardwareScale", dial)
+        self.assertIn("transform: Scale {", dial)
+        self.assertIn("xScale: root.hardwareScale", dial)
+        self.assertIn("yScale: root.hardwareScale", dial)
+        self.assertIn("width: 34", dial)
+        self.assertIn("height: 34", dial)
+        self.assertIn("GohuText {", dial)
         self.assertIn("border.color: root.activeFocus ? Colors.blue : Colors.cyan", dial)
-        self.assertIn("rotation: root.snappedAngle", dial)
         self.assertIn("onPressed: function(mouse)", dial)
         self.assertIn("onPositionChanged: function(mouse)", dial)
         self.assertIn("onWheel: function(wheel)", dial)
+        self.assertIn("wheel.accepted = true", dial)
+        self.assertIn("ReasoningPolicy.stepFromPoint(", dial)
         self.assertIn("Keys.onRightPressed:", dial)
         self.assertIn("Keys.onLeftPressed:", dial)
-        self.assertIn("stepRequested(next)", dial)
+        self.assertNotIn("id: dialBody", dial)
+        self.assertNotIn("rotation: root.snappedAngle", dial)
         self.assertNotIn("Process {", dial)
         self.assertNotIn("Quickshell.execDetached", dial)
+        for shared_contract in (
+            "id: modeBody", "id: centerStatusRing", "id: selectorHandle",
+            "id: outerInteractionRing", "id: selectorHead",
+            "function requestNumericValue(value)",
+            "function steppedValue(value)",
+            "snapContinuousToStep",
+        ):
+            self.assertIn(shared_contract, hardware)
 
         self.assertIn('var labels = ["NONE", "LOW", "MED", "HIGH"]', policy)
         self.assertIn("var deadHalfAngle = 7.5", policy)
@@ -619,6 +653,10 @@ vm.runInContext(data, ctx);
 const assert = require("assert");
 assert.deepStrictEqual(Array.from(ctx.labels), ["NONE","LOW","MED","HIGH"]);
 assert.strictEqual(ctx.arcEnd - ctx.arcStart, 345);
+// QtQuick's right-zero angles are Forest top-zero angles minus 90.
+// Compare against the shared SelectorDial's default 345-degree sweep.
+assert.strictEqual(ctx.arcStart - 90, 97.5);
+assert.strictEqual(ctx.arcEnd - 90, 442.5);
 assert.deepStrictEqual([0,1,2,3].map(ctx.angleForStep),
                        [187.5,302.5,417.5,532.5]);
 for (const a of [173,175,180,185,187])
@@ -630,13 +668,13 @@ for (const a of [-180,540])
     assert.strictEqual(ctx.stepFromAngle(a), -1);
 for (const value of [-500,0,0.49,0.51,2.3,3,999])
     assert.ok(Number.isInteger(ctx.clampStep(value)));
-assert.strictEqual(ctx.stepFromPoint(15,29,30,30), -1);
-assert.strictEqual(ctx.stepFromPoint(15,15,30,30), -1);
+assert.strictEqual(ctx.stepFromPoint(17,32,34,34), -1);
+assert.strictEqual(ctx.stepFromPoint(17,17,34,34), -1);
 for (let i = 0; i < 4; i++) {
     const angle = (ctx.angleForStep(i) % 360) * Math.PI / 180;
-    const x = 15 + 14 * Math.sin(angle);
-    const y = 15 - 14 * Math.cos(angle);
-    assert.strictEqual(ctx.stepFromPoint(x,y,30,30), i);
+    const x = 17 + 16 * Math.sin(angle);
+    const y = 17 - 16 * Math.cos(angle);
+    assert.strictEqual(ctx.stepFromPoint(x,y,34,34), i);
 }
 """
         result = subprocess.run(
@@ -757,7 +795,7 @@ for (let i = 0; i < 4; i++) {
             box = row - send - 6
             mic = max(28, min(34, round(box * 0.16)))
             # Text, mic, 30px dial and model fruit all fit inside the box.
-            local_draft = box - 11 - 6 - mic - 3 - 30 - 3 - 39 - 4
+            local_draft = box - 11 - 6 - mic - 3 - 34 - 3 - 39 - 4
             self.assertGreaterEqual(local_draft, 100)
 
     def test_b0_inventory_ui_is_explicit_and_fail_closed(self):

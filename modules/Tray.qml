@@ -60,6 +60,7 @@ Rectangle {
     // window title, browser URL or raw Sway tree.
     property string windowTreeReadStatus: "unread"
     property int windowTreeVisibleKeyCount: 0
+    property int windowTreeVisibleWindowCount: 0
 
     function publishWindowTreeIfReady() {
         if (windowTreePublished)
@@ -69,11 +70,14 @@ Rectangle {
             return false;
 
         // A failed/empty read is NOT evidence that an app is visible.
-        const keys = result.success
-            ? DesktopVisibility.visibleWindowKeysFromTree(result.stdout) : [];
+        const inspected = result.success
+            ? DesktopVisibility.inspectVisibleWindowTree(result.stdout)
+            : {valid:false, reason:result.reason, keys:[], windowCount:0};
+        const keys = inspected.valid ? inspected.keys : [];
         visibleDesktopKeys = keys;
         windowTreeVisibleKeyCount = keys.length;
-        windowTreeReadStatus = result.reason;
+        windowTreeVisibleWindowCount = inspected.windowCount;
+        windowTreeReadStatus = inspected.reason;
         windowTreePublished = true;
         windowTreeTimeout.stop();
 
@@ -115,6 +119,7 @@ Rectangle {
             if (!trayDock.windowTreePublished) {
                 trayDock.visibleDesktopKeys = [];
                 trayDock.windowTreeVisibleKeyCount = 0;
+                trayDock.windowTreeVisibleWindowCount = 0;
                 trayDock.windowTreeReadStatus = "collector-timeout";
                 trayDock.windowTreePublished = true;
                 console.warn("Tray visible-window read: collector-timeout");

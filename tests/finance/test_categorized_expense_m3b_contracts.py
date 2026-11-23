@@ -50,7 +50,7 @@ assert "await fsyncDirectory(journalDir);" in writer
 assert 'attempted=true;' in writer
 assert 'if(attempted)return "uncertain";' in writer
 assert "priorNames.some(name=>name.endsWith(" in writer
-assert '"-")+command.requestId+".json"' in writer
+assert '"-"+command.requestId+".json"' in writer
 assert 'readActualServerURL()' in writer
 assert '"http://127.0.0.1:5006"' in writer
 assert '.update(serverURL+"\\0"+syncId)' in writer

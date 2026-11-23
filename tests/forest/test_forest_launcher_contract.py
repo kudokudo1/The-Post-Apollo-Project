@@ -1,5 +1,7 @@
 """ForestW V0 source-scoped guards. Native Qt/Wayland acceptance is separate."""
 from pathlib import Path
+import hashlib
+import struct
 import subprocess
 import unittest
 import xml.etree.ElementTree as ET
@@ -98,9 +100,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("text: modelData.name", view)
         self.assertIn("onLeftClicked: root.selectedTreeIndex = index", view)
         self.assertIn("open: index === root.selectedTreeIndex", view)
-        self.assertIn('modelData.name === "CHERRY" ? Colors.white : Colors.orange', view)
+        self.assertIn("readonly property color iconIdentityColor: modelData.identityColor", view)
         self.assertIn("normalForegroundColor: iconIdentityColor", view)
-        self.assertIn('modelData.name === "CHERRY" ? Colors.magenta : Colors.red', view)
+        self.assertIn("readonly property color idleGlowColor: modelData.idleGlowColor", view)
         self.assertIn("normalDockGlowColor: idleGlowColor", view)
         self.assertIn("normalContentGlowColor: idleGlowColor", view)
         self.assertIn("hoverForegroundColor: Colors.orange", view)
@@ -218,6 +220,98 @@ class ForestLauncherContract(unittest.TestCase):
                          "url(#maple-vertical-stroke)")
         self.assertGreaterEqual(contour.attrib["d"].count("C"), 8)
 
+    def test_five_tree_ids_assets_and_unassigned_roles(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        self.assertIn('property var selectedTreeModels: ["", "", "", "", ""]', view)
+        self.assertIn('text: "TREES // " + String(root.treeSlots.length).padStart(2, "0")', view)
+        tree_profiles = (
+            ("CHERRY", "cherry-outline.svg", "white", "magenta"),
+            ("MAPLE", "maple-outline.svg", "orange", "red"),
+            ("BRISTLECONE PINE", "bristlecone-pine.png", "white", "orange"),
+            ("CEDAR", "cedar-outline.svg", "green", "omnitrix"),
+            ("MACINTOSH", "macintosh-outline.svg", "red", "red"),
+        )
+        for name, asset, foreground, glow in tree_profiles:
+            with self.subTest(tree=name):
+                self.assertEqual(view.count('name: "' + name + '", role:'), 1)
+                self.assertIn('iconPath: "../assets/forest/' + asset + '"', view)
+                block = view.split('name: "' + name + '", role:', 1)[1].split(
+                    '        }', 1)[0]
+                self.assertIn('identityColor: Colors.' + foreground, block)
+                self.assertIn('idleGlowColor: Colors.' + glow, block)
+                self.assertTrue((ROOT / "assets/forest" / asset).is_file())
+        for name in ("BRISTLECONE PINE", "CEDAR", "MACINTOSH"):
+            block = view.split('name: "' + name + '", role:', 1)[1].split(
+                '        }', 1)[0]
+            self.assertIn('"ROLE // NOT ASSIGNED"', block)
+        self.assertIn("readonly property bool chatHostTrusted: false", view)
+        self.assertIn("readonly property var activeChatSessions: []", view)
+        self.assertIn("source: Qt.resolvedUrl(root.activeTree.iconPath)", view)
+
+    def test_bristlecone_approved_pixel_art_and_state_variants(self):
+        # Exact user-edited 48px pixel source, including the three tiny
+        # foliage/branch gaps. Binary PNG, not replacement traced vectors.
+        approved = {
+            "bristlecone-pine.png":
+                "cb7d9e4868f4b696ae78722209a806d6c0fd9c97ff710c0c409dfaf68c907798",
+            "bristlecone-hover-orange.png":
+                "d035c7e85115e238608d591d8fb1e27aeae0bc5dddbe51a636f7fde7f2ce2d43",
+            "bristlecone-open-magenta.png":
+                "50b195800d01966791bb362b2e7d71c37a8b97183dd73f7e12019e4107c12f1b",
+        }
+        for filename, expected_hash in approved.items():
+            with self.subTest(filename=filename):
+                data = (ROOT / "assets/forest" / filename).read_bytes()
+                self.assertEqual(hashlib.sha256(data).hexdigest(), expected_hash)
+                self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+                self.assertEqual(data[12:16], b"IHDR")
+                width, height = struct.unpack(">II", data[16:24])
+                self.assertEqual((width, height), (48, 48))
+                self.assertEqual(data[25], 6)  # Truecolor + alpha
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        self.assertIn('hoverIconPath: "../assets/forest/bristlecone-hover-orange.png"', view)
+        self.assertIn('openIconPath: "../assets/forest/bristlecone-open-magenta.png"', view)
+
+    def test_new_line_svg_variants_preserve_geometry_and_palette(self):
+        ns = "{http://www.w3.org/2000/svg}"
+        for stem, gradient_count, identity_colors in (
+            ("cedar", 1, ("#00F782", "#90E84F", "#ED981A")),
+            ("macintosh", 2, ("#FF6154", "#EB3346", "#ED981A",
+                               "#78CC57", "#00F782", "#9ECE6A")),
+        ):
+            original = ET.parse(ROOT / "assets/forest" /
+                                (stem + "-outline.svg")).getroot()
+            self.assertEqual(original.tag, ns + "svg")
+            self.assertEqual(original.attrib.get("viewBox"), "0 0 48 48")
+            orig_paths = [el.attrib.get("d") for el in original.iter()
+                          if el.tag == ns + "path"]
+            gradients = [el for el in original.iter()
+                         if el.tag in (ns + "linearGradient", ns + "radialGradient")]
+            self.assertEqual(len(gradients), gradient_count)
+            stops = [el.attrib.get("stop-color") for el in original.iter()
+                     if el.tag == ns + "stop"]
+            for color in identity_colors:
+                self.assertIn(color, stops)
+            self.assertGreaterEqual(len(orig_paths), 5)
+            for suffix, color in (("hover-orange.svg", "#ED981A"),
+                                  ("open-magenta.svg", "#C74EC7")):
+                with self.subTest(stem=stem, variant=suffix):
+                    svg = ET.parse(ROOT / "assets/forest" /
+                                   (stem + "-" + suffix)).getroot()
+                    self.assertEqual(svg.attrib.get("viewBox"), "0 0 48 48")
+                    self.assertEqual([p.attrib.get("d") for p in svg.iter()
+                                      if p.tag == ns + "path"], orig_paths)
+                    self.assertFalse(any(el.tag in
+                                         (ns + "linearGradient", ns + "radialGradient")
+                                         for el in svg.iter()))
+                    strokes = [el.attrib["stroke"] for el in svg.iter()
+                               if "stroke" in el.attrib]
+                    self.assertTrue(strokes)
+                    self.assertTrue(all(value == color for value in strokes))
+            for el in original.iter():
+                self.assertNotIn(el.tag, {ns + "image", ns + "foreignObject",
+                                          ns + "script", ns + "filter", ns + "mask"})
+
     def test_header_rescan_reuses_reload_without_host_activation(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         reload_button = (ROOT / "components/ReloadButton.qml").read_text()
@@ -250,7 +344,8 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("id: activeChatTreeIcon", view)
         self.assertIn("source: Qt.resolvedUrl(root.activeTree.iconPath)", view)
         self.assertIn("safeSource: activeChatTreeIcon", view)
-        self.assertIn("? Colors.magenta : Colors.red", view)
+        self.assertIn("foregroundColor: root.activeTree.identityColor", view)
+        self.assertIn("preferredGlowColor: root.activeTree.idleGlowColor", view)
         self.assertIn('text: root.activeTree.name + " // CHAT"', view)
         self.assertIn("id: treeSelectorRepeater", view)
         self.assertIn("treeSelectorRepeater.itemAt(selectedTreeIndex)", view)

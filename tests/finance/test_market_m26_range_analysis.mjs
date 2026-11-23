@@ -10,7 +10,7 @@ const policy = readFileSync(new URL(
 const qml = readFileSync(new URL(
     "../../widgets/FinanceStockHistoryPane.qml", import.meta.url
 ), "utf8");
-const api = vm.runInNewContext(policy + "\n({summarizeRange})");
+const api = vm.runInNewContext(policy + "\n({summarizeRange,compareSelectedToLast})");
 function bar(date, price) { return {date,price}; }
 const rows = [
     bar("2026-11-02",100),
@@ -90,6 +90,46 @@ assert.equal(ordering.maxDrawdownPct,20);
 assert.equal(ordering.peak.date,"2026-11-03");
 assert.equal(ordering.trough.date,"2026-11-04");
 
+// M27: compare one already selected actual session with the last LOADED
+// session, never a live/current quote or inferred calendar-day gap.
+const chosen = comparable(api.compareSelectedToLast(frozen,1));
+assert.deepEqual(chosen, {
+    selected:{date:"2026-11-03",price:110},
+    last:{date:"2026-11-09",price:90},
+    deltaPrice:-20,deltaPct:-18.18,sessionSteps:4,
+    priceBasis:"ADJUSTED CLOSE",source:"loaded-eodhd-range-only",
+    noProviderCalls:true,readOnly:true
+});
+chosen.selected.price=999;
+assert.equal(frozen.bars[1].price,110);
+const first=api.compareSelectedToLast(frozen,0);
+assert.equal(first.deltaPrice,-10);
+assert.equal(first.deltaPct,-10);
+assert.equal(first.sessionSteps,5);
+const final=api.compareSelectedToLast(frozen,5);
+assert.equal(final.deltaPrice,0);
+assert.equal(final.deltaPct,0);
+assert.equal(final.sessionSteps,0);
+assert.equal(final.selected.date,final.last.date);
+const positive=api.compareSelectedToLast(
+    fixture([bar("2026-11-02",100),bar("2026-11-09",120)]),0);
+assert.equal(positive.deltaPrice,20);
+assert.equal(positive.deltaPct,20);
+assert.equal(positive.sessionSteps,1);
+const sameDay=api.compareSelectedToLast(
+    fixture([bar("2026-11-03",101)]),0);
+assert.equal(sameDay.sessionSteps,0);
+assert.equal(sameDay.deltaPct,0);
+for (const rejected of [-1,6,1.2,NaN,Infinity,"1",null,undefined]) {
+    assert.equal(api.compareSelectedToLast(frozen,rejected),null);
+}
+assert.equal(api.compareSelectedToLast(
+    {...fixture(),source:"untrusted-eod"},1),null);
+assert.equal(api.compareSelectedToLast(
+    {...fixture(),first:{date:"2026-11-02",price:1}},1),null);
+assert.equal(api.compareSelectedToLast(
+    fixture([bar("2026-11-03",0)]),0),null);
+
 for (const invalid of [
     fixture([]),
     {...fixture(),source:"alpha-vantage"},
@@ -110,6 +150,29 @@ for (const invalid of [
     {...fixture(),last:{date:"2026-11-09",price:999}},
     fixture(Array.from({length:133},(_,i)=>bar("2026-11-02",100+i)))
 ]) assert.equal(api.summarizeRange(invalid), null,JSON.stringify(invalid).slice(0,100));
+
+// M27's QML binds strictly to current M26 RANGE validation and existing
+// selectedPointIndex. Selection resets on date/range and mode changes.
+for (const text of [
+    "readonly property var selectedCloseComparison:",
+    "RangeAnalysisPolicy.compareSelectedToLast(snapshot, selectedPointIndex)",
+    'objectName: "marketSelectedCloseComparisonPanel"',
+    'objectName: "marketSelectedCloseComparisonText"',
+    "SELECTED VS LAST LOADED CLOSE",
+    "OBSERVED SESSION STEPS",
+    "NOT A LIVE QUOTE // NO NEW REQUEST",
+    "onPriceBarsChanged:",
+    "selectedPointIndex = -1;",
+    "onDayModeChanged:"
+])assert.ok(qml.includes(text),text);
+const compareSection=qml.slice(
+    qml.indexOf('objectName: "marketSelectedCloseComparisonPanel"'),
+    qml.indexOf('id: openSelectedInDay'));
+assert.ok(!compareSection.includes("stockFeed.refresh("));
+assert.ok(!compareSection.includes("Process {"));
+assert.ok(!compareSection.includes("fetch("));
+assert.ok(!compareSection.includes("reserve("));
+assert.ok(!compareSection.includes("writeFile("));
 
 for(const expected of [
     'import "FinanceStockRangeAnalysisPolicy.js" as RangeAnalysisPolicy',
@@ -134,4 +197,4 @@ for(const forbidden of [
     "fetch(", "XMLHttpRequest", "Qt.openUrlExternally", "subprocess",
     "Process {", "reserve(", "sqlite", "setInterval(", "Math.random("
 ])assert.ok(!policy.includes(forbidden),forbidden);
-console.log("Finance Market M26 loaded-range close-only stats, chronological drawdown, no IO or stale source: PASS");
+console.log("Finance Market M26/M27 loaded range stats and selected-to-last close comparison, no IO or stale source: PASS");

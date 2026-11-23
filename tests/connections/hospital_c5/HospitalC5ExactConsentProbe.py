@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""C5-H3 source-only *diagnostic* Hospital exact-consent review reference.
+"""C5-H6 source-only *diagnostic* Hospital exact-consent review reference.
 
 No installed native consent agent, operator attestation, protected signer,
 private key, challenge custodian or production admission exists here.
@@ -14,17 +14,17 @@ import re
 
 import HospitalNativeIssuerCore as C
 
-REVIEW_SCHEMA = "postapollo.hospital.c5h3.exact-room-review.v1"
-CLAIM_SCHEMA = "postapollo.hospital.c5h3.untrusted-display-claim.v1"
-DOMAIN = b"postapollo.hospital.c5h3.exact-room-review.v1\x00"
+REVIEW_SCHEMA = "postapollo.hospital.c5h6.exact-room-review.v2"
+CLAIM_SCHEMA = "postapollo.hospital.c5h6.untrusted-display-claim.v2"
+DOMAIN = b"postapollo.hospital.c5h6.exact-room-review.v2\x00"
 REVIEW_FIELDS = frozenset({
     "schema", "purpose", "action", "roomId", "patientId", "repository",
-    "expectedRevision", "expectedDigest", "requestNonce", "operatorUid",
+    "expectedRevision", "expectedDigest", "requestNonce", "writerInstance", "operatorUid",
     "seatId", "hostId", "policyGeneration", "issuedAt", "expiresAt",
     "retentionApproved", "legalHold", "originalPreserved", "burnAllowed",
 })
 CLAIM_FIELDS = frozenset({
-    "schema", "reviewDigest", "requestNonce", "action", "roomId",
+    "schema", "reviewDigest", "requestNonce", "writerInstance", "action", "roomId",
     "operatorUid", "seatId", "hostId", "agentReleaseDigest",
     "claimedVisible", "claimedConfirmed", "shownAt", "confirmedAt",
 })
@@ -75,6 +75,7 @@ def build_review(request, prepared, policy, *, operator_uid, seat_id, host_id, n
         "expectedRevision": state["expectedRevision"],
         "expectedDigest": state["expectedDigest"],
         "requestNonce": nonce,
+        "writerInstance": state["writerInstance"],
         "operatorUid": operator_uid,
         "seatId": seat_id,
         "hostId": host_id,
@@ -112,6 +113,8 @@ def inspect_untrusted_claim(reference, claim_raw, *, now):
     if (claim["schema"] != CLAIM_SCHEMA
             or type(claim["reviewDigest"]) is not str
             or type(claim["requestNonce"]) is not str
+            or type(claim["writerInstance"]) is not str
+            or C.ID.fullmatch(claim["writerInstance"]) is None
             or type(claim["action"]) is not str
             or type(claim["roomId"]) is not str
             or type(claim["operatorUid"]) is not int
@@ -127,6 +130,7 @@ def inspect_untrusted_claim(reference, claim_raw, *, now):
     matched = (
         claim["reviewDigest"] == digest
         and claim["requestNonce"] == review["requestNonce"]
+        and claim["writerInstance"] == review["writerInstance"]
         and claim["action"] == review["action"]
         and claim["roomId"] == review["roomId"]
         and claim["operatorUid"] == review["operatorUid"]
@@ -139,7 +143,7 @@ def inspect_untrusted_claim(reference, claim_raw, *, now):
         and now < review["expiresAt"]
     )
     return {
-        "schema": "postapollo.hospital.c5h3.consent-probe-result.v1",
+        "schema": "postapollo.hospital.c5h6.consent-probe-result.v2",
         "status": ("MATCHING_CLAIM_UNTRUSTED_HOLD" if matched
                    else "CHANGED_OR_STALE_CLAIM_HOLD"),
         "claimMatchesReview": matched,

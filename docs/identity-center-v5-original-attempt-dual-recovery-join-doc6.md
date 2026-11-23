@@ -12,7 +12,7 @@ Previous merged DOC 6 milestones:
 - [#2289](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2289): inspect **one caller-controlled, untrusted** custodian-style outcome candidate and always return `UNKNOWN_HOLD`.
 - [#2349](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2349): verify a **recorded** Ed25519 native command receipt with the original request, nonce, signed host instance and sequence; a valid old signature is never protected terminal settlement.
 
-This additive DOC 6-only milestone implements a **read-only join of those three existing components** in `services/identity/native_original_attempt_recovery_join_v0.py`. The caller supplies the original attempt fingerprint, immutable original action/nonce/request digest binding, the raw original command request ID and client nonce, one optional outcome candidate provider, and an optional recorded signed receipt plus caller-provided public key.
+This DOC 6-only milestone implements a **read-only join of those three existing components** in `services/identity/native_original_attempt_recovery_join_v0.py`. The original fingerprint value class is factored into the transport-free `services/identity/native_attempt_fingerprint_v0.py` module; the signed client still imports and re-exports the **same** immutable class without changing its native send logic. This separation is required by the existing `test_native_adapter_only_call_path_v1.py` security gate: no shipped helper may directly import the raw signed client rather than using the mandatory installed composite adapter for live actions. The caller supplies the original attempt fingerprint, immutable original action/nonce/request digest binding, the raw original command request ID and client nonce, one optional outcome candidate provider, and an optional recorded signed receipt plus caller-provided public key.
 
 1. First validate the original action and digest bindings. Rebuild the **exact newline-terminated signed-client request bytes** using the **existing** `build_request()` parser/serializer. Require SHA-256 equality to the original attempted wire frame. Inconsistent, absent, foreign type, malformed, or mismatched original material returns `UNKNOWN_HOLD` **before** invoking the candidate provider or attempting to verify a signed receipt.
 2. If and only if that local frame correlation matches, inspect at most **one** untrusted outcome candidate using the existing DOC 6 `inspect_candidate_once()` and separately verify the existing recorded native receipt using `inspect_recorded_signed_receipt()`. No fallback source or retry.
@@ -34,7 +34,7 @@ No machine changes or live provider accounts are required. The workflow runs in 
 
 ## VERIFY
 
-The 25-case adversarial suite includes:
+The 26-case adversarial suite includes:
 - Valid throwaway Ed25519 original BEGIN/STATUS/CANCEL/RECOVER receipts and a structurally matching candidate, all permanently `UNKNOWN_HOLD`.
 - Actual signed `AUTHENTICATED` and `UNAVAILABLE` host reports never becoming a credential grant or proof of no effect.
 - Missing original fingerprint, wrong action/digest, altered frame hash, raw request ID/nonce drift, bad input type/case and invalid request bytes preventing any candidate lookup.
@@ -42,7 +42,7 @@ The 25-case adversarial suite includes:
 - Mismatched history head, forged positive authority fields, wrong signing key, wrong signed host instance, stale signed sequence and replayed identical signed bytes staying HOLD.
 - Frozen no-authority output with no raw client challenge, request ID, frame or settle API; source static checks for no network, storage or actuator code.
 
-The dedicated exact-head CI also reruns 16 untrusted candidate cases, 19 recorded signed-receipt cases, 16 local durable-HOLD cases, 54 native signed-client cases and the CPU++ fixed-offline checks. Verify GitHub workflow outcomes and raw logs before reporting PASS.
+The dedicated exact-head CI also reruns 16 untrusted candidate cases, 19 recorded signed-receipt cases, 16 local durable-HOLD cases, 54 native signed-client cases, the mandatory adapter-only call-path checks, and the CPU++ fixed-offline checks. Verify GitHub workflow outcomes and raw logs before reporting PASS.
 
 ## WATCH OUT FOR
 
@@ -56,7 +56,7 @@ The exact original fingerprint is **process-local** and does not survive host cr
 
 - [x] Check latest Syntagma/Hospital policy, shared GitHub main, native Identity adapter/client, and nearby DOC 1 / DOC 2 / C5 ownership
 - [x] Add bounded original-attempt ↔ candidate ↔ signed-receipt diagnostic join
-- [x] Add 25 focused hostile tests and dedicated CI
+- [x] Add 26 focused hostile tests and dedicated CI, including the raw-client bypass guard
 - [ ] Verify exact-head GitHub CI and raw tests
 - [ ] Independent Nurse 2 **pre-merge** review
 - [ ] Operator merge decision

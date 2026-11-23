@@ -160,8 +160,9 @@ def serve_one_ci_only(listener, root: Path, boundary, *,
             conn.settimeout(3.0)
             peer_pid, peer_uid, _peer_gid = _accepted_peer(conn)
             if peer_pid != expected_connecting_pid or peer_uid != expected_uid:
-                # Do not read an unapproved peer's request body.
-                P._write(conn, dict(P.REFUSAL))
+                # Drop without parsing the unapproved peer's request bytes.
+                # The peer may observe EOF or connection reset; we promise
+                # neither an acknowledgement nor a parseable refusal frame.
                 return
             # The ORIGINAL C3e read-only route validates exactly one request,
             # fixed refusal, and all false authority flags. No writes.

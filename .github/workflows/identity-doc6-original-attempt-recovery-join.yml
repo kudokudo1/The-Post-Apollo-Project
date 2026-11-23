@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'services/identity/native_original_attempt_recovery_join_v0.py'
+      - 'services/identity/native_attempt_fingerprint_v0.py'
+      - 'services/identity/desktop_signed_command_client_v0.py'
       - 'tests/identity/test_native_original_attempt_recovery_join_v0.py'
       - '.github/workflows/identity-doc6-original-attempt-recovery-join.yml'
       - 'docs/identity-center-v5-original-attempt-dual-recovery-join-doc6.md'
@@ -11,6 +13,8 @@ on:
     branches: [main]
     paths:
       - 'services/identity/native_original_attempt_recovery_join_v0.py'
+      - 'services/identity/native_attempt_fingerprint_v0.py'
+      - 'services/identity/desktop_signed_command_client_v0.py'
       - 'tests/identity/test_native_original_attempt_recovery_join_v0.py'
       - '.github/workflows/identity-doc6-original-attempt-recovery-join.yml'
 
@@ -30,6 +34,8 @@ jobs:
         run: python3 -m pip install cryptography==46.0.4
       - name: Compile nonauthorizing Identity original-attempt join
         run: |
+          python3 -m py_compile services/identity/native_attempt_fingerprint_v0.py
+          python3 -m py_compile services/identity/desktop_signed_command_client_v0.py
           python3 -m py_compile services/identity/native_original_attempt_recovery_join_v0.py
           python3 -m py_compile tests/identity/test_native_original_attempt_recovery_join_v0.py
       - name: Reject forged fingerprint / signed receipt / candidate joins
@@ -42,5 +48,6 @@ jobs:
       - name: Preserve real disposable native signed client and offline UI
         run: |
           python3 -m unittest discover -s tests/identity -p 'test_desktop_signed_command_client_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_native_adapter_only_call_path_v1.py' -v
           node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
           node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs

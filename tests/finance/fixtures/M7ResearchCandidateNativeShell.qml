@@ -139,7 +139,7 @@ ShellRoot {
                         || data.candidates.length !== 31
                         || data.candidates[0].authenticatedProvenance !== false
                         || data.candidates[1].eligibleForDraft !== false) {
-                    root.fail("INCOMPLETE_OR_UNSAFE_PREVIEW");
+                    root.fail("INCOMPLETE_OR_UNSAFE_PREVIEW // SEC=" + (data && data.counts ? data.counts.sec : "null") + " / DEMO=" + (data && data.counts ? data.counts.demo : "null") + " / TOTAL=" + (data && data.candidates ? data.candidates.length : "null") + " / INPUT=" + secMock.snapshot.filings.length);
                     return;
                 }
                 root.checkedReady = true;

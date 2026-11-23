@@ -193,3 +193,5 @@ await import("./test_alpha_vantage_free.mjs");
 await import("./test_market_shared_quota.mjs");
 // M21: zero-provider-call local quota STATUS reads, missing/unsafe/locked DB.
 await import("./test_market_quota_status.mjs");
+// M26: derived close-to-close RANGE movement analysis, no new provider IO.
+await import("./test_market_m26_range_analysis.mjs");

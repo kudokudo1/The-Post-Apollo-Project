@@ -199,7 +199,7 @@ class LocalExactCaptureStore:
     """An explicit-path local data store. No trusted authority is returned."""
 
     def __init__(self, path):
-        if type(path) not in (str, Path):
+        if not isinstance(path, (str, Path)):
             _refuse()
         self.path = Path(path).expanduser()
         if (not self.path.is_absolute() or self.path.name != DB_NAME

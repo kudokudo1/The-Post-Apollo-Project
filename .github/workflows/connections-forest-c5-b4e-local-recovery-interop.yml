@@ -1,0 +1,89 @@
+name: Connections Forest C5 and B4e local recovery disagreement (NO AUTHORITY)
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/forest/ForestC5LocalRecoveryComparison.py'
+      - 'tests/connections/test_connections_forest_c5_b4e_local_recovery_interop.py'
+      - 'docs/connections-forest-c5-b4e-local-recovery-interop.md'
+      - '.github/workflows/connections-forest-c5-b4e-local-recovery-interop.yml'
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'services/connections/forest/ForestC5ExactSessionV1Preflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forest-local-recovery-never-settles-c5:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install disposable-only crypto test dependency
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile and reject C5 authority, storage or model calls
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/forest/ForestC5LocalRecoveryComparison.py \
+            tests/connections/test_connections_forest_c5_b4e_local_recovery_interop.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('services/connections/forest/ForestC5LocalRecoveryComparison.py').read_text()
+          for text in (
+              'FOREST_C5_TWO_UNTRUSTED_SOURCES_UNKNOWN_HOLD',
+              'FOREST_COMMITTED', 'FOREST_ABORTED', 'FOREST_RESERVED',
+              'LOCAL_AND_SIGNED_CLAIM_CONFLICT_HOLD',
+              '"actualSQLiteTransactionDurabilityProven": False',
+              '"independentC5IssuerOutcomeAuthenticated": False',
+              '"safeToRetryInference": False',
+              '"safeToReleaseRevocation": False',
+              '"safeActions": []',
+          ):
+              assert text in source, text
+          for forbidden in (
+              'sqlite3.connect(', 'subprocess.run(', 'Ed25519PrivateKey',
+              'socket.connect(', 'request_generate(', 'start_ollama(',
+              'genui.issue', 'write_journal(', '"productionAuthority": True',
+              '"crossStoreTerminalSettlementVerified": True',
+          ):
+              assert forbidden not in source, forbidden
+          for path in (
+              'scripts/forest/recovery_inspect_b4d.py',
+              'scripts/forest/turn_bridge_b3.py',
+              'scripts/forest/host_admission_b4a.py',
+          ):
+              assert 'ForestC5LocalRecoveryComparison' not in Path(path).read_text()
+          print('FOREST_C5_B4E_INTEROP // NEVER_PROMOTES_LOCAL_COMMIT_TO_C5_SETTLEMENT')
+          PY
+      - name: Twenty direct disposable Forest B4e SQLite and signed V1 comparison cases
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_b4e_local_recovery_interop.py' -v
+      - name: Preserve Forest B4e actual-lineage and B4d local-inspection regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_recovery_lineage_b4e.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_recovery_inspect_b4d.py' -v
+      - name: Preserve existing V1 and protected authority denial regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_exact_session_v1_preflight.py' -v
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_authority_boundary.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_fenced_commit_b4c.py' -v
+          echo 'FOREST_B4E_LOCAL_STATE_NOT_C5_TERMINAL // PRODUCTION_HOLD'

@@ -24,6 +24,7 @@ from collections.abc import Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from native_attempt_fingerprint_v0 import AttemptedWireFingerprint
 from desktop_command_gateway_v0 import KernelPeer, _peer
 from signed_command_receipt_v0 import (
     ReceiptRejected, build_request, verify_receipt,
@@ -38,20 +39,6 @@ class HostCommandObservation:
     request_id: str | None
     instance: str
     sequence: int
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptedWireFingerprint:
-    """Digest-only last *attempted* command, not a signed or trusted record.
-
-    This remains process-local, is not issuer evidence, and grants no retry.
-    A sendall failure may have delivered enough bytes for the host to act.
-    """
-
-    action: str
-    request_id_sha256: str | None
-    client_nonce_sha256: str
-    frame_sha256: str
 
 
 class SignedIdentityCommandClient:

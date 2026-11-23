@@ -1137,8 +1137,8 @@ PanelWindow {
                         anchors.right: modelPickerButton.left
                         anchors.rightMargin: 3
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 30
-                        height: 30
+                        width: 34
+                        height: 34
                         stepIndex: root.selectedReasoningStep
                         interactive: root.menuOpen
                         onStepRequested: function(step) {

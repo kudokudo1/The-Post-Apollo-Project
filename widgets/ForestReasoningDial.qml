@@ -2,22 +2,26 @@ import QtQuick
 import "../components"
 import "ForestReasoningDialPolicy.js" as ReasoningPolicy
 
-// Forest-local, four-position rotary selector, not an inference permission.
-// Drag/click/wheel/keyboard request discrete indices; none of them animate
-// through intermediate angles. The 15-degree gap centered at bottom is dead.
+// A compact viewport for the established Post-Apollo hardware dial.
+// The shared SelectorDial owns ALL physical 3D artwork and step animation.
+// Forest alone controls sizing, the 15-degree bottom dead-zone and per-Tree
+// local-only reasoning preference. No model, voice or session dispatch.
 Item {
     id: root
 
-    width: 30
-    height: 30
+    width: 34
+    height: 34
+    clip: true
     property int stepIndex: 0
     property bool interactive: true
     signal stepRequested(int nextStep)
 
     readonly property string stepLabel:
         ReasoningPolicy.labelForStep(stepIndex)
-    readonly property real snappedAngle:
-        ReasoningPolicy.angleForStep(stepIndex)
+    // The shared hardware's built-in knob center is (68, 76) in its
+    // original 136 x 160 coordinates. Scale around that fixed center.
+    readonly property real hardwareScale:
+        Math.min(width, height) / 116
 
     activeFocusOnTab: interactive
     Accessible.role: Accessible.Slider
@@ -26,65 +30,81 @@ Item {
         "Four-position local reasoning preference: NONE, LOW, MED, HIGH. No trusted inference host is connected."
 
     function requestStep(value) {
-        var next = ReasoningPolicy.clampStep(value);
-        if (interactive && next !== stepIndex)
-            stepRequested(next);
+        const next = ReasoningPolicy.clampStep(value);
+        if (!interactive || next === stepIndex)
+            return;
+        // Use the real Post-Apollo dial's bounded, stepped settling motion.
+        // The callback still only requests an in-memory Tree preference.
+        sharedHardwareDial.requestNumericValue(next);
     }
 
     function requestPoint(x, y) {
         if (!interactive)
             return;
-        var next = ReasoningPolicy.stepFromPoint(x, y, width, height);
+        const next = ReasoningPolicy.stepFromPoint(x, y, width, height);
+        // Reject the 15-degree bottom gap AND the interior label area.
         if (next >= 0)
             requestStep(next);
     }
 
-    Rectangle {
-        id: dialBody
-        anchors.fill: parent
-        radius: width / 2
-        color: Colors.dark
-        border.width: 2
-        border.color: root.activeFocus ? Colors.blue : Colors.cyan
-    }
+    SelectorDial {
+        id: sharedHardwareDial
+        width: 136
+        height: 160
+        x: root.width / 2 - 68 * root.hardwareScale
+        y: root.height / 2 - 76 * root.hardwareScale
+        transform: Scale {
+            origin.x: 0
+            origin.y: 0
+            xScale: root.hardwareScale
+            yScale: root.hardwareScale
+        }
 
-    Repeater {
-        model: 4
-        delegate: Item {
-            anchors.fill: parent
-            rotation: ReasoningPolicy.angleForStep(index)
-            Rectangle {
-                anchors.top: parent.top
-                anchors.topMargin: 2
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: 2
-                height: 3
-                color: index === root.stepIndex ? Colors.orange : Colors.cyan
+        labelText: ""
+        selectorMode: "continuous"
+        arcSweepAngle: 345
+        // QtQuick angles: right=0, bottom=90. With a 345-degree sweep,
+        // SelectorDial's default arcStartAngle=97.5 and end=442.5.
+        // This leaves the required 15-degree gap centered at six o'clock.
+        minimumValue: 0
+        maximumValue: 3
+        currentValue: root.stepIndex
+        valueStep: 1
+        valueDecimals: 0
+        snapContinuousToStep: true
+        numericDetentInterval: 1
+        numericDetentOrigin: 0
+        showNumericDetentTicks: true
+        numericReferenceValues: [0, 1, 2, 3]
+        options: ["NONE", "LOW", "MED", "HIGH"]
+        displayOptions: ["N", "L", "M", "H"]
+        readoutText: ""
+
+        accentColor: Colors.cyan
+        markerColor: Colors.orange
+        labelColor: Colors.cyan
+        interactive: root.interactive
+        // The outer viewport accepts gesture input so the dead bottom
+        // sector cannot accidentally reach SelectorDial's internal handlers.
+        activeFocusOnTab: false
+        onValueRequested: function(value) {
+            if (root.interactive) {
+                const next = ReasoningPolicy.clampStep(value);
+                if (next !== root.stepIndex)
+                    root.stepRequested(next);
             }
         }
     }
 
-    // Only the chosen detent angle is rendered, never a drag-time float.
-    Item {
-        anchors.fill: parent
-        rotation: root.snappedAngle
-        Rectangle {
-            anchors.top: parent.top
-            anchors.topMargin: 5
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: 3
-            height: 7
-            radius: 1
-            color: Colors.orange
-        }
-    }
-
+    // Keep the center label legible after reducing the original 90px
+    // hardware body for the composer. The actual knob stays shared.
     Rectangle {
         anchors.centerIn: parent
-        width: 22
-        height: 13
+        width: 24
+        height: 12
         radius: 2
         color: Colors.dark
+        opacity: 0.92
     }
     GohuText {
         anchors.centerIn: parent
@@ -95,9 +115,20 @@ Item {
         color: Colors.cyan
     }
 
+    Rectangle {
+        anchors.fill: parent
+        radius: width / 2
+        color: "transparent"
+        border.width: 1
+        border.color: root.activeFocus ? Colors.blue : Colors.cyan
+    }
+
+    // The Post-Apollo hardware renders below; this unpainted capture
+    // surface filters input through the previously tested 15-degree policy.
     MouseArea {
         anchors.fill: parent
         enabled: root.interactive
+        preventStealing: true
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton
@@ -110,13 +141,14 @@ Item {
                 root.requestPoint(mouse.x, mouse.y);
         }
         onWheel: function(wheel) {
-            if (ReasoningPolicy.stepFromPoint(
-                    wheel.x, wheel.y, root.width, root.height) < 0)
+            const withinArc = ReasoningPolicy.stepFromPoint(
+                wheel.x, wheel.y, root.width, root.height);
+            // Always consume this gesture. Outside the arc it is a no-op,
+            // not a leaked wheel event to the shared unbounded handler.
+            wheel.accepted = true;
+            if (withinArc < 0 || wheel.angleDelta.y === 0)
                 return;
-            if (wheel.angleDelta.y !== 0) {
-                root.requestStep(root.stepIndex + (wheel.angleDelta.y > 0 ? 1 : -1));
-                wheel.accepted = true;
-            }
+            root.requestStep(root.stepIndex + (wheel.angleDelta.y > 0 ? 1 : -1));
         }
     }
 

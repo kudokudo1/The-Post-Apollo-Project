@@ -116,6 +116,10 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         # available balance, not a category's name or budget size, controls it.
         attention = matching_items("categoryOverspentOnlyAction")
         assert len(attention) == 1
+        print("M9 initial overspentCount:",repr(prop(pane, "overspentCount")),
+              type(prop(pane, "overspentCount")),
+              "categories:",repr(prop(pane, "categories")),
+              "fixture:",repr(prop(root, "fixture")),flush=True)
         assert prop(pane, "overspentCount") == 0
         assert prop(attention[0], "selected") is False
         assert prop(attention[0], "label") == "OVERSPENT ONLY // 0"

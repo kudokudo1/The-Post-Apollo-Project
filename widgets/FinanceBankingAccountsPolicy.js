@@ -247,7 +247,7 @@ function correctManualTransfer(state,fields) {
     if(!validState(state)||state.mode!=="manual")
         return resultError("MANUAL TRANSFER SESSION REQUIRED");
     if(!fields||typeof fields.transferId!=="string"
-       ||!/^transfer-[1-9]\\d*$/.test(fields.transferId))
+       ||!/^transfer-[1-9]\d*$/.test(fields.transferId))
         return resultError("SELECT A VALID MANUAL TRANSFER PAIR");
     var list=transferPairs(state);
     if(!list.ok)return list;

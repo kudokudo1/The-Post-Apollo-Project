@@ -112,7 +112,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("id: treeGradientBorder", view)
         self.assertIn("border.width: 0", view)
         self.assertIn("baseColor: treeRow.foregroundColor", view)
-        self.assertIn("accentColor: modelData.gradientAccentColor", view)
+        self.assertIn("accentColor: treeRow.energized", view)
         self.assertIn("accentTopRight: modelData.gradientTopRight", view)
         self.assertIn("color: treeRow.foregroundColor", view)
         self.assertIn("id: treeNameGlow", view)
@@ -279,9 +279,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("foregroundColor: treeRow.foregroundColor", name_block)
         self.assertIn("border.width: 0", tree_block)
         self.assertIn("id: treeGradientBorder", tree_block)
-        # The selected Tree title continues to use the resolved button glow,
-        # while the preview icon keeps the icon's independent idle hue.
-        self.assertIn("root.selectedTreeButton.contentGlowColor", view)
+        # Chat title keeps its own Tree spiritual channel rather than
+        # inheriting the selected button's magenta open state.
+        self.assertIn("preferredGlowColor: root.activeTree.spiritualIdleGlowColor", view)
         self.assertIn("preferredGlowColor: root.activeTree.iconIdleGlowColor", view)
         self.assertNotIn("chromeIdleGlowColor", view)
         self.assertNotIn("modelData.idleGlowColor", view)
@@ -356,20 +356,20 @@ class ForestLauncherContract(unittest.TestCase):
         name = (ROOT / "widgets/ForestGradientName.qml").read_text()
 
         self.assertEqual(view.count("ForestCornerGradientBorder {"), 1)
-        self.assertEqual(view.count("ForestGradientName {"), 2)
+        self.assertEqual(view.count("ForestGradientName {"), 1)
         self.assertIn("baseColor: treeRow.foregroundColor", view)
-        self.assertIn("accentColor: modelData.gradientAccentColor", view)
+        self.assertEqual(view.count("accentColor: treeRow.energized"), 2)
+        self.assertEqual(view.count("? treeRow.foregroundColor : modelData.gradientAccentColor"), 2)
         self.assertIn("accentTopRight: modelData.gradientTopRight", view)
         self.assertIn("text: modelData.name", view)
         self.assertIn('text: root.activeTree.name + " // CHAT"', view)
-        self.assertIn("accentColor: root.activeTree.gradientAccentColor", view)
-        self.assertIn("accentTopRight: root.activeTree.gradientTopRight", view)
-        self.assertIn("root.selectedTreeButton.foregroundColor", view)
+        self.assertIn("color: root.activeTree.identityColor", view)
+        self.assertIn("preferredGlowColor: root.activeTree.spiritualIdleGlowColor", view)
         self.assertIn("safeSource: treeName", view)
         self.assertIn("safeSource: chatHeading", view)
-        self.assertIn("foregroundColor: chatHeading.baseColor", view)
-        self.assertIn("root.selectedTreeButton.contentGlowColor", view)
-        self.assertIn("root.selectedTreeButton.contentGlowOpacity", view)
+        self.assertIn("foregroundColor: chatHeading.color", view)
+        self.assertNotIn("baseColor: root.selectedTreeButton", view)
+        self.assertNotIn("accentColor: root.activeTree.gradientAccentColor", view)
 
         # The corner border is an even-odd 1px ring, not a filled overlay.
         # It retains the existing yellow open fill and shared button input.
@@ -386,9 +386,16 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertNotIn("ShaderEffect {", ring)
         self.assertIn("border.width: 0", view)
         self.assertIn("open: index === root.selectedTreeIndex", view)
+        # All energized states are solid ink; open has precedence over
+        # hover/press and must retain yellow fill, magenta ink and glow.
+        dock = (ROOT / "components/DockButton.qml").read_text()
+        self.assertIn("property color openFillColor: Colors.yellow", dock)
+        self.assertIn("property color openForegroundColor: Colors.magenta", dock)
+        self.assertIn("property color openGlowColor: Colors.magenta", dock)
 
-        # The gradient is masked through the real GohuFont glyph and then
-        # source-sampled by the pre-existing Tree and chat title glows.
+        # The button-name gradient is masked through the real GohuFont
+        # glyph, while the chat title is now solid identity-colored.
+        # TextHashGlow still samples each actual rendered label.
         # GraphicalEffects and QtQuick.Shapes both export RadialGradient,
         # but only the Shapes type provides centerX/focalY. An unqualified
         # import silently selects the wrong one and Quickshell refuses to load.
@@ -407,7 +414,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("source: radialInk", name)
         self.assertIn("maskSource: inkMask", name)
         self.assertIn("fillGradient: RadialGradient {", name)
-        self.assertIn("centerX: root.accentTopRight ? root.width : 0", name)
+        self.assertIn("centerX: root.accentTopRight ? root.visibleGlyphWidth : 0", name)
+        self.assertIn("Math.min(width, inkMask.implicitWidth)", name)
+        self.assertIn("visibleGlyphWidth * 0.42", name)
+        self.assertNotIn("Math.max(38", name)
         self.assertIn("color: root.accentColor", name)
         self.assertIn("color: root.baseColor", name)
         self.assertNotIn("MouseArea {", name)
@@ -452,10 +462,11 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("treeSelectorRepeater.itemAt(selectedTreeIndex)", view)
         self.assertIn("id: chatHeadingGlow", view)
         self.assertIn("safeSource: chatHeading", view)
-        self.assertIn("foregroundColor: chatHeading.baseColor", view)
-        self.assertIn("root.selectedTreeButton.foregroundColor", view)
-        self.assertIn("root.selectedTreeButton.contentGlowColor", view)
-        self.assertIn("root.selectedTreeButton.contentGlowOpacity", view)
+        self.assertIn("foregroundColor: chatHeading.color", view)
+        self.assertIn("color: root.activeTree.identityColor", view)
+        self.assertIn("preferredGlowColor: root.activeTree.spiritualIdleGlowColor", view)
+        self.assertNotIn("root.selectedTreeButton.foregroundColor", view)
+        self.assertNotIn("root.selectedTreeButton.contentGlowColor", view)
         self.assertIn("radius: 7", view)
         self.assertIn("samples: 13", view)
         self.assertIn("anchors.top: chatHeadingRow.bottom", view)

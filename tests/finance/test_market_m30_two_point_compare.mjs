@@ -103,12 +103,12 @@ for(const expected of [
     'objectName: "marketPinnedPairComparisonText"',
     'label: "PIN AS A"',
     'label: "CLEAR PIN A"',
-    "stocks.pinnedSnapshot = null",
+    "pinnedSnapshot = null;",
     "ctx.strokeStyle=\"#F2D24D\"",
     "OBSERVED SESSION STEPS",
     "LOADED CLOSES ONLY // NO NEW REQUEST",
     'id: openSelectedInDay'
-].filter(x=>x!=="stocks.pinnedSnapshot = null")) {
+]) {
     assert.ok(qml.includes(expected),expected);
 }
 const controls=qml.slice(

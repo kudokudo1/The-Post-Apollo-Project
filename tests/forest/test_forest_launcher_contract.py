@@ -233,7 +233,7 @@ class ForestLauncherContract(unittest.TestCase):
             ("CHERRY", "cherry-outline.svg", "GENERAL // ASSISTANT",
              "white", "magenta", "magenta", '"#EE76B2"', False),
             ("MAPLE", "maple-outline.svg", "FILES // ORGANIZATION",
-             "orange", "red", "red", '"#C7482F"', True),
+             "orange", "red", "red", '"#C7482F"', False),
             ("BRISTLECONE PINE", "bristlecone-pine.png", "TREEWRITE // CODER",
              "white", "orange", "green", "Colors.green", False),
             ("CEDAR", "cedar-outline.svg", "SECURITY // PROTECTION",
@@ -361,7 +361,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertEqual(view.count("accentColor: treeRow.energized"), 2)
         self.assertEqual(view.count("? treeRow.foregroundColor : modelData.gradientAccentColor"), 2)
         self.assertIn("accentTopRight: modelData.gradientTopRight", view)
-        self.assertIn('gradientAccentColor: "#C7482F", gradientTopRight: true', view)
+        self.assertIn('gradientAccentColor: "#C7482F", gradientTopRight: false', view)
         self.assertIn("text: modelData.name", view)
         self.assertIn('text: root.activeTree.name + " // CHAT"', view)
         self.assertIn("baseColor: root.activeTree.identityColor", view)
@@ -415,19 +415,18 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("textFormat: Text.PlainText", name)
         self.assertIn("elide: Text.ElideRight", name)
         self.assertIn("OpacityMask {", name)
-        self.assertIn("source: root.accentTopRight ? rightInk : radialInk", name)
+        self.assertIn("source: radialInk", name)
         self.assertIn("maskSource: inkMask", name)
         self.assertIn("fillGradient: RadialGradient {", name)
-        self.assertIn("fillGradient: LinearGradient {", name)
         self.assertIn("centerX: root.accentTopRight ? root.visibleGlyphWidth : 0", name)
-        # Maple must progress from orange on the left to red on the right;
-        # rightInk is used only when accentTopRight is true.
-        self.assertIn("id: rightInk", name)
-        self.assertIn("x1: 0", name)
-        self.assertIn("x2: root.visibleGlyphWidth", name)
-        self.assertIn("GradientStop { position: 0.0; color: root.baseColor }", name)
-        self.assertIn("GradientStop { position: 0.42; color: root.baseColor }", name)
-        self.assertIn("GradientStop { position: 1.0; color: root.accentColor }", name)
+        self.assertIn("GradientStop { position: 0.0; color: root.accentColor }", name)
+        self.assertIn("GradientStop { position: 1.0; color: root.baseColor }", name)
+        # Maple has red accent anchored to the upper-left and orange
+        # base progressing rightward in both the name and button border.
+        self.assertIn("GradientStop { position: 0.0; color: root.accentColor }", ring)
+        self.assertIn("GradientStop { position: 1.0; color: root.baseColor }", ring)
+        self.assertNotIn("id: rightInk", name)
+        self.assertNotIn("fillGradient: LinearGradient {", name)
         self.assertIn("Math.min(width, gradientMeasure.implicitWidth)", name)
         self.assertIn("visibleGlyphWidth * 0.58", name)
         self.assertIn("Math.max(19", name)

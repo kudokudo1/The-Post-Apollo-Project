@@ -138,7 +138,7 @@ assert.equal(removed.state.nextId,state.nextId);
 // A failed amount change exceeding a known account's allowed balance is atomic.
 let capped=Accounts.emptyState();
 let r=Accounts.addAccount(capped,{providerId:"bank",productId:"bank-checking",
-    nickname:"At Max",openingText:"9999999.00"});
+    nickname:"At Max",openingText:"9999999.99"});
 assert.equal(r.ok,true);capped=r.state;const maxId=r.account.id;
 r=Accounts.addAccount(capped,{providerId:"bank",productId:"bank-checking",
     nickname:"Source",openingText:"100.00"});
@@ -157,7 +157,7 @@ const over=Accounts.correctManualTransfer(capped,{
     toAccountId:raw.toAccountId,expectedDate:raw.date,
     expectedDescription:raw.description,expectedAmountCents:raw.amountCents,
     date:raw.date,description:"Will overflow source",
-    amountText:"1000000.00"});
+    amountText:"9999999.99"});
 assert.equal(over.ok,false);
 assert.equal(JSON.stringify(capped),fullBefore);
 

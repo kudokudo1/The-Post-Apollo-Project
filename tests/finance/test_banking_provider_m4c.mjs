@@ -142,6 +142,23 @@ assert.equal(long.visibleRecent.length,4);
 assert.equal(long.visibleRecentOmitted,true);
 assert.equal(long.visibleRecent.some(x=>x.description==="manual 0"),false);
 assert.equal(long.visibleRecent.some(x=>x.description==="manual 19"),true);
+assert.equal(long.visibleRecent[0].description,"manual 19");
+// Entry IDs cross one-digit to two-digit sequence numbers. Same-date
+// activity must follow numeric insertion order, not string sorting.
+let short=Accounts.emptyState();
+const qa=Accounts.addAccount(short,{providerId:"paypal",productId:"paypal-wallet",
+    nickname:"Same day",openingText:"50.00"});
+assert.equal(qa.ok,true);short=qa.state;
+for(let i=0;i<10;i++){
+    const res=Accounts.addEntry(short,{accountId:qa.account.id,date:"2026-11-22",
+        description:"item "+i,direction:"out",amountText:"1.00"});
+    assert.equal(res.ok,true);short=res.state;
+}
+const newest=Provider.build("paypal",Accounts.snapshot(short),"home");
+assert.equal(newest.visibleRecent[0].description,"item 9");
+assert.equal(newest.visibleRecent[1].description,"item 8");
+const act=Provider.build("paypal",Accounts.snapshot(short),"activity");
+assert.equal(act.activity[0].description,"item 9");
 const demo=Accounts.sampleDemo();
 assert.equal(demo.ok,true);
 const d=Provider.build("chime",Accounts.snapshot(demo.state),"home");

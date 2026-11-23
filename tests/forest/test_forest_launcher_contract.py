@@ -135,9 +135,9 @@ class ForestLauncherContract(unittest.TestCase):
         # No runtime shader, bitmap, mask or unrelated markup is permitted.
         for asset, kind, gradient_id, colors, min_paths in (
             ("cherry-outline.svg", "radialGradient", "cherry-petal-stroke",
-             ("#F29CC5", "#F1B1D3", "#DCF3FA"), 6),
+             ("#EE76B2", "#F09AC7", "#DCF3FA"), 6),
             ("maple-outline.svg", "linearGradient", "maple-vertical-stroke",
-             ("#D16041", "#DC7940", "#E98D29", "#ED981A"), 2),
+             ("#C7482F", "#D86438", "#E78924", "#ED981A"), 2),
         ):
             with self.subTest(icon=asset):
                 svg = ET.parse(ROOT / "assets/forest" / asset).getroot()
@@ -166,6 +166,10 @@ class ForestLauncherContract(unittest.TestCase):
                 self.assertEqual(tuple(el.attrib.get("stop-color")
                                        for el in stops), colors)
                 self.assertEqual(stops[0].attrib.get("offset"), "0%")
+                expected_offsets = ("0%", "52%", "100%") if kind == "radialGradient" \
+                    else ("0%", "38%", "74%", "100%")
+                self.assertEqual(tuple(stop.attrib.get("offset") for stop in stops),
+                                 expected_offsets)
                 self.assertEqual(stops[-1].attrib.get("offset"), "100%")
                 self.assertIn("url(#" + gradient_id + ")",
                               [el.attrib.get("stroke") for el in descendants])
@@ -202,7 +206,7 @@ class ForestLauncherContract(unittest.TestCase):
         )
         stamens = cherry.find(".//" + ns + "g[@id='sakura-stamens']")
         self.assertIsNotNone(stamens)
-        self.assertEqual(stamens.attrib.get("stroke"), "#F29CC5")
+        self.assertEqual(stamens.attrib.get("stroke"), "#EE76B2")
         self.assertGreaterEqual(len(stamens.findall(ns + "circle")), 6)
         maple = ET.parse(ROOT / "assets/forest/maple-outline.svg").getroot()
         contour = maple.find(".//" + ns + "path[@id='maple-contour']")

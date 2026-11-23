@@ -110,7 +110,9 @@ class RawChallengeEvidenceCandidateTests(unittest.TestCase):
             "schema": LEGACY_RECEIPT_SCHEMA,
             "state": "UNAVAILABLE", "requestId": None,
         }) + b"\n"
-        wrong = ReceiptIssuer(self.key).seal("CANCEL", None, self.nonce, body)
+        wrong = ReceiptIssuer(self.key).seal(
+            "STATUS", "CI_NO_LOGIN_REQUEST_01234567", self.nonce, body,
+        )
         with self.assertRaises(E.Refused):
             self.check(serial=self.proof(self.pub, wrong))
 

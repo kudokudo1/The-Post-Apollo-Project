@@ -28,40 +28,6 @@ class UnavailableLedger(Exception):
     pass
 
 
-def _open_canonical():
-    home = pwd.getpwuid(os.getuid()).pw_dir
-    if not home or not os.path.isabs(home):
-        raise UnavailableLedger("home")
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    try:
-        parent = os.open(home, directory_flags)
-    except FileNotFoundError as exc:
-        raise MissingLedger() from exc
-    except OSError as exc:
-        raise UnavailableLedger("home") from exc
-    try:
-        for index, component in enumerate((
-            ".local", "share", "post-apollo", "finance-market"
-        )):
-            try:
-                child = os.open(component, directory_flags, dir_fd=parent)
-            except FileNotFoundError as exc:
-                raise MissingLedger() from exc
-            except OSError as exc:
-                raise UnavailableLedger("directory") from exc
-            info = os.fstat(child)
-            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() \
-                    or info.st_mode & 0o022 \
-                    or index == 3 and info.st_mode & 0o077:
-                os.close(child)
-                raise UnavailableLedger("directory")
-            os.close(parent)
-            parent = child
-        return _open_db(DB_NAME, parent)
-    finally:
-        os.close(parent)
-
-
 def _open_db(filename, directory_fd):
     flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NOATIME", 0)
     try:
@@ -157,6 +123,8 @@ def _has_sidecars(directory_fd, base):
 
 def _read_canonical():
     home = pwd.getpwuid(os.getuid()).pw_dir
+    if not home or not os.path.isabs(home):
+        raise UnavailableLedger("untrusted-home")
     # Open each existing component read-only, never mkdir/chmod/unlink.
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     parent = None

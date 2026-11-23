@@ -114,7 +114,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("baseColor: treeRow.foregroundColor", view)
         self.assertIn("accentColor: treeRow.energized", view)
         self.assertIn("accentTopRight: modelData.gradientTopRight", view)
-        self.assertIn("color: treeRow.foregroundColor", view)
+        self.assertIn("baseColor: treeRow.foregroundColor", view)
         self.assertIn("id: treeNameGlow", view)
         self.assertIn("safeSource: treeName", view)
         self.assertIn("contentGlowEnabled: false", view)

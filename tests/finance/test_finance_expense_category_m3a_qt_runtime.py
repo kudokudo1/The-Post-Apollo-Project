@@ -84,6 +84,10 @@ with tempfile.TemporaryDirectory(prefix="financew-m3a-expense-") as temp:
         assert prop(pane,"open") is False
         invoke(root,"openFixture")
         invoke(root,"selectGroceries")
+        assert prop(pane,"selectedCategoryId")=="", "duplicate picker must refuse"
+        # Force malformed selection directly to test policy's defensive
+        # refusal, even when a caller bypasses the normal picker.
+        setprop(pane,"selectedCategoryId","groceries")
         invoke(root,"propose")
         assert prop(pane,"errorText")=="CATEGORY AMBIGUOUS OR UNAVAILABLE"
 

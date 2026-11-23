@@ -592,8 +592,8 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("property alias contentItem: contentHost", button)
         self.assertIn("id: forestAskSendButton", view)
         self.assertIn("id: modelPickerButton", view)
-        # Prompt is the outer magenta text field; both controls are nested
-        # inside it. The SEND control is an adjacent sibling, not an input.
+        # Prompt is an idle-cyan / hover-orange / focus-magenta text field;
+        # both controls remain nested inside it. SEND is adjacent and gated.
         inside = view.split("id: sendGate", 1)[1].split(
             "id: forestAskSendButton", 1)[0]
         self.assertIn("id: forestPromptInput", inside)
@@ -601,15 +601,32 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("DockButton {", inside)
         self.assertIn("id: modelPickerButton", inside)
         self.assertIn("anchors.right: modelPickerButton.left", inside)
-        self.assertIn("border.color: Colors.magenta", inside)
-        self.assertIn("font.family: \"GohuFont 11 Nerd Font Mono\"", inside)
+        self.assertIn("readonly property color promptBorderColor:", inside)
+        self.assertIn("forestPromptInput.activeFocus ? Colors.magenta", inside)
+        self.assertIn(": promptHover.hovered ? Colors.orange : Colors.cyan", inside)
+        self.assertIn("border.width: forestPromptInput.activeFocus ? 2 : 1", inside)
+        self.assertIn("border.color: promptBorderColor", inside)
+        self.assertIn("HoverHandler {", inside)
+        self.assertIn("id: promptHover", inside)
+        self.assertIn("enabled: root.menuOpen", inside)
+        field = inside.split("TextInput {", 1)[1].split("GohuText {", 1)[0]
+        self.assertIn('font.family: "GohuFont 11 Nerd Font Mono"', field)
+        self.assertIn("font.pixelSize: 16", field)
+        self.assertIn("height: parent.height - 8", field)
+        self.assertIn("anchors.verticalCenter: parent.verticalCenter", field)
+        self.assertIn("verticalAlignment: TextInput.AlignVCenter", field)
+        self.assertIn("color: Colors.magenta", field)
+        self.assertIn("selectionColor: Colors.magenta", field)
+        self.assertIn("selectedTextColor: Colors.black", field)
+        self.assertIn("cursorDelegate: Rectangle {", field)
+        self.assertIn("width: 3", field)
+        self.assertIn("color: Colors.orange", field)
+        # A custom Qt TextInput cursorDelegate tracks cursorRectangle
+        # position/height. Do not pin its y to a fixed pixel offset.
+        self.assertNotIn("cursorDelegate: Rectangle {\n                            y:", field)
+        self.assertIn("height: forestPromptInput.height", inside)
+        self.assertIn("verticalAlignment: Text.AlignVCenter", inside)
         self.assertIn("font.pixelSize: 11", inside)
-        self.assertIn("color: Colors.magenta", inside)
-        self.assertIn("selectionColor: Colors.magenta", inside)
-        self.assertIn("selectedTextColor: Colors.black", inside)
-        self.assertIn("cursorDelegate: Rectangle {", inside)
-        self.assertIn("width: 2", inside)
-        self.assertIn("color: Colors.orange", inside)
         self.assertIn("enabled: root.menuOpen", inside)
         self.assertIn("In-memory draft only.", inside)
         self.assertIn("anchors.left: forestPromptInput.left", inside)

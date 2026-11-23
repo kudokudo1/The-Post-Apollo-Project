@@ -132,6 +132,7 @@ PanelWindow {
     readonly property var treeSlots: [
         {
             name: "CHERRY", role: "GENERAL // ASSISTANT",
+            sessionKey: "CHERRY",
             iconPath: "../assets/forest/cherry-outline.svg",
             hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
             openIconPath: "../assets/forest/cherry-open-magenta.svg",
@@ -141,6 +142,7 @@ PanelWindow {
         },
         {
             name: "MAPLE", role: "FILES // ORGANIZATION",
+            sessionKey: "MAPLE",
             iconPath: "../assets/forest/maple-outline.svg",
             hoverIconPath: "../assets/forest/maple-hover-orange.svg",
             openIconPath: "../assets/forest/maple-open-magenta.svg",
@@ -151,6 +153,7 @@ PanelWindow {
         },
         {
             name: "BRISTLECONE PINE", role: "TREEWRITE // CODER",
+            sessionKey: "BRISTLECONE_PINE",
             iconPath: "../assets/forest/bristlecone-pine.png",
             hoverIconPath: "../assets/forest/bristlecone-hover-orange.png",
             openIconPath: "../assets/forest/bristlecone-open-magenta.png",
@@ -160,6 +163,7 @@ PanelWindow {
         },
         {
             name: "CEDAR", role: "SECURITY // PROTECTION",
+            sessionKey: "CEDAR",
             iconPath: "../assets/forest/cedar-outline.svg",
             hoverIconPath: "../assets/forest/cedar-hover-orange.svg",
             openIconPath: "../assets/forest/cedar-open-magenta.svg",
@@ -169,6 +173,7 @@ PanelWindow {
         },
         {
             name: "MACINTOSH", role: "TECH // SUPPORT",
+            sessionKey: "MACINTOSH",
             iconPath: "../assets/forest/macintosh-outline.svg",
             hoverIconPath: "../assets/forest/macintosh-hover-orange.svg",
             openIconPath: "../assets/forest/macintosh-open-magenta.svg",
@@ -592,6 +597,12 @@ PanelWindow {
             visible: width > 0
             hostConnected: root.chatHostTrusted
             sessions: root.activeChatSessions
+            // Presentation key only; Forest Core must approve canonical Tree
+            // scope before ever supplying protected session metadata.
+            treeKey: root.activeTree.sessionKey
+            inventoryStatus: localInventory.status
+            discoveredModels: localInventory.modelCount
+            selectedModel: root.selectedLocalModel
         }
 
         Item {

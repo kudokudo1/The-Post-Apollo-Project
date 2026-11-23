@@ -1175,7 +1175,7 @@ PanelWindow {
                         ForestGradientName {
                             id: coffeeGradientGlyph
                             anchors.centerIn: parent
-                            width: root.reasoningRailExpanded ? 19 : 29
+                            width: root.reasoningRailExpanded ? 18 : 29
                             height: parent.height
                             anchors.verticalCenterOffset:
                                 root.reasoningRailExpanded ? 3 : 0
@@ -1183,7 +1183,7 @@ PanelWindow {
                             gradientText: text
                             // The inset 32px red cap cannot fit a 26px cup
                             // AND ornaments. Its 18px cup has a real margin.
-                            pixelSize: root.reasoningRailExpanded ? 18 : 26
+                            pixelSize: root.reasoningRailExpanded ? 17 : 26
                             bold: false
                             horizontalAlignment: Text.AlignHCenter
                             baseColor: reasoningCoffeeButton.pressed

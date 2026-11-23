@@ -1,5 +1,6 @@
 import QtQuick
 import "../components"
+import "ForestChatSessionPolicy.js" as SessionPolicy
 
 // Forest's chat rail borrows Social's contact-list presentation recipe:
 // a fixed heading, vertical ListView, row previews and the shared star scroll.
@@ -10,6 +11,15 @@ Rectangle {
 
     property var sessions: []
     property bool hostConnected: false
+    // These read-only signals come from B0; they do not establish a chat host.
+    property string treeKey: ""
+    property string inventoryStatus: "NOT_CHECKED"
+    property int discoveredModels: 0
+    property string selectedModel: ""
+    // The host must already authorize owner and Tree scope. This is only
+    // a defensive presentation filter; it never authorizes SQLite access.
+    readonly property var visibleSessions: hostConnected
+        ? SessionPolicy.openSessions(sessions, treeKey) : []
 
     color: Colors.black
     border.width: 0
@@ -32,7 +42,7 @@ Rectangle {
             anchors.topMargin: 9
             font.pixelSize: 12
             color: Colors.cyan
-            text: "CHATS // " + String(chatListRoot.sessions.length).padStart(2, "0")
+            text: "CHATS // " + String(chatListRoot.visibleSessions.length).padStart(2, "0")
             elide: Text.ElideRight
         }
         GohuText {
@@ -44,7 +54,7 @@ Rectangle {
             anchors.bottomMargin: 8
             font.pixelSize: 9
             color: chatListRoot.hostConnected ? Colors.green : Colors.orange
-            text: chatListRoot.hostConnected ? "ACTIVE SESSIONS" : "CHAT HOST OFFLINE"
+            text: chatListRoot.hostConnected ? "OPEN SESSIONS" : "CHAT HOST OFFLINE"
             elide: Text.ElideRight
         }
         Rectangle {
@@ -56,9 +66,54 @@ Rectangle {
         }
     }
 
+    // Show a REAL B0 model signal even while protected B1 session reads
+    // remain unavailable. This status never means that a Tree is running.
+    Rectangle {
+        id: modelStatusStrip
+        anchors.top: chatListHeader.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 56
+        color: Colors.black
+        GohuText {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.leftMargin: 10
+            anchors.rightMargin: 9
+            anchors.topMargin: 8
+            font.pixelSize: 9
+            color: chatListRoot.inventoryStatus === "REACHABLE"
+                   ? Colors.green : Colors.orange
+            text: chatListRoot.inventoryStatus === "REACHABLE"
+                ? "OLLAMA // " + chatListRoot.discoveredModels + " FOUND"
+                : chatListRoot.inventoryStatus === "CHECKING"
+                    ? "OLLAMA // SCANNING"
+                    : chatListRoot.inventoryStatus === "NOT_CHECKED"
+                        ? "OLLAMA // NOT SCANNED" : "OLLAMA // OFFLINE"
+            elide: Text.ElideRight
+            textFormat: Text.PlainText
+        }
+        GohuText {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 9
+            anchors.bottomMargin: 8
+            font.pixelSize: 9
+            color: Colors.cyan
+            text: chatListRoot.selectedModel
+                ? "MODEL // " + chatListRoot.selectedModel
+                : "MODEL // NOT SELECTED"
+            elide: Text.ElideRight
+            textFormat: Text.PlainText
+        }
+    }
+
     ListView {
         id: activeChatList
-        anchors.top: chatListHeader.bottom
+        anchors.top: modelStatusStrip.bottom
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -68,7 +123,7 @@ Rectangle {
         anchors.bottomMargin: 10
         clip: true
         spacing: 7
-        model: chatListRoot.hostConnected ? chatListRoot.sessions : []
+        model: chatListRoot.hostConnected ? chatListRoot.visibleSessions : []
         // No fake selection or cross-host session activation. A future
         // authorized Forest session adapter owns selection and switching.
         delegate: Rectangle {
@@ -96,7 +151,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: 9
-                text: String(modelData.lastMessage || "")
+                text: "OPEN // REV " + String(modelData.revision)
                 textFormat: Text.PlainText
                 font.pixelSize: 10
                 color: Colors.cyan
@@ -124,7 +179,7 @@ Rectangle {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
         textFormat: Text.PlainText
-        visible: !chatListRoot.hostConnected || chatListRoot.sessions.length === 0
+        visible: !chatListRoot.hostConnected || chatListRoot.visibleSessions.length === 0
     }
 
     Rectangle {

@@ -29,6 +29,9 @@ PanelWindow {
     // Per-Tree local visual preference only. No Ollama/Hermes transport
     // consumes this setting while the trusted Forest host is disconnected.
     property var selectedTreeReasoningSteps: [0, 0, 0, 0, 0]
+    // One visual toggle for both opening and closing the reasoning rail.
+    // Reasoning choices remain per-Tree even when the rail is compact.
+    property bool reasoningRailExpanded: false
     readonly property int selectedReasoningStep:
         selectedTreeReasoningSteps[selectedTreeIndex] || 0
     function chooseTreeReasoningStep(step) {
@@ -92,6 +95,7 @@ PanelWindow {
     onMenuOpenChanged: {
         if (!menuOpen) {
             modelPopupOpen = false;
+            reasoningRailExpanded = false;
             // Local-only drafts never outlive the displayed Forest session.
             if (forestPromptInput)
                 forestPromptInput.clear();
@@ -977,10 +981,10 @@ PanelWindow {
                 anchors.bottom: promptRow.top
                 anchors.bottomMargin: 8
                 anchors.left: parent.left
-                // Reserve a label gutter left of the hardware slider;
-                // neither labels nor thumb overlap active chat content.
+                // Labels now live in the slider's bottom readout.
+                // The compact coffee button reserves only the rail column.
                 anchors.right: reasoningRailHost.left
-                anchors.rightMargin: 35
+                anchors.rightMargin: 8
                 clip: true
 
                 Column {
@@ -1017,10 +1021,10 @@ PanelWindow {
                     }
                 }
             }
-            // Use the actual Post-Apollo SelectorSlider as in Git/Hospital,
-            // not the slimmer IndexRail. Keep the full usable chat height,
-            // below the green divider to the message/SEND lower baseline.
-            // The slider changes only the local Tree reasoning preference.
+            // One coffee ActionButton owns both compact and expanded
+            // states. In compact mode it sits at the composer baseline;
+            // when open it rises under the chat divider and becomes the
+            // red close control without changing its icon.
             Item {
                 id: reasoningRailHost
                 z: 12
@@ -1032,35 +1036,154 @@ PanelWindow {
                 anchors.rightMargin: 7
                 width: 46
 
-                // SelectorSlider has a 38px top inset, 26px bottom inset
-                // and a 52px thumb in its INDEX profile. Match its actual
-                // physical detent centers for the external Gohu labels.
-                readonly property real trackHeight:
-                    Math.max(0, height - 64)
-                readonly property real handleHeight: 52
-                function detentCenterY(index) {
-                    const travel = Math.max(0, trackHeight - handleHeight);
-                    return 38 + handleHeight / 2
-                        + travel * Math.max(0, Math.min(3, index)) / 3;
+                ActionButton {
+                    id: reasoningCoffeeButton
+                    x: 0
+                    y: root.reasoningRailExpanded
+                       ? 0 : Math.max(0, parent.height - height)
+                    width: 40
+                    height: 40
+                    z: 40
+                    radius: 0
+                    acceptedButtons: Qt.LeftButton
+                    available: root.menuOpen
+                    interactive: root.menuOpen
+                    Accessible.name: root.reasoningRailExpanded
+                        ? "Close Forest reasoning slider"
+                        : "Open Forest reasoning slider"
+                    Accessible.description:
+                        "Coffee control expands or collapses the four-step local reasoning selector."
+                    onLeftClicked: {
+                        if (root.menuOpen)
+                            root.reasoningRailExpanded = !root.reasoningRailExpanded;
+                    }
+
+                    // Compact: Tree gradient + spiritual halo. Expanded:
+                    // standard close identity (red border/glyph/glow on
+                    // black, yellow hover, red pressed fill). The same
+                    // coffee and white stars stay present throughout.
+                    accentColor: root.reasoningRailExpanded
+                        ? Colors.red : root.activeTree.identityColor
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    pressedFillColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.magenta
+                    idleForegroundColor: accentColor
+                    hoverForegroundColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.orange
+                    pressedForegroundColor: Colors.black
+                    idleBorderColor: accentColor
+                    hoverBorderColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.orange
+                    pressedBorderColor: root.reasoningRailExpanded
+                        ? Colors.black : Colors.magenta
+                    idleContentGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : root.activeTree.spiritualIdleGlowColor
+                    hoverContentGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.orange
+                    pressedContentGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.magenta
+                    idleSoftGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : root.activeTree.spiritualIdleGlowColor
+                    hoverSoftGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.orange
+                    pressedSoftGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : Colors.magenta
+                    softGlowEnabled: true
+                    wideGlowEnabled: root.reasoningRailExpanded
+                    idleWideGlowColor: Colors.red
+                    hoverWideGlowColor: Colors.red
+                    pressedWideGlowColor: Colors.red
+                    contentGlowSource: coffeeGlyph
+                    contentGlowRadius: 7
+                    contentGlowSamples: 9
+
+                    Item {
+                        id: coffeeGlyph
+                        anchors.centerIn: parent
+                        width: 36
+                        height: 30
+
+                        GohuText {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 8
+                            height: parent.height
+                            text: "⊹"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 12
+                            color: Colors.white
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        ForestGradientName {
+                            id: coffeeGradientGlyph
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 23
+                            height: parent.height
+                            text: "☕︎๋࣭"
+                            gradientText: text
+                            pixelSize: 18
+                            bold: false
+                            baseColor: root.reasoningRailExpanded
+                                ? Colors.red : root.activeTree.identityColor
+                            accentColor: root.reasoningRailExpanded
+                                ? Colors.red : root.activeTree.gradientAccentColor
+                            accentTopRight: root.activeTree.gradientTopRight
+                        }
+                        GohuText {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 9
+                            height: parent.height
+                            text: "⭑"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 11
+                            color: Colors.white
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    Behavior on y {
+                        NumberAnimation {
+                            duration: 170
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                }
+
+                // The same Forest border gradient used on Tree buttons
+                // outlines the compact control. Open state uses the
+                // ordinary red close-button border instead.
+                ForestCornerGradientBorder {
+                    anchors.fill: reasoningCoffeeButton
+                    lineWidth: 1
+                    baseColor: root.activeTree.identityColor
+                    accentColor: root.activeTree.gradientAccentColor
+                    accentTopRight: root.activeTree.gradientTopRight
+                    visible: !root.reasoningRailExpanded
+                    z: 41
                 }
 
                 SelectorSlider {
                     id: reasoningSelectorSlider
                     anchors.left: parent.left
-                    anchors.top: parent.top
+                    anchors.top: reasoningCoffeeButton.bottom
+                    anchors.topMargin: 4
                     anchors.bottom: parent.bottom
                     width: 40
+                    z: 10
+                    visible: root.reasoningRailExpanded
                     selectorProfile: "index"
-                    // Git's legacy INDEX interaction snaps to integer stops;
-                    // Hospital can opt into release-preview separately.
                     indexInteraction: "legacy"
                     count: 4
-                    // SelectorSlider index 0 is the top HIGH position.
                     currentIndex: 3 - root.selectedReasoningStep
                     optionLabels: ["HIGH", "MED", "LOW", "NONE"]
-                    // Each Tree owns its native identity/base, corner
-                    // accent and spiritual/icon glow. Only this Forest
-                    // instance opts into the shared gradient thumb skin.
+                    // Native number is suppressed only for this Forest
+                    // instance; the gradient name below replaces it.
+                    showIndexReadout: false
                     accentColor: root.activeTree.identityColor
                     handleColor: root.activeTree.identityColor
                     handleGradientEnabled: true
@@ -1072,66 +1195,57 @@ PanelWindow {
                     handleGlowColor:
                         root.activeTree.spiritualIdleGlowColor
                     activityGlowColor: root.activeTree.iconIdleGlowColor
-                    // The Forest corner ring below supplies the gradient
-                    // outline instead of a second solid outer border.
                     border.color: "transparent"
                     sideLabel: "THINK"
-                    enabledSlider: root.menuOpen
+                    enabledSlider: root.menuOpen && root.reasoningRailExpanded
                     Accessible.name: "Forest reasoning level"
                     Accessible.description:
                         "Local Tree preference only; not connected to inference."
                     onIndexRequested: function(index) {
-                        if (root.menuOpen)
+                        if (root.menuOpen && root.reasoningRailExpanded)
                             root.chooseTreeReasoningStep(3 - index);
                     }
                 }
 
-                // Same Forest 1px radial border ink as the Tree buttons.
-                // This is visual-only and does not intercept slider input.
                 ForestCornerGradientBorder {
                     anchors.fill: reasoningSelectorSlider
                     lineWidth: 1
                     baseColor: root.activeTree.identityColor
                     accentColor: root.activeTree.gradientAccentColor
                     accentTopRight: root.activeTree.gradientTopRight
+                    visible: root.reasoningRailExpanded
                     z: 20
                 }
 
-                Repeater {
-                    model: ["HIGH", "MED", "LOW", "NONE"]
-                    delegate: Item {
-                        required property int index
-                        required property string modelData
-                        anchors.right: reasoningSelectorSlider.left
-                        anchors.rightMargin: 3
-                        width: 28
-                        height: 15
-                        y: reasoningRailHost.detentCenterY(index) - height / 2
-
-                        ForestGradientName {
-                            id: reasoningLevelInk
-                            anchors.fill: parent
-                            text: modelData
-                            gradientText: modelData
-                            pixelSize: 8
-                            bold: false
-                            baseColor: root.activeTree.identityColor
-                            accentColor: root.activeTree.gradientAccentColor
-                            accentTopRight: root.activeTree.gradientTopRight
-                        }
-                        TextHashGlow {
-                            safeSource: reasoningLevelInk
-                            requestedVisible: root.menuOpen
-                                && index === reasoningSelectorSlider.currentIndex
-                            foregroundColor: root.activeTree.identityColor
-                            preferredGlowColor:
-                                root.activeTree.spiritualIdleGlowColor
-                            radius: 4
-                            samples: 9
-                            opacity: 0.78
-                            z: -1
-                        }
-                    }
+                // Replace the selector's old numeric footer and all
+                // external labels with one Tree-gradient Gohu value.
+                ForestGradientName {
+                    id: reasoningLevelInk
+                    anchors.horizontalCenter: reasoningSelectorSlider.horizontalCenter
+                    anchors.bottom: reasoningSelectorSlider.bottom
+                    anchors.bottomMargin: 6
+                    width: reasoningSelectorSlider.width - 4
+                    height: 16
+                    text: ["HIGH", "MED", "LOW", "NONE"][
+                        reasoningSelectorSlider.currentIndex] || "NONE"
+                    gradientText: text
+                    pixelSize: 9
+                    bold: true
+                    baseColor: root.activeTree.identityColor
+                    accentColor: root.activeTree.gradientAccentColor
+                    accentTopRight: root.activeTree.gradientTopRight
+                    visible: root.reasoningRailExpanded
+                    z: 22
+                }
+                TextHashGlow {
+                    safeSource: reasoningLevelInk
+                    requestedVisible: root.menuOpen && root.reasoningRailExpanded
+                    foregroundColor: root.activeTree.identityColor
+                    preferredGlowColor: root.activeTree.spiritualIdleGlowColor
+                    radius: 4
+                    samples: 9
+                    opacity: 0.78
+                    z: 21
                 }
             }
 

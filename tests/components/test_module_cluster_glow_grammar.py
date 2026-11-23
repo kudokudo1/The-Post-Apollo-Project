@@ -127,9 +127,9 @@ assert re.search(r"(?m)^\s*SafeDropShadow\s*\{", tray)
 assert not re.search(r"(?m)^\s*DropShadow\s*\{", tray)
 assert "safeSource: trayIcon" in tray
 assert "trayButtonMouse.containsMouse ? 0.95 : 0.75" in tray
-# Workspace-style semantics: an actually displayed native menu is open
-# magenta. Hover is orange, idle cyan, and the backing/icon halos are
-# independent source-aligned layers.
+# Workspace-style semantics: each SNI-registered app gets a persistent
+# magenta active card/icon glow. The OUTER tray still uses the native-menu
+# magenta, hover-orange, and idle-cyan colors.
 assert "trayMenuOpen ? Colors.magenta" in tray
 assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in tray
 assert "trayMenuOpen ? 0.72" in tray
@@ -140,7 +140,9 @@ assert "safeSource: trayButtonBackground" in tray
 assert "id: trayButtonBackgroundGlow" in tray
 assert "id: trayActiveIconGlow" in tray
 assert tray.count("safeSource: trayIcon") == 2
-assert "trayNativeMenu.visible ? Colors.magenta" in tray
+assert "trayButton.appRegistered ? Colors.magenta" in tray
+assert "readonly property bool cardEmphasized: trayButton.appRegistered" in tray
+assert "visible: trayButton.appRegistered" in tray
 assert "onOpened: trayDock.openMenuAnchor = trayNativeMenu" in tray
 assert "Component.onDestruction:" in tray
 # No phantom local toggle can precede a real system-tray activation.

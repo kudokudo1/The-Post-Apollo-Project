@@ -12,21 +12,25 @@ function canonicalAppId(value) {
         .replace(/\s+/g, "");
 }
 
-function visibleWindowKeysFromTree(jsonText) {
-    // Do not accept stale or oversized / incomplete IPC output.
-    if (typeof jsonText !== "string" || jsonText.length === 0
-            || jsonText.length > 2000000)
-        return [];
+function inspectVisibleWindowTree(jsonText) {
+    // Distinguish a malformed/failed query from a legitimate desktop with
+    // no visible app windows. Counts are safe for diagnostics; never log
+    // window titles, PIDs, browser URLs or the raw Sway tree.
+    if (typeof jsonText !== "string" || jsonText.length === 0)
+        return {valid:false, reason:"empty", keys:[], windowCount:0};
+    if (jsonText.length > 8000000)
+        return {valid:false, reason:"oversize", keys:[], windowCount:0};
     var tree;
     try {
         tree = JSON.parse(jsonText);
     } catch (error) {
-        return [];
+        return {valid:false, reason:"invalid-json", keys:[], windowCount:0};
     }
     if (!tree || tree.type !== "root")
-        return [];
+        return {valid:false, reason:"not-root", keys:[], windowCount:0};
 
     var ids = [];
+    var windowCount = 0;
     function add(value) {
         var id = canonicalAppId(value);
         if (id && ids.indexOf(id) < 0)
@@ -40,6 +44,7 @@ function visibleWindowKeysFromTree(jsonText) {
         // Never use a workspace's mere existence or a window's title.
         if (node.visible === true
                 && (node.type === "con" || node.type === "floating_con")) {
+            windowCount++;
             add(node.app_id);
             if (node.window_properties) {
                 add(node.window_properties.class);
@@ -56,7 +61,12 @@ function visibleWindowKeysFromTree(jsonText) {
         }
     }
     visit(tree, 0);
-    return ids;
+    return {valid:true, reason:"ok", keys:ids, windowCount:windowCount};
+}
+
+// Retained for existing consumers and tests.
+function visibleWindowKeysFromTree(jsonText) {
+    return inspectVisibleWindowTree(jsonText).keys;
 }
 
 function trayAppKeys(item) {

@@ -1,0 +1,25 @@
+name: Connections TimeW v3 and C5 real local interlock (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/test_timew_c5_v3_real_local_interlock.py"
+      - "docs/connections/timew-c5-v3-real-local-interlock.md"
+      - ".github/workflows/connections-timew-c5-v3-real-local-interlock-ci.yml"
+      - "services/time/MachineV3LocalExactCaptureStore.py"
+      - "tests/connections/timew/TimeWC5SpendFenceReference.py"
+  workflow_dispatch:
+jobs:
+  real-local-nonauthority:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real separate TimeW v3 + C5 local SQLite cross-store hostile tests
+        run: python3 -B -I tests/connections/timew/test_timew_c5_v3_real_local_interlock.py
+      - name: Inherited TimeW v3 local exact capture contract
+        run: python3 -B -I tests/timew/test_machine_v3_local_exact_capture_store.py
+      - name: Inherited DOC 5 C5 local spend/revoke and lost response
+        run: python3 -B -I tests/connections/timew/test_timew_c5_spend_fence_reference.py
+      - name: Inherited DOC 5 local-to-protected nonpromotion
+        run: python3 -B -I tests/connections/timew/test_timew_c5_local_history_quarantine.py

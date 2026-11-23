@@ -8,7 +8,6 @@ are NEVER proof of an independently enrolled, durable native C5 terminal.
 """
 from __future__ import annotations
 
-import hashlib
 from types import MappingProxyType
 
 from services.connections.forest import ForestC5ExactSessionV1Preflight as V
@@ -58,6 +57,7 @@ def _check_local(value: object) -> dict:
     if (value["schema"] != LOCAL_SCHEMA or
             type(value["attemptId"]) is not str or
             type(value["sessionId"]) is not str or
+            type(value["forestWriteState"]) is not str or
             value["forestWriteState"] not in LOCAL_STATES or
             value["c5Settlement"] != "UNKNOWN_HOLD"):
         _hold("LOCAL_SCHEMA_OR_STATE_UNTRUSTED")

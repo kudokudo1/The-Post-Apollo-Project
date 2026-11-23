@@ -62,14 +62,24 @@ for token in (
     "stdinEnabled: true",
     "worker.write(candidateService.requestFrame)",
     "submittedGeneration",
-    "=== candidateService.generation",
-    "candidateService.monitoring",
-    "candidateService.candidatePreview = null",
+    "submittedGeneration === generation",
+    "const fresh = monitoring && submittedGeneration === generation",
+    "candidatePreview = null",
     "state = \"failed\"",
     "FINANCE_RESEARCH_CANDIDATES_RESULT ",
     "item.reviewed !== false",
     "item.authenticatedProvenance !== false",
-    "item.eligibleForDraft === false"
+    "item.eligibleForDraft === false",
+    "property bool stdoutFinished: false",
+    "property bool stderrFinished: false",
+    "property bool processExited: false",
+    "function completeAttempt(force)",
+    "candidateService.completeAttempt(false)",
+    "candidateService.completeAttempt(true)",
+    "stderr: StdioCollector {",
+    "refusalCode(code, output, diagnostic)",
+    "FINANCE_RESEARCH_PREVIEW_REFUSED // ",
+    "PREVIEW REFUSED // "
 ):
     assert token in service, token
 

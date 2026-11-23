@@ -16,11 +16,23 @@ Item {
     readonly property bool verifiedSave:
         !simulationOnly && phase === "acknowledged"
         && exactAcknowledgement && acknowledgedRevision >= 0
+    readonly property bool simulatedAck:
+        simulationOnly && phase === "acknowledged"
     readonly property bool unresolved:
         phase === "reviewRequired"
-        || (phase === "acknowledged" && !verifiedSave)
+        || (phase === "acknowledged" && !verifiedSave && !simulatedAck)
     readonly property string headline: {
-        if (simulationOnly) return "DISPOSABLE PREVIEW // NOT SAVED TO LIVE STORAGE";
+        if (simulationOnly) {
+            if (phase === "inFlight")
+                return "TEST DISPATCH IN FLIGHT // NO LIVE WRITE";
+            if (phase === "acknowledged")
+                return "TEST ACK RECEIVED // NOT SAVED TO LIVE STORAGE";
+            if (phase === "reviewRequired")
+                return "TEST OUTCOME UNKNOWN // KEEP DRAFT";
+            if (phase === "refused")
+                return "TEST REFUSED // NO LIVE WRITE";
+            return "DISPOSABLE PREVIEW // NOT SAVED TO LIVE STORAGE";
+        }
         if (verifiedSave) return "SAVED // EXACT ACK VERIFIED";
         if (phase === "inFlight") return "WRITE IN FLIGHT // DO NOT RESUBMIT";
         if (phase === "refused") return "REQUEST REFUSED // NO SAVE CLAIM";
@@ -40,7 +52,7 @@ Item {
             return "KEEP THE DRAFT // RELOAD READ ONLY BEFORE ANY NEW ACTION";
         return "NO WRITE REQUEST WAS SENT";
     }
-    readonly property color tone: verifiedSave ? Colors.cyan
+    readonly property color tone: verifiedSave || simulatedAck ? Colors.cyan
         : unresolved || phase === "refused" ? Colors.red : Colors.orange
 
     implicitHeight: shell.height

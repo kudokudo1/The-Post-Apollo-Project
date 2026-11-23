@@ -31,6 +31,7 @@ Item {
     property bool groupSubmitted: false
     property string groupWriteState: "idle"
     property string groupWriteMessage: ""
+    property bool externalWriteBusy: false
     property string writeState: "idle"
     property string writeMessage: ""
     signal editBudgetRequested(var category)
@@ -62,14 +63,16 @@ Item {
     readonly property var groupPlan: GroupPlan.previewGroupPlan(
         snapshot,groupDraftMode,groupDraftId,groupDraftName)
     readonly property bool groupProposalEligible: groupPreviewVisible
-        && !!groupPlan && groupPlan.ok && !busy && !groupSubmitted
+        && !!groupPlan && groupPlan.ok && !busy && !externalWriteBusy
+        && !groupSubmitted
         && snapshot && snapshot.readOnly===true
         && groupPlan.sourceKey===groupSourceAtOpen
         && groupPlan.sourceKey===snapshot.sourceKey
         && groupPlan.month===groupMonthAtOpen
         && groupPlan.month===snapshot.month
     readonly property bool proposalEligible: previewVisible && !!plan && plan.ok
-        && !busy && !submitted && snapshot && snapshot.readOnly===true
+        && !busy && !externalWriteBusy
+        && !submitted && snapshot && snapshot.readOnly===true
         && plan.sourceKey===sourceAtOpen
         && plan.sourceKey===snapshot.sourceKey
         && plan.month===monthAtOpen && plan.month===snapshot.month

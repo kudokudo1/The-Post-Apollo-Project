@@ -13,7 +13,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
-from PySide6.QtCore import QObject, QMetaObject, QUrl
+from PySide6.QtCore import QObject, QMetaObject, QUrl, Q_ARG
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuick import QQuickItem
@@ -115,6 +115,13 @@ QtObject {
         )
         pump()
 
+    def click(obj):
+        # ActionButton.leftClicked(var mouseEvent) expects QVariant.
+        assert QMetaObject.invokeMethod(
+            obj, "leftClicked", Q_ARG("QVariant", None)
+        ), "real ActionButton signal could not be emitted"
+        pump()
+
     def prop(obj, name):
         pump()
         return obj.property(name)
@@ -183,7 +190,7 @@ QtObject {
         # Click real refresh signal; it may only invoke the mocked local
         # read transport, never spawn a process or touch M20 quotas.
         invoke(root,"stageFull")
-        invoke(refresh,"leftClicked")
+        click(refresh)
         assert counts() == 2
         assert "LOCAL RESERVED 20 / 20" in labels(),labels()
         assert "LOCAL RESERVED 25 / 25" in labels(),labels()
@@ -226,7 +233,7 @@ QtObject {
         assert prop(service,"state") == "ready"
 
         # Verify real BACK ActionButton reaches the owning screen signal.
-        invoke(back,"leftClicked")
+        click(back)
         assert prop(root,"backEmitted") is True
 
         print("Finance M22 actual quota-pane Qt offscreen open/refresh/"

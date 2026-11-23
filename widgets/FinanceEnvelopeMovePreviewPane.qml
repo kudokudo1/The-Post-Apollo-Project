@@ -2,8 +2,8 @@ import QtQuick
 import "../components"
 import "../services/finance/FinanceEnvelopeMovePlan.js" as MoveRules
 
-// FinanceW Simple M2a // staged, unmounted preview only.
-// No write signal, Process, filesystem, Actual API, payment or account transfer.
+// FinanceW Simple M2c // mounted preview, still READ-ONLY.
+// No write signal, Process, filesystem, API, payment or account transfer.
 Item {
     id: move
     objectName: "envelopeMovePreviewPane"
@@ -19,6 +19,11 @@ Item {
         && snapshot.readOnly===true
         && snapshot.source==="actual-budget"
         && snapshot.schemaVersion===1
+        && typeof snapshot.sourceKey==="string"
+        && /^[a-f0-9]{64}$/.test(snapshot.sourceKey)
+        && /^(19|20)\d{2}-(0[1-9]|1[0-2])$/.test(snapshot.month||"")
+        && Number.isSafeInteger(snapshot.toBudgetCents)
+        && Math.abs(snapshot.toBudgetCents)<=99999999999
         && Array.isArray(snapshot.categories)
     readonly property var choices: sourceReady
         ? snapshot.categories.filter(function(c) {
@@ -250,7 +255,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "NOT SAVED // ATOMIC FINANCIAL WRITER NOT IMPLEMENTED"
+            text: "PREVIEW ONLY // NO CHANGES SAVED // WRITER NOT CONNECTED"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

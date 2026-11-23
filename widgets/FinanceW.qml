@@ -268,6 +268,7 @@ PanelWindow {
             && selectedBudgetSubMode === "budget"
             && !financeBudget.loading && !fundingReviewOpen
             && !transactionDraftPane.open
+            && !envelopeMovePreviewPane.open
             && financeWrite.state !== "pending"
             && financeWrite.state !== "uncertain"
             && financeCategoryWrite.state !== "pending"
@@ -313,6 +314,7 @@ PanelWindow {
         || quickAddPane.open
         || guidedFundingPane.expanded
         || allocationPreviewPane.open
+        || envelopeMovePreviewPane.open
         || financeCategoriesPane.openMode !== ""
         || financeCategoriesPane.groupDraftMode !== ""
         || financeDrafts.state === "pending"
@@ -326,6 +328,20 @@ PanelWindow {
         || financeCategoryWrite.state === "uncertain"
         || financeCategoryGroupWrite.state === "pending"
         || financeCategoryGroupWrite.state === "uncertain"
+
+    // M2c is a view-only launcher. Neither this property nor the UI can
+    // invoke the dormant paired writer from M2b.
+    readonly property bool envelopeMoveLaunchReady:
+        menuOpen
+        && selectedMainMode === "budget"
+        && selectedBudgetSubMode === "budget"
+        && budgetExperienceMode === "simple"
+        && budgetSection === "budget"
+        && financeBudget.state === "ready"
+        && !financeBudget.loading
+        && !budgetExperienceSwitchBlocked
+        && envelopeMovePreviewPane.sourceReady
+        && envelopeMovePreviewPane.choices.length >= 2
 
     function selectBudgetExperience(next) {
         if (next !== "simple" && next !== "advanced") return false;
@@ -469,6 +485,8 @@ PanelWindow {
     Connections {
         target: root
         function onSelectedMainModeChanged() {
+            if(root.selectedMainMode!=="budget")
+                envelopeMovePreviewPane.clear();
             financeContentKeys.reset();
             Qt.callLater(function() {
                 if(financeContentKeys.navigationActive)
@@ -476,6 +494,8 @@ PanelWindow {
             });
         }
         function onSelectedBudgetSubModeChanged() {
+            if(root.selectedBudgetSubMode!=="budget")
+                envelopeMovePreviewPane.clear();
             financeContentKeys.reset();
             Qt.callLater(function() {
                 if(financeContentKeys.navigationActive)
@@ -483,6 +503,8 @@ PanelWindow {
             });
         }
         function onBudgetSectionChanged() {
+            if(root.budgetSection!=="budget")
+                envelopeMovePreviewPane.clear();
             financeContentKeys.reset();
             Qt.callLater(function() {
                 if(financeContentKeys.navigationActive)
@@ -557,6 +579,7 @@ PanelWindow {
         } else {
             diagnosticsOpen = false;
             transactionDraftPane.clear();
+            envelopeMovePreviewPane.clear();
         }
     }
     onKeyboardActiveChanged: {
@@ -1618,6 +1641,7 @@ ActionButton {
     accentColor: Colors.orange
     trackLabelGlowLocally: true
     available: financeBudget.state==="ready" && !!financeBudget.snapshot
+        && !envelopeMovePreviewPane.open
         && financeFundingWrite.state!=="pending"
         && financeFundingWrite.state!=="uncertain"
     onLeftClicked: {
@@ -1640,6 +1664,32 @@ FinanceQuickAddPane {
                 && financeFundingWrite.state!=="uncertain")
             financeFundingWrite.submit(payload);
     }
+}
+ActionButton {
+    id: moveEnvelopePreviewAction
+    objectName: "moveEnvelopePreviewAction"
+    width: parent.width
+    height: 30
+    visible: root.budgetExperienceMode==="simple"
+    label: envelopeMovePreviewPane.open
+        ? "HIDE MOVE MONEY PREVIEW" : "MOVE MONEY // PREVIEW"
+    labelPixelSize: 10
+    accentColor: Colors.cyan
+    trackLabelGlowLocally: true
+    keyboardActivationSignal: "leftClicked"
+    available: envelopeMovePreviewPane.open || root.envelopeMoveLaunchReady
+    onLeftClicked: {
+        if(envelopeMovePreviewPane.open)
+            envelopeMovePreviewPane.clear();
+        else if(root.envelopeMoveLaunchReady)
+            envelopeMovePreviewPane.begin();
+    }
+}
+FinanceEnvelopeMovePreviewPane {
+    id: envelopeMovePreviewPane
+    objectName: "financeBudgetEnvelopeMovePreview"
+    width: parent.width
+    snapshot: financeBudget.snapshot
 }
 FinanceBudgetGrid {
     id: financeBudgetGrid

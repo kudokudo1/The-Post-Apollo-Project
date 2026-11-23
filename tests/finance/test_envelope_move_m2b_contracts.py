@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FinanceW Simple M2b separate permit, two-category recovery, unmounted authority."""
+"""FinanceW Simple M2b writer authority: M2c mounts view-only UI only."""
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 writer=(root/"scripts/finance/write_envelope_move.mjs").read_text()
@@ -8,14 +8,14 @@ rootqml=(root/"widgets/FinanceW.qml").read_text()
 pane=(root/"widgets/FinanceEnvelopeMovePreviewPane.qml").read_text()
 existing=(root/"scripts/finance/write_allocation.mjs").read_text()
 
-# M2b does not mount or activate a financial writer from a view-only pane.
+# The M2c mounted preview never activates the separate M2b financial writer.
 assert 'write_envelope_move.mjs' not in rootqml
 assert 'write_envelope_move.mjs' not in pane
 assert "FINANCEW_ENVELOPE_MOVES_APPROVED" not in rootqml
 assert "FINANCEW_ENVELOPE_MOVES_APPROVED" not in pane
 assert "signal saveRequested" not in pane
 assert "signal moveRequested" not in pane
-assert 'FinanceEnvelopeMovePreviewPane {' not in rootqml
+assert rootqml.count('FinanceEnvelopeMovePreviewPane {') == 1
 assert "setBudgetAmount(" not in rootqml
 assert "setBudgetAmount(" not in pane
 
@@ -87,4 +87,4 @@ for forbidden in ("Process {","LocalStorage","fetch(",
                   "FINANCEW_ENVELOPE_MOVES_APPROVED","createPermit(",
                   "replay(", "retry("):
     assert forbidden not in guard,forbidden
-print("FinanceW Simple M2b guarded dormant writer authority and recovery: PASS")
+print("FinanceW Simple M2b guarded writer remains dormant after M2c: PASS")

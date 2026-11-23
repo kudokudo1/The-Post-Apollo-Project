@@ -135,6 +135,32 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         assert prop(pane, "groupDraftMode") == ""
         assert prop(pane, "groupPreviewVisible") is False
 
+        # The category-name editor has the same snapshot invalidation
+        # guarantee. A stale name cannot retain a previously armed preview.
+        invoke(root, "resetFixture")
+        invoke(root, "openRentCategoryRename")
+        assert prop(pane, "openMode") == "rename"
+        assert prop(pane, "selectedCategoryId") == "rent"
+        setprop(pane, "draftName", "Housing")
+        setprop(pane, "previewVisible", True)
+        setprop(pane, "approvalArmed", True)
+        invoke(root, "changeCategoryName")
+        assert prop(pane, "openMode") == ""
+        assert prop(pane, "approvalArmed") is False
+        assert prop(pane, "previewVisible") is False
+
+        # Navigating away from Categories discards an unsent group draft.
+        invoke(root, "resetFixture")
+        invoke(pane, "beginCreateGroup")
+        setprop(pane, "groupDraftName", "Emergency")
+        setprop(pane, "groupPreviewVisible", True)
+        setprop(pane, "groupApprovalArmed", True)
+        setprop(pane, "visible", False)
+        assert prop(pane, "groupDraftMode") == ""
+        assert prop(pane, "groupPreviewVisible") is False
+        assert prop(pane, "groupApprovalArmed") is False
+        setprop(pane, "visible", True)
+
         # Income-group rows are never renameable, even in an unexpected
         # source, and an ambiguous group ID cannot arm a preview.
         invoke(root, "resetFixture")

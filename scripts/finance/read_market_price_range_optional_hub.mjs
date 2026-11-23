@@ -1,7 +1,7 @@
 // M10: local Market Hub read-through for a bounded EOD price range.
 // Same absent-only fallback as M8; never bypass an active failing hub.
 import {pathToFileURL} from "node:url";
-import {SYMBOLS} from "./read_sec_price_context.mjs";
+import {STOCK_SYMBOLS} from "./market_stock_catalog.mjs";
 import {loadPriceRange,validateRange,MAX_RANGE_BARS,dayNumber}
   from "./read_market_price_range.mjs";
 
@@ -25,7 +25,7 @@ async function boundedJson(response){
 }
 function validateResult(x,cik,from,to) {
   if(!x || x.schemaVersion!==1 || x.source!=="eodhd-eod" || x.readOnly!==true
-      || x.cik!==cik || x.symbol!==SYMBOLS[cik]
+      || x.cik!==cik || x.symbol!==STOCK_SYMBOLS[cik]
       || x.from!==from || x.to!==to
       || !["CLOSE","ADJUSTED CLOSE"].includes(x.priceBasis)
       || typeof x.retrievedAt!=="string" || !Number.isFinite(Date.parse(x.retrievedAt))

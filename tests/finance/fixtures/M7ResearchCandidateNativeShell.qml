@@ -35,6 +35,32 @@ ShellRoot {
             }]
         })
     }
+    // A live SEC page can contain 30 records. The original M7 smoke
+    // only covered one, missing the operator's populated preview failure.
+    Component.onCompleted: {
+        const source = secMock.snapshot;
+        const filings = source.filings.slice();
+        for (let i = 1; i < 30; ++i) {
+            const suffix = ("000000" + (111 + i)).slice(-6);
+            const accession = "0000320193-26-" + suffix;
+            const form4 = i % 3 === 0;
+            const document = form4
+                ? "xslF345X05/wk-form4-" + suffix + ".xml" : "index.htm";
+            filings.push({
+                accession: accession,
+                form: form4 ? "4" : "8-K",
+                category: form4 ? "INSIDER DISCLOSURE" : "MATERIAL EVENT",
+                filedAt: "2026-11-20",
+                acceptedAt: null,
+                primaryDocument: document,
+                items: [],
+                documentUrl: "https://www.sec.gov/Archives/edgar/data/"
+                    + "320193/" + accession.replace(/-/g, "") + "/" + document
+            });
+        }
+        secMock.snapshot = Object.assign({}, source, {filings: filings});
+    }
+
     QtObject {
         id: crawlMock
         property string state: "ready"
@@ -108,9 +134,9 @@ ShellRoot {
             if (!root.checkedReady && host.previewState === "ready") {
                 const data = host.previewResult;
                 if (!data || !data.readOnly || !data.counts
-                        || data.counts.sec !== 1
+                        || data.counts.sec !== 30
                         || data.counts.demo !== 1
-                        || data.candidates.length !== 2
+                        || data.candidates.length !== 31
                         || data.candidates[0].authenticatedProvenance !== false
                         || data.candidates[1].eligibleForDraft !== false) {
                     root.fail("INCOMPLETE_OR_UNSAFE_PREVIEW");

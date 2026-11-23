@@ -188,7 +188,7 @@ class DevelopmentLedger:
         try:
             db.execute("BEGIN IMMEDIATE")
             head, seq = db.execute("SELECT head,seq FROM meta WHERE id=1").fetchone()
-            db.execute("INSERT INTO challenges VALUES(?,?,?,?,?,?,?,?,?,'issued',NULL)",
+            db.execute("INSERT INTO challenges VALUES(?,?,?,?,?,?,?,?,'issued',NULL)",
                        (digest(challenge), PURPOSE, host, release_epoch,
                         release_seq, head, seq, now_ms + ttl_ms))
             db.execute("COMMIT")

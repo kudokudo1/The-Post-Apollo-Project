@@ -52,7 +52,7 @@ Rectangle {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: 1
-            color: Colors.cyan
+            color: Colors.green
         }
     }
 
@@ -132,6 +132,6 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 1
-        color: Colors.cyan
+        color: Colors.green
     }
 }

@@ -1,0 +1,37 @@
+name: Finance Research M9a memory-only scratch native smoke
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceResearchInvestigationsPane.qml"
+      - "widgets/FinanceResearchEvidenceCandidatePreviewHost.qml"
+      - "services/finance/FinanceResearchCandidateDraftService.qml"
+      - "scripts/finance/research_candidate_draft_preview.mjs"
+      - "scripts/finance/verify_research_scratch_native_m9a.sh"
+      - "tests/finance/fixtures/M9aResearchScratchNativeShell.qml"
+      - ".github/workflows/finance-research-scratch-native-m9a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-scratch:
+    name: M9a actual Quickshell with empty local store and unsaved SEC citation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
+    steps:
+      - name: Install isolated Fedora Quickshell and test dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Verify empty-store scratch, citation, disposal and no writes
+        run: bash scripts/finance/verify_research_scratch_native_m9a.sh

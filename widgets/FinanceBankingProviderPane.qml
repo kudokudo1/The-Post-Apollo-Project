@@ -17,6 +17,9 @@ Item {
     property int activityPageIndex: 0
     property int entryAccountIndex: 0
     property string entryDirection: "out" // out | in
+    property var correctionCandidate: null
+    property string correctionDirection: "out"
+    property bool correctionDeleteArmed: false
     readonly property var details: ProviderPolicy.build(
         providerId,accountSnapshot,sectionId)
     readonly property var providerAccounts: details.ok ? details.allAccounts : []
@@ -28,6 +31,8 @@ Item {
             accountId:activityAccountId,query:activitySearch.text,page:activityPageIndex})
     signal accountRequested(string accountId)
     signal manualEntryRequested(var draft)
+    signal manualCorrectionRequested(var draft)
+    signal manualDeletionRequested(var draft)
     signal returnToTopRequested()
     implicitHeight: providerContent.implicitHeight
 
@@ -36,19 +41,89 @@ Item {
         activityAccountIndex=0;
         activityPageIndex=0;
         entryAccountIndex=0;
+        clearSelectedEntry();
     }
     onSectionIdChanged: {
         activityDirection="all";
         activityAccountIndex=0;
         activityPageIndex=0;
+        clearSelectedEntry();
         returnToTopRequested();
     }
-    onActivityDirectionChanged: activityPageIndex=0
-    onActivityAccountIndexChanged: activityPageIndex=0
-    onManualSessionChanged: activityPageIndex=0
+    onActivityDirectionChanged: {
+        activityPageIndex=0;
+        clearSelectedEntry();
+    }
+    onActivityAccountIndexChanged: {
+        activityPageIndex=0;
+        clearSelectedEntry();
+    }
+    onActivityPageIndexChanged: clearSelectedEntry()
+    onManualSessionChanged: {
+        activityPageIndex=0;
+        clearSelectedEntry();
+    }
     function clearAfterEntry() {
         quickDescription.text="";
         quickAmount.text="";
+    }
+    function clearSelectedEntry() {
+        correctionCandidate=null;
+        correctionDeleteArmed=false;
+    }
+    function chooseManualEntry(row) {
+        if(!details.ok||details.sectionKind!=="activity"
+           ||manualSession.mode!=="manual"||!filteredActivity.ok
+           ||!filteredActivity.rows.some(function(e){
+               return e.id===row.id&&e.accountId===row.accountId
+                   &&e.date===row.date&&e.description===row.description
+                   &&e.amountCents===row.amountCents;
+           }))return false;
+        correctionCandidate={
+            providerId:providerId,entryId:row.id,accountId:row.accountId,
+            expectedDate:row.date,expectedDescription:row.description,
+            expectedAmountCents:row.amountCents
+        };
+        editDate.text=row.date;
+        editDescription.text=row.description;
+        editAmount.text=(Math.abs(row.amountCents)/100).toFixed(2);
+        correctionDirection=row.amountCents<0?"out":"in";
+        correctionDeleteArmed=false;
+        returnToTopRequested();
+        return true;
+    }
+    function requestCorrection() {
+        if(!correctionCandidate||manualSession.mode!=="manual"
+           ||!details.ok||details.sectionKind!=="activity")return false;
+        manualCorrectionRequested({
+            providerId:correctionCandidate.providerId,
+            entryId:correctionCandidate.entryId,
+            accountId:correctionCandidate.accountId,
+            expectedDate:correctionCandidate.expectedDate,
+            expectedDescription:correctionCandidate.expectedDescription,
+            expectedAmountCents:correctionCandidate.expectedAmountCents,
+            date:editDate.text,description:editDescription.text,
+            amountText:editAmount.text,direction:correctionDirection
+        });
+        return true;
+    }
+    function requestDeletion() {
+        if(!correctionCandidate||manualSession.mode!=="manual"
+           ||!details.ok||details.sectionKind!=="activity")return false;
+        if(!correctionDeleteArmed) {
+            correctionDeleteArmed=true;
+            return false;
+        }
+        correctionDeleteArmed=false;
+        manualDeletionRequested({
+            providerId:correctionCandidate.providerId,
+            entryId:correctionCandidate.entryId,
+            accountId:correctionCandidate.accountId,
+            expectedDate:correctionCandidate.expectedDate,
+            expectedDescription:correctionCandidate.expectedDescription,
+            expectedAmountCents:correctionCandidate.expectedAmountCents
+        });
+        return true;
     }
     function requestManualEntry() {
         if(!details.ok||details.sectionKind!=="activity"
@@ -442,7 +517,10 @@ Item {
                     selectByMouse: true
                     activeFocusOnPress: true
                     maximumLength: 64
-                    onTextChanged: providerPane.activityPageIndex=0
+                    onTextChanged: {
+                        providerPane.activityPageIndex=0;
+                        providerPane.clearSelectedEntry();
+                    }
                 }
             }
             GohuText {

@@ -84,7 +84,7 @@ for (const key of [
     "pressedSoftGlowColor","selectedSoftGlowColor","idleWideGlowColor",
     "hoverWideGlowColor","pressedWideGlowColor","selectedWideGlowColor"
 ]) {
-    const re = new RegExp("^\\\\s*" + key + ":\\\\s*([^\\\\n]+)", "m");
+    const re = new RegExp("^\\s*" + key + ":\\s*([^\\n]+)", "m");
     const expected = resize.match(re);
     const actual = toggle.match(re);
     assert.ok(expected && actual, "missing down-arrow color recipe " + key);

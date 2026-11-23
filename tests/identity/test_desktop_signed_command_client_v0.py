@@ -533,7 +533,7 @@ class SignedNativeCommandTests(unittest.TestCase):
 
         peer = KernelPeer(os.getpid(), os.geteuid(), os.getegid())
         with patch("desktop_signed_command_client_v0.socket.socket",
-                   return_value=PartialSend()), \\
+                   return_value=PartialSend()), \
              patch("desktop_signed_command_client_v0._peer",
                    return_value=peer):
             with self.assertRaises(ReceiptRejected):
@@ -561,7 +561,7 @@ class SignedNativeCommandTests(unittest.TestCase):
             return wire
 
         with patch("desktop_signed_command_client_v0.build_request",
-                   side_effect=capture), \\
+                   side_effect=capture), \
              patch("desktop_signed_command_client_v0.verify_receipt",
                    side_effect=ReceiptRejected("lost response")):
             with self.assertRaises(ReceiptRejected):

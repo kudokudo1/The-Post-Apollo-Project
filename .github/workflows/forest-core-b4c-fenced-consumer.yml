@@ -1,0 +1,33 @@
+name: Forest Core B4c Synthetic Held-Permit Consumer
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/FENCED_CONSUMER_B4C.md'
+      - 'tests/forest/test_fenced_commit_b4c.py'
+      - '.github/workflows/forest-core-b4c-fenced-consumer.yml'
+  push:
+    paths:
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/FENCED_CONSUMER_B4C.md'
+      - 'tests/forest/test_fenced_commit_b4c.py'
+      - '.github/workflows/forest-core-b4c-fenced-consumer.yml'
+
+jobs:
+  synthetic-held-permit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Forest B4c separate-store permit and uncertainty regressions
+        run: python3 -m unittest discover -s tests/forest -p 'test_fenced_commit_b4c.py' -v
+      - name: Existing B3 no-retry and durable write regressions
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: Existing B4a caller and policy regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: Existing B4b pre-commit regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_precommit_b4b.py' -v
+      - name: Check Python syntax
+        run: python3 -m py_compile scripts/forest/turn_bridge_b3.py scripts/forest/host_admission_b4a.py tests/forest/test_fenced_commit_b4c.py

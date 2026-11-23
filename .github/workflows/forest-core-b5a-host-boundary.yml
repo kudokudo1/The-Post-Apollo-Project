@@ -1,0 +1,33 @@
+name: Forest Core B5a Disposable Host Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/host_boundary_fixture_b5a.py'
+      - 'scripts/forest/HOST_BOUNDARY_B5A.md'
+      - 'tests/forest/test_host_boundary_fixture_b5a.py'
+      - '.github/workflows/forest-core-b5a-host-boundary.yml'
+  push:
+    paths:
+      - 'scripts/forest/host_boundary_fixture_b5a.py'
+      - 'scripts/forest/HOST_BOUNDARY_B5A.md'
+      - 'tests/forest/test_host_boundary_fixture_b5a.py'
+      - '.github/workflows/forest-core-b5a-host-boundary.yml'
+
+jobs:
+  synthetic-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: B5a synthetic host boundary
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_boundary_fixture_b5a.py' -v
+      - name: B1 synthetic session journal
+        run: python3 -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: B3 synthetic turn bridge
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a injected host admission
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: ForestW synthetic session list consumer
+        run: python3 tests/forest/test_forest_session_list_consumer_v1.py
+      - name: Compile
+        run: python3 -m py_compile scripts/forest/host_boundary_fixture_b5a.py tests/forest/test_host_boundary_fixture_b5a.py

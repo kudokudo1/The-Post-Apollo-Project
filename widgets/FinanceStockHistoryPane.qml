@@ -33,6 +33,12 @@ Item {
         && snapshot.from === stockFeed.startDate
         && snapshot.to === stockFeed.endDate
         ? RangeAnalysisPolicy.summarizeRange(snapshot) : null
+    // M27: selected chart session to LAST LOADED range session, never now.
+    // Follows existing point/issuer/date invalidation and spends no API call.
+    readonly property var selectedCloseComparison: rangeAnalysis !== null
+        && selectedPointIndex >= 0
+        ? RangeAnalysisPolicy.compareSelectedToLast(snapshot, selectedPointIndex)
+        : null
 
     function inspectChartPoint(x, y) {
         if (dayMode || !snapshot || priceBars.length < 2
@@ -591,6 +597,44 @@ Item {
                 font.pixelSize: 11
                 color: Colors.orange
                 wrapMode: Text.WordWrap
+            }
+            Rectangle {
+                objectName: "marketSelectedCloseComparisonPanel"
+                width: parent.width
+                visible: !stocks.dayMode && stocks.selectedCloseComparison !== null
+                height: visible ? selectedComparisonText.implicitHeight + 24 : 0
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                GohuText {
+                    id: selectedComparisonText
+                    objectName: "marketSelectedCloseComparisonText"
+                    anchors.top: parent.top
+                    anchors.topMargin: 11
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    text: stocks.selectedCloseComparison
+                        ? ("SELECTED VS LAST LOADED CLOSE // "
+                            + stocks.selectedCloseComparison.priceBasis
+                            + "\nSELECTED " + stocks.selectedCloseComparison.selected.date
+                            + " // $" + stocks.selectedCloseComparison.selected.price.toFixed(2)
+                            + "\nLAST " + stocks.selectedCloseComparison.last.date
+                            + " // $" + stocks.selectedCloseComparison.last.price.toFixed(2)
+                            + "\nCHANGE " + (stocks.selectedCloseComparison.deltaPrice > 0 ? "+" : "")
+                            + "$" + stocks.selectedCloseComparison.deltaPrice.toFixed(2)
+                            + " // " + (stocks.selectedCloseComparison.deltaPct > 0 ? "+" : "")
+                            + stocks.selectedCloseComparison.deltaPct.toFixed(2) + "%"
+                            + "\nOBSERVED SESSION STEPS "
+                            + stocks.selectedCloseComparison.sessionSteps
+                            + "\nNOT A LIVE QUOTE // NO NEW REQUEST")
+                        : ""
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 11
+                    color: Colors.white
+                }
             }
             ActionButton {
                 id: openSelectedInDay

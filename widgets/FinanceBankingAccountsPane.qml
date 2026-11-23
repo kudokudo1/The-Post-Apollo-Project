@@ -17,6 +17,7 @@ Item {
     property int productIndex: 0
     property string direction: "out"
     property bool createOpen: false
+    property bool showAllRecentHistory: false
     property bool deleteArmed: false
     property var accountCorrectionCandidate: null
     property bool accountCorrectionArmed: false
@@ -55,6 +56,7 @@ Item {
         transferCorrectionArmed=false;
     }
     onViewChanged: {
+        showAllRecentHistory=false;
         accountCorrectionCandidate=null;
         accountCorrectionArmed=false;
         deleteArmed=false;
@@ -66,6 +68,7 @@ Item {
         returnToTopRequested();
     }
     onSelectedIdChanged: {
+        showAllRecentHistory=false;
         accountCorrectionCandidate=null;
         accountCorrectionArmed=false;
         deleteArmed=false;
@@ -256,6 +259,17 @@ Item {
         selectedProviderId=id;
         message="";
         view="provider";
+        return true;
+    }
+    function openSelectedProviderActivity() {
+        // Read/navigation only. No mutation, transaction, or connection action.
+        if(view!=="detail"||!selected
+           ||!ProviderPolicy.isProviderId(selected.providerId))return false;
+        selectedProviderId=selected.providerId;
+        message="";
+        view="provider";
+        providerMiniApp.sectionId="activity";
+        returnToTopRequested();
         return true;
     }
     function showProviderAccount(id) {
@@ -1407,44 +1421,79 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "RECENT ACTIVITY // LATEST 12 // SESSION ONLY"
+                text: "RECENT ACTIVITY // "
+                    +(manager.selected
+                        ? Math.min(manager.selected.recent.length,
+                            manager.showAllRecentHistory?12:3):0)
+                    +" OF "+(manager.selected?manager.selected.transactionCount:0)
+                    +" SESSION ENTRIES"
                 font.pixelSize: 10
+                font.bold: true
                 color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: manager.selected!==null&&manager.selected.transactionCount>12
+                text: "ONLY THE 12 MOST RECENTLY RECORDED ENTRIES ARE PREVIEWED HERE"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
             }
             Repeater {
-                model: manager.selected?manager.selected.recent:[]
+                // The same immutable session projection supplies both modes.
+                // This only limits rendered cards; no entry is hidden from
+                // provider ACTIVITY or removed from the session.
+                model: manager.selected
+                    ? manager.selected.recent.slice(0,manager.showAllRecentHistory?12:3):[]
                 delegate: Rectangle {
+                    id: recentEntryCard
                     required property var modelData
+                    readonly property bool transferLeg: !!modelData.transferId
                     width: layout.width
-                    height: activityBlock.implicitHeight+10
+                    height: activityBlock.implicitHeight+14
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: recentEntryCard.transferLeg?Colors.magenta:Colors.cyan
                     color: Colors.black
                     Column {
                         id: activityBlock
-                        x: 5
-                        y: 5
-                        width: parent.width-10
-                        spacing: 3
+                        x: 7
+                        y: 7
+                        width: recentEntryCard.width-14
+                        spacing: 4
                         GohuText {
                             width: parent.width
-                            text: modelData.date+" // "+Accounts.money(modelData.amountCents)
+                            text: "DATE // "+modelData.date
                             font.pixelSize: 10
-                            color: modelData.amountCents<0?Colors.orange:Colors.omnitrix
+                            color: Colors.cyan
                             textFormat: Text.PlainText
                         }
                         GohuText {
                             width: parent.width
+                            text: (recentEntryCard.transferLeg
+                                ? (modelData.amountCents<0?"TRANSFER OUT // ":"TRANSFER IN // ")
+                                : (modelData.amountCents<0?"MONEY OUT // ":"MONEY IN // "))
+                                +Accounts.money(Math.abs(modelData.amountCents))
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: modelData.amountCents<0?Colors.orange:Colors.omnitrix
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                        }
+                        GohuText {
+                            width: parent.width
                             text: modelData.description
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             color: Colors.white
                             textFormat: Text.PlainText
                             wrapMode: Text.WordWrap
                         }
                         GohuText {
                             width: parent.width
-                            visible: !!modelData.transferId
-                            text: "PAIRED MANUAL TRANSFER // NOT VERIFIED INCOME OR SPENDING"
+                            visible: recentEntryCard.transferLeg
+                            text: "DECLARED PAIRED MANUAL TRANSFER // NOT VERIFIED INCOME OR SPENDING"
                             font.pixelSize: 9
                             color: Colors.orange
                             textFormat: Text.PlainText
@@ -1452,6 +1501,26 @@ Item {
                         }
                     }
                 }
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                visible: manager.selected!==null&&manager.selected.recent.length>3
+                label: manager.showAllRecentHistory
+                    ? "SHOW LATEST 3 ENTRIES"
+                    : "SHOW UP TO 12 RECENT ENTRIES"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: manager.showAllRecentHistory=!manager.showAllRecentHistory
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                visible: manager.selected!==null&&manager.selected.transactionCount>0
+                label: "OPEN FULL PROVIDER ACTIVITY // FILTERS AND HISTORY"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                onLeftClicked: manager.openSelectedProviderActivity()
             }
             GohuText {
                 width: parent.width

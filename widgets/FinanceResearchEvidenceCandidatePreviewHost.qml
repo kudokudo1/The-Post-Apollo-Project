@@ -12,6 +12,7 @@ Item {
 
     // Read-only host API for isolated native acceptance and future Finance UI.
     readonly property string previewState: previewService.state
+    readonly property string previewMessage: previewService.message
     readonly property var previewResult: previewService.candidatePreview
     function buildPreview() { return previewService.refresh(); }
 

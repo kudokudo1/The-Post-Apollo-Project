@@ -36,6 +36,35 @@ assert.equal(payload.candidates[0].kind,"sec-index");
 assert.equal(payload.candidates[0].reviewed,false);
 assert.equal(payload.candidates[0].authenticatedProvenance,false);
 assert.equal(payload.candidates[1].eligibleForDraft,false);
+
+// M8a: the live SEC reader presents up to 30 recent submissions, not one.
+// Exercise actual normalized shapes and the upper bound of JSON/IPC output.
+const accessionNumber=Array.from({length:30},(_,i)=>
+  "0000320193-26-"+String(i+111).padStart(6,"0"));
+const filingDate=Array.from({length:30},()=>"2026-11-20");
+const forms=Array.from({length:30},(_,i)=>i%3===0?"4":"8-K");
+const documents=Array.from({length:30},(_,i)=>i%3===0
+  ? "xslF345X05/wk-form4-"+String(i+111)+".xml":"index.htm");
+const populatedSec=normalizeSubmissions({
+  cik:320193,name:"Apple Inc",
+  filings:{recent:{
+    accessionNumber,filingDate,form:forms,primaryDocument:documents,
+    acceptanceDateTime:Array.from({length:30},()=>"2026-11-20T12:33:00"),
+    items:Array.from({length:30},(_,i)=>i%3===0?"":"1.01, 9.01")
+  }}
+},"0000320193",timestamp);
+assert.equal(populatedSec.filings.length,30);
+const maxFrame=JSON.stringify({...request,secSnapshot:populatedSec})+"\n";
+const maxOutput=prepareCandidatePreviewResponse(maxFrame);
+const maxPayload=JSON.parse(maxOutput.slice(RESULT_PREFIX.length));
+assert.deepEqual(maxPayload.counts,{sec:30,demo:1,attachablePreview:30});
+assert.equal(maxPayload.candidates.length,31);
+assert.ok(maxPayload.candidates.slice(0,30).every(x=>
+  x.kind==="sec-index" && x.reviewed===false
+    && x.authenticatedProvenance===false));
+assert.equal(maxPayload.candidates[30].eligibleForDraft,false);
+assert.ok(Buffer.byteLength(maxOutput,"utf8")<65536);
+assert.ok(maxOutput.length<66000);
 assert.match(payload.notice,/NO AUTOMATIC SOURCE VERIFICATION/);
 assert.equal(prepareCandidatePreviewResponse(JSON.stringify({
   action:"preview",selectedCik:null,secSnapshot:null,crawlSnapshot:null

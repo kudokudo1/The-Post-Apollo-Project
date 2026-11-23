@@ -15,8 +15,14 @@ Scope {
     property var candidatePreview: null
     property string requestFrame: ""
     property string responseBuffer: ""
+    property string errorBuffer: ""
+    readonly property string processErrorPrefix: "FINANCE_RESEARCH_CANDIDATES_ERROR "
     property int generation: 0
     property int submittedGeneration: -1
+    property bool stdoutFinished: false
+    property bool stderrFinished: false
+    property bool processExited: false
+    property int processExitCode: -1
     readonly property bool loading: state === "loading"
 
     function clear() {
@@ -49,6 +55,12 @@ Scope {
         submittedGeneration = generation;
         requestFrame = frame;
         responseBuffer = "";
+        errorBuffer = "";
+        stdoutFinished = false;
+        stderrFinished = false;
+        processExited = false;
+        processExitCode = -1;
+        completionDeadline.stop();
         candidatePreview = null;
         state = "loading";
         message = "VALIDATING CURRENT SOURCE SNAPSHOTS // READ ONLY";
@@ -135,6 +147,72 @@ Scope {
         return true;
     }
 
+    // Only the bridge's fixed, allowlisted codes may reach UI/logs.
+    // Never surface raw stderr, URLs, titles, SEC contact, or snapshots.
+    function refusalCode(exitCode, response, diagnostic) {
+        if (exitCode !== 0) {
+            const allowed = /^(INVALID_FRAME|INVALID_REQUEST|INVALID_SOURCE_SNAPSHOT|INVALID_RESULT|RESULT_TOO_LARGE|PREVIEW_UNAVAILABLE|INVALID_ARGUMENTS)$/;
+            const raw = String(diagnostic || "").trim();
+            if (raw.indexOf(processErrorPrefix) === 0) {
+                const code = raw.slice(processErrorPrefix.length);
+                if (allowed.test(code))
+                    return code;
+            }
+            return "PROCESS_FAILED";
+        }
+        if (!response || response.length === 0)
+            return "EMPTY_RESULT_STREAM";
+        return "INVALID_RESULT_STREAM";
+    }
+
+    // Process exit and StdioCollector completion are separate events.
+    // Do not assume stdout has flushed at onExited (especially for 30 rows).
+    // No automatic retry, provider call, or persistent storage action.
+    function completeAttempt(force) {
+        if (!processExited)
+            return;
+        // A successful bridge may have no stderr; a refused bridge may
+        // have no stdout. Await only the output stream relevant to its code.
+        const requiredStreamFinished = processExitCode === 0
+            ? stdoutFinished : stderrFinished;
+        if (!force && !requiredStreamFinished)
+            return;
+        completionDeadline.stop();
+
+        const fresh = monitoring && submittedGeneration === generation;
+        const output = responseBuffer;
+        const diagnostic = errorBuffer;
+        const code = processExitCode;
+        const streamIncomplete = !requiredStreamFinished;
+
+        responseBuffer = "";
+        errorBuffer = "";
+        requestFrame = "";
+        processExited = false;
+        stdoutFinished = false;
+        stderrFinished = false;
+        processExitCode = -1;
+        if (!fresh)
+            return;
+
+        if (streamIncomplete || !acceptResponse(output, code)) {
+            const reason = streamIncomplete ? "STREAM_INCOMPLETE"
+                                           : refusalCode(code, output, diagnostic);
+            candidatePreview = null;
+            state = "failed";
+            message = "PREVIEW REFUSED // " + reason;
+            // Log only a fixed rejection code. Never log raw source data.
+            console.warn("FINANCE_RESEARCH_PREVIEW_REFUSED // " + reason);
+        }
+    }
+
+    Timer {
+        id: completionDeadline
+        interval: 1800
+        repeat: false
+        onTriggered: candidateService.completeAttempt(true)
+    }
+
     Process {
         id: worker
         stdinEnabled: true
@@ -147,24 +225,25 @@ Scope {
             }
         }
         stdout: StdioCollector {
-            onStreamFinished: candidateService.responseBuffer = text
+            onStreamFinished: {
+                candidateService.responseBuffer = text;
+                candidateService.stdoutFinished = true;
+                candidateService.completeAttempt(false);
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                candidateService.errorBuffer = text;
+                candidateService.stderrFinished = true;
+                candidateService.completeAttempt(false);
+            }
         }
         onExited: function(exitCode, exitStatus) {
-            Qt.callLater(function() {
-                const fresh = candidateService.monitoring
-                    && candidateService.submittedGeneration
-                       === candidateService.generation;
-                const output = candidateService.responseBuffer;
-                candidateService.responseBuffer = "";
-                candidateService.requestFrame = "";
-                if (!fresh) return;
-                if (!candidateService.acceptResponse(output, exitCode)) {
-                    candidateService.candidatePreview = null;
-                    candidateService.state = "failed";
-                    candidateService.message =
-                        "PREVIEW REFUSED // RECHECK SOURCE SNAPSHOTS";
-                }
-            });
+            candidateService.processExitCode = exitCode;
+            candidateService.processExited = true;
+            candidateService.completeAttempt(false);
+            if (candidateService.processExited)
+                completionDeadline.start();
         }
     }
 }

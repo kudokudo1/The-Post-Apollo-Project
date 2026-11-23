@@ -124,8 +124,40 @@ function build(providerId,snapshot,sectionId) {
             kind:f.kind};}),accountCount:accounts.length,knownCount:known,
         unknownCount:unknown,knownSubtotalCents:subtotal,
         totalCents:accounts.length>0&&unknown===0?subtotal:null,
-        transactionCount:txCount,visibleAccounts:listed,
+        transactionCount:txCount,visibleAccounts:listed,allAccounts:accounts,
         activity: selected.kind==="activity"?activity.slice(0,24):[],
+        activitySourceCount:activity.length,
         connected:false,persisted:false,canTransfer:false,
         canTrade:false,canBorrow:false,canManageCard:false};
+}
+
+ 
+// Filtering is deliberately limited to the bounded recent-session projection
+// (at most 12 entries per account, then 24 provider entries), never full history.
+function filterRecentActivity(projection,options) {
+    if(!projection||projection.ok!==true||projection.sectionKind!=="activity"
+       ||projection.connected!==false||projection.persisted!==false
+       ||!Array.isArray(projection.activity)||!Array.isArray(projection.allAccounts))
+        return {ok:false,error:"ACTIVITY SECTION REQUIRED"};
+    var opts=options||{},direction=opts.direction||"all",
+        accountId=opts.accountId||"",rawQuery=opts.query||"";
+    if(["all","in","out"].indexOf(direction)<0||typeof accountId!=="string"
+       ||typeof rawQuery!=="string"||rawQuery.length>64
+       ||/[\u0000-\u001F\u007F]/.test(rawQuery))
+        return {ok:false,error:"INVALID ACTIVITY FILTER"};
+    if(accountId && !projection.allAccounts.some(function(a){return a.id===accountId;}))
+        return {ok:false,error:"ACCOUNT IS NOT IN THIS PROVIDER"};
+    var query=rawQuery.trim().toLowerCase();
+    var rows=projection.activity.filter(function(entry){
+        return (!accountId||entry.accountId===accountId)
+            &&(direction==="all"
+               ||(direction==="in"&&entry.amountCents>0)
+               ||(direction==="out"&&entry.amountCents<0))
+            &&(!query||entry.description.toLowerCase().indexOf(query)>=0
+               ||entry.accountNickname.toLowerCase().indexOf(query)>=0);
+    });
+    return {ok:true,rows:rows,shownCount:rows.length,
+        recentWindowCount:projection.activity.length,
+        hasOlderEntries:projection.transactionCount>projection.activity.length,
+        filterDirection:direction,filterAccountId:accountId};
 }

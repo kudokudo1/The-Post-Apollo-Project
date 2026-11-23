@@ -9,14 +9,54 @@ Item {
     property string providerId: ""
     property var accountSnapshot: ({ok:false})
     property string sectionId: "home"
+    property string feedback: ""
+    property string activityDirection: "all" // all | in | out
+    property int activityAccountIndex: 0 // 0 = all; 1..N = provider account
+    property int entryAccountIndex: 0
+    property string entryDirection: "out" // out | in
     readonly property var details: ProviderPolicy.build(
         providerId,accountSnapshot,sectionId)
+    readonly property var providerAccounts: details.ok ? details.allAccounts : []
+    readonly property string activityAccountId: activityAccountIndex>0
+        &&activityAccountIndex<=providerAccounts.length
+        ? providerAccounts[activityAccountIndex-1].id : ""
+    readonly property var filteredActivity: ProviderPolicy.filterRecentActivity(
+        details,{direction:activityDirection,accountId:activityAccountId,query:activitySearch.text})
     signal accountRequested(string accountId)
+    signal manualEntryRequested(var draft)
     signal returnToTopRequested()
     implicitHeight: providerContent.implicitHeight
 
-    onProviderIdChanged: sectionId="home"
-    onSectionIdChanged: returnToTopRequested()
+    onProviderIdChanged: {
+        sectionId="home";
+        activityAccountIndex=0;
+        entryAccountIndex=0;
+    }
+    onSectionIdChanged: {
+        activityDirection="all";
+        activityAccountIndex=0;
+        returnToTopRequested();
+    }
+    function clearAfterEntry() {
+        quickDescription.text="";
+        quickAmount.text="";
+    }
+    function requestManualEntry() {
+        if(!details.ok||details.sectionKind!=="activity"
+           ||accountSnapshot.mode!=="manual"||providerAccounts.length===0)
+            return false;
+        var index=entryAccountIndex>=0&&entryAccountIndex<providerAccounts.length
+            ?entryAccountIndex:0;
+        manualEntryRequested({
+            providerId:providerId,
+            accountId:providerAccounts[index].id,
+            date:quickDate.text,
+            description:quickDescription.text,
+            amountText:quickAmount.text,
+            direction:entryDirection
+        });
+        return true;
+    }
 
     Column {
         id: providerContent
@@ -189,19 +229,254 @@ Item {
                 }
             }
         }
+        Column {
+            width: parent.width
+            spacing: 6
+            visible: providerPane.details.ok
+                     &&providerPane.details.sectionKind==="activity"
+            GohuText {
+                width: parent.width
+                text: "RECENT MANUAL/DEMO ACTIVITY // FILTERS APPLY TO AT MOST 24 RECENT ENTRIES"
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Row {
+                width: parent.width
+                spacing: 4
+                ActionButton {
+                    width: (parent.width-8)/3
+                    height: 28
+                    label: "ALL"
+                    labelPixelSize: 9
+                    accentColor: Colors.cyan
+                    selected: providerPane.activityDirection==="all"
+                    onLeftClicked: providerPane.activityDirection="all"
+                }
+                ActionButton {
+                    width: (parent.width-8)/3
+                    height: 28
+                    label: "MONEY IN"
+                    labelPixelSize: 9
+                    accentColor: Colors.omnitrix
+                    selected: providerPane.activityDirection==="in"
+                    onLeftClicked: providerPane.activityDirection="in"
+                }
+                ActionButton {
+                    width: (parent.width-8)/3
+                    height: 28
+                    label: "MONEY OUT"
+                    labelPixelSize: 9
+                    accentColor: Colors.orange
+                    selected: providerPane.activityDirection==="out"
+                    onLeftClicked: providerPane.activityDirection="out"
+                }
+            }
+            ActionButton {
+                width: parent.width
+                height: 28
+                label: providerPane.activityAccountIndex>0
+                       &&providerPane.activityAccountIndex<=providerPane.providerAccounts.length
+                       ? "FILTER ACCOUNT // "+providerPane.providerAccounts[providerPane.activityAccountIndex-1].nickname
+                       : "FILTER ACCOUNT // ALL"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                available: providerPane.providerAccounts.length>0
+                onLeftClicked: providerPane.activityAccountIndex=
+                    (providerPane.activityAccountIndex+1)%(providerPane.providerAccounts.length+1)
+            }
+            GohuText {
+                width: parent.width
+                text: "SEARCH RECENT DESCRIPTION OR MANUAL ACCOUNT NICKNAME"
+                font.pixelSize: 9
+                color: Colors.white
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: activitySearch
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                    maximumLength: 64
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: providerPane.filteredActivity.ok
+                    ? "MATCHES "+providerPane.filteredActivity.shownCount
+                      +" / RECENT WINDOW "+providerPane.filteredActivity.recentWindowCount
+                      +(providerPane.filteredActivity.hasOlderEntries
+                        ? " // OLDER ACTIVITY NOT INCLUDED":"")
+                    : "ACTIVITY FILTER UNAVAILABLE"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+        }
+        Column {
+            width: parent.width
+            spacing: 6
+            visible: providerPane.details.ok
+                     &&providerPane.details.sectionKind==="activity"
+                     &&providerPane.accountSnapshot.mode==="manual"
+                     &&providerPane.providerAccounts.length>0
+            GohuText {
+                width: parent.width
+                text: "QUICK MANUAL ENTRY // UPDATES ONLY THIS SESSION // DOES NOT MOVE MONEY"
+                font.pixelSize: 10
+                font.bold: true
+                color: Colors.magenta
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 28
+                label: providerPane.entryAccountIndex>=0
+                       &&providerPane.entryAccountIndex<providerPane.providerAccounts.length
+                       ? "MANUAL ACCOUNT // "+providerPane.providerAccounts[providerPane.entryAccountIndex].nickname
+                       : "MANUAL ACCOUNT // SELECT"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                onLeftClicked: providerPane.entryAccountIndex=
+                    (providerPane.entryAccountIndex+1)%providerPane.providerAccounts.length
+            }
+            Row {
+                width: parent.width
+                spacing: 4
+                ActionButton {
+                    width: (parent.width-4)/2
+                    height: 28
+                    label: "MONEY OUT"
+                    labelPixelSize: 9
+                    selected: providerPane.entryDirection==="out"
+                    accentColor: Colors.orange
+                    onLeftClicked: providerPane.entryDirection="out"
+                }
+                ActionButton {
+                    width: (parent.width-4)/2
+                    height: 28
+                    label: "MONEY IN"
+                    labelPixelSize: 9
+                    selected: providerPane.entryDirection==="in"
+                    accentColor: Colors.omnitrix
+                    onLeftClicked: providerPane.entryDirection="in"
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "DATE // YYYY-MM-DD"
+                font.pixelSize: 9
+                color: Colors.white
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: quickDate
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    text: Qt.formatDate(new Date(),"yyyy-MM-dd")
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "DESCRIPTION // MANUAL ENTRY"
+                font.pixelSize: 9
+                color: Colors.white
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: quickDescription
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    maximumLength: 120
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "AMOUNT USD // POSITIVE NUMBER, E.G. 12.50"
+                font.pixelSize: 9
+                color: Colors.white
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Rectangle {
+                width: parent.width
+                height: 29
+                color: Colors.black
+                border.color: Colors.cyan
+                clip: true
+                TextInput {
+                    id: quickAmount
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    font.pixelSize: 11
+                    color: Colors.white
+                    selectByMouse: true
+                    activeFocusOnPress: true
+                }
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                label: "ADD PROVIDER MANUAL ACTIVITY"
+                labelPixelSize: 9
+                accentColor: Colors.omnitrix
+                onLeftClicked: providerPane.requestManualEntry()
+            }
+            GohuText {
+                width: parent.width
+                visible: !!providerPane.feedback
+                text: providerPane.feedback
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+        }
         GohuText {
             width: parent.width
             visible: providerPane.details.ok
                      &&providerPane.details.sectionKind==="activity"
-                     &&providerPane.details.activity.length===0
-            text: "NO MANUAL OR FICTIONAL ACTIVITY FOR THIS PROVIDER"
+                     &&providerPane.filteredActivity.ok
+                     &&providerPane.filteredActivity.rows.length===0
+            text: "NO RECENT ACTIVITY MATCHES THESE FILTERS"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
         }
         Repeater {
-            model: providerPane.details.ok?providerPane.details.activity:[]
+            model: providerPane.filteredActivity.ok?providerPane.filteredActivity.rows:[]
             delegate: Rectangle {
                 id: providerActivityCard
                 required property var modelData
@@ -238,7 +513,7 @@ Item {
         }
         GohuText {
             width: parent.width
-            text: "NO VERIFIED BALANCES, PAYMENTS, CARDS, STOCKS OR LOANS // VIEW AND NAVIGATION ONLY"
+            text: "NO VERIFIED BALANCES, PAYMENTS, CARDS, STOCKS OR LOANS // MANUAL BOOKKEEPING ONLY"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

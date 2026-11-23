@@ -8,6 +8,7 @@ Item {
     property var investigations: []
     property string loadState: "preview" // preview, loading, ready, pending, failed
     property string statusMessage: "INTERFACE PREVIEW // STORAGE NOT CONNECTED"
+    property bool controllerConnected: false
     property bool writeEnabled: false
     property string selectedId: ""
     property string draftTitle: ""
@@ -26,10 +27,10 @@ Item {
         }
         return null;
     }
-    readonly property bool canCreate: writeEnabled && loadState === "ready"
+    readonly property bool canCreate: controllerConnected && writeEnabled && loadState === "ready"
         && draftTitle.trim().length > 0 && draftTitle.length <= 160
         && draftQuestion.trim().length > 0 && draftQuestion.length <= 1000
-    readonly property bool canAttach: writeEnabled && loadState === "ready"
+    readonly property bool canAttach: controllerConnected && writeEnabled && loadState === "ready"
         && selectedInvestigation !== null
         && draftEvidenceTitle.trim().length > 0 && draftEvidenceTitle.length <= 160
         && draftEvidenceSummary.trim().length > 0 && draftEvidenceSummary.length <= 2000
@@ -95,7 +96,7 @@ Item {
                     height: 28
                     label: "LOAD CASES"
                     labelPixelSize: 9
-                    available: pane.loadState !== "loading" && pane.loadState !== "pending"
+                    available: pane.controllerConnected && pane.loadState !== "loading" && pane.loadState !== "pending"
                     onLeftClicked: pane.loadRequested()
                 }
                 ActionButton {

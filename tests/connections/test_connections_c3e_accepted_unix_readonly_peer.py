@@ -134,6 +134,7 @@ class AcceptedUnixReadOnlyPeerTests(unittest.TestCase):
             self.assertEqual(client.exitcode, 0, outcome)
             self.assertEqual(server.exitcode, 0, outcome)
             self.assertNotIn("error", outcome, outcome)
+            outcome["connectingPid"] = client.pid
             self.assertTrue(outcome["replyEnded"])
             self.assertFalse(self.sockpath.exists(),
                              "exact one-request listener must unlink path")
@@ -273,7 +274,7 @@ class AcceptedUnixReadOnlyPeerTests(unittest.TestCase):
         # Connector is root client A, but an inherited socket FD can be
         # written by forked B. SO_PEERCRED tracks A's connect(), not B's write.
         result = self.start_one(fork_sender=True)
-        self.assertNotEqual(result["senderPid"], os.getpid())
+        self.assertNotEqual(result["senderPid"], result["connectingPid"])
         self.assertEqual(result["reply"]["status"], "IPC_CI_DIAGNOSTIC_ONLY")
         self.assertIs(
             M.denial_only_observation_ci_only()

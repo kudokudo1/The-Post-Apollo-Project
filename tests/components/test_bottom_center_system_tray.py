@@ -174,7 +174,7 @@ for token in (
     "opacity: trayButton.cardEmphasized ? 0.2 : 0.0",
     "id: trayIconGlow",
     "id: trayActiveIconGlow",
-    "color: Colors.cyan",
+    "color: trayButton.appOnDesktop ? Colors.magenta : Colors.cyan",
     "color: trayButton.iconAccentColor",
 ):
     assert token in tray, token

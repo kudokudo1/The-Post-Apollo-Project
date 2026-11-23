@@ -63,8 +63,8 @@ def deny(reason: str):
 def _no_authority(record: dict, required: set[str]):
     if type(record) is not dict or set(record) != required:
         deny("C3E_STORAGE_UNEXPECTED_BACKEND_FIELDS")
-    for flag in DENIED:
-        if record.get(flag) is not False:
+    for flag in (set(record) & set(DENIED)):
+        if record[flag] is not False:
             deny("C3E_STORAGE_BACKEND_ATTEMPTED_AUTHORITY_PROMOTION")
 
 
@@ -99,7 +99,7 @@ class TrustBoundary:
     """
 
     def __init__(self, *, required_mode: str, local_adapter=None):
-        if required_mode not in (LOCAL_DEVELOPMENT, PROTECTED_REQUIRED):
+        if type(required_mode) is not str or required_mode not in (LOCAL_DEVELOPMENT, PROTECTED_REQUIRED):
             deny("C3E_STORAGE_UNKNOWN_TRUST_MODE")
         if required_mode == LOCAL_DEVELOPMENT:
             if type(local_adapter) is not LocalSQLiteTestAdapter:

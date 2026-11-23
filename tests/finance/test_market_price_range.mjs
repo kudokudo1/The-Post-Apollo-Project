@@ -195,3 +195,5 @@ await import("./test_market_shared_quota.mjs");
 await import("./test_market_quota_status.mjs");
 // M26: derived close-to-close RANGE movement analysis, no new provider IO.
 await import("./test_market_m26_range_analysis.mjs");
+// M28: optional local-only trailing session SMA 5/20 chart overlays.
+await import("./test_market_m28_moving_averages.mjs");

@@ -97,3 +97,8 @@ jobs:
           node --test tests/finance/test_envelope_move_cli_recovery_m2b.mjs
           node --test tests/finance/test_finance_envelope_move_plan_m2a.mjs
           python3 -B tests/finance/test_envelope_move_m2b_contracts.py
+
+      - name: Simple M3a read-only expense-category proposal, no save bridge
+        run: |
+          node --test tests/finance/test_finance_expense_category_preview_m3a.mjs
+          python3 -B tests/finance/test_finance_expense_category_m3a_contracts.py

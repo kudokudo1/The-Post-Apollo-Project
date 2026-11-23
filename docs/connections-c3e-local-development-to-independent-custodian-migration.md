@@ -7,6 +7,15 @@
 **STATE:** Development roadmap; future custodian architecture / host / owner / root / recovery still need explicit acceptance. **Production protected Sign-In HOLD.**  
 **RELATED:** [C3e custody/admission RFC](./connections-c3e-protected-identity-witness-custody-admission-rfc.md), [operator signer history #2192](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2192), [original trust handoff #2018](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2018), [owner ledger #2119](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2119).
 
+## TWO MODES // Plain-language names, not just option letters
+
+| Name | What it means | Authority boundary |
+| --- | --- | --- |
+| **Local Development Ledger** (formerly **Option A**) | The current computer runs a small **test-only** security process backed by local SQLite. It stores simulated enrollments, one-use challenges and history to develop the interface and test rollback/crash behavior. | **Cannot independently authorize real Sign-In or prove that its own history has not been rolled back.** |
+| **Independent Trust Custodian** (future direction from **Option C**) | A separately administered security process on a suitably isolated NAS or another Post-Apollo computer retains the real, current trust roster, signed history, challenge-spend state and restricted signing authority. | **Potential production source of truth only after real enrollment, isolation, crash/rollback testing and operator acceptance.** |
+
+The operator approved the **sequence**: build with the Local Development Ledger now, then deliberately migrate to an independently protected custodian when suitable hardware is ready. The operator has not selected the specific NAS/computer, the custodian administrator, keys, backup topology or release date. **A migration is a new trust enrollment and cutover, not an automatic promotion of the SQLite database.**
+
 ## IMPLEMENTATION // What is actually being stored and run
 
 A *security service* is a program that receives requests to look up enrolled public keys, issue one-use challenges, verify evidence and manage a durable history of decisions. A separate database holds its records. The source code and build/test recipes belong in the repository; they are **not** the security authority themselves.

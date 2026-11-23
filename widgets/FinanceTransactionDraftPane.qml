@@ -370,8 +370,8 @@ Item {
         }
 
         ActionButton {
-            objectName: "draftCategoryPreviewLauncher"
             trackLabelGlowLocally: true
+            objectName: "draftCategoryPreviewLauncher"
             width: parent.width
             height: 28
             visible: draft.allowCategoryPreview && !draft.editing
@@ -397,8 +397,8 @@ Item {
             wrapMode: Text.WordWrap
         }
         ActionButton {
-            objectName: "draftDiscardCategoryPlan"
             trackLabelGlowLocally: true
+            objectName: "draftDiscardCategoryPlan"
             width: parent.width
             height: 28
             visible: draft.categoryPreviewArmed

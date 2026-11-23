@@ -2,7 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {createHash} from "node:crypto";
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,existsSync,rmSync}
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,existsSync,rmSync,chmodSync}
   from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -212,6 +212,22 @@ test("false or unsafe permit refuses before creating a ledger journal",()=>{
     writeFileSync(file,"NOT_APPROVED\n",{mode:0o600});
     outcome(invoke(f,cmd()),"blocked:writes-disabled",1);
     assert.equal(existsSync(f.journal),false);
+    assert.deepEqual(data(f).events,[]);
+  }finally{cleanup(f);}
+});
+
+test("world-readable permit and oversized framed input refuse before mutation",()=>{
+  const f=setup();
+  try{
+    const permit=join(f.home,".config","financew","envelope-moves-enabled");
+    chmodSync(permit,0o644);
+    outcome(invoke(f,cmd()),"blocked:writes-disabled",1);
+    assert.equal(existsSync(f.journal),false);
+    assert.deepEqual(data(f).events,[]);
+    chmodSync(permit,0o600);
+    outcome(invoke(f,cmd(),{rawInput:"x".repeat(4100)+"\\n"}),
+      "blocked:input-too-large",1);
+    assert.equal(existsSync(journal(f)),false);
     assert.deepEqual(data(f).events,[]);
   }finally{cleanup(f);}
 });

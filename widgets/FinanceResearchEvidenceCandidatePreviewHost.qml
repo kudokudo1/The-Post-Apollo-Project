@@ -171,18 +171,23 @@ Item {
         anchors.margins: 8
         spacing: 5
         Row {
+            id: reviewActions
+            width: parent.width
             spacing: 6
+            readonly property real availableWidth: Math.max(0, width - spacing)
             ActionButton {
-                width: 100
+                width: Math.min(100, Math.floor(
+                    reviewActions.availableWidth * 0.34))
                 height: 29
                 label: "BACK"
                 labelPixelSize: 10
                 onLeftClicked: host.closeReview()
             }
             ActionButton {
-                width: 172
+                width: Math.min(172, Math.floor(
+                    reviewActions.availableWidth * 0.66))
                 height: 29
-                label: "PREPARE UNSAVED"
+                label: host.width < 430 ? "PREPARE" : "PREPARE UNSAVED"
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 available: host.active && host.reviewCandidate !== null

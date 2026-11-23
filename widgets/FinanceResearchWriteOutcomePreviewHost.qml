@@ -8,7 +8,6 @@ Item {
     property bool active: false
     property string demoPhase: "staged"
     property bool draftPresent: true
-    property int demoSequence: 0
 
     readonly property bool demoPending: demoPhase === "inFlight"
     readonly property bool demoFinished:
@@ -22,7 +21,6 @@ Item {
     }
     function acknowledgePreview() {
         if (!demoPending) return false;
-        demoSequence += 1;
         draftPresent = false; // Simulated exact ACK only, never real storage.
         demoPhase = "acknowledged";
         return true;
@@ -74,7 +72,7 @@ Item {
         Grid {
             id: demoActions
             width: parent.width
-            columns: width >= 610 ? 4 : 2
+            columns: width >= 700 ? 5 : 2
             columnSpacing: 6
             rowSpacing: 6
             ActionButton {
@@ -106,6 +104,16 @@ Item {
                 labelPixelSize: 9
                 available: preview.demoPending
                 onLeftClicked: preview.unknownPreview()
+            }
+            ActionButton {
+                width: Math.max(0,(demoActions.width
+                    - demoActions.columnSpacing * (demoActions.columns - 1))
+                    / demoActions.columns)
+                height: 29
+                label: "TEST REFUSE"
+                labelPixelSize: 9
+                available: preview.demoPending
+                onLeftClicked: preview.refusePreview()
             }
             ActionButton {
                 width: Math.max(0,(demoActions.width

@@ -41,7 +41,9 @@ assert "root.keyboardOwnershipRequested();" in menu
 # Reuse the standard controls instead of introducing custom MouseAreas.
 assert menu.count("ModeButton {") == 1
 # Existing controls plus local-draft actions, ALLOCATE and CHECK WRITE LOCK.
-# Navigation grammar remains unchanged; no custom MouseArea introduced.
+# Navigation grammar remains unchanged. The ONE modal input shield is
+# limited to the read-only diagnostics backdrop; it must not be used as
+# a second navigation button or a finance write control.
 # Two safe CURSOR A/B samples and the Budget Simple/Advanced selector
 # extend the existing 20-control baseline. All real finance actions remain.
 # M8 adds one read-only CANDIDATES action; M2c adds one Simple-mode
@@ -51,7 +53,15 @@ assert menu.count('keyboardActivationSignal: "leftClicked"') >= 2
 assert 'property string selectorPreviewActive: "a"' in menu
 assert menu.count("ResizeButton {") == 2
 assert menu.count("CloseButton {") == 1
-assert "MouseArea {" not in menu
+assert menu.count("MouseArea {") == 1
+backdrop = menu[menu.index("id: financeDiagnosticsBackdrop"):
+                menu.index("id: financeDiagnosticsPane")]
+assert "z: 89" in backdrop
+assert "acceptedButtons: Qt.AllButtons" in backdrop
+assert "onPressed: function(mouse) { mouse.accepted = true; }" in backdrop
+assert "onWheel: function(wheel) { wheel.accepted = true; }" in backdrop
+assert "onClicked" not in backdrop
+assert "financeWrite" not in backdrop
 
 # Distinct header, divider, and canonical U+00D7 close control.
 assert "id: financeHeader" in menu

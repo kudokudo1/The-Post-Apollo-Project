@@ -10,15 +10,32 @@ weather_adapter=(root/"widgets/weather/StationWeatherProviderDiagnostics.qml").r
 weather_policy=(root/"widgets/weather/StationProviderDiagnosticsPolicy.js").read_text()
 finance=(root/"widgets/FinanceW.qml").read_text()
 
-# One real reusable ActionButton, preserving DIAG/BACK, button geometry and toggle.
+# The actual shared toggle is icon-only. White stars use rich text and the
+# medical glyph retains its state color; the three effect planes match the
+# canonical CloseButton / ResizeButton numeric intensities.
 for marker in (
     "ActionButton {", "property bool diagnosticsOpen: false",
-    "signal toggleRequested()", 'label: diagnosticsOpen ? "BACK" : "DIAG"',
-    "width: 59", "height: 32", "labelPixelSize: 11",
+    "signal toggleRequested()", "˖", "⚕๋࣭", "⭑",
+    "labelItem.textFormat: Text.StyledText",
+    "selected: diagnosticsOpen",
+    "width: 59", "height: 32", "labelPixelSize: 21",
     "accentColor: Colors.yellow",
     "onLeftClicked: diagnosticButton.toggleRequested()",
+    "contentGlowRadius: 7", "contentGlowSamples: 7",
+    "contentGlowIdleOpacity: 0.34",
+    "contentGlowHoverOpacity: 0.72",
+    "contentGlowPressedOpacity: 1.0",
+    "softGlowIdleOpacity: 0.48",
+    "softGlowHoverOpacity: 0.70",
+    "softGlowPressedOpacity: 1.0",
+    "wideGlowEnabled: true", "wideGlowSpread: 10",
+    "wideGlowIdleOpacity: 0.22",
+    "wideGlowHoverOpacity: 0.32",
+    "wideGlowPressedOpacity: 1.0",
 ):
     assert marker in button, marker
+assert 'label: diagnosticsOpen ? "BACK" : "DIAG"' not in button
+assert button.count("Colors.white") == 2  # both decorative star regions
 
 # Weather's M6c pane retains its real source policy and overlay ownership.
 for marker in (
@@ -46,7 +63,13 @@ for marker in (
     'text: "LOCATION // "',
     "model: Array.isArray(diagnosticsPane.serviceRows)",
     "text: sourceRow.modelData.state", "text: sourceRow.modelData.label",
-    "onLeftClicked: diagnosticsPane.closeRequested()",
+    "CloseButton {", "onCloseRequested: diagnosticsPane.closeRequested()",
+    "id: diagnosticsPointerShield", "id: diagnosticsWheelContainment",
+    "blocking: true", "wheel.accepted = true;",
+    'color: "#110319"', "opacity: 1.0",
+    "mountingParent: diagnosticsPane", "geometryHost: diagnosticsPane",
+    'geometryMode: "box"', 'boxTopInset: 68',
+    'boxBottomInset: 12', 'rightInset: 8',
 ):
     assert marker in popup, marker
 
@@ -69,6 +92,14 @@ for marker in (
     assert marker in finance, marker
 assert finance.count("DiagnosticsServicePopup {") == 1
 assert finance.count("DiagnosticsDockButton {") == 1
+assert "id: financeDiagnosticsBackdrop" in finance
+assert "z: 89" in finance
+assert "color: Qt.rgba(Colors.black.r, Colors.black.g," in finance
+assert "onWheel: function(wheel) { wheel.accepted = true; }" in finance
+assert "id: providerDiagnosticsBackdrop" in weather
+assert "z: 49" in weather
+assert "onWheel: function(wheel) { wheel.accepted = true; }" in weather
+assert "ActionButton {" not in popup  # use existing CloseButton, not a local clone
 
 # The rows must read SAME pre-existing service actors without adding new owners.
 for actor in (

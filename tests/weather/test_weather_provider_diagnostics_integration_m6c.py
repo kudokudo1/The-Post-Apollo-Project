@@ -52,7 +52,8 @@ for token in (
     'Flickable {', 'Repeater {', 'NeonScrollBar {',
 ):
     assert token in shared_popup, token
-for token in ('ActionButton {', 'label: diagnosticsOpen ? "BACK" : "DIAG"',
+for token in ('ActionButton {', "˖", "⚕๋࣭", "⭑",
+              'labelItem.textFormat: Text.StyledText',
               'signal toggleRequested()', 'onLeftClicked:'):
     assert token in shared_button, token
 for forbidden in ('Process {','Timer {','FileView {','curl','Qt.openUrlExternally',

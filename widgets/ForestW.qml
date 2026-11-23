@@ -1080,12 +1080,12 @@ PanelWindow {
                         ? Colors.red : root.activeTree.gradientAccentColor
                     pressedBorderColor: root.reasoningRailExpanded
                         ? Colors.black : Colors.magenta
-                    idleContentGlowColor: root.reasoningRailExpanded
-                        ? Colors.red : root.activeTree.spiritualIdleGlowColor
-                    hoverContentGlowColor: root.reasoningRailExpanded
-                        ? Colors.red : root.activeTree.gradientAccentColor
-                    pressedContentGlowColor: root.reasoningRailExpanded
-                        ? Colors.red : Colors.magenta
+                    // One sampled glow for the complete cup + ornament
+                    // cluster, in the active Tree's native icon-glow color.
+                    // This stays consistent in compact and red-close modes.
+                    idleContentGlowColor: root.activeTree.iconIdleGlowColor
+                    hoverContentGlowColor: root.activeTree.iconIdleGlowColor
+                    pressedContentGlowColor: root.activeTree.iconIdleGlowColor
                     idleSoftGlowColor: root.reasoningRailExpanded
                         ? Colors.red : root.activeTree.spiritualIdleGlowColor
                     hoverSoftGlowColor: root.reasoningRailExpanded
@@ -1098,11 +1098,16 @@ PanelWindow {
                     hoverWideGlowColor: root.reasoningRailExpanded
                         ? Colors.red : root.activeTree.gradientAccentColor
                     pressedWideGlowColor: Colors.red
-                    // Source the larger centered cup, not the entire
-                    // ornament box. Stars remain plain white.
-                    contentGlowSource: coffeeGradientGlyph
-                    contentGlowRadius: 7
+                    // Source the ActionButton's *stable anchored* content
+                    // host rather than the nested OpacityMask cup. Directly
+                    // sampling the moving cup could leave a second-looking
+                    // red ghost when the close cap animates/resizes.
+                    // The host samples all four stars plus the cup together.
+                    contentGlowSource: contentItem
+                    contentGlowRadius: 6
                     contentGlowSamples: 9
+                    contentGlowIdleOpacity: 0.45
+                    contentGlowHoverOpacity: 0.66
 
                     // Four physically separate white ornaments. Previously
                     // the top/bottom combining marks were inside the gradient
@@ -1114,9 +1119,18 @@ PanelWindow {
                         anchors.centerIn: parent
                         width: root.reasoningRailExpanded ? 30 : 36
                         height: root.reasoningRailExpanded ? 28 : 34
+                        // Idle remains white. Hover adopts the same solid
+                        // accent as the cup's active corner (Tree color
+                        // when compact, red when used as the close cap).
+                        // Red close press keeps the full artwork black.
                         readonly property color starInk:
                             root.reasoningRailExpanded && reasoningCoffeeButton.pressed
-                                ? Colors.black : Colors.white
+                                ? Colors.black
+                                : reasoningCoffeeButton.hovered
+                                  ? (root.reasoningRailExpanded
+                                      ? Colors.red
+                                      : root.activeTree.gradientAccentColor)
+                                  : Colors.white
 
                         // The cup is the only gradient-filled text.
                         ForestGradientName {
@@ -1170,8 +1184,8 @@ PanelWindow {
                         GohuText {
                             id: coffeeTopStar
                             anchors.horizontalCenter: parent.horizontalCenter
-                            // Move the top mark one pixel higher.
-                            y: -1
+                            // Pull the top mark 3px toward the cup.
+                            y: 2
                             width: 8
                             height: 10
                             text: "✦"
@@ -1184,9 +1198,9 @@ PanelWindow {
                         GohuText {
                             id: coffeeBottomRightStar
                             anchors.right: parent.right
-                            anchors.rightMargin: 5
+                            anchors.rightMargin: 8
                             anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 0
+                            anchors.bottomMargin: 4
                             width: 8
                             height: 8
                             text: "⋆"

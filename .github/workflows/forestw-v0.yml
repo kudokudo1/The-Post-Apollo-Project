@@ -5,6 +5,8 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'widgets/ForestChatList.qml'
+      - 'widgets/ForestChatSessionPolicy.js'
       - 'components/VoiceToTextButton.qml'
       - 'components/AskSendButton.qml'
       - 'services/forest/**'
@@ -17,6 +19,8 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'widgets/ForestChatList.qml'
+      - 'widgets/ForestChatSessionPolicy.js'
       - 'components/VoiceToTextButton.qml'
       - 'components/AskSendButton.qml'
       - 'services/forest/**'
@@ -32,4 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Forest launcher and geometry regressions
-        run: python3 tests/forest/test_forest_launcher_contract.py
+        run: |
+          python3 tests/forest/test_forest_launcher_contract.py
+          python3 tests/forest/test_forest_session_readonly_contract.py

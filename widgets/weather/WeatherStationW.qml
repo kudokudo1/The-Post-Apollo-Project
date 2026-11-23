@@ -1288,6 +1288,26 @@ PanelWindow {
                 stationRailWidth: modeRail.width
             }
 
+            // Diagnostics is modal inside the Weather content section.
+            // Background controls never receive pointer or wheel events
+            // when the shared service inspector is open.
+            Rectangle {
+                id: providerDiagnosticsBackdrop
+                anchors.fill: parent
+                z: 49
+                visible: weatherStation.providerDiagnosticsOpen
+                         && !terminalView.visible
+                color: Qt.rgba(Colors.black.r, Colors.black.g,
+                               Colors.black.b, 0.90)
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.AllButtons
+                    preventStealing: true
+                    onPressed: function(mouse) { mouse.accepted = true; }
+                    onWheel: function(wheel) { wheel.accepted = true; }
+                }
+            }
+
             StationWeatherProviderDiagnostics {
                 id: providerDiagnosticsPane
                 z: 50

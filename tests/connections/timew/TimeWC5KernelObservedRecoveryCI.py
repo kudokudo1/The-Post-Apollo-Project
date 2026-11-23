@@ -170,8 +170,7 @@ def inspect_dual_packet_returns_ci_only(*, c5_receiver, native_receiver,
     except (TypeError, ValueError):
         return _hold("COMPARATOR_REFUSED_UNKNOWN_HOLD")
     if (type(comparison) is not Comparison
-            or type(comparison.comparison_diagnostic if hasattr(comparison, "comparison_diagnostic")
-                    else comparison.diagnostic) is not str
+            or type(comparison.diagnostic) is not str
             or comparison.safe_actions != ()
             or any(getattr(comparison, k) is not False
                    for k in AUTHORITY_FIELDS)):

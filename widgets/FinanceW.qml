@@ -13,7 +13,7 @@ PanelWindow {
     property bool menuOpen: false
     property bool diagnosticsOpen: false // Weather-style in-widget service inspector
     property bool fundingReviewOpen: false
-    // Budget experiences are presentation choices over the SAME Actual source.
+    // Budget experiences are presentation choices over the SAME budget source.
     // Simple is the default; neither mode grants financial write authority.
     property string budgetExperienceMode: "simple"
     readonly property bool advancedOpen: budgetExperienceMode === "advanced"
@@ -280,6 +280,23 @@ PanelWindow {
         return false;
     }
 
+    function selectBudgetSection(section) {
+        if(["budget","transactions","accounts","categories"].indexOf(section)<0)
+            return false;
+        // Never hide an unfinished transaction editor or an active write.
+        if((transactionDraftPane.open && section!=="transactions")
+                || financeWrite.state==="pending"
+                || financeWrite.state==="uncertain"
+                || financeCategoryWrite.state==="pending"
+                || financeCategoryWrite.state==="uncertain"
+                || financeCategoryGroupWrite.state==="pending"
+                || financeCategoryGroupWrite.state==="uncertain")
+            return false;
+        budgetSection=section;
+        budgetScroll.contentY=0;
+        return true;
+    }
+
     // Do not hide an unsent editor or an unresolved write behind a mode switch.
     // This guard affects visibility only; every existing financial gate remains.
     readonly property bool budgetExperienceSwitchBlocked:
@@ -308,23 +325,6 @@ PanelWindow {
         budgetExperienceMode = next;
         // Review-only content must not linger unseen across view switches.
         fundingReviewOpen = false;
-        return true;
-    }
-
-    function selectBudgetSection(section) {
-        if(["budget","transactions","accounts","categories"].indexOf(section)<0)
-            return false;
-        // Never hide an unfinished transaction editor or an active write.
-        if((transactionDraftPane.open && section!=="transactions")
-                || financeWrite.state==="pending"
-                || financeWrite.state==="uncertain"
-                || financeCategoryWrite.state==="pending"
-                || financeCategoryWrite.state==="uncertain"
-                || financeCategoryGroupWrite.state==="pending"
-                || financeCategoryGroupWrite.state==="uncertain")
-            return false;
-        budgetSection=section;
-        budgetScroll.contentY=0;
         return true;
     }
 

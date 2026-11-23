@@ -6,15 +6,16 @@ ui=(root/"widgets/FinanceW.qml").read_text()
 grid=(root/"widgets/FinanceBudgetGrid.qml").read_text()
 money=(root/"widgets/FinanceQuickAddPane.qml").read_text()
 rules=(root/"services/finance/FinanceSpreadsheetPolicy.js").read_text()
-assert 'property bool advancedOpen: false' in ui
+assert 'property string budgetExperienceMode: "simple"' in ui
+assert 'readonly property bool advancedOpen: budgetExperienceMode === "advanced"' in ui
 assert 'id: quickAddMoney' in ui
 assert 'id: quickAddPane' in ui
 assert 'id: financeBudgetGrid' in ui
-assert 'id: advancedToggle' in ui
+assert 'id: advancedBudgetDetails' in ui
 assert 'visible: root.advancedOpen' in ui
 assert ui.index('id: quickAddMoney') < ui.index('id: reviewFunding')
-assert ui.index('id: financeBudgetGrid') < ui.index('id: advancedToggle')
-assert ui.index('id: advancedToggle') < ui.index('id: reviewFunding')
+assert ui.index('id: financeBudgetGrid') < ui.index('id: advancedBudgetDetails')
+assert ui.index('id: advancedBudgetDetails') < ui.index('id: reviewFunding')
 assert ui.index('id: reviewFunding') < ui.index('id: newTransactionDraft')
 assert 'quickAddPane.clear();' in ui
 assert 'financeBudgetGrid.reset();' in ui

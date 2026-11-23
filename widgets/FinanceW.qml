@@ -13,7 +13,10 @@ PanelWindow {
     property bool menuOpen: false
     property bool diagnosticsOpen: false // Weather-style in-widget service inspector
     property bool fundingReviewOpen: false
-    property bool advancedOpen: false
+    // Budget experiences are presentation choices over the SAME budget source.
+    // Simple is the default; neither mode grants financial write authority.
+    property string budgetExperienceMode: "simple"
+    readonly property bool advancedOpen: budgetExperienceMode === "advanced"
     property string budgetSection: "budget"
     property bool keyboardActive: false
     property bool keyboardLock: false
@@ -291,6 +294,37 @@ PanelWindow {
             return false;
         budgetSection=section;
         budgetScroll.contentY=0;
+        return true;
+    }
+
+    // Do not hide an unsent editor or an unresolved write behind a mode switch.
+    // This guard affects visibility only; every existing financial gate remains.
+    readonly property bool budgetExperienceSwitchBlocked:
+        transactionDraftPane.open
+        || quickAddPane.open
+        || guidedFundingPane.expanded
+        || allocationPreviewPane.open
+        || financeCategoriesPane.openMode !== ""
+        || financeCategoriesPane.groupDraftMode !== ""
+        || financeDrafts.state === "pending"
+        || financeWrite.state === "pending"
+        || financeWrite.state === "uncertain"
+        || financeFundingWrite.state === "pending"
+        || financeFundingWrite.state === "uncertain"
+        || financeAllocationWrite.state === "pending"
+        || financeAllocationWrite.state === "uncertain"
+        || financeCategoryWrite.state === "pending"
+        || financeCategoryWrite.state === "uncertain"
+        || financeCategoryGroupWrite.state === "pending"
+        || financeCategoryGroupWrite.state === "uncertain"
+
+    function selectBudgetExperience(next) {
+        if (next !== "simple" && next !== "advanced") return false;
+        if (next === budgetExperienceMode) return true;
+        if (budgetExperienceSwitchBlocked) return false;
+        budgetExperienceMode = next;
+        // Review-only content must not linger unseen across view switches.
+        fundingReviewOpen = false;
         return true;
     }
 
@@ -1483,6 +1517,55 @@ PanelWindow {
                             width: Math.max(0, budgetScroll.width - 22)
                             spacing: 7
 
+                            Row {
+    id: budgetExperienceSelector
+    objectName: "budgetExperienceSelector"
+    width: parent.width
+    spacing: 5
+    ActionButton {
+        objectName: "budgetSimpleModeAction"
+        width: (parent.width-5)/2
+        height: 30
+        label: "SIMPLE"
+        labelPixelSize: 10
+        accentColor: Colors.magenta
+        selected: root.budgetExperienceMode==="simple"
+        available: !root.budgetExperienceSwitchBlocked
+        keyboardActivationSignal: "leftClicked"
+        trackLabelGlowLocally: true
+        onLeftClicked: root.selectBudgetExperience("simple")
+    }
+    ActionButton {
+        objectName: "budgetAdvancedModeAction"
+        width: (parent.width-5)/2
+        height: 30
+        label: "ADVANCED"
+        labelPixelSize: 10
+        accentColor: Colors.cyan
+        selected: root.budgetExperienceMode==="advanced"
+        available: !root.budgetExperienceSwitchBlocked
+        keyboardActivationSignal: "leftClicked"
+        trackLabelGlowLocally: true
+        onLeftClicked: root.selectBudgetExperience("advanced")
+    }
+}
+GohuText {
+    width: parent.width
+    font.pixelSize: 9
+    textFormat: Text.PlainText
+    color: Colors.cyan
+    text: root.advancedOpen
+        ? "ADVANCED // ADDITIONAL FUNDING REVIEW"
+        : "SIMPLE // ENVELOPE BALANCES + EVERYDAY ACTIONS"
+}
+GohuText {
+    width: parent.width
+    font.pixelSize: 9
+    textFormat: Text.PlainText
+    color: Colors.orange
+    visible: root.budgetExperienceSwitchBlocked
+    text: "FINISH OR CLOSE ACTIVE EDITORS BEFORE SWITCHING MODES"
+}
                             Grid {
     id: budgetSectionTabs
     width: parent.width
@@ -1565,18 +1648,8 @@ FinanceBudgetGrid {
             financeAllocationWrite.submit(payload);
     }
 }
-ActionButton {
-    id: advancedToggle
-    width: parent.width
-    height: 26
-    keyboardActivationSignal: "leftClicked"
-    label: root.advancedOpen ? "HIDE ADVANCED" : "ADVANCED"
-    labelPixelSize: 9
-    accentColor: Colors.cyan
-    trackLabelGlowLocally: true
-    onLeftClicked: root.advancedOpen=!root.advancedOpen
-}
 Column {
+    id: advancedBudgetDetails
     width: parent.width
     spacing: 7
     visible: root.advancedOpen

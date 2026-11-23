@@ -43,6 +43,8 @@ for prohibited in (
     assert prohibited not in resolver, prohibited
 assert 'function applySavedCheckpoint(' not in qml
 assert 'function machineApplyRecovery(' not in qml
-assert qml.count("Process {") == 16  # Includes the explicit deny-only V2 review process
+assert qml.count("Process {") == 17  # V2 review plus M5 explicit local read-only preview
+assert "id: machineM5PreviewProcess" in qml
+assert "MachineV3LocalPreviewUiRead.py" in qml
 assert "id: machineSaveBridgeProcess" in qml
 print("TIMEW MACHINE M1J UI CONTRACT: PASS / EPHEMERAL / READ ONLY")

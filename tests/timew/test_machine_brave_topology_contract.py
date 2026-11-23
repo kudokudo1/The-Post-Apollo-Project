@@ -74,7 +74,9 @@ assert "brave-topology" not in bridge
 assert "brave-topology" not in restorer
 assert "brave-topology" not in legacy
 assert "SCHEMA_VERSION = 1" in legacy
-assert qml.count("Process {") == 16  # V2 read-only review adds one isolated process
+assert qml.count("Process {") == 17  # V2 review plus M5 explicit local read-only preview
+assert "id: machineM5PreviewProcess" in qml
+assert "MachineV3LocalPreviewUiRead.py" in qml
 roots = re.findall(r"^    (?:readonly )?property\s+\w+\s+(\w+)\s*[:=]",
                    qml, flags=re.MULTILINE)
 assert roots and len(roots) == len(set(roots))

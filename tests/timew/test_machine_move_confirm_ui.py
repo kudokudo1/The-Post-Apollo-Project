@@ -53,6 +53,8 @@ for forbidden in (
 for forbidden in ("MachineWindowMovePilot.py", "MachineMoveApproval.py",
                   "machineExecuteMove(", "onLeftClicked: timew.apply"):
     assert forbidden not in qml, forbidden
-assert qml.count("Process {") == 16
+assert qml.count("Process {") == 17
+assert "id: machineM5PreviewProcess" in qml
+assert "MachineV3LocalPreviewUiRead.py" in qml
 assert "id: machineSaveBridgeProcess" in qml
 print("MACHINE M1P: NO-APPLY CONFIRMATION UI CONTRACT PASS")

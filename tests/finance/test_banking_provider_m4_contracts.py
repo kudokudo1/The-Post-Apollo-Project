@@ -28,6 +28,7 @@ assert 'providerId: manager.selectedProviderId' in manager
 assert 'accountSnapshot: manager.review' in manager
 assert 'onAccountRequested: function(accountId)' in manager
 assert 'manager.showProviderAccount(accountId);' in manager
+assert 'onReturnToTopRequested: manager.returnToTopRequested()' in manager
 assert 'visible: manager.view==="provider"' in manager
 assert 'OPEN ACCOUNT DETAILS' in manager
 assert 'ADD MANUAL ACCOUNT' in manager
@@ -43,6 +44,8 @@ assert '{ id: "banking", name: "Banking", icon: "₊˚⋆🏛⊹"' in finance
 assert 'FinanceBankingProviderPolicy.js' in provider
 assert 'property string sectionId: "home"' in provider
 assert 'onProviderIdChanged: sectionId="home"' in provider
+assert 'onSectionIdChanged: returnToTopRequested()' in provider
+assert 'signal returnToTopRequested()' in provider
 assert 'ProviderPolicy.build(' in provider
 assert 'signal accountRequested(string accountId)' in provider
 assert 'providerPane.accountRequested(modelData.id)' in provider

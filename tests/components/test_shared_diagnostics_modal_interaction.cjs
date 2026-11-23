@@ -15,6 +15,8 @@ const resize = from("components/ResizeButton.qml");
 const resync = from("components/ReloadButton.qml");
 const finance = from("widgets/FinanceW.qml");
 const weather = from("widgets/weather/WeatherStationW.qml");
+const financePopup = finance.slice(finance.indexOf("id: financeDiagnosticsPane"));
+const weatherPopup = weather.slice(weather.indexOf("id: providerDiagnosticsPane"));
 
 // All sampled glow intensities come from the shared × and arrow grammar,
 // not another independent cosmetic tuning table.
@@ -61,14 +63,14 @@ assert.match(medical, /text:\s*"⚕"/);
 assert.match(upper, /text:\s*"✦"/);
 assert.match(right, /text:\s*"⭑"/);
 for (const part of [left, upper, right]) {
-    assert.match(part, /color:\s*Colors\.white/);
+    assert.match(part, /color:\s*diagnosticButton\.diagnosticsOpen\s*\?\s*Colors\.magenta\s*:\s*Colors\.white/);
     assert.match(part, /textFormat:\s*Text\.PlainText/);
     assert.doesNotMatch(part, /diagnosticButton\.foregroundColor|accentColor/);
 }
 assert.match(medical, /color:\s*diagnosticButton\.foregroundColor/);
 assert.doesNotMatch(toggle, /text:\s*"⚕๋࣭"/);
-assert.equal((toggle.match(/color:\s*Colors\.white/g) || []).length, 3,
-    "all three accents, not only the two outer stars, remain white");
+assert.equal((toggle.match(/color:\s*diagnosticButton\.diagnosticsOpen\s*\?\s*Colors\.magenta\s*:\s*Colors\.white/g) || []).length, 3,
+    "all three ornaments turn magenta when the panel is open and remain white when closed");
 assert.match(toggle, /contentGlowSource:\s*diagnosticsMedicalSymbol/);
 assert.match(toggle, /label:\s*""/);
 assert.match(toggle, /selected:\s*diagnosticsOpen/);
@@ -85,17 +87,17 @@ assert.match(toggle, /property color semanticColor:\s*Colors\.yellow/);
 assert.match(toggle, /property color hoverSurfaceColor:\s*Colors\.orange/);
 for (const key of [
     "accentColor", "idleFillColor","hoverFillColor","pressedFillColor",
-    "selectedFillColor","keyboardSelectedFillColor",
+    "keyboardSelectedFillColor",
     "idleForegroundColor","hoverForegroundColor","pressedForegroundColor",
-    "selectedForegroundColor","keyboardSelectedForegroundColor",
+    "keyboardSelectedForegroundColor",
     "idleBorderColor","hoverBorderColor","pressedBorderColor",
-    "selectedBorderColor","keyboardSelectedBorderColor",
+    "keyboardSelectedBorderColor",
     "idleContentGlowColor","hoverContentGlowColor","pressedContentGlowColor",
-    "selectedContentGlowColor","keyboardSelectedContentGlowColor",
+    "keyboardSelectedContentGlowColor",
     "idleSoftGlowColor","hoverSoftGlowColor","pressedSoftGlowColor",
-    "selectedSoftGlowColor","keyboardSelectedSoftGlowColor",
+    "keyboardSelectedSoftGlowColor",
     "idleWideGlowColor","hoverWideGlowColor","pressedWideGlowColor",
-    "selectedWideGlowColor","keyboardSelectedWideGlowColor"
+    "keyboardSelectedWideGlowColor"
 ]) {
     const expression = new RegExp("^\\s*" + key + ":\\s*([^\\n]+)", "m");
     const expected = resync.match(expression);
@@ -103,6 +105,23 @@ for (const key of [
     assert.ok(expected && actual, "missing TimeW RESYNC recipe " + key);
     assert.equal(actual[1].trim(),expected[1].trim(),
         "diagnostics differs from RESYNC at " + key);
+}
+
+// OPEN follows the ordinary activated-button rule. The background is
+// yellow while the medical symbol, three stars, border and ALL glows are
+// magenta; idle/hover/press still match the existing TimeW RESYNC control.
+for (const [key,expected] of [
+    ["selectedFillColor","Colors.yellow"],
+    ["selectedForegroundColor","Colors.magenta"],
+    ["selectedBorderColor","Colors.magenta"],
+    ["selectedContentGlowColor","Colors.magenta"],
+    ["selectedSoftGlowColor","Colors.magenta"],
+    ["selectedWideGlowColor","Colors.magenta"]
+]) {
+    const expression = new RegExp("^\\s*" + key + ":\\s*([^\\n]+)", "m");
+    const actual = toggle.match(expression);
+    assert.ok(actual,key + " missing");
+    assert.equal(actual[1].trim(),expected,key + " open-state mismatch");
 }
 
 assert.match(popup, /id:\s*diagnosticsPointerShield/);
@@ -115,10 +134,46 @@ assert.doesNotMatch(popup, /ActionButton\s*\{/);
 assert.match(popup, /mountingParent:\s*diagnosticsPane/);
 assert.match(popup, /geometryHost:\s*diagnosticsPane/);
 assert.match(popup, /geometryMode:\s*"box"/);
-assert.match(popup, /boxTopInset:\s*68/);
+assert.match(popup, /boxTopInset:\s*7/);
 assert.match(popup, /boxBottomInset:\s*12/);
 assert.match(popup, /rightInset:\s*8/);
-assert.match(popup, /diagnosticsScroll\.width\s*-\s*44/);
+assert.match(popup, /railSpaceReserved\s*\?\s*44\s*:\s*24/);
+assert.match(popup, /property bool railSpaceReserved:\s*false/);
+assert.match(popup, /onContentHeightChanged:\s*Qt\.callLater/);
+assert.match(popup, /id:\s*diagnosticsPinnedHeader/);
+assert.match(popup, /id:\s*diagnosticsPinnedDivider/);
+assert.match(popup, /anchors\.top:\s*diagnosticsPinnedHeader\.bottom/);
+const headerIndex = popup.indexOf("id: diagnosticsPinnedHeader");
+const scrollIndex = popup.indexOf("id: diagnosticsScroll");
+const closeIndex = popup.indexOf("id: diagnosticsCloseButton");
+assert.ok(headerIndex >= 0 && closeIndex > headerIndex
+       && closeIndex < scrollIndex,
+    "title and CloseButton must stay above/outside the scrolling body");
+
+// Execute the actual gutter decision using synthetic content heights.
+// With no overflow, no 44px gutter can remain.
+const fnStart = popup.indexOf("    function updateRailSpace() {");
+const fnEnd = popup.indexOf("\n    signal closeRequested()",fnStart);
+assert.ok(fnStart>=0 && fnEnd>fnStart);
+const actualGutterFunction = popup.slice(fnStart,fnEnd).trim();
+const pane = {railSpaceReserved:false};
+const sampleScroll = {contentHeight:100,height:200};
+const sampleRail = {scrollThreshold:1};
+const paneContext = vm.createContext({
+    diagnosticsScroll:sampleScroll, diagnosticsRail:sampleRail,
+    get railSpaceReserved() { return pane.railSpaceReserved; },
+    set railSpaceReserved(value) { pane.railSpaceReserved = value; }
+});
+const updateGutter = vm.runInContext("(" + actualGutterFunction + ")",paneContext);
+updateGutter();
+assert.equal(pane.railSpaceReserved,false);
+sampleScroll.contentHeight=260;
+updateGutter();
+assert.equal(pane.railSpaceReserved,true,"overflow reserves the star rail area");
+sampleScroll.contentHeight=200;
+updateGutter();
+assert.equal(pane.railSpaceReserved,false,"gutter clears when scrollbar disappears");
+assert.match(popup, /visible:\s*scrollable/);
 
 // Extract and EXECUTE the real wheel callback, not a restatement.
 // It must scroll within its own content and accept all deltas even when
@@ -177,4 +232,15 @@ for (const [source, backing, overlay, backdropZ, overlayZ] of [
     assert.match(shield, /acceptedButtons:\s*Qt\.AllButtons/);
     assert.match(shield, /onWheel:\s*function\(wheel\)\s*\{\s*wheel\.accepted\s*=\s*true/);
 }
+for (const [s,button] of [
+    [financePopup,"financeDiagnosticsButton"],
+    [weatherPopup,"providerDiagnosticsButton"]
+]) {
+    assert.match(s,new RegExp(button + "\\.mapToItem\\(parent,"));
+    assert.match(s,/readonly property point dropFromButton/);
+    assert.match(s,/dropFromButton\.x/);
+    assert.match(s,/dropFromButton\.y/);
+    assert.doesNotMatch(s.slice(0,500),/anchors\.top:\s*parent\.top/);
+}
+
 console.log("Shared diagnostics: exact glow, modal layering, inset star rail and wheel containment PASS");

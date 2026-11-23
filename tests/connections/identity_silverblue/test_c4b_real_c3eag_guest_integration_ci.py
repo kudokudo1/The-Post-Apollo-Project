@@ -144,6 +144,28 @@ class RealSilverblueC3eAGOwnerIntegration(unittest.TestCase):
         self.assertIn("ah.AG.NEGATIVE", binding)
         self.assertNotIn("hostAuthenticated\": True", binding)
 
+    def test_15_actual_guest_pins_kernel_boot_id_across_all_signed_denials(self):
+        self.assertIn('Path("/proc/sys/kernel/random/boot_id")',PROBE)
+        self.assertIn("def boot_id_from_kernel():",PROBE)
+        self.assertIn("pinned_boot_id=boot_id_from_kernel()",PROBE)
+        self.assertIn("def require_same_kernel_boot(stage, expected):",PROBE)
+        self.assertIn("if boot_id_from_kernel()!=expected:",PROBE)
+        self.assertIn("def check_origin(stage):\n    require_same_kernel_boot(stage,pinned_boot_id)",PROBE)
+        self.assertLess(PROBE.index("pinned_boot_id=boot_id_from_kernel()"),
+                        PROBE.index('for action in ("BEGIN","STATUS","CANCEL","RECOVER"):'))
+        self.assertIn('check_origin(f"before {action}")',PROBE)
+        self.assertIn('check_origin(f"after {action}")',PROBE)
+        self.assertIn('check_origin("after C3eAG real guest observation and refusals")',PROBE)
+
+    def test_16_mutated_boot_pin_denied_and_exact_native_marker_required(self):
+        marker="REAL_KERNEL_BOOT_ID_CONTINUITY_AND_MUTATED_PIN_REFUSED_CI_ONLY"
+        self.assertIn('tampered_boot=(b"1" if pinned_boot_id[:1]==b"0" else b"0")+pinned_boot_id[1:]',PROBE)
+        self.assertIn('require_same_kernel_boot("tampered pin",tampered_boot)',PROBE)
+        self.assertIn('raise RuntimeError("substituted kernel boot ID pin was accepted")',PROBE)
+        self.assertEqual(PROBE.count('print("C4B_ID_PASS // '+marker+'")'),1)
+        self.assertEqual(HARNESS.count("'C4B_ID_PASS // "+marker+"'"),1)
+        self.assertIn("NO_INDEPENDENT_RELEASE_ROOT_SEAT_OR_C5_CONSENT",HARNESS)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

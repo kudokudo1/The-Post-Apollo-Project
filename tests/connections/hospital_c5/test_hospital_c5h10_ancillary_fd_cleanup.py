@@ -193,7 +193,7 @@ class HospitalNativeAncillaryFdCleanup(unittest.TestCase):
 
     def test_13_missing_credentials_even_with_no_fds_refused(self):
         with self.assertRaisesRegex(
-                C.Refused, "PACKET_SENDER_DIFFERS_FROM_PINN_SOCKET_PEER"):
+                C.Refused, "PACKET_SENDER_DIFFERS_FROM_PINNED_SOCKET_PEER"):
             S._packet_recv(self.fake(), expected_sender=self.sender)
 
     def test_14_unknown_ancillary_control_refused_after_credentials(self):

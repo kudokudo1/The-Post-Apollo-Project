@@ -10,9 +10,8 @@ Item {
     id: root
 
     property string text: ""
-    // By default size the accent to the displayed name. A heading can
-    // include a suffix (// CHAT) without letting it shift Maple's
-    // top-right red accent away from the Tree name.
+    // Measure the entire displayed text by default, including // CHAT.
+    // The gradient is always proportional to the visible label, not row width.
     property string gradientText: text
     property color baseColor: "#DCF3FA"
     property color accentColor: "#EE76B2"
@@ -20,9 +19,8 @@ Item {
     property int pixelSize: 12
     property bool bold: true
 
-    // Use the natural GohuFont width of the *Tree name* (not the
-    // surrounding button, and not any // CHAT suffix). Clamp to what
-    // actually fits if the label elides on a narrow display.
+    // Use the actual GohuFont width of gradientText, including suffixes
+    // when provided. Clamp to the visible label span on narrow screens.
     readonly property real visibleGlyphWidth:
         Math.max(1, Math.min(width, gradientMeasure.implicitWidth))
     // A slightly stronger accent than the previous 0.42, kept
@@ -80,10 +78,38 @@ Item {
         }
     }
 
+    // MAPLE's right-side accent must progress ORANGE -> RED when read
+    // left to right. A directional linear ramp avoids the apparent reversal
+    // of a symmetric radial highlight. Left-corner Trees keep radial ink.
+    Shape {
+        id: rightInk
+        anchors.fill: parent
+        visible: false
+
+        ShapePath {
+            strokeWidth: -1
+            fillGradient: LinearGradient {
+                x1: 0
+                y1: 0
+                x2: root.visibleGlyphWidth
+                y2: 0
+                GradientStop { position: 0.0; color: root.baseColor }
+                GradientStop { position: 0.42; color: root.baseColor }
+                GradientStop { position: 1.0; color: root.accentColor }
+            }
+
+            startX: 0; startY: 0
+            PathLine { x: root.width; y: 0 }
+            PathLine { x: root.width; y: root.height }
+            PathLine { x: 0; y: root.height }
+            PathLine { x: 0; y: 0 }
+        }
+    }
+
     Effects.OpacityMask {
         id: coloredText
         anchors.fill: parent
-        source: radialInk
+        source: root.accentTopRight ? rightInk : radialInk
         maskSource: inkMask
         cached: false
     }

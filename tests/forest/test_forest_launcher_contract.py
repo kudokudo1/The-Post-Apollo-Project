@@ -1206,7 +1206,7 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("boundsBehavior: Flickable.StopAtBounds", view)
         self.assertIn('text: "FOREST // MODELS"', view)
         self.assertIn('text: "FOUND"', view)
-        self.assertIn('text: "LIVE ?"', view)
+        self.assertIn(': "LIVE ?"', view)
         self.assertIn('text: "ACCESS ?"', view)
         self.assertIn("SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED", view)
         self.assertIn("onClicked: root.scanModel(modelEntry.modelName)", view)

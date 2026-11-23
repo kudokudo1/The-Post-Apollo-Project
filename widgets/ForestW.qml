@@ -1033,17 +1033,22 @@ PanelWindow {
                         anchors.right: voiceToTextButton.left
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
-                        height: 26
+                        height: 32
                         enabled: root.menuOpen
                         clip: true
                         selectByMouse: true
+                        horizontalAlignment: TextInput.AlignLeft
+                        verticalAlignment: TextInput.AlignVCenter
                         font.family: "GohuFont 11 Nerd Font Mono"
-                        font.pixelSize: 11
+                        font.pixelSize: 17
                         color: Colors.magenta
                         selectionColor: Colors.magenta
                         selectedTextColor: Colors.black
+                        // Qt positions/heights the cursor from the text
+                        // cursorRectangle; 17px glyphs make it taller.
+                        // A 3px caret makes the orange accent legible.
                         cursorDelegate: Rectangle {
-                            width: 2
+                            width: 3
                             color: Colors.orange
                         }
                         Accessible.name: "Forest local draft text input"
@@ -1052,9 +1057,9 @@ PanelWindow {
                         // Intentionally no onAccepted / transport / history.
                     }
                     GohuText {
-                        anchors.left: forestPromptInput.left
-                        anchors.right: forestPromptInput.right
-                        anchors.verticalCenter: forestPromptInput.verticalCenter
+                        // Match the editable line's exact vertical box.
+                        anchors.fill: forestPromptInput
+                        verticalAlignment: Text.AlignVCenter
                         visible: forestPromptInput.text.length === 0
                                  && !forestPromptInput.activeFocus
                         text: root.frameHeight < 540
@@ -1062,7 +1067,7 @@ PanelWindow {
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                         color: Colors.magenta
                         opacity: 0.74
-                        font.pixelSize: 9
+                        font.pixelSize: 12
                         elide: Text.ElideRight
                     }
 

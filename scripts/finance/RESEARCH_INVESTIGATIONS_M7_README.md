@@ -37,7 +37,9 @@ python3 -B tests/finance/test_research_candidate_picker_contract.py
 
 The Research GitHub Actions workflow runs these alongside the M1–M5 regressions. The transport tests exercise normal SEC/Crawl outputs, malformed/spoofed sources, wrong issuer selection, refusal before network/storage, invalid oversized input, and a child that responds even while its parent keeps stdin open.
 
-A QML source contract is **not** native desktop acceptance. The next operator check, only after coordinated menu integration, should verify actual Quickshell component loading, compact/wide selection and scrolling, source/issuer change invalidation, Escape/back behavior and lack of new provider requests.
+The additional `finance-research-candidate-native-m7.yml` workflow starts a **real Quickshell** with synthetic SEC/Crawl objects on a disposable Fedora Xvfb display. Its smoke test verifies the candidate widget loads, its read-only Node IPC delivers two bounded candidates, and changing the selected issuer discards that result. This is native source/runtime verification in CI, **not operator desktop acceptance**.
+
+The next operator check, only after coordinated menu integration, should still inspect compact/wide selection and scrolling, Escape/back behavior and lack of new provider requests.
 
 ## WATCH OUT FOR
 

@@ -585,8 +585,8 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
         self.assertNotIn("ReasoningPolicy", view)  # no inference adapter coupling
-        self.assertNotIn("onPrimaryRequested:", view)
-        self.assertNotIn("onToggleRequested:", view)
+        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
 
         self.assertIn('import "ForestReasoningDialPolicy.js" as ReasoningPolicy', dial)
         self.assertIn('import "../components"', dial)

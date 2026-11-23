@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e
 
 on:
   pull_request:
@@ -11,6 +11,9 @@ on:
       - 'widgets/FinanceBankingAccountsPane.qml'
       - 'widgets/FinanceBankingProviderPane.qml'
       - 'widgets/FinanceBankingProviderPolicy.js'
+      - 'widgets/FinanceBankingSessionJournalPolicy.js'
+      - 'tests/finance/test_banking_session_journal_m4e.mjs'
+      - 'tests/finance/test_banking_session_journal_m4e_contracts.py'
       - 'widgets/FinanceBankingOfficialHandoff.qml'
       - 'widgets/FinanceBankingOfficialHandoffPolicy.js'
       - 'tests/finance/test_banking_official_handoff_m4d.mjs'
@@ -43,6 +46,9 @@ on:
       - 'widgets/FinanceBankingAccountsPane.qml'
       - 'widgets/FinanceBankingProviderPane.qml'
       - 'widgets/FinanceBankingProviderPolicy.js'
+      - 'widgets/FinanceBankingSessionJournalPolicy.js'
+      - 'tests/finance/test_banking_session_journal_m4e.mjs'
+      - 'tests/finance/test_banking_session_journal_m4e_contracts.py'
       - 'widgets/FinanceBankingOfficialHandoff.qml'
       - 'widgets/FinanceBankingOfficialHandoffPolicy.js'
       - 'tests/finance/test_banking_official_handoff_m4d.mjs'
@@ -107,3 +113,7 @@ jobs:
         run: node tests/finance/test_banking_official_handoff_m4d.mjs
       - name: Test M4d two-click official site and restricted-only UI contract
         run: python3 tests/finance/test_banking_official_handoff_m4d_contracts.py
+      - name: Test M4e full manual session journal and paginated provider isolation
+        run: node tests/finance/test_banking_session_journal_m4e.mjs
+      - name: Test M4e session journal source and no-financial-authority contracts
+        run: python3 tests/finance/test_banking_session_journal_m4e_contracts.py

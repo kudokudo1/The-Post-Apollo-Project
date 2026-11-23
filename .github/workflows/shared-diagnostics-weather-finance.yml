@@ -5,6 +5,8 @@ on:
     paths:
       - "components/DiagnosticsDockButton.qml"
       - "components/DiagnosticsServicePopup.qml"
+      - "components/qmldir"
+      - "tests/components/test_shared_diagnostics_qmldir.py"
       - "widgets/weather/WeatherStationW.qml"
       - "widgets/weather/StationWeatherProviderDiagnostics.qml"
       - "widgets/FinanceW.qml"
@@ -16,6 +18,8 @@ on:
     paths:
       - "components/DiagnosticsDockButton.qml"
       - "components/DiagnosticsServicePopup.qml"
+      - "components/qmldir"
+      - "tests/components/test_shared_diagnostics_qmldir.py"
       - "widgets/weather/WeatherStationW.qml"
       - "widgets/weather/StationWeatherProviderDiagnostics.qml"
       - "widgets/FinanceW.qml"
@@ -33,6 +37,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - name: Verify diagnostics QML types are registered and loadable by directory import
+        run: python3 -B tests/components/test_shared_diagnostics_qmldir.py
       - name: Verify shared dock button, popup and real service-state wiring
         run: python3 -B tests/components/test_shared_diagnostics_weather_finance.py
       - name: Preserve Weather provider state policy

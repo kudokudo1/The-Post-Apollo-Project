@@ -3,6 +3,7 @@ name: FinanceW Market M24 disposable populated-ledger real-QML fixture
 on:
   pull_request:
     paths:
+      - "widgets/FinanceMarketQuotaStatusPane.qml"
       - "tests/finance/finance_market_m24_populated_visual_harness.qml"
       - "tests/finance/test_market_m24_populated_visual.py"
       - "scripts/finance/MARKET_M24_POPULATED_QT_FIXTURE_README.md"
@@ -10,6 +11,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "widgets/FinanceMarketQuotaStatusPane.qml"
       - "tests/finance/finance_market_m24_populated_visual_harness.qml"
       - "tests/finance/test_market_m24_populated_visual.py"
       - "scripts/finance/MARKET_M24_POPULATED_QT_FIXTURE_README.md"

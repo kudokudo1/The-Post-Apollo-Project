@@ -1,0 +1,38 @@
+name: TimeW M6 local exact checkpoint admission (atomic, no Restore)
+
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3LocalExactCaptureStore.py'
+      - 'services/time/MachineV3LocalCheckpointAdmission.py'
+      - 'tests/timew/test_machine_v6_local_exact_checkpoint_admission.py'
+      - 'docs/timew-m6-local-exact-checkpoint-admission.md'
+      - '.github/workflows/timew-m6-local-exact-checkpoint-admission.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-local-batch-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify local-only complete checkpoint batch and rollback
+        run: python3 -B -I tests/timew/test_machine_v6_local_exact_checkpoint_admission.py
+      - name: Preserve M5/M4/M3 read-only and legacy stores
+        run: |
+          python3 -B -I tests/timew/test_machine_v5_local_preview_ui_bridge.py
+          node tests/timew/test_machine_v5_local_preview_policy.cjs
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_preview.py
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_store.py
+          python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py
+          python3 -B -I tests/timew/test_machine_v2_fractional_observation_review.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

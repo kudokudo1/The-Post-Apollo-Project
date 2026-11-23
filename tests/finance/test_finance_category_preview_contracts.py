@@ -72,13 +72,14 @@ for expected in (
     'function clearGroupDraft()',
     'function beginCreateGroup()',
     'function beginRenameGroup(row)',
-    'onGroupDraftNameChanged: groupPreviewVisible=false',
+    'onGroupDraftNameChanged:',
+    'groupApprovalArmed=false;',
     'groupPreviewVisible=false;',
     'label: "PREVIEW GROUP"',
     'label: "CANCEL GROUP"',
     'label: "RENAME GROUP"',
     'CLOSE GROUP" : "+ NEW GROUP"',
-    'PREVIEW ONLY // GROUP NOT SAVED IN ACTUAL',
+    'NOT SAVED // ACTUAL GROUP UNCHANGED',
     'categoryPane.groupPlan.ok',
 ):
     assert expected in pane, expected
@@ -104,14 +105,15 @@ for forbidden in (
 ):
     assert forbidden not in group_plan, forbidden
 
-# No group save is exposed. Existing category ARM/CONFIRM stays separate.
-assert 'signal groupSaveRequested' not in pane
-assert 'saveGroupRequested(' not in pane
-assert 'groupWriteService' not in pane
+# M6 adds a separately gated service; group proposal policy remains pure.
+assert 'signal groupSaveRequested(var payload)' in pane
+assert 'FinanceCategoryGroupWriteService' not in pane
+assert 'createCategoryGroup(' not in pane
+assert 'updateCategoryGroup(' not in pane
 
 # The existing guarded allocation entry point remains the only action
 # available through the list's EDIT SET link.
 assert 'id: financeCategoriesPane' in menu
 assert 'onEditBudgetRequested: function(category)' in menu
 assert 'financeBudgetGrid.choose(category);' in menu
-print("FinanceW category draft/preview isolation: PASS")
+print("FinanceW category and group preview policies remain non-mutating: PASS")

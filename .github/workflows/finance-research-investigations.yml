@@ -13,6 +13,7 @@ on:
       - "widgets/FinanceResearchInvestigationsPane.qml"
       - "widgets/FinanceResearchInvestigationsReadHost.qml"
       - "widgets/FinanceResearchWriteOutcomePanel.qml"
+      - "widgets/FinanceResearchWriteOutcomePreviewHost.qml"
       - "services/finance/FinanceResearchInvestigationReadService.qml"
       - "tests/finance/test_research_investigations.mjs"
       - "tests/finance/test_research_investigation_store.mjs"
@@ -21,6 +22,7 @@ on:
       - "tests/finance/test_research_investigation_write_attempt.mjs"
       - "tests/finance/test_research_investigation_disposable_dispatcher.mjs"
       - "tests/finance/test_research_write_outcome_panel_contract.py"
+      - "tests/finance/test_research_write_preview_host_contract.py"
       - "tests/finance/test_research_investigation_read_controller_contract.py"
       - "tests/finance/test_research_investigations_pane_contract.py"
       - ".github/workflows/finance-research-investigations.yml"
@@ -36,6 +38,7 @@ on:
       - "widgets/FinanceResearchInvestigationsPane.qml"
       - "widgets/FinanceResearchInvestigationsReadHost.qml"
       - "widgets/FinanceResearchWriteOutcomePanel.qml"
+      - "widgets/FinanceResearchWriteOutcomePreviewHost.qml"
       - "services/finance/FinanceResearchInvestigationReadService.qml"
       - "tests/finance/test_research_investigations.mjs"
       - "tests/finance/test_research_investigation_store.mjs"
@@ -44,6 +47,7 @@ on:
       - "tests/finance/test_research_investigation_write_attempt.mjs"
       - "tests/finance/test_research_investigation_disposable_dispatcher.mjs"
       - "tests/finance/test_research_write_outcome_panel_contract.py"
+      - "tests/finance/test_research_write_preview_host_contract.py"
       - "tests/finance/test_research_investigation_read_controller_contract.py"
       - "tests/finance/test_research_investigations_pane_contract.py"
       - ".github/workflows/finance-research-investigations.yml"
@@ -89,3 +93,5 @@ jobs:
         run: python3 -B tests/finance/test_research_investigation_read_controller_contract.py
       - name: M4b-T2 disposable outcome display contract
         run: python3 -B tests/finance/test_research_write_outcome_panel_contract.py
+      - name: M4b-T2 non-writing preview host contract
+        run: python3 -B tests/finance/test_research_write_preview_host_contract.py

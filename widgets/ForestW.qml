@@ -609,19 +609,23 @@ PanelWindow {
                 }
 
                 // The chat title is informational, not a selected button:
-                // show the whole Tree identity in its solid base color even
-                // while that Tree's selector is open-magenta on yellow.
-                GohuText {
+                // retain the Tree's idle identity/gradient while its button
+                // can be open-magenta. The accent is measured over the Tree
+                // NAME, not the // CHAT suffix (important for right-side MAPLE).
+                ForestGradientName {
                     id: chatHeading
                     anchors.left: chatTreeIconHost.right
                     anchors.leftMargin: 8
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
+                    height: 27
                     text: root.activeTree.name + " // CHAT"
-                    color: root.activeTree.identityColor
-                    font.pixelSize: 15
-                    font.bold: true
-                    elide: Text.ElideRight
+                    gradientText: root.activeTree.name
+                    pixelSize: 15
+                    bold: true
+                    baseColor: root.activeTree.identityColor
+                    accentColor: root.activeTree.gradientAccentColor
+                    accentTopRight: root.activeTree.gradientTopRight
                 }
                 // The title keeps its independent Tree Spiritual Glow; it
                 // does not inherit the active selector's magenta open state.
@@ -629,7 +633,7 @@ PanelWindow {
                     id: chatHeadingGlow
                     safeSource: chatHeading
                     requestedVisible: root.menuOpen
-                    foregroundColor: chatHeading.color
+                    foregroundColor: chatHeading.baseColor
                     preferredGlowColor: root.activeTree.spiritualIdleGlowColor
                     radius: 7
                     samples: 13

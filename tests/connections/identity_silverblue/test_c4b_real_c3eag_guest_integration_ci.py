@@ -120,5 +120,30 @@ class RealSilverblueC3eAGOwnerIntegration(unittest.TestCase):
                     "externalRollbackResistanceVerified","c5HumanConsentVerified"):
             self.assertFalse(AG.NEGATIVE[key])
 
+    def test_13_original_c3eah_source_runs_on_same_real_guest_process(self):
+        binding = (GUEST / "runtime_receipt_binding_ci.py").read_text()
+        self.assertIn("c3eah_combined_observer_payload=", HARNESS)
+        self.assertIn("C3eAHSignedReleaseLiveOrigin.py", HARNESS)
+        self.assertIn("C4B_ORIGINAL_C3EAH", HARNESS)
+        self.assertIn("source = Path(", binding)
+        self.assertIn("ah.inspect_ci_only(**ah_args)", binding)
+        self.assertIn('mode="c4b-guest-candidate"', binding)
+        self.assertIn("expected_process=real_guest_expected", PROBE)
+        self.assertIn("C3EAG.observe_ci_only(", PROBE)
+        self.assertLess(PROBE.index("expected_process=real_guest_expected"),
+                        PROBE.index("systemctl stop \"$unit\" || fail"))
+
+    def test_14_combined_signed_release_and_kernel_join_stays_diagnostic(self):
+        binding = (GUEST / "runtime_receipt_binding_ci.py").read_text()
+        marker = "REAL_C3EAH_SIGNED_RELEASE_RUNNING_GATEWAY_JOIN_DIAGNOSTIC_ONLY"
+        self.assertEqual(HARNESS.count("'C4B_ID_PASS // " + marker + "'"), 1)
+        self.assertEqual(PROBE.count('print("C4B_ID_PASS // ' + marker + '")'), 1)
+        self.assertIn('wrong["entrypointSha256"] = "0" * 64', binding)
+        self.assertIn("C4B_BINDING_C3EAH_TAMPERED_SOURCE_NOT_REFUSED", binding)
+        self.assertIn("ah.NEGATIVE", binding)
+        self.assertIn("ah.AG.NEGATIVE", binding)
+        self.assertNotIn("hostAuthenticated\": True", binding)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

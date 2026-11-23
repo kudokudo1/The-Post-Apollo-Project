@@ -20,6 +20,7 @@ Item {
     property var correctionCandidate: null
     property string correctionDirection: "out"
     property bool correctionDeleteArmed: false
+    property bool showActivityBreakdown: false
     readonly property var details: ProviderPolicy.build(
         providerId,accountSnapshot,sectionId)
     readonly property var providerAccounts: details.ok ? details.allAccounts : []
@@ -44,6 +45,7 @@ Item {
         entryAccountIndex=0;
         activityFromDate.text="";
         activityToDate.text="";
+        showActivityBreakdown=false;
         clearSelectedEntry();
     }
     onSectionIdChanged: {
@@ -52,6 +54,7 @@ Item {
         activityPageIndex=0;
         activityFromDate.text="";
         activityToDate.text="";
+        showActivityBreakdown=false;
         clearSelectedEntry();
         returnToTopRequested();
     }
@@ -653,6 +656,82 @@ Item {
                 color: Colors.orange
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                width: parent.width
+                height: 29
+                visible: providerPane.filteredActivity.ok
+                available: providerPane.filteredActivity.ok
+                    &&providerPane.filteredActivity.accountBreakdown.length>0
+                label: providerPane.showActivityBreakdown
+                    ? "HIDE FILTERED ACCOUNT BREAKDOWN"
+                    : "SHOW FILTERED ACCOUNT BREAKDOWN"
+                labelPixelSize: 9
+                accentColor: Colors.magenta
+                onLeftClicked: providerPane.showActivityBreakdown=
+                    !providerPane.showActivityBreakdown
+            }
+            Column {
+                width: parent.width
+                spacing: 5
+                visible: providerPane.showActivityBreakdown
+                    &&providerPane.filteredActivity.ok
+                    &&providerPane.filteredActivity.accountBreakdown.length>0
+                GohuText {
+                    width: parent.width
+                    text: "MATCHED ACTIVITY BY MANUAL ACCOUNT // TOTALS INCLUDE ALL MATCHING PAGES"
+                    font.pixelSize: 9
+                    color: Colors.cyan
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
+                Repeater {
+                    model: providerPane.filteredActivity.ok
+                        ? providerPane.filteredActivity.accountBreakdown:[]
+                    delegate: Rectangle {
+                        id: accountMovementCard
+                        required property var modelData
+                        width: providerContent.width
+                        height: movementDetails.implicitHeight+12
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+                        Column {
+                            id: movementDetails
+                            x: 6
+                            y: 6
+                            width: accountMovementCard.width-12
+                            spacing: 4
+                            GohuText {
+                                width: parent.width
+                                text: modelData.accountNickname
+                                    +" // "+modelData.matchedCount+" MATCHED ENTRIES"
+                                font.pixelSize: 10
+                                color: Colors.white
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "IN "+ProviderPolicy.money(modelData.matchedInCents)
+                                    +" // OUT "+ProviderPolicy.money(modelData.matchedOutCents)
+                                    +" // NET "+ProviderPolicy.money(modelData.matchedNetCents)
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "MANUAL/DEMO CASH MOVEMENT ONLY // NOT VERIFIED BALANCES OR PROFIT"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                }
             }
         }
         Column {

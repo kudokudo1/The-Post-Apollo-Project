@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h
 
 on:
   pull_request:
@@ -18,6 +18,8 @@ on:
       - 'tests/finance/test_banking_manual_corrections_m4f_contracts.py'
       - 'tests/finance/test_banking_activity_dates_m4g.mjs'
       - 'tests/finance/test_banking_activity_dates_m4g_contracts.py'
+      - 'tests/finance/test_banking_account_breakdown_m4h.mjs'
+      - 'tests/finance/test_banking_account_breakdown_m4h_contracts.py'
       - 'widgets/FinanceBankingOfficialHandoff.qml'
       - 'widgets/FinanceBankingOfficialHandoffPolicy.js'
       - 'tests/finance/test_banking_official_handoff_m4d.mjs'
@@ -57,6 +59,8 @@ on:
       - 'tests/finance/test_banking_manual_corrections_m4f_contracts.py'
       - 'tests/finance/test_banking_activity_dates_m4g.mjs'
       - 'tests/finance/test_banking_activity_dates_m4g_contracts.py'
+      - 'tests/finance/test_banking_account_breakdown_m4h.mjs'
+      - 'tests/finance/test_banking_account_breakdown_m4h_contracts.py'
       - 'widgets/FinanceBankingOfficialHandoff.qml'
       - 'widgets/FinanceBankingOfficialHandoffPolicy.js'
       - 'tests/finance/test_banking_official_handoff_m4d.mjs'
@@ -133,3 +137,7 @@ jobs:
         run: node tests/finance/test_banking_activity_dates_m4g.mjs
       - name: Test M4g date-range UI and no-financial-authority source contracts
         run: python3 tests/finance/test_banking_activity_dates_m4g_contracts.py
+      - name: Test M4h per-account matched session summaries and provider isolation
+        run: node tests/finance/test_banking_account_breakdown_m4h.mjs
+      - name: Test M4h read-only account breakdown and QML authority contracts
+        run: python3 tests/finance/test_banking_account_breakdown_m4h_contracts.py

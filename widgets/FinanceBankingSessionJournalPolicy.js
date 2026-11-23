@@ -85,6 +85,16 @@ function project(projection,session,options) {
     }
     if(accountId && !Object.prototype.hasOwnProperty.call(providerAccounts,accountId))
         return fail("ACCOUNT IS NOT IN THIS PROVIDER");
+    // All breakdown buckets are created solely from validated provider accounts.
+    // They accumulate the exact same filtered records as the provider totals.
+    var breakdownById=Object.create(null),breakdown=[];
+    for(var b=0;b<projection.allAccounts.length;b++) {
+        var account=projection.allAccounts[b];
+        var bucket={accountId:account.id,accountNickname:account.nickname,
+            matchedCount:0,matchedInCents:0,matchedOutCents:0};
+        breakdownById[account.id]=bucket;
+        breakdown.push(bucket);
+    }
     var uniqueEntries=Object.create(null),rows=[],providerCount=0;
     var matchedInCents=0,matchedOutCents=0;
     for(var k=0;k<session.entries.length;k++) {
@@ -110,13 +120,44 @@ function project(projection,session,options) {
         var q=rawQuery.trim().toLowerCase();
         if(q && e.description.toLowerCase().indexOf(q)<0
              &&owned.nickname.toLowerCase().indexOf(q)<0)continue;
-        if(e.amountCents>0)matchedInCents+=e.amountCents;
-        else matchedOutCents+=-e.amountCents;
+        var bucket=breakdownById[e.accountId];
+        if(!bucket)return fail("INVALID PROVIDER ACTIVITY BUCKET");
+        bucket.matchedCount++;
+        if(e.amountCents>0) {
+            matchedInCents+=e.amountCents;
+            bucket.matchedInCents+=e.amountCents;
+        } else {
+            matchedOutCents+=-e.amountCents;
+            bucket.matchedOutCents+=-e.amountCents;
+        }
         rows.push({id:e.id,accountId:e.accountId,accountNickname:owned.nickname,
             date:e.date,description:e.description,amountCents:e.amountCents});
     }
     if(providerCount!==projection.transactionCount)
         return fail("STALE PROVIDER TRANSACTION COUNT");
+    var accountBreakdown=[],checkIn=0,checkOut=0,checkCount=0;
+    for(var t=0;t<breakdown.length;t++) {
+        var item=breakdown[t];
+        if(item.matchedCount===0)continue;
+        if(!Number.isSafeInteger(item.matchedCount)
+           ||!Number.isSafeInteger(item.matchedInCents)
+           ||!Number.isSafeInteger(item.matchedOutCents))
+            return fail("INVALID SESSION MOVEMENT TOTAL");
+        checkCount+=item.matchedCount;
+        checkIn+=item.matchedInCents;
+        checkOut+=item.matchedOutCents;
+        accountBreakdown.push({accountId:item.accountId,
+            accountNickname:item.accountNickname,
+            matchedCount:item.matchedCount,
+            matchedInCents:item.matchedInCents,
+            matchedOutCents:item.matchedOutCents,
+            matchedNetCents:item.matchedInCents-item.matchedOutCents});
+    }
+    if(!Number.isSafeInteger(matchedInCents)
+       ||!Number.isSafeInteger(matchedOutCents)
+       ||checkCount!==rows.length
+       ||checkIn!==matchedInCents||checkOut!==matchedOutCents)
+        return fail("INCONSISTENT SESSION MOVEMENT TOTAL");
     rows.sort(compareEntries);
     var matchCount=rows.length,pageCount=Math.max(1,Math.ceil(matchCount/PAGE_SIZE)),
         pageIndex=Math.min(requested,pageCount-1),start=pageIndex*PAGE_SIZE,
@@ -129,6 +170,7 @@ function project(projection,session,options) {
         fromDate:fromDate,toDate:toDate,
         matchedInCents:matchedInCents,matchedOutCents:matchedOutCents,
         matchedNetCents:matchedInCents-matchedOutCents,
+        accountBreakdown:accountBreakdown,
         totalsScope:"FILTERED SESSION ENTRIES // NOT VERIFIED INCOME OR SPENDING",
         scope:session.mode==="demo"?"COMPLETE FICTIONAL DEMO SESSION":
               "COMPLETE CURRENT MANUAL SESSION",

@@ -173,7 +173,7 @@ class NativeConsentHardHold(unittest.TestCase):
     def test_10_wrong_nonce_prepared_refused_before_polkit(self):
         self.prepared["requestNonce"] = C.b64(bytes(range(31, -1, -1)))
         msg, calls, pk = self.exercise()
-        self.assertIn("REFUSED", msg)
+        self.assertIn("UNTRUSTED_OR_STALE_PROTECTED_PX_REVIEW", msg)
         self.assertEqual(calls, ["prepare"])
         self.assertEqual(pk, 0)
 

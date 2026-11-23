@@ -7,11 +7,11 @@
 
 ## Purpose and mechanism
 
-The existing \`MachineV2ExactLogicalGeometry.py\` provides an immutable untrusted versioned Python value with four exact binary64 logical-coordinate bit patterns and two distinct phases: PENDING and CURRENT.
+The existing `MachineV2ExactLogicalGeometry.py` provides an immutable untrusted versioned Python value with four exact binary64 logical-coordinate bit patterns and two distinct phases: PENDING and CURRENT.
 
-The additive \`MachineV2FractionalObservationReview.py\` reads those values *in memory* and compares a provisional four-step observation: before CURRENT, target PENDING, observed CURRENT after resize, and a later CURRENT after an independently proposed move. It checks exact dimensions at the resize point and exact complete target values at the final point. No rounding and no assumption that resize preserved original x/y are allowed. A center-adjusting resize can move x/y, so a new post-resize reading is required for even a value-only comparison.
+The additive `MachineV2FractionalObservationReview.py` reads those values *in memory* and compares a provisional four-step observation: before CURRENT, target PENDING, observed CURRENT after resize, and a later CURRENT after an independently proposed move. It checks exact dimensions at the resize point and exact complete target values at the final point. No rounding and no assumption that resize preserved original x/y are allowed. A center-adjusting resize can move x/y, so a new post-resize reading is required for even a value-only comparison.
 
-The supplied diagnostic stage labels \`READY_REPORTED\`, \`TIMEOUT_FORCED\`, and \`UNKNOWN\` are **caller-created** and intentionally NOT a canonical native wire, configure receipt, or signed transaction state. If either stage is timeout/unknown or any intermediate observation is missing, the status is \`UNKNOWN_HOLD\`. Mismatched values yield \`GEOMETRY_MISMATCH_HOLD\`. Even perfectly matching values with both ready-reported labels yield \`MATCHED_VALUES_UNTRUSTED_HOLD\`. Every result hard-denies Restore, native actions, source/selection/ACK/settlement/C5 authority and returns no safe actions.
+The supplied diagnostic stage labels `READY_REPORTED`, `TIMEOUT_FORCED`, and `UNKNOWN` are **caller-created** and intentionally NOT a canonical native wire, configure receipt, or signed transaction state. If either stage is timeout/unknown or any intermediate observation is missing, the status is `UNKNOWN_HOLD`. Mismatched values yield `GEOMETRY_MISMATCH_HOLD`. Even perfectly matching values with both ready-reported labels yield `MATCHED_VALUES_UNTRUSTED_HOLD`. Every result hard-denies Restore, native actions, source/selection/ACK/settlement/C5 authority and returns no safe actions.
 
 Why: SwayPX #176 observed that the actual timeout handler can lead to copying CURRENT and arranging the scene without successful configure ACK. Neither a CURRENT match nor scene arrangement proves frame presentation, authorized target, or permission to issue a move.
 
@@ -30,11 +30,11 @@ There is deliberately **no serialized receipt schema, byte order, native IPC tra
 
 On an isolated repository checkout:
 
-\`\`\`sh
+```sh
 python3 -B -I tests/timew/test_machine_v2_fractional_observation_review.py
 python3 -B -I tests/timew/test_machine_v2_exact_logical_geometry.py
 python3 -B -I tests/timew/test_machine_geometry_store_v2.py
 python3 -B -I tests/timew/test_machine_v2_geometry_journal.py
-\`\`\`
+```
 
 The new workflow is source/CI-only and cannot move a window. **Native Restore remains HOLD.**

@@ -19,6 +19,10 @@ Scope {
     readonly property string processErrorPrefix: "FINANCE_RESEARCH_CANDIDATES_ERROR "
     property int generation: 0
     property int submittedGeneration: -1
+    property bool stdoutFinished: false
+    property bool stderrFinished: false
+    property bool processExited: false
+    property int processExitCode: -1
     readonly property bool loading: state === "loading"
 
     function clear() {
@@ -52,6 +56,11 @@ Scope {
         requestFrame = frame;
         responseBuffer = "";
         errorBuffer = "";
+        stdoutFinished = false;
+        stderrFinished = false;
+        processExited = false;
+        processExitCode = -1;
+        completionDeadline.stop();
         candidatePreview = null;
         state = "loading";
         message = "VALIDATING CURRENT SOURCE SNAPSHOTS // READ ONLY";
@@ -156,6 +165,50 @@ Scope {
         return "INVALID_RESULT_STREAM";
     }
 
+    // Process exit and StdioCollector completion are separate events.
+    // Do not assume stdout has flushed at onExited (especially for 30 rows).
+    // No automatic retry, provider call, or persistent storage action.
+    function completeAttempt(force) {
+        if (!processExited)
+            return;
+        if (!force && (!stdoutFinished || !stderrFinished))
+            return;
+        completionDeadline.stop();
+
+        const fresh = monitoring && submittedGeneration === generation;
+        const output = responseBuffer;
+        const diagnostic = errorBuffer;
+        const code = processExitCode;
+        const streamIncomplete = !stdoutFinished || !stderrFinished;
+
+        responseBuffer = "";
+        errorBuffer = "";
+        requestFrame = "";
+        processExited = false;
+        stdoutFinished = false;
+        stderrFinished = false;
+        processExitCode = -1;
+        if (!fresh)
+            return;
+
+        if (streamIncomplete || !acceptResponse(output, code)) {
+            const reason = streamIncomplete ? "STREAM_INCOMPLETE"
+                                           : refusalCode(code, output, diagnostic);
+            candidatePreview = null;
+            state = "failed";
+            message = "PREVIEW REFUSED // " + reason;
+            // Log only a fixed rejection code. Never log raw source data.
+            console.warn("FINANCE_RESEARCH_PREVIEW_REFUSED // " + reason);
+        }
+    }
+
+    Timer {
+        id: completionDeadline
+        interval: 1800
+        repeat: false
+        onTriggered: candidateService.completeAttempt(true)
+    }
+
     Process {
         id: worker
         stdinEnabled: true
@@ -168,31 +221,25 @@ Scope {
             }
         }
         stdout: StdioCollector {
-            onStreamFinished: candidateService.responseBuffer = text
+            onStreamFinished: {
+                candidateService.responseBuffer = text;
+                candidateService.stdoutFinished = true;
+                candidateService.completeAttempt(false);
+            }
         }
         stderr: StdioCollector {
-            onStreamFinished: candidateService.errorBuffer = text
+            onStreamFinished: {
+                candidateService.errorBuffer = text;
+                candidateService.stderrFinished = true;
+                candidateService.completeAttempt(false);
+            }
         }
         onExited: function(exitCode, exitStatus) {
-            Qt.callLater(function() {
-                const fresh = candidateService.monitoring
-                    && candidateService.submittedGeneration
-                       === candidateService.generation;
-                const output = candidateService.responseBuffer;
-                const diagnostic = candidateService.errorBuffer;
-                candidateService.responseBuffer = "";
-                candidateService.errorBuffer = "";
-                candidateService.requestFrame = "";
-                if (!fresh) return;
-                if (!candidateService.acceptResponse(output, exitCode)) {
-                    const code = candidateService.refusalCode(
-                        exitCode, output, diagnostic);
-                    candidateService.candidatePreview = null;
-                    candidateService.state = "failed";
-                    candidateService.message = "PREVIEW REFUSED // " + code;
-                    console.warn("FINANCE_RESEARCH_PREVIEW_REFUSED // " + code);
-                }
-            });
+            candidateService.processExitCode = exitCode;
+            candidateService.processExited = true;
+            candidateService.completeAttempt(false);
+            if (candidateService.processExited)
+                completionDeadline.start();
         }
     }
 }

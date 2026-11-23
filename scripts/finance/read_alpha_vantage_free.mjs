@@ -131,8 +131,7 @@ export function normalizeDaily(raw,symbol,currency,from,to,retrievedAt) {
     fail("provider-invalid");
   const rows=[];
   for(const date of days) {
-    if(dayNumber(date)===null || date>to && dayNumber(date)===null)
-      fail("provider-invalid");
+    if(dayNumber(date)===null)fail("provider-invalid");
     const item=series[date],price=closePrice(item?.["4. close"]);
     if(price===null)fail("provider-invalid");
     if(date>=from && date<=to)rows.push({date,price});

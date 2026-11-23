@@ -153,6 +153,7 @@ Rectangle {
                         }
                         GohuText {
                             id: number
+                            objectName: "marketQuotaReservedLabel"
                             anchors.top: providerTitle.bottom
                             anchors.topMargin: 7
                             anchors.left: providerTitle.left

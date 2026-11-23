@@ -45,12 +45,19 @@ function project(projection,session,options) {
     var opts=options||{},direction=opts.direction===undefined?"all":opts.direction,
         accountId=opts.accountId===undefined?"":opts.accountId,
         rawQuery=opts.query===undefined?"":opts.query,
+        fromDate=opts.fromDate===undefined?"":opts.fromDate,
+        toDate=opts.toDate===undefined?"":opts.toDate,
         requested=opts.page===undefined?0:opts.page;
     if(!["all","in","out"].includes(direction)
        ||typeof accountId!=="string"||typeof rawQuery!=="string"
        ||rawQuery.length>64||/[\u0000-\u001F\u007F]/.test(rawQuery)
        ||!Number.isSafeInteger(requested)||requested<0||requested>MAX_ENTRIES)
         return fail("INVALID ACTIVITY FILTER");
+    if(typeof fromDate!=="string"||typeof toDate!=="string"
+       ||(fromDate!==""&&!safeDate(fromDate))
+       ||(toDate!==""&&!safeDate(toDate))
+       ||(fromDate!==""&&toDate!==""&&fromDate>toDate))
+        return fail("INVALID DATE RANGE // USE YYYY-MM-DD AND FROM <= TO");
     var known=Object.create(null),providerAccounts=Object.create(null);
     var totalProviderAccounts=0;
     for(var i=0;i<session.accounts.length;i++) {
@@ -79,6 +86,7 @@ function project(projection,session,options) {
     if(accountId && !Object.prototype.hasOwnProperty.call(providerAccounts,accountId))
         return fail("ACCOUNT IS NOT IN THIS PROVIDER");
     var uniqueEntries=Object.create(null),rows=[],providerCount=0;
+    var matchedInCents=0,matchedOutCents=0;
     for(var k=0;k<session.entries.length;k++) {
         var e=session.entries[k];
         if(!e||typeof e.id!=="string"
@@ -95,11 +103,15 @@ function project(projection,session,options) {
         if(!owned)continue; // Never expose another provider's account activity
         providerCount++;
         if(accountId && accountId!==e.accountId)continue;
+        if(fromDate!==""&&e.date<fromDate)continue;
+        if(toDate!==""&&e.date>toDate)continue;
         if(direction==="in"&&e.amountCents<=0)continue;
         if(direction==="out"&&e.amountCents>=0)continue;
         var q=rawQuery.trim().toLowerCase();
         if(q && e.description.toLowerCase().indexOf(q)<0
              &&owned.nickname.toLowerCase().indexOf(q)<0)continue;
+        if(e.amountCents>0)matchedInCents+=e.amountCents;
+        else matchedOutCents+=-e.amountCents;
         rows.push({id:e.id,accountId:e.accountId,accountNickname:owned.nickname,
             date:e.date,description:e.description,amountCents:e.amountCents});
     }
@@ -114,6 +126,10 @@ function project(projection,session,options) {
         pageIndex:pageIndex,pageCount:pageCount,pageSize:PAGE_SIZE,
         from:matchCount?start+1:0,to:Math.min(start+PAGE_SIZE,matchCount),
         accountId:accountId,direction:direction,
+        fromDate:fromDate,toDate:toDate,
+        matchedInCents:matchedInCents,matchedOutCents:matchedOutCents,
+        matchedNetCents:matchedInCents-matchedOutCents,
+        totalsScope:"FILTERED SESSION ENTRIES // NOT VERIFIED INCOME OR SPENDING",
         scope:session.mode==="demo"?"COMPLETE FICTIONAL DEMO SESSION":
               "COMPLETE CURRENT MANUAL SESSION",
         connected:false,persisted:false};

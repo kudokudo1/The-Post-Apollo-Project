@@ -124,7 +124,7 @@ assert.equal(iconAccent(false,true,false),Colors.orange,
 // Exercise the QML registration predicate, not a synthetic local click flag.
 const registeredStart = "readonly property bool appRegistered:";
 assert.equal(source.split(registeredStart).length - 1, 1);
-const registeredExpr = source.split(registeredStart,2)[1].split("\\n\\n",1)[0];
+const registeredExpr = source.split(registeredStart,2)[1].split("\n\n",1)[0];
 function registered(modelData) {
     return vm.runInNewContext("(" + registeredExpr + ")", {
         trayButton:{modelData}

@@ -48,7 +48,7 @@ Window {
         var s=original();s.month="2026-12";fixture=s;
     }
     function duplicateCategory(){
-        var s=original();s.categories.push({...s.categories[0]});fixture=s;
+        var s=original();s.categories.push(JSON.parse(JSON.stringify(s.categories[0])));fixture=s;
     }
     function breakSource(){
         var s=original();s.sourceKey="invalid";fixture=s;

@@ -22,9 +22,13 @@ function prepareNameIntent(doctorId, displayName) {
     if (typeof displayName !== "string")
         return refused("DOCTOR_NAME_TEXT_TYPE_REFUSED");
     const name = displayName.trim();
-    if (Array.from(name).length > 96
+    const scalars = Array.from(name);
+    if (scalars.length > 96
             || /[\x00-\x1f\x7f]/.test(name)
-            || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(name))
+            || scalars.some(function(ch) {
+                const first = ch.charCodeAt(0);
+                return ch.length === 1 && first >= 0xD800 && first <= 0xDFFF;
+            }))
         return refused("DOCTOR_NAME_TEXT_REFUSED");
 
     // An empty name is explicitly allowed. The protected backend's

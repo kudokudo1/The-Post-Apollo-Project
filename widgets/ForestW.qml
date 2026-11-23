@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import "../components"
 import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
+import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
 
 // FOREST V0: self-contained visual workspace. No model, PX or Hospital calls.
 PanelWindow {
@@ -56,6 +57,20 @@ PanelWindow {
         return "";
     }
 
+    // Last explicit P0 snapshot drives BOTH badge and popup rows.
+    readonly property string selectedModelLoadState: ResidencyPolicy.modelState(
+        modelResidency.status, modelResidency.models, selectedLocalModel)
+    function refreshLocalModelEvidence() {
+        // One user gesture. Both fixed GET helpers target local Ollama.
+        if (localInventory.scanning || modelResidency.scanning)
+            return false;
+        if (!localInventory.scanModels())
+            return false;
+        if (!modelResidency.scanResidency())
+            modelResidency.invalidate();
+        return true;
+    }
+
     function chooseLocalModel(name) {
         if (localInventory.status !== "REACHABLE" || localInventory.scanning)
             return false;
@@ -72,7 +87,7 @@ PanelWindow {
     function scanModel(name) {
         if (!menuOpen || !modelPopupOpen || !name || localInventory.scanning)
             return false;
-        if (!localInventory.scanModels())
+        if (!refreshLocalModelEvidence())
             return false;
         pendingModelScan = name;
         lastScannedModel = "";
@@ -88,8 +103,8 @@ PanelWindow {
             pendingModelScan = "";
             lastScannedModel = "";
             lastModelScanResult = "";
-            if (!localInventory.scanning)
-                localInventory.scanModels();
+            if (!localInventory.scanning && !modelResidency.scanning)
+                refreshLocalModelEvidence();
         }
     }
     onMenuOpenChanged: {
@@ -100,6 +115,9 @@ PanelWindow {
             if (forestPromptInput)
                 forestPromptInput.clear();
         }
+    }
+    ForestResidencyAdapter {
+        id: modelResidency
     }
     ForestInventoryAdapter {
         id: localInventory
@@ -340,7 +358,7 @@ PanelWindow {
                     id: headerRescanButton
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    interactive: root.menuOpen && !localInventory.scanning
+                    interactive: root.menuOpen && !localInventory.scanning && !modelResidency.scanning
                     Accessible.name: localInventory.scanning
                         ? "Forest model inventory scan in progress"
                         : "Rescan local Ollama model inventory (read-only)"
@@ -350,12 +368,12 @@ PanelWindow {
                         root.pendingModelScan = "";
                         root.lastScannedModel = "";
                         root.lastModelScanResult = "";
-                        localInventory.scanModels();
+                        root.refreshLocalModelEvidence();
                     }
                 }
 
-                // LIVE describes only the Quickshell workspace, not Ollama
-                // or Hermes connectivity. It is always RIGHT of Rescan.
+                // One last P0 /api/ps observation for selected Tree model.
+                // Residency is not proof of active token generation or C5 access.
                 Rectangle {
                     id: liveIndicator
                     anchors.left: headerRescanButton.right
@@ -365,8 +383,16 @@ PanelWindow {
                     height: 25
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
-                    Accessible.name: "Forest workspace live; AI engine not connected"
+                    readonly property color modelStatusColor:
+                        root.selectedModelLoadState === "LOADED" ? Colors.green
+                        : root.selectedModelLoadState === "NOT_LOADED"
+                            ? Colors.orange : Colors.cyan
+                    border.color: modelStatusColor
+                    Accessible.name: root.selectedLocalModel
+                        ? ("Selected model " + root.selectedLocalModel
+                            + " // " + root.selectedModelLoadState
+                            + " // last Ollama residency scan, not active inference")
+                        : "No selected local model // model residency unknown"
 
                     Rectangle {
                         anchors.left: parent.left
@@ -375,15 +401,16 @@ PanelWindow {
                         width: 6
                         height: 6
                         radius: 3
-                        color: Colors.green
+                        color: liveIndicator.modelStatusColor
                     }
                     GohuText {
                         anchors.right: parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "LIVE"
+                        text: root.selectedModelLoadState === "LOADED" ? "LOAD"
+                            : root.selectedModelLoadState === "NOT_LOADED" ? "IDLE" : "?"
                         font.pixelSize: 11
-                        color: Colors.green
+                        color: liveIndicator.modelStatusColor
                     }
                 }
             }
@@ -761,18 +788,18 @@ PanelWindow {
                         Accessible.name: "Scan local Ollama models, read-only"
                         GohuText {
                             anchors.centerIn: parent
-                            text: localInventory.scanning ? "..." : "SCAN ALL"
+                            text: localInventory.scanning || modelResidency.scanning ? "..." : "SCAN ALL"
                             color: Colors.cyan
                             font.pixelSize: 9
                         }
                         MouseArea {
                             anchors.fill: parent
-                            enabled: !localInventory.scanning
+                            enabled: !localInventory.scanning && !modelResidency.scanning
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onClicked: {
                                 root.lastScannedModel = "";
                                 root.lastModelScanResult = "";
-                                localInventory.scanModels();
+                                root.refreshLocalModelEvidence();
                             }
                         }
                     }
@@ -890,7 +917,7 @@ PanelWindow {
                             }
                             MouseArea {
                                 anchors.fill: parent
-                                enabled: !localInventory.scanning
+                                enabled: !localInventory.scanning && !modelResidency.scanning
                                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onClicked: root.scanModel(modelEntry.modelName)
                             }
@@ -925,14 +952,24 @@ PanelWindow {
                             Rectangle {
                                 width: (modelStatusBar.width - 6) / 3
                                 height: parent.height
+                                readonly property string observedState:
+                                    ResidencyPolicy.modelState(
+                                        modelResidency.status,
+                                        modelResidency.models, modelEntry.modelName)
+                                readonly property color observedColor:
+                                    observedState === "LOADED" ? Colors.green
+                                    : observedState === "NOT_LOADED"
+                                        ? Colors.orange : Colors.cyan
                                 color: Colors.dark
                                 border.width: 1
-                                border.color: Colors.orange
+                                border.color: observedColor
                                 GohuText {
                                     anchors.centerIn: parent
-                                    text: "LIVE ?"
+                                    text: parent.observedState === "LOADED" ? "LOADED"
+                                        : parent.observedState === "NOT_LOADED" ? "IDLE"
+                                        : "LIVE ?"
                                     font.pixelSize: 9
-                                    color: Colors.orange
+                                    color: parent.observedColor
                                 }
                             }
                             Rectangle {
@@ -980,7 +1017,7 @@ PanelWindow {
                     elide: Text.ElideRight
                     text: root.lastScannedModel
                         ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
-                        : "SCAN = INVENTORY ONLY // LIVE & ACCESS UNVERIFIED"
+                        : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"
                 }
             }
             // Compact empty-session state remains below the chat heading.

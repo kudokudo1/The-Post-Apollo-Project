@@ -20,7 +20,17 @@ Item {
         phase === "reviewRequired"
         || (phase === "acknowledged" && !verifiedSave)
     readonly property string headline: {
-        if (simulationOnly) return "DISPOSABLE PREVIEW // NOT SAVED TO LIVE STORAGE";
+        if (simulationOnly) {
+            if (phase === "inFlight")
+                return "TEST DISPATCH IN FLIGHT // NO LIVE WRITE";
+            if (phase === "acknowledged")
+                return "TEST ACK RECEIVED // NOT SAVED TO LIVE STORAGE";
+            if (phase === "reviewRequired")
+                return "TEST OUTCOME UNKNOWN // KEEP DRAFT";
+            if (phase === "refused")
+                return "TEST REFUSED // NO LIVE WRITE";
+            return "DISPOSABLE PREVIEW // NOT SAVED TO LIVE STORAGE";
+        }
         if (verifiedSave) return "SAVED // EXACT ACK VERIFIED";
         if (phase === "inFlight") return "WRITE IN FLIGHT // DO NOT RESUBMIT";
         if (phase === "refused") return "REQUEST REFUSED // NO SAVE CLAIM";

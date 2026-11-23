@@ -119,7 +119,7 @@ deny(x => { x.entries[0].app_id = "<script>\n"; }, "text injection");
 deny(x => { x.entries[0].output_id = ""; }, "empty output");
 deny(x => { x.entries[0].workspace_id = "A".repeat(129); },
      "oversized workspace");
-deny(x => { x.entries[0].capture_id = windowId; }, "capture uuid wrong version");
+deny(x => { x.entries[0].capture_id = "bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb"; }, "capture uuid wrong version");
 deny(x => { x.entries[0].checkpoint_window_key = "abc"; }, "invalid window id");
 deny(x => { x.entries[0].saved_at_utc = "\n"; }, "bad timestamp display");
 deny(x => { x.entries[0].local_data_untrusted = false; },

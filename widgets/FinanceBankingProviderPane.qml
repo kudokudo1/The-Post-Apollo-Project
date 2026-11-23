@@ -439,6 +439,7 @@ Item {
                     text: modelData.date+" // "+modelData.nickname
                         +" // "+ProviderPolicy.money(modelData.amountCents)
                         +" // "+modelData.description
+                        +(modelData.transferId?" // DECLARED MANUAL TRANSFER":"")
                     font.pixelSize: 9
                     color: modelData.amountCents<0?Colors.orange:Colors.omnitrix
                     textFormat: Text.PlainText

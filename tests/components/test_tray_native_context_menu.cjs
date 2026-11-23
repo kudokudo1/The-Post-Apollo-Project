@@ -101,42 +101,42 @@ assert.equal(accent(true,true,true),Colors.magenta,"open beats hovering and pres
 const iconColorStart = "readonly property color iconAccentColor:";
 assert.equal(source.split(iconColorStart).length - 1,1);
 const iconExpression = source.split(iconColorStart,2)[1].split("\n\n",1)[0];
-function iconAccent(registered, hovered, pressed) {
+function iconAccent(onDesktop, hovered, pressed) {
     return vm.runInNewContext("(" + iconExpression + ")", {
-        trayButton:{appRegistered:registered},
+        trayButton:{appOnDesktop:onDesktop},
         trayButtonMouse:{containsMouse:hovered,pressed:pressed},
         Colors
     });
 }
-// The app icon is born as a registered SNI delegate and remains open-colored
-// after moving the pointer away or closing the native menu.
 assert.equal(iconAccent(true,false,false),Colors.magenta,
-    "registered application idle is open-magenta");
-assert.equal(iconAccent(true,true,false),Colors.magenta,
-    "hover must not clear the registered application's magenta identity");
-assert.equal(iconAccent(true,false,true),Colors.magenta,
-    "click must not clear the registered application's magenta identity");
+    "visible desktop application stays magenta without hover");
+assert.equal(iconAccent(true,true,true),Colors.magenta,
+    "visible app state takes priority over pointer state");
 assert.equal(iconAccent(false,false,false),Colors.cyan,
-    "only an unregistered/fallback app icon can be idle cyan");
+    "background registered app has idle cyan");
 assert.equal(iconAccent(false,true,false),Colors.orange,
-    "unregistered/fallback hover still orange");
+    "background registered app turns orange on hover");
+assert.equal(iconAccent(false,false,true),Colors.orange,
+    "background registered app turns orange when pressed");
 
-// Exercise the QML registration predicate, not a synthetic local click flag.
-const registeredStart = "readonly property bool appRegistered:";
-assert.equal(source.split(registeredStart).length - 1, 1);
-const registeredExpr = source.split(registeredStart,2)[1].split("\n\n",1)[0];
-function registered(modelData) {
-    return vm.runInNewContext("(" + registeredExpr + ")", {
-        trayButton:{modelData}
+// Execute the actual QML desktop visibility binding using isolated Sway
+// policy values, without inventing a click-driven active flag.
+const desktopStart = "readonly property bool appOnDesktop:";
+assert.equal(source.split(desktopStart).length - 1, 1);
+const desktopExpr = source.split(desktopStart,2)[1].split("\n\n",1)[0];
+function appOnDesktop(modelData, visibleKeys) {
+    return vm.runInNewContext("(" + desktopExpr + ")", {
+        trayButton:{modelData},
+        trayDock:{visibleDesktopKeys:visibleKeys},
+        DesktopVisibility:{hasVisibleDesktopWindow: (item, keys) =>
+            !!item && keys.includes(item.id)}
     });
 }
-assert.equal(registered({id:"vesktop"}),true);
-assert.equal(registered({id:"net.lutris.Lutris"}),true);
-assert.equal(registered(null),false);
-assert.equal(registered(undefined),false);
-assert.match(source,/readonly property bool cardEmphasized:\s*trayButton\.appRegistered/);
-assert.match(source,/visible:\s*trayButton\.appRegistered/);
-assert.doesNotMatch(source,/readonly property bool cardEmphasized:\s*trayNativeMenu\.visible/);
+assert.equal(appOnDesktop({id:"vesktop"},["vesktop"]),true);
+assert.equal(appOnDesktop({id:"vesktop"},[]),false);
+assert.match(source,/readonly property bool cardEmphasized:\s*trayButton\.appOnDesktop/);
+assert.match(source,/visible:\s*trayButton\.appOnDesktop/);
+assert.doesNotMatch(source,/readonly property bool cardEmphasized:\s*trayButton\.appRegistered/);
 assert.match(source,/trayMenuOpen \? 0\.72/);
 assert.match(source,/trayMenuOpen \? 0\.18/);
 assert.match(source,/onOpened: trayDock\.openMenuAnchor = trayNativeMenu/);

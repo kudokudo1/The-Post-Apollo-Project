@@ -192,7 +192,7 @@ class RealIdentityPacketAndSignedDenialStillHold(unittest.TestCase):
             return {**observed, "sourceEvidenceTrusted": True}
 
         with mock.patch.object(P.K, "inspect_one_untrusted_packet", side_effect=poisoned):
-            with self.assertRaisesRegex(P.Refused, "UNEXPECTED_KERNEL_REPORT"):
+            with self.assertRaisesRegex(P.Refused, "PACKET_OR_AUTHORITY_MISMATCH"):
                 P.inspect_ci_only(
                     receiver, expected_request_frame=self.original_outcome_frame(),
                     boundary=self.p.local)

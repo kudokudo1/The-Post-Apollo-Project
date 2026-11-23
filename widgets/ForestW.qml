@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import "../components"
 import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
+import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
 
 // FOREST V0: self-contained visual workspace. No model, PX or Hospital calls.
 PanelWindow {
@@ -56,6 +57,20 @@ PanelWindow {
         return "";
     }
 
+    // Last explicit P0 snapshot drives BOTH badge and popup rows.
+    readonly property string selectedModelLoadState: ResidencyPolicy.modelState(
+        modelResidency.status, modelResidency.models, selectedLocalModel)
+    function refreshLocalModelEvidence() {
+        // One user gesture. Both fixed GET helpers target local Ollama.
+        if (localInventory.scanning || modelResidency.scanning)
+            return false;
+        if (!localInventory.scanModels())
+            return false;
+        if (!modelResidency.scanResidency())
+            modelResidency.invalidate();
+        return true;
+    }
+
     function chooseLocalModel(name) {
         if (localInventory.status !== "REACHABLE" || localInventory.scanning)
             return false;
@@ -72,7 +87,7 @@ PanelWindow {
     function scanModel(name) {
         if (!menuOpen || !modelPopupOpen || !name || localInventory.scanning)
             return false;
-        if (!localInventory.scanModels())
+        if (!refreshLocalModelEvidence())
             return false;
         pendingModelScan = name;
         lastScannedModel = "";
@@ -88,8 +103,8 @@ PanelWindow {
             pendingModelScan = "";
             lastScannedModel = "";
             lastModelScanResult = "";
-            if (!localInventory.scanning)
-                localInventory.scanModels();
+            if (!localInventory.scanning && !modelResidency.scanning)
+                refreshLocalModelEvidence();
         }
     }
     onMenuOpenChanged: {
@@ -100,6 +115,9 @@ PanelWindow {
             if (forestPromptInput)
                 forestPromptInput.clear();
         }
+    }
+    ForestResidencyAdapter {
+        id: modelResidency
     }
     ForestInventoryAdapter {
         id: localInventory
@@ -340,7 +358,7 @@ PanelWindow {
                     id: headerRescanButton
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    interactive: root.menuOpen && !localInventory.scanning
+                    interactive: root.menuOpen && !localInventory.scanning && !modelResidency.scanning
                     Accessible.name: localInventory.scanning
                         ? "Forest model inventory scan in progress"
                         : "Rescan local Ollama model inventory (read-only)"

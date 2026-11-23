@@ -84,6 +84,45 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         assert len(rename_actions()) == 3
         assert all(prop(x, "available") for x in rename_actions())
 
+        # M8: search is a pure view filter, not a source or writer mutation.
+        def category_rows():
+            return matching_items("categoryFilteredRow")
+
+        summary = matching_items("categorySearchSummary")
+        empty = matching_items("categorySearchEmptyState")
+        clear = matching_items("categoryClearSearchAction")
+        assert len(summary) == len(empty) == len(clear) == 1
+        assert len(category_rows()) == 2
+        assert prop(clear[0], "available") is False
+        assert prop(summary[0], "text") == "SHOWING 2 / 2 CATEGORIES"
+
+        setprop(pane, "filterText", "RENT")
+        assert len(category_rows()) == 1
+        assert prop(summary[0], "text") == "SHOWING 1 / 2 CATEGORIES"
+        assert prop(clear[0], "available") is True
+        setprop(pane, "filterText", "wAnTs")
+        assert len(category_rows()) == 1
+
+        setprop(pane, "filterText", "not-a-real-category")
+        assert len(category_rows()) == 0
+        assert prop(empty[0], "visible") is True
+        assert prop(empty[0], "text") == "NO SEARCH MATCHES // CLEAR SEARCH"
+        invoke(pane, "clearCategorySearch")
+        assert prop(pane, "filterText") == ""
+        assert len(category_rows()) == 2
+        assert prop(clear[0], "available") is False
+
+        invoke(root, "emptyCategoriesFixture")
+        assert len(category_rows()) == 0
+        assert prop(summary[0], "text") == "SHOWING 0 / 0 CATEGORIES"
+        assert prop(empty[0], "text") == "NO CATEGORIES IN THIS BUDGET"
+        invoke(root, "noBudgetFixture")
+        assert len(category_rows()) == 0
+        assert prop(summary[0], "text") == "CATEGORIES // NO AUTHENTICATED BUDGET"
+        assert prop(empty[0], "text") == "LOAD A BUDGET TO VIEW CATEGORIES"
+        invoke(root, "resetFixture")
+        assert len(category_rows()) == 2
+
         # New group has a real QML lifecycle. No writer is instantiated.
         invoke(pane, "beginCreateGroup")
         assert prop(pane, "groupDraftMode") == "create"
@@ -179,7 +218,7 @@ with tempfile.TemporaryDirectory(prefix="financew-categories-m7-qml-") as temp:
         setprop(pane, "groupDraftName", "Housing")
         assert prop(pane, "groupProposalEligible") is False
 
-        print("FinanceW Categories M7 real-pane Qt lifecycle/count smoke: PASS")
+        print("FinanceW Categories M8 real-pane Qt search/lifecycle/count smoke: PASS")
     finally:
         root.close()
         root.deleteLater()

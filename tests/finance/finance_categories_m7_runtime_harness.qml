@@ -33,6 +33,12 @@ Window {
     property var fixture: original()
 
     function resetFixture() { fixture=original(); }
+    function noBudgetFixture() { fixture=null; }
+    function emptyCategoriesFixture() {
+        var copy=JSON.parse(JSON.stringify(fixture));
+        copy.categories=[];
+        fixture=copy;
+    }
     function refreshFixture() {
         fixture=JSON.parse(JSON.stringify(fixture));
     }

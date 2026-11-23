@@ -1,0 +1,21 @@
+name: Connections TimeW C5 native outcome recovery HOLD (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/**"
+      - "docs/connections/timew-c5-native-outcome-hold.md"
+      - ".github/workflows/connections-timew-c5-native-outcome-hold-ci.yml"
+  workflow_dispatch:
+jobs:
+  native-outcome-shadow:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: C5 spent-to-native timeout and ambiguous outcome refusals
+        run: python3 -B -I tests/connections/timew/test_timew_c5_native_outcome_hold_reference.py
+      - name: Inherited C5 exact-review shadow and fractional value checks
+        run: python3 -B -I tests/connections/timew/test_timew_c5_review_shadow_reference.py
+      - name: Inherited C5 independent-custodian boundary refusal
+        run: python3 -B -I tests/connections/timew/test_timew_c5_custodian_boundary_reference.py

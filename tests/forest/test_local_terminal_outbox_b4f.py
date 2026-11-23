@@ -377,6 +377,59 @@ class OutboxTests(unittest.TestCase):
         finally:
             db.close()
 
+    def test_locally_misbound_event_owner_refuses_instead_of_looking_absent(self):
+        attempt = self.reserve()
+        self.commit(attempt)
+        # A privileged local writer can drop SQL triggers, which is why
+        # this event is NOT independently authenticated custody.
+        self.db.execute("DROP TRIGGER forest_b4f_deny_update")
+        self.db.execute(
+            "UPDATE forest_local_terminal_events_b4f "
+            "SET owner_key='owner_b' WHERE attempt_id=?", (attempt,))
+        self.db.commit()
+        with self.assertRaisesRegex(
+                b4f.OutboxRefusal, "LOCAL_EVENT_INTEGRITY_HOLD"):
+            self.inspect(attempt)
+
+    def test_locally_misbound_event_session_refuses_instead_of_looking_absent(self):
+        attempt = self.reserve()
+        self.commit(attempt)
+        other = self.journal.create_session(
+            "owner_a", "MAPLE", "other synthetic", now_ms=101)
+        self.db.execute("DROP TRIGGER forest_b4f_deny_update")
+        self.db.execute(
+            "UPDATE forest_local_terminal_events_b4f "
+            "SET session_id=? WHERE attempt_id=?",
+            (other["session_id"], attempt))
+        self.db.commit()
+        with self.assertRaisesRegex(
+                b4f.OutboxRefusal, "LOCAL_EVENT_INTEGRITY_HOLD"):
+            self.inspect(attempt)
+
+    def test_failed_local_abort_preserves_original_error_and_reserved_hold(self):
+        self.stream_mode = "invalid"
+        gen = self.bridge.exchange(
+            owner="owner_a", session_id=self.sid,
+            expected_revision=1, model="qwen3:1.7b")
+        attempt = next(gen)["attempt_id"]
+        next(gen)  # STARTED
+        # An adversarial local writer modifies the original user turn.
+        # ABORT event validation will fail and rollback. The original
+        # invalid-stream reason must not be replaced by that secondary error.
+        self.db.execute(
+            "UPDATE forest_turns SET role='assistant' WHERE turn_id=?",
+            (self.user,))
+        self.db.commit()
+        with self.assertRaisesRegex(
+                b3.BridgeRefusal, "INVALID_STREAM_EVENT"):
+            list(gen)
+        self.assertEqual(self.row()[1], "RESERVED")
+        self.assertEqual(self.events(), [])
+        with self.assertRaises(b3.BridgeRefusal):
+            list(self.bridge.exchange(
+                owner="owner_a", session_id=self.sid,
+                expected_revision=1, model="qwen3:1.7b"))
+
     def test_no_client_data_prompts_answers_or_authority_in_outbox(self):
         attempt = self.reserve()
         self.commit(attempt)

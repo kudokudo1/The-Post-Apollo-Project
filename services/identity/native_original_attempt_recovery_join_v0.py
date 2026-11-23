@@ -17,7 +17,7 @@ from collections.abc import Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from desktop_signed_command_client_v0 import AttemptedWireFingerprint
+from native_attempt_fingerprint_v0 import AttemptedWireFingerprint
 from native_outcome_candidate_shadow_v0 import (
     OriginalCommandBinding, inspect_candidate_once,
 )

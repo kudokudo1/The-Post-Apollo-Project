@@ -145,7 +145,7 @@ class ForestC5NativeDisclosureHandoffNegativeTests(unittest.TestCase):
 
     def test_07_new_disclosure_candidate_changes_hash_binding(self):
         changed = dict(self.candidate, recipientInstance="differentRecipient")
-        self.reject("ORIGINAL_CANDIDATE_INVALID",
+        self.reject("ISSUER_CANDIDATE_OR_ORIGINAL_INTENT_MISMATCH",
                     candidate=S.canonical_bytes(changed))
         # If caller recalculates claimed digest, still no independent grant.
         candidate = dict(self.candidate, recipientInstance="differentRecipient")
@@ -231,7 +231,8 @@ class ForestC5NativeDisclosureHandoffNegativeTests(unittest.TestCase):
             ("recipientSeatEpoch", -1), ("processUid", False),
         ):
             with self.subTest(key=key):
-                self.reject("INVALID_RECIPIENT_" + key,
+                self.reject("INVALID_RECIPIENT_PROCESS_UID" if key == "processUid"
+                            else "INVALID_RECIPIENT_" + key,
                             recipient=dict(self.recipient, **{key:value}))
 
     def test_18_made_up_peer_digest_is_still_untrusted_even_if_well_shaped(self):

@@ -1,0 +1,72 @@
+name: Connections Forest C5 provisional DELTA disclosure (NEGATIVE CI ONLY)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/test_connections_forest_c5_provisional_delta_disclosure.py'
+      - 'docs/connections-forest-c5-provisional-delta-disclosure-negative-ci.md'
+      - '.github/workflows/connections-forest-c5-provisional-delta-disclosure.yml'
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/local_terminal_outbox_b4f.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provisional-text-is-not-protected-consent:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Static inspect source-only negative tests and untouched Forest streaming boundary
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/test_connections_forest_c5_provisional_delta_disclosure.py
+          python3 - <<'PY'
+          from pathlib import Path
+          test = Path("tests/connections/test_connections_forest_c5_provisional_delta_disclosure.py").read_text()
+          bridge = Path("scripts/forest/turn_bridge_b3.py").read_text()
+          for text in (
+              'test_01_final_policy_denied_after_provisional_text_disclosed',
+              'test_02_revocation_after_first_delta_still_cannot_retract_it',
+              'test_06_lost_terminal_ack_after_commit_disclosed_delta_no_confirmation',
+              'test_08_permit_acquisition_refused_after_delta_leaves_abort',
+              'test_12_final_commit_check_runs_after_delta_yield_not_before',
+          ):
+              assert text in test, text
+          assert 'yield {"event": "DELTA", "text": chunk,' in bridge
+          assert '"provisional": True' in bridge
+          assert 'pre_commit=pre_commit' in bridge
+          assert 'synthetic_terminal_outbox=True' in test
+          for forbidden in (
+              'subprocess.run(', 'socket.connect(', 'Ed25519PrivateKey',
+              'os.system(', 'requests.post(', 'httpx.post(',
+          ):
+              assert forbidden not in test, forbidden
+          print("DOC3_C5_DELTA_NEGATIVE // NO_NATIVE_PRODUCTION_ACTUATION")
+          PY
+      - name: Twelve real disposable B3/B4f streaming disclosure denial tests
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections \
+            -p 'test_connections_forest_c5_provisional_delta_disclosure.py' -v
+      - name: Preserve Forest B4f, B4c, B4e and B4d existing source behavior
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_local_terminal_outbox_b4f.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_fenced_commit_b4c.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_recovery_lineage_b4e.py' -v
+          python3 -B -I -m unittest discover -s tests/forest \
+            -p 'test_recovery_inspect_b4d.py' -v
+          echo 'FOREST_C5_PROVISIONAL_DELTA_CAN_PRECEDE_COMMIT // PRODUCTION_HOLD'

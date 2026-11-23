@@ -39,3 +39,4 @@ jobs:
         run: |
           python3 tests/forest/test_forest_launcher_contract.py
           python3 tests/forest/test_forest_session_readonly_contract.py
+          python3 tests/forest/test_forest_session_list_consumer_v1.py

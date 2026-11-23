@@ -732,7 +732,7 @@ Item {
             GohuText {
                 width: parent.width
                 visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                text: "CYAN = DAILY CLOSES // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
+                text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

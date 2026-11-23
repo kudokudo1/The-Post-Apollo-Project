@@ -18,6 +18,9 @@ Rectangle {
     property color handleGlowColor: Colors.magenta
     property color activityGlowColor: Colors.magenta
     property var activityPoints: []
+    // Opt-in for owners that render their own gradient/labeled readout.
+    // Existing Git/Hospital sliders keep their numeric readouts.
+    property bool showIndexReadout: true
     property string sideLabel: ""
     // F2 VALUE is opt-in. Existing INDEX users retain the exact default.
     property string selectorProfile: "index" // "index" | "value" | "step" | "range"
@@ -1058,6 +1061,7 @@ Rectangle {
 
     GohuText {
         visible: !slider.rangeMode
+            && (slider.numericMode || slider.showIndexReadout)
         anchors {
             horizontalCenter: parent.horizontalCenter
             bottom: parent.bottom

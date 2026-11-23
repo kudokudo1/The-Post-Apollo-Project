@@ -58,7 +58,7 @@ Scope {
 
         // No activated issuer or backend receipt verifier exists in this
         // candidate. In particular, the desktop must NOT call generic
-        // protected store-command, execute px, or synthesize nameSaved().
+        // protected generic store bridge, invoke PX, or emit a success signal.
         lastError =
             "HOSPITAL NATIVE HOLD // PROTECTED DOCTOR NAME ISSUER NOT ENROLLED";
         lastStatus = "DOCTOR NAME // NO WRITE PERFORMED";

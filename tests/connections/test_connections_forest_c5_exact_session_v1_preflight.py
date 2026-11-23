@@ -201,7 +201,7 @@ class ForestC5V1SessionReceiptTests(unittest.TestCase):
                           receipt_changes={name: new})
 
     def test_09_v0_intent_and_v0_receipt_not_implicitly_promoted(self):
-        self.hold("INVALID_V1_INTENT",
+        self.hold("V1_INTENT_WRONG_DOMAIN_OR_PHASE",
                   intent_changes={"schema": S.INTENT_SCHEMA})
         self.hold("V1_RECEIPT_WRONG_DOMAIN",
                   receipt_changes={"schema": R.RECEIPT_SCHEMA})

@@ -159,8 +159,13 @@ class SignedIdentityCommandClient:
                 body = verify_receipt(bytes(raw), pinned_key=self._key,
                                       action=action, command_request_id=request_id,
                                       client_nonce=nonce)
+                # A complete frame is not a timely completed transaction:
+                # verification and the final independent guard share the
+                # same monotonic budget before we accept any receipt state.
+                remaining()
                 if not self._trusted(peer):
                     raise ReceiptRejected("Lost trusted host or desktop seat")
+                remaining()
             if self._instance is None:
                 self._instance = body["hostInstance"]
             elif self._instance != body["hostInstance"]:

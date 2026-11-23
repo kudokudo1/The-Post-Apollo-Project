@@ -16,6 +16,7 @@ import "../services/time/CountdownPolicy.js" as CountdownPolicy
 import "../services/time/MachineTimelinePolicy.js" as MachineTimelinePolicy
 import "../services/time/MachineSelectionPolicy.js" as MachineSelectionPolicy
 import "../services/time/MachineLayoutDiffPolicy.js" as MachineLayoutDiffPolicy
+import "../services/time/MachineV3LocalPreviewPolicy.js" as MachineV3LocalPreviewPolicy
 import "../services/time/MachineRestorePreviewPolicy.js" as MachineRestorePreviewPolicy
 
 // TimeW: standalone temporal window. Manual MACHINE timeline markers are session-local;
@@ -1470,6 +1471,61 @@ PanelWindow {
         machineSavedIndex >= 0 && machineSavedIndex < machineSavedCheckpoints.length
         ? machineSavedCheckpoints[machineSavedIndex] : null
 
+    // M5: one explicit click reads ordinary M3 local fractional captures for
+    // the selected stored checkpoint. No Save, Restore, C5, Sway or authority.
+    property bool machineM5PreviewBusy: false
+    property string machineM5PreviewKey: ""
+    property string machineM5PreviewStatus: "LOCAL PREVIEW NOT RUN // READ ONLY"
+    property var machineM5PreviewResult: null
+    property int machineM5PreviewIndex: 0
+    readonly property var machineM5PreviewItem:
+        machineM5PreviewResult && machineSavedItem
+        && machineM5PreviewKey === machineSavedItem.id
+        && machineM5PreviewResult.status === "LOCAL_CAPTURES_UNTRUSTED_HOLD"
+        && machineM5PreviewIndex >= 0
+        && machineM5PreviewIndex < machineM5PreviewResult.entries.length
+        ? machineM5PreviewResult.entries[machineM5PreviewIndex] : null
+
+    onMachineSavedItemChanged: machineInvalidateM5Preview()
+    onMachineStoredViewOpenChanged: machineInvalidateM5Preview()
+
+    function machineInvalidateM5Preview() {
+        // Do not clear busy until the previous process really exits.
+        machineM5PreviewKey = "";
+        machineM5PreviewResult = null;
+        machineM5PreviewIndex = 0;
+        machineM5PreviewStatus = "LOCAL PREVIEW NOT RUN // READ ONLY";
+    }
+
+    function machineRequestM5Preview() {
+        if (!menuOpen || selectedMode !== "machine"
+                || !machineStoredViewOpen || !machineSavedItem
+                || machineM5PreviewBusy || machineStoreBusy
+                || machineSaveBridgeBusy || machineV2ReviewBusy
+                || machineAutoRestoreBusy || machineApplyBusy
+                || machineCaptureBusy || machineNotesDirty)
+            return;
+        machineM5PreviewKey = machineSavedItem.id;
+        machineM5PreviewResult = null;
+        machineM5PreviewIndex = 0;
+        machineM5PreviewStatus = "READING LOCAL FRACTIONAL DATA // NO ACTION";
+        machineM5PreviewBusy = true;
+        machineM5PreviewProcess.exec(["python3", "-B", "-I",
+            Quickshell.shellPath("services/time/MachineV3LocalPreviewUiRead.py"),
+            "preview", machineM5PreviewKey]);
+    }
+
+    function machineStepM5PreviewItem(delta) {
+        if (machineM5PreviewBusy || !machineM5PreviewResult
+                || !machineSavedItem
+                || machineM5PreviewKey !== machineSavedItem.id)
+            return;
+        const count = machineM5PreviewResult.entries.length;
+        if (count > 0)
+            machineM5PreviewIndex =
+                (machineM5PreviewIndex + delta + count) % count;
+    }
+
     // V2 restored-layout inspection is a separate, explicit read-only step.
     // The checkpoint UUID is a result freshness key, never a move grant.
     property bool machineV2ReviewBusy: false
@@ -1846,6 +1902,7 @@ PanelWindow {
         }
         machineNotesDiscard();
         machineInvalidateV2Review();
+        machineInvalidateM5Preview();
         machineNotesNameOverlay = ({});
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
@@ -1856,6 +1913,7 @@ PanelWindow {
         if (!machineSavedItem)
             return;
         machineInvalidateV2Review();
+        machineInvalidateM5Preview();
         machineOpenedCheckpoint = null;
         machineLayoutComparison = null;
         machineRestorePlan = null;
@@ -1872,6 +1930,7 @@ PanelWindow {
         }
         machineNotesDiscard();
         machineInvalidateV2Review();
+        machineInvalidateM5Preview();
         machineGeometryVerifyId = "";
         machineGeometryVerifyResult = null;
         machineGeometryVerifyStatus = "NOT VERIFIED // READ-ONLY CHECK AVAILABLE";
@@ -2558,6 +2617,52 @@ PanelWindow {
                 timew.machineApplyResult = null;
                 timew.machineApplyStatus =
                     "MOVE REFUSED OR INTERRUPTED // CHECK INTERRUPTS";
+            }
+        }
+    }
+
+    // M5 ordinary local-data preview, launched only from the STORED click.
+    // The Python bridge reads one XDG v3 DB and one selected checkpoint.
+    // Response display validation denies all native/consent authority.
+    Process {
+        id: machineM5PreviewProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!timew.menuOpen || timew.selectedMode !== "machine"
+                        || !timew.machineStoredViewOpen
+                        || !timew.machineSavedItem || !timew.machineM5PreviewBusy
+                        || timew.machineM5PreviewKey === ""
+                        || timew.machineM5PreviewKey !== timew.machineSavedItem.id)
+                    return;
+                try {
+                    const data = JSON.parse(this.text);
+                    const display = MachineV3LocalPreviewPolicy.accept(
+                        data, timew.machineM5PreviewKey);
+                    if (!display.valid)
+                        throw new Error("INVALID LOCAL M5 PREVIEW");
+                    timew.machineM5PreviewResult = display;
+                    timew.machineM5PreviewIndex = 0;
+                    timew.machineM5PreviewStatus =
+                        display.status === "NO_LOCAL_CAPTURES"
+                        ? "NO LOCAL FRACTIONAL CAPTURES // READ ONLY"
+                        : "LOCAL FRACTIONAL CAPTURES // " + display.count
+                          + " // UNTRUSTED";
+                } catch (error) {
+                    timew.machineM5PreviewResult = null;
+                    timew.machineM5PreviewStatus =
+                        "LOCAL FRACTIONAL PREVIEW UNAVAILABLE // HOLD";
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.machineM5PreviewBusy = false;
+            if (exitCode !== 0 && timew.machineM5PreviewKey !== ""
+                    && timew.machineSavedItem
+                    && timew.machineM5PreviewKey === timew.machineSavedItem.id) {
+                timew.machineM5PreviewResult = null;
+                timew.machineM5PreviewStatus =
+                    "LOCAL FRACTIONAL PREVIEW UNAVAILABLE // HOLD";
             }
         }
     }
@@ -6673,6 +6778,102 @@ PanelWindow {
                             font.pixelSize: 10
                             wrapMode: Text.Wrap
                         }
+                        // M5 is a distinct, opt-in LOCAL DATA read. The
+                        // standard V2 review and Restore controls are unchanged.
+                        Row {
+                            width: parent.width
+                            height: 34
+                            spacing: 8
+                            ActionButton {
+                                width: parent.width
+                                height: parent.height
+                                label: timew.machineM5PreviewBusy
+                                       ? "READING LOCAL FRACTIONAL..."
+                                       : "LOCAL FRACTIONAL CAPTURES // READ ONLY"
+                                labelPixelSize: 10
+                                accentColor: Colors.cyan
+                                available: !!timew.machineSavedItem
+                                           && !timew.machineM5PreviewBusy
+                                           && !timew.machineV2ReviewBusy
+                                           && !timew.machineStoreBusy
+                                           && !timew.machineSaveBridgeBusy
+                                           && !timew.machineAutoRestoreBusy
+                                           && !timew.machineApplyBusy
+                                           && !timew.machineNotesDirty
+                                onLeftClicked: timew.machineRequestM5Preview()
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: timew.machineM5PreviewStatus
+                            textFormat: Text.PlainText
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: "LOCAL DATA ONLY // NOT A NATIVE RECEIPT"
+                            textFormat: Text.PlainText
+                            color: Colors.orange
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+                        Row {
+                            width: parent.width
+                            height: 31
+                            spacing: 6
+                            visible: !!timew.machineM5PreviewResult
+                                     && timew.machineM5PreviewResult.count > 0
+                                     && !!timew.machineSavedItem
+                                     && timew.machineM5PreviewKey === timew.machineSavedItem.id
+                            ActionButton {
+                                width: 48
+                                height: parent.height
+                                label: "<"
+                                accentColor: Colors.cyan
+                                available: !timew.machineM5PreviewBusy
+                                onLeftClicked: timew.machineStepM5PreviewItem(-1)
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 108)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: timew.machineM5PreviewResult
+                                      ? "LOCAL WINDOW " + (timew.machineM5PreviewIndex + 1)
+                                        + " / " + timew.machineM5PreviewResult.count
+                                      : ""
+                                color: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 11
+                            }
+                            ActionButton {
+                                width: 48
+                                height: parent.height
+                                label: ">"
+                                accentColor: Colors.cyan
+                                available: !timew.machineM5PreviewBusy
+                                onLeftClicked: timew.machineStepM5PreviewItem(1)
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: !!timew.machineM5PreviewItem
+                            text: timew.machineM5PreviewItem
+                                  ? timew.machineM5PreviewItem.app_id
+                                    + " // " + timew.machineM5PreviewItem.output_id
+                                    + " // " + timew.machineM5PreviewItem.workspace_id
+                                    + "\nX " + timew.machineM5PreviewItem.geometry.x.decimal
+                                    + "   Y " + timew.machineM5PreviewItem.geometry.y.decimal
+                                    + "\nW " + timew.machineM5PreviewItem.geometry.width.decimal
+                                    + "   H " + timew.machineM5PreviewItem.geometry.height.decimal
+                                    + "\nSAVED LOCAL GEOMETRY // UNTRUSTED"
+                                  : ""
+                            textFormat: Text.PlainText
+                            color: Colors.cyan
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
+
                         Row {
                             width: parent.width
                             height: 42

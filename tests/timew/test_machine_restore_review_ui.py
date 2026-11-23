@@ -49,7 +49,9 @@ for expected in (
 ):
     assert expected in qml, expected
 
-assert qml.count("Process {") == 16
+assert qml.count("Process {") == 17
+assert "id: machineM5PreviewProcess" in qml
+assert "MachineV3LocalPreviewUiRead.py" in qml
 assert qml.count("id: machineV2ReviewProcess") == 1
 assert qml.count("onLeftClicked: timew.machineRequestV2Review()") == 1
 assert qml.count("onLeftClicked: timew.machineRestoreSelectedCheckpoint()") == 1

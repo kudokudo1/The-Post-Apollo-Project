@@ -1,0 +1,24 @@
+name: Connections TimeW C5 dual read-only recovery returns (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/TimeWC5DualRecoveryReturnReference.py"
+      - "tests/connections/timew/test_timew_c5_dual_recovery_return_reference.py"
+      - "docs/connections/timew-c5-dual-readonly-return-comparison.md"
+      - ".github/workflows/connections-timew-c5-dual-recovery-returns-ci.yml"
+  workflow_dispatch:
+jobs:
+  compare-untrusted-history-and-native:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Untrusted C5 and SwayPX recovery return correlation
+        run: python3 -B -I tests/connections/timew/test_timew_c5_dual_recovery_return_reference.py
+      - name: Existing immutable original-operation lookup intents
+        run: python3 -B -I tests/connections/timew/test_timew_c5_readonly_recovery_plan_reference.py
+      - name: Existing C5 provider-response and local head mismatch refusals
+        run: python3 -B -I tests/connections/timew/test_timew_c5_custodian_boundary_reference.py
+      - name: Existing native outcome unknown/lost-ack refusals
+        run: python3 -B -I tests/connections/timew/test_timew_c5_native_outcome_hold_reference.py

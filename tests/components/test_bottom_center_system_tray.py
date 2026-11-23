@@ -142,12 +142,28 @@ assert 'text: "TRAY"' in tray and 'text: "NO ICONS"' in tray
 assert tray.count("GohuText {") >= 2
 assert "border.width: 1" in tray
 assert "border.color: accentColor" in tray
-assert "readonly property color accentColor: Colors.orange" in tray
-# Orange is a persistent tray identity; hover/pressed state increases glow
-# energy instead of switching hue, including the registered icon silhouettes.
-assert "trayButtonPressed ? 0.82 : trayButtonHovered ? 0.7 : 0.55" in tray
-assert "trayButtonPressed ? 0.24 : trayButtonHovered ? 0.18 : 0.12" in tray
+# The actual visible native menu, not the click, owns open magenta.
+assert "readonly property bool trayMenuOpen:" in tray
+assert "trayMenuOpen ? Colors.magenta" in tray
+assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in tray
+assert "trayMenuOpen ? 0.72" in tray
+assert "trayMenuOpen ? 0.18" in tray
 assert "safeSource: trayIcon" in tray
+# Copy Workspaces' two backing layers, sampled backdrop shadow, and two
+# sampled icon shadows. A real rectangle remains visible behind each app.
+for token in (
+    "id: trayActiveButtonBackground",
+    "opacity: trayNativeMenu.visible ? 0.7 : 0.0",
+    "id: trayButtonBackground",
+    "opacity: 0.68",
+    "id: trayButtonBackgroundGlow",
+    "safeSource: trayButtonBackground",
+    "id: trayIconGlow",
+    "id: trayActiveIconGlow",
+    "color: Colors.cyan",
+    "color: trayButton.iconAccentColor",
+):
+    assert token in tray, token
 assert "readonly property bool trayButtonHovered: trayHoverHandler.hovered" in tray
 assert "HoverHandler {" in tray and "blocking: false" in tray
 assert "trayDock.trayButtonHovered =" not in tray
@@ -155,7 +171,7 @@ assert "trayDock.trayButtonHovered =" not in tray
 # all app-owned activation and menu semantics.
 assert 'text: "TRAY"' in tray
 assert 'color: trayDock.accentColor' in tray
-assert tray.count("color: trayDock.accentColor") == 5
+assert tray.count("color: trayDock.accentColor") == 4
 assert "QsMenuAnchor {" in tray
 assert "menu: trayButton.modelData.menu" in tray
 assert "anchor.item: trayButton" in tray

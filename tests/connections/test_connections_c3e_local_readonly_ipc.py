@@ -11,6 +11,7 @@ import socket
 import struct
 import sys
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "tests/connections/c3e_release_trust"
@@ -237,6 +238,106 @@ class LocalReadOnlyIpcTests(unittest.TestCase):
         with self.assertRaisesRegex(M.Refused, "NO_REAL_SIGNIN"):
             M.production_admission()
         self.refused(req={**self.req, "op": "ENABLE_CREDENTIALS"})
+
+
+    def reject_injected_result(self, value, *, method="read_current_snapshot",
+                               mode="local", req=None):
+        boundary = self.local if mode == "local" else self.protected
+        with mock.patch.object(boundary, method, return_value=value):
+            return self.refused(req=req, mode=mode)
+
+    def test_29_extra_positive_grant_field_not_forwarded(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious["authorizationGranted"] = True
+        self.reject_injected_result(malicious)
+
+    def test_30_nested_positive_authority_not_forwarded(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious["nested"] = {"credentialActionsEnabled": True}
+        self.reject_injected_result(malicious)
+
+    def test_31_local_snapshot_cannot_claim_protected_hold_status(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious["status"] = M.S.STATUS_HOLD
+        self.reject_injected_result(malicious)
+
+    def test_32_local_snapshot_cannot_claim_protected_source(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious["source"] = M.S.PROTECTED_REQUIRED
+        self.reject_injected_result(malicious)
+
+    def test_33_bool_as_test_sequence_refused(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious["testSequence"] = True
+        self.reject_injected_result(malicious)
+
+    def test_34_malformed_snapshot_head_refused(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious["testHeadSha256"] = "0"
+        self.reject_injected_result(malicious)
+
+    def test_35_missing_denied_field_not_forwarded(self):
+        malicious = dict(self.local.read_current_snapshot())
+        malicious.pop("hostAuthenticated")
+        self.reject_injected_result(malicious)
+
+    def test_36_extra_outcome_claim_not_forwarded(self):
+        malicious = dict(
+            self.local.lookup_terminal_outcome(self.fixture.challenge))
+        malicious["remoteGrant"] = {"enabled": True}
+        self.reject_injected_result(
+            malicious, method="lookup_terminal_outcome",
+            req={**self.req, "op": "OUTCOME",
+                 "challengeHex": self.fixture.challenge.hex()})
+
+    def test_37_outcome_consumed_without_head_refused(self):
+        malicious = dict(
+            self.local.lookup_terminal_outcome(self.fixture.challenge))
+        malicious["testState"] = "consumed"
+        malicious["testHeadSha256"] = None
+        self.reject_injected_result(
+            malicious, method="lookup_terminal_outcome",
+            req={**self.req, "op": "OUTCOME",
+                 "challengeHex": self.fixture.challenge.hex()})
+
+    def test_38_outcome_issued_with_head_refused(self):
+        malicious = dict(
+            self.local.lookup_terminal_outcome(self.fixture.challenge))
+        malicious["testState"] = "issued"
+        malicious["testHeadSha256"] = "f" * 64
+        self.reject_injected_result(
+            malicious, method="lookup_terminal_outcome",
+            req={**self.req, "op": "OUTCOME",
+                 "challengeHex": self.fixture.challenge.hex()})
+
+    def test_39_protected_hold_with_extra_authority_refused(self):
+        malicious = dict(self.protected.protected_required_status())
+        malicious["grantToken"] = "fake"
+        self.reject_injected_result(
+            malicious, method="protected_required_status",
+            mode="protected",
+            req={**self.req, "op": "CUSTODIAN_STATUS"})
+
+    def test_40_protected_hold_cannot_claim_local_status(self):
+        malicious = dict(self.protected.protected_required_status())
+        malicious["status"] = M.S.STATUS_LOCAL
+        self.reject_injected_result(
+            malicious, method="protected_required_status",
+            mode="protected",
+            req={**self.req, "op": "CUSTODIAN_STATUS"})
+
+    def test_41_protected_hold_cannot_claim_enrolled_authority(self):
+        malicious = dict(self.protected.protected_required_status())
+        malicious["protectedCustodianReachable"] = True
+        self.reject_injected_result(
+            malicious, method="protected_required_status",
+            mode="protected",
+            req={**self.req, "op": "CUSTODIAN_STATUS"})
+
+    def test_42_protected_snapshot_cannot_be_forged_as_local(self):
+        forged = dict(self.local.read_current_snapshot())
+        self.reject_injected_result(
+            forged, method="read_current_snapshot", mode="protected")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,43 @@
+name: Identity DOC 6 one-query native outcome candidate shadow
+
+on:
+  pull_request:
+    paths:
+      - 'services/identity/native_outcome_candidate_shadow_v0.py'
+      - 'tests/identity/test_native_outcome_candidate_shadow_v0.py'
+      - '.github/workflows/identity-doc6-native-outcome-candidate-shadow.yml'
+      - 'docs/identity-center-native-outcome-candidate-shadow-doc6.md'
+  push:
+    branches: [main]
+    paths:
+      - 'services/identity/native_outcome_candidate_shadow_v0.py'
+      - 'tests/identity/test_native_outcome_candidate_shadow_v0.py'
+      - '.github/workflows/identity-doc6-native-outcome-candidate-shadow.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  outcome-shadow-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile bounded untrusted outcome candidate consumer
+        run: |
+          python3 -m py_compile services/identity/native_outcome_candidate_shadow_v0.py
+          python3 -m py_compile tests/identity/test_native_outcome_candidate_shadow_v0.py
+      - name: One-query exact binding, no source trust and permanent UNKNOWN_HOLD
+        run: python3 -m unittest discover -s tests/identity -p 'test_native_outcome_candidate_shadow_v0.py' -v
+      - name: Preserve existing DOC 6 durable local HOLD and diagnostic boundaries
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_local_command_outcome_hold_reference_v0.py' -v
+          python3 -m unittest discover -s tests/identity -p 'test_native_admission_diagnostic_v0.py' -v
+      - name: Preserve mandatory installed adapter route and fixed-offline CPU++ controls
+        run: |
+          python3 -m unittest discover -s tests/identity -p 'test_native_adapter_only_call_path_v1.py' -v
+          node tests/cpuplus/test_cpuplus_universal_signin_host_boundary_v4.cjs
+          node tests/cpuplus/test_cpuplus_universal_signin_intent_v5.cjs

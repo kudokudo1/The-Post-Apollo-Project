@@ -101,7 +101,7 @@ assert.ok(bridge.includes('Quickshell.shellPath("scripts/finance/search_openfigi
 assert.equal((bridge.match(/reader.exec\(\[/g)||[]).length,1);
 assert.doesNotMatch(bridge,/onMonitoringChanged:[\s\S]*?if\s*\(monitoring\)\s*search\(/);
 assert.ok(searchUi.includes('label: "NEXT PAGE"'));
-assert.ok(searchUi.includes('label: "SEARCH"'));
+assert.ok(searchUi.includes('label: finder.loading ? "SEARCHING" : "SEARCH"'));
 assert.ok(searchUi.includes('FinanceServices.FinanceStockDiscoveryService {'));
 assert.ok(searchUi.includes('TextInput {'));
 assert.ok(searchUi.includes('textFormat: Text.PlainText'));

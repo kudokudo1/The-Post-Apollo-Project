@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ollama_chat_transport import ChatRefusal, _model_name
+from recovery_inspect_b4d import ForestLocalRecoveryInspector, RecoveryRefusal
 from session_journal_v0 import ForestSessionJournal, JournalRefusal, _key
 from turn_bridge_b3 import BridgeRefusal, ForestTurnBridge
 
@@ -74,7 +75,9 @@ def decode_intent(wire: object) -> dict[str, Any]:
     keys = {"schema", "action", "requestId", "sessionId"}
     if action == "GENERATE":
         keys |= {"model", "expectedRevision"}
-    if action not in ("READ_SESSION", "GENERATE") or set(intent) != keys:
+    elif action == "INSPECT_ATTEMPT":
+        keys.add("attemptId")
+    if action not in ("READ_SESSION", "GENERATE", "INSPECT_ATTEMPT") or set(intent) != keys:
         raise AdmissionRefusal("INVALID_INTENT")
     if intent["schema"] != SCHEMA:
         raise AdmissionRefusal("INVALID_SCHEMA")
@@ -85,6 +88,11 @@ def decode_intent(wire: object) -> dict[str, Any]:
         _key(intent["sessionId"])
     except JournalRefusal as exc:
         raise AdmissionRefusal("INVALID_SESSION_ID") from exc
+    if action == "INSPECT_ATTEMPT":
+        try:
+            _key(intent["attemptId"])
+        except JournalRefusal as exc:
+            raise AdmissionRefusal("INVALID_ATTEMPT_ID") from exc
     if action == "GENERATE":
         rev = intent["expectedRevision"]
         if type(rev) is not int or not 0 <= rev <= 2**63 - 2:
@@ -186,6 +194,35 @@ class ForestHostAdmission:
                 "state": record["state"],
                 "revision": record["revision"],
             },
+        }
+
+    def inspect_attempt(self, wire: bytes, *,
+                        peer: KernelPeer) -> dict[str, Any]:
+        """Host-authorized READ-ONLY local status, not C5 settlement.
+
+        INSPECT_ATTEMPT has its own policy action; GENERATE and READ_SESSION
+        permissions are not inherited. No prompt, reply body or model text
+        crosses this boundary. Caller supplies only IDs, never owner identity.
+        """
+        intent = decode_intent(wire)
+        if intent["action"] != "INSPECT_ATTEMPT":
+            raise AdmissionRefusal("INVALID_ACTION")
+        principal = self._authorize(peer, intent)
+        try:
+            report = ForestLocalRecoveryInspector(self._journal).inspect(
+                owner=principal.owner_key,
+                session_id=intent["sessionId"],
+                attempt_id=intent["attemptId"],
+            )
+        except RecoveryRefusal as exc:
+            # Wrong owner/session/missing attempt/integrity failure all
+            # receive the same outward refusal, without private data.
+            raise AdmissionRefusal("ATTEMPT_UNAVAILABLE") from exc
+        return {
+            "schema": SCHEMA,
+            "requestId": intent["requestId"],
+            "status": "LOCAL_RECOVERY_ONLY",
+            "recovery": report,
         }
 
     def generate(self, wire: bytes, *, peer: KernelPeer

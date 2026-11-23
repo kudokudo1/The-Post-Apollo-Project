@@ -1,0 +1,35 @@
+name: Forest Core B4d Read-Only Local Recovery
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/RECOVERY_INSPECT_B4D.md'
+      - 'tests/forest/test_recovery_inspect_b4d.py'
+      - '.github/workflows/forest-core-b4d-recovery.yml'
+  push:
+    paths:
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/RECOVERY_INSPECT_B4D.md'
+      - 'tests/forest/test_recovery_inspect_b4d.py'
+      - '.github/workflows/forest-core-b4d-recovery.yml'
+
+jobs:
+  readonly-local-recovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run new B4d read-only local-recovery tests
+        run: python3 -m unittest discover -s tests/forest -p 'test_recovery_inspect_b4d.py' -v
+      - name: Existing B3 no-retry and durable write regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: Existing B4a caller and policy regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: Existing B4b pre-commit regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_host_precommit_b4b.py' -v
+      - name: Existing B4c held-permit regression
+        run: python3 -m unittest discover -s tests/forest -p 'test_fenced_commit_b4c.py' -v
+      - name: Python compile
+        run: python3 -m py_compile scripts/forest/recovery_inspect_b4d.py scripts/forest/host_admission_b4a.py tests/forest/test_recovery_inspect_b4d.py

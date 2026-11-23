@@ -1,0 +1,53 @@
+name: Connections C4b real per-packet kernel source plus signed denial remains HOLD (CI)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/test_c4b_c3e_packet_signed_denial_ci.py'
+      - '.github/workflows/connections-c4b-c3e-packet-signed-denial-ci.yml'
+      - 'docs/connections-c4b-c3e-packet-signed-denial-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-real-kernel-packet-plus-one-original-signed-denial:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin existing disposable signature test dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Reject production Sign-In and syntax regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile tests/connections/identity_silverblue/test_c4b_c3e_packet_signed_denial_ci.py
+          grep -Fq 'readonly property bool credentialActionsEnabled: false' services/connections/ConnectionsBroker.qml
+          echo "C4B_PACKET_DIAGNOSTIC_ONLY // NO_PROTECTED_SIGNIN"
+      - name: Test original real DOC 1 packet kernel observer with C4b signed denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B tests/connections/identity_silverblue/test_c4b_c3e_packet_signed_denial_ci.py
+          echo "C4B_PACKET_SENDER_NONPROMOTION // HOLD"
+      - name: Inherited DOC 1 real packet and DOC 2 original signed denial suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B tests/connections/test_connections_c3e_identity_packet_origin_nonadmission.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_raw_challenge_evidence_candidate_ci.py
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+          echo "C4B_PACKET_AND_ORIGINAL_DENIAL // NO_ENROLLED_SOURCE_OR_TERMINAL_RECEIPT"

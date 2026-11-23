@@ -324,7 +324,7 @@ class SignedNativeCommandTests(unittest.TestCase):
                 return None
 
             def recv(self, _):
-                return b"completed-frame\\n"
+                return b"completed-frame\n"
 
         peer = KernelPeer(os.getpid(), os.geteuid(), os.getegid())
         apparently_valid = {

@@ -1,0 +1,89 @@
+name: Connections C3e local SQLite history development ONLY
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eLocalDevelopmentHistoryLedger.py'
+      - 'tests/connections/test_connections_c3e_local_development_history_ledger.py'
+      - '.github/workflows/connections-c3e-local-development-history-ledger-ci.yml'
+      - 'docs/connections-c3e-local-development-history-ledger.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-history-fixture-only:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable CI cryptography dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify test-only module, signed-history reuse and disabled broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eLocalDevelopmentHistoryLedger.py \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eLocalDevelopmentHistoryLedger.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for forbidden in ("socket.socket(", "subprocess.run(", "Ed25519PrivateKey",
+                            '"productionAuthority": True',
+                            '"credentialActionsEnabled": True'):
+              assert forbidden not in source, forbidden
+          for required in ("H.inspect_next_history_proposal_ci_only(", "BEGIN IMMEDIATE",
+                           "C3E_LOCAL_HISTORY_DEVELOPMENT_ONLY_ROLLBACKABLE",
+                           "R.validate_root(", "R.check_file(",
+                           "LOCAL_DEVELOPMENT_LEDGER_NEVER_AUTHORIZES_PRODUCTION"):
+              assert required in source, required
+          for flag in ("operatorEnrollmentRootCustodyVerified",
+                       "independentlyPersistedPreviousHeadVerified",
+                       "externallyRecordedNextHeadVerified",
+                       "externallyConsumedOneUseChallengeVerified",
+                       "externalRollbackResistanceVerified",
+                       "realInstalledHostAuthenticated",
+                       "authenticatedActiveSeatVerified", "c5HumanConsentVerified",
+                       "hostAuthenticated", "canBeginSignIn",
+                       "credentialActionsEnabled", "productionAuthority"):
+              assert '"'+flag+'": False' in source, flag
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_LOCAL_DEV_ONLY // NO_INDEPENDENT_CUSTODY_OR_SIGNIN")
+          PY
+      - name: Run 28 malicious, crash, concurrency and same-UID rollback demonstrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py
+          echo "C3E_LOCAL_DEV_PASS // LOCAL_ROLLBACK_IS_STILL_UNTRUSTED"
+      - name: Preserve existing signed history and operator enrollment regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py \
+            tests/connections/test_connections_c3e_operator_witness_enrollment_preflight.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          do
+            sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+              "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_LOCAL_HOLD // NEVER_REMOTE_ANTIROLLBACK_OR_AUTHORITY"

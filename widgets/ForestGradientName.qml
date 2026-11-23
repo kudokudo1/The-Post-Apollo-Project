@@ -78,38 +78,12 @@ Item {
         }
     }
 
-    // MAPLE's right-side accent must progress ORANGE -> RED when read
-    // left to right. A directional linear ramp avoids the apparent reversal
-    // of a symmetric radial highlight. Left-corner Trees keep radial ink.
-    Shape {
-        id: rightInk
-        anchors.fill: parent
-        visible: false
-
-        ShapePath {
-            strokeWidth: -1
-            fillGradient: LinearGradient {
-                x1: 0
-                y1: 0
-                x2: root.visibleGlyphWidth
-                y2: 0
-                GradientStop { position: 0.0; color: root.baseColor }
-                GradientStop { position: 0.42; color: root.baseColor }
-                GradientStop { position: 1.0; color: root.accentColor }
-            }
-
-            startX: 0; startY: 0
-            PathLine { x: root.width; y: 0 }
-            PathLine { x: root.width; y: root.height }
-            PathLine { x: 0; y: root.height }
-            PathLine { x: 0; y: 0 }
-        }
-    }
-
+    // The radial upper-left accent now applies consistently to every Tree:
+    // Maple uses red at the upper-left and orange as its base to the right.
     Effects.OpacityMask {
         id: coloredText
         anchors.fill: parent
-        source: root.accentTopRight ? rightInk : radialInk
+        source: radialInk
         maskSource: inkMask
         cached: false
     }

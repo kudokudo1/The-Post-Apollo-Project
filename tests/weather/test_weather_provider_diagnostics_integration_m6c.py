@@ -5,6 +5,8 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 station = (root/"widgets/weather/WeatherStationW.qml").read_text()
 panel = (root/"widgets/weather/StationWeatherProviderDiagnostics.qml").read_text()
+shared_button = (root/"components/DiagnosticsDockButton.qml").read_text()
+shared_popup = (root/"components/DiagnosticsServicePopup.qml").read_text()
 policy = (root/"widgets/weather/StationProviderDiagnosticsPolicy.js").read_text()
 home = (root/"widgets/weather/StationHome.qml").read_text()
 health = (root/"widgets/weather/StationSourceHealthPolicy.js").read_text()
@@ -13,8 +15,9 @@ weather = (root/"services/weather/WeatherService.qml").read_text()
 for token in (
     'import "StationProviderDiagnosticsPolicy.js" as ProviderDiagnostics',
     'ProviderDiagnostics.snapshot({', 'id: providerDiagnosticsButton',
-    'label: weatherStation.providerDiagnosticsOpen',
-    'onLeftClicked:', 'weatherStation.providerDiagnosticsOpen =',
+    'DiagnosticsDockButton {',
+    'diagnosticsOpen: weatherStation.providerDiagnosticsOpen',
+    'onToggleRequested:', 'weatherStation.providerDiagnosticsOpen =',
     'StationWeatherProviderDiagnostics {', 'snapshot: weatherStation.weatherDiagnostics',
     'onCloseRequested: weatherStation.providerDiagnosticsOpen = false',
     'if (providerDiagnosticsOpen)',
@@ -36,16 +39,28 @@ assert 'id: providerDiagnosticsPane' in station
 assert 'visible: weatherStation.providerDiagnosticsOpen' in station
 
 for token in (
-    'property var snapshot: null', 'signal closeRequested()',
-    'PROVIDER HEALTH // DIAGNOSTICS', 'DISPLAYED //',
-    'LOCATION //', 'LAST PROVIDER SUCCESS //', 'REASON // CURRENT ROUTING',
+    'DiagnosticsServicePopup {', 'property var snapshot: null',
+    'PROVIDER HEALTH // DIAGNOSTICS', 'LAST PROVIDER SUCCESS //',
+    'REASON // CURRENT ROUTING',
     'READ ONLY // PROVIDER STATUS IS SESSION-LOCAL',
+    '[snapshot.primary, snapshot.fallback, snapshot.aqi]'
 ):
     assert token in panel, token
+for token in (
+    'signal closeRequested()', 'DISPLAYED //', 'LOCATION //',
+    'LAST PROVIDER SUCCESS // ', 'REASON // CURRENT ROUTING',
+    'Flickable {', 'Repeater {', 'NeonScrollBar {',
+):
+    assert token in shared_popup, token
+for token in ('ActionButton {', 'label: diagnosticsOpen ? "BACK" : "DIAG"',
+              'signal toggleRequested()', 'onLeftClicked:'):
+    assert token in shared_button, token
 for forbidden in ('Process {','Timer {','FileView {','curl','Qt.openUrlExternally',
                   'saveHome(', 'refresh(', 'exploreHere('):
     assert forbidden not in panel, forbidden
     assert forbidden not in policy, forbidden
+    assert forbidden not in shared_popup, forbidden
+    assert forbidden not in shared_button, forbidden
 
 for token in (
     'property var primaryLastSuccessAt: null',

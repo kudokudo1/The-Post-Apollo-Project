@@ -1,0 +1,45 @@
+name: Shared Weather and Finance diagnostics dock popup
+
+on:
+  pull_request:
+    paths:
+      - "components/DiagnosticsDockButton.qml"
+      - "components/DiagnosticsServicePopup.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationWeatherProviderDiagnostics.qml"
+      - "widgets/FinanceW.qml"
+      - "tests/weather/test_weather_provider_diagnostics_integration_m6c.py"
+      - "tests/components/test_shared_diagnostics_weather_finance.py"
+      - ".github/workflows/shared-diagnostics-weather-finance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "components/DiagnosticsDockButton.qml"
+      - "components/DiagnosticsServicePopup.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/weather/StationWeatherProviderDiagnostics.qml"
+      - "widgets/FinanceW.qml"
+      - "tests/weather/test_weather_provider_diagnostics_integration_m6c.py"
+      - "tests/components/test_shared_diagnostics_weather_finance.py"
+      - ".github/workflows/shared-diagnostics-weather-finance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-diagnostics-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shared dock button, popup and real service-state wiring
+        run: python3 -B tests/components/test_shared_diagnostics_weather_finance.py
+      - name: Preserve Weather provider state policy
+        run: node tests/weather/test_weather_provider_diagnostics_m6c.cjs
+      - name: Preserve Weather M6c single-owner / Escape / popup contract
+        run: python3 -B tests/weather/test_weather_provider_diagnostics_integration_m6c.py
+      - name: Preserve Finance chassis and dock contracts
+        run: |
+          python3 -B tests/finance/test_finance_adaptive_chassis_contracts.py
+          python3 -B tests/components/test_finance_dock_contracts.py

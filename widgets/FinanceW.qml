@@ -11,6 +11,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property bool diagnosticsOpen: false // Weather-style in-widget service inspector
     property bool fundingReviewOpen: false
     property bool advancedOpen: false
     property string budgetSection: "budget"
@@ -170,6 +171,67 @@ PanelWindow {
           && financeBudget.snapshot
           && financeBudget.healthStatus === "online" ? "LIVE"
         : "CHECK"
+    // Live read-only view over existing Finance owners. DIAG never starts a
+    // reader, replays a write, changes a selected mode or creates a service.
+    function diagnosticsRowState(monitoring, state) {
+        if (!monitoring) return "IDLE";
+        if (state === "loading" || state === "busy") return "READING";
+        if (state === "failed") return "ERROR";
+        if (state === "ready") return "SNAPSHOT";
+        if (state === "setup") return "SETUP";
+        return "WAITING";
+    }
+    readonly property var diagnosticServiceRows: [
+        {
+            label:"BUDGET / ACTUAL",
+            state:!root.menuOpen ? "IDLE"
+                : financeBudget.healthStatus === "offline" ? "OFFLINE"
+                : financeBudget.state === "failed" ? "ERROR"
+                : financeBudget.loading ? "READING"
+                : financeBudget.state === "ready"
+                  && financeBudget.snapshot
+                  && financeBudget.healthStatus === "online" ? "LIVE"
+                : "WAITING",
+            age:"--"
+        },
+        {
+            label:"MARKET / PUBLIC",
+            state:root.diagnosticsRowState(marketService.monitoring,
+                                           marketService.state),
+            age:"--"
+        },
+        {
+            label:"RESEARCH / SOURCE CRAWL",
+            state:root.diagnosticsRowState(crawlService.monitoring,
+                                           crawlService.state),
+            age:"--"
+        },
+        {
+            label:"RESEARCH / SEC EDGAR",
+            state:root.diagnosticsRowState(secService.monitoring,
+                                           secService.state),
+            age:"--"
+        },
+        {
+            label:"SEC DOCUMENT / INSPECT",
+            state:root.diagnosticsRowState(secDocumentService.monitoring,
+                                           secDocumentService.state),
+            age:"--"
+        },
+        {
+            label:"SEC PRICE / CONTEXT",
+            state:root.diagnosticsRowState(secPriceService.monitoring,
+                                           secPriceService.state),
+            age:"--"
+        },
+        {
+            label:"BANKING / MANUAL",
+            state:root.menuOpen && root.selectedMainMode === "banking"
+                  ? "MANUAL" : "IDLE",
+            age:"--"
+        }
+    ]
+
     readonly property color feedStatusColor:
         feedStatus === "LIVE" ? Colors.green
         : feedStatus === "OFFLINE" || feedStatus === "ERROR" ? Colors.red
@@ -305,6 +367,7 @@ PanelWindow {
     property string selectorPreviewActive: "a"
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !transactionDraftPane.open
+        && !diagnosticsOpen
 
     function activeMainModes() {
         return mainModes.filter(function(mode) { return !mode.future; });
@@ -449,6 +512,7 @@ PanelWindow {
             if (keyboardActive)
                 Qt.callLater(root.restoreFinanceContentFocus);
         } else {
+            diagnosticsOpen = false;
             transactionDraftPane.clear();
         }
     }
@@ -539,6 +603,11 @@ PanelWindow {
                 event.accepted = true;
         }
         Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape && root.diagnosticsOpen) {
+                root.diagnosticsOpen = false;
+                event.accepted = true;
+                return;
+            }
             if (!root.standardKeysAvailable)
                 return;
             if (event.key === Qt.Key_Escape) {
@@ -662,7 +731,12 @@ PanelWindow {
         // transaction draft editor is open. Other mode/navigation keys keep
         // their stricter standardKeysAvailable editing guard.
         enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.menuOpen = false
+        onActivated: {
+            if (root.diagnosticsOpen)
+                root.diagnosticsOpen = false;
+            else
+                root.menuOpen = false;
+        }
     }
 
     WindowPanelFrame {
@@ -704,13 +778,25 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.right: collapseChassisButton.left
+                anchors.right: financeDiagnosticsButton.left
                 anchors.rightMargin: 8
                 text: "FINANCE // " + root.mainModeName().toUpperCase()
                 font.pixelSize: 17
                 font.bold: true
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+
+            // Same M6c DIAG/BACK dock control as Weather Station.
+            // No diagnostic fetch and no extra service owner.
+            DiagnosticsDockButton {
+                id: financeDiagnosticsButton
+                anchors.right: collapseChassisButton.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                diagnosticsOpen: root.diagnosticsOpen
+                available: root.menuOpen && !transactionDraftPane.open
+                onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen
             }
 
             // Size controls stay inside FinanceW; they never open another app.
@@ -2327,6 +2413,38 @@ Row {
                         documentFeed: secDocumentService
                         priceFeed: secPriceService
                     }
+                }
+
+                // Weather's actual in-widget DIAG popup, generalized.
+                // This overlays the active work area; it cannot launch a
+                // provider, create a new PanelWindow, or submit a finance write.
+                DiagnosticsServicePopup {
+                    id: financeDiagnosticsPane
+                    z: 90
+                    visible: root.menuOpen && root.diagnosticsOpen
+                    enabled: visible
+                    width: Math.max(0, Math.min(478, parent.width - 16))
+                    height: Math.max(0, Math.min(460, parent.height - 16))
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.topMargin: 8
+                    anchors.rightMargin: 8
+
+                    heading: "FINANCE HEALTH // DIAGNOSTICS"
+                    displayedState: root.feedStatus
+                    providerLabel: "FINANCE // " + root.mainModeName().toUpperCase()
+                    currentAge: "--"
+                    showLocation: false
+                    serviceRows: root.diagnosticServiceRows
+                    ageHeading: "LAST PROVIDER SUCCESS // "
+                    reasonHeading: "REASON // SERVICE OWNERS"
+                    reason: "EACH ROW READS THE EXISTING SERVICE INSTANCE. "
+                            + "IDLE MEANS ITS MODE IS NOT ACTIVE; "
+                            + "SNAPSHOT IS NOT A VERIFIED BANK CONNECTION."
+                    footnote: "READ ONLY // NO EXTRA FETCHES. "
+                              + "NO ACCOUNT LINKING, PERMITS, OR WRITES "
+                              + "FROM THIS DIAGNOSTIC POPUP."
+                    onCloseRequested: root.diagnosticsOpen = false
                 }
             }
         }

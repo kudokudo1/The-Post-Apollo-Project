@@ -7,6 +7,8 @@ import "FinanceStockChartPointPolicy.js" as ChartPointPolicy
 Item {
     id: stocks
     property var stockFeed: null
+    property bool discoveryOpen: false
+    onVisibleChanged: { if (!visible) discoveryOpen = false; }
     readonly property var snapshot: stockFeed && stockFeed.ready
         ? stockFeed.snapshot : null
     readonly property var priceBars: snapshot && Array.isArray(snapshot.bars)
@@ -42,12 +44,25 @@ Item {
         anchors.top: parent.top
         anchors.topMargin: 11
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: discoveryToggle.left
+        anchors.rightMargin: 7
         text: "STOCKS // HISTORICAL DAILY PRICES"
         color: Colors.cyan
         font.pixelSize: 13
         font.bold: true
         elide: Text.ElideRight
+    }
+    ActionButton {
+        id: discoveryToggle
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        anchors.right: parent.right
+        width: 121
+        height: 28
+        label: "GLOBAL SEARCH"
+        labelPixelSize: 9
+        accentColor: Colors.magenta
+        onLeftClicked: stocks.discoveryOpen = true
     }
     Grid {
         id: issuers
@@ -512,6 +527,16 @@ Item {
                 color: Colors.orange
             }
         }
+    }
+
+    FinanceStockDiscoveryPane {
+        id: worldwideSearch
+        anchors.fill: parent
+        visible: stocks.discoveryOpen
+        active: stocks.discoveryOpen && stocks.visible
+            && stocks.stockFeed && stocks.stockFeed.monitoring
+        z: 20
+        onExitRequested: stocks.discoveryOpen = false
     }
 
     // Finance uses the ordinary bar, not the Git/Hospital star family.

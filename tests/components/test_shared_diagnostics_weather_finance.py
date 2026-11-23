@@ -10,16 +10,19 @@ weather_adapter=(root/"widgets/weather/StationWeatherProviderDiagnostics.qml").r
 weather_policy=(root/"widgets/weather/StationProviderDiagnosticsPolicy.js").read_text()
 finance=(root/"widgets/FinanceW.qml").read_text()
 
-# The actual shared toggle is icon-only. White stars use rich text and the
-# medical glyph retains its state color; the three effect planes match the
-# canonical CloseButton / ResizeButton numeric intensities.
+# The actual shared toggle is a tight three-item icon cluster. Each star has
+# its own immutable white paint; only the center medical glyph samples the
+# down-arrow's state color/glow. Canonical × and arrow numeric glow sizes stay.
 for marker in (
     "ActionButton {", "property bool diagnosticsOpen: false",
     "signal toggleRequested()", "˖", "⚕๋࣭", "⭑",
-    "labelItem.textFormat: Text.StyledText",
+    "id: diagnosticsArtwork", "id: diagnosticsSymbols",
+    "id: diagnosticsLeftStar", "id: diagnosticsMedicalSymbol",
+    "id: diagnosticsRightStar", "spacing: -2",
+    "contentGlowSource: diagnosticsMedicalSymbol",
     "selected: diagnosticsOpen",
-    "width: 59", "height: 32", "labelPixelSize: 21",
-    "accentColor: Colors.yellow",
+    "width: 59", "height: 32", 'label: ""',
+    "accentColor: Colors.orange",
     "onLeftClicked: diagnosticButton.toggleRequested()",
     "contentGlowRadius: 7", "contentGlowSamples: 7",
     "contentGlowIdleOpacity: 0.34",
@@ -35,7 +38,16 @@ for marker in (
 ):
     assert marker in button, marker
 assert 'label: diagnosticsOpen ? "BACK" : "DIAG"' not in button
-assert button.count("Colors.white") == 2  # both decorative star regions
+assert button.count("color: Colors.white") == 2
+assert "Text.StyledText" not in button
+assert "labelItem.textFormat" not in button
+assert "color: diagnosticButton.foregroundColor" in button
+assert button.count("textFormat: Text.PlainText") == 3
+assert "hoverFillColor: Colors.yellow" in button
+assert "hoverForegroundColor: accentColor" in button
+assert "hoverBorderColor: accentColor" in button
+assert "selectedForegroundColor: accentColor" in button
+assert "selectedContentGlowColor: accentColor" in button
 
 # Weather's M6c pane retains its real source policy and overlay ownership.
 for marker in (

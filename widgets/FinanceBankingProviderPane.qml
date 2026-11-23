@@ -12,9 +12,11 @@ Item {
     readonly property var details: ProviderPolicy.build(
         providerId,accountSnapshot,sectionId)
     signal accountRequested(string accountId)
+    signal returnToTopRequested()
     implicitHeight: providerContent.implicitHeight
 
     onProviderIdChanged: sectionId="home"
+    onSectionIdChanged: returnToTopRequested()
 
     Column {
         id: providerContent

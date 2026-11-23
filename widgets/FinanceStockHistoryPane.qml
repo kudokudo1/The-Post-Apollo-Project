@@ -49,23 +49,22 @@ Item {
         font.bold: true
         elide: Text.ElideRight
     }
-    Row {
+    Grid {
         id: issuers
         anchors.top: title.bottom
         anchors.topMargin: 13
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 30
-        spacing: 6
+        columns: width >= 590 ? 6 : 3
+        height: columns === 6 ? 30 : 62
+        columnSpacing: 6
+        rowSpacing: 6
         Repeater {
-            model: [
-                {cik:"0000320193",symbol:"AAPL"},
-                {cik:"0000789019",symbol:"MSFT"},
-                {cik:"0001045810",symbol:"NVDA"}
-            ]
+            model: StockModePolicy.stockItems()
             delegate: ActionButton {
                 required property var modelData
-                width: Math.max(58, (issuers.width - 12) / 3)
+                width: Math.max(0, (issuers.width - (issuers.columns - 1) * 6)
+                    / issuers.columns)
                 height: 28
                 label: modelData.symbol
                 labelPixelSize: 10
@@ -272,7 +271,10 @@ Item {
                     ? "NVDA // TOKEN REQUIRED"
                   : stocks.stockFeed.selectedCik === "0000789019"
                     ? "MSFT // DEMO TRIAL"
-                  : "AAPL // DEMO"
+                  : stocks.stockFeed.selectedCik === "0000320193"
+                    ? "AAPL // DEMO"
+                    : StockModePolicy.stockSymbol(stocks.stockFeed.selectedCik)
+                      + " // TOKEN REQUIRED"
                 : "NO STOCK SOURCE"
             font.pixelSize: 9
             color: Colors.orange

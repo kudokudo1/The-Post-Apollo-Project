@@ -1,0 +1,57 @@
+name: Connections C4b C3e protected custody HOLD compatibility (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/identity_silverblue/c4b_c3e_storage_boundary_compat_ci.py'
+      - 'tests/connections/identity_silverblue/test_c4b_c3e_storage_boundary_compat_ci.py'
+      - '.github/workflows/connections-c4b-c3e-storage-boundary-compat-ci.yml'
+      - 'docs/connections-c4b-c3e-storage-boundary-compat-ci.md'
+      - 'tests/connections/c3e_release_trust/C3eStorageIndependentTrustBoundary.py'
+      - 'tests/connections/identity_silverblue/verify_controller_challenge_ci.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c4b-c3e-protected-hold:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Ed25519 parser used by original C4b and C3e tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Run 14 C4b to C3e protected HOLD compatibility tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/identity_silverblue/c4b_c3e_storage_boundary_compat_ci.py \
+            tests/connections/identity_silverblue/test_c4b_c3e_storage_boundary_compat_ci.py
+          python3 -B tests/connections/identity_silverblue/test_c4b_c3e_storage_boundary_compat_ci.py
+          echo "C4B_C3E_HOLD // SIGNED_CI_DENIAL_CANNOT_PROMOTE_PROTECTED_CUSTODY"
+      - name: Preserve original C4b controller challenge attacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B tests/connections/identity_silverblue/test_controller_challenge_ci.py
+      - name: Preserve original C3e protected no-fallback tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py
+          echo "C4B_C3E_PRODUCTION_HOLD // NO_PROTECTED_CUSTODIAN_OR_SIGNIN"

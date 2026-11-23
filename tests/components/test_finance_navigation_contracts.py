@@ -42,9 +42,9 @@ assert "root.keyboardOwnershipRequested();" in menu
 assert menu.count("ModeButton {") == 1
 # Existing controls plus local-draft actions, ALLOCATE and CHECK WRITE LOCK.
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
-# Two additional safe CURSOR A/B sample buttons deliberately extend the
-# existing 20-control Finance baseline. All real finance actions remain intact.
-assert menu.count("ActionButton {") == 22
+# Two safe CURSOR A/B samples and the Budget Simple/Advanced selector
+# extend the existing 20-control baseline. All real finance actions remain.
+assert menu.count("ActionButton {") == 23
 assert menu.count('keyboardActivationSignal: "leftClicked"') >= 2
 assert 'property string selectorPreviewActive: "a"' in menu
 assert menu.count("ResizeButton {") == 2

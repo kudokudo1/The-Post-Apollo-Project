@@ -63,6 +63,11 @@ Item {
         && selectedPointIndex !== pinnedPointIndex
         ? RangeAnalysisPolicy.comparePinnedRangeSessions(
             snapshot, pinnedPointIndex, selectedPointIndex) : null
+    // M31: the real closing-price path between the two M30 chart choices.
+    // Reuses exact snapshot/selection validity; no data access or new state.
+    readonly property var pinnedInterval: pinnedPairComparison !== null
+        ? RangeAnalysisPolicy.summarizePinnedInterval(
+            snapshot, pinnedPointIndex, selectedPointIndex) : null
 
     function clearPinnedComparison() {
         pinnedPointIndex = -1;
@@ -870,6 +875,54 @@ Item {
                             + stocks.pinnedPairComparison.observedSteps
                             + " // " + stocks.pinnedPairComparison.order
                             + "\nLOADED CLOSES ONLY // NO NEW REQUEST")
+                        : ""
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 11
+                    color: Colors.white
+                }
+            }
+            Rectangle {
+                objectName: "marketPinnedIntervalAnalysisPanel"
+                width: parent.width
+                visible: stocks.pinnedInterval !== null
+                height: visible ? pinnedIntervalText.implicitHeight + 22 : 0
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                GohuText {
+                    id: pinnedIntervalText
+                    objectName: "marketPinnedIntervalAnalysisText"
+                    anchors.top: parent.top
+                    anchors.topMargin: 9
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    text: stocks.pinnedInterval
+                        ? ("BETWEEN PINNED A AND B // CHRONOLOGICAL LOADED CLOSES"
+                            + "\n" + stocks.pinnedInterval.from.date
+                            + " TO " + stocks.pinnedInterval.to.date
+                            + " // " + stocks.pinnedInterval.sessions
+                            + " OBSERVED SESSIONS"
+                            + "\nHIGHEST CLOSE $"
+                            + stocks.pinnedInterval.high.price.toFixed(2)
+                            + " // " + stocks.pinnedInterval.high.date
+                            + "\nLOWEST CLOSE $"
+                            + stocks.pinnedInterval.low.price.toFixed(2)
+                            + " // " + stocks.pinnedInterval.low.date
+                            + "\nMAX PEAK-TO-TROUGH CLOSE DECLINE "
+                            + stocks.pinnedInterval.maxDrawdownPct.toFixed(2) + "%"
+                            + (stocks.pinnedInterval.drawdownPeak
+                                ? " // " + stocks.pinnedInterval.drawdownPeak.date
+                                    + " TO " + stocks.pinnedInterval.drawdownTrough.date
+                                : " // NONE OBSERVED")
+                            + "\nSESSION STEPS // UP "
+                            + stocks.pinnedInterval.upSteps
+                            + " / DOWN " + stocks.pinnedInterval.downSteps
+                            + " / FLAT " + stocks.pinnedInterval.flatSteps
+                            + "\nEARLIER TO LATER EVEN IF B PRECEDES A"
+                            + " // NO NEW REQUEST")
                         : ""
                     textFormat: Text.PlainText
                     wrapMode: Text.WordWrap

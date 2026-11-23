@@ -233,3 +233,49 @@ function comparePinnedRangeSessions(snapshot, firstIndex, secondIndex) {
         noProviderCalls:true
     };
 }
+
+// M31: inspect the ACTUAL loaded closes between two selected historical bars.
+// The interval is chronological regardless of the order in which A and B were
+// pinned. It does not infer intraday extremes, missing sessions or future data.
+function summarizePinnedInterval(snapshot, firstIndex, secondIndex) {
+    const compared = comparePinnedRangeSessions(snapshot, firstIndex, secondIndex);
+    if (!compared) return null;
+    const bars = snapshot.bars;
+    const startIndex = Math.min(firstIndex, secondIndex);
+    const endIndex = Math.max(firstIndex, secondIndex);
+    const first = bars[startIndex], last = bars[endIndex];
+    let high = first, low = first, runningPeak = first;
+    let drawdownPeak = null, drawdownTrough = null, worstDrop = 0;
+    let up = 0, down = 0, flat = 0;
+    for (let i=startIndex + 1; i<=endIndex; i++) {
+        const current = bars[i], previous = bars[i-1];
+        if (current.price > high.price) high = current;
+        if (current.price < low.price) low = current;
+        if (current.price > runningPeak.price) runningPeak = current;
+        const drop = (runningPeak.price - current.price)
+            / runningPeak.price * 100;
+        if (drop > worstDrop) {
+            worstDrop = drop;
+            drawdownPeak = runningPeak;
+            drawdownTrough = current;
+        }
+        if (current.price > previous.price) up++;
+        else if (current.price < previous.price) down++;
+        else flat++;
+    }
+    const point = bar => ({date:bar.date,price:bar.price});
+    return {
+        from:point(first), to:point(last),
+        sessions:endIndex - startIndex + 1,
+        observedSteps:endIndex - startIndex,
+        high:point(high),low:point(low),
+        maxDrawdownPct:roundPct(worstDrop),
+        drawdownPeak:drawdownPeak ? point(drawdownPeak) : null,
+        drawdownTrough:drawdownTrough ? point(drawdownTrough) : null,
+        upSteps:up,downSteps:down,flatSteps:flat,
+        priceBasis:compared.priceBasis,
+        pathOrder:"CHRONOLOGICAL",
+        source:"loaded-eodhd-range-only",
+        readOnly:true,noProviderCalls:true
+    };
+}

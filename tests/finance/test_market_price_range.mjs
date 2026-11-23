@@ -191,3 +191,5 @@ await import("./test_global_free_price_bridge.mjs");
 await import("./test_alpha_vantage_free.mjs");
 // M20: durable, cross-process local-only reservation guard and adversarial tests.
 await import("./test_market_shared_quota.mjs");
+// M21: zero-provider-call local quota STATUS reads, missing/unsafe/locked DB.
+await import("./test_market_quota_status.mjs");

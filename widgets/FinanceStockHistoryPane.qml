@@ -36,7 +36,7 @@ Item {
         && snapshot.to === stockFeed.endDate
         ? RangeAnalysisPolicy.summarizeRange(snapshot) : null
     readonly property var averageOverlay: !dayMode && showAverages
-        && rangeAnalysis !== null
+        && priceBars.length >= 5 && rangeAnalysis !== null
         ? RangeAnalysisPolicy.movingAverageSeries(snapshot) : null
     onShowAveragesChanged: priceCanvas.requestPaint()
     onAverageOverlayChanged: priceCanvas.requestPaint()

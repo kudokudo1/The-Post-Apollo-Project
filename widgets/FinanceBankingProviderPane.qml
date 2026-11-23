@@ -15,6 +15,8 @@ Item {
     property string activityDirection: "all" // all | in | out
     property int activityAccountIndex: 0 // 0 = all; 1..N = provider account
     property int activityPageIndex: 0
+    property string activityFromDate: ""
+    property string activityToDate: ""
     property int entryAccountIndex: 0
     property string entryDirection: "out" // out | in
     property var correctionCandidate: null
@@ -30,7 +32,7 @@ Item {
     readonly property var filteredActivity: Journal.project(
         details,manualSession,{direction:activityDirection,
             accountId:activityAccountId,query:activitySearch.text,page:activityPageIndex,
-            fromDate:activityFromDate.text,toDate:activityToDate.text})
+            fromDate:activityFromDate,toDate:activityToDate})
     signal accountRequested(string accountId)
     signal manualEntryRequested(var draft)
     signal manualCorrectionRequested(var draft)
@@ -43,8 +45,8 @@ Item {
         activityAccountIndex=0;
         activityPageIndex=0;
         entryAccountIndex=0;
-        activityFromDate.text="";
-        activityToDate.text="";
+        activityFromDate="";
+        activityToDate="";
         showActivityBreakdown=false;
         clearSelectedEntry();
     }
@@ -52,8 +54,8 @@ Item {
         activityDirection="all";
         activityAccountIndex=0;
         activityPageIndex=0;
-        activityFromDate.text="";
-        activityToDate.text="";
+        activityFromDate="";
+        activityToDate="";
         showActivityBreakdown=false;
         clearSelectedEntry();
         returnToTopRequested();
@@ -67,6 +69,14 @@ Item {
         clearSelectedEntry();
     }
     onActivityPageIndexChanged: clearSelectedEntry()
+    onActivityFromDateChanged: {
+        activityPageIndex=0;
+        clearSelectedEntry();
+    }
+    onActivityToDateChanged: {
+        activityPageIndex=0;
+        clearSelectedEntry();
+    }
     onManualSessionChanged: {
         activityPageIndex=0;
         clearSelectedEntry();
@@ -512,68 +522,44 @@ Item {
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
             }
-            Row {
+            GohuText {
                 width: parent.width
-                spacing: 5
-                Rectangle {
-                    width: (parent.width-5)/2
-                    height: 29
-                    color: Colors.black
-                    border.color: Colors.cyan
-                    clip: true
-                    TextInput {
-                        id: activityFromDate
-                        anchors.fill: parent
-                        anchors.margins: 5
-                        font.pixelSize: 11
-                        color: Colors.white
-                        selectByMouse: true
-                        activeFocusOnPress: true
-                        maximumLength: 10
-                        onTextChanged: {
-                            providerPane.activityPageIndex=0;
-                            providerPane.clearSelectedEntry();
-                        }
-                    }
-                }
-                Rectangle {
-                    width: (parent.width-5)/2
-                    height: 29
-                    color: Colors.black
-                    border.color: Colors.cyan
-                    clip: true
-                    TextInput {
-                        id: activityToDate
-                        anchors.fill: parent
-                        anchors.margins: 5
-                        font.pixelSize: 11
-                        color: Colors.white
-                        selectByMouse: true
-                        activeFocusOnPress: true
-                        maximumLength: 10
-                        onTextChanged: {
-                            providerPane.activityPageIndex=0;
-                            providerPane.clearSelectedEntry();
-                        }
-                    }
+                text: "FROM DATE // OPTIONAL"
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+            }
+            PostApolloDateStepper {
+                id: fromDateStepper
+                width: parent.width
+                dateValue: providerPane.activityFromDate
+                minDate: "1900-01-01"
+                maxDate: "2100-12-31"
+                useUtcToday: false
+                showToday: true
+                allowClear: true
+                onDateEdited: function(isoDate) {
+                    providerPane.activityFromDate=isoDate;
                 }
             }
-            Row {
+            GohuText {
                 width: parent.width
-                spacing: 5
-                GohuText {
-                    width: (parent.width-5)/2
-                    text: "FROM DATE (OPTIONAL)"
-                    font.pixelSize: 9
-                    color: Colors.cyan
-                    textFormat: Text.PlainText
-                }
-                GohuText {
-                    width: (parent.width-5)/2
-                    text: "TO DATE (OPTIONAL)"
-                    font.pixelSize: 9
-                    color: Colors.cyan
-                    textFormat: Text.PlainText
+                text: "TO DATE // OPTIONAL"
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+            }
+            PostApolloDateStepper {
+                id: toDateStepper
+                width: parent.width
+                dateValue: providerPane.activityToDate
+                minDate: "1900-01-01"
+                maxDate: "2100-12-31"
+                useUtcToday: false
+                showToday: true
+                allowClear: true
+                onDateEdited: function(isoDate) {
+                    providerPane.activityToDate=isoDate;
                 }
             }
             ActionButton {
@@ -583,8 +569,8 @@ Item {
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 onLeftClicked: {
-                    activityFromDate.text="";
-                    activityToDate.text="";
+                    providerPane.activityFromDate="";
+                    providerPane.activityToDate="";
                 }
             }
             GohuText {

@@ -32,16 +32,16 @@ for phrase in (
     assert phrase in journal,phrase
 
 for phrase in (
-    'fromDate:activityFromDate.text,toDate:activityToDate.text',
-    'id: activityFromDate',
-    'id: activityToDate',
-    'FROM DATE (OPTIONAL)',
-    'TO DATE (OPTIONAL)',
+    'fromDate:activityFromDate,toDate:activityToDate',
+    'id: fromDateStepper',
+    'id: toDateStepper',
+    'FROM DATE // OPTIONAL',
+    'TO DATE // OPTIONAL',
     'SESSION DATE RANGE // INCLUSIVE // YYYY-MM-DD',
-    'maximumLength: 10',
+    'PostApolloDateStepper {',
     'CLEAR ACTIVITY DATE RANGE',
-    'activityFromDate.text="";',
-    'activityToDate.text="";',
+    'activityFromDate="";',
+    'activityToDate="";',
     'providerPane.activityPageIndex=0;',
     'providerPane.clearSelectedEntry();',
     'providerPane.filteredActivity.matchedInCents',
@@ -57,9 +57,9 @@ for phrase in (
 ):
     assert phrase in provider,phrase
 
-assert provider.count('id: activityFromDate')==1
-assert provider.count('id: activityToDate')==1
-assert provider.count('maximumLength: 10')==2
+assert provider.count('id: fromDateStepper')==1
+assert provider.count('id: toDateStepper')==1
+assert provider.count('PostApolloDateStepper {')==2
 assert "property var manualSession" in provider
 assert 'manualSession: manager.session' in manager
 assert 'Accounts.correctEntry(session,draft)' in manager

@@ -225,7 +225,7 @@ test("world-readable permit and oversized framed input refuse before mutation",(
     assert.equal(existsSync(f.journal),false);
     assert.deepEqual(data(f).events,[]);
     chmodSync(permit,0o600);
-    outcome(invoke(f,cmd(),{rawInput:"x".repeat(4100)+"\\n"}),
+    outcome(invoke(f,cmd(),{rawInput:"x".repeat(4100)+"\n"}),
       "blocked:input-too-large",1);
     assert.equal(existsSync(journal(f)),false);
     assert.deepEqual(data(f).events,[]);

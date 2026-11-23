@@ -53,6 +53,9 @@ with tempfile.TemporaryDirectory(prefix="finance-m21-readonly-") as tmp:
         check_unknown(quota_status(utc_day=DAY), "absent")
         assert not db.exists()
 
+        # Canonical M20 _database() creates the real DB as owner-only
+        # (0600); test injection bypasses that creation path.
+        db.touch(mode=0o600)
         # Use the existing M20 writer only in disposable test setup.
         reserve("eodhd", utc_day=DAY, database=db)
         reserve("eodhd", utc_day=DAY, database=db)
@@ -60,16 +63,6 @@ with tempfile.TemporaryDirectory(prefix="finance-m21-readonly-") as tmp:
         before = db.read_bytes()
         before_stat = db.stat()
         view = quota_status(utc_day=DAY)
-        if view["ledgerState"] != "ready":
-            from market_quota_status import _read_canonical, _rows
-            try:
-                print("M21 DIAGNOSTIC canonical snapshot bytes",
-                      len(_read_canonical()), file=sys.stderr)
-                print("M21 DIAGNOSTIC parsed rows",
-                      _rows(_read_canonical(), DAY), file=sys.stderr)
-            except Exception as error:
-                print("M21 DIAGNOSTIC failure", type(error).__name__,
-                      repr(error), file=sys.stderr)
         assert view["ledgerState"] == "ready", view
         assert [x["reserved"] for x in view["providers"]] == [2, 0], view
         assert all(x["recordState"] == "known" for x in view["providers"])

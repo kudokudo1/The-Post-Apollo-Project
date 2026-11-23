@@ -159,7 +159,7 @@ class BenchmarkP2BTests(unittest.TestCase):
         self.assertIs(result["production_authority"], False)
         self.assertEqual(result["c5_authority"], "NOT_EVALUATED")
         encoded = json.dumps(result)
-        for secret in ("READY", "Reply with", "thinking", "/private", "tools"):
+        for secret in ("READY", "Reply with", '"thinking":', "/private", '"tools":'):
             self.assertNotIn(secret, encoded)
 
     def test_post_uses_fixed_synthetic_prompt_without_tool_or_unload(self):

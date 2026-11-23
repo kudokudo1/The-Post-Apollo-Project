@@ -119,6 +119,31 @@ assert.equal(iconAccent(false,true,false),Colors.orange,
 assert.equal(iconAccent(false,false,true),Colors.orange,
     "background registered app turns orange when pressed");
 
+// Evaluate the actual *base* SafeDropShadow color expression, not merely
+// the extra active halo. A fixed cyan base + magenta second halo can
+// visually combine to pale white even when the open accent is magenta.
+const baseIconGlow = source.split("id: trayIconGlow", 2)[1]
+    .split("id: trayActiveIconGlow", 1)[0];
+assert.ok(baseIconGlow, "base glow is present before the active glow");
+const baseColorMatch = baseIconGlow.match(
+    /color:\s*(trayButton\.appOnDesktop\s*\?\s*Colors\.magenta\s*:\s*Colors\.cyan)/
+);
+assert.ok(baseColorMatch, "base icon halo switches cyan to magenta on visible window");
+function baseIconGlowColor(onDesktop) {
+    return vm.runInNewContext("(" + baseColorMatch[1] + ")", {
+        trayButton: {appOnDesktop: onDesktop}, Colors
+    });
+}
+assert.equal(baseIconGlowColor(true), Colors.magenta, "visible base halo magenta");
+assert.equal(baseIconGlowColor(false), Colors.cyan, "hidden base halo cyan");
+const activeIconGlow = source.split("id: trayActiveIconGlow", 2)[1]
+    .split("QsMenuAnchor {", 1)[0];
+assert.match(activeIconGlow, /visible:\s*trayButton\.appOnDesktop/);
+assert.match(activeIconGlow, /color:\s*trayButton\.iconAccentColor/);
+assert.equal(iconAccent(true,false,false),baseIconGlowColor(true),
+    "visible app base and active sampled icon glows must match magenta");
+
+
 // Execute the actual QML desktop visibility binding using isolated Sway
 // policy values, without inventing a click-driven active flag.
 const desktopStart = "readonly property bool appOnDesktop:";

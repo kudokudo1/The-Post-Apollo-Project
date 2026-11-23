@@ -30,10 +30,19 @@ Rectangle {
     }
     readonly property bool trayButtonHovered: trayHoverHandler.hovered
 
-    // The tray keeps a visible ORANGE identity at rest, on hover and
-    // while pressed. Hover and press brighten halo energy, not its hue.
-    // Border, icon halos, empty label and bottom marker share this color.
-    readonly property color accentColor: Colors.orange
+    // The native menu is the one truthful "open" state available from
+    // StatusNotifier. Running apps are not necessarily open windows.
+    // Hold only the most recently opened anchor and release on close or
+    // delegate destruction so removing an app cannot latch a magenta tray.
+    property var openMenuAnchor: null
+    readonly property bool trayMenuOpen: openMenuAnchor !== null
+                                         && openMenuAnchor.visible
+
+    // Workspace-style precedence: actual menu OPEN > hover/press > idle.
+    // The perimeter, two outer halos, empty label and marker agree.
+    readonly property color accentColor:
+        trayMenuOpen ? Colors.magenta
+        : (trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan)
 
     // Exact application identity, never a substring match on a random tray
     // tooltip. Other applications retain their own native tray activation.
@@ -74,7 +83,8 @@ Rectangle {
 
         z: -1
 
-        opacity: trayButtonPressed ? 0.82 : trayButtonHovered ? 0.7 : 0.55
+        opacity: trayMenuOpen ? 0.72
+                 : trayButtonPressed ? 0.6 : trayButtonHovered ? 0.5 : 0.4
 
         color: trayDock.accentColor
     }
@@ -88,7 +98,8 @@ Rectangle {
 
         z: 1
 
-        opacity: trayButtonPressed ? 0.24 : trayButtonHovered ? 0.18 : 0.12
+        opacity: trayMenuOpen ? 0.18
+                 : trayButtonPressed ? 0.12 : trayButtonHovered ? 0.09 : 0.07
 
         color: trayDock.accentColor
     }
@@ -154,11 +165,70 @@ Rectangle {
                 color: "transparent"
 
                 clip: false
+                z: trayNativeMenu.visible ? 2 : 1
 
-                // ===== ICON =====================================
+                // A StatusNotifier item has no reliable "app window open"
+                // property. The actual native menu visibility is authoritative.
+                readonly property color iconAccentColor:
+                    trayNativeMenu.visible ? Colors.magenta
+                    : (trayButtonMouse.containsMouse || trayButtonMouse.pressed
+                       ? Colors.orange : Colors.cyan)
 
+                Component.onDestruction: {
+                    if (trayDock.openMenuAnchor === trayNativeMenu)
+                        trayDock.openMenuAnchor = null;
+                }
+
+                // ===== WORKSPACE-STYLE BACKING ===================
+                // Inactive state is invisible, but kept separate from
+                // the persistent small tile just like Workspaces.qml.
+                Rectangle {
+                    id: trayActiveButtonBackground
+                    anchors.centerIn: parent
+                    width: parent.width
+                    height: parent.height - 4
+                    clip: false
+                    z: 0
+                    opacity: trayNativeMenu.visible ? 0.7 : 0.0
+                    color: Colors.dark
+                }
+
+                // A real small dark rectangle sits behind every app icon.
+                // The hue follows that exact icon's hover/native-menu state.
+                Rectangle {
+                    id: trayButtonBackground
+                    anchors.centerIn: parent
+                    width: parent.width
+                    height: parent.height - 6
+                    clip: false
+                    z: -1
+                    color: Colors.dark
+                    opacity: 0.68
+                    border.width: 1
+                    border.color: trayButton.iconAccentColor
+                }
+
+                // The backing has its OWN glow underneath its rectangle,
+                // rather than deriving an unrelated halo from the icon.
+                SafeDropShadow {
+                    id: trayButtonBackgroundGlow
+                    anchors.fill: trayButtonBackground
+                    safeSource: trayButtonBackground
+                    z: -2
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    radius: 20
+                    samples: 21
+                    color: trayButton.iconAccentColor
+                    opacity: trayNativeMenu.visible ? 0.36
+                             : trayButtonMouse.containsMouse ? 0.26 : 0.16
+                    transparentBorder: true
+                }
+
+                // ===== ICON AND DUAL WORKSPACE GLOWS ============
                 Item {
                     id: trayIconContainer
+                    z: 1
 
                     anchors.fill: parent
 
@@ -194,10 +264,26 @@ Rectangle {
 
                         opacity: trayButtonMouse.pressed ? 1.0 : trayButtonMouse.containsMouse ? 0.95 : 0.75
 
-                        // Tray selection belongs to the external item; a local
-                        // click toggle cannot represent its menu/open state.
-                        color: trayDock.accentColor
+                        // As on Workspaces, cyan remains the base image aura.
+                        color: Colors.cyan
 
+                        transparentBorder: true
+                    }
+
+                    SafeDropShadow {
+                        id: trayActiveIconGlow
+                        anchors.fill: trayIcon
+                        safeSource: trayIcon
+                        horizontalOffset: 0
+                        verticalOffset: 0
+                        radius: 14
+                        samples: 15
+                        z: 2
+                        visible: trayNativeMenu.visible
+                                 || trayButtonMouse.containsMouse
+                        opacity: trayNativeMenu.visible ? 0.95
+                                 : trayButtonMouse.pressed ? 0.85 : 0.72
+                        color: trayButton.iconAccentColor
                         transparentBorder: true
                     }
                 }
@@ -214,6 +300,14 @@ Rectangle {
                     // rather than trying to draw the menu below its edge.
                     anchor.edges: Edges.Top
                     anchor.gravity: Edges.Top
+
+                    // The MAGENTA state reflects the menu being displayed,
+                    // not just a click which the application may ignore.
+                    onOpened: trayDock.openMenuAnchor = trayNativeMenu
+                    onClosed: {
+                        if (trayDock.openMenuAnchor === trayNativeMenu)
+                            trayDock.openMenuAnchor = null;
+                    }
                 }
 
                 // ===== MOUSE ====================================

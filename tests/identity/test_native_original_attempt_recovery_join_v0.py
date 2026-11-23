@@ -289,6 +289,18 @@ class OriginalAttemptJoinTests(unittest.TestCase):
         self.assertFalse(hasattr(result, "settle"))
         self.assertFalse(hasattr(result, "retry"))
 
+    def test_shared_value_type_preserves_client_compatibility(self):
+        # Re-exported class remains the same immutable value, while shipped
+        # recovery code never imports the raw native sender.
+        from native_attempt_fingerprint_v0 import AttemptedWireFingerprint as Shared
+        from desktop_signed_command_client_v0 import AttemptedWireFingerprint as Legacy
+        self.assertIs(Shared, Legacy)
+        self.assertIs(AttemptedWireFingerprint, Shared)
+        attempted, original, rid, frame, candidate = self.evidence()
+        self.assertIsInstance(attempted, Shared)
+        self.hold(self.inspect(attempted, original, rid, frame, candidate),
+                  matched=True, checked=True, calls=1)
+
     def test_no_sender_storage_or_c5_import(self):
         import ast
         path = ROOT / "services/identity/native_original_attempt_recovery_join_v0.py"
@@ -301,6 +313,7 @@ class OriginalAttemptJoinTests(unittest.TestCase):
                 imports.append(node.module)
         for name in ("socket", "sqlite3", "subprocess",
                      "installed_command_adapter_v1", "desktop_command_gateway_v0",
+                     "desktop_signed_command_client_v0",
                      "local_command_outcome_hold_reference_v0"):
             self.assertNotIn(name, imports)
         self.assertNotIn("sendall(", code)

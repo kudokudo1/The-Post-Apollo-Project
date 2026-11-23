@@ -293,6 +293,30 @@ def start_ticks():
     if len(fields)<20:raise RuntimeError("truncated kernel process stat")
     return int(fields[19])
 
+# /proc/sys/kernel/random/boot_id is kernel-observed boot-lifetime identity.
+# Pin the real guest value while this exact installed systemd process is live.
+# Neither the boot UUID nor this guest-local comparison authenticates a host,
+# operator, unlocked seat, independent witness root or protected authority.
+boot_id_path=Path("/proc/sys/kernel/random/boot_id")
+def boot_id_from_kernel():
+    try:
+        raw=boot_id_path.read_bytes()
+    except OSError as exc:
+        raise RuntimeError("kernel boot identity unreadable") from exc
+    if re.fullmatch(
+        rb"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\n?",
+        raw,
+    ) is None:
+        raise RuntimeError("malformed kernel boot identity")
+    return raw.rstrip(b"\n")
+
+pinned_boot_id=boot_id_from_kernel()
+def require_same_kernel_boot(stage, expected):
+    if type(expected) is not bytes or len(expected)!=36:
+        raise RuntimeError(f"{stage}: invalid pinned boot identity")
+    if boot_id_from_kernel()!=expected:
+        raise RuntimeError(f"{stage}: kernel boot identity changed")
+
 pinned_start=start_ticks()
 if pinned_start<=0:raise RuntimeError("invalid kernel process start time")
 
@@ -309,6 +333,7 @@ def read_kernel_lsm(path):
     return raw.decode("ascii")
 
 def check_origin(stage):
+    require_same_kernel_boot(stage,pinned_boot_id)
     current=subprocess.check_output([
         "/usr/bin/systemctl","show",
         "post-apollo-identity-silverblue-ci.service",
@@ -368,6 +393,17 @@ for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
         print("C4B_ID_CHALLENGE_PROOF // pub="+b64(public)+" frame="+b64(out))
     print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
 print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
+# A deliberately altered *expected* boot UUID must be rejected by the same
+# guard that reads the actual guest kernel. Never forge a changed kernel value.
+tampered_boot=(b"1" if pinned_boot_id[:1]==b"0" else b"0")+pinned_boot_id[1:]
+try:
+    require_same_kernel_boot("tampered pin",tampered_boot)
+except RuntimeError:
+    pass
+else:
+    raise RuntimeError("substituted kernel boot ID pin was accepted")
+check_origin("after negative kernel boot pin test")
+print("C4B_ID_PASS // REAL_KERNEL_BOOT_ID_CONTINUITY_AND_MUTATED_PIN_REFUSED_CI_ONLY")
 # The signed release and actual runtime receipt signer were previously
 # separate CI fixtures. After verifying FOUR signed responses from the
 # actual SO_PEERCRED-pinned service, rehearse a separate, guest-local

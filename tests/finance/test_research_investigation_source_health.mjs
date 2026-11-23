@@ -45,7 +45,7 @@ cases[1].evidence=[
     url:"https://quotes.toscrape.com/page/1/",observedAt:recent}
 ];
 cases[2].evidence=[
-  manual("cross-case","https://EXAMPLE.com/report",recent)
+  manual("cross-case","https://EXAMPLE.com/report",recent,false)
 ];
 assert.equal(validateCollection(cases),true);
 const snapshot={schemaVersion:1,revision:17,investigations:cases};

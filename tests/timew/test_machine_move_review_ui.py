@@ -59,6 +59,8 @@ for forbidden in (
     "approval_token:",
 ):
     assert forbidden not in qml, forbidden
-assert qml.count("Process {") == 16
+assert qml.count("Process {") == 17
+assert "id: machineM5PreviewProcess" in qml
+assert "MachineV3LocalPreviewUiRead.py" in qml
 assert "id: machineSaveBridgeProcess" in qml
 print("TIMEW MACHINE M1O: READ-ONLY UI / NO-APPLY CONTRACT PASS")

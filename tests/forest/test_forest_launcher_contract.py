@@ -223,12 +223,22 @@ class ForestLauncherContract(unittest.TestCase):
         reload_button = (ROOT / "components/ReloadButton.qml").read_text()
         self.assertIn("ReloadButton {", view)
         self.assertIn("id: headerRescanButton", view)
-        self.assertIn("anchors.right: headerRescanButton.left", view)
-        self.assertIn("anchors.right: liveIndicator.left", view)
+        self.assertIn("id: headerStatusControls", view)
+        self.assertIn("anchors.right: headerStatusControls.left", view)
+        self.assertIn("anchors.right: closeButton.left", view)
+        self.assertIn("width: headerRescanButton.width + 7 + liveIndicator.width", view)
+        self.assertIn("anchors.left: parent.left", view)
+        self.assertIn("anchors.left: headerRescanButton.right", view)
+        self.assertIn("anchors.leftMargin: 7", view)
+        # The two controls occupy a single cluster with explicit left-to-right order.
+        cluster = view.split("id: headerStatusControls", 1)[1].split(
+            "id: closeButton", 1)[0]
+        self.assertLess(cluster.index("id: headerRescanButton"),
+                        cluster.index("id: liveIndicator"))
         self.assertIn("interactive: root.menuOpen && !localInventory.scanning", view)
         self.assertIn("onReloadRequested: {", view)
         block = view.split("id: headerRescanButton", 1)[1].split(
-            "// LIVE is the Quickshell workspace state", 1)[0]
+            "// LIVE describes only the Quickshell workspace", 1)[0]
         self.assertIn("localInventory.scanModels();", block)
         self.assertIn('root.pendingModelScan = "";', block)
         self.assertNotIn("session", block.lower().replace("model inventory scan in progress", ""))
@@ -242,6 +252,16 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("safeSource: activeChatTreeIcon", view)
         self.assertIn("? Colors.magenta : Colors.red", view)
         self.assertIn('text: root.activeTree.name + " // CHAT"', view)
+        self.assertIn("id: treeSelectorRepeater", view)
+        self.assertIn("treeSelectorRepeater.itemAt(selectedTreeIndex)", view)
+        self.assertIn("id: chatHeadingGlow", view)
+        self.assertIn("safeSource: chatHeading", view)
+        self.assertIn("foregroundColor: chatHeading.color", view)
+        self.assertIn("root.selectedTreeButton.foregroundColor", view)
+        self.assertIn("root.selectedTreeButton.contentGlowColor", view)
+        self.assertIn("root.selectedTreeButton.contentGlowOpacity", view)
+        self.assertIn("radius: 7", view)
+        self.assertIn("samples: 13", view)
         self.assertIn("anchors.top: chatHeadingRow.bottom", view)
         self.assertNotIn("anchors.top: chatHeading.bottom", view)
 
@@ -571,7 +591,8 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         last = text.index("id: closeButton")
         self.assertLess(first, middle)
         self.assertLess(middle, last)
-        self.assertIn("anchors.right: liveIndicator.left", text)
+        self.assertIn("anchors.right: headerStatusControls.left", text)
+        self.assertIn("anchors.left: headerRescanButton.right", text)
         self.assertIn("anchors.right: closeButton.left", text)
         self.assertIn('text: "LIVE"', text)
         self.assertIn("border.color: Colors.green", text)

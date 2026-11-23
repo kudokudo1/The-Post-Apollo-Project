@@ -80,6 +80,11 @@ Item {
     width: parent ? parent.width : 0
     height: content.implicitHeight
 
+    function clearCategorySearch(){
+        if(!filterText.length)return false;
+        filterText="";
+        return true;
+    }
     function clearGroupDraft(){
         if(busy)return false;
         groupPreviewVisible=false;
@@ -682,24 +687,56 @@ Item {
             wrapMode: Text.WordWrap
         }
 
-        Rectangle {
+        Row {
+            id: categorySearchRow
             width: parent.width
-            height: 30
-            color: Colors.dark
-            border.color: Colors.cyan
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 6
-                text: categoryPane.filterText
-                color: Colors.white
-                font.pixelSize: 11
-                selectByMouse: true
-                onTextEdited: categoryPane.filterText=text
+            spacing: 6
+            Rectangle {
+                width: parent.width - clearCategorySearchButton.width - 6
+                height: 30
+                color: Colors.dark
+                border.color: Colors.cyan
+                GohuText {
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    visible: categoryPane.filterText.length===0
+                    text: "SEARCH CATEGORIES / GROUPS"
+                    color: Colors.cyan
+                    font.pixelSize: 9
+                    textFormat: Text.PlainText
+                    verticalAlignment: Text.AlignVCenter
+                }
+                TextInput {
+                    objectName: "categorySearchInput"
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    text: categoryPane.filterText
+                    color: Colors.white
+                    font.pixelSize: 11
+                    selectByMouse: true
+                    onTextEdited: categoryPane.filterText=text
+                }
+            }
+            ActionButton {
+                id: clearCategorySearchButton
+                objectName: "categoryClearSearchAction"
+                width: 106
+                height: 30
+                label: "CLEAR SEARCH"
+                labelPixelSize: 8
+                accentColor: Colors.orange
+                trackLabelGlowLocally: true
+                available: categoryPane.filterText.length>0
+                onLeftClicked: categoryPane.clearCategorySearch()
             }
         }
         GohuText {
+            objectName: "categorySearchSummary"
             width: parent.width
-            text: "CATEGORY / GROUP // "+categoryPane.displayed.length
+            text: categoryPane.snapshot && categoryPane.snapshot.readOnly===true
+                ? "SHOWING "+categoryPane.displayed.length+" / "
+                    +categoryPane.categories.length+" CATEGORIES"
+                : "CATEGORIES // NO AUTHENTICATED BUDGET"
             font.pixelSize: 9
             color: Colors.cyan
             textFormat: Text.PlainText
@@ -709,6 +746,7 @@ Item {
             model: categoryPane.displayed
             delegate: Rectangle {
                 id: item
+                objectName: "categoryFilteredRow"
                 required property var modelData
                 width: content.width
                 height: 66
@@ -767,9 +805,15 @@ Item {
             }
         }
         GohuText {
+            objectName: "categorySearchEmptyState"
             width: parent.width
             visible: categoryPane.displayed.length===0
-            text: "NO MATCHING CATEGORIES"
+            text: !categoryPane.snapshot
+                || categoryPane.snapshot.readOnly!==true
+                ? "LOAD A BUDGET TO VIEW CATEGORIES"
+                : categoryPane.filterText.trim().length>0
+                    ? "NO SEARCH MATCHES // CLEAR SEARCH"
+                    : "NO CATEGORIES IN THIS BUDGET"
             font.pixelSize: 9
             color: Colors.cyan
             textFormat: Text.PlainText

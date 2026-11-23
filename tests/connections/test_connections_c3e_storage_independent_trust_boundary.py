@@ -100,7 +100,7 @@ class StorageBoundaryTests(unittest.TestCase):
             self.dev.commit_signed_history(**args)
 
     def test_07_unknown_issued_nonce_refused(self):
-        with self.assertRaisesRegex(M.L.Refused, "CHALLENGE_UNKNOWN"):
+        with self.assertRaisesRegex(M.L.Refused, "UNKNOWN_OUTCOME_NO_REPLAY"):
             self.dev.lookup_terminal_outcome(b"\x14" * 32)
 
     def test_08_local_lost_ack_requires_query_no_autoretry(self):

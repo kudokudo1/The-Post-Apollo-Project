@@ -131,7 +131,8 @@ PanelWindow {
     // Tree roles are operator-assigned presentation labels, not new host permissions.
     readonly property var treeSlots: [
         {
-            name: "CHERRY", sessionKey: "CHERRY", role: "GENERAL // ASSISTANT",
+            name: "CHERRY", role: "GENERAL // ASSISTANT",
+            sessionKey: "CHERRY",
             iconPath: "../assets/forest/cherry-outline.svg",
             hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
             openIconPath: "../assets/forest/cherry-open-magenta.svg",
@@ -140,7 +141,8 @@ PanelWindow {
             gradientAccentColor: "#EE76B2", gradientTopRight: false
         },
         {
-            name: "MAPLE", sessionKey: "MAPLE", role: "FILES // ORGANIZATION",
+            name: "MAPLE", role: "FILES // ORGANIZATION",
+            sessionKey: "MAPLE",
             iconPath: "../assets/forest/maple-outline.svg",
             hoverIconPath: "../assets/forest/maple-hover-orange.svg",
             openIconPath: "../assets/forest/maple-open-magenta.svg",
@@ -150,7 +152,8 @@ PanelWindow {
             gradientAccentColor: "#C7482F", gradientTopRight: false
         },
         {
-            name: "BRISTLECONE PINE", sessionKey: "BRISTLECONE_PINE", role: "TREEWRITE // CODER",
+            name: "BRISTLECONE PINE", role: "TREEWRITE // CODER",
+            sessionKey: "BRISTLECONE_PINE",
             iconPath: "../assets/forest/bristlecone-pine.png",
             hoverIconPath: "../assets/forest/bristlecone-hover-orange.png",
             openIconPath: "../assets/forest/bristlecone-open-magenta.png",
@@ -159,7 +162,8 @@ PanelWindow {
             gradientAccentColor: Colors.green, gradientTopRight: false
         },
         {
-            name: "CEDAR", sessionKey: "CEDAR", role: "SECURITY // PROTECTION",
+            name: "CEDAR", role: "SECURITY // PROTECTION",
+            sessionKey: "CEDAR",
             iconPath: "../assets/forest/cedar-outline.svg",
             hoverIconPath: "../assets/forest/cedar-hover-orange.svg",
             openIconPath: "../assets/forest/cedar-open-magenta.svg",
@@ -168,7 +172,8 @@ PanelWindow {
             gradientAccentColor: Colors.orange, gradientTopRight: false
         },
         {
-            name: "MACINTOSH", sessionKey: "MACINTOSH", role: "TECH // SUPPORT",
+            name: "MACINTOSH", role: "TECH // SUPPORT",
+            sessionKey: "MACINTOSH",
             iconPath: "../assets/forest/macintosh-outline.svg",
             hoverIconPath: "../assets/forest/macintosh-hover-orange.svg",
             openIconPath: "../assets/forest/macintosh-open-magenta.svg",

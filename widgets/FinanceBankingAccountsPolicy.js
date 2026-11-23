@@ -395,7 +395,13 @@ function sampleDemo() {
 }
 function snapshot(state) {
     if(!validState(state))return resultError("INVALID SESSION STATE");
+    // M4k // Separate declared linked transfers from unlinked session
+    // movements. Both groups are manually supplied and never verified income.
+    // This derives solely from validState's validated pair identities.
     var rows=[],total=0,known=0,unknown=0,debits=0,credits=0;
+    var transferIds=Object.create(null),transferLegCount=0;
+    var transferInCents=0,transferOutCents=0;
+    var unlinkedCount=0,unlinkedInCents=0,unlinkedOutCents=0;
     for(var i=0;i<state.accounts.length;i++) {
         var account=state.accounts[i],provider=findProvider(account.providerId),
             product=findProduct(account.providerId,account.productId),
@@ -406,6 +412,16 @@ function snapshot(state) {
             net+=e.amountCents;
             if(e.amountCents<0)outs+=-e.amountCents;
             else ins+=e.amountCents;
+            if(e.transferId) {
+                transferIds[e.transferId]=true;
+                transferLegCount++;
+                if(e.amountCents<0)transferOutCents+=-e.amountCents;
+                else transferInCents+=e.amountCents;
+            } else {
+                unlinkedCount++;
+                if(e.amountCents<0)unlinkedOutCents+=-e.amountCents;
+                else unlinkedInCents+=e.amountCents;
+            }
             activity.push(e);
         }
         var balance=account.openingCents===null?null:account.openingCents+net;
@@ -421,13 +437,35 @@ function snapshot(state) {
     }
     // Each account is bounded separately; the aggregate may legitimately
     // exceed the per-account ceiling when several accounts are listed.
+    var transferPairCount=Object.keys(transferIds).length;
     if(!Number.isSafeInteger(total)||!Number.isSafeInteger(debits)
-       ||!Number.isSafeInteger(credits))
-        return resultError("SESSION AMOUNT LIMIT REACHED");
+       ||!Number.isSafeInteger(credits)
+       ||!Number.isSafeInteger(transferInCents)
+       ||!Number.isSafeInteger(transferOutCents)
+       ||!Number.isSafeInteger(unlinkedInCents)
+       ||!Number.isSafeInteger(unlinkedOutCents)
+       ||transferLegCount!==transferPairCount*2
+       ||transferInCents!==transferOutCents
+       ||transferInCents+unlinkedInCents!==credits
+       ||transferOutCents+unlinkedOutCents!==debits
+       ||transferLegCount+unlinkedCount!==state.entries.length)
+        return resultError("INCONSISTENT SESSION MOVEMENT RECONCILIATION");
     return {ok:true,mode:state.mode,accounts:rows,accountCount:rows.length,
         transactionCount:state.entries.length,knownBalanceCount:known,
         unknownBalanceCount:unknown,knownBalanceSubtotalCents:total,
         combinedBalanceCents:unknown===0&&rows.length>0?total:null,
-        outCents:debits,inCents:credits,connected:false,persisted:false,
+        outCents:debits,inCents:credits,
+        transferPairCount:transferPairCount,
+        transferLegCount:transferLegCount,
+        transferVolumeCents:transferInCents,
+        transferInCents:transferInCents,
+        transferOutCents:transferOutCents,
+        transferNetCents:transferInCents-transferOutCents,
+        unlinkedCount:unlinkedCount,
+        unlinkedInCents:unlinkedInCents,
+        unlinkedOutCents:unlinkedOutCents,
+        unlinkedNetCents:unlinkedInCents-unlinkedOutCents,
+        movementScope:"ALL CURRENT MANUAL/DEMO SESSION ACCOUNTS // NOT VERIFIED INCOME OR SPENDING",
+        connected:false,persisted:false,
         demo:state.mode==="demo"};
 }

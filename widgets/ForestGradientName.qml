@@ -16,8 +16,13 @@ Item {
     property int pixelSize: 12
     property bool bold: true
 
+    // Text.implicitWidth is measured from the actual GohuFont text, not
+    // the available button width. For long names the source Text elides,
+    // so constrain the gradient anchor to the visible glyph span.
+    readonly property real visibleGlyphWidth:
+        Math.max(1, Math.min(width, inkMask.implicitWidth))
     readonly property real accentRadius:
-        Math.max(38, Math.min(96, width * 0.66))
+        Math.max(16, visibleGlyphWidth * 0.42)
 
     GohuText {
         id: inkMask
@@ -40,7 +45,7 @@ Item {
         ShapePath {
             strokeWidth: -1
             fillGradient: RadialGradient {
-                centerX: root.accentTopRight ? root.width : 0
+                centerX: root.accentTopRight ? root.visibleGlyphWidth : 0
                 centerY: 0
                 centerRadius: root.accentRadius
                 focalX: centerX

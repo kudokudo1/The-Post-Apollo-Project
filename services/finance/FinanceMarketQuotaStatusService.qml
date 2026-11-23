@@ -6,6 +6,7 @@ import Quickshell.Io
 // The only subprocess is market_quota_status.py status; it has no reserve path.
 Scope {
     id: quotaReader
+    objectName: "marketQuotaReaderService"
     property bool monitoring: false
     property string state: "idle"
     property string message: "OPEN QUOTA STATUS TO READ LOCAL RESERVATIONS."

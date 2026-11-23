@@ -127,10 +127,22 @@ assert re.search(r"(?m)^\s*SafeDropShadow\s*\{", tray)
 assert not re.search(r"(?m)^\s*DropShadow\s*\{", tray)
 assert "safeSource: trayIcon" in tray
 assert "trayButtonMouse.containsMouse ? 0.95 : 0.75" in tray
-# The tray has an orange identity even when not hovered. Hover and
-# press raise the two halo intensities without changing hue.
-assert "trayButtonPressed ? 0.82 : trayButtonHovered ? 0.7 : 0.55" in tray
-assert "trayButtonPressed ? 0.24 : trayButtonHovered ? 0.18 : 0.12" in tray
+# Workspace-style semantics: an actually displayed native menu is open
+# magenta. Hover is orange, idle cyan, and the backing/icon halos are
+# independent source-aligned layers.
+assert "trayMenuOpen ? Colors.magenta" in tray
+assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in tray
+assert "trayMenuOpen ? 0.72" in tray
+assert "trayMenuOpen ? 0.18" in tray
+assert "id: trayActiveButtonBackground" in tray
+assert "id: trayButtonBackground" in tray
+assert "safeSource: trayButtonBackground" in tray
+assert "id: trayButtonBackgroundGlow" in tray
+assert "id: trayActiveIconGlow" in tray
+assert tray.count("safeSource: trayIcon") == 2
+assert "trayNativeMenu.visible ? Colors.magenta" in tray
+assert "onOpened: trayDock.openMenuAnchor = trayNativeMenu" in tray
+assert "Component.onDestruction:" in tray
 # No phantom local toggle can precede a real system-tray activation.
 # External application menu/open state is not inferred from a click.
 assert "clickTest" not in tray
@@ -141,7 +153,7 @@ assert "if (mouse.button === Qt.RightButton)" in tray
 # one stateful color; no independently colored icon halo can contradict it.
 assert 'readonly property color accentColor:' in tray
 assert 'border.color: accentColor' in tray
-assert tray.count('color: trayDock.accentColor') == 5
+assert tray.count('color: trayDock.accentColor') == 4
 assert 'color: trayButtonMouse.pressed ? Colors.cyan' not in tray
 assert "trayDock.trayButtonPressed = false;" in tray
 assert "readonly property bool trayButtonHovered: trayHoverHandler.hovered" in tray

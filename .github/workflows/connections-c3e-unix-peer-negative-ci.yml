@@ -1,0 +1,85 @@
+name: Connections C3e Linux AF_UNIX peer identity limitation (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c3e_release_trust/C3eUnixPeerCredentialsNegativeCI.py'
+      - 'tests/connections/test_connections_c3e_unix_peer_credentials_negative.py'
+      - '.github/workflows/connections-c3e-unix-peer-negative-ci.yml'
+      - 'docs/connections-c3e-unix-peer-credentials-negative-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-kernel-peer-creds-no-authority:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin existing original C3e signature dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Static enforcement of CI-only kernel probes and zero authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            tests/connections/c3e_release_trust/C3eUnixPeerCredentialsNegativeCI.py \
+            tests/connections/test_connections_c3e_unix_peer_credentials_negative.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("tests/connections/c3e_release_trust/C3eUnixPeerCredentialsNegativeCI.py").read_text()
+          broker=Path("services/connections/ConnectionsBroker.qml").read_text()
+          for prohibited in ("socket.socket(socket.AF_INET", "sqlite3.connect(",
+                             "Ed25519PrivateKey", "subprocess.run(",
+                             '"productionAuthority": True',
+                             '"credentialActionsEnabled": True'):
+              assert prohibited not in source, prohibited
+          for expected in ("socket.SO_PEERCRED", "os.setuid(NOBODY_UID)",
+                           "os.fork()", "listener.accept()",
+                           "SO_PEERCRED_SOCKETPAIR_CREATOR_NOT_FORKED_SENDER",
+                           "SO_PEERCRED_FRESH_CONNECTION_NOT_TRUST_ENROLLMENT",
+                           "C3E_PEER_NEVER_GRANTS_HOST_OR_CREDENTIAL_AUTHORITY"):
+              assert expected in source, expected
+          assert "readonly property bool credentialActionsEnabled: false" in broker
+          print("C3E_PEER_CI_ONLY // NO_TRUST_ENROLLMENT_OR_SIGNIN")
+          PY
+      - name: Run 20 real-kernel Linux peer-credential and negative authority tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n test "$(sudo -n id -u)" -eq 0
+          sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            "$(command -v python3)" -B \
+            tests/connections/test_connections_c3e_unix_peer_credentials_negative.py
+          echo "C3E_PEER_CREDENTIAL_MISMATCH_DEMONSTRATED // AUTHORITY_HOLD"
+      - name: Preserve original local IPC and migration-negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/test_connections_c3e_custodian_cutover_negative.py
+          for test in \
+            tests/connections/test_connections_c3e_local_readonly_ipc.py \
+            tests/connections/test_connections_c3e_storage_independent_trust_boundary.py \
+            tests/connections/test_connections_c3e_local_development_history_ledger.py \
+            tests/connections/test_connections_c3e_operator_witness_history_continuity.py \
+            tests/connections/test_connections_c3e_operator_witness_enrollment_preflight.py \
+            tests/connections/test_connections_c3eaf_signed_role_enrollment.py \
+            tests/connections/test_connections_c3ez_release_bound_host_evidence.py
+          do
+            sudo -n env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+              "$(command -v python3)" -B "$test"
+          done
+          echo "C3E_PEER_HOLD // SAME_UID_OR_KERNEL_CREDS_NEVER_PRODUCTION_AUTHORITY"

@@ -57,7 +57,7 @@ def _guard(root: Path):
             or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"):
         _deny("C3E_REAL_SIGKILL_DISPOSABLE_HOSTED_ROOT_ONLY")
-    if type(root) is not Path:
+    if not isinstance(root, Path):
         _deny("C3E_REAL_SIGKILL_EXACT_FIXTURE_PATH_REQUIRED")
     return L._hosted_ci_root(root)
 

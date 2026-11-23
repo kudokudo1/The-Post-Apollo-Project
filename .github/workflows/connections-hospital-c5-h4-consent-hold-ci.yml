@@ -1,0 +1,54 @@
+name: Connections DOC 4 C5-H4 native consent hard HOLD
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/test_connections_hospital_native_issuer_h2.py'
+      - 'tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py'
+      - '.github/workflows/connections-hospital-c5-h4-consent-hold-ci.yml'
+      - 'docs/connections-hospital-c5-h4-native-consent-hold.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-consent-gate-no-authority:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned test-only dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Compile issuer and no-consent gate test
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/HospitalNativeIssuerService.py \
+            tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py
+      - name: Mocked protected PREPARE and Polkit cannot load key or COMMIT
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py
+          python3 -B - <<'PY'
+          from pathlib import Path
+          source=Path('services/connections/hospital/HospitalNativeIssuerService.py').read_text()
+          start=source.index('def _native_step(client, policy):')
+          body=source[start:]
+          guard=body.index('_require_independent_room_consent(request, prepared, peer, first_seat)')
+          polkit=body.index('_polkit_approve(request, prepared, peer, first_seat)')
+          key=body.index('key = C.load_installed_key()')
+          commit=body.index('"kind": "commit"')
+          assert polkit < guard < key < commit
+          assert 'C.deny("INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE")' in source
+          assert 'HospitalC5ExactConsentProbe' not in source
+          assert 'POST_APOLLO_CI' not in source
+          print('DOC4_C5H4_HOLD // AUTHORIZATION_CANNOT_FOLLOW_POLKIT_ALONE')
+          PY

@@ -3,7 +3,7 @@
 **PATIENT:** The-Post-Apollo-Project  
 **ROOM:** Universal Connections · Protected C3e Identity  
 **STAFF ROLE:** DOC 1, external Hospital-compatible; live Room/session registration unverified  
-**ASSIGNMENT:** First bounded source milestone under [the operator's local-development → future independent-custodian roadmap](./connections-c3e-local-development-to-independent-custodian-migration.md) (in separately reviewed draft #2217 at time of this milestone).  
+**ASSIGNMENT:** First bounded source milestone under [the operator's local-development → future independent-custodian roadmap (reviewed draft PR #2217)](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2217) (in separately reviewed draft #2217 at time of this milestone).  
 **STATE:** Source/CI experiment only; no installed signer, native service, machine changes, provider secrets, real Sign-In or production trust. **PRODUCTION HOLD.**
 
 ## IMPLEMENTATION // Concrete storage and process behavior

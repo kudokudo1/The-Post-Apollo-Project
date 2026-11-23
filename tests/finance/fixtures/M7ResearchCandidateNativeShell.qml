@@ -75,7 +75,8 @@ ShellRoot {
             pages: [{
                 url: "https://quotes.toscrape.com/page/1/",
                 title: "Synthetic demo page",
-                observedAt: "2026-11-23T12:00:00.000Z",
+                // Real Scrapy emits this microsecond/UTC-offset format.
+                observedAt: "2026-11-23T14:42:00.123456+00:00",
                 snippet: "Synthetic demonstration data",
                 links: []
             }]
@@ -139,7 +140,9 @@ ShellRoot {
                         || data.counts.demo !== 1
                         || data.candidates.length !== 31
                         || data.candidates[0].authenticatedProvenance !== false
-                        || data.candidates[30].eligibleForDraft !== false) {
+                        || data.candidates[30].eligibleForDraft !== false
+                        || data.candidates[30].observedAt
+                            !== "2026-11-23T14:42:00.123456+00:00") {
                     root.fail("INCOMPLETE_OR_UNSAFE_PREVIEW // SEC=" + (data && data.counts ? data.counts.sec : "null") + " / DEMO=" + (data && data.counts ? data.counts.demo : "null") + " / TOTAL=" + (data && data.candidates ? data.candidates.length : "null") + " / INPUT=" + secMock.snapshot.filings.length);
                     return;
                 }
@@ -165,7 +168,7 @@ ShellRoot {
                     && host.previewState === "failed") {
                 if (host.previewResult !== null
                         || host.previewMessage !==
-                            "PREVIEW REFUSED // INVALID_SOURCE_SNAPSHOT") {
+                            "PREVIEW REFUSED // INVALID_SEC_SNAPSHOT") {
                     root.fail("UNSAFE_OR_AMBIGUOUS_FAILURE // "
                               + host.previewMessage);
                     return;

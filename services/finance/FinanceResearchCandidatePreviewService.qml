@@ -151,7 +151,7 @@ Scope {
     // Never surface raw stderr, URLs, titles, SEC contact, or snapshots.
     function refusalCode(exitCode, response, diagnostic) {
         if (exitCode !== 0) {
-            const allowed = /^(INVALID_FRAME|INVALID_REQUEST|INVALID_SOURCE_SNAPSHOT|INVALID_RESULT|RESULT_TOO_LARGE|PREVIEW_UNAVAILABLE|INVALID_ARGUMENTS)$/;
+            const allowed = /^(INVALID_FRAME|INVALID_REQUEST|INVALID_SOURCE_SNAPSHOT|INVALID_ISSUER_SELECTION|INVALID_SEC_SNAPSHOT|INVALID_SEC_FILING|INVALID_SEC_URL|INVALID_DEMO_SNAPSHOT|INVALID_DEMO_PAGE|INVALID_DEMO_COUNT|INVALID_RESULT|RESULT_TOO_LARGE|PREVIEW_UNAVAILABLE|INVALID_ARGUMENTS)$/;
             const raw = String(diagnostic || "").trim();
             if (raw.indexOf(processErrorPrefix) === 0) {
                 const code = raw.slice(processErrorPrefix.length);

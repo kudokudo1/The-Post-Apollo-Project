@@ -35,6 +35,46 @@ const demo = normalizeCrawl([{
 }]);
 assert.equal(demo.pages.length,1);
 
+// M8b: use the ACTUAL Python spider's timestamp format. Its
+// datetime.now(timezone.utc).isoformat() emits six fractional digits and
+// "+00:00"; the upstream read_scrapy_crawl normalizer already accepts it.
+const spiderStyle = normalizeCrawl([{
+  schemaVersion:1,source:"finance-demo-scrapy",readOnly:true,
+  url:"https://quotes.toscrape.com/",
+  title:"Scrapy generated demo",
+  observedAt:"2026-11-23T14:42:00.123456+00:00",
+  links:["https://quotes.toscrape.com/page/2/"],
+  snippets:["Demonstration only"]
+}]);
+const spiderBefore=JSON.stringify(spiderStyle);
+const combined=previewEvidenceCandidates({
+  secSnapshot:sec,crawlSnapshot:spiderStyle,selectedCik:cik
+});
+assert.deepEqual(combined.counts,{sec:1,demo:1,attachablePreview:1});
+assert.equal(combined.candidates[1].kind,"demo-crawl");
+assert.equal(combined.candidates[1].observedAt,
+  "2026-11-23T14:42:00.123456+00:00");
+assert.equal(combined.candidates[1].eligibleForDraft,false);
+assert.equal(combined.candidates[1].authenticatedProvenance,false);
+assert.equal(JSON.stringify(spiderStyle),spiderBefore,"Do not rewrite source timestamps");
+assert.equal(previewEvidenceCandidates({
+  secSnapshot:sec,
+  crawlSnapshot:{...spiderStyle,pages:[{
+    ...spiderStyle.pages[0],
+    observedAt:"2026-11-23T09:42:00.123456-05:00"
+  }]},
+  selectedCik:cik
+}).counts.sec,1,"Valid offset timestamp cannot blank the SEC candidates");
+for(const badDate of [
+  "November 23, 2026","2026-11-23 14:42:00",
+  "2026-11-23T14:42:00+25:00","2026-11-23T14:42:00.123456789+00:00",
+  "not a date"
+]) assert.throws(()=>previewEvidenceCandidates({
+  secSnapshot:sec,crawlSnapshot:{...spiderStyle,
+    pages:[{...spiderStyle.pages[0],observedAt:badDate}]},selectedCik:cik
+}), e=>e instanceof CandidateRefusal
+  && e.message==="INVALID_DEMO_PAGE");
+
 const before=JSON.stringify({sec,demo});
 const preview=previewEvidenceCandidates({secSnapshot:sec,crawlSnapshot:demo,selectedCik:cik});
 assert.equal(JSON.stringify({sec,demo}),before,"Preview must never mutate source snapshots");

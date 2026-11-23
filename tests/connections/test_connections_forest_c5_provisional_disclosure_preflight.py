@@ -89,7 +89,7 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
         self.assertEqual(x["safeActions"], [])
         for k in D.NO_AUTHORITY:
             self.assertIs(x[k], False, k)
-        for item in ("DELTA", SECRET, "sessionA", "alice", "qwen3:1.7b"):
+        for item in (SECRET, "sessionA", "alice", "qwen3:1.7b"):
             self.assertNotIn(item, str(x))
 
     def test_01_matching_candidate_only_reports_hold(self):

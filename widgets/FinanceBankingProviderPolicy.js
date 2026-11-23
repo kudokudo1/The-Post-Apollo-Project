@@ -79,6 +79,10 @@ function build(providerId,snapshot,sectionId) {
            ||typeof row.productName!=="string"
            ||!Number.isSafeInteger(row.transactionCount)
            ||row.transactionCount<0||row.transactionCount>300
+           ||!Number.isSafeInteger(row.debitsCents)||row.debitsCents<0
+           ||!Number.isSafeInteger(row.creditsCents)||row.creditsCents<0
+           ||!Number.isSafeInteger(row.netChangeCents)
+           ||row.creditsCents-row.debitsCents!==row.netChangeCents
            ||(row.balanceCents!==null
                 &&(!Number.isSafeInteger(row.balanceCents)
                     ||Math.abs(row.balanceCents)>999999999))
@@ -112,6 +116,31 @@ function build(providerId,snapshot,sectionId) {
     var listed=selected.kind==="product"
         ?accounts.filter(function(a){return a.productId===selected.productId;})
         :(selected.kind==="accounts"?accounts:[]);
+    // M4c: show per-provider cash movement without treating a transfer as income
+    // or a debit as an expense. Totals include the whole current M3 session;
+    // the displayed recent list is deliberately a small, partial preview.
+    var viewIn=0,viewOut=0,viewCount=0,preview=[],older=false;
+    for(var n=0;n<listed.length;n++){
+        var selectedAccount=listed[n];
+        viewIn+=selectedAccount.creditsCents;
+        viewOut+=selectedAccount.debitsCents;
+        viewCount+=selectedAccount.transactionCount;
+        if(selectedAccount.transactionCount>selectedAccount.recent.length)
+            older=true;
+        for(var m=0;m<selectedAccount.recent.length;m++){
+            var item=selectedAccount.recent[m];
+            preview.push({id:item.id,accountId:selectedAccount.id,
+                nickname:selectedAccount.nickname,date:item.date,
+                description:item.description,amountCents:item.amountCents});
+        }
+    }
+    if(!Number.isSafeInteger(viewIn)||!Number.isSafeInteger(viewOut)
+       ||!Number.isSafeInteger(viewCount))
+        return {ok:false,error:"INVALID SESSION MOVEMENT TOTAL"};
+    preview.sort(function(a,b){
+        if(a.date===b.date)return a.id<b.id?1:a.id>b.id?-1:0;
+        return a.date>b.date?-1:1;
+    });
     var mode=snapshot.mode==="demo"?"FICTIONAL DEMO"
          :snapshot.mode==="manual"?"MANUAL SESSION":"NO MANUAL ACCOUNTS";
     var access=selected.kind==="restricted"?"PROVIDER AUTHORIZATION REQUIRED"
@@ -125,6 +154,10 @@ function build(providerId,snapshot,sectionId) {
         unknownCount:unknown,knownSubtotalCents:subtotal,
         totalCents:accounts.length>0&&unknown===0?subtotal:null,
         transactionCount:txCount,visibleAccounts:listed,allAccounts:accounts,
+        visibleMovementInCents:viewIn,visibleMovementOutCents:viewOut,
+        visibleMovementNetCents:viewIn-viewOut,visibleTransactionCount:viewCount,
+        visibleRecent:preview.slice(0,4),
+        visibleRecentOmitted:older||preview.length>4,
         activity: selected.kind==="activity"?activity.slice(0,24):[],
         activitySourceCount:activity.length,
         connected:false,persisted:false,canTransfer:false,

@@ -96,8 +96,9 @@ class ForestC5AuthorityBoundary:
 
         Even a complete match is not proof of the actual persisted DB row:
         the caller supplies BOTH objects. Additionally, the signed intent
-        lacks B4c's session_id, so the original exact Forest session cannot
-        be cryptographically bound. No root, owner or source is trusted.
+        lacks B4c's session_id. An independently authenticated B3 lookup
+        of the unique signed attempt could bind the session *indirectly*, but
+        this caller-supplied diagnostic cannot prove that. No source is trusted.
         """
         if self._mode != MODE_REFERENCE:
             _deny("PROTECTED_MODE_REFUSES_UNTRUSTED_REFERENCE_INSPECTION")

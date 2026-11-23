@@ -87,11 +87,24 @@ with tempfile.TemporaryDirectory(prefix="financew-m2a-qml-") as temp:
         invoke(root,"newMonth")
         assert prop(pane,"open") is False
         assert not value(pane,"proposal")
+        # The launcher must not offer a preview for malformed reader data.
+        invoke(root,"invalidateSourceKey")
+        assert prop(pane,"sourceReady") is False
+        invoke(pane,"begin")
+        assert prop(pane,"open") is False
+        invoke(root,"invalidateSourceMonth")
+        assert prop(pane,"sourceReady") is False
+        invoke(pane,"begin")
+        assert prop(pane,"open") is False
+        invoke(root,"invalidateUnassigned")
+        assert prop(pane,"sourceReady") is False
+        invoke(pane,"begin")
+        assert prop(pane,"open") is False
         invoke(root,"dropSource")
         assert prop(pane,"sourceReady") is False
         invoke(pane,"begin")
         assert prop(pane,"open") is False
-        print("FinanceW Simple M2a actual QML fictional move preview: PASS")
+        print("FinanceW Simple M2c actual QML source/preview lifecycle: PASS")
     finally:
         root.close()
         root.deleteLater()

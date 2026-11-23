@@ -100,8 +100,16 @@ def digest(blob: bytes):
     return hashlib.sha256(blob).hexdigest()
 
 
+def _hosted_ci_root(root: Path) -> Path:
+    root = R.validate_root(root)
+    # C3e-R predates this workload's stricter hosted-only requirement.
+    if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+        deny("LOCAL_GITHUB_HOSTED_DISPOSABLE_RUNNER_REQUIRED")
+    return root
+
+
 def connect(root: Path):
-    root = R.validate_root(root)  # /run/c3er-ci-* root-only GitHub fixture
+    root = _hosted_ci_root(root)  # /run/c3er-ci-* root-only GitHub fixture
     path = root / DB
     R.check_file(path)  # existing mode, owner, nlink and regular-file guard
     if (root / (DB + "-wal")).exists() or (root / (DB + "-shm")).exists():
@@ -126,7 +134,7 @@ def connect(root: Path):
 
 def initialize_ci_only(root: Path):
     """Explicit fixture bootstrap: never called automatically from reads."""
-    root = R.validate_root(root)
+    root = _hosted_ci_root(root)
     path = root / DB
     if os.path.lexists(path):
         deny("LOCAL_LEDGER_EXISTS_NO_REINIT")
@@ -158,7 +166,7 @@ class DevelopmentLedger:
     """All methods remain nonauthoritative, even after a successful commit."""
 
     def __init__(self, root: Path):
-        self.root = R.validate_root(root)
+        self.root = _hosted_ci_root(root)
         connection = connect(self.root)
         connection.close()
 

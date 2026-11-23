@@ -75,6 +75,18 @@ class SignedIdentityCommandClient:
         self._nonces: set[str] = set()
         self._begin_consumed = False
         self._faulted = False
+        # Local process observation only. A fresh client cannot prove that
+        # an earlier process did not dispatch a command before crashing.
+        self._last_wire_outcome = "UNOBSERVED"
+
+    @property
+    def last_wire_outcome(self) -> str:
+        """UNOBSERVED, NO_SEND_ATTEMPT, UNKNOWN_HOLD, or SIGNED_FRAME_SEEN.
+
+        Not durable and NEVER authority, cancellation proof, nor retry
+        permission. A signed frame can still report an uncertain host effect.
+        """
+        return self._last_wire_outcome
 
     @property
     def faulted(self) -> bool:
@@ -132,6 +144,7 @@ class SignedIdentityCommandClient:
         # One total budget for connect, send, and every response fragment.
         # Socket idle timeouts alone allow a slow peer to drip bytes forever.
         deadline = time.monotonic() + 2.0
+        self._last_wire_outcome = "NO_SEND_ATTEMPT"
 
         def remaining() -> float:
             left = deadline - time.monotonic()
@@ -148,6 +161,9 @@ class SignedIdentityCommandClient:
                 if not self._trusted(peer):
                     raise ReceiptRejected("Untrusted installed native host or desktop seat")
                 conn.settimeout(remaining())
+                # Once a send is attempted, even a send failure cannot prove
+                # the native host did not receive enough bytes to act.
+                self._last_wire_outcome = "UNKNOWN_HOLD"
                 conn.sendall(wire)
                 raw = bytearray()
                 while len(raw) <= 1024 and b"\n" not in raw:
@@ -175,6 +191,7 @@ class SignedIdentityCommandClient:
             self._sequence = body["sequence"]
             self._phase = body["state"]
             if self._phase == "UNAVAILABLE":
+                self._last_wire_outcome = "SIGNED_FRAME_SEEN"
                 # Unavailable is not permission. Keep the current host-issued
                 # request for another explicit status check if still trusted.
                 return HostCommandObservation(
@@ -184,6 +201,7 @@ class SignedIdentityCommandClient:
             if self._phase == "HOST_LOST":
                 self._fault()
                 raise ReceiptRejected("Native host revoked; new enrollment required")
+            self._last_wire_outcome = "SIGNED_FRAME_SEEN"
             return HostCommandObservation(
                 phase=self._phase, request_id=self._request_id,
                 instance=self._instance, sequence=self._sequence)

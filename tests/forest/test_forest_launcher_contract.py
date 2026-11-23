@@ -394,7 +394,7 @@ class ForestLauncherContract(unittest.TestCase):
         # import silently selects the wrong one and Quickshell refuses to load.
         self.assertIn("import QtQuick.Shapes", name)
         self.assertIn("import Qt5Compat.GraphicalEffects as Effects", name)
-        self.assertNotIn("import Qt5Compat.GraphicalEffects\\n", name)
+        self.assertNotIn("import Qt5Compat.GraphicalEffects" + chr(10), name)
         self.assertIn("Effects.OpacityMask {", name)
         self.assertIn("focalY: centerY", name)
         self.assertIn("import QtQuick.Shapes", ring)

@@ -198,7 +198,8 @@ class ForestC5NativeDisclosureHandoffNegativeTests(unittest.TestCase):
                     issuer=dict(self.issuer, issuedAtMs=999))
 
     def test_14_claimed_issuer_lifetime_check_does_not_authenticate_clock(self):
-        self.reject("ISSUER_FIXTURE_TIME_NOT_CURRENT", now=1100)
+        self.reject("ISSUER_FIXTURE_TIME_NOT_CURRENT",
+                    issuer=dict(self.issuer, expiresAtMs=1030), now=1030)
         self.reject("ISSUER_FIXTURE_TIME_NOT_CURRENT",
                     issuer=dict(self.issuer, issuedAtMs=1010), now=1000)
 

@@ -1023,27 +1023,43 @@ PanelWindow {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.magenta
+                    // Restore the established Post-Apollo input state colors:
+                    // cyan at rest (the original Forest border), orange on
+                    // hover and magenta when the draft has keyboard focus.
+                    // The interaction is presentational: no host activation.
+                    readonly property color promptBorderColor:
+                        forestPromptInput.activeFocus ? Colors.magenta
+                        : promptHover.hovered ? Colors.orange : Colors.cyan
+                    border.width: forestPromptInput.activeFocus ? 2 : 1
+                    border.color: promptBorderColor
+
+                    HoverHandler {
+                        id: promptHover
+                        enabled: root.menuOpen
+                    }
 
                     TextInput {
                         id: forestPromptInput
                         anchors.left: parent.left
-                        anchors.leftMargin: 9
+                        anchors.leftMargin: 11
                         anchors.right: voiceToTextButton.left
-                        anchors.rightMargin: 6
+                        anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
-                        height: 26
+                        height: parent.height - 8
+                        verticalAlignment: TextInput.AlignVCenter
                         enabled: root.menuOpen
                         clip: true
                         selectByMouse: true
                         font.family: "GohuFont 11 Nerd Font Mono"
-                        font.pixelSize: 11
+                        font.pixelSize: 16
                         color: Colors.magenta
                         selectionColor: Colors.magenta
                         selectedTextColor: Colors.black
+                        // Qt automatically aligns custom cursor height and
+                        // position to cursorRectangle. Increasing the font
+                        // enlarges its height; make its orange stroke 3px.
                         cursorDelegate: Rectangle {
-                            width: 2
+                            width: 3
                             color: Colors.orange
                         }
                         Accessible.name: "Forest local draft text input"
@@ -1055,6 +1071,8 @@ PanelWindow {
                         anchors.left: forestPromptInput.left
                         anchors.right: forestPromptInput.right
                         anchors.verticalCenter: forestPromptInput.verticalCenter
+                        height: forestPromptInput.height
+                        verticalAlignment: Text.AlignVCenter
                         visible: forestPromptInput.text.length === 0
                                  && !forestPromptInput.activeFocus
                         text: root.frameHeight < 540
@@ -1062,7 +1080,7 @@ PanelWindow {
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                         color: Colors.magenta
                         opacity: 0.74
-                        font.pixelSize: 9
+                        font.pixelSize: 11
                         elide: Text.ElideRight
                     }
 

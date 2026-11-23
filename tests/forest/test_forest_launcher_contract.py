@@ -490,8 +490,8 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("interactive: root.menuOpen && !localInventory.scanning", view)
         self.assertIn("onReloadRequested: {", view)
         block = view.split("id: headerRescanButton", 1)[1].split(
-            "// LIVE describes only the Quickshell workspace", 1)[0]
-        self.assertIn("localInventory.scanModels();", block)
+            "// One last P0 /api/ps observation for selected Tree model.", 1)[0]
+        self.assertIn("root.refreshLocalModelEvidence();", block)
         self.assertIn('root.pendingModelScan = "";', block)
         self.assertNotIn("session", block.lower().replace("model inventory scan in progress", ""))
         self.assertIn('label: "⟳"', reload_button)
@@ -1006,7 +1006,7 @@ class ForestLauncherContract(unittest.TestCase):
         adapter = (ROOT / "services/forest/ForestInventoryAdapter.qml").read_text()
         policy = (ROOT / "services/forest/ForestInventoryPolicy.js").read_text()
         self.assertIn("ForestInventoryAdapter {", view)
-        self.assertIn("localInventory.scanModels();", view)
+        self.assertIn("root.refreshLocalModelEvidence();", view)
         self.assertIn("id: scanAllButton", view)
         self.assertIn("SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED", view)
         self.assertIn("B1 / B2 / B3 READY AS CONTRACTS", view)
@@ -1181,8 +1181,8 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("onLeftClicked: root.modelPopupOpen = !root.modelPopupOpen", view)
         self.assertIn("onModelPopupOpenChanged:", view)
         self.assertIn("if (modelPopupOpen)", view)
-        self.assertIn("if (!localInventory.scanning)", view)
-        self.assertIn("localInventory.scanModels();", view)
+        self.assertIn("if (!localInventory.scanning && !modelResidency.scanning)", view)
+        self.assertIn("root.refreshLocalModelEvidence();", view)
         self.assertNotIn("onMenuOpenChanged: localInventory.scanModels()", view)
         self.assertIn("id: closeModelPopupButton", view)
         self.assertIn("CloseButton {\n                        id: closeModelPopupButton", view)
@@ -1208,7 +1208,7 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn('text: "FOUND"', view)
         self.assertIn('text: "LIVE ?"', view)
         self.assertIn('text: "ACCESS ?"', view)
-        self.assertIn("SCAN = INVENTORY ONLY // LIVE & ACCESS UNVERIFIED", view)
+        self.assertIn("SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED", view)
         self.assertIn("onClicked: root.scanModel(modelEntry.modelName)", view)
         self.assertIn("onClicked: root.chooseLocalModel(modelEntry.modelName)", view)
         self.assertIn("property var selectedTreeModels:", view)
@@ -1233,10 +1233,10 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("anchors.right: headerStatusControls.left", text)
         self.assertIn("anchors.left: headerRescanButton.right", text)
         self.assertIn("anchors.right: closeButton.left", text)
-        self.assertIn('text: "LIVE"', text)
+        self.assertIn('root.selectedModelLoadState === "LOADED" ? "LOAD"', text)
         self.assertIn("border.color: Colors.green", text)
-        # LIVE reflects an open QML workspace, not an inference backend.
-        self.assertIn("AI engine not connected", text)
+        # Header reflects only last explicit P0 model residency observation.
+        self.assertIn("last Ollama residency scan, not active inference", text)
         self.assertIn("ADAPTER NOT CONNECTED", text)
 
     def test_chassis_has_common_top_edge(self):

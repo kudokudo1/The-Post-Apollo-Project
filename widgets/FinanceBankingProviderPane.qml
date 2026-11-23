@@ -181,11 +181,19 @@ Item {
             width: parent.width
             visible: providerPane.details.ok
                 &&providerPane.details.sectionKind==="restricted"
-            text: "NOT CONNECTED // FEATURE INFORMATION ONLY // OPEN THE OFFICIAL PROVIDER APP FOR REAL ACTIONS"
+            text: "NOT CONNECTED // FEATURE INFORMATION ONLY // USE THE OFFICIAL SERVICE FOR REAL ACTIONS"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
+        }
+        FinanceBankingOfficialHandoff {
+            width: parent.width
+            visible: providerPane.details.ok
+                && providerPane.details.sectionKind==="restricted"
+            height: visible ? implicitHeight : 0
+            providerId: providerPane.providerId
+            sectionId: providerPane.details.ok ? providerPane.details.sectionId : ""
         }
         GohuText {
             width: parent.width

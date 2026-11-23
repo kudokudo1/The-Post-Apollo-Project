@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d
 
 on:
   pull_request:
@@ -11,6 +11,10 @@ on:
       - 'widgets/FinanceBankingAccountsPane.qml'
       - 'widgets/FinanceBankingProviderPane.qml'
       - 'widgets/FinanceBankingProviderPolicy.js'
+      - 'widgets/FinanceBankingOfficialHandoff.qml'
+      - 'widgets/FinanceBankingOfficialHandoffPolicy.js'
+      - 'tests/finance/test_banking_official_handoff_m4d.mjs'
+      - 'tests/finance/test_banking_official_handoff_m4d_contracts.py'
       - 'tests/finance/test_banking_provider_m4.mjs'
       - 'tests/finance/test_banking_provider_m4_contracts.py'
       - 'tests/finance/test_banking_provider_m4b.mjs'
@@ -39,6 +43,10 @@ on:
       - 'widgets/FinanceBankingAccountsPane.qml'
       - 'widgets/FinanceBankingProviderPane.qml'
       - 'widgets/FinanceBankingProviderPolicy.js'
+      - 'widgets/FinanceBankingOfficialHandoff.qml'
+      - 'widgets/FinanceBankingOfficialHandoffPolicy.js'
+      - 'tests/finance/test_banking_official_handoff_m4d.mjs'
+      - 'tests/finance/test_banking_official_handoff_m4d_contracts.py'
       - 'tests/finance/test_banking_provider_m4.mjs'
       - 'tests/finance/test_banking_provider_m4_contracts.py'
       - 'tests/finance/test_banking_provider_m4b.mjs'
@@ -95,3 +103,7 @@ jobs:
         run: node tests/finance/test_banking_provider_m4c.mjs
       - name: Test M4c safe provider dashboards and source isolation
         run: python3 tests/finance/test_banking_provider_m4c_contracts.py
+      - name: Test M4d verified provider homepages and malformed URLs
+        run: node tests/finance/test_banking_official_handoff_m4d.mjs
+      - name: Test M4d two-click official site and restricted-only UI contract
+        run: python3 tests/finance/test_banking_official_handoff_m4d_contracts.py

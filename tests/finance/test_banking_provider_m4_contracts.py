@@ -56,7 +56,7 @@ assert 'onLeftClicked: providerPane.sectionId=modelData.id' in provider
 assert 'OPEN ACCOUNT DETAILS' in provider
 assert 'PROVIDER AUTHORIZATION REQUIRED' in policy
 assert 'POST-APOLLO VIEW // NOT THE ORIGINAL APP // NO PROVIDER LOGIN' in provider
-assert 'OPEN THE OFFICIAL PROVIDER APP FOR REAL ACTIONS' in provider
+assert 'USE THE OFFICIAL SERVICE FOR REAL ACTIONS' in provider
 assert 'FICTIONAL PROVIDER CASH TOTAL' in provider
 assert 'MANUAL PROVIDER CASH ESTIMATE' in provider
 assert 'PARTIAL KNOWN CASH AMOUNT' in provider

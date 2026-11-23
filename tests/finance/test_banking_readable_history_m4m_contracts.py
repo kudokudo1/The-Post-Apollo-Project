@@ -35,7 +35,7 @@ for p in (
     'onLeftClicked: manager.showAllRecentHistory=!manager.showAllRecentHistory',
     'OPEN FULL PROVIDER ACTIVITY // FILTERS AND HISTORY',
     'function openSelectedProviderActivity()',
-    'view!=="detail"||!selected',
+    'view!=="detail"||!review.ok||!selected',
     '!ProviderPolicy.isProviderId(selected.providerId)',
     'selectedProviderId=selected.providerId;',
     'view="provider";',

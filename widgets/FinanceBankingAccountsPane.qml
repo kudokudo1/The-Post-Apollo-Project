@@ -262,13 +262,24 @@ Item {
         return true;
     }
     function openSelectedProviderActivity() {
-        // Read/navigation only. No mutation, transaction, or connection action.
-        if(view!=="detail"||!selected
-           ||!ProviderPolicy.isProviderId(selected.providerId))return false;
+        // M4n: deep-link to the selected MANUAL/DEMO account, not the provider's
+        // unfiltered ALL view. No session write or external provider call.
+        if(view!=="detail"||!review.ok||!selected
+           ||!ProviderPolicy.isProviderId(selected.providerId)
+           ||!review.accounts.some(function(a) {
+               return a.id===selected.id&&a.providerId===selected.providerId;
+           }))return false;
+        var accountId=selected.id;
         selectedProviderId=selected.providerId;
+        // Keep this explicit transition before selecting the account; the
+        // ProviderPane resets its account filter when the section changes.
+        providerMiniApp.sectionId="activity";
+        if(!providerMiniApp.showActivityForAccount(accountId)) {
+            message="ACCOUNT-SCOPED PROVIDER ACTIVITY UNAVAILABLE";
+            return false;
+        }
         message="";
         view="provider";
-        providerMiniApp.sectionId="activity";
         returnToTopRequested();
         return true;
     }

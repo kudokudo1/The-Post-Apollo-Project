@@ -25,7 +25,7 @@ PanelWindow {
     property int selectedTreeIndex: 0
     // One explicit model choice per Tree. Inventory refreshes never silently
     // switch either Tree to the first returned model.
-    property var selectedTreeModels: ["", ""]
+    property var selectedTreeModels: ["", "", "", "", ""]
     property bool modelPopupOpen: false
     property string pendingModelScan: ""
     property string lastScannedModel: ""
@@ -105,20 +105,45 @@ PanelWindow {
             root.pendingModelScan = "";
         }
     }
-    // Tree identities remain model-independent; outline icons are local SVG
-    // assets in Post-Apollo's fixed palette, not emoji font fallbacks.
+    // Tree names are presentation identities independent of trusted models.
+    // Preserve the approved 48px artwork: Cherry/Maple vectors; Cedar and
+    // Macintosh vectors; Bristlecone's operator-edited 48px pixel artwork.
+    // Roles for new Trees are deliberately unassigned, not fabricated.
     readonly property var treeSlots: [
         {
             name: "CHERRY", role: "GENERAL COORDINATOR",
             iconPath: "../assets/forest/cherry-outline.svg",
             hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
-            openIconPath: "../assets/forest/cherry-open-magenta.svg"
+            openIconPath: "../assets/forest/cherry-open-magenta.svg",
+            identityColor: Colors.white, idleGlowColor: Colors.magenta
         },
         {
             name: "MAPLE", role: "FILES & ORGANIZATION",
             iconPath: "../assets/forest/maple-outline.svg",
             hoverIconPath: "../assets/forest/maple-hover-orange.svg",
-            openIconPath: "../assets/forest/maple-open-magenta.svg"
+            openIconPath: "../assets/forest/maple-open-magenta.svg",
+            identityColor: Colors.orange, idleGlowColor: Colors.red
+        },
+        {
+            name: "BRISTLECONE PINE", role: "ROLE // NOT ASSIGNED",
+            iconPath: "../assets/forest/bristlecone-pine.png",
+            hoverIconPath: "../assets/forest/bristlecone-hover-orange.png",
+            openIconPath: "../assets/forest/bristlecone-open-magenta.png",
+            identityColor: Colors.white, idleGlowColor: Colors.orange
+        },
+        {
+            name: "CEDAR", role: "ROLE // NOT ASSIGNED",
+            iconPath: "../assets/forest/cedar-outline.svg",
+            hoverIconPath: "../assets/forest/cedar-hover-orange.svg",
+            openIconPath: "../assets/forest/cedar-open-magenta.svg",
+            identityColor: Colors.green, idleGlowColor: Colors.omnitrix
+        },
+        {
+            name: "MACINTOSH", role: "ROLE // NOT ASSIGNED",
+            iconPath: "../assets/forest/macintosh-outline.svg",
+            hoverIconPath: "../assets/forest/macintosh-hover-orange.svg",
+            openIconPath: "../assets/forest/macintosh-open-magenta.svg",
+            identityColor: Colors.red, idleGlowColor: Colors.red
         }
     ]
     readonly property var activeTree: treeSlots[selectedTreeIndex]
@@ -357,7 +382,7 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.margins: 13
-                text: "TREES // 02"
+                text: "TREES // " + String(root.treeSlots.length).padStart(2, "0")
                 font.pixelSize: 12
                 color: Colors.cyan
             }
@@ -378,18 +403,11 @@ PanelWindow {
                         width: treeColumn.width
                         height: 59
                         open: index === root.selectedTreeIndex
-                        // Each Tree keeps its own idle outline identity.
-                        // Hover, press, and open use the SAME shared DockButton
-                        // orange/magenta state grammar with no Tree exception.
-                        readonly property color iconIdentityColor:
-                            modelData.name === "CHERRY" ? Colors.white : Colors.orange
-                        // Keep idle lettering and border in the original
-                        // outline colors, while the default icon/name/halo glow
-                        // follows each Tree's own identity: Cherry magenta,
-                        // Maple red. Hover/open are still shared DockButton
-                        // state transitions, not per-Tree exceptions.
-                        readonly property color idleGlowColor:
-                            modelData.name === "CHERRY" ? Colors.magenta : Colors.red
+                        // Identity colors are explicit for each Tree, while
+                        // hover, pressed, and open retain shared DockButton
+                        // state precedence. No two-Tree fallback color guess.
+                        readonly property color iconIdentityColor: modelData.identityColor
+                        readonly property color idleGlowColor: modelData.idleGlowColor
                         normalForegroundColor: iconIdentityColor
                         hoverForegroundColor: Colors.orange
                         pressedForegroundColor: Colors.magenta
@@ -551,10 +569,8 @@ PanelWindow {
                     TextHashGlow {
                         safeSource: activeChatTreeIcon
                         requestedVisible: root.menuOpen
-                        foregroundColor: root.selectedTreeIndex === 0
-                            ? Colors.white : Colors.orange
-                        preferredGlowColor: root.selectedTreeIndex === 0
-                            ? Colors.magenta : Colors.red
+                        foregroundColor: root.activeTree.identityColor
+                        preferredGlowColor: root.activeTree.idleGlowColor
                         radius: 8
                         samples: 17
                         opacity: 0.82

@@ -610,8 +610,8 @@ PanelWindow {
 
                 // The chat title is informational, not a selected button:
                 // retain the Tree's idle identity/gradient while its button
-                // can be open-magenta. The accent is measured over the Tree
-                // NAME, not the // CHAT suffix (important for right-side MAPLE).
+                // can be open-magenta. The accent now spans the full
+                // NAME // CHAT label, including the suffix, for every Tree.
                 ForestGradientName {
                     id: chatHeading
                     anchors.left: chatTreeIconHost.right
@@ -620,7 +620,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     height: 27
                     text: root.activeTree.name + " // CHAT"
-                    gradientText: root.activeTree.name
+                    gradientText: root.activeTree.name + " // CHAT"
                     pixelSize: 15
                     bold: true
                     baseColor: root.activeTree.identityColor

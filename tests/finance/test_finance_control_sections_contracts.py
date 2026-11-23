@@ -25,8 +25,9 @@ for name in ('budget','transactions','accounts','categories'):
     assert 'visible: root.budgetSection==="'+name+'"' in menu,name
 
 assert menu.index('id: budgetSectionTabs') < menu.index('id: quickAddMoney')
-assert menu.index('id: financeBudgetGrid') < menu.index('id: advancedToggle')
-assert menu.index('id: advancedToggle') < menu.index('id: financeAccountsPane')
+assert menu.index('id: budgetExperienceSelector') < menu.index('id: budgetSectionTabs')
+assert menu.index('id: financeBudgetGrid') < menu.index('id: advancedBudgetDetails')
+assert menu.index('id: advancedBudgetDetails') < menu.index('id: financeAccountsPane')
 assert menu.index('id: financeAccountsPane') < menu.index('id: transactionsSectionContent')
 assert menu.index('id: financeCategoriesPane') < menu.index('id: transactionsSectionContent')
 

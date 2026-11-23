@@ -126,7 +126,8 @@ PanelWindow {
             openIconPath: "../assets/forest/maple-open-magenta.svg",
             identityColor: Colors.orange,
             iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red,
-            gradientAccentColor: "#C7482F", gradientTopRight: true
+            // Red in the upper-left, fading toward orange on the right.
+            gradientAccentColor: "#C7482F", gradientTopRight: false
         },
         {
             name: "BRISTLECONE PINE", role: "TREEWRITE // CODER",

@@ -31,10 +31,11 @@ from market_shared_quota import reserve, LIMITS, DB_NAME  # noqa: E402
 from market_quota_status import quota_status  # noqa: E402
 
 try:
-    from PySide6.QtCore import QObject, QMetaObject, Q_ARG, QUrl
+    from PySide6.QtCore import QObject, QMetaObject, Q_ARG, QUrl, QTimer
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtQml import QQmlComponent, QQmlEngine
     from PySide6.QtQuick import QQuickItem
+    from shiboken6 import isValid
 except ImportError as exc:
     raise SystemExit(
         "M24 requires existing PySide6 (Qt6). No package installed. "
@@ -340,9 +341,9 @@ def ci_verify(app, root, pane, service, refresh, back, expected):
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("--ci", "--visual"):
+    if len(sys.argv) != 2 or sys.argv[1] not in ("--ci", "--visual", "--visual-smoke"):
         print("USAGE: python3 -B tests/finance/"
-              "test_market_m24_populated_visual.py [--ci|--visual]")
+              "test_market_m24_populated_visual.py [--ci|--visual|--visual-smoke]")
         return 2
     with tempfile.TemporaryDirectory(prefix="finance-market-M24-") as temp:
         snapshots, initial = build_fixture(temp)
@@ -365,6 +366,10 @@ def main():
                 print("M24 uses a fake Quickshell Process; "
                       "it NEVER calls real market APIs or the local live DB.")
                 print("Closing this test window deletes disposable fixtures.")
+                if sys.argv[1] == "--visual-smoke":
+                    # Exercise the real Qt event loop and normal window close
+                    # without requiring an interactive person in CI.
+                    QTimer.singleShot(150, root.close)
                 app.exec()
             for file, digest in initial.items():
                 if safe_digest(file) != digest:
@@ -375,10 +380,15 @@ def main():
                   "real production ledger not inspected", flush=True)
             return 0
         finally:
-            root.close()
-            root.deleteLater()
-            component.deleteLater()
-            engine.deleteLater()
+            # A native user close may destroy the QML root. PySide6 will
+            # raise if we dereference a deleted wrapper during cleanup.
+            if isValid(root):
+                root.close()
+                root.deleteLater()
+            if isValid(component):
+                component.deleteLater()
+            if isValid(engine):
+                engine.deleteLater()
             pump(app)
 
 

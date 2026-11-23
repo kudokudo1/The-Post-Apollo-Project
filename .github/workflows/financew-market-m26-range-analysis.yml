@@ -1,0 +1,39 @@
+name: FinanceW Market M26 loaded-range movement statistics
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceStockRangeAnalysisPolicy.js"
+      - "tests/finance/test_market_m26_range_analysis.mjs"
+      - "tests/finance/test_market_price_range.mjs"
+      - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
+      - ".github/workflows/financew-market-m26-range-analysis.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceStockRangeAnalysisPolicy.js"
+      - "tests/finance/test_market_m26_range_analysis.mjs"
+      - "tests/finance/test_market_price_range.mjs"
+      - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
+      - ".github/workflows/financew-market-m26-range-analysis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  loaded-range-analysis:
+    name: Derived daily closes and chronological drawdown; no provider calls
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pure Market M26 range movement, malformed source and UI contracts
+        run: node tests/finance/test_market_m26_range_analysis.mjs
+      - name: Existing M10-M26 Market price-range regression chain
+        run: node tests/finance/test_market_price_range.mjs

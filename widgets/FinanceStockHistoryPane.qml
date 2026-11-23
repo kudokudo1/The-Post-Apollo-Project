@@ -2,6 +2,7 @@ import QtQuick
 import "../components"
 import "FinanceStockModePolicy.js" as StockModePolicy
 import "FinanceStockChartPointPolicy.js" as ChartPointPolicy
+import "FinanceStockRangeAnalysisPolicy.js" as RangeAnalysisPolicy
 
 // Market STOCKS M14: one-step BACK TO RANGE restores previously loaded chart.
 Item {
@@ -25,6 +26,13 @@ Item {
     property int selectedPointIndex: -1
     readonly property var inspectedPoint: !dayMode
         ? ChartPointPolicy.selectedBar(priceBars, selectedPointIndex) : null
+    // M26: recompute locally only from the current, loaded RANGE snapshot.
+    // No QML service, provider request, local file, timer or persistent state.
+    readonly property var rangeAnalysis: !dayMode && snapshot
+        && stockFeed && snapshot.cik === stockFeed.selectedCik
+        && snapshot.from === stockFeed.startDate
+        && snapshot.to === stockFeed.endDate
+        ? RangeAnalysisPolicy.summarizeRange(snapshot) : null
 
     function inspectChartPoint(x, y) {
         if (dayMode || !snapshot || priceBars.length < 2
@@ -411,6 +419,64 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
                 color: Colors.white
+            }
+            Rectangle {
+                objectName: "marketRangeAnalysisPanel"
+                width: parent.width
+                visible: !stocks.dayMode && stocks.rangeAnalysis !== null
+                height: visible ? analysisCopy.implicitHeight + analysisNote.implicitHeight + 30 : 0
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                GohuText {
+                    id: analysisCopy
+                    objectName: "marketRangeAnalysisSummary"
+                    anchors.top: parent.top
+                    anchors.topMargin: 8
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    text: stocks.rangeAnalysis
+                        ? ("RANGE MOVEMENT // LOADED " + stocks.rangeAnalysis.priceBasis
+                            + "\nHIGH $" + stocks.rangeAnalysis.high.price.toFixed(2)
+                            + " // " + stocks.rangeAnalysis.high.date
+                            + "\nLOW $" + stocks.rangeAnalysis.low.price.toFixed(2)
+                            + " // " + stocks.rangeAnalysis.low.date
+                            + "\nMAX PEAK-TO-TROUGH DROP "
+                            + stocks.rangeAnalysis.maxDrawdownPct.toFixed(2) + "%"
+                            + " // " + stocks.rangeAnalysis.peak.date
+                            + " TO " + stocks.rangeAnalysis.trough.date
+                            + "\nSESSION STEPS // UP " + stocks.rangeAnalysis.upSteps
+                            + " / DOWN " + stocks.rangeAnalysis.downSteps
+                            + " / FLAT " + stocks.rangeAnalysis.flatSteps
+                            + "\nBIGGEST UP STEP "
+                            + (stocks.rangeAnalysis.largestUpPct === null ? "N/A"
+                               : "+" + stocks.rangeAnalysis.largestUpPct.toFixed(2) + "%")
+                            + " // BIGGEST DOWN STEP "
+                            + (stocks.rangeAnalysis.largestDownPct === null ? "N/A"
+                               : stocks.rangeAnalysis.largestDownPct.toFixed(2) + "%"))
+                        : ""
+                    textFormat: Text.PlainText
+                    font.pixelSize: 11
+                    color: Colors.white
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    id: analysisNote
+                    objectName: "marketRangeAnalysisScope"
+                    anchors.top: analysisCopy.bottom
+                    anchors.topMargin: 7
+                    anchors.left: analysisCopy.left
+                    anchors.right: analysisCopy.right
+                    text: "OBSERVED CLOSE-TO-CLOSE SESSIONS ONLY // "
+                        + "NOT INTRADAY EXTREMES OR A VOLATILITY FORECAST // "
+                        + "NO NEW REQUEST"
+                    textFormat: Text.PlainText
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    wrapMode: Text.WordWrap
+                }
             }
             ActionButton {
                 id: backToRange

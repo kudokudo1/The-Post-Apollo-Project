@@ -3,12 +3,20 @@
 // SEC/Crawl snapshots. No provider calls, disk access, or persistence writes.
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { previewEvidenceCandidates } from "./research_evidence_candidates.mjs";
+import { previewEvidenceCandidates, CandidateRefusal } from "./research_evidence_candidates.mjs";
 
 export const RESULT_PREFIX = "FINANCE_RESEARCH_CANDIDATES_RESULT ";
 export const ERROR_PREFIX = "FINANCE_RESEARCH_CANDIDATES_ERROR ";
 const MAX_REQUEST_BYTES = 131072;
 const MAX_RESULT_BYTES = 65536;
+// The M6 source validator emits only fixed codes. Never forward unknown
+// exceptions, individual URLs, titles, accession numbers or source text.
+const SOURCE_REFUSALS = new Set([
+  "INVALID_ISSUER_SELECTION", "INVALID_SEC_SNAPSHOT",
+  "INVALID_SEC_FILING", "INVALID_SEC_URL",
+  "INVALID_DEMO_SNAPSHOT", "INVALID_DEMO_PAGE",
+  "INVALID_DEMO_COUNT"
+]);
 export class CandidateBridgeRefusal extends Error {}
 function refuse(code) { throw new CandidateBridgeRefusal(code); }
 function exact(value, keys) {
@@ -39,7 +47,9 @@ export function prepareCandidatePreviewResponse(frame, transform=previewEvidence
       crawlSnapshot:request.crawlSnapshot,
       selectedCik:request.selectedCik===null?undefined:request.selectedCik
     });
-  }catch{
+  }catch(error){
+    if(error instanceof CandidateRefusal && SOURCE_REFUSALS.has(error.message))
+      refuse(error.message);
     refuse("INVALID_SOURCE_SNAPSHOT");
   }
   if (!result || result.readOnly!==true

@@ -147,7 +147,7 @@ refuses(lambda: review(before_current=wrong_before), "before must be CURRENT")
 refuses(lambda: review(target_pending=wrong_target), "target must be PENDING")
 refuses(lambda: review(post_resize_current=wrong_before),
         "post-resize must be CURRENT")
-refuses(lambda: review(final_current=wrong_target),
+refuses(lambda: review(final_current=pending(100.125, 60.5, 1000.25, 700.75)),
         "final must be CURRENT")
 refuses(lambda: review(before_current={"phase": "CURRENT"}),
         "untyped map cannot become native record")

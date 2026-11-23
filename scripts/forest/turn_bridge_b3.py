@@ -14,7 +14,7 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import closing
+from dataclasses import dataclass
 
 from ollama_chat_transport import (
     ChatRefusal, _messages, _model_name, _number, stream_chat,
@@ -52,6 +52,23 @@ class BridgeRefusal(Exception):
     def __init__(self, code: str):
         super().__init__(code)
         self.code = code
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticCommitBinding:
+    """Persisted B3 context, not an authenticated security grant.
+
+    Never construct a production authorizer from client-supplied values.
+    In particular, a request ID is only a correlation identifier.
+    """
+    owner_key: str
+    tree_key: str
+    session_id: str
+    user_turn_id: str
+    attempt_id: str
+    request_id: str
+    model_key: str
+    expected_revision: int
 
 
 def bootstrap_attempts_synthetic(db: sqlite3.Connection) -> None:
@@ -135,6 +152,69 @@ class ForestTurnBridge:
 
         return attempt_id, messages
 
+    def _commit_binding(self, owner: str, session_id: str,
+                        attempt_id: str, request_id: str,
+                        model: str, revision: int) -> SyntheticCommitBinding:
+        """Derive exact attempt, user turn and Tree from B3's durable rows."""
+        row = self.db.execute(
+            "SELECT a.user_turn_id,a.model_key,a.expected_revision,a.status,"
+            "s.tree_key FROM forest_attempts_b3 AS a "
+            "JOIN forest_sessions AS s ON s.session_id=a.session_id "
+            "WHERE a.attempt_id=? AND a.session_id=? AND a.owner_key=? "
+            "AND s.owner_key=?",
+            (attempt_id, session_id, owner, owner),
+        ).fetchone()
+        if row is None or row[3] != "RESERVED":
+            raise BridgeRefusal("FENCE_ATTEMPT_UNAVAILABLE")
+        if row[1] != model or row[2] != revision:
+            raise BridgeRefusal("FENCE_BINDING_MISMATCH")
+        if type(request_id) is not str or not request_id or len(request_id) > 96:
+            raise BridgeRefusal("INVALID_FENCE_REQUEST")
+        return SyntheticCommitBinding(
+            owner_key=owner, tree_key=row[4], session_id=session_id,
+            user_turn_id=row[0], attempt_id=attempt_id, request_id=request_id,
+            model_key=model, expected_revision=revision,
+        )
+
+    def _commit_fenced(self, binding: SyntheticCommitBinding,
+                       response: str, pre_commit: Callable[[], bool],
+                       fence_factory: Callable) -> dict[str, object]:
+        """B4c test seam: keep injected permit around real SQLite COMMIT.
+
+        The injected permit is a synthetic fixture. A production host must
+        independently verify and hold a C5-issued permit, including revocation
+        ordering, through actual COMMIT and independently durable terminal ACK.
+        """
+        wrote_reply = False
+        try:
+            guard = fence_factory(binding)
+            with guard as held:
+                # Require an object bound to the exact durable B3 attempt.
+                # This equality is a TEST constraint, not cryptographic proof.
+                if (held is None or
+                        getattr(held, "binding", None) != binding or
+                        not callable(getattr(held, "terminal", None))):
+                    raise BridgeRefusal("FENCE_BINDING_MISMATCH")
+                result = self._commit(
+                    binding.owner_key, binding.session_id, binding.attempt_id,
+                    binding.expected_revision, binding.model_key, response,
+                    pre_commit=pre_commit)
+                wrote_reply = True
+                # Happens after SQLite transaction has exited. An unavailable
+                # terminal receipt must NOT advertise COMMITTED to the client.
+                if held.terminal(result) is not True:
+                    raise BridgeRefusal("UNKNOWN_HOLD")
+            return result
+        except BaseException as exc:
+            # Even a post-COMMIT exception or lost receipt cannot cause replay.
+            # Raising UNKNOWN_HOLD does NOT undo a previously committed reply.
+            if wrote_reply:
+                raise BridgeRefusal("UNKNOWN_HOLD") from exc
+            if isinstance(exc, (BridgeRefusal, KeyboardInterrupt, GeneratorExit,
+                                SystemExit)):
+                raise
+            raise BridgeRefusal("FENCE_UNAVAILABLE") from exc
+
     def _commit(self, owner: str, session_id: str, attempt_id: str,
                 revision: int, model: str, response: str,
                 pre_commit: Callable[[], bool] | None = None) -> dict[str, object]:
@@ -217,6 +297,8 @@ class ForestTurnBridge:
                  endpoint: str = "http://127.0.0.1:11434",
                  max_predict: int = 256, num_ctx: int = 4096,
                  pre_commit: Callable[[], bool] | None = None,
+                 fence_factory: Callable | None = None,
+                 fence_request_id: str | None = None,
                  ) -> Iterator[dict[str, object]]:
         """Provisional DELTA events; COMMITTED only after atomic durable write.
 
@@ -229,6 +311,16 @@ class ForestTurnBridge:
         try:
             if pre_commit is not None and not callable(pre_commit):
                 raise BridgeRefusal("INVALID_PRE_COMMIT_HOOK")
+            if fence_factory is not None:
+                if (not callable(fence_factory) or pre_commit is None
+                        or type(fence_request_id) is not str
+                        or not 16 <= len(fence_request_id) <= 96
+                        or not all(ch.isascii() and
+                                   (ch.isalnum() or ch in "_-")
+                                   for ch in fence_request_id)):
+                    raise BridgeRefusal("INVALID_FENCE_DEPENDENCY")
+            elif fence_request_id is not None:
+                raise BridgeRefusal("INVALID_FENCE_DEPENDENCY")
             # Validate network and resource policy BEFORE reserving a turn.
             # A malformed request must not consume its one-time attempt.
             _number(max_predict, lower=1, upper=MAX_OUTPUT_TOKENS,
@@ -289,10 +381,18 @@ class ForestTurnBridge:
             # No output can follow COMPLETE. Response must end cleanly.
             if state != "TERMINAL" or completed_text is None:
                 raise BridgeRefusal("INCOMPLETE_STREAM")
-            receipt = self._commit(
-                _key(owner), _key(session_id), reserved,
-                expected_revision, _model_name(model), completed_text,
-                pre_commit=pre_commit)
+            if fence_factory is not None:
+                binding = self._commit_binding(
+                    _key(owner), _key(session_id), reserved,
+                    fence_request_id, _model_name(model), expected_revision)
+                receipt = self._commit_fenced(
+                    binding, completed_text, pre_commit, fence_factory)
+            else:
+                # Legacy B3/B4b remains synthetic and NOT production-authorized.
+                receipt = self._commit(
+                    _key(owner), _key(session_id), reserved,
+                    expected_revision, _model_name(model), completed_text,
+                    pre_commit=pre_commit)
             completed = True
             yield receipt
         except (BridgeRefusal, ChatRefusal, JournalRefusal) as exc:

@@ -759,7 +759,8 @@ class ForestLauncherContract(unittest.TestCase):
             self.assertIn('text: "' + glyph + '"', view)
         self.assertIn("root.reasoningRailExpanded && reasoningCoffeeButton.pressed", view)
         self.assertIn("? Colors.black : Colors.white", view)
-        self.assertEqual(view.count("reasoningCoffeeButton.pressed"), 3)
+        # Star ink, cup base/accent, and compact border-overlay gating.
+        self.assertEqual(view.count("reasoningCoffeeButton.pressed"), 4)
         self.assertIn("contentGlowSource: coffeeGradientGlyph", view)
         self.assertIn("width: root.reasoningRailExpanded ? 30 : 36", view)
         self.assertIn("height: root.reasoningRailExpanded ? 28 : 34", view)

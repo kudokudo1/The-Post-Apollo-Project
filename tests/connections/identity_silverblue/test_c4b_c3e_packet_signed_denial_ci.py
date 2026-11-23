@@ -17,6 +17,7 @@ from pathlib import Path
 import socket
 import sys
 import unittest
+from unittest import mock
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -181,15 +182,20 @@ class RealIdentityPacketAndSignedDenialStillHold(unittest.TestCase):
         with self.assertRaises(E.Refused):
             self.check_signed(serial=self.proof(self.public, bytes(altered)))
 
-    def test_11_forged_packet_trust_or_terminal_claim_refused(self):
-        record = P.denial_only_observation_ci_only if hasattr(P, "denial_only_observation_ci_only") else None
-        # Genuine packet result retains exact negative fields. No policy
-        # conversion from that result into a trusted C4b producer exists.
-        self.assertIsNone(record)
-        out = self.check_packet()
-        self.assertFalse(out["verifiedOriginalNativeGateway"])
-        self.assertFalse(out["perPacketProcessObservationIsProtectedProof"])
-        self.assertFalse(out["signedTerminalOutcomeVerified"])
+    def test_11_forged_real_packet_source_authority_refused(self):
+        receiver, sender = self.p.pair()
+        sender.sendall(self.original_outcome_frame())
+        original = P.K.inspect_one_untrusted_packet
+
+        def poisoned(sock):
+            observed = original(sock)  # truly read kernel packet first
+            return {**observed, "sourceEvidenceTrusted": True}
+
+        with mock.patch.object(P.K, "inspect_one_untrusted_packet", side_effect=poisoned):
+            with self.assertRaisesRegex(P.Refused, "UNEXPECTED_KERNEL_REPORT"):
+                P.inspect_ci_only(
+                    receiver, expected_request_frame=self.original_outcome_frame(),
+                    boundary=self.p.local)
         self.check_signed()
 
     def test_12_original_protected_identity_admission_and_broker_remain_disabled(self):

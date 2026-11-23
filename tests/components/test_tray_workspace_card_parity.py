@@ -66,8 +66,9 @@ assert 'trayButton.cardEmphasized ? Colors.dark : "transparent"' in t_active
 w_back, t_back = check_workspace_parity(
     "workspacesButtonBackground", "trayButtonBackground",
     [("width", "parent.width + 6"), ("height", "parent.height + 5"),
-     ("clip", "false"), ("z", "-1"), ("color", "Colors.dark"),
-     ("opacity", "0.0")])
+     ("clip", "false"), ("z", "-1"), ("color", "Colors.dark")])
+assert "workspacesWorkspaceButton.isActive ? 0.0 : 0.0" in w_back
+assert "trayButton.cardEmphasized ? 0.0 : 0.0" in t_back
 assert "border." not in t_back
 assert "opacity: 0.68" not in tray
 

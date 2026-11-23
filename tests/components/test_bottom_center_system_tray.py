@@ -142,13 +142,20 @@ assert 'text: "TRAY"' in tray and 'text: "NO ICONS"' in tray
 assert tray.count("GohuText {") >= 2
 assert "border.width: 1" in tray
 assert "border.color: accentColor" in tray
-# The actual visible native menu, not the click, owns open magenta.
+# The outer tray tracks actual native menu visibility. Individual app
+# cards separately track durable StatusNotifier registration.
 assert "readonly property bool trayMenuOpen:" in tray
 assert "trayMenuOpen ? Colors.magenta" in tray
 assert "trayButtonPressed || trayButtonHovered ? Colors.orange : Colors.cyan" in tray
 assert "trayMenuOpen ? 0.72" in tray
 assert "trayMenuOpen ? 0.18" in tray
 assert "safeSource: trayIcon" in tray
+assert "readonly property bool appRegistered:" in tray
+assert "trayButton.modelData !== null" in tray
+assert "trayButton.modelData !== undefined" in tray
+assert "readonly property bool cardEmphasized: trayButton.appRegistered" in tray
+assert "visible: trayButton.appRegistered" in tray
+assert "trayButton.appRegistered ? Colors.magenta" in tray
 # Copy Workspaces' real construction, not a permanent bordered mini
 # card: 25×42 delegate, a 70% dark active layer, invisible oversized
 # backing and low-opacity sampled glow beneath the icon.

@@ -101,17 +101,42 @@ assert.equal(accent(true,true,true),Colors.magenta,"open beats hovering and pres
 const iconColorStart = "readonly property color iconAccentColor:";
 assert.equal(source.split(iconColorStart).length - 1,1);
 const iconExpression = source.split(iconColorStart,2)[1].split("\n\n",1)[0];
-function iconAccent(hovered, pressed, menuOpen) {
+function iconAccent(registered, hovered, pressed) {
     return vm.runInNewContext("(" + iconExpression + ")", {
+        trayButton:{appRegistered:registered},
         trayButtonMouse:{containsMouse:hovered,pressed:pressed},
-        trayNativeMenu:{visible:menuOpen}, Colors
+        Colors
     });
 }
-assert.equal(iconAccent(false,false,false),Colors.cyan);
-assert.equal(iconAccent(true,false,false),Colors.orange);
-assert.equal(iconAccent(false,true,false),Colors.orange);
-assert.equal(iconAccent(false,false,true),Colors.magenta);
-assert.equal(iconAccent(true,true,true),Colors.magenta);
+// The app icon is born as a registered SNI delegate and remains open-colored
+// after moving the pointer away or closing the native menu.
+assert.equal(iconAccent(true,false,false),Colors.magenta,
+    "registered application idle is open-magenta");
+assert.equal(iconAccent(true,true,false),Colors.magenta,
+    "hover must not clear the registered application's magenta identity");
+assert.equal(iconAccent(true,false,true),Colors.magenta,
+    "click must not clear the registered application's magenta identity");
+assert.equal(iconAccent(false,false,false),Colors.cyan,
+    "only an unregistered/fallback app icon can be idle cyan");
+assert.equal(iconAccent(false,true,false),Colors.orange,
+    "unregistered/fallback hover still orange");
+
+// Exercise the QML registration predicate, not a synthetic local click flag.
+const registeredStart = "readonly property bool appRegistered:";
+assert.equal(source.split(registeredStart).length - 1, 1);
+const registeredExpr = source.split(registeredStart,2)[1].split("\n\n",1)[0];
+function registered(modelData) {
+    return vm.runInNewContext("(" + registeredExpr + ")", {
+        trayButton:{modelData}
+    });
+}
+assert.equal(registered({id:"vesktop"}),true);
+assert.equal(registered({id:"net.lutris.Lutris"}),true);
+assert.equal(registered(null),false);
+assert.equal(registered(undefined),false);
+assert.match(source,/readonly property bool cardEmphasized:\s*trayButton\.appRegistered/);
+assert.match(source,/visible:\s*trayButton\.appRegistered/);
+assert.doesNotMatch(source,/readonly property bool cardEmphasized:\s*trayNativeMenu\.visible/);
 assert.match(source,/trayMenuOpen \? 0\.72/);
 assert.match(source,/trayMenuOpen \? 0\.18/);
 assert.match(source,/onOpened: trayDock\.openMenuAnchor = trayNativeMenu/);
@@ -127,4 +152,4 @@ assert.match(source,/QsMenuAnchor\s*\{[\s\S]*?menu:\s*trayButton\.modelData\.men
 assert.match(source,/anchor\.item:\s*trayButton/);
 assert.match(source,/anchor\.edges:\s*Edges\.Top/);
 assert.match(source,/anchor\.gravity:\s*Edges\.Top/);
-console.log("Tray native-menu click dispatch, cyan/orange/magenta precedence and layered glows: PASS");
+console.log("Tray native clicks, outer accent and persistent registered-app magenta/card: PASS");

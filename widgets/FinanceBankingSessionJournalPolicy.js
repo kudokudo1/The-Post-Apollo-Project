@@ -91,13 +91,15 @@ function project(projection,session,options) {
     for(var b=0;b<projection.allAccounts.length;b++) {
         var account=projection.allAccounts[b];
         var bucket={accountId:account.id,accountNickname:account.nickname,
-            matchedCount:0,matchedInCents:0,matchedOutCents:0};
+            matchedCount:0,matchedInCents:0,matchedOutCents:0,
+            transferCount:0,transferInCents:0,transferOutCents:0};
         breakdownById[account.id]=bucket;
         breakdown.push(bucket);
     }
     var uniqueEntries=Object.create(null),rows=[],providerCount=0;
     var pairs=Object.create(null);
     var matchedInCents=0,matchedOutCents=0;
+    var matchedTransferCount=0,matchedTransferInCents=0,matchedTransferOutCents=0;
     for(var k=0;k<session.entries.length;k++) {
         var e=session.entries[k];
         if(!e||typeof e.id!=="string"
@@ -136,6 +138,17 @@ function project(projection,session,options) {
         var bucket=breakdownById[e.accountId];
         if(!bucket)return fail("INVALID PROVIDER ACTIVITY BUCKET");
         bucket.matchedCount++;
+        if(e.transferId) {
+            matchedTransferCount++;
+            bucket.transferCount++;
+            if(e.amountCents>0) {
+                matchedTransferInCents+=e.amountCents;
+                bucket.transferInCents+=e.amountCents;
+            } else {
+                matchedTransferOutCents+=-e.amountCents;
+                bucket.transferOutCents+=-e.amountCents;
+            }
+        }
         if(e.amountCents>0) {
             matchedInCents+=e.amountCents;
             bucket.matchedInCents+=e.amountCents;
@@ -174,12 +187,43 @@ function project(projection,session,options) {
             matchedCount:item.matchedCount,
             matchedInCents:item.matchedInCents,
             matchedOutCents:item.matchedOutCents,
-            matchedNetCents:item.matchedInCents-item.matchedOutCents});
+            matchedNetCents:item.matchedInCents-item.matchedOutCents,
+            transferCount:item.transferCount,
+            transferInCents:item.transferInCents,
+            transferOutCents:item.transferOutCents,
+            transferNetCents:item.transferInCents-item.transferOutCents,
+            unlinkedCount:item.matchedCount-item.transferCount,
+            unlinkedInCents:item.matchedInCents-item.transferInCents,
+            unlinkedOutCents:item.matchedOutCents-item.transferOutCents});
+    }
+    var checkTransferCount=0,checkTransferIn=0,checkTransferOut=0;
+    for(var n=0;n<accountBreakdown.length;n++) {
+        var item=accountBreakdown[n];
+        if(!Number.isSafeInteger(item.transferCount)
+           ||!Number.isSafeInteger(item.transferInCents)
+           ||!Number.isSafeInteger(item.transferOutCents)
+           ||item.transferCount<0||item.transferCount>item.matchedCount
+           ||item.transferInCents<0||item.transferInCents>item.matchedInCents
+           ||item.transferOutCents<0||item.transferOutCents>item.matchedOutCents
+           ||!Number.isSafeInteger(item.unlinkedInCents)
+           ||!Number.isSafeInteger(item.unlinkedOutCents))
+            return fail("INCONSISTENT TRANSFER CLASSIFICATION");
+        checkTransferCount+=item.transferCount;
+        checkTransferIn+=item.transferInCents;
+        checkTransferOut+=item.transferOutCents;
     }
     if(!Number.isSafeInteger(matchedInCents)
        ||!Number.isSafeInteger(matchedOutCents)
+       ||!Number.isSafeInteger(matchedTransferCount)
+       ||!Number.isSafeInteger(matchedTransferInCents)
+       ||!Number.isSafeInteger(matchedTransferOutCents)
        ||checkCount!==rows.length
-       ||checkIn!==matchedInCents||checkOut!==matchedOutCents)
+       ||checkIn!==matchedInCents||checkOut!==matchedOutCents
+       ||checkTransferCount!==matchedTransferCount
+       ||checkTransferIn!==matchedTransferInCents
+       ||checkTransferOut!==matchedTransferOutCents
+       ||matchedTransferInCents>matchedInCents
+       ||matchedTransferOutCents>matchedOutCents)
         return fail("INCONSISTENT SESSION MOVEMENT TOTAL");
     rows.sort(compareEntries);
     var matchCount=rows.length,pageCount=Math.max(1,Math.ceil(matchCount/PAGE_SIZE)),
@@ -193,6 +237,13 @@ function project(projection,session,options) {
         fromDate:fromDate,toDate:toDate,
         matchedInCents:matchedInCents,matchedOutCents:matchedOutCents,
         matchedNetCents:matchedInCents-matchedOutCents,
+        matchedTransferCount:matchedTransferCount,
+        matchedTransferInCents:matchedTransferInCents,
+        matchedTransferOutCents:matchedTransferOutCents,
+        matchedTransferNetCents:matchedTransferInCents-matchedTransferOutCents,
+        matchedUnlinkedCount:matchCount-matchedTransferCount,
+        matchedUnlinkedInCents:matchedInCents-matchedTransferInCents,
+        matchedUnlinkedOutCents:matchedOutCents-matchedTransferOutCents,
         accountBreakdown:accountBreakdown,
         totalsScope:"FILTERED SESSION ENTRIES // NOT VERIFIED INCOME OR SPENDING",
         scope:session.mode==="demo"?"COMPLETE FICTIONAL DEMO SESSION":

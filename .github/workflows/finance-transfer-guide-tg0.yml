@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k
 
 on:
   pull_request:
@@ -21,6 +21,8 @@ on:
       - 'tests/finance/test_banking_transfer_aware_activity_m4i_contracts.py'
       - 'tests/finance/test_banking_transfer_corrections_m4j.mjs'
       - 'tests/finance/test_banking_transfer_corrections_m4j_contracts.py'
+      - 'tests/finance/test_banking_session_reconciliation_m4k.mjs'
+      - 'tests/finance/test_banking_session_reconciliation_m4k_contracts.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -73,6 +75,8 @@ on:
       - 'tests/finance/test_banking_transfer_aware_activity_m4i_contracts.py'
       - 'tests/finance/test_banking_transfer_corrections_m4j.mjs'
       - 'tests/finance/test_banking_transfer_corrections_m4j_contracts.py'
+      - 'tests/finance/test_banking_session_reconciliation_m4k.mjs'
+      - 'tests/finance/test_banking_session_reconciliation_m4k_contracts.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -179,3 +183,7 @@ jobs:
         run: node tests/finance/test_banking_transfer_corrections_m4j.mjs
       - name: Test M4j two-leg correction UI and no-payment authority contracts
         run: python3 tests/finance/test_banking_transfer_corrections_m4j_contracts.py
+      - name: Test M4k whole-session transfer and unlinked movement reconciliation
+        run: node tests/finance/test_banking_session_reconciliation_m4k.mjs
+      - name: Test M4k reconciliation UI and no-account-authority contracts
+        run: python3 tests/finance/test_banking_session_reconciliation_m4k_contracts.py

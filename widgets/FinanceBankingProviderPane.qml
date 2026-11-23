@@ -2,6 +2,7 @@ import QtQuick
 import "../components"
 import "FinanceBankingProviderPolicy.js" as ProviderPolicy
 import "FinanceBankingSessionJournalPolicy.js" as Journal
+import "FinanceBankingActivityNavigationPolicy.js" as ActivityNavigation
 
 // Banking M4: provider-specific Post-Apollo navigation over M3 manual/demo
 // snapshots only. Restricted features are informative, never actionable.
@@ -88,6 +89,24 @@ Item {
     function clearSelectedEntry() {
         correctionCandidate=null;
         correctionDeleteArmed=false;
+    }
+    function showActivityForAccount(accountId) {
+        // Read-only deep-link from a manual/demo Account Detail. Validate the
+        // currently projected provider BEFORE changing any visible filter.
+        var index=ActivityNavigation.accountFilterIndex(details,providerId,accountId);
+        if(index<1)return false;
+        // Setting sectionId triggers the existing section reset. Apply the
+        // account filter afterwards so it cannot be reset back to ALL.
+        sectionId="activity";
+        activityDirection="all";
+        activityFromDate="";
+        activityToDate="";
+        activitySearch.text="";
+        activityPageIndex=0;
+        showActivityBreakdown=false;
+        activityAccountIndex=index;
+        clearSelectedEntry();
+        return activityAccountId===accountId&&filteredActivity.ok;
     }
     function chooseManualEntry(row) {
         if(!row||typeof row.id!=="string"||typeof row.accountId!=="string"

@@ -105,7 +105,7 @@ class AcceptedUnixReadOnlyPeerTests(unittest.TestCase):
         return M.P.frame_ci_only(self.request if request is None else request)
 
     def start_one(self, *, raw=None, boundary=None, pid_override=None,
-                  fork_sender=False, half_close=False):
+                  fork_sender=False, half_close=False, expect_peer_drop=False):
         listener = M.bind_one_ci_only(self.root)
         self.assertTrue(self.sockpath.exists())
         self.assertEqual(self.sockpath.stat().st_mode & 0o777, 0o600)
@@ -133,9 +133,13 @@ class AcceptedUnixReadOnlyPeerTests(unittest.TestCase):
             server.join(timeout=5)
             self.assertEqual(client.exitcode, 0, outcome)
             self.assertEqual(server.exitcode, 0, outcome)
-            self.assertNotIn("error", outcome, outcome)
+            if expect_peer_drop:
+                self.assertIn("error", outcome, outcome)
+                self.assertNotIn("reply", outcome)
+            else:
+                self.assertNotIn("error", outcome, outcome)
+                self.assertTrue(outcome["replyEnded"])
             outcome["connectingPid"] = client.pid
-            self.assertTrue(outcome["replyEnded"])
             self.assertFalse(self.sockpath.exists(),
                              "exact one-request listener must unlink path")
             return outcome
@@ -195,8 +199,10 @@ class AcceptedUnixReadOnlyPeerTests(unittest.TestCase):
         self.assertEqual(out["result"]["testState"], "consumed")
         self.assertIs(out["result"]["productionAuthority"], False)
 
-    def test_06_wrong_connecting_pid_is_refused_before_parser(self):
-        self.refused(pid_override=os.getpid())
+    def test_06_wrong_connecting_pid_is_dropped_before_parser(self):
+        result = self.start_one(
+            pid_override=os.getpid(), expect_peer_drop=True)
+        self.assertNotIn("reply", result)
 
     def test_07_fake_begin_signin_request_is_refused(self):
         self.refused(request={**self.request, "op": "BEGIN_SIGNIN"})

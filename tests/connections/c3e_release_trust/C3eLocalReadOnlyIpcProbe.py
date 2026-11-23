@@ -121,6 +121,58 @@ def frame_ci_only(doc: dict):
     return struct.pack(">I", len(raw)) + raw
 
 
+def _validated_diagnostic(op: str, boundary: S.TrustBoundary,
+                          result: dict) -> dict:
+    """Reject arbitrary nested/extra claims even when known flags are false.
+
+    This is a CI-only *shape* check, not independent custodian authentication.
+    A valid local fixture or protected HOLD may not acquire a new success
+    field by appending it to an otherwise correctly denied response.
+    """
+    if type(result) is not dict:
+        _deny("C3E_IPC_BACKEND_RESULT_NOT_OBJECT")
+    if op == "CUSTODIAN_STATUS":
+        expected = {"schema", "status", "source", *S.DENIED}
+        expected_status = S.STATUS_HOLD
+        expected_source = S.PROTECTED_REQUIRED
+    elif op == "SNAPSHOT":
+        expected = {"schema", "status", "source",
+                    "testHeadSha256", "testSequence", *S.DENIED}
+        expected_status = S.STATUS_LOCAL
+        expected_source = S.LOCAL_DEVELOPMENT
+    elif op == "OUTCOME":
+        expected = {"schema", "status", "source",
+                    "testState", "testHeadSha256", *S.DENIED}
+        expected_status = S.STATUS_LOCAL
+        expected_source = S.LOCAL_DEVELOPMENT
+    else:
+        _deny("C3E_IPC_UNEXPECTED_DIAGNOSTIC_OPERATION")
+    if set(result) != expected:
+        _deny("C3E_IPC_EXTRA_OR_MISSING_BACKEND_FIELDS")
+    if (result["schema"] != S.SCHEMA
+            or result["status"] != expected_status
+            or result["source"] != expected_source
+            or boundary._mode != expected_source):
+        _deny("C3E_IPC_OPERATION_MODE_OR_STATUS_MISMATCH")
+    if any(result[k] is not False for k in S.DENIED):
+        _deny("C3E_IPC_BACKEND_ATTEMPTED_AUTHORITY_PROMOTION")
+    if op == "SNAPSHOT":
+        if (type(result["testHeadSha256"]) is not str
+                or re.fullmatch(r"[0-9a-f]{64}", result["testHeadSha256"]) is None
+                or type(result["testSequence"]) is not int
+                or result["testSequence"] < 1):
+            _deny("C3E_IPC_MALFORMED_LOCAL_SNAPSHOT")
+    if op == "OUTCOME":
+        state, head = result["testState"], result["testHeadSha256"]
+        if (type(state) is not str or state not in ("issued", "consumed")
+                or (state == "issued" and head is not None)
+                or (state == "consumed" and
+                    (type(head) is not str
+                     or re.fullmatch(r"[0-9a-f]{64}", head) is None))):
+            _deny("C3E_IPC_MALFORMED_LOCAL_OUTCOME")
+    return result
+
+
 def _route(boundary: S.TrustBoundary, request: dict):
     if type(boundary) is not S.TrustBoundary:
         _deny("C3E_IPC_ORIGINAL_BOUNDARY_REQUIRED")
@@ -152,10 +204,7 @@ def _route(boundary: S.TrustBoundary, request: dict):
     else:
         result = boundary.lookup_terminal_outcome(bytes.fromhex(request["challengeHex"]))
 
-    if (type(result) is not dict or result.get("schema") != S.SCHEMA
-            or any(result.get(k) is not False for k in S.DENIED)
-            or result.get("status") not in (S.STATUS_LOCAL, S.STATUS_HOLD)):
-        _deny("C3E_IPC_BACKEND_ATTEMPTED_AUTHORITY_PROMOTION")
+    result = _validated_diagnostic(op, boundary, result)
     return {
         "schema": REPLY_SCHEMA,
         "status": "IPC_CI_DIAGNOSTIC_ONLY",

@@ -37,7 +37,7 @@ function destination(providerId,sectionId) {
 // QML passes the exact object produced by destination, not a typed URL.
 function canOpen(decision,providerId,sectionId) {
     var expected=destination(providerId,sectionId);
-    return expected.ok===true && decision && decision.ok===true
+    return expected.ok===true && !!decision && decision.ok===true
         &&decision.providerId===providerId
         &&decision.sectionId===sectionId
         &&decision.url===expected.url

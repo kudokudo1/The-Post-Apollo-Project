@@ -349,6 +349,75 @@ class SignedNativeCommandTests(unittest.TestCase):
         self.assertEqual(self.client._sequence, 0)
         self.assertEqual(self.base.factory_calls, 0)
 
+    def test_transport_marker_pre_send_refusal_has_no_dispatch_evidence(self):
+        self.assertEqual(self.client.last_wire_outcome, "UNOBSERVED")
+        self.accept_server = False
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.client.last_wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertEqual(self.base.factory_calls, 0)
+        # A new client has NO observations about prior processes or commands.
+        self.assertEqual(self._client().last_wire_outcome, "UNOBSERVED")
+
+    def test_real_begin_with_lost_receipt_is_unknown_and_not_retried(self):
+        # The real disposable native gateway executes BEGIN and launches the
+        # fake browser, but the client loses the signed acknowledgement.
+        with patch("desktop_signed_command_client_v0.verify_receipt",
+                   side_effect=ReceiptRejected("lost signed response")):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(len(self.base.urls), 1)
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        with self.assertRaises(ReceiptRejected):
+            self.client.status()
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertEqual(len(self.base.urls), 1)
+
+    def test_started_send_that_fails_is_unknown_even_without_ack(self):
+        # A failed sendall does NOT prove that zero bytes reached the peer.
+        class BrokenSend:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def settimeout(self, _):
+                pass
+
+            def connect(self, _):
+                pass
+
+            def sendall(self, _):
+                raise BrokenPipeError("partial write")
+
+        peer = KernelPeer(os.getpid(), os.geteuid(), os.getegid())
+        with patch("desktop_signed_command_client_v0.socket.socket",
+                   return_value=BrokenSend()), \
+             patch("desktop_signed_command_client_v0._peer",
+                   return_value=peer):
+            with self.assertRaises(ReceiptRejected):
+                self.client.begin()
+        self.assertEqual(self.client.last_wire_outcome, "UNKNOWN_HOLD")
+        self.assertTrue(self.client.faulted)
+        self.assertEqual(self.base.factory_calls, 0)
+
+    def test_signed_receipt_is_observation_not_safe_retry_authority(self):
+        self.assertEqual(self.client.last_wire_outcome, "UNOBSERVED")
+        begin = self.client.begin()
+        self.assertEqual(begin.phase, "REQUESTED")
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertEqual(self.client.status().phase, "PENDING")
+        self.assertEqual(self.client.last_wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertFalse(hasattr(self.client, "safe_to_retry"))
+        self.assertFalse(hasattr(self.client, "production_authority"))
+        self.assertFalse(hasattr(self.client, "can_begin_sign_in"))
+
     def test_signer_failure_revokes_host_instead_of_orphan_login(self):
         # Existing gateway bound socket and signed mode. Fail signing after
         # successful side-effect-bearing host BEGIN.

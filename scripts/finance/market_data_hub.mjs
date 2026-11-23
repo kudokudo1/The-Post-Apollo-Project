@@ -2,6 +2,7 @@
 // Provider-neutral contract; EODHD is the ONLY wired provider in this milestone.
 // Nothing is fetched at module import, no disk writes and no background polling.
 import { loadPrices, SYMBOLS } from "./read_sec_price_context.mjs";
+import {STOCK_SYMBOLS} from "./market_stock_catalog.mjs";
 import {loadPriceRange, validateRange, MAX_RANGE_BARS, dayNumber} from "./read_market_price_range.mjs";
 
 const DEFAULT_TTL_RECENT_MS = 15 * 60 * 1000;
@@ -190,7 +191,7 @@ export function createMarketDataHub({
         result=await rangeAdapter(cik,from,to);
         if(!result || result.schemaVersion!==1 || result.source!=="eodhd-eod"
             || result.readOnly!==true || result.cik!==cik
-            || result.symbol!==SYMBOLS[cik] || result.from!==from || result.to!==to
+            || result.symbol!==STOCK_SYMBOLS[cik] || result.from!==from || result.to!==to
             || !["CLOSE","ADJUSTED CLOSE"].includes(result.priceBasis)
             || !Array.isArray(result.bars) || result.bars.length>MAX_RANGE_BARS
             || !result.bars.every((bar,i)=>{

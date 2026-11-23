@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c
 
 on:
   pull_request:
@@ -15,6 +15,8 @@ on:
       - 'tests/finance/test_banking_provider_m4_contracts.py'
       - 'tests/finance/test_banking_provider_m4b.mjs'
       - 'tests/finance/test_banking_provider_m4b_contracts.py'
+      - 'tests/finance/test_banking_provider_m4c.mjs'
+      - 'tests/finance/test_banking_provider_m4c_contracts.py'
       - 'widgets/FinanceBankingAccountsPolicy.js'
       - 'tests/finance/test_banking_accounts_m3.mjs'
       - 'tests/finance/test_banking_accounts_m3_contracts.py'
@@ -41,6 +43,8 @@ on:
       - 'tests/finance/test_banking_provider_m4_contracts.py'
       - 'tests/finance/test_banking_provider_m4b.mjs'
       - 'tests/finance/test_banking_provider_m4b_contracts.py'
+      - 'tests/finance/test_banking_provider_m4c.mjs'
+      - 'tests/finance/test_banking_provider_m4c_contracts.py'
       - 'widgets/FinanceBankingAccountsPolicy.js'
       - 'tests/finance/test_banking_accounts_m3.mjs'
       - 'tests/finance/test_banking_accounts_m3_contracts.py'
@@ -87,3 +91,7 @@ jobs:
         run: node tests/finance/test_banking_provider_m4b.mjs
       - name: Test M4b provider quick-entry and no-payment source contracts
         run: python3 tests/finance/test_banking_provider_m4b_contracts.py
+      - name: Test M4c provider cash movement and selected-product balances
+        run: node tests/finance/test_banking_provider_m4c.mjs
+      - name: Test M4c safe provider dashboards and source isolation
+        run: python3 tests/finance/test_banking_provider_m4c_contracts.py

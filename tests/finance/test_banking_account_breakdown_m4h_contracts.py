@@ -40,8 +40,8 @@ for item in (
 for item in (
     "property bool showActivityBreakdown: false",
     "showActivityBreakdown=false;",
-    'label: "SHOW FILTERED ACCOUNT BREAKDOWN"',
-    'label: "HIDE FILTERED ACCOUNT BREAKDOWN"',
+    '"SHOW FILTERED ACCOUNT BREAKDOWN"',
+    '"HIDE FILTERED ACCOUNT BREAKDOWN"',
     "providerPane.showActivityBreakdown=",
     "!providerPane.showActivityBreakdown",
     "providerPane.filteredActivity.accountBreakdown.length>0",

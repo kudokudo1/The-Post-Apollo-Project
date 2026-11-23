@@ -1038,11 +1038,14 @@ PanelWindow {
 
                 ActionButton {
                     id: reasoningCoffeeButton
-                    x: 0
+                    // Inset the red close state INSIDE the slider's own
+                    // 40px frame/38px top cap. The surround is part of the
+                    // existing SelectorSlider, not another floating row.
+                    x: root.reasoningRailExpanded ? 4 : 0
                     y: root.reasoningRailExpanded
-                       ? 0 : Math.max(0, parent.height - height)
-                    width: 40
-                    height: root.reasoningRailExpanded ? 38 : 40
+                       ? 4 : Math.max(0, parent.height - height)
+                    width: root.reasoningRailExpanded ? 32 : 40
+                    height: root.reasoningRailExpanded ? 30 : 40
                     z: 40
                     radius: 0
                     acceptedButtons: Qt.LeftButton
@@ -1070,29 +1073,30 @@ PanelWindow {
                         ? Colors.red : Colors.magenta
                     idleForegroundColor: accentColor
                     hoverForegroundColor: root.reasoningRailExpanded
-                        ? Colors.red : Colors.orange
+                        ? Colors.red : root.activeTree.gradientAccentColor
                     pressedForegroundColor: Colors.black
                     idleBorderColor: accentColor
                     hoverBorderColor: root.reasoningRailExpanded
-                        ? Colors.red : Colors.orange
+                        ? Colors.red : root.activeTree.gradientAccentColor
                     pressedBorderColor: root.reasoningRailExpanded
                         ? Colors.black : Colors.magenta
                     idleContentGlowColor: root.reasoningRailExpanded
                         ? Colors.red : root.activeTree.spiritualIdleGlowColor
                     hoverContentGlowColor: root.reasoningRailExpanded
-                        ? Colors.red : Colors.orange
+                        ? Colors.red : root.activeTree.gradientAccentColor
                     pressedContentGlowColor: root.reasoningRailExpanded
                         ? Colors.red : Colors.magenta
                     idleSoftGlowColor: root.reasoningRailExpanded
                         ? Colors.red : root.activeTree.spiritualIdleGlowColor
                     hoverSoftGlowColor: root.reasoningRailExpanded
-                        ? Colors.red : Colors.orange
+                        ? Colors.red : root.activeTree.gradientAccentColor
                     pressedSoftGlowColor: root.reasoningRailExpanded
                         ? Colors.red : Colors.magenta
                     softGlowEnabled: true
                     wideGlowEnabled: root.reasoningRailExpanded
                     idleWideGlowColor: Colors.red
-                    hoverWideGlowColor: Colors.red
+                    hoverWideGlowColor: root.reasoningRailExpanded
+                        ? Colors.red : root.activeTree.gradientAccentColor
                     pressedWideGlowColor: Colors.red
                     // Source the larger centered cup, not the entire
                     // ornament box. Stars remain plain white.
@@ -1100,58 +1104,112 @@ PanelWindow {
                     contentGlowRadius: 7
                     contentGlowSamples: 9
 
-                    // Fixed 40px optical cluster: cup occupies the center
-                    // 30px, stars flank it symmetrically. The gradient mask
-                    // now supports true centered glyph shaping.
+                    // Four physically separate white ornaments. Previously
+                    // the top/bottom combining marks were inside the gradient
+                    // coffee glyph and inherited its Tree/red coloring.
+                    // Close-button press uses black for ALL ornaments and
+                    // for the cup against the standard red pressed fill.
                     Item {
                         id: coffeeGlyph
                         anchors.centerIn: parent
-                        width: 40
-                        height: 36
+                        width: root.reasoningRailExpanded ? 30 : 36
+                        height: root.reasoningRailExpanded ? 28 : 34
+                        readonly property color starInk:
+                            root.reasoningRailExpanded && reasoningCoffeeButton.pressed
+                                ? Colors.black : Colors.white
 
-                        GohuText {
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 8
-                            height: parent.height
-                            text: "⊹"
-                            textFormat: Text.PlainText
-                            font.pixelSize: 11
-                            color: Colors.white
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                        // The cup is the only gradient-filled text.
                         ForestGradientName {
                             id: coffeeGradientGlyph
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 30
+                            anchors.centerIn: parent
+                            width: 29
                             height: parent.height
-                            text: "☕︎๋࣭"
+                            text: "☕︎"
                             gradientText: text
                             pixelSize: 26
                             bold: false
                             horizontalAlignment: Text.AlignHCenter
                             baseColor: root.reasoningRailExpanded
-                                ? Colors.red : root.activeTree.identityColor
+                                ? (reasoningCoffeeButton.pressed
+                                    ? Colors.black : Colors.red)
+                                : root.activeTree.identityColor
                             accentColor: root.reasoningRailExpanded
-                                ? Colors.red : root.activeTree.gradientAccentColor
+                                ? (reasoningCoffeeButton.pressed
+                                    ? Colors.black : Colors.red)
+                                : root.activeTree.gradientAccentColor
                             accentTopRight: root.activeTree.gradientTopRight
                         }
                         GohuText {
-                            anchors.right: parent.right
+                            id: coffeeLeftStar
+                            anchors.left: parent.left
+                            anchors.leftMargin: 2
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 8
-                            height: parent.height
-                            text: "⭑"
+                            width: 7
+                            height: 11
+                            text: "⊹"
                             textFormat: Text.PlainText
                             font.pixelSize: 11
-                            color: Colors.white
+                            color: coffeeGlyph.starInk
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        GohuText {
+                            id: coffeeRightStar
+                            anchors.right: parent.right
+                            anchors.rightMargin: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 7
+                            height: 11
+                            text: "⭑"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 10
+                            color: coffeeGlyph.starInk
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        GohuText {
+                            id: coffeeTopStar
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            // Move the top mark one pixel higher.
+                            y: -1
+                            width: 8
+                            height: 10
+                            text: "✦"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 9
+                            color: coffeeGlyph.starInk
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        GohuText {
+                            id: coffeeBottomRightStar
+                            anchors.right: parent.right
+                            anchors.rightMargin: 5
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 0
+                            width: 8
+                            height: 8
+                            text: "⋆"
+                            textFormat: Text.PlainText
+                            font.pixelSize: 9
+                            color: coffeeGlyph.starInk
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
                     }
 
+                    Behavior on x {
+                        NumberAnimation {
+                            duration: 170
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                    Behavior on width {
+                        NumberAnimation {
+                            duration: 170
+                            easing.type: Easing.OutQuad
+                        }
+                    }
                     Behavior on y {
                         NumberAnimation {
                             duration: 170
@@ -1175,7 +1233,11 @@ PanelWindow {
                     baseColor: root.activeTree.identityColor
                     accentColor: root.activeTree.gradientAccentColor
                     accentTopRight: root.activeTree.gradientTopRight
+                    // On compact hover, expose ActionButton's solid Tree
+                    // gradient-accent border. Idle keeps the original ring.
                     visible: !root.reasoningRailExpanded
+                        && !reasoningCoffeeButton.hovered
+                        && !reasoningCoffeeButton.pressed
                     z: 41
                 }
 

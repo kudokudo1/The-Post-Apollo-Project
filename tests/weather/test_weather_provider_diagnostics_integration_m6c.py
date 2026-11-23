@@ -53,7 +53,9 @@ for token in (
 ):
     assert token in shared_popup, token
 for token in ('ActionButton {', "˖", "⚕๋࣭", "⭑",
-              'labelItem.textFormat: Text.StyledText',
+              'id: diagnosticsLeftStar', 'id: diagnosticsMedicalSymbol',
+              'id: diagnosticsRightStar', 'accentColor: Colors.orange',
+              'contentGlowSource: diagnosticsMedicalSymbol',
               'signal toggleRequested()', 'onLeftClicked:'):
     assert token in shared_button, token
 for forbidden in ('Process {','Timer {','FileView {','curl','Qt.openUrlExternally',

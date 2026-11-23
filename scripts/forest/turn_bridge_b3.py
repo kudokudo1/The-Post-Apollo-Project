@@ -21,6 +21,10 @@ from ollama_chat_transport import (
     MIN_CONTEXT, MAX_CONTEXT, MAX_OUTPUT_TOKENS,
 )
 from ollama_inventory import InventoryFailure, _target
+from local_terminal_outbox_b4f import (
+    append_terminal_in_writer_transaction, require_local_outbox,
+    OutboxRefusal,
+)
 from session_journal_v0 import (
     ForestSessionJournal, JournalRefusal, MAX_BODY, MAX_MESSAGES_PER_SESSION,
     _key, _text, _time, _write,
@@ -91,11 +95,19 @@ class ForestTurnBridge:
 
     def __init__(self, journal: ForestSessionJournal, *,
                  clock_ms: Callable[[], int],
-                 streamer: Callable = stream_chat):
+                 streamer: Callable = stream_chat,
+                 synthetic_terminal_outbox: bool = False):
         if not isinstance(journal, ForestSessionJournal):
             raise BridgeRefusal("INVALID_JOURNAL")
-        if not callable(clock_ms) or not callable(streamer):
+        if (not callable(clock_ms) or not callable(streamer)
+                or type(synthetic_terminal_outbox) is not bool):
             raise BridgeRefusal("INVALID_DEPENDENCY")
+        self._synthetic_terminal_outbox = synthetic_terminal_outbox
+        if synthetic_terminal_outbox:
+            try:
+                require_local_outbox(journal.db)
+            except OutboxRefusal as exc:
+                raise BridgeRefusal("LOCAL_OUTBOX_UNAVAILABLE") from exc
         self.journal = journal
         self.db = journal.db
         self.clock_ms = clock_ms
@@ -279,6 +291,15 @@ class ForestTurnBridge:
             ).rowcount
             if updated != 1:
                 raise BridgeRefusal("ATTEMPT_NOT_RESERVED")
+            # B4f optional *synthetic* outbox: in the SAME transaction
+            # as the assistant INSERT, revision and attempt COMMITTED.
+            # A failed event INSERT rolls back all those writes.
+            if self._synthetic_terminal_outbox:
+                try:
+                    append_terminal_in_writer_transaction(
+                        self.db, attempt_id, "COMMITTED")
+                except OutboxRefusal as exc:
+                    raise BridgeRefusal("LOCAL_OUTBOX_INTEGRITY_HOLD") from exc
         return {"event": "COMMITTED", "revision": revision + 1,
                 "turn_id": reply_turn_id, "ordinal": ordinal,
                 "provider": "ollama", "model": model, "text": answer}
@@ -286,11 +307,29 @@ class ForestTurnBridge:
     def _abort(self, attempt_id: str) -> None:
         # A committed turn stays committed; no retry can reuse this user turn.
         with _write(self.db):
-            self.db.execute(
-                "UPDATE forest_attempts_b3 SET status='ABORTED' "
-                "WHERE attempt_id=? AND status='RESERVED'",
-                (attempt_id,),
-            )
+            if self._synthetic_terminal_outbox:
+                now = _time(self.clock_ms())
+                updated = self.db.execute(
+                    "UPDATE forest_attempts_b3 "
+                    "SET status='ABORTED',updated_at_ms=? "
+                    "WHERE attempt_id=? AND status='RESERVED' "
+                    "AND created_at_ms<=?",
+                    (now, attempt_id, now),
+                ).rowcount
+                if updated == 1:
+                    # This local ABORT is a positive durable transition,
+                    # not proof that remote C5 acknowledged noncommit.
+                    try:
+                        append_terminal_in_writer_transaction(
+                            self.db, attempt_id, "ABORTED")
+                    except OutboxRefusal as exc:
+                        raise BridgeRefusal("LOCAL_OUTBOX_INTEGRITY_HOLD") from exc
+            else:
+                self.db.execute(
+                    "UPDATE forest_attempts_b3 SET status='ABORTED' "
+                    "WHERE attempt_id=? AND status='RESERVED'",
+                    (attempt_id,),
+                )
 
     def exchange(self, *, owner: str, session_id: str,
                  expected_revision: int, model: str,

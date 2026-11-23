@@ -18,6 +18,17 @@ Rectangle {
     property string footnote: "READ ONLY // NO EXTRA FETCHES FROM THIS PANEL."
     property string ageHeading: "LAST PROVIDER SUCCESS // "
 
+    // A deferred gutter update avoids a binding cycle:
+    // column width -> wrapped height -> scrollbar visibility -> column width.
+    // Reserve width only for a genuinely overflowing content viewport.
+    property bool railSpaceReserved: false
+    function updateRailSpace() {
+        const needsRail = diagnosticsScroll.contentHeight
+                          > diagnosticsScroll.height + diagnosticsRail.scrollThreshold;
+        if (railSpaceReserved !== needsRail)
+            railSpaceReserved = needsRail;
+    }
+
     signal closeRequested()
 
     // Fully opaque local backing. The host separately dims/blocks the work
@@ -75,51 +86,80 @@ Rectangle {
         return Colors.red;
     }
 
+    // Header and canonical close are siblings ABOVE the Flickable. They
+    // remain pinned while the service rows and reason text scroll below.
+    Item {
+        id: diagnosticsPinnedHeader
+        z: 4
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: 8
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        height: 49
+
+        Row {
+            id: diagnosticsHeaderRow
+            anchors.top: parent.top
+            width: parent.width
+            height: 34
+            spacing: 8
+
+            GohuText {
+                width: Math.max(0, parent.width - diagnosticsCloseButton.width
+                                   - parent.spacing)
+                anchors.verticalCenter: parent.verticalCenter
+                text: diagnosticsPane.heading
+                font.pixelSize: 12
+                color: Colors.magenta
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+            }
+            CloseButton {
+                id: diagnosticsCloseButton
+                width: 34
+                onCloseRequested: diagnosticsPane.closeRequested()
+            }
+        }
+
+        Rectangle {
+            id: diagnosticsPinnedDivider
+            anchors.top: diagnosticsHeaderRow.bottom
+            anchors.topMargin: 8
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 2
+            color: Colors.cyan
+        }
+    }
+
     Flickable {
         id: diagnosticsScroll
         z: 1
-        anchors.fill: parent
+        anchors.top: diagnosticsPinnedHeader.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottomMargin: 4
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
         contentHeight: Math.max(height, detailBody.y + detailBody.implicitHeight + 16)
 
+        // Schedule after layout settles. No polling, timer, and no direct
+        // rail.scrollable -> column width -> contentHeight binding cycle.
+        onContentHeightChanged: Qt.callLater(diagnosticsPane.updateRailSpace)
+        onHeightChanged: Qt.callLater(diagnosticsPane.updateRailSpace)
+        Component.onCompleted: Qt.callLater(diagnosticsPane.updateRailSpace)
+
         Column {
             id: detailBody
             x: 12
-            y: 12
-            // Keep the complete right-hand 16px star rail plus a clean gap
-            // outside text and service-row borders, even after resizing.
-            width: Math.max(0, diagnosticsScroll.width - 44)
+            y: 10
+            width: Math.max(0, diagnosticsScroll.width
+                - (diagnosticsPane.railSpaceReserved ? 44 : 24))
             spacing: 11
-
-            Row {
-                width: parent.width
-                height: 34
-                spacing: 8
-
-                GohuText {
-                    width: Math.max(0, parent.width - 44)
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: diagnosticsPane.heading
-                    font.pixelSize: 12
-                    color: Colors.magenta
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                }
-                // Use the canonical ×: same red glyph, border, three glow
-                // planes, and pointer/keyboard behavior as other menus.
-                CloseButton {
-                    width: 34
-                    onCloseRequested: diagnosticsPane.closeRequested()
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 2
-                color: Colors.cyan
-            }
 
             GohuText {
                 width: parent.width
@@ -233,9 +273,9 @@ Rectangle {
         geometryHost: diagnosticsPane
         geometryMode: "box"
         handleStyle: "star"
-        // The title, × and cyan divider occupy the header. Do not draw
-        // the star over the close target or let the rail touch the frame.
-        boxTopInset: 68
+        // The fixed sibling header bounds the rail's usable box. Reserve
+        // only a modest gap BELOW its divider, never header/× height twice.
+        boxTopInset: 7
         boxBottomInset: 12
         rightInset: 8
         z: 3

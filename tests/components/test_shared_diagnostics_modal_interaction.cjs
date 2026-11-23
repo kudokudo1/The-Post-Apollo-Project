@@ -40,14 +40,57 @@ for (const key of [
         "diagnostic glow differs from shared arrow for " + key);
 }
 
-assert.match(toggle, /˖/);
-assert.match(toggle, /⚕๋࣭/);
-assert.match(toggle, /⭑/);
-assert.match(toggle, /labelItem\.textFormat:\s*Text\.StyledText/);
+// The composite shares a centered Row but paints each glyph separately.
+// White stars must never inherit the medical glyph's hover or pressed color.
+assert.match(toggle, /id:\s*diagnosticsArtwork[\s\S]*?anchors\.centerIn:\s*parent/);
+assert.match(toggle, /id:\s*diagnosticsSymbols[\s\S]*?spacing:\s*-2/);
+function glyphBody(id) {
+    const start = toggle.indexOf("id: " + id);
+    assert.ok(start >= 0, "missing composite glyph " + id);
+    const end = toggle.indexOf("\n            }", start);
+    assert.ok(end > start);
+    return toggle.slice(start, end);
+}
+const left = glyphBody("diagnosticsLeftStar");
+const medical = glyphBody("diagnosticsMedicalSymbol");
+const right = glyphBody("diagnosticsRightStar");
+assert.match(left, /text:\s*"˖"/);
+assert.match(medical, /text:\s*"⚕๋࣭"/);
+assert.match(right, /text:\s*"⭑"/);
+for (const part of [left,right]) {
+    assert.match(part, /color:\s*Colors\.white/);
+    assert.doesNotMatch(part, /diagnosticButton\.foregroundColor|accentColor/);
+}
+assert.match(medical, /color:\s*diagnosticButton\.foregroundColor/);
+assert.match(toggle, /contentGlowSource:\s*diagnosticsMedicalSymbol/);
+assert.match(toggle, /label:\s*""/);
+assert.doesNotMatch(toggle, /Text\.StyledText|<font/);
 assert.match(toggle, /selected:\s*diagnosticsOpen/);
-assert.equal((toggle.match(/Colors\.white/g) || []).length, 2,
-    "both decorated stars must be white");
-assert.doesNotMatch(toggle, /label:\s*diagnosticsOpen\s*\?\s*"BACK"/);
+assert.equal((toggle.match(/color:\s*Colors\.white/g) || []).length, 2,
+    "both decorative stars keep white paint in all button states");
+
+// Downward ResizeButton's semantic accent is orange. Its yellow hover
+// surface must not be paired with an invisible yellow medical glyph.
+// Check actual source color recipes, not only numeric glow intensity.
+assert.match(resize, /property color decreaseAccentColor:\s*Colors\.orange/);
+assert.match(toggle, /accentColor:\s*Colors\.orange/);
+for (const key of [
+    "idleFillColor","hoverFillColor","pressedFillColor","selectedFillColor",
+    "idleForegroundColor","hoverForegroundColor","pressedForegroundColor",
+    "selectedForegroundColor","idleBorderColor","hoverBorderColor",
+    "pressedBorderColor","selectedBorderColor","idleContentGlowColor",
+    "hoverContentGlowColor","pressedContentGlowColor",
+    "selectedContentGlowColor","idleSoftGlowColor","hoverSoftGlowColor",
+    "pressedSoftGlowColor","selectedSoftGlowColor","idleWideGlowColor",
+    "hoverWideGlowColor","pressedWideGlowColor","selectedWideGlowColor"
+]) {
+    const re = new RegExp("^\\s*" + key + ":\\s*([^\\n]+)", "m");
+    const expected = resize.match(re);
+    const actual = toggle.match(re);
+    assert.ok(expected && actual, "missing down-arrow color recipe " + key);
+    assert.equal(actual[1].trim(),expected[1].trim(),
+        "diagnostics does not match down-arrow state " + key);
+}
 
 assert.match(popup, /id:\s*diagnosticsPointerShield/);
 assert.match(popup, /id:\s*diagnosticsWheelContainment/);

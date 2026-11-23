@@ -373,6 +373,8 @@ Item {
                     &&manager.review.ok&&manager.review.accounts.length>=2
                 onLeftClicked: {
                     manager.manualTransferOpen=!manager.manualTransferOpen;
+                    if(manager.manualTransferOpen&&manager.manualTransferDate==="")
+                        manager.manualTransferDate=Qt.formatDate(new Date(),"yyyy-MM-dd");
                     manager.manualTransferArmed=false;
                     manager.transferRemoveArmedId="";
                 }
@@ -395,7 +397,8 @@ Item {
                     width: parent.width
                     height: 29
                     label: manager.review.accounts.length>manager.transferFromIndex
-                        ? "FROM // "+manager.review.accounts[manager.transferFromIndex].nickname
+                        ? "FROM // "+manager.review.accounts[manager.transferFromIndex].providerName
+                            +" // "+manager.review.accounts[manager.transferFromIndex].nickname
                         : "FROM // SELECT ACCOUNT"
                     labelPixelSize: 9
                     accentColor: Colors.orange
@@ -408,7 +411,8 @@ Item {
                     width: parent.width
                     height: 29
                     label: manager.review.accounts.length>manager.transferToIndex
-                        ? "TO // "+manager.review.accounts[manager.transferToIndex].nickname
+                        ? "TO // "+manager.review.accounts[manager.transferToIndex].providerName
+                            +" // "+manager.review.accounts[manager.transferToIndex].nickname
                         : "TO // SELECT ACCOUNT"
                     labelPixelSize: 9
                     accentColor: Colors.cyan
@@ -524,7 +528,10 @@ Item {
                             width: parent.width
                             text: modelData.date+" // "
                                 +Accounts.money(modelData.amountCents)
-                                +" // "+modelData.fromLabel+" TO "+modelData.toLabel
+                                +" // "+modelData.fromProviderId.toUpperCase()
+                                +" / "+modelData.fromLabel
+                                +" TO "+modelData.toProviderId.toUpperCase()
+                                +" / "+modelData.toLabel
                             font.pixelSize: 9
                             color: Colors.cyan
                             textFormat: Text.PlainText

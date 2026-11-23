@@ -8,6 +8,9 @@ ShellRoot {
     id: root
     property bool sent: false
     property bool checkedReady: false
+    property bool reviewStarted: false
+    property bool casesLoaded: false
+    property bool draftPrepared: false
     property bool submittedInvalidSource: false
     property bool finished: false
     property int ticks: 0
@@ -148,11 +151,67 @@ ShellRoot {
                 }
                 root.checkedReady = true;
                 console.log("M7_NATIVE_CHECK // CANDIDATES_FROM_NODE_VALIDATED");
-                // Changing the issuer must invalidate a cached Apple preview.
-                secMock.selectedCik = "0000789019";
+                // M9: review one candidate in the ACTUAL existing case editor.
+                root.reviewStarted = host.beginReview(data.candidates[0].key);
+                if (!root.reviewStarted || !host.loadCases()) {
+                    root.fail("M9_REVIEW_OR_READ_CASES_UNAVAILABLE");
+                    return;
+                }
                 return;
             }
-            if (root.checkedReady && host.previewState === "idle") {
+            if (root.reviewStarted && !root.casesLoaded) {
+                if (host.caseReadState === "failed") {
+                    root.fail("M9_LOCAL_CASE_READ_FAILED");
+                    return;
+                }
+                if (host.caseReadState === "ready") {
+                    if (host.editorCaseId !== "synthetic-case"
+                            || host.writerEnabled) {
+                        root.fail("M9_CASE_SELECTION_OR_WRITE_HOLD_FAILED");
+                        return;
+                    }
+                    root.casesLoaded = true;
+                    if (!host.prepareDraft()) {
+                        root.fail("M9_PREPARE_DRAFT_DISPATCH_FAILED");
+                        return;
+                    }
+                    return;
+                }
+            }
+            if (root.casesLoaded && !root.draftPrepared) {
+                if (host.draftState === "failed") {
+                    root.fail("M9_DRAFT_REFUSED // " + host.draftMessage);
+                    return;
+                }
+                if (host.draftState === "ready") {
+                    const prepared = host.draftResult;
+                    if (!prepared || !prepared.readOnly || !prepared.preparedOnly
+                            || prepared.caseRevision !== 7
+                            || prepared.investigationId !== "synthetic-case"
+                            || prepared.fields.source !== "manual"
+                            || prepared.fields.reviewed !== false
+                            || prepared.fields.url !== host.editorDraftUrl
+                            || prepared.fields.title !== host.editorDraftTitle
+                            || prepared.fields.summary !== host.editorDraftSummary
+                            || host.writerEnabled) {
+                        root.fail("M9_UNSAVED_EDITOR_PREFILL_INVALID");
+                        return;
+                    }
+                    console.log("M9_NATIVE_CHECK // EXISTING_CASE_EDITOR_PREFILLED_UNSAVED");
+                    root.draftPrepared = true;
+                    // Source changes MUST invalidate both candidate and draft.
+                    secMock.selectedCik = "0000789019";
+                    return;
+                }
+            }
+            if (root.draftPrepared && host.previewState === "idle") {
+                if (host.reviewOpen || host.draftResult !== null
+                        || host.editorDraftUrl !== "") {
+                    root.fail("M9_STALE_DRAFT_NOT_INVALIDATED");
+                    return;
+                }
+            }
+            if (root.draftPrepared && host.previewState === "idle") {
                 if (host.previewResult !== null) {
                     root.fail("STALE_SOURCE_PREVIEW_NOT_CLEARED");
                     return;

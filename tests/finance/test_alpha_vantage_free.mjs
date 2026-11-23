@@ -116,7 +116,7 @@ for(let i=0;i<100;i++){
   packed[date]={"4. close":String(i+1)};
 }
 const truncated=normalizeDaily({"Meta Data":{"2. Symbol":symbol},
-  "Time Series (Daily)":packed},symbol,"EUR","2026-01-01",today,"now");
+  "Time Series (Daily)":packed},symbol,"EUR","2026-06-01",today,"now");
 assert.equal(truncated.compactMayBeTruncated,true);
 assert.equal(truncated.returnedBars,100);
 assert.throws(()=>normalizeDaily({"Meta Data":{"2. Symbol":other},

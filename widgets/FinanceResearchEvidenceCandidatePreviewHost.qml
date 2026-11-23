@@ -12,6 +12,12 @@ Item {
     property var crawlFeed: null
     property bool reviewOpen: false
     property string reviewKey: ""
+    property var scratchCase: null // volatile QML memory; never persisted
+    property int scratchCounter: 0
+    readonly property bool scratchSelected: scratchCase !== null
+        && caseEditor.selectedId === scratchCase.id
+    readonly property int selectedRevision: scratchSelected ? 0
+        : readService.revision
 
     readonly property var reviewCandidate: {
         const rows = previewService.candidatePreview
@@ -32,7 +38,50 @@ Item {
     readonly property string editorDraftUrl: caseEditor.draftEvidenceUrl
     readonly property string editorDraftSummary: caseEditor.draftEvidenceSummary
     readonly property bool writerEnabled: caseEditor.writeEnabled
+    readonly property string scratchCaseId: scratchCase ? scratchCase.id : ""
+    readonly property string scratchTitle: scratchCase ? scratchCase.title : ""
+    readonly property string scratchQuestion: scratchCase ? scratchCase.question : ""
     function loadCases() { return readService.load(); }
+
+    function discardScratch() {
+        if (scratchCase === null) return;
+        draftService.clear();
+        resetEditorDraft();
+        scratchCase = null;
+        caseEditor.draftTitle = "";
+        caseEditor.draftQuestion = "";
+        caseEditor.showNewForm = false;
+    }
+    function createScratch(title, question) {
+        if (!active || !reviewOpen || reviewCandidate === null
+                || scratchCase !== null
+                || typeof title !== "string" || typeof question !== "string"
+                || title !== title.trim() || question !== question.trim()
+                || title.length < 1 || title.length > 160
+                || question.length < 1 || question.length > 1000
+                || readService.investigations.length >= 50)
+            return false;
+        const timestamp = new Date().toISOString();
+        scratchCounter++;
+        const id = "scratch_" + Date.now().toString(36)
+            + "_" + scratchCounter.toString(36);
+        if (readService.investigations.some(function(item) {
+            return item.id === id;
+        })) return false;
+        // Identical, bounded M1 investigation shape, but QML-owned only.
+        const item = {
+            schemaVersion: 1, id: id, title: title, question: question,
+            createdAt: timestamp, updatedAt: timestamp, evidence: []
+        };
+        scratchCase = item;
+        caseEditor.selectedId = id;
+        caseEditor.showNewForm = false;
+        caseEditor.draftTitle = "";
+        caseEditor.draftQuestion = "";
+        draftService.clear();
+        resetEditorDraft();
+        return true;
+    }
 
     function resetEditorDraft() {
         caseEditor.draftSource = "manual";
@@ -43,6 +92,7 @@ Item {
     function closeReview() {
         reviewOpen = false;
         reviewKey = "";
+        discardScratch();
         draftService.clear();
         resetEditorDraft();
     }
@@ -68,17 +118,17 @@ Item {
     }
     function prepareDraft() {
         if (!active || !reviewOpen || !reviewCandidate
-                || readService.state !== "ready"
+                || (!scratchSelected && readService.state !== "ready")
                 || !caseEditor.selectedInvestigation)
             return false;
         return draftService.prepare(reviewCandidate,
-            caseEditor.selectedInvestigation,readService.revision);
+            caseEditor.selectedInvestigation,selectedRevision);
     }
     function applyPreparedDraft(data) {
         if (!active || !reviewOpen || !reviewCandidate || !data
-                || readService.state !== "ready"
+                || (!scratchSelected && readService.state !== "ready")
                 || data.investigationId !== caseEditor.selectedId
-                || data.caseRevision !== readService.revision
+                || data.caseRevision !== selectedRevision
                 || data.candidateKey !== reviewKey
                 || !data.fields || data.fields.url !== reviewCandidate.url
                 || data.fields.source !== "manual" || data.fields.reviewed !== false)
@@ -191,7 +241,8 @@ Item {
                 labelPixelSize: 9
                 accentColor: Colors.cyan
                 available: host.active && host.reviewCandidate !== null
-                    && readService.state === "ready"
+                    && (host.scratchSelected
+                        || readService.state === "ready")
                     && caseEditor.selectedInvestigation !== null
                     && !draftService.loading
                 onLeftClicked: host.prepareDraft()
@@ -219,10 +270,21 @@ Item {
         anchors.topMargin: 4
         controllerConnected: host.active && host.reviewOpen
         writeEnabled: false // HARD HOLD: no M2 writer authorization
+        scratchEnabled: true
+        scratchId: host.scratchCaseId
         loadState: readService.state
-        statusMessage: readService.message
-        investigations: readService.investigations
+        statusMessage: host.scratchCase !== null
+            && readService.state !== "failed"
+            ? "SCRATCH CASE // MEMORY ONLY // NEVER SAVED"
+            : readService.message
+        investigations: host.scratchCase
+            ? readService.investigations.concat([host.scratchCase])
+            : readService.investigations
         onLoadRequested: readService.load()
+        onCreateScratchRequested: function(title, question) {
+            host.createScratch(title, question);
+        }
+        onDiscardScratchRequested: host.discardScratch()
         onSelectedIdChanged: {
             draftService.clear();
         }

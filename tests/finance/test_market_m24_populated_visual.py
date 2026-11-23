@@ -34,6 +34,7 @@ try:
     from PySide6.QtCore import QObject, QMetaObject, Q_ARG, QUrl
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtQml import QQmlComponent, QQmlEngine
+    from PySide6.QtQuick import QQuickItem
 except ImportError as exc:
     raise SystemExit(
         "M24 requires existing PySide6 (Qt6). No package installed. "
@@ -225,7 +226,7 @@ def mount(app, temp, snapshots):
                            "; ".join(str(x) for x in component.errors()))
     for case, fixture in snapshots.items():
         assert root.setProperty(case.lower() + "Payload", payload(fixture)), case
-    pane = root.findChild(QObject, "marketQuotaRealPane")
+    pane = root.findChild(QQuickItem, "marketQuotaRealPane")
     service = root.findChild(QObject, "marketQuotaReaderService")
     refresh = root.findChild(QObject, "marketQuotaRefreshButton")
     back = root.findChild(QObject, "marketQuotaBackButton")

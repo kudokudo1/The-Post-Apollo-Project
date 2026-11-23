@@ -49,6 +49,20 @@ EXPECTED_NATIVE = {
     "services/hospital/HospitalRoomBinService.qml": frozenset(("read",)),
     "services/hospital/HospitalDoctorService.qml": frozenset(("read",)),
 }
+# High-impact desktop operations that must remain visible until their
+# owning native authorizations and caller routing are independently approved.
+LEGACY_OPERATION_WITNESSES = {
+    "services/hospital/HospitalRoomConversationAdapter.qml":
+        ('"session-create"',),
+    "services/hospital/HospitalWorkerAttachmentActionService.qml":
+        ('"session-attach"',),
+    "services/hospital/HospitalDoctorNameService.qml":
+        ('"doctor-name-set"',),
+    "services/hospital/HospitalRoomNameService.qml":
+        ('"room-name-set"',),
+    "services/hospital/HospitalWorkforceRoomCreateService.qml":
+        ('"room-bind"', '"room-name-set"'),
+}
 APP_REQUIRED = frozenset((
     "services/hospital/native/hospital_room_request_client.c",
     "services/hospital/native/hospital_room_read_client.py",
@@ -197,6 +211,9 @@ def audit_texts(application: dict[str, str], px_source: dict[str, str]):
         hold("UNRECONCILED_LEGACY_DESKTOP_PX_ENTRYPOINTS")
     if native != EXPECTED_NATIVE:
         hold("UNRECONCILED_NATIVE_HOSPITAL_UI_ENTRYPOINTS")
+    for path, tokens in LEGACY_OPERATION_WITNESSES.items():
+        if any(token not in application[path] for token in tokens):
+            hold("KNOWN_LEGACY_SESSION_OR_METADATA_ROUTE_CHANGED")
     for path, source in ui_sources.items():
         if any(token in source for token in DIRECT_UI_TOKENS):
             hold("DIRECT_PRIVILEGED_HOSPITAL_UI_ROUTE")

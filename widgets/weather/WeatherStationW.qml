@@ -1316,10 +1316,18 @@ PanelWindow {
                 enabled: visible
                 width: Math.min(478, parent.width - 24)
                 height: Math.min(460, parent.height - 24)
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.topMargin: 12
-                anchors.rightMargin: 12
+                // Follow the actual diagnostic header button and clamp the
+                // popup within Weather's live content viewport.
+                readonly property point dropFromButton:
+                    providerDiagnosticsButton.mapToItem(parent,
+                        providerDiagnosticsButton.width - width,
+                        providerDiagnosticsButton.height + 8)
+                x: Math.max(12, Math.min(
+                       Math.max(12, parent.width - width - 12),
+                       dropFromButton.x))
+                y: Math.max(12, Math.min(
+                       Math.max(12, parent.height - height - 12),
+                       dropFromButton.y))
                 snapshot: weatherStation.weatherDiagnostics
                 onCloseRequested: weatherStation.providerDiagnosticsOpen = false
             }

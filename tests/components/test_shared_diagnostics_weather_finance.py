@@ -40,18 +40,23 @@ for marker in (
 ):
     assert marker in button, marker
 assert 'label: diagnosticsOpen ? "BACK" : "DIAG"' not in button
-assert button.count("color: Colors.white") == 3
+assert button.count("color: diagnosticButton.diagnosticsOpen ? Colors.magenta : Colors.white") == 3
 assert "Text.StyledText" not in button
 assert "labelItem.textFormat" not in button
 assert "color: diagnosticButton.foregroundColor" in button
 assert button.count("textFormat: Text.PlainText") == 4
 assert 'text: "⚕๋࣭"' not in button
 assert "hoverFillColor: hoverSurfaceColor" in button
-assert "selectedFillColor: hoverSurfaceColor" in button
+assert "selectedFillColor: Colors.yellow" in button
+assert "selectedForegroundColor: Colors.magenta" in button
+assert "selectedBorderColor: Colors.magenta" in button
+assert "selectedContentGlowColor: Colors.magenta" in button
+assert "selectedSoftGlowColor: Colors.magenta" in button
+assert "selectedWideGlowColor: Colors.magenta" in button
 assert "hoverForegroundColor: accentColor" in button
 assert "hoverBorderColor: accentColor" in button
-assert "selectedForegroundColor: accentColor" in button
-assert "selectedContentGlowColor: accentColor" in button
+assert "keyboardSelectedForegroundColor: accentColor" in button
+assert "keyboardSelectedContentGlowColor: accentColor" in button
 
 # Weather's M6c pane retains its real source policy and overlay ownership.
 for marker in (
@@ -84,8 +89,14 @@ for marker in (
     "blocking: true", "wheel.accepted = true;",
     'color: "#110319"', "opacity: 1.0",
     "mountingParent: diagnosticsPane", "geometryHost: diagnosticsPane",
-    'geometryMode: "box"', 'boxTopInset: 68',
+    'geometryMode: "box"', 'boxTopInset: 7',
     'boxBottomInset: 12', 'rightInset: 8',
+    'id: diagnosticsPinnedHeader', 'id: diagnosticsHeaderRow',
+    'id: diagnosticsCloseButton', 'id: diagnosticsPinnedDivider',
+    'anchors.top: diagnosticsPinnedHeader.bottom',
+    'property bool railSpaceReserved: false',
+    'Qt.callLater(diagnosticsPane.updateRailSpace)',
+    '(diagnosticsPane.railSpaceReserved ? 44 : 24)',
 ):
     assert marker in popup, marker
 
@@ -109,6 +120,10 @@ for marker in (
 assert finance.count("DiagnosticsServicePopup {") == 1
 assert finance.count("DiagnosticsDockButton {") == 1
 assert "id: financeDiagnosticsBackdrop" in finance
+assert finance.count("financeDiagnosticsButton.mapToItem(parent,") == 1
+assert "id: financeDiagnosticsPane" in finance
+assert weather.count("providerDiagnosticsButton.mapToItem(parent,") == 1
+assert "id: providerDiagnosticsPane" in weather
 assert "z: 89" in finance
 assert "color: Qt.rgba(Colors.black.r, Colors.black.g," in finance
 assert "onWheel: function(wheel) { wheel.accepted = true; }" in finance

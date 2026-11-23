@@ -115,9 +115,16 @@ function build(providerId,snapshot,sectionId) {
                 ||typeof entry.description!=="string"
                 ||!Number.isSafeInteger(entry.amountCents))
                 return {ok:false,error:"INVALID ACTIVITY SNAPSHOT"};
+            if((entry.transferId!==undefined||entry.transferSide!==undefined)
+               &&(typeof entry.transferId!=="string"
+                   ||!/^transfer-[1-9]\d*$/.test(entry.transferId)
+                   ||!["in","out"].includes(entry.transferSide)))
+                return {ok:false,error:"INVALID TRANSFER SNAPSHOT"};
             activity.push({id:entry.id,accountId:account.id,
                 accountNickname:account.nickname,date:entry.date,
-                description:entry.description,amountCents:entry.amountCents});
+                description:entry.description,amountCents:entry.amountCents,
+                transferId:entry.transferId||"",
+                transferSide:entry.transferSide||""});
         }
     }
     activity.sort(compareSessionActivity);

@@ -115,6 +115,36 @@ Item {
         detailReturnView="provider";
         return true;
     }
+    function addProviderTransaction(draft) {
+        // The Accounts pane alone owns M3 manual session mutations.
+        // A provider label is not an authenticated provider or payment capability.
+        if(view!=="provider" || providerMiniApp.sectionId!=="activity"
+           ||session.mode!=="manual" || !draft || draft.providerId!==selectedProviderId) {
+            message="MANUAL PROVIDER ACTIVITY UNAVAILABLE";
+            return false;
+        }
+        var target=session.accounts.find(function(a) {
+            return a.id===draft.accountId && a.providerId===selectedProviderId;
+        });
+        if(!target) {
+            message="ACCOUNT DOES NOT BELONG TO THIS PROVIDER";
+            return false;
+        }
+        const res=Accounts.addEntry(session,{
+            accountId:target.id,
+            date:draft.date,
+            description:draft.description,
+            amountText:draft.amountText,
+            direction:draft.direction
+        });
+        if(!res.ok) {
+            message=res.error;
+            return false;
+        }
+        session=res.state;
+        message="PROVIDER MANUAL ACTIVITY SAVED IN SESSION // NO FINANCIAL ACTION";
+        return true;
+    }
     function addTransaction() {
         const res=Accounts.addEntry(session,{
             accountId:selectedId,
@@ -446,11 +476,17 @@ Item {
                 onLeftClicked: manager.view="overview"
             }
             FinanceBankingProviderPane {
+                id: providerMiniApp
                 width: parent.width
                 providerId: manager.selectedProviderId
                 accountSnapshot: manager.review
+                feedback: manager.message
                 onAccountRequested: function(accountId) {
                     manager.showProviderAccount(accountId);
+                }
+                onManualEntryRequested: function(draft) {
+                    if(manager.addProviderTransaction(draft))
+                        providerMiniApp.clearAfterEntry();
                 }
                 onReturnToTopRequested: manager.returnToTopRequested()
             }

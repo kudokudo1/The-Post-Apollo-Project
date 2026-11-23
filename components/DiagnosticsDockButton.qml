@@ -8,73 +8,84 @@ ActionButton {
     property bool diagnosticsOpen: false
     signal toggleRequested()
 
-    // Keep the existing header footprint. Three separately painted glyphs
-    // stop rich-text fallback and tinting from coloring either white star.
-    // The slight overlap keeps the smaller left star close to the medical mark.
-    width: 59
+    // Tight optical cluster: the glyphs are separately positioned, so font
+    // advance whitespace cannot push the small left star away from the staff.
+    // Decorators are explicit WHITE Text items, including the two ornaments
+    // previously encoded as colored combining marks inside "⚕๋࣭".
+    width: 38
     height: 32
     label: ""
     Item {
         id: diagnosticsArtwork
         anchors.centerIn: parent
-        width: diagnosticsSymbols.implicitWidth
-        height: 27
+        width: 30
+        height: 26
 
-        Row {
-            id: diagnosticsSymbols
+        Text {
+            id: diagnosticsMedicalSymbol
             anchors.centerIn: parent
-            spacing: -2
+            text: "⚕"
+            textFormat: Text.PlainText
+            color: diagnosticButton.foregroundColor
+            font.pixelSize: 21
+        }
 
-            Text {
-                id: diagnosticsLeftStar
-                text: "˖"
-                textFormat: Text.PlainText
-                color: Colors.white
-                font.pixelSize: 16
-                height: diagnosticsArtwork.height
-                verticalAlignment: Text.AlignVCenter
-            }
+        Text {
+            id: diagnosticsLeftStar
+            text: "˖"
+            textFormat: Text.PlainText
+            color: Colors.white
+            font.pixelSize: 14
+            anchors.right: diagnosticsMedicalSymbol.left
+            // Pull the actual ink toward the staff despite fallback bearings.
+            anchors.rightMargin: -6
+            anchors.verticalCenter: diagnosticsMedicalSymbol.verticalCenter
+        }
 
-            Text {
-                id: diagnosticsMedicalSymbol
-                text: "⚕๋࣭"
-                textFormat: Text.PlainText
-                color: diagnosticButton.foregroundColor
-                font.pixelSize: 21
-                height: diagnosticsArtwork.height
-                verticalAlignment: Text.AlignVCenter
-            }
+        Text {
+            id: diagnosticsUpperStar
+            text: "✦"
+            textFormat: Text.PlainText
+            color: Colors.white
+            font.pixelSize: 8
+            anchors.left: diagnosticsMedicalSymbol.right
+            anchors.leftMargin: -6
+            anchors.top: diagnosticsMedicalSymbol.top
+        }
 
-            Text {
-                id: diagnosticsRightStar
-                text: "⭑"
-                textFormat: Text.PlainText
-                color: Colors.white
-                font.pixelSize: 15
-                height: diagnosticsArtwork.height
-                verticalAlignment: Text.AlignVCenter
-            }
+        Text {
+            id: diagnosticsRightStar
+            text: "⭑"
+            textFormat: Text.PlainText
+            color: Colors.white
+            font.pixelSize: 10
+            anchors.left: diagnosticsMedicalSymbol.right
+            anchors.leftMargin: -4
+            anchors.bottom: diagnosticsMedicalSymbol.bottom
+            anchors.bottomMargin: -1
         }
     }
 
-    // Sample only the medical glyph. The separate white stars should not
-    // inherit its orange/magenta shadow or change with hover/press.
+    // Reuse the existing ActionButton glow on the medical symbol alone.
+    // No duplicate glyph and no orange/yellow tint added to white stars.
     contentGlowSource: diagnosticsMedicalSymbol
     trackLabelGlowLocally: true
 
     selected: diagnosticsOpen
-    // Same semantic identity as ResizeButton's downward arrow. Hover is
-    // yellow fill with ORANGE glyph, border and all glow planes.
-    accentColor: Colors.orange
+    // Match TimeW's actual RESYNC / ReloadButton color order:
+    // YELLOW semantic icon/border/glows; ORANGE hover/selected surface.
+    property color semanticColor: Colors.yellow
+    property color hoverSurfaceColor: Colors.orange
+    accentColor: semanticColor
     acceptedButtons: Qt.LeftButton
 
-    // Match the canonical CloseButton / ResizeButton glow geometry and
-    // downward arrow colors. The two decorative stars stay white.
+    // Reuse the existing three-plane glow strengths. The icon's COLOR
+    // order follows ReloadButton, not the downward ResizeButton.
     idleFillColor: Colors.black
-    hoverFillColor: Colors.yellow
+    hoverFillColor: hoverSurfaceColor
     pressedFillColor: accentColor
-    selectedFillColor: Colors.yellow
-    keyboardSelectedFillColor: Colors.yellow
+    selectedFillColor: hoverSurfaceColor
+    keyboardSelectedFillColor: hoverSurfaceColor
 
     idleForegroundColor: accentColor
     hoverForegroundColor: accentColor

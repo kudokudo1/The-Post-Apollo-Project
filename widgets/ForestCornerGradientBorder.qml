@@ -12,8 +12,11 @@ Item {
     property bool accentTopRight: false
     property real lineWidth: 1
 
+    // Carry the idle accent farther along the top edge, about 78% of
+    // this button's width instead of the previous 43%. The ring's 1px
+    // transparent-center geometry and selected state remain untouched.
     readonly property real accentRadius:
-        Math.max(42, Math.min(100, width * 0.43))
+        Math.max(56, Math.min(160, width * 0.78))
 
     Shape {
         anchors.fill: parent

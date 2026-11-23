@@ -114,7 +114,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("baseColor: treeRow.foregroundColor", view)
         self.assertIn("accentColor: treeRow.energized", view)
         self.assertIn("accentTopRight: modelData.gradientTopRight", view)
-        self.assertIn("color: treeRow.foregroundColor", view)
+        self.assertIn("baseColor: treeRow.foregroundColor", view)
         self.assertIn("id: treeNameGlow", view)
         self.assertIn("safeSource: treeName", view)
         self.assertIn("contentGlowEnabled: false", view)
@@ -356,13 +356,18 @@ class ForestLauncherContract(unittest.TestCase):
         name = (ROOT / "widgets/ForestGradientName.qml").read_text()
 
         self.assertEqual(view.count("ForestCornerGradientBorder {"), 1)
-        self.assertEqual(view.count("ForestGradientName {"), 2)
+        self.assertEqual(view.count("ForestGradientName {"), 3)
         self.assertIn("baseColor: treeRow.foregroundColor", view)
-        self.assertEqual(view.count("accentColor: treeRow.energized"), 2)
-        self.assertEqual(view.count("? treeRow.foregroundColor : modelData.gradientAccentColor"), 2)
+        self.assertEqual(view.count("accentColor: treeRow.energized"), 3)
+        self.assertEqual(view.count("? treeRow.foregroundColor : modelData.gradientAccentColor"), 3)
         self.assertIn("accentTopRight: modelData.gradientTopRight", view)
         self.assertIn('gradientAccentColor: "#C7482F", gradientTopRight: false', view)
         self.assertIn("text: modelData.name", view)
+        self.assertIn("id: treeRole", view)
+        self.assertIn("text: modelData.role", view)
+        self.assertIn("pixelSize: 9", view)
+        self.assertIn("bold: false", view)
+        self.assertIn("height: 12", view)
         self.assertIn('text: root.activeTree.name + " // CHAT"', view)
         self.assertIn("baseColor: root.activeTree.identityColor", view)
         self.assertIn("accentColor: root.activeTree.gradientAccentColor", view)
@@ -385,6 +390,14 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("centerX: root.accentTopRight ? root.width : 0", ring)
         self.assertIn("color: root.accentColor", ring)
         self.assertIn("color: root.baseColor", ring)
+        # The previous 0.43-width glow stopped too early on the top edge.
+        # Keep an accent spanning roughly four-fifths of the button top.
+        self.assertIn("Math.max(56, Math.min(160, width * 0.78))", ring)
+        self.assertNotIn("width * 0.43", ring)
+        for button_width in (96, 128, 160):
+            new_radius = max(56, min(160, button_width * 0.78))
+            old_radius = max(42, min(100, button_width * 0.43))
+            self.assertGreater(new_radius, old_radius)
         self.assertNotIn("MouseArea {", ring)
         self.assertNotIn("Process {", ring)
         self.assertNotIn("ShaderEffect {", ring)
@@ -396,6 +409,19 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("property color openFillColor: Colors.yellow", dock)
         self.assertIn("property color openForegroundColor: Colors.magenta", dock)
         self.assertIn("property color openGlowColor: Colors.magenta", dock)
+        # Role labels use the identical idle corner accent and resolve to
+        # solid foreground ink in hover/open, without changing button fill.
+        role_block = view.split("id: treeRole", 1)[1].split(
+            "        }", 1)[0]
+        self.assertIn("text: modelData.role", role_block)
+        self.assertIn("baseColor: treeRow.foregroundColor", role_block)
+        self.assertIn("accentColor: treeRow.energized", role_block)
+        self.assertIn("? treeRow.foregroundColor : modelData.gradientAccentColor",
+                      role_block)
+        self.assertIn("accentTopRight: modelData.gradientTopRight", role_block)
+        self.assertIn("pixelSize: 9", role_block)
+        self.assertIn("bold: false", role_block)
+        self.assertIn("height: 12", role_block)
 
         # Both the button-name and the chat title use the measured GohuFont
         # glyph gradient, while the selected button still uses solid magenta.

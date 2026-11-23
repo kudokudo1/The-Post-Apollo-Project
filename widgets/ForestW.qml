@@ -517,16 +517,25 @@ PanelWindow {
                                 z: -1
                             }
                         }
-                        GohuText {
+                        // Role labels use the same measured, tree-specific
+                        // idle gradient as the Tree name. Normal DockButton
+                        // hover/open foreground replaces both colors, so
+                        // selected roles stay solid magenta on yellow.
+                        ForestGradientName {
+                            id: treeRole
                             anchors.left: parent.left
                             anchors.leftMargin: 9
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: 9
                             width: parent.width - 18
-                            elide: Text.ElideRight
+                            height: 12
                             text: modelData.role
-                            font.pixelSize: 9
-                            color: treeRow.foregroundColor
+                            pixelSize: 9
+                            bold: false
+                            baseColor: treeRow.foregroundColor
+                            accentColor: treeRow.energized
+                                ? treeRow.foregroundColor : modelData.gradientAccentColor
+                            accentTopRight: modelData.gradientTopRight
                         }
                     }
                 }

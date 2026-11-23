@@ -161,6 +161,24 @@ for needle in (
 ):
     assert needle in pane, needle
 
+# M10 lowest-available-first is only a local, stable view sort.
+for needle in (
+    'property bool lowestAvailableFirst: false',
+    'if(!lowestAvailableFirst)return matches;',
+    'return {category:category,index:index};',
+    'validA!==validB',
+    'a.index-b.index',
+    'a.category.availableCents < b.category.availableCents ? -1 : 1',
+    'function toggleLowestAvailableSort()',
+    'lowestAvailableFirst=!lowestAvailableFirst;',
+    'lowestAvailableFirst=false;',
+    'objectName: "categoryLowestAvailableAction"',
+    'label: "LOWEST AVAILABLE FIRST"',
+    'selected: categoryPane.lowestAvailableFirst',
+    'onLeftClicked: categoryPane.toggleLowestAvailableSort()',
+):
+    assert needle in pane, needle
+
 # M6 adds a separately gated service; group proposal policy remains pure.
 assert 'signal groupSaveRequested(var payload)' in pane
 assert 'FinanceCategoryGroupWriteService' not in pane

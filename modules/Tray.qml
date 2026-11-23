@@ -159,7 +159,8 @@ Rectangle {
 
                 required property var modelData
 
-                implicitWidth: 30
+                // Match Workspaces.qml's 25 × 42 delegate footprint.
+                implicitWidth: 25
                 implicitHeight: 42
 
                 color: "transparent"
@@ -179,50 +180,48 @@ Rectangle {
                         trayDock.openMenuAnchor = null;
                 }
 
-                // ===== WORKSPACE-STYLE BACKING ===================
-                // Inactive state is invisible, but kept separate from
-                // the persistent small tile just like Workspaces.qml.
+                // ===== WORKSPACE-EXACT CARD LAYERS ==============
+                // Workspaces.qml uses a transparent inactive rectangle,
+                // a dark active rectangle, and a fully transparent larger
+                // sampled backing. The tray's "active" visual follows a
+                // real open native menu or direct pointer hover, not a
+                // guessed application-window state.
+                readonly property bool cardEmphasized:
+                    trayNativeMenu.visible || trayButtonMouse.containsMouse
+
                 Rectangle {
                     id: trayActiveButtonBackground
                     anchors.centerIn: parent
                     width: parent.width
-                    height: parent.height - 4
+                    height: parent.height
                     clip: false
                     z: 0
-                    opacity: trayNativeMenu.visible ? 0.7 : 0.0
-                    color: Colors.dark
+                    opacity: 0.7
+                    color: trayButton.cardEmphasized ? Colors.dark : "transparent"
                 }
 
-                // A real small dark rectangle sits behind every app icon.
-                // The hue follows that exact icon's hover/native-menu state.
                 Rectangle {
                     id: trayButtonBackground
                     anchors.centerIn: parent
-                    width: parent.width
-                    height: parent.height - 6
+                    width: parent.width + 6
+                    height: parent.height + 5
                     clip: false
                     z: -1
                     color: Colors.dark
-                    opacity: 0.68
-                    border.width: 1
-                    border.color: trayButton.iconAccentColor
+                    opacity: 0.0
                 }
 
-                // The backing has its OWN glow underneath its rectangle,
-                // rather than deriving an unrelated halo from the icon.
                 SafeDropShadow {
                     id: trayButtonBackgroundGlow
                     anchors.fill: trayButtonBackground
                     safeSource: trayButtonBackground
-                    z: -2
+                    z: -1
                     horizontalOffset: 0
                     verticalOffset: 0
                     radius: 20
                     samples: 21
                     color: trayButton.iconAccentColor
-                    opacity: trayNativeMenu.visible ? 0.36
-                             : trayButtonMouse.containsMouse ? 0.26 : 0.16
-                    transparentBorder: true
+                    opacity: trayButton.cardEmphasized ? 0.2 : 0.0
                 }
 
                 // ===== ICON AND DUAL WORKSPACE GLOWS ============
@@ -281,8 +280,8 @@ Rectangle {
                         z: 2
                         visible: trayNativeMenu.visible
                                  || trayButtonMouse.containsMouse
-                        opacity: trayNativeMenu.visible ? 0.95
-                                 : trayButtonMouse.pressed ? 0.85 : 0.72
+                        opacity: trayButtonMouse.pressed ? 1.0
+                                 : trayButtonMouse.containsMouse ? 0.95 : 0.75
                         color: trayButton.iconAccentColor
                         transparentBorder: true
                     }

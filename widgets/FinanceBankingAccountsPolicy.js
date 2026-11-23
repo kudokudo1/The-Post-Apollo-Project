@@ -234,7 +234,9 @@ function transferPairs(state) {
             date:pair.out.date,description:pair.out.description,
             amountCents:pair.in.amountCents});
     }
-    out.sort(function(a,b){return a.transferId>b.transferId?-1:1;});
+    out.sort(function(a,b){
+        return Number(b.transferId.slice(9))-Number(a.transferId.slice(9));
+    });
     return {ok:true,rows:out,connected:false,persisted:false};
 }
 function removeManualTransfer(state,fields) {

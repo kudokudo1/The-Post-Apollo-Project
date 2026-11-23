@@ -199,3 +199,37 @@ function movingAverageRelationship(snapshot) {
         noProviderCalls:true
     };
 }
+
+// M30: arbitrary two-point historical comparison inside a single loaded RANGE.
+// A/B indices refer ONLY to provider-returned closing sessions. Date order may
+// run forward or backward; percentages always use A (pinned) as the baseline.
+// No quote requests, portfolio holdings, storage, timers or implicit endpoints.
+function comparePinnedRangeSessions(snapshot, firstIndex, secondIndex) {
+    const validated = summarizeRange(snapshot);
+    if (!validated || !Number.isInteger(firstIndex)
+            || !Number.isInteger(secondIndex)
+            || firstIndex < 0 || secondIndex < 0
+            || firstIndex >= snapshot.bars.length
+            || secondIndex >= snapshot.bars.length)
+        return null;
+    const a = snapshot.bars[firstIndex];
+    const b = snapshot.bars[secondIndex];
+    const change = b.price - a.price;
+    const changePct = (b.price / a.price - 1) * 100;
+    if (!Number.isFinite(change) || !Number.isFinite(changePct))
+        return null;
+    const rounded = Math.round(change * 100) / 100;
+    return {
+        start:{index:firstIndex,date:a.date,price:a.price},
+        end:{index:secondIndex,date:b.date,price:b.price},
+        deltaPrice:rounded === 0 ? 0 : rounded,
+        deltaPct:roundPct(changePct) || 0,
+        observedSteps:Math.abs(secondIndex - firstIndex),
+        order:secondIndex > firstIndex ? "FORWARD"
+            : secondIndex < firstIndex ? "BACKWARD" : "SAME",
+        priceBasis:validated.priceBasis,
+        source:"loaded-eodhd-range-only",
+        readOnly:true,
+        noProviderCalls:true
+    };
+}

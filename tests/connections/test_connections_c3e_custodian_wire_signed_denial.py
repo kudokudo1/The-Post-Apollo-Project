@@ -316,10 +316,10 @@ class RealProcessCustodianWireDenialTests(unittest.TestCase):
     def test_32_linux_empty_seqpacket_actually_delivers_rights(self):
         # Prove the kernel stimulus is real; an EOF-only simulation would
         # allow an ineffective leak regression to go green.
+        before_create = set(os.listdir("/proc/self/fd"))
         receiver, sender = socket.socketpair(
             socket.AF_UNIX, socket.SOCK_SEQPACKET)
         fd = os.open("/dev/null", os.O_RDONLY)
-        before_receive = set(os.listdir("/proc/self/fd"))
         ancillary = []
         try:
             sent = sender.sendmsg(
@@ -346,8 +346,7 @@ class RealProcessCustodianWireDenialTests(unittest.TestCase):
             receiver.close()
             sender.close()
         self.assertEqual(
-            set(os.listdir("/proc/self/fd")),
-            before_receive - {str(fd)},
+            set(os.listdir("/proc/self/fd")), before_create,
             "kernel reproduction leaked an imported descriptor")
 
     def test_25_stream_socket_is_not_exact_packet_connection(self):

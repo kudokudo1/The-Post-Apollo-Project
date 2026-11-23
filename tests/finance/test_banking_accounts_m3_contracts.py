@@ -55,7 +55,9 @@ assert 'BALANCE UNKNOWN' in view
 assert 'FICTIONAL COMBINED TOTAL' in view
 assert 'NOT SAVED' in view and 'NO BANK CONNECTION' in view
 assert view.count("ActionButton {") >= 10
-assert view.count("TextInput {") == 5
+assert view.count("TextInput {") == 7  # original five + M4i paired-transfer amount and description
+assert 'id: manualTransferAmount' in view
+assert 'id: manualTransferDescription' in view
 assert "Text.PlainText" in view
 assert "Qt.formatDate(new Date()" in view
 assert "Component.onCompleted:" not in view

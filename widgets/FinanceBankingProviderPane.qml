@@ -90,8 +90,8 @@ Item {
         correctionDeleteArmed=false;
     }
     function chooseManualEntry(row) {
-        if(!row||typeof row.id!=="string"||typeof row.accountId!=="string")
-            return false;
+        if(!row||typeof row.id!=="string"||typeof row.accountId!=="string"
+           ||row.transferId)return false;
         if(!details.ok||details.sectionKind!=="activity"
            ||manualSession.mode!=="manual"||!filteredActivity.ok
            ||!filteredActivity.rows.some(function(e){
@@ -439,6 +439,7 @@ Item {
                     text: modelData.date+" // "+modelData.nickname
                         +" // "+ProviderPolicy.money(modelData.amountCents)
                         +" // "+modelData.description
+                        +(modelData.transferId?" // DECLARED MANUAL TRANSFER":"")
                     font.pixelSize: 9
                     color: modelData.amountCents<0?Colors.orange:Colors.omnitrix
                     textFormat: Text.PlainText
@@ -637,6 +638,43 @@ Item {
             GohuText {
                 width: parent.width
                 visible: providerPane.filteredActivity.ok
+                text: "OF THE FILTERED MOVEMENT // DECLARED TRANSFERS "
+                    +providerPane.filteredActivity.matchedTransferCount+" LEGS"
+                    +" // IN "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedTransferInCents)
+                    +" // OUT "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedTransferOutCents)
+                font.pixelSize: 9
+                color: Colors.magenta
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
+                text: "UNLINKED MANUAL/DEMO ENTRIES "
+                    +providerPane.filteredActivity.matchedUnlinkedCount
+                    +" // IN "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedUnlinkedInCents)
+                    +" // OUT "
+                    +ProviderPolicy.money(providerPane.filteredActivity.matchedUnlinkedOutCents)
+                font.pixelSize: 9
+                color: Colors.cyan
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
+                text: "DECLARED TRANSFERS ARE NOT NEW INCOME OR SPENDING // UNLINKED ENTRIES ARE ALSO UNVERIFIED"
+                font.pixelSize: 9
+                color: Colors.orange
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: providerPane.filteredActivity.ok
                 text: "THESE ARE USER-ENTERED MONEY MOVEMENTS // NOT VERIFIED INCOME OR SPENDING"
                 font.pixelSize: 9
                 color: Colors.orange
@@ -704,6 +742,26 @@ Item {
                                     +" // NET "+ProviderPolicy.money(modelData.matchedNetCents)
                                 font.pixelSize: 9
                                 color: Colors.cyan
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "DECLARED TRANSFER LEGS "+modelData.transferCount
+                                    +" // IN "+ProviderPolicy.money(modelData.transferInCents)
+                                    +" // OUT "+ProviderPolicy.money(modelData.transferOutCents)
+                                font.pixelSize: 9
+                                color: Colors.magenta
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: "UNLINKED ENTRIES "+modelData.unlinkedCount
+                                    +" // IN "+ProviderPolicy.money(modelData.unlinkedInCents)
+                                    +" // OUT "+ProviderPolicy.money(modelData.unlinkedOutCents)
+                                font.pixelSize: 9
+                                color: Colors.orange
                                 textFormat: Text.PlainText
                                 wrapMode: Text.WordWrap
                             }
@@ -1048,10 +1106,20 @@ Item {
                         textFormat: Text.PlainText
                         wrapMode: Text.WordWrap
                     }
+                    GohuText {
+                        width: parent.width
+                        visible: modelData.transferId!==""
+                        text: "PAIRED MANUAL TRANSFER // NOT INCOME OR SPENDING // REMOVE BOTH SIDES FROM BANKING ACCOUNTS OVERVIEW"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                    }
                     ActionButton {
                         width: parent.width
                         height: 28
                         visible: providerPane.manualSession.mode==="manual"
+                            &&modelData.transferId===""
                         label: "CORRECT / REMOVE THIS MANUAL ENTRY"
                         labelPixelSize: 9
                         accentColor: Colors.magenta

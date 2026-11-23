@@ -1,0 +1,29 @@
+name: Forest Core Performance P0 Read-Only Snapshot
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/performance_snapshot_p0.py'
+      - 'scripts/forest/PERFORMANCE_RECONCILIATION_P0.md'
+      - 'tests/forest/test_performance_snapshot_p0.py'
+      - '.github/workflows/forest-core-performance-p0.yml'
+  push:
+    paths:
+      - 'scripts/forest/performance_snapshot_p0.py'
+      - 'scripts/forest/PERFORMANCE_RECONCILIATION_P0.md'
+      - 'tests/forest/test_performance_snapshot_p0.py'
+      - '.github/workflows/forest-core-performance-p0.yml'
+
+jobs:
+  disposable-readonly-observer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P0 fake loopback and resource parser tests
+        run: python3 -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - name: B0 local inventory compatibility
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_inventory.py' -v
+      - name: B2 streaming safety compatibility
+        run: python3 -m unittest discover -s tests/forest -p 'test_ollama_chat_transport.py' -v
+      - name: Python compilation
+        run: python3 -m py_compile scripts/forest/performance_snapshot_p0.py tests/forest/test_performance_snapshot_p0.py

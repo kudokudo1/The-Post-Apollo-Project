@@ -201,3 +201,5 @@ await import("./test_market_m28_moving_averages.mjs");
 await import("./test_market_m29_sma_relationship.mjs");
 // M30: pin A, select B, compare two already-loaded historical closes.
 await import("./test_market_m30_two_point_compare.mjs");
+// M31: chronological actual-close path strictly between pinned A and B.
+await import("./test_market_m31_pinned_interval.mjs");

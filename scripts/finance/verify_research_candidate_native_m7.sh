@@ -58,7 +58,9 @@ timeout --signal=TERM --kill-after=3s 27s \
     XDG_DATA_HOME="$work/data" \
     XDG_CONFIG_HOME="$work/config-root" \
     XDG_CACHE_HOME="$work/cache" \
-    quickshell --no-color -p "$work/config/shell.qml" \
+    QT_LOGGING_RULES="qml.debug=true" \
+    quickshell --no-color --log-rules "qml.debug=true" \
+      -p "$work/config/shell.qml" \
     >"$log" 2>&1 || rc=$?
 cat "$log"
 if [ "$rc" -ne 0 ] \
@@ -66,8 +68,10 @@ if [ "$rc" -ne 0 ] \
   echo "M7_NATIVE_FAIL // process rc=$rc" >&2
   exit 1
 fi
-grep -F 'M7_NATIVE_CHECK // CANDIDATES_FROM_NODE_VALIDATED' "$log"
-grep -F 'M7_NATIVE_PASS // QML_TYPES_AND_READ_ONLY_IPC' "$log"
+if ! grep -F 'M7_NATIVE_CHECK // CANDIDATES_FROM_NODE_VALIDATED' "$log"     || ! grep -F 'M7_NATIVE_PASS // QML_TYPES_AND_READ_ONLY_IPC' "$log"; then
+  echo "M7_NATIVE_FAIL // native stage markers absent" >&2
+  exit 1
+fi
 if find "$work/data" -type f \
     \( -name 'investigations.json' -o -name 'investigations.lock' \) \
     | grep . >/dev/null; then

@@ -284,6 +284,15 @@ def label_texts(pane):
 
 
 def ci_verify(app, root, pane, service, refresh, back, expected):
+    # M25: exercise real layout responsiveness and never truncate provider
+    # context text in the original pane, not a copied fixture card.
+    provider_grid = root.findChild(QQuickItem, "marketQuotaProviderGrid")
+    assert provider_grid is not None, "real quota provider grid absent"
+
+    def contexts():
+        return [x for x in descendants(pane)
+                if x.objectName() == "marketQuotaProviderContext"]
+
     assert prop(app, service, "state") == "idle"
     assert prop(app, root, "requestCount") == 0
     for case, result in expected.items():
@@ -321,8 +330,24 @@ def ci_verify(app, root, pane, service, refresh, back, expected):
         setprop(app, root, "width", 365)
         setprop(app, root, "height", 630)
         assert len(label_texts(pane)) == 2
+        assert prop(app, provider_grid, "columns") == 1, (
+            "M25 compact quotas should stack cards")
+        details = contexts()
+        assert len(details) == 2, ("M25 context labels missing", len(details))
+        for x in details:
+            font = prop(app, x, "font")
+            assert font.pixelSize() >= 11, (
+                "M25 provider detail is too small", font.pixelSize())
+            assert float(prop(app, x, "height")) + 1 >= float(
+                prop(app, x, "implicitHeight")), (
+                "M25 context label was cropped", prop(app, x, "text"))
+            assert x.y() + x.height() <= x.parentItem().height() + 1, (
+                "M25 context extends outside provider card")
         assert prop(app, root, "requestCount") == old
         setprop(app, root, "width", 750)
+        assert prop(app, provider_grid, "columns") == 2, (
+            "M25 wide quotas should use two cards")
+        assert len(contexts()) == 2
         assert prop(app, root, "requestCount") == old
 
     old_back = int(prop(app, root, "backCount"))

@@ -1,4 +1,4 @@
-name: FinanceW Market M26-M27 loaded range and selected close comparisons
+name: FinanceW Market M26-M28 loaded range analytics and moving averages
 
 on:
   pull_request:
@@ -6,9 +6,11 @@ on:
       - "widgets/FinanceStockHistoryPane.qml"
       - "widgets/FinanceStockRangeAnalysisPolicy.js"
       - "tests/finance/test_market_m26_range_analysis.mjs"
+      - "tests/finance/test_market_m28_moving_averages.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
+      - "scripts/finance/MARKET_M28_SMA_OVERLAYS_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   push:
     branches: [main]
@@ -16,9 +18,11 @@ on:
       - "widgets/FinanceStockHistoryPane.qml"
       - "widgets/FinanceStockRangeAnalysisPolicy.js"
       - "tests/finance/test_market_m26_range_analysis.mjs"
+      - "tests/finance/test_market_m28_moving_averages.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
+      - "scripts/finance/MARKET_M28_SMA_OVERLAYS_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   workflow_dispatch:
 
@@ -27,7 +31,7 @@ permissions:
 
 jobs:
   loaded-range-analysis:
-    name: Loaded range movement + selected-to-last close; no provider calls
+    name: Loaded range, selected close and SMA 5/20; no provider calls
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -35,7 +39,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Pure Market M26-M27 range movement/selected compare, malformed source and UI contracts
+      - name: Pure Market M26-M27 range movement/selected compare and malformed data
         run: node tests/finance/test_market_m26_range_analysis.mjs
-      - name: Existing M10-M27 Market price-range regression chain
+      - name: Existing M10-M28 Market price-range regression chain
         run: node tests/finance/test_market_price_range.mjs

@@ -1,0 +1,49 @@
+name: Connections DOC 4 C5-H7 native consent producer origin HOLD
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/hospital_c5/HospitalC5H7ProducerOriginProbe.py'
+      - 'tests/connections/hospital_c5/test_hospital_c5h7_producer_origin.py'
+      - '.github/workflows/connections-hospital-c5-h7-producer-origin-ci.yml'
+      - 'docs/connections-hospital-c5-h7-producer-origin-boundary.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-origin-no-human-consent:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned test-only verifier dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Inspect Linux kernel credentials in unprivileged disposable CI
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          python3 -B -m py_compile \
+            tests/connections/hospital_c5/HospitalC5H7ProducerOriginProbe.py \
+            tests/connections/hospital_c5/test_hospital_c5h7_producer_origin.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h7_producer_origin.py
+          python3 -B - <<'PY'
+          from pathlib import Path
+          runtime = Path('services/connections/hospital/HospitalNativeIssuerService.py').read_text()
+          probe = Path('tests/connections/hospital_c5/HospitalC5H7ProducerOriginProbe.py').read_text()
+          assert "HospitalC5H7ProducerOriginProbe" not in runtime
+          assert 'C.deny("INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE")' in runtime
+          assert "_require_independent_room_consent(request, prepared, peer, first_seat)" in runtime
+          assert 'S._packet_recv(sock, expected_sender=observed_peer[:3])' in probe
+          assert 'C.deny("C5H7_INDEPENDENT_NATIVE_CONSENT_PRODUCER_NOT_ENROLLED")' in probe
+          assert "load_installed_key" not in probe
+          assert "sign_px_grant" not in probe
+          print("DOC4_C5H7_HOLD // KERNEL_SENDER_IS_NOT_HUMAN_CONSENT_OR_RELEASE_TRUST")
+          PY

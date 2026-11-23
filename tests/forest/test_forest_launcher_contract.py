@@ -836,7 +836,7 @@ class ForestLauncherContract(unittest.TestCase):
             self.assertIn(prop + ": root.reasoningRailExpanded", view)
         self.assertEqual(
             view.count("? Colors.red : root.activeTree.gradientAccentColor"),
-            4)
+            5)
         # Tree icon glow, not one generic red shadow or a cup-only mask.
         self.assertIn("idleContentGlowColor: root.activeTree.iconIdleGlowColor", view)
         self.assertIn("hoverContentGlowColor: root.activeTree.iconIdleGlowColor", view)

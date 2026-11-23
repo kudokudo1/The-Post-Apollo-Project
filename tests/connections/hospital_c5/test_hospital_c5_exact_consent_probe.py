@@ -65,6 +65,7 @@ class C5H3UntrustedEvidence(unittest.TestCase):
             "schema": P.CLAIM_SCHEMA,
             "reviewDigest": ref["reviewDigest"],
             "requestNonce": review["requestNonce"],
+            "writerInstance": review["writerInstance"],
             "action": review["action"],
             "roomId": review["roomId"],
             "operatorUid": review["operatorUid"],
@@ -105,6 +106,7 @@ class C5H3UntrustedEvidence(unittest.TestCase):
         self.assertEqual(value["expectedRevision"], 37)
         self.assertEqual(value["expectedDigest"], "d" * 64)
         self.assertEqual(value["requestNonce"], self.prepared["requestNonce"])
+        self.assertEqual(value["writerInstance"], self.prepared["writerInstance"])
         self.assertEqual(value["operatorUid"], 1000)
         self.assertEqual(value["seatId"], "logind-seat0-c2")
         self.assertEqual(value["hostId"], "c" * 64)
@@ -231,7 +233,7 @@ class C5H3UntrustedEvidence(unittest.TestCase):
         self.assertFalse(result["claimMatchesReview"])
         self.assert_hold(result)
 
-    def test_16_duplicate_json_claim_fields_refused(self):
+    def test_16b_duplicate_json_claim_fields_refused(self):
         raw = C.canonical(self.claim()).replace(
             b'"action":', b'"action":"RESTORE","action":', 1)
         with self.assertRaises(C.Refused):
@@ -273,6 +275,38 @@ class C5H3UntrustedEvidence(unittest.TestCase):
             result = self.probe(c)
             self.assertTrue(result["claimMatchesReview"])
             self.assert_hold(result)
+
+    def test_23_writer_instance_rotation_changes_review_digest(self):
+        before = self.review()
+        self.prepared["writerInstance"] = "protected-px-002"
+        after = self.review()
+        self.assertEqual(before["review"]["requestNonce"],
+                         after["review"]["requestNonce"])
+        self.assertEqual(before["review"]["roomId"], after["review"]["roomId"])
+        self.assertNotEqual(before["reviewDigest"], after["reviewDigest"])
+
+    def test_24_cross_writer_claim_is_rejected_even_same_room_and_nonce(self):
+        claim = self.claim()
+        claim["writerInstance"] = "protected-px-002"
+        outcome = self.probe(claim)
+        self.assertFalse(outcome["claimMatchesReview"])
+        self.assert_hold(outcome)
+
+    def test_25_source_deadline_change_changes_review_digest(self):
+        previous = self.review()["reviewDigest"]
+        self.prepared["expiresAt"] = self.now + 20
+        self.assertNotEqual(previous, self.review()["reviewDigest"])
+
+    def test_26_missing_writer_instance_source_rejected(self):
+        del self.prepared["writerInstance"]
+        with self.assertRaises(C.Refused):
+            self.review()
+
+    def test_27_old_v1_display_claim_schema_not_promoted(self):
+        claim = self.claim()
+        claim["schema"] = "postapollo.hospital.c5h3.untrusted-display-claim.v1"
+        with self.assertRaises(C.Refused):
+            self.probe(claim)
 
     def test_21_never_accept_arbitrary_modes_or_prod_controls(self):
         for kw in ({}, {"provider": object()}, {"approved": True}):

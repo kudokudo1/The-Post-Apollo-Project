@@ -18,6 +18,11 @@ var RESTRICTED = {
 function destination(providerId,sectionId) {
     if(typeof providerId!=="string"||typeof sectionId!=="string")
         return {ok:false,reason:"UNSUPPORTED PROVIDER"};
+    if(!Object.prototype.hasOwnProperty.call(OFFICIAL,providerId)
+       ||!Object.prototype.hasOwnProperty.call(RESTRICTED,providerId))
+        return {ok:false,reason:providerId==="bank"
+            ?"NO VERIFIED BANK DESTINATION // USE YOUR BANK'S KNOWN OFFICIAL CHANNEL"
+            :"NO HANDOFF AVAILABLE FOR THIS PROVIDER"};
     var site=OFFICIAL[providerId],sections=RESTRICTED[providerId];
     if(!site||!sections||sections.indexOf(sectionId)<0)
         return {ok:false,reason:providerId==="bank"

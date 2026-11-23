@@ -167,6 +167,7 @@ def rehearse_guest_local_ci_only(
     *, actual_runtime_receipt_public: bytes,
     verified_actions: tuple,
     signed_rpm_archive: Path,
+    expected_process: dict | None = None,
 ):
     """Run only from the existing root probe INSIDE real disposable C4b VM.
 
@@ -247,4 +248,62 @@ def rehearse_guest_local_ci_only(
         pass
     else:
         _deny("C4B_BINDING_NEGATIVE_SUBSTITUTION_DID_NOT_REFUSE")
+    # Existing protected C3e-AH combines the same signed release with the
+    # actual C3e-AG kernel observation. This path is only a disposable guest
+    # diagnostic; the release signer and expected process pins are guest-local.
+    if expected_process is not None:
+        source = Path(
+            "/usr/local/libexec/postapollo-id-ci-existing/tests/connections/"
+            "c3e_release_trust/C3eAHSignedReleaseLiveOrigin.py"
+        )
+        if not source.is_file() or type(expected_process) is not dict:
+            _deny("C4B_BINDING_ORIGINAL_C3EAH_OR_EXACT_PROCESS_REQUIRED")
+        spec = importlib.util.spec_from_file_location(
+            "c4b_existing_c3eah_same_running_guest", source
+        )
+        if spec is None or spec.loader is None:
+            _deny("C4B_BINDING_ORIGINAL_C3EAH_IMPORT_REFUSED")
+        ah = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = ah
+        spec.loader.exec_module(ah)
+        if set(expected_process) != ah.AG.EXPECTED:
+            _deny("C4B_BINDING_EXACT_C3EAH_PROCESS_PINS_REQUIRED")
+        ah_args = dict(
+            signed_release=raw,
+            release_signature=signature,
+            independently_pinned_release_root=ephemeral_guest_root.public_key(),
+            independently_pinned_receipt_key=actual_runtime_receipt_public,
+            independently_measured_rpm_sha256=rpm_sha,
+            independently_measured_release_files=installed,
+            minimum_release_epoch=1,
+            minimum_release_sequence=1,
+            expected_process=dict(expected_process),
+            mode="c4b-guest-candidate",
+        )
+        try:
+            joined = ah.inspect_ci_only(**ah_args)
+        except ah.Refused as exc:
+            raise Refused("C4B_BINDING_C3EAH_REAL_GUEST_JOIN_REFUSED") from exc
+        if (joined.get("signedReleaseAndRealProcessScriptBytesMatchInCI")
+                is not True
+                or joined.get("realKernelProcessMatchesCallerPinsInCI")
+                is not True
+                or joined.get("c4bOfficialSilverblueHostNotAttested")
+                is not True
+                or any(joined.get(k) is not False
+                       for k in (*ah.NEGATIVE, *ah.AG.NEGATIVE))):
+            _deny("C4B_BINDING_C3EAH_AUTHORITY_PROMOTION_REFUSED")
+        # A signed release with a substituted script pin must not become a
+        # matching real process merely because the guest signed both fixtures.
+        wrong = dict(expected_process)
+        wrong["entrypointSha256"] = "0" * 64
+        try:
+            ah.inspect_ci_only(**{
+                **ah_args, "expected_process": wrong
+            })
+        except ah.Refused:
+            pass
+        else:
+            _deny("C4B_BINDING_C3EAH_TAMPERED_SOURCE_NOT_REFUSED")
+        result["realC3eAHReleaseAndKernelJoinedOnlyInDisposableCI"] = True
     return result

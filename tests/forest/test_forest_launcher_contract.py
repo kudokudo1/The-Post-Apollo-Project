@@ -355,8 +355,8 @@ class ForestLauncherContract(unittest.TestCase):
         ring = (ROOT / "widgets/ForestCornerGradientBorder.qml").read_text()
         name = (ROOT / "widgets/ForestGradientName.qml").read_text()
 
-        self.assertEqual(view.count("ForestCornerGradientBorder {"), 2)
-        self.assertEqual(view.count("ForestGradientName {"), 4)
+        self.assertEqual(view.count("ForestCornerGradientBorder {"), 3)
+        self.assertEqual(view.count("ForestGradientName {"), 5)
         self.assertIn("baseColor: treeRow.foregroundColor", view)
         self.assertEqual(view.count("accentColor: treeRow.energized"), 3)
         self.assertEqual(view.count("? treeRow.foregroundColor : modelData.gradientAccentColor"), 3)
@@ -592,7 +592,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("anchors.bottom: promptRow.bottom", view)
         self.assertIn("anchors.right: parent.right", view)
         self.assertIn("anchors.right: reasoningRailHost.left", view)
-        self.assertIn("anchors.rightMargin: 35", view)  # labels clear chat
+        self.assertIn("anchors.rightMargin: 8", view)  # no external label gutter
         self.assertIn("width: 46", view)                 # composer unchanged
         self.assertIn("width: 40", view)                 # real slider width
         self.assertIn('selectorProfile: "index"', view)
@@ -601,9 +601,11 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("currentIndex: 3 - root.selectedReasoningStep", view)
         self.assertIn("root.chooseTreeReasoningStep(3 - index);", view)
         self.assertIn('optionLabels: ["HIGH", "MED", "LOW", "NONE"]', view)
-        self.assertIn('model: ["HIGH", "MED", "LOW", "NONE"]', view)
-        self.assertIn("anchors.right: reasoningSelectorSlider.left", view)
-        self.assertIn("reasoningRailHost.detentCenterY(index)", view)
+        self.assertIn('text: ["HIGH", "MED", "LOW", "NONE"][', view)
+        self.assertIn("anchors.top: reasoningCoffeeButton.bottom", view)
+        self.assertIn("anchors.bottom: reasoningSelectorSlider.bottom", view)
+        self.assertIn("showIndexReadout: false", view)
+        self.assertNotIn("reasoningRailHost.detentCenterY(", view)
         self.assertIn('sideLabel: "THINK"', view)
         self.assertIn("accentColor: root.activeTree.identityColor", view)
         self.assertIn("handleColor: root.activeTree.identityColor", view)
@@ -620,12 +622,12 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("anchors.fill: reasoningSelectorSlider", view)
         self.assertIn("lineWidth: 1", view)
         self.assertIn("id: reasoningLevelInk", view)
-        self.assertIn("gradientText: modelData", view)
-        self.assertIn("pixelSize: 8", view)
+        self.assertIn("gradientText: text", view)
+        self.assertIn("pixelSize: 9", view)
         self.assertIn("safeSource: reasoningLevelInk", view)
-        self.assertIn("index === reasoningSelectorSlider.currentIndex", view)
+        self.assertIn("requestedVisible: root.menuOpen && root.reasoningRailExpanded", view)
         self.assertIn("preferredGlowColor:", view)
-        self.assertIn("enabledSlider: root.menuOpen", view)
+        self.assertIn("enabledSlider: root.menuOpen && root.reasoningRailExpanded", view)
         self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
         self.assertIn("steps[selectedTreeIndex] = step", view)
         self.assertIn("selectedTreeReasoningSteps = steps", view)
@@ -664,10 +666,12 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("orientation: Gradient.Vertical", selector)
         self.assertIn("slider.handleGradientEnabled", selector)
         self.assertIn("dragArea.pressed ? Colors.yellow", selector)
+        self.assertIn("property bool showIndexReadout: true", selector)
+        self.assertIn("&& (slider.numericMode || slider.showIndexReadout)", selector)
         self.assertNotIn("handleGradientEnabled: true", git)
         self.assertNotIn("handleGradientEnabled: true", hospital)
-        self.assertEqual(view.count("ForestCornerGradientBorder {"), 2)
-        self.assertEqual(view.count("ForestGradientName {"), 4)
+        self.assertEqual(view.count("ForestCornerGradientBorder {"), 3)
+        self.assertEqual(view.count("ForestGradientName {"), 5)
         self.assertIn('gradientAccentColor: "#C7482F", gradientTopRight: false',
                       view)
 
@@ -680,7 +684,10 @@ class ForestLauncherContract(unittest.TestCase):
             self.assertEqual(levels[step], label)
             self.assertEqual(3 - step, rail_index)
         for height in (190, 245, 310):
-            track_height = height - 64  # SelectorSlider top 38 / bottom 26
+            # Expanded SelectorSlider begins below the 40px coffee
+            # close button and its 4px gap; the last stop remains visible.
+            slider_height = height - 40 - 4
+            track_height = slider_height - 64
             handle_height = 52
             travel = max(0, track_height - handle_height)
             self.assertGreater(travel, 0)
@@ -688,7 +695,73 @@ class ForestLauncherContract(unittest.TestCase):
                        for i in range(4)]
             self.assertEqual(centers, sorted(centers))
             self.assertGreaterEqual(centers[0], 38)
-            self.assertLessEqual(centers[-1], height - 26)
+            self.assertLessEqual(centers[-1], slider_height - 26)
+
+    def test_one_coffee_button_expands_upward_and_becomes_red_close(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        action = (ROOT / "components/ActionButton.qml").read_text()
+        close = (ROOT / "components/CloseButton.qml").read_text()
+        selector = (ROOT / "components/SelectorSlider.qml").read_text()
+
+        self.assertEqual(view.count("id: reasoningCoffeeButton"), 1)
+        self.assertEqual(view.count("ActionButton {"), 1)
+        self.assertIn("property bool reasoningRailExpanded: false", view)
+        self.assertIn("reasoningRailExpanded = false;", view)
+        self.assertIn("y: root.reasoningRailExpanded", view)
+        self.assertIn("0 : Math.max(0, parent.height - height)", view)
+        self.assertIn("width: 40", view)
+        self.assertIn("height: 40", view)
+        self.assertIn("Behavior on y {", view)
+        self.assertIn("duration: 170", view)
+        self.assertIn("onLeftClicked:", view)
+        self.assertIn(
+            "root.reasoningRailExpanded = !root.reasoningRailExpanded;", view)
+        self.assertIn('"Close Forest reasoning slider"', view)
+        self.assertIn('"Open Forest reasoning slider"', view)
+        self.assertIn("visible: root.reasoningRailExpanded", view)
+        self.assertIn("enabledSlider: root.menuOpen && root.reasoningRailExpanded", view)
+        self.assertIn("if (root.menuOpen && root.reasoningRailExpanded)", view)
+        self.assertIn("anchors.top: reasoningCoffeeButton.bottom", view)
+        self.assertIn("anchors.bottom: parent.bottom", view)
+        self.assertIn("anchors.topMargin: 4", view)
+
+        # The same coffee artwork stays in the button during both states.
+        self.assertIn("id: coffeeGlyph", view)
+        self.assertIn('text: "⊹"', view)
+        self.assertIn('text: "☕︎๋࣭"', view)
+        self.assertIn('text: "⭑"', view)
+        self.assertIn("id: coffeeGradientGlyph", view)
+        self.assertIn("contentGlowSource: coffeeGlyph", view)
+        self.assertIn("color: Colors.white", view)
+        self.assertIn("root.activeTree.gradientAccentColor", view)
+        self.assertIn("root.activeTree.gradientTopRight", view)
+        # Expanded state follows the actual standard red CloseButton
+        # identity without substituting an × for coffee.
+        self.assertIn('idleForegroundColor: Colors.red', close)
+        self.assertIn('idleBorderColor: Colors.red', close)
+        self.assertIn('hoverFillColor: Colors.yellow', close)
+        self.assertIn("root.reasoningRailExpanded", view)
+        self.assertIn("? Colors.red : root.activeTree.identityColor", view)
+        self.assertIn("? Colors.red : root.activeTree.spiritualIdleGlowColor", view)
+        self.assertIn("wideGlowEnabled: root.reasoningRailExpanded", view)
+        self.assertIn("ForestCornerGradientBorder {", view)
+        self.assertIn("visible: !root.reasoningRailExpanded", view)
+        self.assertIn("signal leftClicked(var mouseEvent)", action)
+
+        # The numeric footer is replaced by the current Gohu level.
+        self.assertIn("property bool showIndexReadout: true", selector)
+        self.assertIn("showIndexReadout: false", view)
+        self.assertIn('text: ["HIGH", "MED", "LOW", "NONE"][', view)
+        self.assertIn("anchors.bottom: reasoningSelectorSlider.bottom", view)
+        self.assertNotIn('model: ["HIGH", "MED", "LOW", "NONE"]', view)
+        self.assertNotIn("reasoningRailHost.detentCenterY(", view)
+        self.assertIn("currentIndex: 3 - root.selectedReasoningStep", view)
+        self.assertIn("root.chooseTreeReasoningStep(3 - index);", view)
+        self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
+        self.assertIn("readonly property bool chatHostTrusted: false", view)
+        self.assertIn("readonly property bool voiceHostTrusted: false", view)
+        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()

@@ -1,7 +1,8 @@
 // Finance M10: bounded date-range daily closing prices for Market STOCKS.
 // One EODHD request per explicit read, no writes, no background polling.
 import {pathToFileURL} from "node:url";
-import {SYMBOLS, loadOptionalToken} from "./read_sec_price_context.mjs";
+import {loadOptionalToken} from "./read_sec_price_context.mjs";
+import {STOCK_SYMBOLS} from "./market_stock_catalog.mjs";
 
 export const MAX_RANGE_DAYS = 180;
 export const MAX_RANGE_BARS = 132;
@@ -16,7 +17,7 @@ export function dayNumber(value) {
 }
 export function validateRange(cik, from, to, today) {
   const a=dayNumber(from), b=dayNumber(to), t=dayNumber(today);
-  if (!Object.hasOwn(SYMBOLS,cik) || a===null || b===null || t===null
+  if (!Object.hasOwn(STOCK_SYMBOLS,cik) || a===null || b===null || t===null
       || from < "2000-01-01" || a > b || b > t || b-a > MAX_RANGE_DAYS)
     throw new Error("invalid-range");
   return {cik,from,to};
@@ -52,7 +53,7 @@ export function normalizePriceRange(raw, cik, from, to, retrievedAt) {
     ? Math.round((last.price/first.price-1)*10000)/100 : null;
   return {
     schemaVersion:1,source:"eodhd-eod",readOnly:true,
-    cik,symbol:SYMBOLS[cik],from,to,retrievedAt,
+    cik,symbol:STOCK_SYMBOLS[cik],from,to,retrievedAt,
     priceBasis:useAdjusted?"ADJUSTED CLOSE":"CLOSE",
     first,last,changePct,bars,
     scope:"Selected trading sessions in an inclusive requested date range"
@@ -70,7 +71,7 @@ export async function loadPriceRange(cik,from,to, fetcher=fetch,
   });
   let response;
   try {
-    response=await fetcher("https://eodhd.com/api/eod/"+SYMBOLS[cik]+"?"+params,{
+    response=await fetcher("https://eodhd.com/api/eod/"+STOCK_SYMBOLS[cik]+"?"+params,{
       method:"GET",redirect:"error",headers:{Accept:"application/json"},
       signal:AbortSignal.timeout(12000)
     });

@@ -66,10 +66,15 @@ class ForestLocalRecoveryInspector:
 
         try:
             row = self._db.execute(
-                "SELECT a.status,a.reply_turn_id,t.turn_id,t.role,"
-                "t.session_id FROM forest_attempts_b3 AS a "
+                "SELECT a.status,a.reply_turn_id,a.expected_revision,"
+                "a.model_key,a.created_at_ms,a.updated_at_ms,s.revision,"
+                "u.turn_id,u.role,u.session_id,u.ordinal,u.recorded_at_ms,"
+                "t.turn_id,t.role,t.session_id,t.ordinal,t.model_key,"
+                "t.provider_key,t.recorded_at_ms "
+                "FROM forest_attempts_b3 AS a "
                 "INNER JOIN forest_sessions AS s "
                 "ON s.session_id=a.session_id "
+                "LEFT JOIN forest_turns AS u ON u.turn_id=a.user_turn_id "
                 "LEFT JOIN forest_turns AS t ON t.turn_id=a.reply_turn_id "
                 "WHERE a.attempt_id=? AND a.session_id=? AND a.owner_key=? "
                 "AND s.owner_key=?",
@@ -80,15 +85,46 @@ class ForestLocalRecoveryInspector:
         if row is None:
             # Same refusal for nonexistent, wrong owner, wrong Tree/session.
             raise RecoveryRefusal("ATTEMPT_UNAVAILABLE")
-        state, reply_id, joined_id, role, joined_session = row
-        if state not in FOREST_STATES:
+        (state, reply_id, expected_revision, model_key, created_at,
+         updated_at, current_revision, user_id, user_role, user_session,
+         user_ordinal, user_recorded_at, joined_id, reply_role,
+         reply_session, reply_ordinal, reply_model, reply_provider,
+         reply_recorded_at) = row
+        # B4e synthetic lineage check: local FK existence is insufficient.
+        # The original attempt must point to a genuine user turn in the same
+        # owner-scoped session. Revision can exceed turn ordinal because B1's
+        # state transitions also advance revision.
+        if (state not in FOREST_STATES
+                or type(expected_revision) is not int
+                or type(current_revision) is not int
+                or type(user_ordinal) is not int
+                or type(created_at) is not int
+                or type(updated_at) is not int
+                or type(user_recorded_at) is not int
+                or user_id is None or user_role != "user"
+                or user_session != session_id or user_ordinal < 1
+                or expected_revision < user_ordinal
+                or current_revision < expected_revision
+                or not model_key or created_at < user_recorded_at
+                or updated_at < created_at):
             raise RecoveryRefusal("LOCAL_INTEGRITY_HOLD")
         if state == "COMMITTED":
+            # The B3 writer appends one assistant turn immediately after the
+            # reserved user turn and stores that reply ID atomically with the
+            # session revision. Check this local lineage, not C5 settlement.
             if (type(reply_id) is not str or reply_id != joined_id
-                    or role != "assistant" or joined_session != session_id):
+                    or reply_role != "assistant"
+                    or reply_session != session_id
+                    or type(reply_ordinal) is not int
+                    or reply_ordinal != user_ordinal + 1
+                    or reply_model != model_key
+                    or reply_provider != "ollama"
+                    or type(reply_recorded_at) is not int
+                    or reply_recorded_at < created_at
+                    or current_revision < expected_revision + 1):
                 raise RecoveryRefusal("LOCAL_INTEGRITY_HOLD")
         elif reply_id is not None:
-            # RESERVED/ABORTED must not point to an assistant reply.
+            # RESERVED/ABORTED must not point to any assistant or user reply.
             raise RecoveryRefusal("LOCAL_INTEGRITY_HOLD")
 
         return {

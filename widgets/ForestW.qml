@@ -368,12 +368,12 @@ PanelWindow {
                         root.pendingModelScan = "";
                         root.lastScannedModel = "";
                         root.lastModelScanResult = "";
-                        localInventory.scanModels();
+                        root.refreshLocalModelEvidence();
                     }
                 }
 
-                // LIVE describes only the Quickshell workspace, not Ollama
-                // or Hermes connectivity. It is always RIGHT of Rescan.
+                // One last P0 /api/ps observation for selected Tree model.
+                // Residency is not proof of active token generation or C5 access.
                 Rectangle {
                     id: liveIndicator
                     anchors.left: headerRescanButton.right
@@ -383,8 +383,16 @@ PanelWindow {
                     height: 25
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
-                    Accessible.name: "Forest workspace live; AI engine not connected"
+                    readonly property color modelStatusColor:
+                        root.selectedModelLoadState === "LOADED" ? Colors.green
+                        : root.selectedModelLoadState === "NOT_LOADED"
+                            ? Colors.orange : Colors.cyan
+                    border.color: modelStatusColor
+                    Accessible.name: root.selectedLocalModel
+                        ? ("Selected model " + root.selectedLocalModel
+                            + " // " + root.selectedModelLoadState
+                            + " // last Ollama residency scan, not active inference")
+                        : "No selected local model // model residency unknown"
 
                     Rectangle {
                         anchors.left: parent.left
@@ -393,15 +401,16 @@ PanelWindow {
                         width: 6
                         height: 6
                         radius: 3
-                        color: Colors.green
+                        color: liveIndicator.modelStatusColor
                     }
                     GohuText {
                         anchors.right: parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "LIVE"
+                        text: root.selectedModelLoadState === "LOADED" ? "LOAD"
+                            : root.selectedModelLoadState === "NOT_LOADED" ? "IDLE" : "?"
                         font.pixelSize: 11
-                        color: Colors.green
+                        color: liveIndicator.modelStatusColor
                     }
                 }
             }

@@ -71,7 +71,8 @@ class LocalReadOnlyIpcTests(unittest.TestCase):
             "requestNonce": "a1" * 16,
         }
 
-    def run_one(self, *, req=None, raw=None, mode="local", chunks=None):
+    def run_one(self, *, req=None, raw=None, mode="local", chunks=None,
+                half_close=False):
         boundary = self.local if mode == "local" else self.protected
         parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
         parent.settimeout(5)
@@ -90,6 +91,8 @@ class LocalReadOnlyIpcTests(unittest.TestCase):
                     parent.sendall(payload[cursor:cursor + step])
                     cursor += step
                 parent.sendall(payload[cursor:])
+            if half_close:
+                parent.shutdown(socket.SHUT_WR)
             n = struct.unpack(">I", _recv_exact(parent, 4))[0]
             self.assertLessEqual(n, M.MAX_FRAME)
             msg = json.loads(_recv_exact(parent, n).decode("ascii"))
@@ -108,8 +111,10 @@ class LocalReadOnlyIpcTests(unittest.TestCase):
         for k in M.S.DENIED:
             self.assertIs(reply[k], False, k)
 
-    def refused(self, *, req=None, raw=None, mode="local"):
-        out = self.run_one(req=req, raw=raw, mode=mode)
+    def refused(self, *, req=None, raw=None, mode="local",
+                half_close=False):
+        out = self.run_one(req=req, raw=raw, mode=mode,
+                           half_close=half_close)
         self.denied(out)
         self.assertEqual(out["status"], M.REFUSAL_STATUS)
         self.assertNotIn("result", out)
@@ -338,6 +343,24 @@ class LocalReadOnlyIpcTests(unittest.TestCase):
         forged = dict(self.local.read_current_snapshot())
         self.reject_injected_result(
             forged, method="read_current_snapshot", mode="protected")
+
+
+    def test_43_partial_length_header_half_closed_returns_fixed_refusal(self):
+        # The sender has finished writing, but the length header is truncated.
+        self.refused(raw=b"\x00\x00", half_close=True)
+
+    def test_44_partial_body_half_closed_returns_fixed_refusal(self):
+        # Three bytes were promised; only one was transmitted.
+        self.refused(raw=struct.pack(">I", 3) + b"{", half_close=True)
+
+    def test_45_partial_length_header_left_open_times_out_to_refusal(self):
+        # The sender neither completes the frame nor closes its write side.
+        self.refused(raw=b"\x00")
+
+    def test_46_partial_json_body_left_open_times_out_to_refusal(self):
+        # A complete header with a body shorter than its advertised length.
+        self.refused(raw=struct.pack(">I", 10) + b"{")
+
 
 
 if __name__ == "__main__":

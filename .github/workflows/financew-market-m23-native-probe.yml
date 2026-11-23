@@ -1,0 +1,37 @@
+name: FinanceW Market M23 no-write native quota acceptance probe contracts
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/market_quota_native_acceptance.py"
+      - "tests/finance/test_market_m23_native_probe.py"
+      - "scripts/finance/MARKET_M23_NATIVE_PROBE_README.md"
+      - ".github/workflows/financew-market-m23-native-probe.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/finance/market_quota_native_acceptance.py"
+      - "tests/finance/test_market_m23_native_probe.py"
+      - "scripts/finance/MARKET_M23_NATIVE_PROBE_README.md"
+      - ".github/workflows/financew-market-m23-native-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-probe-contracts:
+    name: Read-only native probe fixture; never a live provider
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: M20 disposable SQLite concurrency regression
+        run: python3 -B tests/finance/test_market_shared_quota.py
+      - name: M21 disposable no-write local quota status regression
+        run: python3 -B tests/finance/test_market_quota_status.py
+      - name: M23 read-only operator acceptance probe fake-only contracts
+        run: python3 -B tests/finance/test_market_m23_native_probe.py

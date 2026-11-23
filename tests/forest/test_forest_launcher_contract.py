@@ -102,9 +102,11 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("open: index === root.selectedTreeIndex", view)
         self.assertIn("readonly property color iconIdentityColor: modelData.identityColor", view)
         self.assertIn("normalForegroundColor: iconIdentityColor", view)
-        self.assertIn("readonly property color idleGlowColor: modelData.idleGlowColor", view)
-        self.assertIn("normalDockGlowColor: idleGlowColor", view)
-        self.assertIn("normalContentGlowColor: idleGlowColor", view)
+        self.assertIn("readonly property color iconIdleGlowColor: modelData.iconIdleGlowColor", view)
+        self.assertIn("readonly property color spiritualIdleGlowColor: modelData.spiritualIdleGlowColor", view)
+        self.assertIn("normalDockGlowColor: spiritualIdleGlowColor", view)
+        self.assertIn("normalContentGlowColor: spiritualIdleGlowColor", view)
+        self.assertIn("preferredGlowColor: treeRow.resolvedIconGlowColor", view)
         self.assertIn("hoverForegroundColor: Colors.orange", view)
         self.assertIn("pressedForegroundColor: Colors.magenta", view)
         self.assertIn("border.color: treeRow.open || treeRow.pressed || treeRow.hovered", view)
@@ -225,20 +227,21 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn('property var selectedTreeModels: ["", "", "", "", ""]', view)
         self.assertIn('text: "TREES // " + String(root.treeSlots.length).padStart(2, "0")', view)
         tree_profiles = (
-            ("CHERRY", "cherry-outline.svg", "white", "magenta"),
-            ("MAPLE", "maple-outline.svg", "orange", "red"),
-            ("BRISTLECONE PINE", "bristlecone-pine.png", "white", "orange"),
-            ("CEDAR", "cedar-outline.svg", "green", "omnitrix"),
-            ("MACINTOSH", "macintosh-outline.svg", "red", "red"),
+            ("CHERRY", "cherry-outline.svg", "white", "magenta", "magenta"),
+            ("MAPLE", "maple-outline.svg", "orange", "red", "red"),
+            ("BRISTLECONE PINE", "bristlecone-pine.png", "white", "orange", "green"),
+            ("CEDAR", "cedar-outline.svg", "green", "orange", "orange"),
+            ("MACINTOSH", "macintosh-outline.svg", "green", "red", "red"),
         )
-        for name, asset, foreground, glow in tree_profiles:
+        for name, asset, foreground, icon_glow, spiritual_glow in tree_profiles:
             with self.subTest(tree=name):
                 self.assertEqual(view.count('name: "' + name + '", role:'), 1)
                 self.assertIn('iconPath: "../assets/forest/' + asset + '"', view)
                 block = view.split('name: "' + name + '", role:', 1)[1].split(
                     '        }', 1)[0]
                 self.assertIn('identityColor: Colors.' + foreground, block)
-                self.assertIn('idleGlowColor: Colors.' + glow, block)
+                self.assertIn('iconIdleGlowColor: Colors.' + icon_glow, block)
+                self.assertIn('spiritualIdleGlowColor: Colors.' + spiritual_glow, block)
                 self.assertTrue((ROOT / "assets/forest" / asset).is_file())
         for name in ("BRISTLECONE PINE", "CEDAR", "MACINTOSH"):
             block = view.split('name: "' + name + '", role:', 1)[1].split(
@@ -247,6 +250,33 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property var activeChatSessions: []", view)
         self.assertIn("source: Qt.resolvedUrl(root.activeTree.iconPath)", view)
+
+    def test_spiritual_tree_glow_is_independent_of_icon_glow(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        tree_block = view.split("id: treeRow", 1)[1].split(
+            "onLeftClicked: root.selectedTreeIndex = index", 1)[0]
+        glyph_block = view.split("id: treeGlyphGlow", 1)[1].split(
+            "id: treeName", 1)[0]
+        name_block = view.split("id: treeNameGlow", 1)[1].split(
+            "GohuText {", 1)[0]
+        self.assertIn("readonly property color resolvedIconGlowColor:", tree_block)
+        self.assertIn("treeRow.open || treeRow.pressed || treeRow.hovered", tree_block)
+        self.assertIn("? treeRow.contentGlowColor : treeRow.iconIdleGlowColor",
+                      tree_block)
+        self.assertIn("normalDockGlowColor: spiritualIdleGlowColor", tree_block)
+        self.assertIn("normalContentGlowColor: spiritualIdleGlowColor", tree_block)
+        self.assertIn("preferredGlowColor: treeRow.resolvedIconGlowColor",
+                      glyph_block)
+        self.assertIn("preferredGlowColor: treeRow.contentGlowColor", name_block)
+        self.assertIn("foregroundColor: treeRow.foregroundColor", name_block)
+        self.assertIn("? treeRow.dockGlowColor : treeRow.iconIdentityColor",
+                      tree_block)
+        # The selected Tree title continues to use the resolved button glow,
+        # while the preview icon keeps the icon's independent idle hue.
+        self.assertIn("root.selectedTreeButton.contentGlowColor", view)
+        self.assertIn("preferredGlowColor: root.activeTree.iconIdleGlowColor", view)
+        self.assertNotIn("chromeIdleGlowColor", view)
+        self.assertNotIn("modelData.idleGlowColor", view)
 
     def test_bristlecone_approved_pixel_art_and_state_variants(self):
         # Exact user-edited 48px pixel source, including the three tiny
@@ -345,7 +375,7 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("source: Qt.resolvedUrl(root.activeTree.iconPath)", view)
         self.assertIn("safeSource: activeChatTreeIcon", view)
         self.assertIn("foregroundColor: root.activeTree.identityColor", view)
-        self.assertIn("preferredGlowColor: root.activeTree.idleGlowColor", view)
+        self.assertIn("preferredGlowColor: root.activeTree.iconIdleGlowColor", view)
         self.assertIn('text: root.activeTree.name + " // CHAT"', view)
         self.assertIn("id: treeSelectorRepeater", view)
         self.assertIn("treeSelectorRepeater.itemAt(selectedTreeIndex)", view)

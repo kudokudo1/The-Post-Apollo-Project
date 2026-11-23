@@ -115,35 +115,40 @@ PanelWindow {
             iconPath: "../assets/forest/cherry-outline.svg",
             hoverIconPath: "../assets/forest/cherry-hover-orange.svg",
             openIconPath: "../assets/forest/cherry-open-magenta.svg",
-            identityColor: Colors.white, idleGlowColor: Colors.magenta
+            identityColor: Colors.white,
+            iconIdleGlowColor: Colors.magenta, spiritualIdleGlowColor: Colors.magenta
         },
         {
             name: "MAPLE", role: "FILES & ORGANIZATION",
             iconPath: "../assets/forest/maple-outline.svg",
             hoverIconPath: "../assets/forest/maple-hover-orange.svg",
             openIconPath: "../assets/forest/maple-open-magenta.svg",
-            identityColor: Colors.orange, idleGlowColor: Colors.red
+            identityColor: Colors.orange,
+            iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red
         },
         {
             name: "BRISTLECONE PINE", role: "ROLE // NOT ASSIGNED",
             iconPath: "../assets/forest/bristlecone-pine.png",
             hoverIconPath: "../assets/forest/bristlecone-hover-orange.png",
             openIconPath: "../assets/forest/bristlecone-open-magenta.png",
-            identityColor: Colors.white, idleGlowColor: Colors.orange
+            identityColor: Colors.white,
+            iconIdleGlowColor: Colors.orange, spiritualIdleGlowColor: Colors.green
         },
         {
             name: "CEDAR", role: "ROLE // NOT ASSIGNED",
             iconPath: "../assets/forest/cedar-outline.svg",
             hoverIconPath: "../assets/forest/cedar-hover-orange.svg",
             openIconPath: "../assets/forest/cedar-open-magenta.svg",
-            identityColor: Colors.green, idleGlowColor: Colors.omnitrix
+            identityColor: Colors.green,
+            iconIdleGlowColor: Colors.orange, spiritualIdleGlowColor: Colors.orange
         },
         {
             name: "MACINTOSH", role: "ROLE // NOT ASSIGNED",
             iconPath: "../assets/forest/macintosh-outline.svg",
             hoverIconPath: "../assets/forest/macintosh-hover-orange.svg",
             openIconPath: "../assets/forest/macintosh-open-magenta.svg",
-            identityColor: Colors.red, idleGlowColor: Colors.red
+            identityColor: Colors.green,
+            iconIdleGlowColor: Colors.red, spiritualIdleGlowColor: Colors.red
         }
     ]
     readonly property var activeTree: treeSlots[selectedTreeIndex]
@@ -403,16 +408,21 @@ PanelWindow {
                         width: treeColumn.width
                         height: 59
                         open: index === root.selectedTreeIndex
-                        // Identity colors are explicit for each Tree, while
-                        // hover, pressed, and open retain shared DockButton
-                        // state precedence. No two-Tree fallback color guess.
+                        // Three independent idle channels: identity sets the
+                        // outline/name/border ink; icon glow illuminates only
+                        // the image; spiritual glow illuminates name and button
+                        // border/perimeter. Shared hover/open states still win.
                         readonly property color iconIdentityColor: modelData.identityColor
-                        readonly property color idleGlowColor: modelData.idleGlowColor
+                        readonly property color iconIdleGlowColor: modelData.iconIdleGlowColor
+                        readonly property color spiritualIdleGlowColor: modelData.spiritualIdleGlowColor
+                        readonly property color resolvedIconGlowColor:
+                            treeRow.open || treeRow.pressed || treeRow.hovered
+                                ? treeRow.contentGlowColor : treeRow.iconIdleGlowColor
                         normalForegroundColor: iconIdentityColor
                         hoverForegroundColor: Colors.orange
                         pressedForegroundColor: Colors.magenta
-                        normalDockGlowColor: idleGlowColor
-                        normalContentGlowColor: idleGlowColor
+                        normalDockGlowColor: spiritualIdleGlowColor
+                        normalContentGlowColor: spiritualIdleGlowColor
                         // DockButton owns the two perimeter halos; separate
                         // text and icon samples avoid duplicate full-row glow.
                         contentGlowEnabled: false
@@ -455,7 +465,7 @@ PanelWindow {
                                 safeSource: treeGlyph
                                 requestedVisible: root.menuOpen
                                 foregroundColor: treeRow.foregroundColor
-                                preferredGlowColor: treeRow.contentGlowColor
+                                preferredGlowColor: treeRow.resolvedIconGlowColor
                                 radius: 8
                                 samples: 17
                                 opacity: treeRow.contentGlowOpacity
@@ -570,7 +580,7 @@ PanelWindow {
                         safeSource: activeChatTreeIcon
                         requestedVisible: root.menuOpen
                         foregroundColor: root.activeTree.identityColor
-                        preferredGlowColor: root.activeTree.idleGlowColor
+                        preferredGlowColor: root.activeTree.iconIdleGlowColor
                         radius: 8
                         samples: 17
                         opacity: 0.82

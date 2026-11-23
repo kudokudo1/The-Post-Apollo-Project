@@ -197,3 +197,5 @@ await import("./test_market_quota_status.mjs");
 await import("./test_market_m26_range_analysis.mjs");
 // M28: optional local-only trailing session SMA 5/20 chart overlays.
 await import("./test_market_m28_moving_averages.mjs");
+// M29: descriptive historical SMA 5-vs-20 side changes, no new API.
+await import("./test_market_m29_sma_relationship.mjs");

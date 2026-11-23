@@ -38,6 +38,9 @@ Item {
     readonly property var averageOverlay: !dayMode && showAverages
         && priceBars.length >= 5 && rangeAnalysis !== null
         ? RangeAnalysisPolicy.movingAverageSeries(snapshot) : null
+    // M29: descriptive SMA5/SMA20 relationship for the loaded RANGE only.
+    readonly property var averageRelationship: averageOverlay !== null
+        ? RangeAnalysisPolicy.movingAverageRelationship(snapshot) : null
     onShowAveragesChanged: priceCanvas.requestPaint()
     onAverageOverlayChanged: priceCanvas.requestPaint()
     // M27: selected chart session to LAST LOADED range session, never now.
@@ -638,6 +641,42 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
                 color: Colors.orange
+            }
+            GohuText {
+                objectName: "marketMovingAverageRelationship"
+                width: parent.width
+                visible: stocks.averageRelationship !== null
+                text: stocks.averageRelationship
+                    ? (stocks.averageRelationship.state === "insufficient"
+                        ? ("SMA 5 VS SMA 20 // INSUFFICIENT LOADED HISTORY"
+                            + "\nNEED 20 OBSERVED SESSIONS // HAVE "
+                            + stocks.averageRelationship.sessions
+                            + "\nNO AUTO-FETCH // NOT A TRADE SIGNAL")
+                        : ("SMA 5 VS SMA 20 // HISTORICAL RELATIONSHIP"
+                            + "\nLATEST " + stocks.averageRelationship.latestDate
+                            + " // SMA 5 " + stocks.averageRelationship.latestSide
+                            + " SMA 20"
+                            + "\nSPREAD SMA 5 MINUS SMA 20 "
+                            + (stocks.averageRelationship.spreadPrice < 0 ? "-$" : "+$")
+                            + Math.abs(stocks.averageRelationship.spreadPrice).toFixed(2)
+                            + " // " + (stocks.averageRelationship.spreadPct > 0 ? "+" : "")
+                            + stocks.averageRelationship.spreadPct.toFixed(2) + "%"
+                            + "\nOBSERVED SIDE CHANGES "
+                            + stocks.averageRelationship.sideChanges
+                            + " // MOVED ABOVE " + stocks.averageRelationship.movedAbove
+                            + " / BELOW " + stocks.averageRelationship.movedBelow
+                            + "\nLAST OBSERVED SIDE CHANGE "
+                            + (stocks.averageRelationship.lastChange
+                                ? stocks.averageRelationship.lastChange.date
+                                    + " // SMA 5 MOVED "
+                                    + stocks.averageRelationship.lastChange.direction
+                                : "NONE IN LOADED RANGE")
+                            + "\nCLOSE-BASED ONLY // NOT A LIVE QUOTE OR TRADE SIGNAL"))
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.cyan
             }
             GohuText {
                 width: parent.width

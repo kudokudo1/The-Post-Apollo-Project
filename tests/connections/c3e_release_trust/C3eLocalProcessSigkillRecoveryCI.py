@@ -30,6 +30,8 @@ def _load(name: str, path: Path):
 
 L = _load("c3e_real_process_kill_existing_local_ledger",
           HERE / "C3eLocalDevelopmentHistoryLedger.py")
+# Capture import-side process; the destructive trap may run only after fork.
+IMPORT_PROCESS_PID = os.getpid()
 SCHEMA = "postapollo.connections.c3e-process-sigkill-recovery.ci-v1"
 STATUS = "LOCAL_PROCESS_CRASH_OBSERVATION_NOT_PROTECTED_SETTLEMENT"
 TRAPS = ("AFTER_META_UPDATE_BEFORE_COMMIT", "AFTER_SQLITE_COMMIT_BEFORE_ACK")
@@ -99,6 +101,8 @@ def child_writer_sigkill_ci_only(*, root: Path, record_args: dict,
     root = _guard(root)
     if type(record_args) is not dict or trap_point not in TRAPS:
         _deny("C3E_REAL_SIGKILL_WRITER_EXACT_INPUTS_REQUIRED")
+    if os.getpid() == IMPORT_PROCESS_PID:
+        _deny("C3E_REAL_SIGKILL_FORKED_CHILD_REQUIRED")
     # Validate guard and database before installing the child-local trap.
     ledger = L.DevelopmentLedger(root)
     original_connect = L.connect

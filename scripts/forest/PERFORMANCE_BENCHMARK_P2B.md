@@ -36,7 +36,8 @@ load/prompt-eval/generation durations in milliseconds. Ollama stream
 packets are not tokens. Tokens/sec uses the terminal eval_count and
 eval_duration only when both positive; missing cached-count remains null.
 An error yields one fixed REFUSED JSON without prompt, response, model,
-endpoint or external exception. A nonnegative provider counter is a
+endpoint or external exception. An expected cold/warm residency mismatch
+returns SKIPPED without POST; it is not a successful measurement. A nonnegative provider counter is a
 server report, not a verified hardware timer.
 
 ## HOW TO USE // CURRENT: tests only, NOT a native benchmark request

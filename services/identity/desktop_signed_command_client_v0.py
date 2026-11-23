@@ -18,6 +18,7 @@ from pathlib import Path
 import secrets
 import socket
 import stat
+import time
 from collections.abc import Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -128,17 +129,29 @@ class SignedIdentityCommandClient:
             raise ReceiptRejected("Repeated native command challenge")
         self._nonces.add(nonce)
         wire = build_request(action, request_id, nonce)
+        # One total budget for connect, send, and every response fragment.
+        # Socket idle timeouts alone allow a slow peer to drip bytes forever.
+        deadline = time.monotonic() + 2.0
+
+        def remaining() -> float:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise TimeoutError("Native command total deadline expired")
+            return left
+
         try:
             self._socket_safety()
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
-                conn.settimeout(2.0)
+                conn.settimeout(remaining())
                 conn.connect(str(self._path))
                 peer = _peer(conn)
                 if not self._trusted(peer):
                     raise ReceiptRejected("Untrusted installed native host or desktop seat")
+                conn.settimeout(remaining())
                 conn.sendall(wire)
                 raw = bytearray()
                 while len(raw) <= 1024 and b"\n" not in raw:
+                    conn.settimeout(remaining())
                     part = conn.recv(1025 - len(raw))
                     if not part:
                         break

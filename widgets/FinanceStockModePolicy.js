@@ -1,5 +1,29 @@
 // Finance Market M11: pure DAY vs RANGE selection policy.
 // No network, filesystem, dates inferred from market sessions, or side effects.
+// M16: QML-only public catalog. Tests enforce parity with the Node stock
+// range catalog. SEC filing-price issuers remain deliberately independent.
+function stockItems() {
+    return [
+        {cik:"0000320193",symbol:"AAPL"},
+        {cik:"0000789019",symbol:"MSFT"},
+        {cik:"0001045810",symbol:"NVDA"},
+        {cik:"0001018724",symbol:"AMZN"},
+        {cik:"0001318605",symbol:"TSLA"},
+        {cik:"0001652044",symbol:"GOOGL"}
+    ];
+}
+function stockSymbols() {
+    const result = {};
+    for (const item of stockItems())
+        result[item.cik] = item.symbol + ".US";
+    return result;
+}
+function stockSymbol(cik) {
+    const symbols = stockSymbols();
+    return typeof cik === "string"
+        && Object.prototype.hasOwnProperty.call(symbols,cik)
+        ? symbols[cik] : null;
+}
 function calendarDay(value) {
     if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
         return null;
@@ -53,11 +77,7 @@ function daySession(snapshot, requestedDay) {
 // and verified RANGE. This does not claim a separate daily API request.
 // Only actual provider-returned bars qualify. Copy rather than mutate.
 function daySnapshotFromRange(snapshot, index, cik, rangeFrom, rangeTo) {
-    const symbols = {
-        "0000320193":"AAPL.US",
-        "0000789019":"MSFT.US",
-        "0001045810":"NVDA.US"
-    };
+    const symbols = stockSymbols();
     if (!snapshot || snapshot.schemaVersion !== 1
             || snapshot.source !== "eodhd-eod" || snapshot.readOnly !== true
             || snapshot.cik !== cik || snapshot.symbol !== symbols[cik]

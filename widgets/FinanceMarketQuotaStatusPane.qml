@@ -35,6 +35,7 @@ Rectangle {
     }
     ActionButton {
         id: backButton
+        objectName: "marketQuotaBackButton"
         anchors.top: parent.top
         anchors.topMargin: 6
         anchors.right: parent.right

@@ -63,6 +63,36 @@ assert.ok(maxPayload.candidates.slice(0,30).every(x=>
   x.kind==="sec-index" && x.reviewed===false
     && x.authenticatedProvenance===false));
 assert.equal(maxPayload.candidates[30].eligibleForDraft,false);
+// M8b: recreate the Python spider's exact ISO output. The old M6
+// validator rejected +00:00 and six fractional digits after Crawl accepted
+// them, which caused a combined SEC/Crawl preview to fail completely.
+const scrapyCrawl=normalizeCrawl([{
+  schemaVersion:1,source:"finance-demo-scrapy",readOnly:true,
+  url:"https://quotes.toscrape.com/",
+  title:"Synthetic Scrapy source",
+  observedAt:"2026-11-23T14:42:00.123456+00:00",
+  links:["https://quotes.toscrape.com/page/2/"],
+  snippets:["Demo text"]
+}]);
+const bridgeFrame=JSON.stringify({
+  ...request,secSnapshot:populatedSec,crawlSnapshot:scrapyCrawl
+})+"\n";
+const bridgeOutput=prepareCandidatePreviewResponse(bridgeFrame);
+const bridgeResult=JSON.parse(bridgeOutput.slice(RESULT_PREFIX.length));
+assert.deepEqual(bridgeResult.counts,{sec:30,demo:1,attachablePreview:30});
+assert.equal(bridgeResult.candidates[30].observedAt,
+  "2026-11-23T14:42:00.123456+00:00");
+assert.equal(bridgeResult.candidates[30].eligibleForDraft,false);
+const malformedDemo={...scrapyCrawl,pages:[
+  {...scrapyCrawl.pages[0],observedAt:"NOT A VALID TIMESTAMP"}]};
+assert.throws(()=>prepareCandidatePreviewResponse(JSON.stringify({
+  ...request,crawlSnapshot:malformedDemo
+})+"\n"),e=>e instanceof CandidateBridgeRefusal
+  && e.message==="INVALID_DEMO_PAGE");
+assert.throws(()=>prepareCandidatePreviewResponse(JSON.stringify({
+  ...request,secSnapshot:{...sec,source:"untrusted"}
+})+"\n"),e=>e instanceof CandidateBridgeRefusal
+  && e.message==="INVALID_SEC_SNAPSHOT");
 assert.ok(Buffer.byteLength(maxOutput,"utf8")<65536);
 assert.ok(maxOutput.length<66000);
 assert.match(payload.notice,/NO AUTOMATIC SOURCE VERIFICATION/);

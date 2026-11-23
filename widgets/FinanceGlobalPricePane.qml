@@ -16,6 +16,7 @@ Rectangle {
     FinanceServices.FinanceGlobalPriceService {
         id: priceFeed
         monitoring: priceView.active
+        onSnapshotChanged: historyChart.requestPaint()
     }
     function inspectInstrument(item) {
         const ok=priceFeed.chooseIdentity(item);

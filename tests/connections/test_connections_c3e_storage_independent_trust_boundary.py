@@ -42,7 +42,8 @@ class StorageBoundaryTests(unittest.TestCase):
             "test_01_true_signed_continuity_advances_only_dev_head")
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
-        self.local = M.LocalSQLiteTestAdapter(self.fixture.ledger)
+        self.local = M.LocalSQLiteTestAdapter(
+            M.L.DevelopmentLedger(self.fixture.work))
         self.dev = M.TrustBoundary(required_mode=M.LOCAL_DEVELOPMENT,
                                    local_adapter=self.local)
         self.protected = M.TrustBoundary(required_mode=M.PROTECTED_REQUIRED)
@@ -173,21 +174,21 @@ class StorageBoundaryTests(unittest.TestCase):
     def test_21_bad_local_snapshot_authority_flag_refused(self):
         bad = self.fixture.ledger.snapshot()
         bad["productionAuthority"] = True
-        with mock.patch.object(self.fixture.ledger, "snapshot", return_value=bad):
+        with mock.patch.object(self.local._ledger, "snapshot", return_value=bad):
             with self.assertRaisesRegex(M.Refused, "AUTHORITY_PROMOTION"):
                 self.dev.read_current_snapshot()
 
     def test_22_missing_local_snapshot_field_refused(self):
         bad = self.fixture.ledger.snapshot()
         bad.pop("testEpoch")
-        with mock.patch.object(self.fixture.ledger, "snapshot", return_value=bad):
+        with mock.patch.object(self.local._ledger, "snapshot", return_value=bad):
             with self.assertRaisesRegex(M.Refused, "UNEXPECTED_BACKEND_FIELDS"):
                 self.dev.read_current_snapshot()
 
     def test_23_invalid_local_snapshot_epoch_refused(self):
         bad = self.fixture.ledger.snapshot()
         bad["testEpoch"] = "fixture"  # Cannot invent an approved key epoch.
-        with mock.patch.object(self.fixture.ledger, "snapshot", return_value=bad):
+        with mock.patch.object(self.local._ledger, "snapshot", return_value=bad):
             with self.assertRaisesRegex(M.Refused, "SNAPSHOT_MALFORMED"):
                 self.dev.read_current_snapshot()
 

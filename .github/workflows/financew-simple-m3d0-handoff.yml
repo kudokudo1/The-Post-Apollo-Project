@@ -1,0 +1,30 @@
+name: FinanceW Simple M3d0 read-only handoff
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/finance/simple_category_handoff_readiness.mjs"
+      - "tests/finance/test_finance_simple_m3d0_handoff.mjs"
+      - "tests/finance/test_finance_simple_m3d0_hold_contracts.py"
+      - ".github/workflows/financew-simple-m3d0-handoff.yml"
+  push:
+    paths:
+      - "scripts/finance/simple_category_handoff_readiness.mjs"
+      - "tests/finance/test_finance_simple_m3d0_handoff.mjs"
+      - "tests/finance/test_finance_simple_m3d0_hold_contracts.py"
+      - ".github/workflows/financew-simple-m3d0-handoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fictional witness and denial cases
+        run: node --test tests/finance/test_finance_simple_m3d0_handoff.mjs
+      - name: No writer, permit, or GUI Save bridge
+        run: python3 -B tests/finance/test_finance_simple_m3d0_hold_contracts.py

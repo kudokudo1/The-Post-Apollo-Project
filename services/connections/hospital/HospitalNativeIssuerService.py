@@ -301,6 +301,20 @@ def _polkit_approve(request, prepared, peer, seat):
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise C.Refused("HOSPITAL_NATIVE_HOLD // POLKIT_UNAVAILABLE") from exc
 
+def _require_independent_room_consent(request, prepared, peer, seat):
+    """Hard stop until a separately reviewed native exact-Room consent producer exists.
+
+    A successful Polkit authorization is NOT proof that the requested Room,
+    Patient, graph, nonce and preservation terms were visibly confirmed by
+    the real operator. There is currently no enrolled, protected producer
+    or independent one-use consent custodian. This MUST remain deny-only.
+
+    No QML flag, Polkit exit status, environment variable, caller callback,
+    locally generated key, or synthetic display claim can change this result.
+    """
+    C.deny("INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE")
+
+
 def _native_step(client, policy):
     peer = _peer(client)
     if peer[1] != policy["operatorUid"]:
@@ -335,8 +349,14 @@ def _native_step(client, policy):
         C.deny("ISSUER_POLICY_CHANGED_DURING_OPERATOR_APPROVAL")
     if C.host_fingerprint() != policy["hostId"]:
         C.deny("HOST_CHANGED_DURING_OPERATOR_APPROVAL")
-    # Root signing key is loaded only AFTER Linux + real Polkit + trusted PX
-    # source checks. Only protected writer receives this signed envelope.
+    # Polkit only verifies identity/authorization. It does NOT prove that
+    # a trusted native agent displayed the exact PX operation and received
+    # the operator's explicit confirmation. Until independent consent is
+    # enrolled and verified this call MUST always refuse, before key load.
+    _require_independent_room_consent(request, prepared, peer, first_seat)
+    # Future approved releases may only load the private key after an
+    # independently reviewed exact-operation, single-use consent gate.
+    # The protected PX writer alone may receive the resulting envelope.
     key = C.load_installed_key()
     signed = C.sign_px_grant(
         request=request, prepared=prepared, operator_uid=peer[1],

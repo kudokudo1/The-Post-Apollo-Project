@@ -183,3 +183,5 @@ assert.equal(fallback.delivery.via,"DIRECT");
 assert.equal(directs,1);
 assert.equal(upstream,4); // AAPL + MSFT + TSLA + NVDA denial
 console.log("Finance M10 historical ranges, provider gates, hub/cache/fallback fixtures: PASS");
+// M17 free global equity identity search runs in the established FinanceW CI gate.
+await import("./test_openfigi_stock_search.mjs");

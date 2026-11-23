@@ -10,6 +10,11 @@ Item {
     property var secFeed: null
     property var crawlFeed: null
 
+    // Read-only host API for isolated native acceptance and future Finance UI.
+    readonly property string previewState: previewService.state
+    readonly property var previewResult: previewService.candidatePreview
+    function buildPreview() { return previewService.refresh(); }
+
     FinanceServices.FinanceResearchCandidatePreviewService {
         id: previewService
         monitoring: host.active

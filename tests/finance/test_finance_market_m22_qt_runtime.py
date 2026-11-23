@@ -16,6 +16,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 from PySide6.QtCore import QObject, QMetaObject, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
+from PySide6.QtQuick import QQuickItem
 
 app = QGuiApplication([])
 harness = Path(__file__).resolve().with_name(
@@ -133,9 +134,17 @@ QtObject {
             "Actual pane/service/ActionButtons were not instantiated"
         )
 
+        def visual_descendants(item):
+            found=[]
+            for child in item.childItems():
+                found.append(child)
+                found.extend(visual_descendants(child))
+            return found
+
         def labels():
             return [str(x.property("text")) for x in
-                    root.findChildren(QObject, "marketQuotaReservedLabel")]
+                    visual_descendants(pane)
+                    if x.objectName() == "marketQuotaReservedLabel"]
 
         def counts():
             return int(prop(root, "fakeProcessCalls"))

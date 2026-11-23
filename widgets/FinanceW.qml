@@ -154,6 +154,15 @@ PanelWindow {
              : secService.loading ? "READING"
              : secService.state === "failed" ? "ERROR"
              : secService.state === "ready" ? "SNAPSHOT" : "NO FEED")
+        : selectedMainMode === "research" && researchTool === "candidates"
+          ? (!menuOpen ? "IDLE"
+             : candidateHost.previewState === "loading" ? "READING"
+             : candidateHost.previewState === "failed" ? "ERROR"
+             : candidateHost.previewState === "ready"
+               && candidateHost.previewResult
+               && (candidateHost.previewResult.secPresent
+                   || candidateHost.previewResult.demoPresent)
+               ? "SNAPSHOT" : "NO FEED")
         : selectedMainMode === "research"
           ? (!menuOpen ? "IDLE"
              : crawlService.loading ? "READING"
@@ -2465,6 +2474,15 @@ Row {
                             selected: root.researchTool === "sec"
                             onLeftClicked: root.researchTool = "sec"
                         }
+                        ActionButton {
+                            width: 109
+                            height: 28
+                            label: "CANDIDATES"
+                            labelPixelSize: 9
+                            accentColor: Colors.magenta
+                            selected: root.researchTool === "candidates"
+                            onLeftClicked: root.researchTool = "candidates"
+                        }
                     }
                     FinanceResearchCrawlPane {
                         id: crawlPane
@@ -2485,6 +2503,21 @@ Row {
                         secFeed: secService
                         documentFeed: secDocumentService
                         priceFeed: secPriceService
+                    }
+                    // M8 exposes M7 using existing owner snapshots only.
+                    // No new SEC/Crawl process and no Research write route.
+                    FinanceResearchEvidenceCandidatePreviewHost {
+                        id: candidateHost
+                        anchors.top: researchToolStrip.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        visible: root.researchTool === "candidates"
+                        active: root.menuOpen
+                            && root.selectedMainMode === "research"
+                            && root.researchTool === "candidates"
+                        secFeed: secService
+                        crawlFeed: crawlService
                     }
                 }
 

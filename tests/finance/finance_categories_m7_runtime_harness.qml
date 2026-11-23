@@ -45,7 +45,7 @@ Window {
         fixture=copy;
     }
     function invalidBalanceFixture() {
-        var copy=JSON.parse(JSON.stringify(fixture));
+        var copy=original();
         copy.categories[0].availableCents="not-a-number";
         fixture=copy;
     }

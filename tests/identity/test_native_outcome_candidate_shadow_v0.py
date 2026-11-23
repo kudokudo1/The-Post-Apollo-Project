@@ -81,6 +81,15 @@ class NegativeOutcomeCandidateShadowTests(unittest.TestCase):
         self.assert_hold(inspect_candidate_once(
             original=original(), provider=None), calls=0)
 
+    def test_noncallable_provider_is_not_a_lookup(self):
+        for value in ("provider", 1, {}, []):
+            with self.subTest(provider=repr(value)):
+                report = inspect_candidate_once(
+                    original=original(), provider=value)
+                self.assert_hold(report, calls=0)
+                self.assertEqual(
+                    report.reason, "INDEPENDENT_PROVIDER_NOT_AVAILABLE")
+
     def test_provider_exception_is_hold_with_one_call_no_retry(self):
         calls = []
         def fails(binding):

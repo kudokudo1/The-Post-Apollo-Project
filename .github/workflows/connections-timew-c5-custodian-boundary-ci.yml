@@ -1,0 +1,19 @@
+name: Connections TimeW C5 custodian probe (deny-only)
+on:
+  pull_request:
+    paths:
+      - "tests/connections/timew/**"
+      - "docs/connections/timew-c5-storage-independent-custodian-boundary.md"
+      - ".github/workflows/connections-timew-c5-custodian-boundary-ci.yml"
+  workflow_dispatch:
+jobs:
+  isolated-probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate storage-independent TimeW C5 recovery refusal
+        run: python3 -B -I tests/connections/timew/test_timew_c5_custodian_boundary_reference.py
+      - name: Preserve merged C5 spend/revoke reference tests
+        run: python3 -B -I tests/connections/timew/test_timew_c5_spend_fence_reference.py

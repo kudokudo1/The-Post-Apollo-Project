@@ -104,7 +104,7 @@ Item {
                     height: 28
                     label: pane.showNewForm ? "CANCEL NEW" : "NEW CASE"
                     labelPixelSize: 9
-                    available: pane.writeEnabled && pane.loadState === "ready"
+                    available: pane.controllerConnected && pane.writeEnabled && pane.loadState === "ready"
                     accentColor: Colors.magenta
                     onLeftClicked: pane.showNewForm = !pane.showNewForm
                 }
@@ -176,8 +176,8 @@ Item {
                         accentColor: Colors.magenta
                         available: pane.canCreate
                         onLeftClicked: {
+                            // Only the controller may close/clear this form after a verified save.
                             pane.createRequested(pane.draftTitle.trim(), pane.draftQuestion.trim());
-                            pane.showNewForm = false;
                         }
                     }
                 }
@@ -218,6 +218,7 @@ Item {
                                 width: casesList.width
                                 height: 37
                                 label: modelData.title
+                                labelItem.textFormat: Text.PlainText
                                 labelPixelSize: 10
                                 selected: pane.selectedId === modelData.id
                                 onLeftClicked: pane.selectedId = modelData.id
@@ -312,7 +313,7 @@ Item {
                                         label: pane.armedRemoveId === evidenceRow.modelData.id ? "CONFIRM REMOVE" : "REMOVE SOURCE"
                                         labelPixelSize: 9
                                         accentColor: Colors.red
-                                        available: pane.writeEnabled && pane.loadState === "ready"
+                                        available: pane.controllerConnected && pane.writeEnabled && pane.loadState === "ready"
                                         onLeftClicked: {
                                             if (pane.armedRemoveId !== evidenceRow.modelData.id) {
                                                 pane.armedRemoveId = evidenceRow.modelData.id;
@@ -342,16 +343,16 @@ Item {
                     height: 28
                     label: "MANUAL URL"
                     selected: pane.draftSource === "manual"
-                    available: pane.writeEnabled
+                    available: pane.controllerConnected && pane.writeEnabled
                     onLeftClicked: pane.draftSource = "manual"
                 }
                 ActionButton {
                     width: 95
                     height: 28
-                    label: "SEC EDGAR"
-                    selected: pane.draftSource === "sec-edgar-submissions"
-                    available: pane.writeEnabled
-                    onLeftClicked: pane.draftSource = "sec-edgar-submissions"
+                    // A manually typed URL is not proof of a retrieved SEC snapshot.
+                    label: "SEC IMPORT LATER"
+                    selected: false
+                    available: false
                 }
             }
             Repeater {
@@ -398,7 +399,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "PREVIEW IS READ-ONLY UNTIL A REVIEWED CONTROLLER ENABLES WRITES // NO ACCOUNTS OR BANK ACCESS"
+                text: "PREVIEW IS READ-ONLY UNTIL A REVIEWED CONTROLLER ENABLES WRITES // MANUAL LINKS ARE NOT VERIFIED SEC FEED RESULTS"
                 font.pixelSize: 9
                 color: Colors.orange
                 textFormat: Text.PlainText

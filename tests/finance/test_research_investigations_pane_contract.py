@@ -30,5 +30,16 @@ for forbidden in (
 ):
     assert forbidden not in s, forbidden
 assert s.count('ActionButton {') >= 7
+
+# User-originating investigation labels must be displayed as plain text.
+assert 'labelItem.textFormat: Text.PlainText' in s
+# The asynchronous create request must not imply successful storage.
+assert 'pane.showNewForm = false' not in s
+# No manual URL can be falsely labeled as SEC feed provenance.
+assert 'label: "SEC IMPORT LATER"' in s
+assert 'available: false' in s
+assert 'onLeftClicked: pane.draftSource = "sec-edgar-submissions"' not in s
+# A controller connection alone never authorizes mutation.
+assert 'available: pane.controllerConnected && pane.writeEnabled && pane.loadState === "ready"' in s
 assert 'writeEnabled && loadState === "ready"' in s
 print("Finance Research M3 isolated pane contracts: PASS")

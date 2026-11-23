@@ -1053,3 +1053,26 @@ Because this UI activates a previously dormant financial writer path when
 the operator independently creates its permit, a focused Nurse 2 security
 review is appropriate before merge. Real financial write activation and
 local machine changes remain separately operator-approved.
+
+
+## FinanceW Categories M7 // Expense-group clarity and stale-snapshot feedback
+
+Read-only usability improvement to **Finance → Budget → Budget → CATEGORIES**.
+
+- Each expense-group row now displays the number of current expense categories
+  associated with its **stable group ID**, not by comparing names. Zero-count
+  groups display **0 CATEGORIES**.
+- A group ID appearing more than once in the authenticated budget snapshot
+  refuses group previews with **AMBIGUOUS GROUP IDS // REFRESH**.
+- Should an Income group ever be present in the source's group list, the
+  preview refuses renaming it and the rename button is unavailable.
+  The current Actual read-only adapter already excludes Income groups.
+- Malformed group income metadata refuses instead of being silently trusted.
+  The existing M6 preview/arm/confirm, source/month refresh disarming,
+  and M5 writer permissions are unchanged.
+
+**No category or group writer, financial journal, permit, navigation,
+network operation, or shared FinanceW component is modified here.**
+Node fixture tests and source contracts cover the new refusal cases.
+Live Quickshell appearance and financial-write activation remain separate
+acceptance boundaries.

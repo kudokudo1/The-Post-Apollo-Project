@@ -29,8 +29,15 @@ function previewGroupPlan(snapshot, mode, groupId, rawName) {
     if(snapshot.categoryGroups.some(function(g){
         return !g || typeof g.id!=="string"
             || !/^[A-Za-z0-9-]{4,80}$/.test(g.id)
-            || typeof g.name!=="string" || !g.name.trim();
+            || typeof g.name!=="string" || !g.name.trim()
+            || (g.is_income!==undefined && g.is_income!==null
+                && typeof g.is_income!=="boolean");
     }))return refuse("UNTRUSTED GROUP LIST");
+    if(snapshot.categoryGroups.some(function(g,index){
+        return snapshot.categoryGroups.slice(0,index).some(function(other){
+            return other.id===g.id;
+        });
+    }))return refuse("AMBIGUOUS GROUP IDS // REFRESH");
     var current=null;
     if(mode==="rename") {
         var matches=snapshot.categoryGroups.filter(function(g){
@@ -38,6 +45,8 @@ function previewGroupPlan(snapshot, mode, groupId, rawName) {
         });
         if(matches.length!==1)return refuse("GROUP CHANGED // REVIEW AGAIN");
         current=matches[0];
+        if(current.is_income===true)
+            return refuse("INCOME GROUP CANNOT BE RENAMED");
         if(current.name.trim().toLowerCase()===name.toLowerCase())
             return refuse("GROUP NAME UNCHANGED");
     }

@@ -117,8 +117,13 @@ Item {
     }
     function beginRenameGroup(row){
         if(busy || !snapshot || snapshot.readOnly!==true || !row)return false;
-        if(groups.filter(function(g){return g && g.id===row.id
-                && g.name===row.name;}).length!==1)return false;
+        // A list row must still resolve to exactly one non-Income group.
+        // A stale or ambiguous group cannot open a rename draft.
+        if(row.is_income===true || groups.filter(function(g){
+            return g && g.id===row.id;
+        }).length!==1 || !groups.some(function(g){
+            return g && g.id===row.id && g.name===row.name;
+        }))return false;
         clearDraft();
         groupSourceAtOpen=snapshot.sourceKey;
         groupMonthAtOpen=snapshot.month;
@@ -631,7 +636,12 @@ Item {
                     width: parent.width - renameGroupButton.width - 5
                     height: parent.height
                     verticalAlignment: Text.AlignVCenter
-                    text: modelData.name
+                    // The authenticated snapshot owns the group identity;
+                    // count associated expense categories without a write.
+                    text: groupRow.modelData.name+" // "
+                        +categoryPane.categories.filter(function(c){
+                            return c && c.groupId===groupRow.modelData.id;
+                        }).length+" CATEGORIES"
                     font.pixelSize: 10
                     color: Colors.white
                     textFormat: Text.PlainText
@@ -645,7 +655,11 @@ Item {
                     labelPixelSize: 8
                     accentColor: Colors.cyan
                     trackLabelGlowLocally: true
-                    available: !categoryPane.busy
+                    available: !categoryPane.busy && !categoryPane.externalWriteBusy
+                        && groupRow.modelData.is_income!==true
+                        && categoryPane.groups.filter(function(g){
+                            return g && g.id===groupRow.modelData.id;
+                        }).length===1
                     onLeftClicked: categoryPane.beginRenameGroup(groupRow.modelData)
                 }
             }

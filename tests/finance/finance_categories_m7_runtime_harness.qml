@@ -46,6 +46,11 @@ Window {
         copy.categoryGroups[0].name="New Needs";
         fixture=copy;
     }
+    function changeCategoryName() {
+        var copy=JSON.parse(JSON.stringify(fixture));
+        copy.categories[0].name="New Rent";
+        fixture=copy;
+    }
     function addIncomeGroup() {
         var copy=JSON.parse(JSON.stringify(fixture));
         copy.categoryGroups.push({id:"income",name:"Income",is_income:true});
@@ -58,6 +63,9 @@ Window {
     }
     function openNeedsRename() {
         return actualCategoriesPane.beginRenameGroup(fixture.categoryGroups[0]);
+    }
+    function openRentCategoryRename() {
+        return actualCategoriesPane.beginRename(fixture.categories[0]);
     }
     function openIncomeRename() {
         return actualCategoriesPane.beginRenameGroup(

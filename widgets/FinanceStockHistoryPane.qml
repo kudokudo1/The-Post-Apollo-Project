@@ -98,6 +98,8 @@ Item {
         ? RangeAnalysisPolicy.compareStockReferences(stockReference, snapshot,
             stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik))
         : null
+    // M37: chart is derived only from the ready M36 matched-date result.
+    readonly property var crossStockChart: RangeAnalysisPolicy.crossStockNormalizedChart(crossStockComparison)
     function saveStockReference() {
         if (rangeAnalysis === null || !stockFeed) return;
         const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
@@ -581,6 +583,99 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 11
                 color: Colors.cyan
+            }
+            GohuText {
+                width: parent.width
+                visible: stocks.crossStockChart !== null
+                text: stocks.crossStockChart
+                    ? ("CROSS-STOCK CHART // FIRST COMMON CLOSE = 100"
+                        + "\nCYAN = " + stocks.crossStockChart.referenceSymbol
+                        + " // MAGENTA = " + stocks.crossStockChart.currentSymbol
+                        + "\n" + stocks.crossStockChart.priceBasis
+                        + " // INDEX HIGH " + stocks.crossStockChart.high.toPrecision(5)
+                        + " // LOW " + stocks.crossStockChart.low.toPrecision(5))
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+            Rectangle {
+                objectName: "marketCrossStockNormalizedChart"
+                width: parent.width
+                visible: stocks.crossStockChart !== null
+                height: visible ? 174 : 0
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.cyan
+                Canvas {
+                    id: crossStockCanvas
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    property var plot: stocks.crossStockChart
+                    onPlotChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onVisibleChanged: { if (visible) requestPaint(); }
+                    onPaint: {
+                        const ctx=getContext("2d");
+                        ctx.clearRect(0,0,width,height);
+                        const chart=plot;
+                        if (!chart || width < 5 || height < 5) return;
+                        const pointAt=function(p) {
+                            return RangeAnalysisPolicy.normalizedChartPoint(chart,p,width,height);
+                        };
+                        const base=pointAt({step:0,value:100});
+                        if (!base) return;
+                        ctx.beginPath();
+                        ctx.moveTo(0,base.y);
+                        ctx.lineTo(width-1,base.y);
+                        ctx.strokeStyle="#808080";
+                        ctx.lineWidth=1;
+                        ctx.stroke();
+                        function draw(points,color) {
+                            ctx.beginPath();
+                            for (let i=0;i<points.length;i++) {
+                                const p=pointAt(points[i]);
+                                if (!p) return;
+                                if (i===0) ctx.moveTo(p.x,p.y);
+                                else ctx.lineTo(p.x,p.y);
+                            }
+                            ctx.strokeStyle=color;
+                            ctx.lineWidth=1.8;
+                            ctx.stroke();
+                            const last=pointAt(points[points.length-1]);
+                            if (!last) return;
+                            ctx.beginPath();
+                            ctx.arc(last.x,last.y,3,0,Math.PI*2);
+                            ctx.fillStyle=color;
+                            ctx.fill();
+                        }
+                        draw(chart.first,"#55CFCA");
+                        draw(chart.second,"#C74EC7");
+                    }
+                }
+            }
+            GohuText {
+                objectName: "marketCrossStockChartLegend"
+                width: parent.width
+                visible: stocks.crossStockChart !== null
+                text: stocks.crossStockChart
+                    ? (stocks.crossStockChart.from + " TO " + stocks.crossStockChart.to
+                        + " // " + stocks.crossStockChart.first.length + " COMMON CLOSE DATES"
+                        + "\n" + stocks.crossStockChart.referenceSymbol
+                        + " // FINAL INDEX "
+                        + stocks.crossStockChart.first[stocks.crossStockChart.maxSteps].value.toPrecision(5)
+                        + "\n" + stocks.crossStockChart.currentSymbol
+                        + " // FINAL INDEX "
+                        + stocks.crossStockChart.second[stocks.crossStockChart.maxSteps].value.toPrecision(5)
+                        + "\nEQUAL SPACING BY COMMON OBSERVATION // NOT CALENDAR TIME"
+                        + "\nUNMATCHED CLOSES EXCLUDED // NO NEW REQUEST")
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.orange
             }
             Rectangle {
                 objectName: "marketRangeAnalysisPanel"

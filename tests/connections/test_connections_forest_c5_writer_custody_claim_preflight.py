@@ -285,5 +285,44 @@ class ForestC5UnenrolledWriterCustodyTests(unittest.TestCase):
             self.assertNotIn(name, dir(C))
 
 
+
+    def test_19_denial_constants_and_result_isolation(self):
+        for key in C.NO_AUTHORITY:
+            with self.assertRaises(TypeError):
+                C.NO_AUTHORITY[key] = True
+        result = self.check()
+        result["custodyAntirollbackVerified"] = True
+        result["safeActions"].append("SETTLE")
+        fresh = self.check()
+        self.assertFalse(fresh["custodyAntirollbackVerified"])
+        self.assertEqual(fresh["safeActions"], [])
+
+    def test_20_intent_bounds_checked_before_hashing(self):
+        for bad in (None, "not bytes", bytearray(self.intentwire),
+                    memoryview(self.intentwire), b"", b"x" * (S.MAX_WIRE + 1)):
+            with self.subTest(kind=type(bad).__name__):
+                self.hold("INTENT_WIRE_BOUNDS", args=self.make(wire_changes={0: bad}))
+
+    def test_21_custody_public_refusals_do_not_chain(self):
+        for index in (0, 1, 4, 7):
+            with self.subTest(index=index):
+                args = self.make(wire_changes={index: b'{"private":"SYNTHETIC_PRIVATE\xff"}'})
+                # For intent corruption the signed custody commitment will
+                # mismatch before decoding; that is also a fixed refusal.
+                with self.assertRaises(C.CustodyHold) as caught:
+                    self.check(args=args)
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+                self.assertNotIn("SYNTHETIC_PRIVATE", str(caught.exception))
+        for index in (2, 5, 8):
+            args = self.make()
+            args[index] = bytes([args[index][0] ^ 1]) + args[index][1:]
+            with self.assertRaises(C.CustodyHold) as caught:
+                self.check(args=args)
+            self.assertIn("INVALID_SIGNATURE", str(caught.exception))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+
+
 if __name__ == "__main__":
     unittest.main()

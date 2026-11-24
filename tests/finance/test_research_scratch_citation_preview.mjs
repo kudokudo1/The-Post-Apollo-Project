@@ -87,7 +87,7 @@ const refuse=(request,code)=>{
   assert.throws(()=>appendScratchCitation(JSON.stringify(request)+"\n",dependencies),
     e=>e instanceof ScratchRefusal && e.message===code);
 };
-refuse(makeRequest(result1.scratchCase,a),"CANDIDATE_REVIEW_REQUIRED");
+refuse({...first,scratchCase:result1.scratchCase},"CANDIDATE_REVIEW_REQUIRED");
 refuse({...first,action:"store-scratch"},"INVALID_REQUEST");
 refuse({...first,revision:1},"INVALID_REQUEST");
 refuse({...first,scratchCase:{...scratch,id:"non_scratch"}},"INVALID_REQUEST");
@@ -108,7 +108,7 @@ const forty=Array.from({length:40},(_,i)=>({
     +String(100000+i)+"/index.htm"
 }));
 assert.equal(validInvestigation({...scratch,evidence:forty}),true);
-refuse(makeRequest({...scratch,evidence:forty},b),"CANDIDATE_REVIEW_REQUIRED");
+refuse({...first,scratchCase:{...scratch,evidence:forty}},"CANDIDATE_REVIEW_REQUIRED");
 
 const source=fileURLToPath(new URL(
   "../../scripts/finance/research_scratch_citation_preview.mjs",import.meta.url));

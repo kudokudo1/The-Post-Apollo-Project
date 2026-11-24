@@ -484,7 +484,7 @@ Item {
                 spacing: 8
                 ActionButton {
                     id: load
-                    width: 122
+                    width: Math.min(fetchControls.width, 122)
                     height: 28
                     label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"
                         : stocks.dayMode
@@ -574,7 +574,14 @@ Item {
                                   ? "NO TRADING SESSION" : "INVALID DATA")
                           + "\nCLOSE " + (stocks.dayResult && stocks.dayResult.state === "session"
                               ? "$" + stocks.dayResult.close.toFixed(2) : "N/A")
-                        : stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
+                        : !stocks.controlsExpanded
+                            ? (stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
+                                + " // EODHD"
+                                + "\n" + stocks.snapshot.bars.length + " SESSIONS // LAST "
+                                + (stocks.snapshot.last ? "$" + stocks.snapshot.last.price.toFixed(2) : "N/A")
+                                + " // " + (stocks.snapshot.changePct === null
+                                    ? "N/A" : stocks.snapshot.changePct.toFixed(2) + "% FIRST TO LAST"))
+                            : stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
                           + "\nREQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
                           + "\nSESSIONS " + stocks.snapshot.bars.length
                           + "\nFIRST CLOSE " + (stocks.snapshot.first

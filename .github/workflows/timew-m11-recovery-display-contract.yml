@@ -1,0 +1,38 @@
+name: TimeW M11 local Save recovery display contract (read-only)
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3LocalSaveRecoveryUiRead.py'
+      - 'services/time/MachineV3LocalSaveRecoveryPolicy.js'
+      - 'services/time/MachineV3CoordinatedLocalSave.py'
+      - 'tests/timew/test_machine_v11_recovery_ui_read.py'
+      - 'tests/timew/test_machine_v11_recovery_display_policy.cjs'
+      - 'docs/timew-m11-recovery-display-contract.md'
+      - '.github/workflows/timew-m11-recovery-display-contract.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-recovery-display:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify actual local recovery read bridge and display-only decoding
+        run: |
+          python3 -B -I tests/timew/test_machine_v11_recovery_ui_read.py
+          node tests/timew/test_machine_v11_recovery_display_policy.cjs
+      - name: Preserve existing coordinated Save and local preview boundaries
+        run: |
+          python3 -B -I tests/timew/test_machine_v10_coordinated_local_save.py
+          python3 -B -I tests/timew/test_machine_v9_original_save_identity.py
+          python3 -B -I tests/timew/test_machine_v8_local_fractional_attempt_journal.py
+          python3 -B -I tests/timew/test_machine_v7_local_save_recovery.py
+          python3 -B -I tests/timew/test_machine_v6_local_exact_checkpoint_admission.py
+          python3 -B -I tests/timew/test_machine_v5_local_preview_ui_bridge.py
+          node tests/timew/test_machine_v5_local_preview_policy.cjs

@@ -1,18 +1,9 @@
-# CPU++ M1c.3a.5b // Native recovery fault fixture (staged, not connected)
+# CPU++ M1c.3a.5b // Native recovery fault and clean reboot gate
 
-This is a separate test-only preparation while #2461's first native smoke is running. It does not change the running workflow or trigger another VM. It is not a production tool. The exact reviewed #2456 helper blob is pinned. No helper/source or UI changes.
+#2461 verified two real normal adjustment cycles on Silverblue 44 Btrfs with SELinux enforcing, using exact reviewed helper blob eec7a83cc9068303c3fbc6f4ae9c98e78f7b67ad. #2463 staged the fault fixture source. This integration joins it to the existing disposable KVM harness; no production helper, authorization or UI change.
 
-## Required future runner wiring
+The same fresh virtual disk boots twice. The first boot runs the original two-cycle test, a third actual withdrawal/reactivation, SIGKILL immediately after the first journal unlink, protected fence verification, explicit archive resume, and a fourth withdrawal with a durable witness. The dedicated wrapper requests a normal guest poweroff. The host requires clean QEMU exit and exact first-phase markers, then boots the same image without installation media. The second boot checks changed kernel boot ID, persistent base active, extension retained inactive, matching inode/size (including directory identities), unchanged journal and archive bytes, and continued recovery fencing. Btrfs device-number changes remain FILE_IDENTITY_MISMATCH, not permission. Both phases must finish and power off; missing/duplicate markers or timeout fail the job. No guest initialization replay is accepted on boot two.
 
-Only after normal-path guest provisioning has been verified, stage this script at a dedicated root-owned path in that same fresh offline VM alongside the exact pinned helper. Create a second root-only fixture marker /etc/postapollo-memory-native-fault-ci-only containing DISPOSABLE_CPU_MEMORY_FAULT_V1. Do not create this marker outside the disposable test VM. The guest must have the two verified normal cycles already archived, active 4 GiB base + 4 GiB extension, SELinux enforcing, Btrfs and the original fixture marker.
+This fixture runs only inside the offline dedicated VM with both root-owned test markers. Never create the markers or run the test on an operator workstation. Only a fresh qcow2 and read-only installation media are attached. No host disk passthrough, shared guest filesystem or guest network.
 
-1. Run prepare in the guest after the normal-cycle marker. The fixture performs a third real withdraw/reactivate cycle, kills its own test-only archive process immediately after the first original journal unlink, verifies the archive-pending fence and remaining records, explicitly resumes the archive, then withdraws once more and records a durable boot witness.
-2. Require the three preparation PASS markers exactly once, no FAIL. Stop the one-shot service from repeating its initialization on reboot. Have the host controller shut down/reboot the guest cleanly (not the workstation), retain the same qcow2, boot it again without installer media, and invoke after-reboot exactly once from a dedicated guest one-shot stage.
-3. Verify changed kernel boot ID, active persistent base and inactive retained extension, same file inodes/sizes, unchanged withdrawal records and all three archived histories, continued mutation fence and no automatic replay. A Btrfs device-number change is reported as FILE_IDENTITY_MISMATCH; it is not silently approved.
-4. Require both postboot PASS markers exactly once and no FAIL. Retain bounded serial evidence and classify missing markers/provisioning as BLOCKED.
-
-## Limits
-
-The fault is an actual process SIGKILL after archive retirement starts, not a power loss at that instruction. The reboot is controlled and clean, not proof of sudden power-loss fsync ordering. This does not inject pressure, kill util-linux during swapoff, or prove external root actor exclusion, protected installer provenance, or safe deletion. It does not execute or change kernel state on the runner host. Native reclaim and production reduction remain HOLD.
-
-Do not execute the guest script directly on a real workstation, run it outside the dedicated VM, or treat this committed fixture as completed native evidence. A future runner integration PR and independent review are required.
+Limits: real SIGKILL is injected in archive retirement, not the util-linux kernel call. Clean reboot is not power-loss proof. Pressure, actual native command interruption, external root/systemd contention, protected installer and reclamation gates remain. No storage deletion, automatic retry or production installation. Production HOLD.

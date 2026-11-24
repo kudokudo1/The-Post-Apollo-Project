@@ -63,10 +63,11 @@ def _hold(code: str) -> None:
 def _parse(wire: bytes, fields: frozenset[str], schema: str, label: str) -> dict:
     try:
         value = S._parse_exact(wire, fields)
-    except S.EvidenceHold as exc:
-        raise HandoffHold(
-            "FOREST_C5_NATIVE_HANDOFF_UNKNOWN_HOLD // INVALID_" + label + "_WIRE"
-        ) from exc
+    except S.EvidenceHold:
+        value = None
+    # Do not propagate raw parser exception objects through public refusals.
+    if value is None:
+        _hold("INVALID_" + label + "_WIRE")
     if value["schema"] != schema or value["audience"] != HANDOFF_AUDIENCE:
         _hold(label + "_DOMAIN_MISMATCH")
     return value
@@ -102,10 +103,10 @@ def inspect_untrusted_native_handoff_fixture(
         candidate, candidate_digest = D._candidate(
             candidate_wire, original_v1_intent_wire, now_ms)
         original, original_digest = V._intent(original_v1_intent_wire)
-    except (D.DisclosureHold, V.V1Hold, TypeError) as exc:
-        raise HandoffHold(
-            "FOREST_C5_NATIVE_HANDOFF_UNKNOWN_HOLD // ORIGINAL_CANDIDATE_INVALID"
-        ) from exc
+    except (D.DisclosureHold, V.V1Hold, TypeError):
+        candidate = None
+    if candidate is None:
+        _hold("ORIGINAL_CANDIDATE_INVALID")
     issuer = _parse(claimed_issuer_wire, ISSUER_FIELDS, ISSUER_SCHEMA, "ISSUER")
     recipient = _parse(
         claimed_recipient_wire, RECIPIENT_FIELDS, RECIPIENT_SCHEMA, "RECIPIENT")

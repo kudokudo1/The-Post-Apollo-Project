@@ -6,6 +6,8 @@ on:
       - 'tests/cpuplus_memory_queue_test.py'
       - 'services/memory/memory_queue_advisory.py'
       - 'tests/cpuplus_memory_queue_advisory_test.py'
+      - 'services/memory/memory_queue_monitor.py'
+      - 'tests/cpuplus_memory_queue_monitor_test.py'
       - 'services/memory/QUEUE-M1C3B.md'
       - '.github/workflows/cpuplus-memory-queue.yml'
   workflow_dispatch:
@@ -20,3 +22,5 @@ jobs:
         run: python3 -B tests/cpuplus_memory_queue_test.py
       - name: Advisory lifecycle tests (no execution)
         run: python3 -B tests/cpuplus_memory_queue_advisory_test.py
+      - name: Condition monitor lifecycle (fixtures only)
+        run: python3 -B tests/cpuplus_memory_queue_monitor_test.py

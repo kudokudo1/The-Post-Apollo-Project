@@ -13,8 +13,10 @@ with tempfile.TemporaryDirectory(prefix="cpu-memory-ui-") as tmp:
     base = Path(tmp)
     config = base / "scene"
     config.mkdir()
-    for name in ("components", "widgets/cpuplus"):
-        shutil.copytree(ROOT / name, config / name)
+    shutil.copytree(ROOT / "components", config / "components")
+    (config / "widgets/cpuplus").mkdir(parents=True)
+    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js"):
+        shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
     shutil.copy2(ROOT / "tests/fixtures/CpuPlusMemoryUiNative.qml", config / "smoke.qml")
     service = config / "services/memory"
     service.mkdir(parents=True)

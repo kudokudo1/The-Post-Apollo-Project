@@ -29,15 +29,17 @@ ShellRoot {
         }
         return ok;
     }
-    Loader {
-        id: scene
-        active: smoke.armed
-        sourceComponent: Window {
-            id: win
-            visible: true
-            width: 320
-            height: 480
-            color: "#1B0623"
+    Window {
+        id: win
+        visible: smoke.armed
+        width: 320
+        height: 620
+        color: "#1B0623"
+        Loader {
+            id: scene
+            anchors.fill: parent
+            active: smoke.armed
+            sourceComponent: Item {
             CpuPlusMemoryActuatorPane {
                 id: pane
                 anchors.fill: parent
@@ -48,9 +50,14 @@ ShellRoot {
                 const scroll = smoke.find(pane, "cpuplusMemoryScroll");
                 const slider = smoke.find(pane, "cpuplusCapacitySelector");
                 if (!smoke.check(rail && footer && scroll && slider, "missing pane controls")) return;
-                if (!smoke.check(rail.height > 0 && scroll.height > 0
-                        && scroll.y >= rail.y + rail.height
-                        && scroll.y + scroll.height <= footer.y + 1, "rail/footer overlap")) return;
+                const pinned = smoke.find(pane, "cpuplusMemoryPinned");
+                if (pane.width <= 0 || pane.height <= 0 || footer.height <= 0) return;
+                if (!smoke.check(rail.height > 0 && scroll.y >= rail.y + rail.height
+                        && scroll.y + scroll.height <= footer.y + 1,
+                        "rail/footer overlap " + pane.width + "x" + pane.height + " rail=" + rail.height
+                            + " scroll=" + scroll.y + "/" + scroll.height + " footer=" + footer.y)) return;
+                if (pane.page === "CAP" && !smoke.check(pinned && pinned.y + pinned.height <= footer.y
+                        && scroll.y >= pinned.y + pinned.height, "CAP pinned overlap")) return;
                 if (smoke.phase === 0) {
                     if (!pane.received || !pane.exited) return;
                     // Supply stable synthetic observations after the real read-only probe exits.
@@ -63,6 +70,14 @@ ShellRoot {
                     if (!smoke.check(rail.columns === 6 && slider.enabledSlider, "wide CAP geometry/availability")) return;
                     slider.valueRequested(24);
                     if (!smoke.check(pane.stagedGiB === 24 && pane.capacity.actualKiB === 16777212, "target versus actual")) return;
+                    pane.selectCapSection(1);
+                    if (!smoke.check(!slider.visible && scroll.visible, "actions section")) return;
+                    slider.valueRequested(32);
+                    if (!smoke.check(pane.stagedGiB === 24, "hidden slider refusal")) return;
+                    pane.selectCapSection(2);
+                    if (!smoke.check(scroll.visible, "details section")) return;
+                    pane.selectCapSection(0);
+                    if (!smoke.check(!scroll.visible && slider.visible, "target section scroll-free")) return;
                     MemoryOperation.busy = true;
                     slider.valueRequested(32);
                     if (!smoke.check(pane.stagedGiB === 24 && !slider.enabledSlider, "busy refusal")) return;
@@ -97,6 +112,7 @@ ShellRoot {
                 console.log("CPU_MEMORY_UI_NATIVE_PASS");
                 smoke.done = true;
                 Qt.quit();
+            }
             }
         }
     }

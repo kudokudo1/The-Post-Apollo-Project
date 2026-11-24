@@ -18,7 +18,8 @@ with tempfile.TemporaryDirectory(prefix="cpu-diag-native-") as temporary:
     shutil.copytree(ROOT / "services/diagnostics", config / "services/diagnostics")
     destination = config / "widgets/cpuplus"
     destination.mkdir(parents=True)
-    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusMemoryCapacitySlider.qml",
+    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js",
+                 "CpuPlusMemoryCapacitySlider.qml",
                  "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml",
                  "CpuPlusMemorySnapshot.js", "CpuPlusDiagnosticsPane.qml",
                  "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js",

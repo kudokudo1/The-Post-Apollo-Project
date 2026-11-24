@@ -49,7 +49,8 @@ Column {
             {kind: "memory", label: "MEMORY OBSERVE // 120s"},
             {kind: "inventory", label: "SOURCE WORKLOAD SCAN"},
             {kind: "threads", label: "THREAD SAMPLE // 30s"},
-            {kind: "census", label: "PROCESS CENSUS // 30s"}
+            {kind: "census", label: "PROCESS CENSUS // 30s"},
+            {kind: "storage", label: "STORAGE OBSERVE // 30s"}
         ]
         delegate: ActionButton {
             required property var modelData
@@ -75,7 +76,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "Captures run outside Quickshell. Close this menu and reproduce the issue, then return here. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; GPU and database-specific activity are not measured."
+        text: "Captures run outside Quickshell. Close this menu and reproduce the issue, then return here. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
@@ -84,12 +85,12 @@ Column {
         width: parent.width
         spacing: 3
         Repeater {
-            model: ["memory", "inventory", "threads", "census"]
+            model: ["memory", "inventory", "threads", "census", "storage"]
             delegate: ActionButton {
                 required property string modelData
-                width: Math.max(0, Math.floor((root.width - 9) / 4))
+                width: Math.max(0, Math.floor((root.width - 12) / 5))
                 height: 27
-                label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : "CENSUS"
+                label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : "STORE"
                 labelPixelSize: 9
                 selected: root.selectedReport === modelData
                 onLeftClicked: {

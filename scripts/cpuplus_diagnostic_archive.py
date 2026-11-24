@@ -10,7 +10,7 @@ import stat
 import sys
 
 SCHEMA = "post-apollo-diagnostic-archive-v1"
-KINDS = {"memory", "inventory", "threads", "census"}
+KINDS = {"memory", "inventory", "threads", "census", "storage"}
 STATUSES = {"COMPLETE", "CANCELLED", "NOT VERIFIED"}
 LIMIT = 8
 MAX_FRAME = 512 * 1024

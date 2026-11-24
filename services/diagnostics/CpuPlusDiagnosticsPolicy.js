@@ -20,7 +20,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage"].indexOf(kind) >= 0;
 }
 
 function validReportId(id) {
@@ -33,7 +33,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -61,7 +61,7 @@ function referenceFor(entry) {
 }
 
 // Fixed, read-only diagnostic catalog. No caller-supplied arguments.
-function argumentsFor(kind, resolvePath) {
+function argumentsFor(kind, resolvePath, dataDir) {
     const prefix = ["/usr/bin/timeout", "--kill-after=3s", "145s",
                     "/usr/bin/python3", "-B"];
     if (kind === "memory")
@@ -69,6 +69,11 @@ function argumentsFor(kind, resolvePath) {
                              "--duration", "120", "--interval", "10"]);
     if (kind === "inventory")
         return prefix.concat([resolvePath("scripts/cpuplus_qml_workload_inventory.py")]);
+    if (kind === "storage") {
+        if (typeof dataDir !== "string" || !dataDir.startsWith("/")) return null;
+        return prefix.concat([resolvePath("scripts/cpuplus_storage_observer.py"),
+                             "--data-dir", dataDir, "--shell-dir", resolvePath("."), "--duration", "30"]);
+    }
     if (kind === "census")
         return prefix.concat([resolvePath("scripts/cpuplus_process_census.py"),
                              "--duration", "30", "--interval", "10"]);
@@ -95,6 +100,54 @@ function summarize(kind, text) {
             return "QML // " + data.scannedQml + " files\nSOURCE MARKERS // "
                 + data.totals.Timer + " timers / " + data.totals.Process
                 + " processes / " + data.totals.Repeater + " repeaters";
+        }
+        if (kind === "storage") {
+            const records = text.trim().split("\n").map(line => JSON.parse(line));
+            const final = records.pop();
+            const ids = ["notifications.history", "notifications.favorites", "notifications.policies",
+                "notifications.scroll", "weather.cache", "weather.history", "weather.events",
+                "weather.places", "weather.dossier", "hub.layout", "hub.notes", "hub.todo",
+                "social.identities", "git.journal", "git.delta", "forest.preferences",
+                "finance.manual", "company.hubs"];
+            const states = ["present", "absent", "unavailable"];
+            const count = x => Number.isSafeInteger(x) && x >= 0;
+            const size = (state, value) => state === "present" ? count(value) : value === null;
+            if (!final || final.schema !== "post-apollo-storage-observation-v1"
+                    || final.event !== "complete" || final.samples !== records.length
+                    || records.length < 1 || records.length > 3) return null;
+            if (records.some((sample, index) =>
+                sample.schema !== final.schema || sample.event !== "storage"
+                || sample.sequence !== index + 1 || !count(sample.intervals)
+                || sample.intervals < 1 || sample.intervals > 30 || !count(sample.elapsedMs)
+                || (index > 0 && (sample.intervals <= records[index-1].intervals
+                    || sample.elapsedMs < records[index-1].elapsedMs))
+                || !Array.isArray(sample.rows) || sample.rows.length !== ids.length
+                || sample.rows.some((row, i) => !row || row.id !== ids[i]
+                    || states.indexOf(row.initialState) < 0 || states.indexOf(row.finalState) < 0
+                    || !size(row.initialState,row.initialBytes) || !size(row.finalState,row.finalBytes)
+                    || !count(row.changedIntervals) || !count(row.replacementIntervals)
+                    || !count(row.unavailableIntervals) || !count(row.comparableIntervals)
+                    || row.comparableIntervals + row.unavailableIntervals !== sample.intervals
+                    || row.changedIntervals > row.comparableIntervals
+                    || row.replacementIntervals > row.changedIntervals
+                    || (index > 0 && (row.initialState !== records[index-1].rows[i].initialState
+                        || row.initialBytes !== records[index-1].rows[i].initialBytes
+                        || row.changedIntervals < records[index-1].rows[i].changedIntervals
+                        || row.replacementIntervals < records[index-1].rows[i].replacementIntervals
+                        || row.unavailableIntervals < records[index-1].rows[i].unavailableIntervals
+                        || row.comparableIntervals < records[index-1].rows[i].comparableIntervals)))))
+                return null;
+            const last = records[records.length-1];
+            const changed = last.rows.filter(row => row.changedIntervals > 0)
+                .sort((a,b) => b.changedIntervals - a.changedIntervals);
+            const unavailable = last.rows.filter(row => row.unavailableIntervals > 0).length;
+            const absent = last.rows.filter(row => row.finalState === "absent").length;
+            return "STORAGE METADATA // " + last.intervals + " intervals / " + ids.length + " targets"
+                + "\nCHANGED TARGETS // " + changed.length + "   ABSENT AT END // " + absent
+                + "\nUNAVAILABLE INTERVALS IN // " + unavailable + " targets"
+                + (changed.length ? "\n" + changed.slice(0,5).map(row =>
+                    row.id + " // " + row.changedIntervals + " changed intervals").join("\n") : "")
+                + "\nNOT WRITE COUNTS OR WRITER IDENTITY";
         }
         if (kind === "census") {
             const records = text.trim().split("\n").map(line => JSON.parse(line));

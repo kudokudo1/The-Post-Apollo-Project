@@ -24,4 +24,6 @@ assert.match(time, /if \(externalSystemAuthBusy \|\| !resyncConfirmRequired/);
 assert.match(time, /if \(externalSystemAuthBusy \|\| !timezoneConfirmRequired/);
 assert.match(owner, /args.push\("persist-authorized"\)/);
 assert.match(pane, /MemoryOperation.request\("persist", 0\)/);
-console.log("18 native auth source assertions PASS");
+assert.match(owner, /args.push\("expand-authorized", String\(requestedGiB\)\)/);
+assert.match(pane, /MemoryOperation.request\("expand", control.stagedGiB\)/);
+console.log("20 native auth source assertions PASS");

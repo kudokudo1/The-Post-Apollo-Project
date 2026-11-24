@@ -1,0 +1,28 @@
+name: Forest Core I2 Model Binding CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/model_binding_i2.py'
+      - 'scripts/forest/MODEL_BINDING_I2.md'
+      - 'tests/forest/test_model_binding_i2.py'
+      - 'scripts/forest/model_form_routing_i1.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'scripts/forest/capability_registry_b6r2.py'
+      - 'scripts/forest/resource_governor_p1.py'
+      - '.github/workflows/forest-core-i2-model-binding.yml'
+permissions:
+  contents: read
+jobs:
+  binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_binding_i2.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_form_routing_i1.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_shared_context_b6r1.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_capability_registry_b6r2.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - run: python3 -m py_compile scripts/forest/model_binding_i2.py tests/forest/test_model_binding_i2.py

@@ -582,7 +582,8 @@ class ForestLauncherContract(unittest.TestCase):
 
         # The actual shared hardware stays the same in Git/Hospital.
         # Its new gradient skin is opt-in; only Forest turns it on.
-        self.assertEqual(view.count("SelectorSlider {"), 1)
+        self.assertEqual(view.count("SelectorSlider {"), 2)
+        self.assertIn("id: modelFormSlider", view)
         self.assertEqual(view.count("IndexRail {"), 0)
         self.assertIn("SelectorSlider {", git)
         self.assertIn("SelectorSlider {", hospital)
@@ -1227,7 +1228,9 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn('onClicked: root.equipLocalModel("small", modelEntry.modelName)', view)
         self.assertIn('onClicked: root.equipLocalModel("big", modelEntry.modelName)', view)
         self.assertIn("property var selectedTreeEquipment:", view)
-        self.assertIn("choices[selectedTreeIndex] = name", view)
+        self.assertIn("ModelFormPolicy.equip(selectedTreeEquipment, selectedTreeIndex", view)
+        self.assertIn("selectedTreeEquipment = next;", view)
+        self.assertNotIn("selectedTreeModels", view)
         self.assertIn("onSelectedTreeIndexChanged: modelPopupOpen = false", view)
         self.assertIn("if (root.modelPopupOpen)", view)
         self.assertIn("root.lastModelScanResult", view)

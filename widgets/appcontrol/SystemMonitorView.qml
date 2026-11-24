@@ -34,6 +34,9 @@ required property var controller
                 String(safeComponent.category || "").toUpperCase()
             readonly property bool categoryTextAccent:
                 categoryName === "NETWORK" || categoryName === "STORAGE"
+            readonly property bool compactMemoryReading: pinnedInstrument && categoryName === "MEMORY"
+                && String(safeComponent.detail || "").startsWith("AVAILABLE ")
+                && String(safeComponent.secondary || "").length > 0
 
             Column {
                 id: fixedInstrument
@@ -475,7 +478,49 @@ required property var controller
                     }
                 }
 
+                Row {
+                    id: combinedMemory
+                    objectName: "systemMonitorCombinedMemory"
+                    visible: systemMonitorBody.compactMemoryReading
+                    width: parent.width
+                    height: Math.max(availableMemory.implicitHeight, usedMemory.implicitHeight)
+                    spacing: 0
+                    readonly property real remaining: Math.max(0, width - memoryDivider.width)
+                    readonly property real naturalSum: Math.max(1, availableMemory.implicitWidth + usedMemory.implicitWidth)
+                    GohuText {
+                        id: availableMemory
+                        objectName: "systemMonitorAvailableMemory"
+                        text: String(systemMonitorBody.safeComponent.detail || "")
+                        textFormat: Text.PlainText
+                        width: Math.min(implicitWidth, combinedMemory.remaining * implicitWidth / combinedMemory.naturalSum)
+                        color: Colors.cyan
+                        font.pixelSize: 12
+                        fontSizeMode: Text.HorizontalFit
+                        minimumPixelSize: 8
+                        elide: Text.ElideRight
+                    }
+                    GohuText {
+                        id: memoryDivider
+                        text: " // "
+                        color: Colors.white
+                        font.pixelSize: 12
+                    }
+                    GohuText {
+                        id: usedMemory
+                        objectName: "systemMonitorUsedMemory"
+                        text: String(systemMonitorBody.safeComponent.secondary || "")
+                        textFormat: Text.PlainText
+                        width: Math.min(implicitWidth, combinedMemory.remaining * implicitWidth / combinedMemory.naturalSum)
+                        color: Colors.magenta
+                        font.pixelSize: 12
+                        fontSizeMode: Text.HorizontalFit
+                        minimumPixelSize: 8
+                        elide: Text.ElideRight
+                    }
+                }
+
                 GohuText {
+                    visible: !systemMonitorBody.compactMemoryReading
                     width: parent.width
                     text:
                         systemMonitorBody.currentComponent
@@ -492,6 +537,7 @@ required property var controller
                 }
 
                 GohuText {
+                    visible: !systemMonitorBody.compactMemoryReading
                     width: parent.width
                     text:
                         systemMonitorBody.currentComponent

@@ -172,6 +172,29 @@ Item {
             font.pixelSize: 10
             wrapMode: Text.WordWrap
         }
+        Row {
+            id: capBottomRail
+            objectName: "cpuplusCapBottomRail"
+            visible: root.page === "CAP"
+            height: visible ? 28 : 0
+            width: parent.width
+            spacing: 4
+            Repeater {
+                model: ["TARGET", "ACTIONS", "DETAILS"]
+                delegate: ActionButton {
+                    required property string modelData
+                    required property int index
+                    width: Math.max(0, (capBottomRail.width - 8) / 3)
+                    height: 28
+                    label: modelData
+                    contentPadding: 2
+                    selected: root.capSection === index
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectCapSection(index)
+                }
+            }
+        }
     }
     Column {
         id: capInstrument
@@ -201,6 +224,11 @@ Item {
             }
             ActionButton {
                 id: refreshCap
+                objectName: "cpuplusCapRefresh"
+                accentColor: Colors.yellow
+                idleFillColor: Colors.yellow
+                idleForegroundColor: Colors.magenta
+                idleBorderColor: Colors.orange
                 width: 68
                 height: parent.height
                 label: "REFRESH"
@@ -289,23 +317,6 @@ Item {
                 }
             }
         }
-        Row {
-            width: parent.width
-            spacing: 4
-            Repeater {
-                model: ["TARGET", "ACTIONS", "DETAILS"]
-                delegate: ActionButton {
-                    required property string modelData
-                    required property int index
-                    width: Math.max(0, (capInstrument.width - 8) / 3)
-                    height: 28
-                    label: modelData
-                    contentPadding: 2
-                    selected: root.capSection === index
-                    onLeftClicked: root.selectCapSection(index)
-                }
-            }
-        }
         Column {
             width: parent.width
             spacing: 4
@@ -379,8 +390,12 @@ Item {
             ActionButton {
                 width: parent.width
                 height: 30
-                visible: root.page !== "CAP"
+                visible: root.page !== "CAP" && root.page !== "POL"
                 label: "REFRESH"
+                accentColor: Colors.yellow
+                idleFillColor: Colors.yellow
+                idleForegroundColor: Colors.magenta
+                idleBorderColor: Colors.orange
                 available: !probe.running
                 onLeftClicked: root.refresh()
             }
@@ -505,30 +520,63 @@ Item {
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
                     }
-                    SelectorDial {
-                        objectName: "cpuplusSwappinessDial"
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        labelText: "SWAP"
-                        selectorMode: "continuous"
-                        minimumValue: 0
-                        maximumValue: 200
-                        currentValue: Math.max(0, root.stagedSwappiness)
-                        valueStep: 1
-                        valueDecimals: 0
-                        snapContinuousToStep: true
-                        options: ["0", "50", "100", "150", "200"]
-                        numericReferenceValues: [0, 50, 100, 150, 200]
-                        interactive: root.page === "POL" && root.sample !== null
-                                     && root.stagedSwappiness >= 0 && !MemoryOperation.busy
-                        enabled: interactive
-                        onValueRequested: function(value) { root.stagePolicy(Math.round(value)); }
-                    }
-                    ActionButton {
+                    Row {
+                        id: policyInstrument
+                        objectName: "cpuplusPolicyInstrument"
                         width: parent.width
-                        height: 30
-                        label: "RESET TARGET TO ACTUAL"
-                        available: root.sample !== null && !MemoryOperation.busy
-                        onLeftClicked: root.stagePolicy(root.sample.swappiness)
+                        height: Math.max(policyDial.height, policyActions.implicitHeight)
+                        spacing: 8
+                        SelectorDial {
+                            objectName: "cpuplusSwappinessDial"
+                            id: policyDial
+                            width: 136
+                            height: 160
+                            labelText: "SWAP"
+                            selectorMode: "continuous"
+                            minimumValue: 0
+                            maximumValue: 200
+                            currentValue: Math.max(0, root.stagedSwappiness)
+                            valueStep: 1
+                            valueDecimals: 0
+                            snapContinuousToStep: true
+                            options: ["0", "50", "100", "150", "200"]
+                            numericReferenceValues: [0, 50, 100, 150, 200]
+                            interactive: root.page === "POL" && root.sample !== null
+                                         && root.stagedSwappiness >= 0 && !MemoryOperation.busy
+                            enabled: interactive
+                            onValueRequested: function(value) { root.stagePolicy(Math.round(value)); }
+                        }
+                        Column {
+                            id: policyActions
+                            objectName: "cpuplusPolicyActions"
+                            width: Math.max(0, policyInstrument.width - policyDial.width - policyInstrument.spacing)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 8
+                            ActionButton {
+                                objectName: "cpuplusPolicyRefresh"
+                                width: parent.width
+                                height: 30
+                                label: "REFRESH"
+                                accentColor: Colors.yellow
+                                idleFillColor: Colors.yellow
+                                idleForegroundColor: Colors.magenta
+                                idleBorderColor: Colors.orange
+                                contentPadding: 2
+                                labelFontSizeMode: Text.HorizontalFit
+                                available: !probe.running
+                                onLeftClicked: root.refresh()
+                            }
+                            ActionButton {
+                                objectName: "cpuplusPolicyReset"
+                                width: parent.width
+                                height: 30
+                                label: "RESET TARGET"
+                                contentPadding: 2
+                                labelFontSizeMode: Text.HorizontalFit
+                                available: root.sample !== null && !MemoryOperation.busy
+                                onLeftClicked: root.stagePolicy(root.sample.swappiness)
+                            }
+                        }
                     }
                     GohuText {
                         width: parent.width

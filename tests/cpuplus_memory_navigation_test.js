@@ -57,4 +57,10 @@ assert.match(fn, /clearCapConfirmation\(\);/);
 assert.match(pane, /function selectCapSection[\s\S]*?clearCapConfirmation\(\);/);
 assert.match(fn, /CpuPlusDiagnostics\.memoryMenuIndex = index;\s*scroll.contentY = 0;/);
 assert.doesNotMatch(fn, /stagedGiB\s*=|refresh\(|running\s*=|MemoryOperation\.\w/);
+assert.match(pane, /id: footer[\s\S]*?anchors.bottom: parent.bottom[\s\S]*?id: capBottomRail[\s\S]*?model: \["TARGET", "ACTIONS", "DETAILS"\][\s\S]*?id: capInstrument/);
+assert.match(pane, /id: policyInstrument[\s\S]*?SelectorDial\s*\{[\s\S]*?id: policyActions[\s\S]*?label: "RESET TARGET"/);
+for (const name of ["cpuplusCapRefresh", "cpuplusPolicyRefresh"]) {
+    const button = pane.split('objectName: "' + name + '"')[1].split("onLeftClicked:")[0];
+    assert.match(button, /idleFillColor: Colors.yellow/);
+}
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

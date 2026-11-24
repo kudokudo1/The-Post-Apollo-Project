@@ -195,5 +195,57 @@ class ForestC5SignedEvidencePreflightTests(unittest.TestCase):
         self.assertFalse(hasattr(C, "approve_human_consent"))
 
 
+
+    def test_13_denial_constants_and_result_isolation(self):
+        for name in C.NO_AUTHORITY:
+            with self.subTest(name=name):
+                with self.assertRaises(TypeError):
+                    C.NO_AUTHORITY[name] = True
+        result = verify(self.pair)
+        result["productionAuthority"] = True
+        result["safeActions"].append("COMMIT_GENERATE")
+        fresh = verify(self.pair)
+        self.assertFalse(fresh["productionAuthority"])
+        self.assertEqual(fresh["safeActions"], [])
+
+    def test_14_public_decoder_refusal_does_not_chain(self):
+        for wire, reason in (
+            (b'{"private":"SYNTHETIC_PRIVATE', "INVALID_JSON"),
+            (b'{"private":"SYNTHETIC_PRIVATE\xff"}', "INVALID_JSON"),
+            (b'[' * 1500 + b']' * 1500, "INVALID_JSON"),
+            (b'{"schema":"a","schema":"b"}', "DUPLICATE_JSON_KEY"),
+            (b'{"schema":NaN}', "JSON_CONSTANT_REFUSED"),
+        ):
+            with self.subTest(reason=reason, size=len(wire)):
+                parts = self.pair.copy()
+                parts[0] = wire
+                with self.assertRaises(C.EvidenceHold) as caught:
+                    verify(parts)
+                self.assertEqual(str(caught.exception),
+                                 "FOREST_B4C_EVIDENCE_HOLD // " + reason)
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+
+    def test_15_canonical_serialization_and_signature_refusals_are_fixed(self):
+        nested = []
+        for _ in range(1500):
+            nested = [nested]
+        for value in ({"x": nested}, {"x": object()}, {"x": float("nan")}):
+            with self.assertRaises(C.EvidenceHold) as caught:
+                C.canonical_bytes(value)
+            self.assertEqual(str(caught.exception),
+                             "FOREST_B4C_EVIDENCE_HOLD // INVALID_CANONICAL_JSON")
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+        parts = self.pair.copy()
+        parts[2] = bytes([parts[2][0] ^ 1]) + parts[2][1:]
+        with self.assertRaises(C.EvidenceHold) as caught:
+            verify(parts)
+        self.assertEqual(str(caught.exception),
+                         "FOREST_B4C_EVIDENCE_HOLD // SIGNATURE_INVALID")
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+
+
 if __name__ == "__main__":
     unittest.main()

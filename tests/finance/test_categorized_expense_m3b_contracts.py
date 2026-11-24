@@ -45,7 +45,7 @@ for code in (writer,old):
     assert '"wx",0o600' in code
     assert "recovery-needed" in code
     assert 'status!=="committed"' in code or 'status !== "committed"' in code
-assert "await file.sync();" in writer
+assert "await attemptedFile.sync();" in writer
 assert "await fsyncDirectory(journal);" in writer
 assert 'openTrustedDirectory(journalDir,{' in writer
 assert 'readTrustedPrivateFile(path)' in writer

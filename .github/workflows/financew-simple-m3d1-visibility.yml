@@ -1,0 +1,36 @@
+name: FinanceW Simple M3d1 observed category visibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/finance/actual_readonly.mjs"
+      - "tests/finance/test_actual_readonly.mjs"
+      - "tests/finance/test_finance_simple_m3d0_hold_contracts.py"
+      - "tests/finance/test_finance_simple_m3d1_visibility_projection.mjs"
+      - ".github/workflows/financew-simple-m3d1-visibility.yml"
+  push:
+    paths:
+      - "scripts/finance/actual_readonly.mjs"
+      - "tests/finance/test_actual_readonly.mjs"
+      - "tests/finance/test_finance_simple_m3d0_hold_contracts.py"
+      - "tests/finance/test_finance_simple_m3d1_visibility_projection.mjs"
+      - ".github/workflows/financew-simple-m3d1-visibility.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  visibility-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing Actual read-only source contracts
+        run: node --test tests/finance/test_actual_readonly.mjs
+      - name: Real projection to dormant handoff inspector, fictional fixture
+        run: node --test tests/finance/test_finance_simple_m3d1_visibility_projection.mjs
+      - name: Existing Simple M3d0 read-only guard
+        run: node --test tests/finance/test_finance_simple_m3d0_handoff.mjs
+      - name: Preserve uncategorized Save block and writer separation
+        run: python3 -B tests/finance/test_finance_simple_m3d0_hold_contracts.py

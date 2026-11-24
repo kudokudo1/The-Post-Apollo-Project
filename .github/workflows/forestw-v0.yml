@@ -6,6 +6,8 @@ on:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
       - 'widgets/ForestAutoPolicyPreview.qml'
+      - 'widgets/ForestBenchmarkReportView.qml'
+      - 'scripts/forest/performance_benchmark_p2b.py'
       - 'widgets/ForestChatList.qml'
       - 'widgets/ForestChatSessionPolicy.js'
       - 'components/VoiceToTextButton.qml'
@@ -22,6 +24,8 @@ on:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
       - 'widgets/ForestAutoPolicyPreview.qml'
+      - 'widgets/ForestBenchmarkReportView.qml'
+      - 'scripts/forest/performance_benchmark_p2b.py'
       - 'widgets/ForestChatList.qml'
       - 'widgets/ForestChatSessionPolicy.js'
       - 'components/VoiceToTextButton.qml'
@@ -54,3 +58,4 @@ jobs:
           python3 tests/forest/test_forest_model_form_equipment.py
           python3 tests/forest/test_forest_ui_model_preferences.py
           python3 tests/forest/test_forest_auto_policy_preview.py
+          python3 tests/forest/test_forest_benchmark_report_view.py

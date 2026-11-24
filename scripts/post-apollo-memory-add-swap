@@ -22,6 +22,8 @@ LOCK = Path("/run/post-apollo-memory.lock")
 WITHDRAW_MARKER = EXT_DIRECTORY / "withdrawal.json"
 REACTIVATE_MARKER = EXT_DIRECTORY / "reactivation.json"
 REACTIVATE_RESULT = EXT_DIRECTORY / "reactivation-result.json"
+ARCHIVE_PENDING = EXT_DIRECTORY / "archive-pending.json"
+HISTORY_DIRECTORY = PARENT / "post-apollo-memory-history"
 REDUCTION_VERSION = 1
 # Single-threaded helper; ownership remains with the open file description.
 _mutation_fd = None
@@ -182,7 +184,7 @@ def status():
     base = active_swap()
     extension = active_swap(EXT_FILE)
     extension_exists = os.path.lexists(EXT_DIRECTORY)
-    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "recoveryInspectionVersion": 1, "reactivationVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "recoveryInspectionVersion": 1, "reactivationVersion": 1, "cycleArchiveVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": base,
@@ -292,7 +294,7 @@ def check_recovery_fence():
     # Existence alone is sufficient, including partial/corrupt records and
     # orphan result files. Do not parse or clear them on the mutation path.
     for path in (WITHDRAW_MARKER, WITHDRAW_MARKER.with_name("withdrawal-result.json"),
-                 REACTIVATE_MARKER, REACTIVATE_RESULT):
+                 REACTIVATE_MARKER, REACTIVATE_RESULT, ARCHIVE_PENDING):
         try:
             path.lstat()
         except FileNotFoundError:
@@ -452,7 +454,10 @@ def write_protected_record(path, data):
         json.dump(data, stream, sort_keys=True)
         stream.flush()
         os.fsync(stream.fileno())
-    fd = os.open(EXT_DIRECTORY, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    sync_directory(path.parent)
+
+def sync_directory(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         os.fsync(fd)
     finally:
@@ -514,7 +519,7 @@ def withdraw_authorized(target):
 
 
 
-def read_protected_record(path):
+def read_protected_record(path, *, max_bytes=16384):
     """Bounded, no-follow read; absence is distinct from corruption."""
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
@@ -524,11 +529,11 @@ def read_protected_record(path):
         info = os.fstat(fd)
         if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
                 or info.st_mode & 0o077 or info.st_nlink != 1
-                or not 0 < info.st_size <= 16384):
+                or not 0 < info.st_size <= max_bytes):
             raise ValueError("Untrusted or oversized record")
         with os.fdopen(fd, "rb", closefd=False) as stream:
-            raw = stream.read(16385)
-        if len(raw) != info.st_size or len(raw) > 16384:
+            raw = stream.read(max_bytes + 1)
+        if len(raw) != info.st_size or len(raw) > max_bytes:
             raise ValueError("Record changed while reading")
         def unique(pairs):
             result = {}
@@ -679,7 +684,7 @@ def reactivate_authorized(target):
     # authorize this single mutation only after strict predecessor validation.
     with mutation_lock(inspection=True):
         identity = extension_identity()
-        if reactivation_records() != (None, None):
+        if os.path.lexists(ARCHIVE_PENDING) or reactivation_records() != (None, None):
             raise ReductionRecovery("REACTIVATION_RECOVERY_REQUIRED")
         intent = read_protected_record(WITHDRAW_MARKER)
         outcome = read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json"))
@@ -732,6 +737,140 @@ def reactivate_authorized(target):
         print("VERIFIED REACTIVATION:", json.dumps(receipt), flush=True)
 
 
+
+def cycle_paths():
+    return (WITHDRAW_MARKER, WITHDRAW_MARKER.with_name("withdrawal-result.json"),
+            REACTIVATE_MARKER, REACTIVATE_RESULT)
+
+def cycle_digest(records):
+    raw = json.dumps(records, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=True, allow_nan=False).encode("ascii")
+    return hashlib.sha256(raw).hexdigest()
+
+def archive_directory():
+    secure_parent()
+    try:
+        HISTORY_DIRECTORY.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    info = HISTORY_DIRECTORY.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+        raise ReductionRecovery("UNTRUSTED_HISTORY_DIRECTORY")
+    # Also sync the parent if a prior process died just after mkdir.
+    sync_directory(PARENT)
+
+def archive_path(digest):
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ReductionRecovery("INVALID_ARCHIVE_ID")
+    return HISTORY_DIRECTORY / ("cycle-" + digest + ".json")
+
+def cycle_archive_plan(records, identity, snapshot):
+    if len(records) != 4 or not all(isinstance(record, dict) for record in records):
+        raise ReductionRecovery("COMPLETE_VERIFIED_CYCLE_REQUIRED")
+    observation = classify_reactivation(*records, identity, snapshot)
+    if observation["code"] != "REACTIVATION_RECORDED_VERIFIED_ACTIVE":
+        raise ReductionRecovery("ARCHIVE_" + observation["code"])
+    return {"version": 1, "state": "VERIFIED_ACTIVE_CYCLE",
+            "digest": cycle_digest(records), "records": records}
+
+def read_cycle_archive(digest, identity, snapshot):
+    path = archive_path(digest)
+    bundle = read_protected_record(path, max_bytes=131072)
+    if not isinstance(bundle, dict) or not isinstance(bundle.get("records"), list):
+        raise ReductionRecovery("ARCHIVE_UNVERIFIED")
+    expected = cycle_archive_plan(bundle["records"], identity, snapshot)
+    if bundle != expected or expected["digest"] != digest:
+        raise ReductionRecovery("ARCHIVE_UNVERIFIED")
+    return expected
+
+def archive_cycle_authorized():
+    """Explicitly archive a verified active cycle; no swap mutation."""
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    with mutation_lock(inspection=True):
+        identity = extension_identity()
+        check_extension_boot_policy()
+        snapshot = read_reduction_snapshot()
+        pending = read_protected_record(ARCHIVE_PENDING)
+        records = [read_protected_record(path) for path in cycle_paths()]
+        if pending is None:
+            bundle = cycle_archive_plan(records, identity, snapshot)
+            digest = bundle["digest"]
+            archive_directory()
+            destination = archive_path(digest)
+            # If killed after publishing the archive but before the pending
+            # marker, reuse only the byte-equivalent validated archive.
+            if read_protected_record(destination, max_bytes=131072) is None:
+                write_protected_record(destination, bundle)
+            if read_cycle_archive(digest, identity, snapshot) != bundle:
+                raise ReductionRecovery("ARCHIVE_UNVERIFIED")
+            # Re-fsync even an existing archive before retiring live records.
+            sync_archive(destination)
+            if (extension_identity() != identity
+                    or [read_protected_record(path) for path in cycle_paths()] != records
+                    or read_protected_record(ARCHIVE_PENDING) is not None
+                    or cycle_archive_plan(records, identity, read_reduction_snapshot()) != bundle):
+                raise ReductionRecovery("ARCHIVE_EVIDENCE_CHANGED")
+            pending = {"version": 1, "state": "ARCHIVE_PENDING", "digest": digest}
+            write_protected_record(ARCHIVE_PENDING, pending)
+        else:
+            digest = pending.get("digest")
+            if pending != {"version": 1, "state": "ARCHIVE_PENDING", "digest": digest}:
+                raise ReductionRecovery("INVALID_ARCHIVE_PENDING")
+            archive_directory()
+            destination = archive_path(digest)
+            bundle = read_cycle_archive(digest, identity, snapshot)
+            sync_archive(destination)
+        # The pending record is a separate fence throughout partial retirement.
+        # Explicit invocation can resume only this exact archive, never replay
+        # a swapon/swapoff or accept a mismatched remaining record.
+        try:
+            check_extension_boot_policy()
+            if (extension_identity() != identity
+                    or read_protected_record(ARCHIVE_PENDING) != pending
+                    or read_cycle_archive(digest, identity, read_reduction_snapshot()) != bundle):
+                raise ReductionRecovery("ARCHIVE_EVIDENCE_CHANGED")
+            remaining = [read_protected_record(path) for path in cycle_paths()]
+            if any(actual is not None and actual != expected
+                   for actual, expected in zip(remaining, bundle["records"])):
+                raise ReductionRecovery("ARCHIVE_RECORD_MISMATCH")
+            for path, expected in zip(cycle_paths(), bundle["records"]):
+                current = read_protected_record(path)
+                if current is None:
+                    continue
+                if current != expected:
+                    raise ReductionRecovery("ARCHIVE_RECORD_MISMATCH")
+                path.unlink()
+            sync_directory(EXT_DIRECTORY)
+            if (extension_identity() != identity
+                    or read_protected_record(ARCHIVE_PENDING) != pending
+                    or read_cycle_archive(digest, identity, read_reduction_snapshot()) != bundle
+                    or any(read_protected_record(path) is not None for path in cycle_paths())):
+                raise ReductionRecovery("ARCHIVE_EVIDENCE_CHANGED")
+            # This is the only point at which the pending fence may be retired.
+            ARCHIVE_PENDING.unlink()
+            sync_directory(EXT_DIRECTORY)
+        except (OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.SubprocessError) as error:
+            raise ReductionRecovery("ARCHIVE_RECONCILIATION_REQUIRED") from error
+        print("VERIFIED CYCLE ARCHIVE:", json.dumps({"version": 1, "state": "ARCHIVED",
+              "archiveId": digest, "recordCleared": True, "extensionActive": True,
+              "fileRetained": True}), flush=True)
+
+def sync_archive(path):
+    # Archive content was validated via the protected reader. Keep the file
+    # and containing directory durable even if it came from an earlier attempt.
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                or info.st_mode & 0o077 or info.st_nlink != 1):
+            raise ReductionRecovery("UNTRUSTED_ARCHIVE")
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    sync_directory(path.parent)
+
+
 def inspect_recovery_authorized():
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
@@ -746,6 +885,10 @@ def inspect_recovery_authorized():
                           "mutationAllowed":False, "recordCleared":False}
             else:
                 identity = extension_identity()
+                if read_protected_record(ARCHIVE_PENDING) is not None:
+                    print("RECOVERY INSPECTION:", json.dumps({"version": 1, "state": "RECOVERY_REQUIRED",
+                          "code": "ARCHIVE_PENDING", "mutationAllowed": False, "recordCleared": False}), flush=True)
+                    return
                 intent = read_protected_record(WITHDRAW_MARKER)
                 outcome = read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json"))
                 check_extension_boot_policy()
@@ -805,13 +948,15 @@ def main(args):
             print(json.dumps(reduction_preflight(parse_size(args[1]))))
         elif args == ["inspect-recovery-authorized"]:
             inspect_recovery_authorized()
+        elif args == ["archive-cycle-authorized"]:
+            archive_cycle_authorized()
         elif len(args) == 2 and args[0] == "reactivate-authorized":
             reactivate_authorized(parse_size(args[1]))
         elif len(args) == 2 and args[0] == "withdraw-authorized":
             with mutation_lock():
                 withdraw_authorized(parse_size(args[1]))
         else:
-            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB | inspect-recovery-authorized | reactivate-authorized GIB")
+            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB | inspect-recovery-authorized | reactivate-authorized GIB | archive-cycle-authorized")
         return 0
     except ReductionRecovery as error:
         print("REDUCTION RECOVERY:", json.dumps({"version": REDUCTION_VERSION, "state": "RECOVERY_REQUIRED", "code": str(error)}), flush=True)

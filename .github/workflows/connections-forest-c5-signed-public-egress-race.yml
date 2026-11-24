@@ -1,0 +1,43 @@
+name: Connections Forest C5 signed public egress ordering (CI only)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/test_connections_forest_c5_signed_public_egress_race.py'
+      - 'docs/connections-forest-c5-signed-public-egress-race-ci.md'
+      - '.github/workflows/connections-forest-c5-signed-public-egress-race.yml'
+      - 'services/connections/forest/ForestC5AuthorityBoundary.py'
+      - 'scripts/forest/native_host_candidate_b5b.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-linux-public-egress:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing fixture crypto dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Local signed test-only public send and revoke races
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections -p 'test_connections_forest_c5_signed_public_egress_race.py' -v
+      - name: Original C5 authority and native disclosure HOLD regressions
+        run: |
+          set -euo pipefail
+          python3 -B -I -m unittest discover -s tests/connections -p 'test_connections_forest_c5_authority_boundary.py' -v
+          python3 -B -I -m unittest discover -s tests/connections -p 'test_connections_forest_c5_native_disclosure_handoff.py' -v
+      - name: Unchanged Forest B5b native host candidate regression
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests/forest -p 'test_native_host_candidate_b5b.py' -v
+          echo 'PUBLIC_TEST_BYTES_ONLY // NO_PROTECTED_FOREST_AUTHORITY'

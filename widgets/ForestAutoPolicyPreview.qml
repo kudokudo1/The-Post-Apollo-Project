@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import "../components"
 import "../services/forest/ForestAutoPolicyPreview.js" as AutoPreview
 import "../services/forest/ForestModelFormPolicy.js" as ModelFormPolicy
@@ -12,13 +14,91 @@ Item {
     property string complexity: "unset"
     property string failure: "unset"
     property string suitability: "unset"
-    readonly property var result: AutoPreview.preview(complexity, failure, suitability)
+    property string requestedForm: "auto"
+    property string effort: "normal"
+    property var result: null
+    property var submitted: null
+    property bool busy: false
+    property bool discard: false
+    property bool stdoutSeen: false
+    property bool stderrSeen: false
+    property bool exitSeen: false
+    property bool refused: false
+    property string output: ""
+    property string status: "NOT EVALUATED"
     function resetExample() {
         complexity = "unset";
         failure = "unset";
         suitability = "unset";
+        requestedForm = "auto";
+        effort = "normal";
+        result = null;
+        status = "NOT EVALUATED";
+        if (busy) discard = true;
     }
     onVisibleChanged: if (!visible) resetExample()
+    function editExample(key,value) {
+        if (busy) return;
+        if (key === "complexity") complexity = value;
+        else if (key === "failure") failure = value;
+        else if (key === "suitability") suitability = value;
+        else if (key === "requestedForm") requestedForm = value;
+        else if (key === "effort") effort = value;
+        result = null;
+        status = "NOT EVALUATED";
+    }
+    function evaluateExample() {
+        if (!visible || busy || worker.running) return;
+        submitted = [requestedForm,effort,complexity,failure,suitability];
+        result = null;
+        discard = false;
+        stdoutSeen = false;
+        stderrSeen = false;
+        exitSeen = false;
+        refused = false;
+        output = "";
+        busy = true;
+        status = "EVALUATING";
+        worker.exec(["/usr/bin/python3","-B",
+            Quickshell.shellPath("scripts/forest/ui_routing_example.py")].concat(submitted));
+    }
+    function finish() {
+        if (!busy || !stdoutSeen || !stderrSeen || !exitSeen) return;
+        if (!discard && visible) {
+            result = refused ? null : AutoPreview.parse(output,submitted);
+            status = result ? "I1 REFERENCE // UNKNOWN_HOLD" : "REFERENCE REFUSED";
+        }
+        submitted = null;
+        output = "";
+        busy = false;
+    }
+    Process {
+        id: worker
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!pane.busy) return;
+                if (pane.stdoutSeen) pane.refused = true;
+                pane.stdoutSeen = true;
+                pane.output = String(this.text || "");
+                pane.finish();
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (!pane.busy) return;
+                if (pane.stderrSeen || String(this.text || "").trim().length) pane.refused = true;
+                pane.stderrSeen = true;
+                pane.finish();
+            }
+        }
+        onExited: function(code,exitStatus) {
+            if (!pane.busy) return;
+            if (pane.exitSeen || code !== 0 || exitStatus !== 0) pane.refused = true;
+            pane.exitSeen = true;
+            pane.finish();
+        }
+    }
 
     Flickable {
         anchors.fill: parent
@@ -45,6 +125,8 @@ Item {
             }
             Repeater {
                 model: [
+                    { key:"requestedForm", title:"EXAMPLE REQUESTED FORM", values:["auto","small","big"] },
+                    { key:"effort", title:"EXAMPLE RESOLVED REASONING", values:["light","normal","deep"] },
                     { key:"complexity", title:"TASK COMPLEXITY", values:["unset","low","normal","high"] },
                     { key:"failure", title:"KNOWN SMALL FAILURE", values:["unset","absent","present"] },
                     { key:"suitability", title:"SMALL CAPABILITY", values:["unset","sufficient","insufficient","unknown"] }
@@ -83,16 +165,27 @@ Item {
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (group.modelData.key === "complexity") pane.complexity = parent.modelData;
-                                        else if (group.modelData.key === "failure") pane.failure = parent.modelData;
-                                        else if (group.modelData.key === "suitability") pane.suitability = parent.modelData;
-                                    }
+                                    enabled: !pane.busy
+                                    onClicked: pane.editExample(group.modelData.key,parent.modelData)
                                 }
                             }
                         }
                     }
                 }
+            }
+            ActionButton {
+                width: parent.width
+                height: 27
+                label: pane.busy ? "EVALUATING..." : "EVALUATE"
+                available: !pane.busy
+                onLeftClicked: pane.evaluateExample()
+            }
+            GohuText {
+                width: parent.width
+                text: pane.status
+                color: Colors.orange
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
             }
             Rectangle {
                 width: parent.width
@@ -101,21 +194,21 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "EXAMPLE RECOMMENDATION // " + pane.result.form
+                text: "EXAMPLE RECOMMENDATION // " + (pane.result ? pane.result.form : "UNKNOWN")
                 font.pixelSize: 11
                 color: Colors.yellow
                 wrapMode: Text.WordWrap
             }
             GohuText {
                 width: parent.width
-                text: pane.result.reasons.join(" / ")
+                text: pane.result ? pane.result.reasons.join(" / ") : "EVALUATE EXAMPLE INPUTS"
                 font.pixelSize: 9
                 color: Colors.cyan
                 wrapMode: Text.WordWrap
             }
             GohuText {
                 width: parent.width
-                text: pane.result.form === "UNKNOWN" ? "SLOT // UNRESOLVED"
+                text: !pane.result ? "SLOT // UNRESOLVED"
                     : "EQUIPPED SLOT // " + ModelFormPolicy.slotLabel(pane.equipment,
                         pane.result.form.toLowerCase(), pane.inventoryStatus, pane.inventoryModels)
                 font.pixelSize: 9
@@ -125,7 +218,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "PREVIEW ONLY // NO RESOURCE OR PERMISSION DECISION // REASONING INDEPENDENT"
+                text: "I1 EXAMPLE ONLY // NO RESOLVED BINDING // REASONING INDEPENDENT"
                 font.pixelSize: 9
                 color: Colors.orange
                 wrapMode: Text.WordWrap

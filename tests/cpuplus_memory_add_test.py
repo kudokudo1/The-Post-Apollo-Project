@@ -50,6 +50,29 @@ class SwapAddTests(unittest.TestCase):
             self.assertEqual(m.main(["add-authorized", "16"]), 0)
             allocate.assert_called_once_with(16, interactive=False)
 
+    def test_persist_nonroot_refusal(self):
+        with patch.object(m.os, "geteuid", return_value=1000), patch.object(m, "run") as run:
+            with self.assertRaises(PermissionError):
+                m.persist_authorized()
+            run.assert_not_called()
+
+    def test_persist_inactive_refusal(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "trusted_unit_directory"), patch.object(m, "trusted_swap_file"), patch.object(m, "active_swap", return_value=None), patch.object(m, "run") as run:
+            with self.assertRaises(RuntimeError):
+                m.persist_authorized()
+            run.assert_not_called()
+
+    def test_persist_command_grammar(self):
+        with patch.object(m, "persist_authorized") as persist:
+            self.assertEqual(m.main(["persist-authorized"]), 0)
+            persist.assert_called_once_with()
+
+    def test_unit_name_and_policy(self):
+        self.assertEqual(m.UNIT_NAME, r"var-lib-post\x2dapollo\x2dmemory\x2dswap-swapfile.swap")
+        self.assertIn("Priority=10\n", m.UNIT_CONTENT)
+        self.assertIn("WantedBy=swap.target\n", m.UNIT_CONTENT)
+        self.assertIn("What=" + str(m.SWAPFILE), m.UNIT_CONTENT)
+
     def test_size_choices(self):
         for size in range(4, 65, 4):
             self.assertEqual(m.parse_size(str(size)), size)

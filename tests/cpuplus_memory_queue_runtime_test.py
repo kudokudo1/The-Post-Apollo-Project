@@ -7,6 +7,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services/memory"))
 from memory_adjustment_queue import Queue, QueueError
 from memory_queue_runtime import Runtime
+from memory_queue_delivery import Delivery
 
 SOURCE = {"boot_id": "c23683a9-b2ab-4a2c-87ce-31bdf27a3012",
           "base": {"device": 42, "inode": 123, "size_kib": 16777212},
@@ -172,6 +173,80 @@ class RuntimeTests(unittest.TestCase):
         self.queue = Queue(self.path)
         self.runtime = self.make_runtime()
         self.assertEqual(self.tick()["status"]["code"], "STABILITY_INTERVAL")
+
+    def ready_event(self):
+        record = self.enqueue()
+        self.tick()
+        self.tick(1000)
+        self.tick(1000)
+        result = self.tick(1000)
+        self.assertEqual(result["status"]["state"], "READY_ADVISORY")
+        self.assertNotIn("actual_kib", result["status"])
+        return record, result["notification_candidate"]["event"]
+
+    def offer_event(self, event, *, read=None, offer=None):
+        return Delivery(self.runtime.events).attempt(
+            event["event_id"], read_status=read or (lambda: self.runtime.tick()["status"]),
+            clock=self.clock, max_age_ms=3000,
+            offer=offer or (lambda packet: "HISTORY_OBSERVED"))
+
+    def test_composed_ready_projection_to_delivery(self):
+        record, event = self.ready_event()
+        packets = []
+        def offer(packet):
+            packets.append(packet)
+            return "HISTORY_OBSERVED"
+        self.assertEqual(self.offer_event(event, offer=offer), "HISTORY_OBSERVED")
+        self.assertEqual(len(packets), 1)
+        self.assertEqual(packets[0]["original_actual_kib"], record["actual_kib"])
+        self.assertFalse(packets[0]["can_execute"])
+        self.assertEqual(self.runtime.detail(record["id"])["adjustment_outcome"], "UNVERIFIED")
+        self.assertEqual(self.offer_event(event, offer=offer), "ALREADY_RESERVED")
+        self.assertEqual(len(packets), 1)
+
+    def test_composed_deferred_projection_to_delivery(self):
+        self.enqueue()
+        self.blocker = "EXTENSION_OCCUPIED"
+        result = self.tick()
+        event = result["notification_candidate"]["event"]
+        self.assertEqual(event["kind"], "DEFERRED")
+        self.assertEqual(self.offer_event(event), "HISTORY_OBSERVED")
+
+    def test_composed_mismatched_capacity_refused(self):
+        record, event = self.ready_event()
+        def read():
+            status = self.runtime.tick()["status"]
+            status["original_actual_kib"] = record["actual_kib"] + 1
+            return status
+        with self.assertRaisesRegex(QueueError, "STALE_EVENT"):
+            self.offer_event(event, read=read)
+        self.assertEqual(self.offer_event(event), "HISTORY_OBSERVED")
+
+    def test_composed_dual_capacity_even_if_equal_refused(self):
+        record, event = self.ready_event()
+        def read():
+            return dict(self.runtime.tick()["status"], actual_kib=record["actual_kib"])
+        with self.assertRaisesRegex(QueueError, "STALE_EVENT"):
+            self.offer_event(event, read=read)
+        self.assertEqual(self.offer_event(event), "HISTORY_OBSERVED")
+
+    def test_composed_readiness_regression_refused(self):
+        record, event = self.ready_event()
+        self.blocker = "RAM_HEADROOM"
+        self.tick(1000)
+        with self.assertRaisesRegex(QueueError, "STALE_EVENT"):
+            self.offer_event(event)
+        rows = self.runtime.detail(record["id"])["notification_events"]
+        saved = next(row for row in rows if row["event_id"] == event["event_id"])
+        self.assertIsNone(saved["attempt_reserved_at_ms"])
+
+    def test_composed_restart_does_not_replay_ready(self):
+        record, event = self.ready_event()
+        self.assertEqual(self.offer_event(event), "HISTORY_OBSERVED")
+        self.queue = Queue(self.path)
+        self.runtime = self.make_runtime()
+        self.assertEqual(self.tick()["status"]["code"], "STABILITY_INTERVAL")
+        self.assertEqual(self.offer_event(event), "ALREADY_RESERVED")
 
 
 if __name__ == "__main__":

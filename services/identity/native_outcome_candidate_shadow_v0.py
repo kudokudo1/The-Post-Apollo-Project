@@ -152,7 +152,13 @@ def _inspect_supplied(
 ) -> UntrustedOutcomeInspection:
     # This helper only compares supplied values. It cannot prove that an
     # independently protected issuer supplied or freshly signed anything.
-    if type(candidate) is not dict or set(candidate) != _CANDIDATE_FIELDS:
+    # A plain dict can still contain hostile key objects with custom
+    # __hash__/__eq__. Reject them BEFORE constructing a set of the keys;
+    # otherwise a supposedly data-only comparison could invoke their code.
+    if (type(candidate) is not dict
+            or len(candidate) != len(_CANDIDATE_FIELDS)
+            or any(type(key) is not str for key in candidate)
+            or set(candidate) != _CANDIDATE_FIELDS):
         return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
     if (type(candidate["schema"]) is not str
             or candidate["schema"] != SCHEMA

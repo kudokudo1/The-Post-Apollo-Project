@@ -1,0 +1,29 @@
+name: Forest Mind M4 Public History CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/history_public_fixture_m4.py'
+      - 'scripts/forest/HISTORY_PUBLIC_FIXTURE_M4.md'
+      - 'scripts/forest/context_first_tree_m2.py'
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'tests/forest/test_history_public_fixture_m4.py'
+      - '.github/workflows/forest-mind-m4-history.yml'
+permissions:
+  contents: read
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: M4 history and reopening
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_history_public_fixture_m4.py' -v
+      - name: M2 context regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_context_first_tree_m2.py' -v
+      - name: B1 journal regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: UI2 public display regression
+        run: node tests/forest/test_ui21_public_display.js

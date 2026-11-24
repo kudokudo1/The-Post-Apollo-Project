@@ -205,3 +205,6 @@ await import("./test_market_m30_two_point_compare.mjs");
 await import("./test_market_m31_pinned_interval.mjs");
 
 await import("./test_market_m32_interval_compare.mjs");
+
+// M33: geometric endpoint change per observed historical transition.
+await import("./test_market_m33_observed_step.mjs");

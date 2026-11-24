@@ -27,3 +27,30 @@ DOC 1's [#2388 Forest-purpose custodian RFC](https://github.com/kudokudo1/The-Po
 ## NEXT / DECISIONS
 
 Forest Core + operator still must ACCEPT/REVISE/HOLD the real production host path, launcher/UID, independently protected DB/recipient, and signed release/seat scope. DOC 1 + future independent custodian must separately enroll Forest-purpose root/current history/challenge. Only after approval should DOC 2 implement a protected source-to-custodian producer and official Silverblue signed RPM/reboot/rollback/seat tests. Until then, **production HOLD**; no workstation, keys, NAS, active service, private session data, merge or production actuation.
+
+## FOLLOW-UP // Exact recipient lifetime and endpoint regression
+
+The original independently reviewed #2415 baseline pinned the installed host's
+start ticks and pidfd, but only checked the renderer's UID, interpreter and
+socket-inode membership. The original test remained nonauthorizing.
+
+This corrective CI-only follow-up retains the original eight tests, checks the
+renderer start ticks, exact descriptor and invocation, and holds a separate
+kernel pidfd for each original process. Each observation checks both live
+pidfds against kernel fdinfo Pid and poll status, and rechecks both start
+times after procfs inspection. The actual pre-send gate is not opened when
+either observed process has exited.
+
+Three additional native regressions refuse a changed recipient start/FD/argv
+pin, substituted lifetime handle, and actual termination of each original
+process before gate release. No replacement actor or retransmission is
+attempted. The already reviewed eight tests remain part of the same suite
+(11 total expected); the final exact-head CI result is separate.
+
+These are two bounded pre-send observation snapshots and a controlled exit
+test, not continuous proof of either participant, per-packet authentication,
+a protected egress/revoke fence, an independently approved release or active
+seat, or original terminal settlement. The existing isolated CI-only
+SYS_PTRACE capability is unchanged. No runtime or cross-owner source change.
+Operator has explicitly deferred NAS and second-PC setup; do not treat this
+test as approval to provision either machine.

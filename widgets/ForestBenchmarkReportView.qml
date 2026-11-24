@@ -21,7 +21,7 @@ Item {
     function clearReports() {
         reportA = null;
         reportB = null;
-        reportInput.clear();
+        if (reportInput) reportInput.clear();
         importStatus = "NO REPORTS";
     }
     onVisibleChanged: if (!visible) clearReports()

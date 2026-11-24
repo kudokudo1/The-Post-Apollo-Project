@@ -477,17 +477,32 @@ Item {
             width: parent.width
             text: manager.session.mode==="demo"
                   ? "FICTIONAL DEMO // NO REAL MONEY // NOTHING CONNECTED"
-                  : "LOCAL SESSION ONLY // USD // NO BANK CONNECTION // NOT SAVED"
+                  : "MANUAL USD ACCOUNTS // NO BANK CONNECTION // CHANGES NOT SAVED AUTOMATICALLY"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
+        }
+        FinanceBankingManualStorageControls {
+            id: storageControls
+            width: parent.width
+            active: manager.active
+            manualSession: manager.session
+            onSessionRestored: function(restored) {
+                // Only the first validated local load may replace the initial
+                // empty session; no refresh overwrites later unsaved edits.
+                manager.session=restored;
+                manager.selectedId="";
+                manager.view="overview";
+                manager.message="";
+            }
         }
 
         Column {
             width: parent.width
             spacing: 7
             visible: manager.view==="overview"
+            enabled: storageControls.ready
             GohuText {
                 width: parent.width
                 text: manager.review.accountCount+" ACCOUNTS  //  "
@@ -1088,6 +1103,7 @@ Item {
             width: parent.width
             spacing: 7
             visible: manager.view==="provider"
+            enabled: storageControls.ready
             ActionButton {
                 width: parent.width
                 height: 28
@@ -1126,6 +1142,7 @@ Item {
             width: parent.width
             spacing: 7
             visible: manager.view==="detail"
+            enabled: storageControls.ready
             ActionButton {
                 width: parent.width
                 height: 28

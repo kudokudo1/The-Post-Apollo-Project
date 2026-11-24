@@ -1,0 +1,27 @@
+name: Forest Heart H1 dispatch reference CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/heart_dispatch_reference_h1.py'
+      - 'scripts/forest/HEART_DISPATCH_REFERENCE_H1.md'
+      - 'scripts/forest/model_binding_i2.py'
+      - 'scripts/forest/model_form_routing_i1.py'
+      - 'scripts/forest/resource_governor_p1.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'tests/forest/test_heart_dispatch_reference_h1.py'
+      - '.github/workflows/forest-heart-h1-dispatch-reference.yml'
+permissions:
+  contents: read
+jobs:
+  dispatch-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_heart_dispatch_reference_h1.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_binding_i2.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_form_routing_i1.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - run: python3 -m py_compile scripts/forest/heart_dispatch_reference_h1.py tests/forest/test_heart_dispatch_reference_h1.py

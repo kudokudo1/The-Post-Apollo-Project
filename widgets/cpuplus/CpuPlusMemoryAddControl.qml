@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.services.memory
 import "../../components"
 
 // Fixed argv; separate terminal lifetime. Installed helper validates and confirms.
@@ -22,6 +23,7 @@ Column {
         && host.filesystem === "btrfs" && Number.isInteger(host.maximumGiB)
         && stagedGiB >= 4 && stagedGiB <= host.maximumGiB && stagedGiB % 4 === 0
         && sample !== null && !observedActive && !check.running
+        && !MemoryOperation.busy
 
     spacing: 8
     onStagedGiBChanged: armed = false
@@ -41,6 +43,10 @@ Column {
         check.running = true;
     }
     Component.onCompleted: checkHost()
+    Connections {
+        target: MemoryOperation
+        function onRevisionChanged() { control.checkHost(); }
+    }
     Process {
         id: check
         command: ["/usr/bin/python3", "-I", "-B", control.helperPath, "status"]
@@ -86,18 +92,14 @@ Column {
     ActionButton {
         width: parent.width
         height: 34
-        label: control.armed ? "CONFIRM // OPEN AUTH TERMINAL" : "PREPARE ADD " + control.stagedGiB + " GiB"
+        label: control.armed ? "CONFIRM // AUTHORIZE" : "PREPARE ADD " + control.stagedGiB + " GiB"
         labelPixelSize: 10
         available: control.eligible
         onLeftClicked: {
             if (!control.eligible) return;
             if (!control.armed) { control.armed = true; return; }
             control.armed = false;
-            control.feedback = "TERMINAL REQUESTED // AUTHENTICATE, THEN TYPE ADD "
-                + control.stagedGiB + ". CHECK HOST AND LIVE SWAP AFTERWARD."
-            Quickshell.execDetached(["/usr/bin/kitty", "--hold", "/usr/bin/sudo", "--",
-                control.helperPath, "add", String(control.stagedGiB)]);
-            control.host = null;
+            MemoryOperation.request("add", control.stagedGiB);
         }
     }
     ActionButton {
@@ -107,9 +109,17 @@ Column {
         label: "CANCEL"
         onLeftClicked: control.armed = false
     }
+    ActionButton {
+        width: parent.width
+        height: 34
+        visible: control.observedActive
+        label: "VERIFY ACTIVE // AUTHORIZE"
+        available: !MemoryOperation.busy && control.host !== null
+        onLeftClicked: MemoryOperation.request("verify", 0)
+    }
     GohuText {
         width: parent.width
-        text: control.feedback || "ONE-TIME ADD ONLY // NO PERSISTENCE OR RESIZE"
+        text: MemoryOperation.feedback + "\nONE-TIME ADD ONLY // NO PERSISTENCE OR RESIZE"
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

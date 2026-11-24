@@ -3077,6 +3077,26 @@ PanelWindow {
                 color: Colors.cyan
             }
         }
+        Loader {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 20
+            anchors.bottomMargin: 10
+            active: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 3
+                    && (cpuPlusWindow.systemSubMode === "MEMORY"
+                        || cpuPlusWindow.systemSubMode === "SWAP"
+                        || (cpuPlusWindow.systemSubMode === "ALL"
+                            && ["MEMORY", "SWAP"].indexOf(String(
+                                (cpuPlusWindow.selectedMonitorEntry() || {}).category || ""
+                            ).toUpperCase()) >= 0))
+            visible: active
+            sourceComponent: CpuPlusMemoryActuatorPane {}
+        }
+
         // All live Sway input mutations remain behind this exact-device
         // two-click confirmation in the right/control bay.
         CpuPlusSettingsMouseScrollPane {

@@ -24,7 +24,7 @@ class ForestHardwareViewP2CTests(unittest.TestCase):
         self.assertIn('text: "FOREST // MODELS"', view)
         self.assertNotIn("hardwareViewOpen", view)
         self.assertNotIn("hardwareViewButton", view)
-        self.assertIn('height: modelPopup.height >= 270 ? 48 : 0', view)
+        self.assertIn('height: modelPopup.height >= 340 ? 48 : 0', view)
         self.assertIn('id: forestDiagnosticsPopup', view)
         self.assertIn('visible: root.diagnosticsOpen', view)
         self.assertIn('anchors.top: diagnosticsStatus.bottom', view)

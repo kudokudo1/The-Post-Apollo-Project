@@ -41,9 +41,67 @@ Item {
     readonly property string scratchCaseId: scratchCase ? scratchCase.id : ""
     readonly property string scratchTitle: scratchCase ? scratchCase.title : ""
     readonly property string scratchQuestion: scratchCase ? scratchCase.question : ""
+    readonly property int scratchEvidenceCount: scratchCase ? scratchCase.evidence.length : 0
+    readonly property string appendState: scratchEvidenceService.state
+    readonly property string appendMessage: scratchEvidenceService.message
+    readonly property bool scratchAppendReady: active && reviewOpen
+        && scratchSelected && reviewCandidate !== null
+        && draftService.state === "ready"
+        && draftService.preparedDraft !== null
+        && draftService.preparedDraft.candidateKey === reviewKey
+        && draftService.preparedDraft.investigationId === scratchCaseId
+        && draftService.preparedDraft.fields.url === reviewCandidate.url
+        && caseEditor.draftEvidenceUrl === reviewCandidate.url
+        && caseEditor.draftEvidenceTitle.length > 0
+        && caseEditor.draftEvidenceTitle.trim() === caseEditor.draftEvidenceTitle
+        && caseEditor.draftEvidenceTitle.length <= 160
+        && caseEditor.draftEvidenceSummary.length > 0
+        && caseEditor.draftEvidenceSummary.trim() === caseEditor.draftEvidenceSummary
+        && caseEditor.draftEvidenceSummary.length <= 2000
+        && scratchEvidenceCount < 40
+        && !scratchCase.evidence.some(function(e) {
+            return e.url === caseEditor.draftEvidenceUrl;
+        })
+        && !scratchEvidenceService.loading
+
     function loadCases() { return readService.load(); }
+    function pickNextFiling() {
+        if (!active || !reviewOpen || !scratchSelected
+                || scratchEvidenceService.loading)
+            return false;
+        // Navigation within the SAME immutable source preview preserves
+        // the scratch case, unlike BACK (which deliberately discards it).
+        draftService.clear();
+        scratchEvidenceService.clear();
+        resetEditorDraft();
+        reviewKey = "";
+        reviewOpen = false;
+        return true;
+    }
+    function addToScratch(title, summary, url) {
+        if (!scratchAppendReady || title !== caseEditor.draftEvidenceTitle
+                || summary !== caseEditor.draftEvidenceSummary
+                || url !== caseEditor.draftEvidenceUrl)
+            return false;
+        return scratchEvidenceService.append(
+            reviewCandidate,draftService.preparedDraft,scratchCase,
+            {title: title,summary: summary,url: url});
+    }
+    function applyAppendedCase(data) {
+        if (!active || !reviewOpen || !scratchSelected || !data
+                || data.memoryOnly !== true || data.persisted !== false
+                || data.caseRevision !== 0 || data.candidateKey !== reviewKey
+                || data.scratchCase.id !== scratchCaseId
+                || data.previousCount !== scratchEvidenceCount
+                || data.scratchCase.evidence.length !== scratchEvidenceCount + 1)
+            return;
+        scratchCase = data.scratchCase;
+        draftService.clear();
+        resetEditorDraft();
+    }
 
     function discardScratch() {
+        scratchEvidenceService.clear();
         if (scratchCase === null) return;
         draftService.clear();
         resetEditorDraft();
@@ -74,6 +132,7 @@ Item {
             createdAt: timestamp, updatedAt: timestamp, evidence: []
         };
         scratchCase = item;
+        scratchEvidenceService.clear();
         caseEditor.selectedId = id;
         caseEditor.showNewForm = false;
         caseEditor.draftTitle = "";
@@ -111,9 +170,19 @@ Item {
                 && item.authenticatedProvenance === false;
         });
         if (!candidate) return false;
-        closeReview();
+        // Reopening another filing through PICK NEXT retains the scratch.
+        // Ordinary entry without scratch still follows the old close path.
+        if (scratchCase !== null && !reviewOpen) {
+            draftService.clear();
+            scratchEvidenceService.clear();
+            resetEditorDraft();
+        } else {
+            closeReview();
+        }
         reviewKey = key;
         reviewOpen = true;
+        if (scratchCase !== null)
+            caseEditor.selectedId = scratchCase.id;
         return true;
     }
     function prepareDraft() {
@@ -166,16 +235,25 @@ Item {
         monitoring: host.active && host.reviewOpen
         onPreparedDraftChanged: host.applyPreparedDraft(preparedDraft)
     }
+    FinanceServices.FinanceResearchScratchEvidenceService {
+        id: scratchEvidenceService
+        monitoring: host.active && host.reviewOpen
+        onResultChanged: host.applyAppendedCase(result)
+    }
     Connections {
         target: previewService
         function onCandidatePreviewChanged() {
-            if (host.reviewOpen) host.closeReview();
+            // Includes hidden PICK NEXT state. If source/issuer changes,
+            // discard scratch rather than carrying citations across sources.
+            if (host.reviewOpen || host.scratchCase !== null)
+                host.closeReview();
         }
     }
     Connections {
         target: readService
         function onRevisionChanged() {
             draftService.clear();
+            scratchEvidenceService.clear();
             host.resetEditorDraft();
         }
     }
@@ -227,15 +305,28 @@ Item {
             readonly property real availableWidth: Math.max(0, width - spacing)
             ActionButton {
                 width: Math.min(100, Math.floor(
-                    reviewActions.availableWidth * 0.34))
+                    reviewActions.availableWidth * (host.scratchSelected
+                        ? 0.32 : 0.34)))
                 height: 29
                 label: "BACK"
                 labelPixelSize: 10
                 onLeftClicked: host.closeReview()
             }
             ActionButton {
+                width: Math.min(120, Math.floor(
+                    reviewActions.availableWidth * 0.25))
+                height: 29
+                label: "PICK NEXT"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                visible: host.scratchSelected
+                available: visible && !scratchEvidenceService.loading
+                onLeftClicked: host.pickNextFiling()
+            }
+            ActionButton {
                 width: Math.min(172, Math.floor(
-                    reviewActions.availableWidth * 0.66))
+                    reviewActions.availableWidth * (host.scratchSelected
+                        ? 0.41 : 0.66)))
                 height: 29
                 label: host.width < 430 ? "PREPARE" : "PREPARE UNSAVED"
                 labelPixelSize: 9
@@ -255,7 +346,11 @@ Item {
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
             text: "SEC INDEX // CONTENT NOT INSPECTED // "
-                  + draftService.message
+                  + (scratchEvidenceService.state === "failed"
+                     || scratchEvidenceService.state === "loading"
+                     || scratchEvidenceService.state === "ready"
+                     ? scratchEvidenceService.message
+                     : draftService.message)
         }
     }
 
@@ -285,8 +380,13 @@ Item {
             host.createScratch(title, question);
         }
         onDiscardScratchRequested: host.discardScratch()
+        scratchAppendReady: host.scratchAppendReady
+        onAppendScratchRequested: function(title, summary, url) {
+            host.addToScratch(title, summary, url);
+        }
         onSelectedIdChanged: {
             draftService.clear();
+            scratchEvidenceService.clear();
         }
     }
 }

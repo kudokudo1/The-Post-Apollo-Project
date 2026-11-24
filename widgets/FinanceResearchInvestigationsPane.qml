@@ -11,6 +11,7 @@ Item {
     property bool controllerConnected: false
     property bool writeEnabled: false
     property bool scratchEnabled: false // optional in-memory workflow, never writer authority
+    property bool scratchAppendReady: false // validated prepared SEC citation only
     property string scratchId: ""
     property string selectedId: ""
     property string draftTitle: ""
@@ -45,6 +46,7 @@ Item {
     signal createRequested(string title, string question)
     signal createScratchRequested(string title, string question)
     signal discardScratchRequested()
+    signal appendScratchRequested(string title, string summary, string url)
     signal attachRequested(string investigationId, string source, string title,
                            string summary, string url)
     signal removeRequested(string investigationId, string evidenceId)
@@ -327,7 +329,10 @@ Item {
                                     }
                                     GohuText {
                                         width: parent.width
-                                        text: evidenceRow.modelData.source + " // " + evidenceRow.modelData.observedAt
+                                        text: (pane.selectedId === pane.scratchId
+                                ? "UNSAVED SCRATCH // " : "")
+                                + evidenceRow.modelData.source + " // "
+                                + evidenceRow.modelData.observedAt
                                         font.pixelSize: 9
                                         color: Colors.orange
                                         wrapMode: Text.WordWrap
@@ -429,6 +434,20 @@ Item {
                         }
                     }
                 }
+            }
+            ActionButton {
+                width: 148
+                height: 29
+                label: "ADD TO SCRATCH"
+                labelPixelSize: 9
+                accentColor: Colors.cyan
+                visible: pane.scratchEnabled && pane.selectedId === pane.scratchId
+                    && pane.scratchId !== ""
+                available: visible && pane.controllerConnected
+                    && pane.scratchAppendReady
+                onLeftClicked: pane.appendScratchRequested(
+                    pane.draftEvidenceTitle, pane.draftEvidenceSummary,
+                    pane.draftEvidenceUrl)
             }
             ActionButton {
                 width: 125

@@ -1,0 +1,29 @@
+name: CPU++ native recovery fault fixture source gate
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_native_faults/**'
+      - '.github/workflows/cpuplus-memory-native-fault-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile fixture without running guest operations
+        run: python3 -B -m py_compile tests/cpuplus_memory_native_faults/guest-recovery.py
+      - name: Verify pinned helper and refusal without fixture environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = eec7a83cc9068303c3fbc6f4ae9c98e78f7b67ad
+          set +e
+          output="$(python3 -I -B tests/cpuplus_memory_native_faults/guest-recovery.py prepare 2>&1)"
+          rc="$?"
+          set -e
+          test "$rc" = 2
+          grep -Fq 'CPU_MEM_FAULT_FAIL // RuntimeError: not a root Silverblue guest' <<<"$output"
+          echo 'CPU_MEM_FAULT_SOURCE_PASS // syntax and non-guest refusal only'

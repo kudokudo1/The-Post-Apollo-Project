@@ -1,4 +1,4 @@
-name: FinanceW Market M26-M31 historical range and pinned interval analysis
+name: FinanceW Market M26-M32 historical range and pinned interval analysis
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
       - "tests/finance/test_market_m29_sma_relationship.mjs"
       - "tests/finance/test_market_m30_two_point_compare.mjs"
       - "tests/finance/test_market_m31_pinned_interval.mjs"
+      - "tests/finance/test_market_m32_interval_compare.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
@@ -28,6 +29,7 @@ on:
       - "tests/finance/test_market_m29_sma_relationship.mjs"
       - "tests/finance/test_market_m30_two_point_compare.mjs"
       - "tests/finance/test_market_m31_pinned_interval.mjs"
+      - "tests/finance/test_market_m32_interval_compare.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
@@ -53,5 +55,5 @@ jobs:
           node-version: "22"
       - name: Pure Market M26-M27 range movement/selected compare and malformed data
         run: node tests/finance/test_market_m26_range_analysis.mjs
-      - name: Existing M10-M31 Market price-range regression chain
+      - name: Existing M10-M32 Market price-range regression chain
         run: node tests/finance/test_market_price_range.mjs

@@ -1,0 +1,16 @@
+name: CPU++ queue consumer lifecycle
+on:
+  pull_request:
+    paths:
+      - 'widgets/cpuplus/CpuPlusQueueConsumer.js'
+      - 'tests/cpuplus/test_queue_consumer.cjs'
+      - '.github/workflows/cpuplus-queue-consumer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_queue_consumer.cjs

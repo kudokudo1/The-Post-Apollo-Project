@@ -408,19 +408,44 @@ def _native_step(client, policy):
         request=request, prepared=prepared, operator_uid=peer[1],
         seat_id=first_seat, host_id=policy["hostId"], private_key=key,
     )
-    # Source writer must compare all fields with its current DB inside
-    # BEGIN IMMEDIATE, consume one-use nonce and commit before replying.
-    reply = _writer_exchange(policy, {
-        "schema": "postapollo.hospital.protected-writer-request.v1",
-        "kind": "commit", "action": request["action"],
-        "roomId": request["roomId"], "requestNonce": nonce,
-        "writerInstance": prepared["writerInstance"],
-        "signedGrant": signed.decode("ascii"),
-    })
-    return C.validate_commit_receipt(
-        reply, request=request, prepared=prepared,
-        nonce=nonce, signed_grant=signed,
-    )
+    # The first COMMIT attempt MAY mutate the protected PX database even
+    # when the reply is lost. Never treat any post-attempt error as proof
+    # that the original Room was unchanged or safe to retry.
+    return _commit_with_terminal_receipt_or_unknown(
+        policy, request, prepared, nonce, signed)
+
+
+def _commit_with_terminal_receipt_or_unknown(policy, request, prepared,
+                                              nonce, signed_grant):
+    """One original PX COMMIT attempt; no retry, only exact receipt or HOLD.
+
+    This is NOT a second admission path: _native_step calls it only after
+    independent exact-Room consent, installed-key loading and signing.
+    No caller receives the signed grant. If transport, writer verification
+    or exact receipt validation fails, the original COMMIT might already
+    have changed the protected Room. Conservative UNKNOWN/HOLD is mandatory
+    even if a particular error occurred before sending the packet.
+    """
+    try:
+        reply = _writer_exchange(policy, {
+            "schema": "postapollo.hospital.protected-writer-request.v1",
+            "kind": "commit", "action": request["action"],
+            "roomId": request["roomId"], "requestNonce": nonce,
+            "writerInstance": prepared["writerInstance"],
+            "signedGrant": signed_grant.decode("ascii"),
+        })
+        return C.validate_commit_receipt(
+            reply, request=request, prepared=prepared,
+            nonce=nonce, signed_grant=signed_grant,
+        )
+    except (C.Refused, OSError, TimeoutError, UnicodeError,
+            TypeError, ValueError) as exc:
+        # No second COMMIT, no fallback to local SQLite, and no claim of
+        # REFUSED/ROLLED_BACK. T0 may only be resolved later by an
+        # independently authenticated original-request RECOVER read.
+        raise C.Refused(
+            "HOSPITAL_NATIVE_HOLD // PX_COMMIT_OUTCOME_UNKNOWN_HOLD_NO_AUTO_RETRY"
+        ) from exc
 
 def main():
     """Never runnable from UI or CLI: only systemd LISTEN_FDS socket path."""

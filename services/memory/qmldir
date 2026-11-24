@@ -1,0 +1,3 @@
+module qs.services.memory
+
+singleton MemoryOperation 1.0 MemoryOperation.qml

@@ -32,3 +32,32 @@ function parse(raw,expected) {
             return v.replace(/_/g," ").toUpperCase();
         })};
 }
+
+function parseBinding(raw,expected) {
+    if (typeof raw!=="string" || raw.length>8192 || !Array.isArray(expected) || expected.length!==6) return null;
+    var d;
+    try { d=JSON.parse(raw); } catch(e) { return null; }
+    if (!exact(d,["schema","inputs","routing","binding"]) ||
+        d.schema!=="post-apollo.forest.ui-binding-example.i2" ||
+        JSON.stringify(d.inputs)!==JSON.stringify(expected)) return null;
+    var route=parse(JSON.stringify({schema:"post-apollo.forest.ui-routing-example.i1",
+        inputs:expected.slice(0,5),reference:d.routing}),expected.slice(0,5));
+    var b=d.binding;
+    if (!route || !exact(b,["schema","status","reason","requestedForm","recommendedForm",
+        "referenceBindingMatched","resolvedForm","resolvedBinding","sourceAuthenticated",
+        "permissionGranted","resourceFitEstablished","modelExecutionPermitted","productionAuthority","safeActions"]) ||
+        b.schema!=="post-apollo.forest.binding-reference.i2" || b.status!=="UNKNOWN_HOLD" ||
+        b.requestedForm!==d.routing.requestedForm || b.recommendedForm!==d.routing.recommendedForm ||
+        b.resolvedForm!==null || b.resolvedBinding!==null || b.sourceAuthenticated!==false ||
+        b.permissionGranted!==false || b.resourceFitEstablished!==false ||
+        b.modelExecutionPermitted!==false || b.productionAuthority!==false ||
+        !Array.isArray(b.safeActions) || b.safeActions.length!==0 ||
+        typeof b.referenceBindingMatched!=="boolean" ||
+        ["FORM_UNBOUND","MODEL_EVIDENCE_MISSING","MODEL_EVIDENCE_MISMATCH","MODEL_NOT_INSTALLED",
+         "INSTALL_STATUS_UNKNOWN","CAPABILITY_EVIDENCE_UNKNOWN","REQUIRED_FEATURE_UNSUPPORTED",
+         "CONTEXT_LIMIT_INSUFFICIENT","REFERENCE_BINDING_MATCH_AUTHORITY_HOLD"].indexOf(b.reason)<0 ||
+        b.referenceBindingMatched!==(b.reason==="REFERENCE_BINDING_MATCH_AUTHORITY_HOLD")) return null;
+    route.bindingReason=b.reason.replace(/_/g," ");
+    route.referenceMatched=b.referenceBindingMatched;
+    return route;
+}

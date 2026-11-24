@@ -327,5 +327,43 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                 db.close()
 
 
+    def test_27_invalid_delta_encoding_does_not_retain_unicode_error_chain(self):
+        text = SECRET + "\ud800"
+        with self.assertRaisesRegex(D.DisclosureHold, "INVALID_DELTA_ENCODING") as exc:
+            self.block(text=text)
+        self.assertIsNone(exc.exception.__cause__)
+        self.assertIsNone(exc.exception.__context__)
+        self.assertNotIn(SECRET, str(exc.exception))
+
+    def test_28_invalid_json_refusal_does_not_retain_raw_decoder_document(self):
+        malformed = ('{"private":"' + SECRET + '",').encode("ascii")
+        for wire, original, reason in (
+            (malformed, None, "INVALID_CANDIDATE_WIRE"),
+            (None, malformed, "INVALID_ORIGINAL_COMMIT_INTENT"),
+        ):
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(D.DisclosureHold, reason) as exc:
+                    self.examine(wire=wire, original=original)
+                self.assertIsNone(exc.exception.__cause__)
+                self.assertIsNone(exc.exception.__context__)
+                self.assertNotIn(SECRET, str(exc.exception))
+
+    def test_29_oversize_codepoint_count_refuses_before_utf8_encoding(self):
+        # An invalid surrogate at the end would raise UnicodeError if an
+        # oversized value were encoded before the codepoint-count guard.
+        text = "x" * D.MAX_CANDIDATE_BYTES + "\ud800"
+        with self.assertRaisesRegex(
+            D.DisclosureHold, "DELTA_EXCEEDS_ABSOLUTE_SOURCE_CAP"
+        ):
+            self.block(text=text)
+
+    def test_30_utf8_byte_limit_preserved_after_codepoint_guard(self):
+        self.no_grant(self.block(text="\u00e9" * (D.MAX_CANDIDATE_BYTES // 2)))
+        with self.assertRaisesRegex(
+            D.DisclosureHold, "DELTA_EXCEEDS_ABSOLUTE_SOURCE_CAP"
+        ):
+            self.block(text="\u00e9" * (D.MAX_CANDIDATE_BYTES // 2 + 1))
+
+
 if __name__ == "__main__":
     unittest.main()

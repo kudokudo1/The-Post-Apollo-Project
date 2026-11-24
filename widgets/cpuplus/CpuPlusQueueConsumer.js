@@ -13,7 +13,7 @@ function exact(value,keys) {
         && keys.every(k=>Object.prototype.hasOwnProperty.call(value,k));
 }
 function initial() {
-    return {ownerId:null, sequence:0, nextActionSequence:null, status:null,
+    return {ownerId:null, previousOwnerId:null, sequence:0, nextActionSequence:null, status:null,
         prepared:null, pending:null, unresolved:null, feedback:"NOT CONNECTED"};
 }
 function invalidate(state, feedback) {
@@ -29,12 +29,14 @@ function connect(state, ownerId) {
     // Only the transport lifecycle may call connect; a reply cannot choose its
     // own trusted owner. A lost in-flight action survives owner replacement.
     const lost=uncertain(state,"FRESH STATUS REQUIRED");
-    return Object.assign({},initial(),{ownerId:ownerId,unresolved:lost.unresolved,
+    return Object.assign({},initial(),{ownerId:ownerId,previousOwnerId:ownerId,
+        sequence:state.previousOwnerId === ownerId ? state.sequence : 0,unresolved:lost.unresolved,
         feedback:lost.unresolved ? "OUTCOME UNKNOWN // RECONCILE" : "FRESH STATUS REQUIRED"});
 }
 function disconnect(state) {
     const lost=uncertain(state,"NOT CONNECTED");
-    return Object.assign({},initial(),{unresolved:lost.unresolved,
+    return Object.assign({},initial(),{previousOwnerId:state.ownerId || state.previousOwnerId,
+        sequence:state.sequence,unresolved:lost.unresolved,
         feedback:lost.unresolved ? "OWNER LOST // RECONCILE" : "NOT CONNECTED"});
 }
 function timeout(state) {

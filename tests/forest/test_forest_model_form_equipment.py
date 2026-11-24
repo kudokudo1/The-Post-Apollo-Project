@@ -39,6 +39,41 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         self.assertNotIn("Process", equipment)
         self.assertNotIn("exec", equipment)
 
+    def test_model_form_slider_shares_owner_state_and_keeps_compact_fallback(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        slider = (ROOT / "components/SelectorSlider.qml").read_text()
+        rail = view.split("id: modelFormSlider", 1)[1].split(
+            "visible: localInventory.modelCount === 0", 1)[0]
+        self.assertEqual(view.count("SelectorSlider {"), 2)
+        self.assertIn('indexInteraction: "preview-release"', rail)
+        self.assertIn('optionLabels: ["BIG", "AUTO", "SMALL"]', rail)
+        self.assertIn('currentIndex: root.selectedModelForm === "BIG" ? 0', rail)
+        self.assertIn(': root.selectedModelForm === "SMALL" ? 2 : 1', rail)
+        self.assertIn("root.chooseModelForm(optionLabels[index]);", rail)
+        self.assertIn("enabledSlider: root.menuOpen && root.modelPopupOpen && visible", rail)
+        self.assertIn("if (!visible)", rail)
+        self.assertIn("cancelIndexPreview();", rail)
+        self.assertIn("root.modelPopupOpen && modelPopup.width >= 320", rail)
+        self.assertIn("&& modelPopup.height >= 320", rail)
+        self.assertEqual(view.count("anchors.rightMargin: modelFormSlider.visible ? 53 : 7"), 2)
+        self.assertIn('model: ["SMALL", "AUTO", "BIG"]', view)
+        self.assertIn("root.chooseModelForm(parent.modelData)", view)
+        self.assertIn("onSelectedTreeIndexChanged: modelPopupOpen = false", view)
+        self.assertNotIn("equipLocalModel(", rail)
+        self.assertNotIn("clearLocalModel(", rail)
+        self.assertNotIn("selectedTreeReasoningSteps", rail)
+        self.assertNotIn("scanResidency(", rail)
+        self.assertNotIn("scanModels(", rail)
+        # Ensure a usable vertical track with the shared thumb and ruler.
+        self.assertIn("topMargin: 38", slider)
+        self.assertIn("bottomMargin: 26", slider)
+        self.assertIn("height: 52", slider)
+        for height in (320, 340, 360):
+            rail_height = height - 33 - 19 - 62 - 2 - 2 - 17 - 4 - 3
+            self.assertGreaterEqual(rail_height - 38 - 26 - 52, 60)
+        # At the width threshold the list still has room for its buttons.
+        self.assertGreaterEqual(320 - 53 - 7 - 43 - 32 - 45 - 20, 100)
+
     @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
     def test_equipment_preserves_both_slots_and_tree_isolation(self):
         js = textwrap.dedent(r"""

@@ -5,6 +5,7 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'widgets/ForestAutoPolicyPreview.qml'
       - 'widgets/ForestChatList.qml'
       - 'widgets/ForestChatSessionPolicy.js'
       - 'components/VoiceToTextButton.qml'
@@ -20,6 +21,7 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'widgets/ForestAutoPolicyPreview.qml'
       - 'widgets/ForestChatList.qml'
       - 'widgets/ForestChatSessionPolicy.js'
       - 'components/VoiceToTextButton.qml'
@@ -51,3 +53,4 @@ jobs:
           python3 tests/forest/test_forest_model_disk_comparison.py
           python3 tests/forest/test_forest_model_form_equipment.py
           python3 tests/forest/test_forest_ui_model_preferences.py
+          python3 tests/forest/test_forest_auto_policy_preview.py

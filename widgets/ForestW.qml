@@ -6,6 +6,7 @@ import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
 import "../services/forest/ForestInventoryPolicy.js" as InventoryPolicy
+import "../services/forest/ForestModelFormPolicy.js" as ModelFormPolicy
 
 // FOREST V0: self-contained visual workspace. No model, PX or Hospital calls.
 PanelWindow {
@@ -25,9 +26,11 @@ PanelWindow {
     property var gitFullscreenReference: null
     property int chassisLevel: 0
     property int selectedTreeIndex: 0
-    // One explicit model choice per Tree. Inventory refreshes never silently
-    // switch either Tree to the first returned model.
-    property var selectedTreeModels: ["", "", "", "", ""]
+    // Two independent local equipment slots per Tree. Assignment is not
+    // residency or runtime authorization; AUTO has no resolved model yet.
+    property var selectedTreeEquipment: ModelFormPolicy.emptyEquipment(5)
+    readonly property var selectedEquipment: selectedTreeEquipment[selectedTreeIndex]
+    readonly property string selectedModelForm: selectedEquipment ? selectedEquipment.form : "AUTO"
     // Per-Tree local visual preference only. No Ollama/Hermes transport
     // consumes this setting while the trusted Forest host is disconnected.
     property var selectedTreeReasoningSteps: [0, 0, 0, 0, 0]
@@ -49,16 +52,10 @@ PanelWindow {
     property string pendingModelScan: ""
     property string lastScannedModel: ""
     property string lastModelScanResult: ""
-    readonly property string selectedLocalModel: {
-        const desired = String(selectedTreeModels[selectedTreeIndex] || "");
-        if (!desired || localInventory.status !== "REACHABLE")
-            return "";
-        for (let i = 0; i < localInventory.models.length; i++) {
-            if (localInventory.models[i].name === desired)
-                return desired;
-        }
-        return "";
-    }
+    // Only an explicitly chosen, discovered slot resolves to a model.
+    // AUTO stays unresolved until the protected runtime router is integrated.
+    readonly property string selectedLocalModel: ModelFormPolicy.selectedModel(
+        selectedEquipment, localInventory.status, localInventory.models)
 
     // All relative disk bars use the same published B0 inventory.
     readonly property var modelDiskComparison:
@@ -81,18 +78,33 @@ PanelWindow {
         return true;
     }
 
-    function chooseLocalModel(name) {
-        if (localInventory.status !== "REACHABLE" || localInventory.scanning)
+    function equipLocalModel(slot, name) {
+        if (!menuOpen || !modelPopupOpen || localInventory.scanning)
             return false;
-        for (let i = 0; i < localInventory.models.length; i++) {
-            if (localInventory.models[i].name === name) {
-                const choices = selectedTreeModels.slice();
-                choices[selectedTreeIndex] = name;
-                selectedTreeModels = choices;
-                return true;
-            }
-        }
-        return false;
+        const next = ModelFormPolicy.equip(selectedTreeEquipment, selectedTreeIndex,
+            slot, name, localInventory.status, localInventory.models);
+        if (!next)
+            return false;
+        selectedTreeEquipment = next;
+        return true;
+    }
+    function clearLocalModel(slot) {
+        if (!menuOpen || !modelPopupOpen)
+            return false;
+        const next = ModelFormPolicy.clearSlot(selectedTreeEquipment, selectedTreeIndex, slot);
+        if (!next)
+            return false;
+        selectedTreeEquipment = next;
+        return true;
+    }
+    function chooseModelForm(form) {
+        if (!menuOpen || !modelPopupOpen)
+            return false;
+        const next = ModelFormPolicy.chooseForm(selectedTreeEquipment, selectedTreeIndex, form);
+        if (!next)
+            return false;
+        selectedTreeEquipment = next;
+        return true;
     }
     function scanModel(name) {
         if (!menuOpen || !modelPopupOpen || !name || localInventory.scanning)
@@ -869,18 +881,124 @@ PanelWindow {
                         : "OLLAMA // NOT CONNECTED"
                 }
 
-                // Read-only profile from the SAME P0 observation as the
-                // header LOAD/IDLE badge; never perform a second model probe.
-                // Compact popup stages reserve list height over decoration.
+                // Local equipment and Model Form, deliberately independent
+                // of the Coffee Bar, P0 residency and actual model execution.
                 Rectangle {
-                    id: selectedModelProfilePanel
+                    id: modelEquipmentPanel
                     anchors.top: popupProviderStatus.bottom
                     anchors.topMargin: 2
                     anchors.left: parent.left
                     anchors.leftMargin: 7
                     anchors.right: parent.right
                     anchors.rightMargin: 7
-                    height: modelPopup.height >= 270 ? 48 : 0
+                    height: modelPopup.height >= 190 ? 62 : 24
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Row {
+                        id: modelFormRow
+                        anchors.top: parent.top
+                        anchors.topMargin: 2
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 3
+                        anchors.rightMargin: 3
+                        height: 20
+                        spacing: 3
+                        Repeater {
+                            model: ["SMALL", "AUTO", "BIG"]
+                            delegate: Rectangle {
+                                required property string modelData
+                                width: (modelFormRow.width - 6) / 3
+                                height: modelFormRow.height
+                                color: root.selectedModelForm === modelData ? Colors.yellow : Colors.black
+                                border.width: 1
+                                border.color: root.selectedModelForm === modelData ? Colors.magenta : Colors.cyan
+                                Accessible.name: "Model form " + modelData
+                                    + (modelData === "AUTO" ? ", routing not connected" : ", local selection")
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: parent.modelData
+                                    color: root.selectedModelForm === parent.modelData ? Colors.magenta : Colors.cyan
+                                    font.pixelSize: 9
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.chooseModelForm(parent.modelData)
+                                }
+                            }
+                        }
+                    }
+                    Column {
+                        anchors.top: modelFormRow.bottom
+                        anchors.topMargin: 1
+                        anchors.left: modelFormRow.left
+                        anchors.right: modelFormRow.right
+                        visible: modelEquipmentPanel.height >= 62
+                        spacing: 1
+                        Repeater {
+                            model: ["small", "big"]
+                            delegate: Item {
+                                required property string modelData
+                                width: modelFormRow.width
+                                height: 18
+                                readonly property string assignedName: root.selectedEquipment
+                                    ? String(root.selectedEquipment[modelData] || "") : ""
+                                GohuText {
+                                    anchors.left: parent.left
+                                    anchors.right: clearEquipmentButton.left
+                                    anchors.rightMargin: 4
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: parent.modelData.toUpperCase() + " // " +
+                                        ModelFormPolicy.slotLabel(root.selectedEquipment, parent.modelData,
+                                            localInventory.status, localInventory.models)
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 9
+                                    color: parent.assignedName ? Colors.cyan : Colors.orange
+                                }
+                                Rectangle {
+                                    id: clearEquipmentButton
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 19
+                                    height: 16
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: parent.assignedName ? Colors.red : Colors.dark
+                                    Accessible.name: "Clear " + parent.modelData + " model slot"
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text: "×"
+                                        color: parent.parent.assignedName ? Colors.red : Colors.dark
+                                        font.pixelSize: 10
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        enabled: clearEquipmentButton.parent.assignedName !== ""
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: root.clearLocalModel(clearEquipmentButton.parent.modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Read-only profile from the SAME P0 observation as the
+                // header LOAD/IDLE badge; never perform a second model probe.
+                // Compact popup stages reserve list height over decoration.
+                Rectangle {
+                    id: selectedModelProfilePanel
+                    anchors.top: modelEquipmentPanel.bottom
+                    anchors.topMargin: 2
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    height: modelPopup.height >= 340 ? 48 : 0
                     visible: height > 0
                     color: Colors.dark
                     border.width: 1
@@ -895,7 +1013,9 @@ PanelWindow {
                         anchors.rightMargin: 7
                         text: root.selectedLocalModel
                             ? "PROFILE // " + root.selectedLocalModel
-                            : "PROFILE // NO SELECTED MODEL"
+                            : root.selectedModelForm === "AUTO"
+                                ? "PROFILE // AUTO ROUTER NOT CONNECTED"
+                                : "PROFILE // NO DISCOVERED " + root.selectedModelForm + " MODEL"
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         color: Colors.magenta
@@ -953,7 +1073,7 @@ PanelWindow {
                             anchors.leftMargin: 7
                             anchors.top: parent.top
                             anchors.topMargin: 7
-                            anchors.right: selectModelButton.left
+                            anchors.right: equipSmallButton.left
                             anchors.rightMargin: 5
                             font.pixelSize: 11
                             font.bold: root.selectedLocalModel === modelEntry.modelName
@@ -963,27 +1083,57 @@ PanelWindow {
                         }
 
                         Rectangle {
-                            id: selectModelButton
-                            anchors.right: scanModelButton.left
+                            id: equipSmallButton
+                            anchors.right: equipBigButton.left
                             anchors.rightMargin: 4
                             anchors.top: parent.top
                             anchors.topMargin: 4
-                            width: 46
+                            width: 43
                             height: 23
-                            color: root.selectedLocalModel === modelEntry.modelName ? Colors.dark : Colors.black
+                            readonly property bool equipped: root.selectedEquipment
+                                && root.selectedEquipment.small === modelEntry.modelName
+                            color: equipped ? Colors.yellow : Colors.black
                             border.width: 1
                             border.color: Colors.magenta
-                            Accessible.name: "Select model " + modelEntry.modelName + " for current Tree"
+                            Accessible.name: "Equip " + modelEntry.modelName + " in Small slot"
                             GohuText {
                                 anchors.centerIn: parent
-                                text: root.selectedLocalModel === modelEntry.modelName ? "SET" : "USE"
+                                text: "SMALL"
                                 font.pixelSize: 9
                                 color: Colors.magenta
                             }
                             MouseArea {
                                 anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.chooseLocalModel(modelEntry.modelName)
+                                enabled: !localInventory.scanning
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: root.equipLocalModel("small", modelEntry.modelName)
+                            }
+                        }
+                        Rectangle {
+                            id: equipBigButton
+                            anchors.right: scanModelButton.left
+                            anchors.rightMargin: 4
+                            anchors.top: parent.top
+                            anchors.topMargin: 4
+                            width: 32
+                            height: 23
+                            readonly property bool equipped: root.selectedEquipment
+                                && root.selectedEquipment.big === modelEntry.modelName
+                            color: equipped ? Colors.yellow : Colors.black
+                            border.width: 1
+                            border.color: Colors.magenta
+                            Accessible.name: "Equip " + modelEntry.modelName + " in Big slot"
+                            GohuText {
+                                anchors.centerIn: parent
+                                text: "BIG"
+                                font.pixelSize: 9
+                                color: Colors.magenta
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: !localInventory.scanning
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: root.equipLocalModel("big", modelEntry.modelName)
                             }
                         }
                         Rectangle {

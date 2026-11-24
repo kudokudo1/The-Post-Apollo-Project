@@ -28,6 +28,9 @@ Item {
     // Never save a bare index across range, issuer, date or mode transitions.
     property int pinnedPointIndex: -1
     property var pinnedSnapshot: null
+    property var savedIntervalSnapshot: null
+    property int savedIntervalA: -1
+    property int savedIntervalB: -1
     // M28: local session-only display choice; never changes provider readers.
     property bool showAverages: false
     readonly property var inspectedPoint: !dayMode
@@ -69,6 +72,25 @@ Item {
         ? RangeAnalysisPolicy.summarizePinnedInterval(
             snapshot, pinnedPointIndex, selectedPointIndex) : null
 
+    readonly property bool savedIntervalValid: rangeAnalysis !== null
+        && savedIntervalSnapshot !== null && savedIntervalSnapshot === snapshot
+    onSavedIntervalValidChanged: {
+        if (!savedIntervalValid) clearSavedInterval();
+    }
+    readonly property var intervalComparison: savedIntervalValid && pinnedInterval !== null
+        ? RangeAnalysisPolicy.compareHistoricalIntervals(snapshot, savedIntervalA,
+            savedIntervalB, pinnedPointIndex, selectedPointIndex) : null
+    function clearSavedInterval() {
+        savedIntervalSnapshot = null;
+        savedIntervalA = -1;
+        savedIntervalB = -1;
+    }
+    function saveCurrentInterval() {
+        if (pinnedInterval === null) return;
+        savedIntervalA = pinnedPointIndex;
+        savedIntervalB = selectedPointIndex;
+        savedIntervalSnapshot = snapshot;
+    }
     function clearPinnedComparison() {
         pinnedPointIndex = -1;
         pinnedSnapshot = null;
@@ -97,10 +119,12 @@ Item {
     }
     onPriceBarsChanged: {
         selectedPointIndex = -1;
+        clearSavedInterval();
         clearPinnedComparison();
         priceCanvas.requestPaint();
     }
     onDayModeChanged: {
+        clearSavedInterval();
         selectedPointIndex = -1;
         clearPinnedComparison();
         priceCanvas.requestPaint();
@@ -929,6 +953,55 @@ Item {
                     font.pixelSize: 11
                     color: Colors.white
                 }
+            }
+            Row {
+                width: parent.width
+                visible: stocks.pinnedInterval !== null || stocks.savedIntervalValid
+                height: visible ? 30 : 0
+                spacing: 6
+                ActionButton {
+                    width: 132
+                    height: 29
+                    label: "SAVE INTERVAL 1"
+                    visible: stocks.pinnedInterval !== null
+                    available: visible
+                    onLeftClicked: stocks.saveCurrentInterval()
+                }
+                ActionButton {
+                    width: 112
+                    height: 29
+                    label: "CLEAR INTERVAL"
+                    visible: stocks.savedIntervalValid
+                    available: visible
+                    onLeftClicked: stocks.clearSavedInterval()
+                }
+            }
+            GohuText {
+                objectName: "marketIntervalComparison"
+                width: parent.width
+                visible: stocks.savedIntervalValid
+                text: !stocks.savedIntervalValid ? "" : stocks.intervalComparison
+                    ? ("INTERVAL 1 VS CURRENT A/B // CHRONOLOGICAL CLOSE RETURNS"
+                        + "\n1 // " + stocks.intervalComparison.first.from.date
+                        + " TO " + stocks.intervalComparison.first.to.date
+                        + " // " + stocks.intervalComparison.firstReturnPct.toFixed(2) + "%"
+                        + " // " + stocks.intervalComparison.first.observedSteps + " STEPS"
+                        + "\n2 // " + stocks.intervalComparison.second.from.date
+                        + " TO " + stocks.intervalComparison.second.to.date
+                        + " // " + stocks.intervalComparison.secondReturnPct.toFixed(2) + "%"
+                        + " // " + stocks.intervalComparison.second.observedSteps + " STEPS"
+                        + "\nRETURN DIFFERENCE (2 MINUS 1) "
+                        + stocks.intervalComparison.returnGapPoints.toFixed(2) + " PERCENTAGE POINTS"
+                        + "\nMAX CLOSE DRAWDOWN // 1 "
+                        + stocks.intervalComparison.first.maxDrawdownPct.toFixed(2) + "% // 2 "
+                        + stocks.intervalComparison.second.maxDrawdownPct.toFixed(2) + "%"
+                        + (stocks.intervalComparison.overlaps ? "\nINTERVALS OVERLAP" : "\nINTERVALS DO NOT OVERLAP")
+                        + "\nRAW RETURNS // NOT TIME-NORMALIZED // NO NEW REQUEST")
+                    : "INTERVAL 1 SAVED // CHOOSE ANOTHER A/B PAIR"
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 11
+                color: Colors.cyan
             }
             ActionButton {
                 id: openSelectedInDay

@@ -51,6 +51,10 @@ jobs:
               '"signedIntentMissingForestSessionId": True',
               'MappingProxyType', 'BINDING_FIELDS',
               'def acquire_commit_permit(', 'def request_revocation(',
+              'def authorize_list_sessions(',
+              'def authorize_disclose_session_titles(',
+              '"forestListSessionsPermissionGranted": False',
+              '"forestPrivateTitleDisclosureGranted": False',
           ):
               assert required in src, required
           for forbidden in (
@@ -67,7 +71,7 @@ jobs:
               assert 'ForestC5AuthorityBoundary' not in Path(path).read_text()
           print('FOREST_C5_AUTHORITY_BOUNDARY // NO_LOCAL_FALLBACK_OR_PRODUCTION_AUTHORITY')
           PY
-      - name: Twenty storage-independent Forest C5 refusal and session-binding tests
+      - name: Twenty-six Forest C5 refusal tests including separate list/title permissions
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

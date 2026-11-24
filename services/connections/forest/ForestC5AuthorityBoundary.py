@@ -45,6 +45,9 @@ NO_AUTHORITY = MappingProxyType({
     "forestWriterJournalCustodyVerified": False,
     "forestSessionIdentitySigned": False,
     "forestProtectedTerminalReconciled": False,
+    # A single-session read can never silently permit enumeration or titles.
+    "forestListSessionsPermissionGranted": False,
+    "forestPrivateTitleDisclosureGranted": False,
 })
 
 
@@ -163,6 +166,14 @@ class ForestC5AuthorityBoundary:
 
     def authorize_read_session(self, *_args, **_kwargs):
         _deny("READ_SESSION_SEPARATE_PROTECTED_POLICY_REQUIRED")
+
+    def authorize_list_sessions(self, *_args, **_kwargs):
+        """Future distinct enumeration grant; no issuer or native provider exists."""
+        _deny("LIST_SESSIONS_SEPARATE_PROTECTED_POLICY_REQUIRED")
+
+    def authorize_disclose_session_titles(self, *_args, **_kwargs):
+        """Title disclosure requires its own protected consent, not LIST alone."""
+        _deny("SESSION_TITLES_SEPARATE_PROTECTED_CONSENT_REQUIRED")
 
     def authorize_tool_execution(self, *_args, **_kwargs):
         _deny("FOREST_TOOL_EXECUTION_DISABLED")

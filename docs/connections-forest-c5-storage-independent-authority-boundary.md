@@ -21,6 +21,19 @@ The new Connections-owned services/connections/forest/ForestC5AuthorityBoundary.
 - **request_revocation**: future durable revocation serialization; **refuses** today, never ACKs revoked while a prior permit might still commit
 - **authorize_read_session**, **authorize_tool_execution**, **production_admission**: **refuse** all operations; read and tools need separate explicit policy
 
+- **authorize_list_sessions**: distinct private metadata enumeration entitlement, **refuses** in both modes (never aliases READ_SESSION, GENERATE or ForestW's presentation parser).
+- **authorize_disclose_session_titles**: separately scoped private title-output consent, **refuses** in both modes (never inferred from valid listing, UI request correlation, or matching B1 rows).
+- **forestListSessionsPermissionGranted** and **forestPrivateTitleDisclosureGranted**: immutable reference/status denial bits, both FALSE even if a caller tampers with a diagnostic reply.
+
+### DOC 3 C5 list/title entitlement separation · later additive milestone
+
+After merged ForestW #2358/#2362, Forest Core B5a #2373, B5a provenance follow-up #2377 and DOC 3 #2352, the next native API remains **unapproved**. This additive boundary change closes a local semantic gap without inventing native issuer authority or changing any Forest-owned source: listing IDs and disclosing titles are two separate C5 grants, and each must explicitly fail while the protected issuer/custodian and recipient do not exist.
+
+A future **operator-approved** Forest host (owned by Forest Core) must independently authenticate the original user, process, active seat, release and selected canonical Tree and resolve the original protected database **before** reading. C5 must separately authorize (1) enumeration and (2) release of private titles to the authenticated recipient; current timestamp, consent epoch, revocation and storage history require independent custody. The existing B4a single-ID READ_SESSION, B1 synthetic owner filter, ForestW #2362 requestId/generation and #2352 provisional-DELTA fixture confer none of those permissions. Neither LIST nor title display implies GENERATE/SEND/voice/COMMIT. On any uncertain origin, revoked consent, wrong Tree, mixed-owner rows, unprotected DB, disconnected issuer, partial output or stale recipient, disclose **zero titles**, never fall back to synthetic B1.
+
+**This is not a native LIST_SESSIONS wire protocol.** The new methods accept arbitrary parameters only to refuse them with distinct fixed, non-leaking errors; there is no serializer, trusted permission input, private title reader, fake positive path, key, socket or native host. Actual versioned provider semantics still require Forest Core/ForestW/Connections Nurse 2/operator ACCEPT/REVISE/HOLD. Do not enable session list or private output from source-only checks.
+
+
 Two explicit modes exist: FOREST_CONTRACT_REFERENCE_ONLY and INDEPENDENT_FOREST_CUSTODIAN_REQUIRED. There is **no** trusted adapter in either mode, and no local SQLite, arbitrarily injected provider, supposed remote URL, or caller-provided trust pin may select one. The protected mode returns only INDEPENDENT_FOREST_CUSTODIAN_UNAVAILABLE_HOLD with every authority bit False; all other protected calls raise ForestC5Hold. Loss of future custodian service MUST fail closed, never switch to local state.
 
 Reference mode has a pure diagnostic parity check for B4c's immutable SyntheticCommitBinding: 8 exact persisted fields (owner_key, tree_key, session_id, user_turn_id, attempt_id, request_id, model_key, expected_revision), compared to #2171's canonical COMMIT_GENERATE intent. Request-ID grammar is aligned with the real B4a client requirement (16–96 identifier characters). Inputs are caller-provided, NOT kernel-observed. The diagnostic never grants, spends, settles, signs, stores or authorizes.
@@ -41,7 +54,7 @@ No UI, host installation, protected issuer, remote service, local database, key 
 
 ## VERIFY
 
-Dedicated CI runs 20 new hostile boundary tests plus previous signed receipt/roles/custody/interop/two-DB fence/B4b suites (86 inherited security checks). It also runs the 15-case Forest B4c two-phase synthetic consumer test. Expected combined count: **121** if all suites complete, with independent check-run verification required. Static gate confirms no signer, SQLite connector, sockets, credential actuation, false-to-true authority change or import into the Forest runtime.
+Dedicated CI runs 26 hostile boundary tests, including 6 new independent LIST_SESSIONS/title denial cases, plus previous signed receipt/roles/custody/interop/two-DB fence/B4b suites (86 inherited security checks). It also runs the 15-case Forest B4c two-phase synthetic consumer test. Expected combined count: **127** if all suites complete, with independent check-run verification required. Static gate confirms no signer, SQLite connector, sockets, credential actuation, false-to-true authority change or import into the Forest runtime.
 
 Checks cover:
 - protected mode never accepting an injected caller backend, local development ledger, URL or public root
@@ -69,6 +82,8 @@ Green CI is **not** a trusted custodian, real human consent, native writer journ
 - [x] Preserve DOC 3/Forest/C3e ownership and refuse caller backend injection.
 - [x] Add exact Forest binding diagnostic and explicit unsigned session HOLD.
 - [ ] Verify exact-head CI and obtain independent Nurse 2 review **before merging**.
+- [x] Explicit deny-only LIST_SESSIONS and private-title grants remain separated from READ_SESSION/GENERATE and from UI schema parsing.
+- [ ] Forest Core + C5 + operator approve native private-title policy and independently protected LIST_SESSIONS provider.
 - [ ] Forest backend + DOC 3 approve versioned signed-session binding contract.
 - [ ] DOC 1/DOC 2 supply independently protected writer public key/release/process/seat/current-head trust.
 - [ ] Forest backend emits durable terminal journal tied to actual COMMIT/ROLLBACK.

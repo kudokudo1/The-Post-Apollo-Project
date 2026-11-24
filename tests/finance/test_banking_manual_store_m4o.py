@@ -80,6 +80,9 @@ with tempfile.TemporaryDirectory() as t:
     cleared=m.run(d,{"action":"clear","expectedRevision":2,"confirmClear":True})
     assert cleared["revision"]==3 and cleared["session"]==m.empty_session()
     assert m.run(d,{"action":"list"})==cleared
+    refuses(lambda:m.run(d,{"action":"clear","expectedRevision":3,
+                            "confirmClear":True}),"NOTHING_SAVED")
+    assert m.run(d,{"action":"list"})==cleared
     saved3=m.run(d,{"action":"save","expectedRevision":3,"session":initial})
     assert saved3["revision"]==4
     assert m.run(d,{"action":"list"})["session"]==initial

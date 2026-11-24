@@ -9,7 +9,9 @@ import secrets
 import sys
 import unittest
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey, Ed25519PublicKey,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "identity"))
@@ -101,7 +103,8 @@ class OriginalAttemptJoinTests(unittest.TestCase):
             original_client_nonce=self.nonce if nonce is None else nonce,
             original_request_id=rid, candidate_snapshot=candidate,
             recorded_signed_frame=frame,
-            pinned_receipt_key=self.private.public_key() if key is None else key)
+            pinned_receipt_key=(self.private.public_key().public_bytes_raw()
+                                if key is None else key))
 
     def hold(self, value, *, checked=None, calls=None, matched=None):
         self.assertEqual(value.schema, SCHEMA)
@@ -280,13 +283,87 @@ class OriginalAttemptJoinTests(unittest.TestCase):
 
     def test_snapshot_unpinned_or_wrong_key_stays_hold(self):
         attempted, original, rid, frame, candidate = self.evidence()
-        wrong = Ed25519PrivateKey.generate().public_key()
+        wrong = Ed25519PrivateKey.generate().public_key().public_bytes_raw()
         for key in (wrong, False):
             with self.subTest(key=repr(key)):
                 result = self.inspect_snapshot(
                     attempted, original, rid, frame, candidate, key=key)
                 self.hold(result, matched=True, checked=False, calls=0)
                 self.assertFalse(result.terminal_outcome_settled)
+
+    def test_snapshot_rejects_executable_public_key_without_dispatch(self):
+        class ActiveKey:
+            def __init__(self):
+                self.calls = 0
+
+            @property
+            def __class__(self):
+                self.calls += 1
+                return Ed25519PublicKey
+
+            def verify(self, *_):
+                self.calls += 100
+
+        attempted, original, rid, frame, candidate = self.evidence()
+        key = ActiveKey()
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate,
+                                       key=key)
+        self.hold(result, matched=True, checked=False, calls=0)
+        self.assertEqual(key.calls, 0)
+        self.assertEqual(result.signed_frame_reason,
+                         "NO_INDEPENDENTLY_VERIFIED_RECEIPT_PIN")
+
+    def test_snapshot_rejects_active_bytes_subclass_and_mutable_pin(self):
+        class ActiveBytes(bytes):
+            def __len__(self):
+                raise AssertionError("caller-supplied length dispatched")
+        raw = self.private.public_key().public_bytes_raw()
+        for key in (ActiveBytes(raw), bytearray(raw), memoryview(raw),
+                    self.private.public_key(), b"", raw[:-1], raw + b"x"):
+            with self.subTest(key_type=type(key).__name__):
+                result = self.inspect_snapshot(*self.evidence(), key=key)
+                self.hold(result, matched=True, checked=False, calls=0)
+                self.assertEqual(result.signed_frame_reason,
+                                 "NO_INDEPENDENTLY_VERIFIED_RECEIPT_PIN")
+
+    def test_snapshot_real_raw_pin_verifies_but_does_not_settle(self):
+        raw = self.private.public_key().public_bytes_raw()
+        result = self.inspect_snapshot(*self.evidence(), key=raw)
+        self.hold(result, matched=True, checked=True, calls=0)
+
+    def test_snapshot_matching_false_nonce_commitments_block_both_sources(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        false_nonce_digest = "e" * 64
+        attempted = replace(attempted, client_nonce_sha256=false_nonce_digest)
+        original = replace(original, nonce_digest=false_nonce_digest)
+        candidate["nonceDigest"] = false_nonce_digest
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=False, checked=False, calls=0)
+        self.assertEqual(result.reason, "ORIGINAL_RAW_COMMITMENT_CONFLICT")
+        self.assertEqual(result.candidate_reason, "NOT_INSPECTED")
+        self.assertEqual(result.signed_frame_reason, "NOT_INSPECTED")
+
+    def test_snapshot_matching_false_request_commitments_block_both_sources(self):
+        attempted, original, rid, frame, candidate = self.evidence("STATUS")
+        false_request_digest = "e" * 64
+        attempted = replace(attempted, request_id_sha256=false_request_digest)
+        original = replace(original, request_digest=false_request_digest)
+        candidate["requestDigest"] = false_request_digest
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=False, checked=False, calls=0)
+        self.assertEqual(result.reason, "ORIGINAL_RAW_COMMITMENT_CONFLICT")
+        self.assertEqual(result.candidate_reason, "NOT_INSPECTED")
+        self.assertEqual(result.signed_frame_reason, "NOT_INSPECTED")
+
+    def test_legacy_callback_also_refuses_false_commitment_before_call(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        attempted = replace(attempted, client_nonce_sha256="e" * 64)
+        original = replace(original, nonce_digest="e" * 64)
+        candidate["nonceDigest"] = "e" * 64
+        result = self.inspect(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=False, checked=False, calls=0)
+        self.assertEqual(result.reason, "ORIGINAL_RAW_COMMITMENT_CONFLICT")
+        self.assertEqual(self.calls, [])
 
     def test_snapshot_stale_signed_sequence_remains_hold(self):
         attempted, original, rid, frame, candidate = self.evidence()

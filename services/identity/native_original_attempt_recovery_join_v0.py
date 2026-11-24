@@ -122,13 +122,15 @@ def inspect_original_attempt_snapshot(
     original_request_id: str | None,
     candidate_snapshot: object,
     recorded_signed_frame: bytes | None,
-    pinned_receipt_key: Ed25519PublicKey | None,
+    pinned_receipt_key: bytes | None,
 ) -> OriginalAttemptRecoveryInspection:
     """Compare already-collected data ONLY. No injected provider is invoked.
 
     This cannot attest independent issuer history or terminal results and
-    does not itself fetch the candidate. It neither opens files/sockets nor
-    executes caller-supplied callables. All output remains UNKNOWN_HOLD.
+    does not itself fetch the candidate. The public-key pin must be exactly
+    32 plain bytes; construct the verifier locally instead of invoking a
+    caller-supplied key object's verify method. No source enrollment is
+    implied. All output remains UNKNOWN_HOLD.
     """
     check = _correlate_original(
         attempted=attempted, original=original,
@@ -141,9 +143,18 @@ def inspect_original_attempt_snapshot(
     candidate = inspect_supplied_candidate(
         original=original, candidate=candidate_snapshot
     )
+    # A caller-supplied key object can dispatch arbitrary Python through
+    # verify(), or even __class__ during isinstance(). Only accept inert
+    # serialized key material; construct the cryptography verifier here.
+    local_key = None
+    if type(pinned_receipt_key) is bytes and len(pinned_receipt_key) == 32:
+        try:
+            local_key = Ed25519PublicKey.from_public_bytes(pinned_receipt_key)
+        except ValueError:
+            pass
     signed = inspect_recorded_signed_receipt(
         original=original, recorded_frame=recorded_signed_frame,
-        pinned_receipt_key=pinned_receipt_key,
+        pinned_receipt_key=local_key,
         original_request_id=original_request_id,
         original_client_nonce=original_client_nonce,
     )
@@ -179,6 +190,19 @@ def _correlate_original(
         return _held("INVALID_ORIGINAL_NATIVE_REQUEST")
     if _sha(wire) != attempted.frame_sha256:
         return _held("ORIGINAL_SERIALIZED_FRAME_CONFLICT")
+
+    # The frame digest and the per-field commitments must describe the
+    # SAME request. Two caller-supplied objects can agree with each other
+    # on false request/nonce digests while retaining a correct frame hash.
+    # build_request has already validated the exact ASCII inputs.
+    actual_request_digest = (
+        None if original_request_id is None
+        else _sha(original_request_id.encode("ascii"))
+    )
+    if (actual_request_digest != attempted.request_id_sha256
+            or _sha(original_client_nonce.encode("ascii"))
+            != attempted.client_nonce_sha256):
+        return _held("ORIGINAL_RAW_COMMITMENT_CONFLICT")
 
     return None
 

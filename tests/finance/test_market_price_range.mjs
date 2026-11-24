@@ -229,3 +229,6 @@ await import("./test_market_m39_relative_leadership.mjs");
 
 // M40: common-date cumulative performance gap chart.
 await import("./test_market_m40_relative_gap.mjs");
+
+// M41: presentation-only research views and preserved controls.
+await import("./test_market_m41_research_views.mjs");

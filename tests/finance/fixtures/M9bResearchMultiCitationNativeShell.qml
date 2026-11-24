@@ -11,6 +11,7 @@ ShellRoot {
     property string caseId: ""
     property string firstKey: ""
     property string secondKey: ""
+    property string firstTitle: ""
 
     QtObject {
         id: secMock
@@ -119,10 +120,11 @@ ShellRoot {
                 return;
             }
             if (root.step === 2 && host.draftState === "ready") {
+                root.firstTitle = host.editorDraftTitle;
                 if (!host.scratchAppendReady
                         || !host.addToScratch(
-                            "First SEC filing index note",
-                            "Filing metadata only; content not inspected.",
+                            host.editorDraftTitle,
+                            host.editorDraftSummary,
                             host.editorDraftUrl)) {
                     root.fail("FIRST_APPEND_REFUSED");
                     return;
@@ -138,7 +140,7 @@ ShellRoot {
                 if (host.writerEnabled
                         || host.scratchCaseId !== root.caseId
                         || host.scratchCase.evidence[0].title
-                            !== "First SEC filing index note"
+                            !== root.firstTitle
                         || host.scratchCase.evidence[0].reviewed !== false
                         || host.scratchCase.evidence[0].source !== "manual"
                         || host.editorDraftUrl !== ""
@@ -185,7 +187,7 @@ ShellRoot {
                 if (!evidence || evidence.length!==2
                         || evidence[0].url===evidence[1].url
                         || evidence[0].id===evidence[1].id
-                        || evidence[0].title!=="First SEC filing index note"
+                        || evidence[0].title!==root.firstTitle
                         || evidence[0].reviewed!==false
                         || evidence[1].reviewed!==false
                         || host.writerEnabled || host.scratchCaseId!==root.caseId) {

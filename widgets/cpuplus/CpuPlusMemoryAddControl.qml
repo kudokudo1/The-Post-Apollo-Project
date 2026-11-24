@@ -19,7 +19,8 @@ Column {
     readonly property string helperPath: "/usr/local/sbin/post-apollo-memory-add-swap"
     readonly property bool observedActive: sample !== null && sample.rows.some(
         row => row.name === "/var/lib/post-apollo-memory-swap/swapfile")
-    readonly property bool eligible: host !== null && host.candidate === true
+    readonly property bool nativeReady: host !== null && host.nativeAuthVersion === 1
+    readonly property bool eligible: nativeReady && host.candidate === true
         && host.filesystem === "btrfs" && Number.isInteger(host.maximumGiB)
         && stagedGiB >= 4 && stagedGiB <= host.maximumGiB && stagedGiB % 4 === 0
         && sample !== null && !observedActive && !check.running
@@ -73,7 +74,8 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: control.observedActive ? "VERIFIED ACTIVE // SEE LIVE SWAP ROW ABOVE"
+        text: control.host && !control.nativeReady ? "HELPER UPDATE REQUIRED // EXISTING SWAP UNCHANGED"
+            : control.observedActive ? "VERIFIED ACTIVE // SEE LIVE SWAP ROW ABOVE"
             : control.host ? (control.host.existing ? "EXISTING ALLOCATION // NO OVERWRITE"
                   : "FREE // " + control.host.availableGiB + " GiB   RESERVE // "
                     + control.host.reserveGiB + " GiB   MAX // " + control.host.maximumGiB + " GiB")
@@ -113,8 +115,8 @@ Column {
         width: parent.width
         height: 34
         visible: control.observedActive
-        label: "VERIFY ACTIVE // AUTHORIZE"
-        available: !MemoryOperation.busy && control.host !== null
+        label: "TEST AUTHORIZATION // VERIFY ACTIVE"
+        available: !MemoryOperation.busy && control.nativeReady
         onLeftClicked: MemoryOperation.request("verify", 0)
     }
     GohuText {

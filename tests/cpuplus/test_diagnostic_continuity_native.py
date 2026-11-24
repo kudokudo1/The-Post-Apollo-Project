@@ -38,6 +38,7 @@ Scope {
 """)
     scripts = config / "scripts"
     scripts.mkdir()
+    shutil.copy2(ROOT / "scripts/cpuplus_diagnostic_archive.py", scripts / "cpuplus_diagnostic_archive.py")
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')

@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const pane = fs.readFileSync(path.join(__dirname, "../widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"), "utf8");
 assert.match(pane, /menus: \["CAP", "POL", "PROC", "AUTO", "DIAG", "PROF"\]/);
-assert.match(pane, /property int menuIndex: 0/);
+assert.match(pane, /readonly property int menuIndex: CpuPlusDiagnostics\.memoryMenuIndex/);
 assert.match(pane, /onLeftClicked: root.selectMenu\(index\)/);
 assert.match(pane, /anchors.top: menuRail.bottom/);
 assert.match(pane, /anchors.top: root.page === "CAP" \? capInstrument.bottom : menuRail.bottom/);
@@ -55,6 +55,6 @@ assert.match(fn, /if \(index < 0 \|\| index >= menus.length \|\| index === menuI
 for (const field of ["armed", "persistArmed", "expandArmed"]) assert.ok(pane.includes("addControl." + field + " = false;"));
 assert.match(fn, /clearCapConfirmation\(\);/);
 assert.match(pane, /function selectCapSection[\s\S]*?clearCapConfirmation\(\);/);
-assert.match(fn, /menuIndex = index;\s*scroll.contentY = 0;/);
+assert.match(fn, /CpuPlusDiagnostics\.memoryMenuIndex = index;\s*scroll.contentY = 0;/);
 assert.doesNotMatch(fn, /stagedGiB\s*=|refresh\(|running\s*=|MemoryOperation\.\w/);
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

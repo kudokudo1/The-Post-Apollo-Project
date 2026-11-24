@@ -19,6 +19,7 @@ import qs.services.hub
 import qs.services.location
 import qs.services.time
 import qs.services.memory
+import qs.services.diagnostics
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
@@ -31,6 +32,9 @@ import Qt5Compat.GraphicalEffects
 
 PanelWindow {
     id: shellRoot
+
+    // Keep the idle diagnostic session referenced by the root, not a transient pane.
+    readonly property var diagnosticSessionOwner: CpuPlusDiagnostics
 
     // This shell is developed by multiple concurrent writers. Quickshell's
     // automatic file watcher can reload partially-updated QML graphs while

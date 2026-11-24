@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.services.memory
+import qs.services.diagnostics
 import "../../components"
 import "CpuPlusMemorySnapshot.js" as Snapshot
 
@@ -94,7 +95,7 @@ Item {
         "AUTOMATION & SAFETY", "DIAGNOSTICS", "PROFILES"
     ]
     property int capSection: 0 // TARGET / ACTIONS / DETAILS
-    property int menuIndex: 0
+    readonly property int menuIndex: CpuPlusDiagnostics.memoryMenuIndex
     readonly property string page: menus[menuIndex]
     function clearCapConfirmation() {
         addControl.armed = false;
@@ -115,7 +116,7 @@ Item {
             clearCapConfirmation();
             capSection = 0;
         }
-        menuIndex = index;
+        CpuPlusDiagnostics.memoryMenuIndex = index;
         scroll.contentY = 0;
     }
 

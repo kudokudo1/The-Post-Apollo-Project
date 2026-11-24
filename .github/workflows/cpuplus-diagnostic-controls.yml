@@ -6,6 +6,9 @@ on:
       - "widgets/cpuplus/CpuPlusDiagnosticsPane.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
       - "tests/cpuplus/test_diagnostic_controls.cjs"
+      - "tests/cpuplus/test_diagnostic_continuity_native.py"
+      - "tests/cpuplus/fixtures/DiagnosticContinuityNative.qml"
+      - "shell.qml"
       - ".github/workflows/cpuplus-diagnostic-controls.yml"
   workflow_dispatch:
 permissions:
@@ -16,3 +19,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node tests/cpuplus/test_diagnostic_controls.cjs
+  native-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Run actual diagnostic child across menu unload and reopen
+        env:
+          POST_APOLLO_MEMORY_UI_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/cpuplus/test_diagnostic_continuity_native.py

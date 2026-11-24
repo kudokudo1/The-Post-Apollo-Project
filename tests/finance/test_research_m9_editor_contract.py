@@ -46,7 +46,7 @@ for marker in (
     'label: "BACK"',
     'label: host.width < 430 ? "PREPARE" : "PREPARE UNSAVED"',
     "reviewActions.availableWidth * 0.34",
-    "reviewActions.availableWidth * 0.66",
+    "reviewActions.availableWidth * (host.scratchSelected",
     "caseEditor.draftEvidenceTitle = data.fields.title;",
     "caseEditor.draftEvidenceSummary = data.fields.summary;",
     "caseEditor.draftEvidenceUrl = data.fields.url;",

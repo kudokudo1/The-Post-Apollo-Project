@@ -113,7 +113,8 @@ def _read_nonce_file(path: Path):
         _deny("C4B_CONTROLLER_NONABSOLUTE_CHALLENGE_PATH")
     fd = None
     try:
-        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC |
+                     os.O_NONBLOCK)
         st = os.fstat(fd)
         if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid()
                 or stat.S_IMODE(st.st_mode) != 0o600 or st.st_nlink != 1
@@ -190,6 +191,29 @@ def inspect_ci_only(*, serial: bytes, controller_challenge: str):
         **NEGATIVE,
     }
 
+def _read_serial_file(path: Path):
+    """Bounded regular-file read, including refusal of an idle named pipe."""
+    fd = None
+    try:
+        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW |
+                     os.O_CLOEXEC | os.O_NONBLOCK)
+        before = os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or
+                not 0 < before.st_size <= MAX_SERIAL_BYTES):
+            _deny("C4B_CONTROLLER_GUEST_SERIAL_UNSAFE")
+        # QEMU may still append console output after the rollback marker.
+        # Preserve the original bounded-read behavior, not a frozen-log
+        # requirement. The original proof parser checks the returned bytes.
+        with os.fdopen(fd, "rb") as stream:
+            fd = None
+            return stream.read(MAX_SERIAL_BYTES + 1)
+    except OSError:
+        _deny("C4B_CONTROLLER_GUEST_SERIAL_UNAVAILABLE")
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 def _main(argv):
     if ((len(argv) == 2 and argv[0] == "issue")
             or (len(argv) == 3 and argv[0] == "verify")):
@@ -204,11 +228,7 @@ def _main(argv):
         return 0
     nonce_path, serial_path = map(Path, argv[1:])
     nonce = _read_nonce_file(nonce_path)
-    try:
-        with serial_path.open("rb") as stream:
-            raw = stream.read(MAX_SERIAL_BYTES + 1)
-    except OSError as exc:
-        raise Refused("C4B_CONTROLLER_GUEST_SERIAL_UNAVAILABLE") from exc
+    raw = _read_serial_file(serial_path)
     result = inspect_ci_only(serial=raw, controller_challenge=nonce)
     if any(result.get(key) is not False for key in NEGATIVE):
         _deny("C4B_CONTROLLER_AUTHORITY_FLAG_PROMOTION")

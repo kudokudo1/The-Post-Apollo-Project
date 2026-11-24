@@ -16,6 +16,8 @@ on:
       - 'tests/cpuplus_memory_queue_hub_adapter_test.js'
       - 'services/memory/memory_queue_history.py'
       - 'tests/cpuplus_memory_queue_history_test.py'
+      - 'services/memory/memory_queue_runtime.py'
+      - 'tests/cpuplus_memory_queue_runtime_test.py'
       - 'services/memory/QUEUE-M1C3B.md'
       - '.github/workflows/cpuplus-memory-queue.yml'
   workflow_dispatch:
@@ -40,3 +42,5 @@ jobs:
         run: node tests/cpuplus_memory_queue_hub_adapter_test.js
       - name: Request history and unbound receipt evidence (fixtures only)
         run: python3 -B tests/cpuplus_memory_queue_history_test.py
+      - name: Notify-only runtime composition (fixtures only)
+        run: python3 -B tests/cpuplus_memory_queue_runtime_test.py

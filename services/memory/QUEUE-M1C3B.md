@@ -171,3 +171,43 @@ contract with DOC 1 and Connections remains required. One candidate per
 request is a provisional staging choice; conflicting evidence requires
 manual investigation. User-owned digest is corruption detection, not a
 signature or defense against a same-UID writer. Native verification pending.
+
+## R1 // notify-only runtime composition (DOC 4 integration slice)
+
+Runtime(queue, capture_source, observe, interval_ms=..., max_age_ms=...,
+max_gap_ms=..., stable_ms=..., clock=...) composes the existing Monitor,
+Events and History with explicit local enqueue/replace/cancel/expire actions,
+detail(request_id), and tick(recheck=False). No process, timer, installed
+service, transport, UI edit, Hub delivery or protected operation. The host
+must supply a serialized caller, bounded provider, explicit wake on queue
+mutation and schedule only non-null next_check_monotonic_ms. Manual recheck
+discards stability continuity; it cannot accelerate readiness. No automatic
+expiry write: explicit expire reconciles the row. Intent success and event
+staging failure are distinct. Action results require a wake; cancel/replace
+are intent only, not cancellation of a kernel operation.
+
+capture_source() returns exactly version=1, source (existing queue source
+shape), wall_ms and monotonic_ms, captured during this call in the owner's
+clock domain. Both managed active file identities are required for the
+initial bounded-withdrawal target; missing/unreadable identity refuses
+creation, never copies historical intent or substitutes null as absence.
+This is an untrusted observation, not a security witness. Provider must
+independently capture live evidence; current CPU++ snapshot has capacity
+and pressure but not file identity or boot/recovery witness. No native
+provider supplied here; do not claim current runtime can enqueue on host.
+No default storage path, timing, expiry or scheduling policy. Explicit
+operator action is required before calling enqueue/replace/cancel.
+
+tick returns version, status, optional notification_candidate and
+notification_error, adjustment_outcome=UNVERIFIED and can_execute=false.
+status.original_actual_kib is captured at request time, NOT live capacity.
+The host must separately show current telemetry, invalidate on queue
+mutation/owner loss/deadline, and wake on WAKE_REQUIRED. Candidate staging
+uses only monitor transitions; ordinary STABILITY_INTERVAL is not an alert.
+Persisted event candidates are not instructions to send; no delivery is
+invoked here. A failed edge stage can lose a candidate; later explicit
+reconciliation is needed. Retain the previous one-attempt delivery policy.
+One caller lock is not a cross-process lock; DB compare/rechecks reduce but
+do not eliminate races. Independent native observation and UI/Hub transport
+still need DOC 1/2/3 and Notification Hub coordination. Protected correlation,
+completion and automatic execution remain HOLD.

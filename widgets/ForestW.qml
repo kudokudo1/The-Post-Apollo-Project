@@ -73,6 +73,7 @@ PanelWindow {
         selectedTreeReasoningSteps = steps;
     }
     property bool modelPopupOpen: false
+    property bool autoPreviewOpen: false
     // Independent in-widget diagnostic menu; opening it does not scan.
     property bool diagnosticsOpen: false
     property string pendingModelScan: ""
@@ -147,6 +148,7 @@ PanelWindow {
     // read-only inventory refresh. Reopening refreshes, but merely opening
     // Forest or loading this QML component never scans automatically.
     onModelPopupOpenChanged: {
+        autoPreviewOpen = false;
         if (modelPopupOpen) {
             pendingModelScan = "";
             lastScannedModel = "";
@@ -1101,6 +1103,7 @@ PanelWindow {
 
                 ListView {
                     id: modelList
+                    visible: !root.autoPreviewOpen
                     anchors.top: selectedModelProfilePanel.bottom
                     anchors.topMargin: selectedModelProfilePanel.visible ? 3 : 2
                     anchors.bottom: popupFoot.top
@@ -1387,7 +1390,7 @@ PanelWindow {
                 }
 
                 GohuText {
-                    visible: localInventory.modelCount === 0
+                    visible: !root.autoPreviewOpen && localInventory.modelCount === 0
                     anchors.centerIn: modelList
                     width: modelList.width - 12
                     text: localInventory.scanning ? "SCANNING INVENTORY"
@@ -1400,19 +1403,52 @@ PanelWindow {
                     wrapMode: Text.WordWrap
                 }
 
+                ForestAutoPolicyPreview {
+                    id: autoPreview
+                    visible: root.modelPopupOpen && root.autoPreviewOpen
+                    anchors.fill: modelList
+                    equipment: root.selectedEquipment
+                    inventoryStatus: localInventory.status
+                    inventoryModels: localInventory.models
+                }
+                Rectangle {
+                    id: autoPreviewButton
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 4
+                    width: 88
+                    height: 17
+                    color: root.autoPreviewOpen ? Colors.yellow : Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+                    Accessible.name: "Toggle offline AUTO policy example preview"
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: root.autoPreviewOpen ? "MODELS" : "AUTO PREVIEW"
+                        color: Colors.magenta
+                        font.pixelSize: 8
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.autoPreviewOpen = !root.autoPreviewOpen
+                    }
+                }
                 GohuText {
                     id: popupFoot
                     anchors.left: parent.left
                     anchors.leftMargin: 8
-                    anchors.right: parent.right
-                    anchors.rightMargin: 8
+                    anchors.right: autoPreviewButton.left
+                    anchors.rightMargin: 4
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 4
                     height: 17
                     color: root.lastScannedModel ? Colors.cyan : Colors.orange
                     font.pixelSize: 9
                     elide: Text.ElideRight
-                    text: root.lastScannedModel
+                    text: root.autoPreviewOpen ? "EXAMPLE ONLY // NOT ROUTED"
+                        : root.lastScannedModel
                             ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
                             : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"
                 }

@@ -34,8 +34,22 @@ inodes, modes and ownership. Owner readback remains possible.
 ## HOW TO USE / VERIFY
 
 Disposable Fedora CI only. Reuse the unchanged B5c RPM builder and verify
-installed bytes/mode/roster, run six integration tests, then erase package.
+installed bytes/mode/roster, run seven integration tests, then erase package.
 B5b, B5a and B1 regressions run separately. No workstation installation.
+
+### Corrective fixture isolation
+
+The original merged #2402 native CI ran 4/6 tests successfully. Two tests
+failed at their pre-exchange file-roster assertions after the owner
+readback case caused SQLite to create backup.db-wal and backup.db-shm.
+The readback and exchange cases previously shared class-scoped fixtures.
+Each case now constructs fresh temporary databases and starts fresh writer
+processes, then stops those processes and removes its own fixture directory.
+The readback case validates any legitimate backup sidecars for owner, mode
+and regular-file type. The exchange baseline still requires the original
+exact roster and compares all bytes/metadata; an added negative regression
+proves unexpected backup sidecars remain a refusal. No host, launcher, B1,
+B5d or Connections source changes.
 
 ## WATCH OUT FOR
 

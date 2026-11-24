@@ -1,0 +1,37 @@
+name: TimeW M8 durable local fractional attempt journal (HOLD)
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3LocalFractionalAttemptJournal.py'
+      - 'services/time/MachineV3LocalSaveRecovery.py'
+      - 'services/time/MachineV3LocalCheckpointAdmission.py'
+      - 'services/time/MachineV3LocalExactCaptureStore.py'
+      - 'tests/timew/test_machine_v8_local_fractional_attempt_journal.py'
+      - 'docs/timew-m8-local-fractional-attempt-journal.md'
+      - '.github/workflows/timew-m8-local-fractional-attempt-journal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-fractional-attempt-journal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify durable original attempts and abrupt process exit recovery
+        run: python3 -B -I tests/timew/test_machine_v8_local_fractional_attempt_journal.py
+      - name: Preserve M7 M6 and existing preview boundaries
+        run: |
+          python3 -B -I tests/timew/test_machine_v7_local_save_recovery.py
+          python3 -B -I tests/timew/test_machine_v6_local_exact_checkpoint_admission.py
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_store.py
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_preview.py
+          python3 -B -I tests/timew/test_machine_v5_local_preview_ui_bridge.py
+          node tests/timew/test_machine_v5_local_preview_policy.cjs
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

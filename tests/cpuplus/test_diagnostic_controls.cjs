@@ -33,7 +33,7 @@ const owner = read("services/diagnostics/CpuPlusDiagnostics.qml");
 const ui = read("widgets/cpuplus/CpuPlusDiagnosticsPane.qml");
 const parent = read("widgets/cpuplus/CpuPlusMemoryActuatorPane.qml");
 assert.match(owner,/pragma Singleton/);
-assert.match(owner,/if \(busy \|\| faulted \|\| worker.running\) return false/);
+assert.match(owner,/if \(busy \|\| faulted \|\| worker.running \|\| archive.busy\) return false/);
 assert.match(owner,/if \(!busy \|\| !received \|\| !exited\) return/);
 assert.match(owner,/worker\.exec\(args\)/);
 assert.match(owner,/maximumReport: 65536/);
@@ -56,3 +56,18 @@ assert.equal(policy.summarize("census",jsonl([{...sample,sequence:2},end])),null
 assert.equal(policy.summarize("census",jsonl([{...sample,rows:[{...censusRow,writeBps:-1}]},end])),null);
 assert.match(policy.summarize("census",jsonl([{...sample,coverage:{truncated:true}},end])), /SCAN LIMIT REACHED/);
 assert.match(ui,/PROCESS CENSUS \/\/ 30s/);
+
+const archived = {kind:"memory",id:"session-abc-def-1",status:"COMPLETE",summary:"summary",text:"raw",finishedAt:"2026-11-24T12:00:00.000Z"};
+const document = {schema:"post-apollo-diagnostic-archive-v1",rows:[archived],savedId:archived.id};
+assert.equal(policy.archiveResponse(document,{action:"save",record:archived})[0],archived);
+assert.equal(policy.archiveResponse(document,{action:"save",record:{...archived,text:"other"}}),null);
+assert.equal(policy.archiveResponse({...document,rows:[archived,archived]},{action:"save",record:archived}),null);
+assert.equal(policy.archiveResponse(document,{action:"list"}),null);
+assert.equal(policy.archiveResponse({...document,savedId:null},{action:"list"}).length,1);
+assert.equal(policy.archiveResponse({...document,rows:Array(9).fill(archived)},{action:"save",record:archived}),null);
+assert.match(owner,/archive.invoke\(\{action: "save", record:/);
+assert.match(ui,/LOAD HISTORY/);
+const archive = read("services/diagnostics/DiagnosticReportArchive.qml");
+assert.match(archive,/stdinEnabled: true/);
+assert.match(archive,/worker.write\(store.frame\)/);
+assert.doesNotMatch(archive,/Component.onCompleted|repeat:\s*true|running:\s*true|pkexec|sudo/);

@@ -201,17 +201,12 @@ def _read_serial_file(path: Path):
         if (not stat.S_ISREG(before.st_mode) or
                 not 0 < before.st_size <= MAX_SERIAL_BYTES):
             _deny("C4B_CONTROLLER_GUEST_SERIAL_UNSAFE")
+        # QEMU may still append console output after the rollback marker.
+        # Preserve the original bounded-read behavior, not a frozen-log
+        # requirement. The original proof parser checks the returned bytes.
         with os.fdopen(fd, "rb") as stream:
             fd = None
-            raw = stream.read(MAX_SERIAL_BYTES + 1)
-            after = os.fstat(stream.fileno())
-        if (len(raw) != before.st_size or
-                (before.st_dev, before.st_ino, before.st_size,
-                 before.st_mtime_ns, before.st_ctime_ns) !=
-                (after.st_dev, after.st_ino, after.st_size,
-                 after.st_mtime_ns, after.st_ctime_ns)):
-            _deny("C4B_CONTROLLER_GUEST_SERIAL_CHANGED")
-        return raw
+            return stream.read(MAX_SERIAL_BYTES + 1)
     except OSError:
         _deny("C4B_CONTROLLER_GUEST_SERIAL_UNAVAILABLE")
     finally:

@@ -13,6 +13,7 @@ import http.client
 import json
 import socket
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from typing import Any
@@ -30,6 +31,7 @@ MIN_CONTEXT = 512
 MAX_CONTEXT = 8192
 CONNECT_TIMEOUT = 6
 TOTAL_SECONDS = 120
+CANCEL_POLL_SECONDS = 0.05
 
 
 class ChatRefusal(Exception):
@@ -109,11 +111,14 @@ def stream_chat(
     endpoint: str = "http://127.0.0.1:11434",
     max_predict: int = 256,
     num_ctx: int = 4096,
+    cancel_event: threading.Event | None = None,
 ) -> Iterator[dict[str, object]]:
     """Yields STARTED, DELTA*, COMPLETE. Raises ChatRefusal on any failure.
 
     COMPLETE is the only signal suitable for later durable journal commit.
-    Close the generator to close the socket; no autonomous retries occur.
+    An optional host-owned, single-operation Event may be set from another
+    thread; never clear or reuse it. Closing a generator is still supported.
+    Cancellation closes only this HTTP exchange, not the Ollama process.
     """
     model = _model_name(model)
     messages = _messages(messages)
@@ -133,18 +138,59 @@ def stream_chat(
         # Default modest context/prediction limits avoid huge cold starts.
         "options": {"num_predict": max_predict, "num_ctx": num_ctx},
     }, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
-    connection = http.client.HTTPConnection(host, port, timeout=CONNECT_TIMEOUT)
-    start = time.monotonic()
+    if cancel_event is not None and type(cancel_event) is not threading.Event:
+        raise ChatRefusal("INVALID_CANCEL_EVENT")
+    deadline = time.monotonic() + TOTAL_SECONDS
+
+    def check_interrupt() -> None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise ChatRefusal("OLLAMA_CANCELLED")
+        if time.monotonic() >= deadline:
+            raise ChatRefusal("OLLAMA_STREAM_DEADLINE")
+
+    check_interrupt()
+    connection = http.client.HTTPConnection(
+        host, port, timeout=min(CONNECT_TIMEOUT, TOTAL_SECONDS))
+    # Duplicate this exchange's connected socket so HTTPResponse ownership
+    # transfers (including Connection: close) cannot invalidate the watchdog.
+    # Shutdown interrupts blocked reads/writes on the same TCP connection.
+    # Only the generator owner closes response/connection objects.
+    stop_watch = threading.Event()
+    interrupt_socket = None
+    watcher = None
+    response = None
+
+    def watch() -> None:
+        while not stop_watch.is_set():
+            remaining = deadline - time.monotonic()
+            if ((cancel_event is not None and cancel_event.is_set())
+                    or remaining <= 0):
+                try:
+                    interrupt_socket.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                return
+            stop_watch.wait(min(CANCEL_POLL_SECONDS, remaining))
     received = 0
     output_bytes = 0
     fragments: list[str] = []
     complete = False
     try:
         try:
+            # Literal loopback connect is separately bounded. No request is
+            # dispatched if cancellation/deadline was observed during connect.
+            connection.connect()
+            check_interrupt()
+            interrupt_socket = connection.sock.dup()
+            watcher = threading.Thread(target=watch, name="forest-b2-watch",
+                                       daemon=True)
+            watcher.start()
+            check_interrupt()
             connection.request("POST", "/api/chat", body=payload, headers={
                 "Content-Type": "application/json", "Accept": "application/x-ndjson"
             })
             response = connection.getresponse()
+            check_interrupt()
             if response.status != 200:
                 raise ChatRefusal("OLLAMA_HTTP_ERROR")
             media_type = (response.getheader("Content-Type") or "").lower()
@@ -153,9 +199,9 @@ def stream_chat(
                 raise ChatRefusal("OLLAMA_STREAM_CONTENT_TYPE")
             yield {"event": "STARTED", "model": model, "provider": "ollama"}
             while True:
-                if time.monotonic() - start > TOTAL_SECONDS:
-                    raise ChatRefusal("OLLAMA_STREAM_DEADLINE")
+                check_interrupt()
                 data = response.readline(MAX_CHUNK_BYTES + 1)
+                check_interrupt()
                 received += len(data)
                 if received > MAX_STREAM_BYTES:
                     raise ChatRefusal("OLLAMA_STREAM_TOO_LARGE")
@@ -186,9 +232,11 @@ def stream_chat(
                 if output_bytes > MAX_OUTPUT_BYTES:
                     raise ChatRefusal("OLLAMA_OUTPUT_TOO_LARGE")
                 if content:
+                    check_interrupt()
                     fragments.append(content)
                     yield {"event": "DELTA", "text": content}
                 if packet["done"]:
+                    check_interrupt()
                     if not fragments:
                         raise ChatRefusal("OLLAMA_EMPTY_RESPONSE")
                     complete = True
@@ -200,13 +248,27 @@ def stream_chat(
                     }
                     break
             if not complete:
+                check_interrupt()
                 raise ChatRefusal("OLLAMA_STREAM_TRUNCATED")
         except socket.timeout as exc:
+            check_interrupt()
             raise ChatRefusal("OLLAMA_TIMEOUT") from exc
         except (OSError, http.client.HTTPException) as exc:
+            check_interrupt()
             raise ChatRefusal("OLLAMA_UNAVAILABLE") from exc
     finally:
-        connection.close()
+        stop_watch.set()
+        if watcher is not None and watcher.ident is not None:
+            watcher.join()
+        try:
+            if response is not None:
+                response.close()
+        finally:
+            try:
+                connection.close()
+            finally:
+                if interrupt_socket is not None:
+                    interrupt_socket.close()
 
 
 def main(argv: list[str] | None = None) -> int:

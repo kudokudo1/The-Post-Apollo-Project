@@ -46,12 +46,16 @@ for code in (writer,old):
     assert "recovery-needed" in code
     assert 'status!=="committed"' in code or 'status !== "committed"' in code
 assert "await file.sync();" in writer
-assert "await fsyncDirectory(journalDir);" in writer
+assert "await fsyncDirectory(journal);" in writer
+assert 'openTrustedDirectory(journalDir,{' in writer
+assert 'readTrustedPrivateFile(path)' in writer
+assert 'readPrivateEntry(journal,filename)' in writer
+assert 'dirEntryPath(journal,".write-lock")' in writer
 assert 'attempted=true;' in writer
 assert 'if(attempted)return "uncertain";' in writer
 assert "priorNames.some(name=>name.endsWith(" in writer
 assert '"-"+command.requestId+".json"' in writer
-assert 'readActualServerURL()' in writer
+assert 'privateFile(join(config,"actual-server-url"))' in writer
 assert '"http://127.0.0.1:5006"' in writer
 assert '.update(serverURL+"\\0"+syncId)' in writer
 assert 'if(command.sourceKey!==expectedKey)' in writer

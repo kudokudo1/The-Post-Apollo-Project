@@ -1,0 +1,47 @@
+name: Connections C4b installed Forest original-source observation (CI-only)
+on:
+  pull_request:
+    paths:
+      - 'tests/connections/c4b_forest_native/test_c4b_forest_installed_source_ci.py'
+      - 'tests/connections/c4b_forest_native/verify_c4b_forest_installed_source_ci.sh'
+      - 'docs/connections-c4b-forest-original-installed-source-ci.md'
+      - '.github/workflows/connections-c4b-forest-installed-source-ci.yml'
+      - 'scripts/forest/native_host_candidate_b5b.py'
+      - 'tests/forest/native_ci/build_forest_host_ci.sh'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-installed-source-with-distinct-uid-renderer:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify CI-only scope and pin source bytes from repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile tests/connections/c4b_forest_native/test_c4b_forest_installed_source_ci.py
+          grep -Fq 'readonly property bool credentialActionsEnabled: false' services/connections/ConnectionsBroker.qml
+          sha256sum scripts/forest/native_host_candidate_b5b.py | cut -d ' ' -f1 > "$RUNNER_TEMP/c4b-forest.sha"
+          mkdir "$RUNNER_TEMP/c4b-forest"
+      - name: Build original unchanged B5c test RPM in disposable Fedora
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(cat "$RUNNER_TEMP/c4b-forest.sha")"
+          docker run --rm -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+            -v "$PWD:/source:ro" -v "$RUNNER_TEMP/c4b-forest:/out" \
+            fedora:44 bash /source/tests/forest/native_ci/build_forest_host_ci.sh
+      - name: Actual installed host source and separate renderer kernel observation
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(cat "$RUNNER_TEMP/c4b-forest.sha")"
+          docker run --rm -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+            -v "$RUNNER_TEMP/c4b-forest:/input:ro" \
+            -v "$PWD/tests/connections/c4b_forest_native:/ci:ro" \
+            fedora:44 bash /ci/verify_c4b_forest_installed_source_ci.sh

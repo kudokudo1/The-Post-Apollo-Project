@@ -21,7 +21,8 @@ class ForestModelDiskComparisonTests(unittest.TestCase):
         self.assertEqual(view.count("ForestResidencyAdapter {"),1)
         self.assertEqual(view.count("ForestHardwareCapacityView {"),1)
         self.assertIn("id: forestDiagnosticsPopup",view)
-        self.assertIn("onClicked: root.chooseLocalModel(modelEntry.modelName)",view)
+        self.assertIn('onClicked: root.equipLocalModel("small", modelEntry.modelName)',view)
+        self.assertIn('onClicked: root.equipLocalModel("big", modelEntry.modelName)',view)
         self.assertIn("readonly property bool chatHostTrusted: false",view)
         self.assertIn("readonly property bool voiceHostTrusted: false",view)
         # Existing 82px row: controls end y=27, text y=29..41,

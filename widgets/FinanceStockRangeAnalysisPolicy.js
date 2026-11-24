@@ -280,6 +280,26 @@ function summarizePinnedInterval(snapshot, firstIndex, secondIndex) {
     };
 }
 
+// M33: constant compounded close-to-close change equivalent to a loaded
+// interval's actual endpoint ratio. Observed transitions are not elapsed
+// calendar days; the result is descriptive, never annualized or projected.
+function observedStepChangePct(interval) {
+    if (!interval || !Number.isInteger(interval.observedSteps)
+            || interval.observedSteps < 1
+            || !interval.from || !interval.to
+            || !Number.isFinite(interval.from.price)
+            || !Number.isFinite(interval.to.price)
+            || interval.from.price <= 0 || interval.to.price <= 0)
+        return null;
+    const logChange = (Math.log(interval.to.price)
+        - Math.log(interval.from.price)) / interval.observedSteps;
+    const result = (Math.exp(logChange) - 1) * 100;
+    if (!Number.isFinite(result)) return null;
+    // Four decimals preserve ordinary small observed-step changes.
+    // Rounding is display-only; keep the full precision for the difference.
+    return result === 0 ? 0 : result;
+}
+
 // M32: compare two inclusive historical segments in the same loaded RANGE.
 // Both segment returns are chronological, irrespective of selection direction.
 function compareHistoricalIntervals(snapshot, a, b, c, d) {
@@ -290,10 +310,18 @@ function compareHistoricalIntervals(snapshot, a, b, c, d) {
     const r2 = (second.to.price / second.from.price - 1) * 100;
     const gap = r2 - r1;
     if (![r1, r2, gap].every(Number.isFinite)) return null;
+    const firstStepPct = observedStepChangePct(first);
+    const secondStepPct = observedStepChangePct(second);
+    const stepGapPoints = firstStepPct === null || secondStepPct === null
+        ? null : secondStepPct - firstStepPct;
     return {
         first:first, second:second,
         firstReturnPct:roundPct(r1), secondReturnPct:roundPct(r2),
         returnGapPoints:roundPct(gap),
+        firstStepPct:firstStepPct,
+        secondStepPct:secondStepPct,
+        stepGapPoints:Number.isFinite(stepGapPoints) ? stepGapPoints : null,
+        sameStepCount:first.observedSteps === second.observedSteps,
         overlaps:Math.max(Math.min(a,b),Math.min(c,d))
             <= Math.min(Math.max(a,b),Math.max(c,d)),
         readOnly:true,noProviderCalls:true

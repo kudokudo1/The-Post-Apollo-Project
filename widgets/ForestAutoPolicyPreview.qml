@@ -16,6 +16,7 @@ Item {
     property string suitability: "unset"
     property string requestedForm: "auto"
     property string effort: "normal"
+    property string bindingScenario: "missing"
     property var result: null
     property var submitted: null
     property bool busy: false
@@ -32,6 +33,7 @@ Item {
         suitability = "unset";
         requestedForm = "auto";
         effort = "normal";
+        bindingScenario = "missing";
         result = null;
         status = "NOT EVALUATED";
         if (busy) discard = true;
@@ -44,12 +46,13 @@ Item {
         else if (key === "suitability") suitability = value;
         else if (key === "requestedForm") requestedForm = value;
         else if (key === "effort") effort = value;
+        else if (key === "bindingScenario") bindingScenario = value;
         result = null;
         status = "NOT EVALUATED";
     }
     function evaluateExample() {
         if (!visible || busy || worker.running) return;
-        submitted = [requestedForm,effort,complexity,failure,suitability];
+        submitted = [requestedForm,effort,complexity,failure,suitability,bindingScenario];
         result = null;
         discard = false;
         stdoutSeen = false;
@@ -60,13 +63,13 @@ Item {
         busy = true;
         status = "EVALUATING";
         worker.exec(["/usr/bin/python3","-B",
-            Quickshell.shellPath("scripts/forest/ui_routing_example.py")].concat(submitted));
+            Quickshell.shellPath("scripts/forest/ui_binding_example.py")].concat(submitted));
     }
     function finish() {
         if (!busy || !stdoutSeen || !stderrSeen || !exitSeen) return;
         if (!discard && visible) {
-            result = refused ? null : AutoPreview.parse(output,submitted);
-            status = result ? "I1 REFERENCE // UNKNOWN_HOLD" : "REFERENCE REFUSED";
+            result = refused ? null : AutoPreview.parseBinding(output,submitted);
+            status = result ? "I1 / I2 REFERENCE // UNKNOWN_HOLD" : "REFERENCE REFUSED";
         }
         submitted = null;
         output = "";
@@ -173,6 +176,74 @@ Item {
                     }
                 }
             }
+            Rectangle {
+                width: parent.width
+                height: bindingChoices.implicitHeight + 12
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                Column {
+                    id: bindingChoices
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: 6
+                    spacing: 3
+                    GohuText {
+                        width: parent.width
+                        text: "I2 // FICTIONAL BINDING EVIDENCE"
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Example needs CHAT + REASONING / CTX 4096. Not the equipped model."
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Flow {
+                        width: parent.width
+                        spacing: 3
+                        Repeater {
+                            model: [
+                                {key:"unbound",label:"UNBOUND"},
+                                {key:"missing",label:"NO EVIDENCE"},
+                                {key:"mismatch",label:"DIGEST MISMATCH"},
+                                {key:"not-installed",label:"NOT INSTALLED"},
+                                {key:"install-unknown",label:"INSTALL ?"},
+                                {key:"capability-unknown",label:"CAPABILITY ?"},
+                                {key:"feature-unsupported",label:"FEATURE MISSING"},
+                                {key:"context-insufficient",label:"CTX TOO LOW"},
+                                {key:"match",label:"REFERENCE MATCH"}
+                            ]
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property bool chosen: pane.bindingScenario === modelData.key
+                                width: Math.min(bindingChoices.width, Math.max(48, bindingLabel.implicitWidth + 12))
+                                height: 23
+                                color: chosen ? Colors.yellow : Colors.black
+                                border.width: 1
+                                border.color: chosen ? Colors.magenta : Colors.cyan
+                                GohuText {
+                                    id: bindingLabel
+                                    anchors.centerIn: parent
+                                    text: parent.modelData.label
+                                    color: parent.chosen ? Colors.magenta : Colors.cyan
+                                    font.pixelSize: 9
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: !pane.busy
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: pane.editExample("bindingScenario",parent.modelData.key)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             ActionButton {
                 width: parent.width
                 height: 27
@@ -218,7 +289,21 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "I1 EXAMPLE ONLY // NO RESOLVED BINDING // REASONING INDEPENDENT"
+                text: "I2 REFERENCE // " + (pane.result ? pane.result.bindingReason : "NOT EVALUATED")
+                font.pixelSize: 10
+                color: Colors.orange
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: "LIVE BINDING // UNRESOLVED"
+                font.pixelSize: 9
+                color: Colors.orange
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                text: "I1 / I2 EXAMPLE ONLY // NO RESOLVED BINDING // REASONING INDEPENDENT"
                 font.pixelSize: 9
                 color: Colors.orange
                 wrapMode: Text.WordWrap

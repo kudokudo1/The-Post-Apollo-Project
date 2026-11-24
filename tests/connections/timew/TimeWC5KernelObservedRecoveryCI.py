@@ -84,12 +84,42 @@ def _ci_guard():
             and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
 
 
+def _snapshot_response(response):
+    """Own a bounded flat copy; no mutable child or custom JSON objects."""
+    if type(response) is not dict or len(response) > 64:
+        raise ValueError("INVALID_C5_NATIVE_TEST_RESPONSE")
+    copied = response.copy()
+    if len(copied) > 64:
+        raise ValueError("INVALID_C5_NATIVE_TEST_RESPONSE")
+    for key, value in copied.items():
+        if type(key) is not str or not 1 <= len(key) <= 128:
+            raise ValueError("INVALID_C5_NATIVE_TEST_RESPONSE_KEY")
+        if value is None or type(value) is bool:
+            continue
+        if type(value) is str and len(value) <= MAX_EXPECTED:
+            continue
+        if type(value) is int and value.bit_length() <= 64:
+            continue
+        if (type(value) is tuple and len(value) == 4
+                and all(type(n) is int and n.bit_length() <= 64
+                        for n in value)):
+            continue
+        raise ValueError("INVALID_C5_NATIVE_TEST_RESPONSE_VALUE")
+    return copied
+
+
+def _receiver_identity(receiver):
+    # Different Python socket objects (or dup() FDs) can name the same
+    # kernel socket. Compare live Linux socket inode identities, not objects.
+    info = os.fstat(receiver.fileno())
+    return info.st_dev, info.st_ino
+
+
 def fixture_packet_ci_only(role, response):
     """Private deterministic CI bytes only: not a standardized C5/SwayPX wire."""
-    if role not in (C5_ROLE, NATIVE_ROLE) or type(role) is not str:
+    if type(role) is not str or role not in (C5_ROLE, NATIVE_ROLE):
         raise ValueError("INVALID_C5_NATIVE_TEST_ROLE")
-    if type(response) is not dict:
-        raise ValueError("INVALID_C5_NATIVE_TEST_RESPONSE")
+    response = _snapshot_response(response)
     try:
         packet = json.dumps(
             {"role": role, "diagnosticReturn": response},
@@ -148,8 +178,19 @@ def inspect_dual_packet_returns_ci_only(*, c5_receiver, native_receiver,
             or c5_receiver.fileno() < 0 or native_receiver.fileno() < 0):
         return _hold("TWO_DISTINCT_CONNECTED_RECEIVERS_REQUIRED_HOLD")
     try:
-        c5_expected = fixture_packet_ci_only(C5_ROLE, expected_c5_return)
-        native_expected = fixture_packet_ci_only(NATIVE_ROLE, expected_native_return)
+        if _receiver_identity(c5_receiver) == _receiver_identity(native_receiver):
+            return _hold("TWO_DISTINCT_CONNECTED_RECEIVERS_REQUIRED_HOLD")
+    except OSError:
+        return _hold("TWO_DISTINCT_CONNECTED_RECEIVERS_REQUIRED_HOLD")
+    try:
+        # These private flat snapshots are the SAME values used for both
+        # packet digest matching and the subsequent comparison. In particular,
+        # a caller mutating its original dict during recvmsg cannot substitute
+        # data after its bytes have been matched.
+        c5_snapshot = _snapshot_response(expected_c5_return)
+        native_snapshot = _snapshot_response(expected_native_return)
+        c5_expected = fixture_packet_ci_only(C5_ROLE, c5_snapshot)
+        native_expected = fixture_packet_ci_only(NATIVE_ROLE, native_snapshot)
     except ValueError:
         return _hold("MALFORMED_EXPECTED_LOCAL_FIXTURE_HOLD")
     try:
@@ -163,8 +204,8 @@ def inspect_dual_packet_returns_ci_only(*, c5_receiver, native_receiver,
     try:
         comparison = compare_untrusted_recovery_returns(
             plan=original_recovery_plan,
-            c5_return=expected_c5_return,
-            native_return=expected_native_return,
+            c5_return=c5_snapshot,
+            native_return=native_snapshot,
             last_seen=last_seen,
         )
     except (TypeError, ValueError):

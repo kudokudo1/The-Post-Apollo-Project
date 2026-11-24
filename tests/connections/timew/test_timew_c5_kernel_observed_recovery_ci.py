@@ -148,6 +148,94 @@ class KernelTimeWRecoveryDenyTests(unittest.TestCase):
         self.denied(z)
         self.assertEqual(z.status, "TWO_DISTINCT_CONNECTED_RECEIVERS_REQUIRED_HOLD")
 
+    def test_mutation_during_kernel_read_cannot_replace_c5_history(self):
+        # Use real packets, and inject the mutation at the exact boundary
+        # between packet observation and comparison (no fake kernel report).
+        inspect = K.inspect_one_untrusted_packet
+
+        def mutate_after_read(receiver):
+            result = inspect(receiver)
+            self.c5["ledger_state"] = "SPENT"
+            return result
+
+        self.c5["ledger_state"] = "ACTIVE"
+        with patch.object(K, "inspect_one_untrusted_packet",
+                          side_effect=mutate_after_read):
+            out = self.compare()
+        self.assertEqual(self.c5["ledger_state"], "SPENT")
+        self.assertEqual(out.comparison_diagnostic,
+                         "NATIVE_EFFECT_WITHOUT_PROVEN_SPENT_UNKNOWN_HOLD")
+
+    def test_mutation_during_kernel_read_cannot_hide_native_timeout(self):
+        inspect = K.inspect_one_untrusted_packet
+        self.native["resize_observation"] = "READY_AND_TIMEOUT"
+
+        def mutate_after_read(receiver):
+            result = inspect(receiver)
+            self.native["resize_observation"] = "READY_ONLY"
+            return result
+
+        with patch.object(K, "inspect_one_untrusted_packet",
+                          side_effect=mutate_after_read):
+            out = self.compare()
+        self.assertEqual(self.native["resize_observation"], "READY_ONLY")
+        self.assertEqual(out.comparison_diagnostic,
+                         "CONTRADICTORY_RESIZE_UNKNOWN_HOLD")
+
+    def test_duplicate_fd_alias_cannot_supply_two_role_packets(self):
+        reader, writer = self.pair()
+        alias = reader.dup()
+        self.addCleanup(alias.close)
+        writer.send(fixture_packet_ci_only(C5_ROLE, self.c5))
+        writer.send(fixture_packet_ci_only(NATIVE_ROLE, self.native))
+        with patch.object(K, "inspect_one_untrusted_packet",
+                          wraps=K.inspect_one_untrusted_packet) as observe:
+            out = inspect_dual_packet_returns_ci_only(
+                c5_receiver=reader, native_receiver=alias,
+                expected_c5_return=self.c5,
+                expected_native_return=self.native,
+                original_recovery_plan=self.plan)
+            observe.assert_not_called()
+        self.denied(out)
+        self.assertEqual(out.status,
+                         "TWO_DISTINCT_CONNECTED_RECEIVERS_REQUIRED_HOLD")
+        # Refusal must not consume the original queued packet.
+        self.assertEqual(reader.recv(K.MAX_PAYLOAD),
+                         fixture_packet_ci_only(C5_ROLE, self.c5))
+
+    def test_mutable_nested_response_refused_before_kernel_reads(self):
+        r1, _ = self.pair()
+        r2, _ = self.pair()
+        for bad in ([], {"nested": "value"}, (1, 2, 3, [])):
+            with self.subTest(bad=repr(bad)):
+                with patch.object(K, "inspect_one_untrusted_packet") as observe:
+                    out = inspect_dual_packet_returns_ci_only(
+                        c5_receiver=r1, native_receiver=r2,
+                        expected_c5_return=dict(self.c5, injected=bad),
+                        expected_native_return=self.native,
+                        original_recovery_plan=self.plan)
+                    observe.assert_not_called()
+                self.denied(out)
+                self.assertEqual(out.status,
+                                 "MALFORMED_EXPECTED_LOCAL_FIXTURE_HOLD")
+
+    def test_unbounded_int_and_field_count_refused_before_kernel_reads(self):
+        r1, _ = self.pair()
+        r2, _ = self.pair()
+        for bad in (dict(self.c5, huge=1 << 4096),
+                    {str(i): 0 for i in range(65)}):
+            with self.subTest(size=len(bad)):
+                with patch.object(K, "inspect_one_untrusted_packet") as observe:
+                    out = inspect_dual_packet_returns_ci_only(
+                        c5_receiver=r1, native_receiver=r2,
+                        expected_c5_return=bad,
+                        expected_native_return=self.native,
+                        original_recovery_plan=self.plan)
+                    observe.assert_not_called()
+                self.denied(out)
+                self.assertEqual(out.status,
+                                 "MALFORMED_EXPECTED_LOCAL_FIXTURE_HOLD")
+
     def test_invalid_local_expected_response_cannot_be_transmitted(self):
         r1, _ = self.pair()
         r2, _ = self.pair()

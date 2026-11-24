@@ -90,6 +90,21 @@ Item {
         ? RangeAnalysisPolicy.inspectNormalizedStep(normalizedComparison,
             normalizedSelectedStep) : null
     onNormalizedComparisonChanged: normalizedSelectedStep = -1
+    // M36: explicitly retained comparison reference, separate from M30/M32
+    // same-snapshot pins. Survives issuer changes, never persists to disk.
+    property var stockReference: null
+    readonly property var crossStockComparison: stockReference !== null
+        && rangeAnalysis !== null && stockFeed
+        ? RangeAnalysisPolicy.compareStockReferences(stockReference, snapshot,
+            stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik))
+        : null
+    function saveStockReference() {
+        if (rangeAnalysis === null || !stockFeed) return;
+        const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
+            stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik));
+        if (captured) stockReference=captured;
+    }
+    function clearStockReference() { stockReference=null; }
     function clearSavedInterval() {
         savedIntervalSnapshot = null;
         savedIntervalA = -1;
@@ -507,6 +522,65 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
                 color: Colors.white
+            }
+            Row {
+                width: parent.width
+                visible: !stocks.dayMode && (stocks.rangeAnalysis !== null || stocks.stockReference !== null)
+                height: visible ? 30 : 0
+                spacing: 6
+                ActionButton {
+                    width: 146
+                    height: 29
+                    label: "SAVE STOCK REF"
+                    labelPixelSize: 10
+                    accentColor: Colors.cyan
+                    visible: stocks.rangeAnalysis !== null
+                    available: visible && stocks.priceBars.length >= 2
+                    onLeftClicked: stocks.saveStockReference()
+                }
+                ActionButton {
+                    width: 110
+                    height: 29
+                    label: "CLEAR REF"
+                    labelPixelSize: 10
+                    accentColor: Colors.orange
+                    visible: stocks.stockReference !== null
+                    available: visible
+                    onLeftClicked: stocks.clearStockReference()
+                }
+            }
+            GohuText {
+                objectName: "marketCrossStockComparison"
+                width: parent.width
+                visible: !stocks.dayMode && stocks.stockReference !== null
+                text: {
+                    const ref=stocks.stockReference;
+                    if (!ref) return "";
+                    const header="STOCK REF // " + ref.symbol + " // " + ref.priceBasis
+                        + "\nREQUESTED " + ref.from + " TO " + ref.to
+                        + "\nRETRIEVED " + ref.retrievedAt;
+                    const d=stocks.crossStockComparison;
+                    if (!d) return header + "\nLOAD ANOTHER STOCK WITH SAME DATE WINDOW";
+                    if (d.state === "same-stock") return header + "\nSELECT ANOTHER STOCK AND LOAD RANGE";
+                    if (d.state === "window-mismatch") return header + "\nDATE WINDOW MISMATCH // MATCH REQUESTED DATES";
+                    if (d.state === "basis-mismatch") return header + "\nPRICE BASIS MISMATCH // COMPARISON UNAVAILABLE";
+                    if (d.state === "insufficient") return header + "\nNEED TWO COMMON CLOSE DATES // HAVE " + d.matched;
+                    if (d.state !== "ready") return header + "\nCOMPARISON UNAVAILABLE";
+                    return header
+                        + "\nCURRENT " + d.currentSymbol + " // RETRIEVED " + d.currentRetrievedAt
+                        + "\nCOMMON CLOSE DATES " + d.from + " TO " + d.to
+                        + " // " + d.matched + " MATCHED"
+                        + "\n" + d.referenceSymbol + " // " + d.referencePct.toFixed(2) + "%"
+                        + " // " + d.currentSymbol + " // " + d.currentPct.toFixed(2) + "%"
+                        + "\nCURRENT MINUS REF " + d.gapPoints.toFixed(2) + " PERCENTAGE POINTS"
+                        + "\nUNMATCHED CLOSES // REF " + d.referenceUnmatched
+                        + " // CURRENT " + d.currentUnmatched
+                        + "\nHISTORICAL CLOSE MOVEMENT // NO FILL // NO NEW REQUEST";
+                }
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 11
+                color: Colors.cyan
             }
             Rectangle {
                 objectName: "marketRangeAnalysisPanel"

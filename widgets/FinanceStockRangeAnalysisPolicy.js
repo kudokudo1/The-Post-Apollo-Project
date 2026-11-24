@@ -420,3 +420,60 @@ function inspectNormalizedStep(chart, step) {
         readOnly:true,noProviderCalls:true
     };
 }
+
+// M36: capture one detached, bounded closing-price range in memory.
+// Caller supplies the exact identity from the existing six-stock catalog.
+function captureStockReference(snapshot, cik, symbol) {
+    if (!summarizeRange(snapshot) || snapshot.bars.length < 2
+            || typeof cik !== "string" || !/^\d{10}$/.test(cik)
+            || typeof symbol !== "string" || !/^[A-Z]+\.US$/.test(symbol)
+            || snapshot.cik !== cik || snapshot.symbol !== symbol
+            || typeof snapshot.retrievedAt !== "string"
+            || !Number.isFinite(Date.parse(snapshot.retrievedAt)))
+        return null;
+    const bars = snapshot.bars.map(p => ({date:p.date,price:p.price}));
+    return {
+        schemaVersion:1,source:"eodhd-eod",readOnly:true,
+        cik:cik,symbol:symbol,priceBasis:snapshot.priceBasis,
+        from:snapshot.from,to:snapshot.to,retrievedAt:snapshot.retrievedAt,
+        bars:bars,first:{date:bars[0].date,price:bars[0].price},
+        last:{date:bars[bars.length-1].date,price:bars[bars.length-1].price}
+    };
+}
+
+// Cross-stock movement uses common observed calendar dates, not ordinal
+// alignment. No missing-price fill or cross-basis comparison.
+function compareStockReferences(reference, current, cik, symbol) {
+    const a = reference && captureStockReference(reference,reference.cik,reference.symbol);
+    const b = captureStockReference(current,cik,symbol);
+    if (!a || !b) return {state:"invalid"};
+    if (a.cik === b.cik || a.symbol === b.symbol) return {state:"same-stock"};
+    if (a.from !== b.from || a.to !== b.to) return {state:"window-mismatch"};
+    if (a.priceBasis !== b.priceBasis) return {state:"basis-mismatch"};
+    const pairs = [];
+    let i=0,j=0;
+    while (i<a.bars.length && j<b.bars.length) {
+        const left=a.bars[i], right=b.bars[j];
+        if (left.date < right.date) i++;
+        else if (right.date < left.date) j++;
+        else {
+            pairs.push({date:left.date,referencePrice:left.price,currentPrice:right.price});
+            i++; j++;
+        }
+    }
+    if (pairs.length < 2) return {state:"insufficient",matched:pairs.length};
+    const first=pairs[0], last=pairs[pairs.length-1];
+    const referencePct=(last.referencePrice/first.referencePrice-1)*100;
+    const currentPct=(last.currentPrice/first.currentPrice-1)*100;
+    const gap=currentPct-referencePct;
+    if (![referencePct,currentPct,gap].every(Number.isFinite)) return {state:"invalid"};
+    return {
+        state:"ready",referenceSymbol:a.symbol,currentSymbol:b.symbol,
+        referenceRetrievedAt:a.retrievedAt,currentRetrievedAt:b.retrievedAt,
+        priceBasis:a.priceBasis,from:first.date,to:last.date,
+        matched:pairs.length,referenceUnmatched:a.bars.length-pairs.length,
+        currentUnmatched:b.bars.length-pairs.length,
+        referencePct:referencePct,currentPct:currentPct,gapPoints:gap,
+        pairs:pairs,readOnly:true,noProviderCalls:true
+    };
+}

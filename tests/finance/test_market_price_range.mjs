@@ -214,3 +214,6 @@ await import("./test_market_m34_normalized_chart.mjs");
 
 // M35: normalized chart observed-step cursor and read-only detail.
 await import("./test_market_m35_normalized_step.mjs");
+
+// M36: detached cross-stock comparison on actual matching dates.
+await import("./test_market_m36_cross_stock.mjs");

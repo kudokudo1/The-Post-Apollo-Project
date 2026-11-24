@@ -1,0 +1,44 @@
+name: FinanceW Simple M3d4 disposable categorized SIGKILL recovery
+
+on:
+  pull_request:
+    paths:
+      - "tests/finance/fixtures/simple_m3d4_sigkill_loader.mjs"
+      - "scripts/finance/disposable_categorized_expense_sigkill.mjs"
+      - "tests/finance/test_finance_simple_m3d4_sigkill_isolation.py"
+      - ".github/workflows/financew-simple-m3d4-sigkill.yml"
+      - "scripts/finance/SIMPLE_MODE_M3D4_SIGKILL_README.md"
+  push:
+    paths:
+      - "tests/finance/fixtures/simple_m3d4_sigkill_loader.mjs"
+      - "scripts/finance/disposable_categorized_expense_sigkill.mjs"
+      - "tests/finance/test_finance_simple_m3d4_sigkill_isolation.py"
+      - ".github/workflows/financew-simple-m3d4-sigkill.yml"
+      - "scripts/finance/SIMPLE_MODE_M3D4_SIGKILL_README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-sigkill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FINANCEW_DISPOSABLE_TEST: "yes"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify CI-only crash fixture and UI isolation
+        run: python3 -B tests/finance/test_finance_simple_m3d4_sigkill_isolation.py
+      - name: Verify source syntax
+        run: |
+          node --check tests/finance/fixtures/simple_m3d4_sigkill_loader.mjs
+          node --check scripts/finance/disposable_categorized_expense_sigkill.mjs
+      - name: Install pinned Actual API and server in isolated checkout
+        run: |
+          npm install --prefix scripts/finance --no-save --package-lock=false --no-audit --no-fund @actual-app/api@26.10.0 @actual-app/sync-server@26.10.0
+      - name: SIGKILL at journal and post-add checkpoints, check recovery refusals
+        run: node scripts/finance/disposable_categorized_expense_sigkill.mjs

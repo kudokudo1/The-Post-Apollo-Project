@@ -172,6 +172,50 @@ class OriginalAttemptJoinTests(unittest.TestCase):
         self.assertEqual(result.candidate_reason,
                          "MALFORMED_UNTRUSTED_CANDIDATE")
 
+    def test_snapshot_non_string_dict_key_never_executes_custom_hash(self):
+        class ActiveKey:
+            def __init__(self):
+                self.calls = 0
+            def __hash__(self):
+                self.calls += 1
+                return 982451653
+            def __eq__(self, other):
+                self.calls += 100
+                return False
+        attempted, original, rid, frame, candidate = self.evidence()
+        value = candidate.pop("schema")
+        key = ActiveKey()
+        candidate[key] = value
+        key.calls = 0  # Ignore the necessary one-time dict construction hash.
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+        self.assertEqual(key.calls, 0)
+
+    def test_snapshot_str_subclass_key_never_executes_custom_hash(self):
+        class ActiveString(str):
+            def __new__(cls, value):
+                obj = super().__new__(cls, value)
+                obj.calls = 0
+                return obj
+            def __hash__(self):
+                self.calls += 1
+                return super().__hash__()
+            def __eq__(self, other):
+                self.calls += 100
+                return super().__eq__(other)
+        attempted, original, rid, frame, candidate = self.evidence()
+        value = candidate.pop("schema")
+        key = ActiveString("schema")
+        candidate[key] = value
+        key.calls = 0
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+        self.assertEqual(key.calls, 0)
+
     def test_snapshot_absent_candidate_is_no_provider_not_failure(self):
         attempted, original, rid, frame, _ = self.evidence()
         result = self.inspect_snapshot(attempted, original, rid, frame, None)

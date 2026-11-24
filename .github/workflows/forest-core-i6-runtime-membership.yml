@@ -1,0 +1,30 @@
+name: Forest Core I6 Runtime Membership CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/runtime_membership_i6.py'
+      - 'scripts/forest/RUNTIME_MEMBERSHIP_I6.md'
+      - 'tests/forest/test_runtime_membership_i6.py'
+      - 'scripts/forest/cgroup_observation_i5.py'
+      - 'scripts/forest/process_observation_i4.py'
+      - 'scripts/forest/resource_calibration_i3.py'
+      - 'scripts/forest/model_binding_i2.py'
+      - 'scripts/forest/resource_governor_p1.py'
+      - '.github/workflows/forest-core-i6-runtime-membership.yml'
+permissions:
+  contents: read
+jobs:
+  runtime-membership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_runtime_membership_i6.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_cgroup_observation_i5.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_process_observation_i4.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_calibration_i3.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_binding_i2.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - run: python3 -m py_compile scripts/forest/runtime_membership_i6.py tests/forest/test_runtime_membership_i6.py

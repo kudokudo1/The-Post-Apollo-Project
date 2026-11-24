@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'scripts/post-apollo-memory-add-swap'
+      - 'services/memory/**'
+      - 'services/time/TimeSettings.qml'
+      - 'widgets/TimeResyncAuthW.qml'
+      - 'shell.qml'
       - 'widgets/cpuplus/CpuPlusMemory*.qml'
       - 'widgets/cpuplus/CpuPlusMemorySnapshot.js'
       - 'tests/cpuplus_memory*'
@@ -17,5 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Mocked privileged-operation contract (no real swap writes)
         run: python3 -B tests/cpuplus_memory_add_test.py
+      - name: Native auth source contract
+        run: node tests/cpuplus_memory_auth_test.js
       - name: Inherited read-only snapshot contract
         run: node tests/cpuplus_memory_snapshot_test.js

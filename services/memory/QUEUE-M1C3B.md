@@ -151,3 +151,23 @@ No auto-replay from history, completion receipt, new notification backend or
 privileged operation. The attempt ledger is user-owned, not protected
 against same-UID edits or restoration of an older DB. Native bridge/owner
 coordination, crash tests, policy acceptance and production activation pending.
+
+## M1c.3f.1 // request history and unbound withdrawal evidence
+
+History(queue) explicitly initializes only its candidate table. detail(id)
+joins an existing request, existing event candidates and notification attempt
+reservations in one SQLite read transaction. It does not initialize missing
+event/attempt tables, send notifications or treat a notification attempt as
+a memory adjustment. Outcome remains UNVERIFIED. record_candidate accepts only
+the exact current DOC 1 withdrawal-result v1 shape, matches target/base size
+and time window, stores canonical JSON plus digest, refuses conflicting or
+cross-request duplicate associations. These checks establish structural
+consistency only, not root provenance or a causal request association.
+A matching helper VERIFIED receipt is displayed as UNBOUND_EVIDENCE:
+the helper does not bind request ID, observer, or boot ID in that receipt.
+No actual operation attempt, completion, terminal transition, receipt
+notification or recovery authorization is manufactured. A trusted correlation
+contract with DOC 1 and Connections remains required. One candidate per
+request is a provisional staging choice; conflicting evidence requires
+manual investigation. User-owned digest is corruption detection, not a
+signature or defense against a same-UID writer. Native verification pending.

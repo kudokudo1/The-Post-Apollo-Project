@@ -14,6 +14,8 @@ on:
       - 'services/memory/MemoryQueueNotificationAdapter.js'
       - 'tests/cpuplus_memory_queue_delivery_test.py'
       - 'tests/cpuplus_memory_queue_hub_adapter_test.js'
+      - 'services/memory/memory_queue_history.py'
+      - 'tests/cpuplus_memory_queue_history_test.py'
       - 'services/memory/QUEUE-M1C3B.md'
       - '.github/workflows/cpuplus-memory-queue.yml'
   workflow_dispatch:
@@ -36,3 +38,5 @@ jobs:
         run: python3 -B tests/cpuplus_memory_queue_delivery_test.py
       - name: Notification Hub adapter contract (fixture only)
         run: node tests/cpuplus_memory_queue_hub_adapter_test.js
+      - name: Request history and unbound receipt evidence (fixtures only)
+        run: python3 -B tests/cpuplus_memory_queue_history_test.py

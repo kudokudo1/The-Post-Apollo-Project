@@ -20,5 +20,5 @@ const fn = pane.slice(pane.indexOf("function selectMenu"), pane.indexOf("    Gri
 assert.match(fn, /if \(index < 0 \|\| index >= menus.length \|\| index === menuIndex\) return;/);
 for (const field of ["armed", "persistArmed", "expandArmed"]) assert.ok(fn.includes("addControl." + field + " = false;"));
 assert.match(fn, /menuIndex = index;\s*scroll.contentY = 0;/);
-assert.doesNotMatch(fn, /stagedGiB\s*=|refresh\(|running\s*=|MemoryOperation\./);
+assert.doesNotMatch(fn, /stagedGiB\s*=|refresh\(|running\s*=|MemoryOperation\.\w/);
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

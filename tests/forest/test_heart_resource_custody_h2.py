@@ -35,7 +35,7 @@ class CustodyTests(unittest.TestCase):
 
     def terminal(self, outcome="COMMITTED"):
         return self.c.observe_terminal_reference(reference(self.s),
-                                                 outcome=outcome, observed_ns=400)
+                                                 outcome=outcome, clock_domain="clock", observed_ns=400)
 
     def test_claim_and_separate_release(self):
         self.assertEqual(claim(self.c, self.s), "REFERENCE_HELD")
@@ -91,7 +91,7 @@ class CustodyTests(unittest.TestCase):
                       replace(a, turn_id="other"),
                       replace(a, context=replace(a.context, generation=2))):
             with self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_MISMATCH"):
-                self.c.observe_terminal_reference(other, outcome="FAILED", observed_ns=400)
+                self.c.observe_terminal_reference(other, outcome="FAILED", clock_domain="clock", observed_ns=400)
             with self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_MISMATCH"):
                 self.c.account_release_reference(release(self.s, attempt=other), now_ns=600)
         self.assertTrue(self.c.status()["fixture_slot_occupied"])
@@ -106,7 +106,10 @@ class CustodyTests(unittest.TestCase):
     def test_release_time_refusals(self):
         claim(self.c, self.s)
         self.assertEqual(self.c.observe_terminal_reference(reference(self.s),
-                         outcome="FAILED", observed_ns=299), "TERMINAL_CLOCK_HOLD")
+                         outcome="FAILED", clock_domain="clock", observed_ns=299), "TERMINAL_CLOCK_HOLD")
+        self.assertEqual(self.c.observe_terminal_reference(reference(self.s),
+                         outcome="FAILED", clock_domain="other", observed_ns=400),
+                         "TERMINAL_CLOCK_HOLD")
         self.terminal()
         for obs, now in ((release(self.s, observed_ns=400), 600),
                          (release(self.s, observed_ns=601), 600),

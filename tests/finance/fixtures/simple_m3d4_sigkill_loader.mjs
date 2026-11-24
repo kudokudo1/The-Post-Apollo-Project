@@ -25,7 +25,8 @@ export async function load(url,context,nextLoad){
   const point=process.env.FINANCEW_M3D4_POINT;
   if(point!=="after-attempt" && point!=="after-add")
     throw new Error("m3d4-invalid-checkpoint");
-  const source=String(result.source);
+  const source=typeof result.source==="string" ? result.source
+    : Buffer.from(result.source).toString("utf8");
   const original=point==="after-attempt"?markerAttempt:markerAdd;
   if(source.indexOf(original)<0 || source.indexOf(original)!==source.lastIndexOf(original))
     throw new Error("m3d4-expected-single-policy-checkpoint");

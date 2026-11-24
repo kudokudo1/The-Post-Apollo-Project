@@ -43,8 +43,8 @@ PanelWindow {
         selectedTreeReasoningSteps = steps;
     }
     property bool modelPopupOpen: false
-    // Popup-only navigation. No new window, host service or scan on tab switch.
-    property bool hardwareViewOpen: false
+    // Independent in-widget diagnostic menu; opening it does not scan.
+    property bool diagnosticsOpen: false
     property string pendingModelScan: ""
     property string lastScannedModel: ""
     property string lastModelScanResult: ""
@@ -110,13 +110,12 @@ PanelWindow {
             lastModelScanResult = "";
             if (!localInventory.scanning && !modelResidency.scanning)
                 refreshLocalModelEvidence();
-        } else {
-            hardwareViewOpen = false;
         }
     }
     onMenuOpenChanged: {
         if (!menuOpen) {
             modelPopupOpen = false;
+            diagnosticsOpen = false;
             reasoningRailExpanded = false;
             // Local-only drafts never outlive the displayed Forest session.
             if (forestPromptInput)
@@ -299,6 +298,8 @@ PanelWindow {
         Keys.onEscapePressed: function(event) {
             if (root.modelPopupOpen)
                 root.modelPopupOpen = false;
+            else if (root.diagnosticsOpen)
+                root.diagnosticsOpen = false;
             else
                 root.menuOpen = false;
             event.accepted = true;
@@ -316,13 +317,21 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.right: collapseButton.left
+                anchors.right: forestDiagnosticsButton.left
                 anchors.rightMargin: 8
                 text: "FOREST // AI WORKSPACE"
                 font.pixelSize: 16
                 font.bold: true
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+            DiagnosticsDockButton {
+                id: forestDiagnosticsButton
+                anchors.right: collapseButton.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                diagnosticsOpen: root.diagnosticsOpen
+                onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen
             }
             ResizeButton {
                 id: collapseButton
@@ -778,47 +787,21 @@ PanelWindow {
                     GohuText {
                         anchors.left: parent.left
                         anchors.leftMargin: 9
-                        anchors.right: hardwareViewButton.left
+                        anchors.right: scanAllButton.left
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.hardwareViewOpen ? "FOREST // HARDWARE" : "FOREST // MODELS"
+                        text: "FOREST // MODELS"
                         color: Colors.magenta
                         font.pixelSize: 12
                         elide: Text.ElideRight
                     }
 
                     Rectangle {
-                        id: hardwareViewButton
-                        anchors.right: scanAllButton.left
-                        anchors.rightMargin: 5
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 63
-                        height: 23
-                        color: root.hardwareViewOpen ? Colors.dark : Colors.black
-                        border.width: 1
-                        border.color: root.hardwareViewOpen ? Colors.magenta : Colors.cyan
-                        Accessible.name: root.hardwareViewOpen
-                            ? "Back to Forest model list"
-                            : "Open read-only Forest hardware capacity page"
-                        GohuText {
-                            anchors.centerIn: parent
-                            text: root.hardwareViewOpen ? "MODELS" : "HARDWARE"
-                            font.pixelSize: 9
-                            color: root.hardwareViewOpen ? Colors.magenta : Colors.cyan
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.hardwareViewOpen = !root.hardwareViewOpen
-                        }
-                    }
-                    Rectangle {
                         id: scanAllButton
                         anchors.right: closeModelPopupButton.left
                         anchors.rightMargin: 5
                         anchors.verticalCenter: parent.verticalCenter
-                        width: root.hardwareViewOpen ? 0 : 66
-                        visible: !root.hardwareViewOpen
+                        width: 66
                         height: 23
                         color: Colors.dark
                         border.width: 1
@@ -865,19 +848,9 @@ PanelWindow {
                     height: 19
                     font.pixelSize: 9
                     elide: Text.ElideRight
-                    color: root.hardwareViewOpen
-                        ? (capacityView.snapshotStatus === "OBSERVED" ? Colors.green : Colors.orange)
-                        : (modelResidency.status === "STALE" ? Colors.orange
-                            : localInventory.status === "REACHABLE" ? Colors.green : Colors.orange)
-                    text: root.hardwareViewOpen
-                        ? (capacityView.checking ? "P2C // CHECKING"
-                            : capacityView.snapshotStatus === "OBSERVED"
-                                ? "P2C CHECKED " + capacityView.lastObservedLocalTime + " / READ ONLY"
-                            : capacityView.snapshotStatus === "STALE"
-                                ? "P2C STALE // CHECK AGAIN (LAST " + capacityView.lastObservedLocalTime + ")"
-                            : capacityView.snapshotStatus === "NOT_CHECKED" ? "P2C // NOT CHECKED"
-                            : "P2C // UNAVAILABLE")
-                        : modelResidency.status === "STALE"
+                    color: modelResidency.status === "STALE" ? Colors.orange
+                        : localInventory.status === "REACHABLE" ? Colors.green : Colors.orange
+                    text: modelResidency.status === "STALE"
                             ? "P0 STALE // SCAN AGAIN (LAST " + modelResidency.lastObservedLocalTime + ")"
                         : modelResidency.status === "OBSERVED"
                             ? "P0 CHECKED " + modelResidency.lastObservedLocalTime
@@ -902,7 +875,7 @@ PanelWindow {
                     anchors.leftMargin: 7
                     anchors.right: parent.right
                     anchors.rightMargin: 7
-                    height: !root.hardwareViewOpen && modelPopup.height >= 270 ? 48 : 0
+                    height: modelPopup.height >= 270 ? 48 : 0
                     visible: height > 0
                     color: Colors.dark
                     border.width: 1
@@ -946,7 +919,6 @@ PanelWindow {
 
                 ListView {
                     id: modelList
-                    visible: !root.hardwareViewOpen
                     anchors.top: selectedModelProfilePanel.bottom
                     anchors.topMargin: selectedModelProfilePanel.visible ? 3 : 2
                     anchors.bottom: popupFoot.top
@@ -958,7 +930,7 @@ PanelWindow {
                     clip: true
                     spacing: 5
                     boundsBehavior: Flickable.StopAtBounds
-                    model: !root.hardwareViewOpen && localInventory.status === "REACHABLE"
+                    model: localInventory.status === "REACHABLE"
                         ? localInventory.models : []
                     delegate: Rectangle {
                         id: modelEntry
@@ -1100,7 +1072,7 @@ PanelWindow {
                 }
 
                 GohuText {
-                    visible: !root.hardwareViewOpen && localInventory.modelCount === 0
+                    visible: localInventory.modelCount === 0
                     anchors.centerIn: modelList
                     width: modelList.width - 12
                     text: localInventory.scanning ? "SCANNING INVENTORY"
@@ -1111,22 +1083,6 @@ PanelWindow {
                     font.pixelSize: 10
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                }
-
-                ForestHardwareCapacityView {
-                    id: capacityView
-                    // Same exact per-Tree selection as the P0 header/popup.
-                    // P2C is manual-only and must never feed LOAD/IDLE status.
-                    selectedModelName: root.selectedLocalModel
-                    visible: root.hardwareViewOpen
-                    anchors.top: popupProviderStatus.bottom
-                    anchors.topMargin: 3
-                    anchors.bottom: popupFoot.top
-                    anchors.bottomMargin: 3
-                    anchors.left: parent.left
-                    anchors.leftMargin: 7
-                    anchors.right: parent.right
-                    anchors.rightMargin: 7
                 }
 
                 GohuText {
@@ -1141,9 +1097,7 @@ PanelWindow {
                     color: root.lastScannedModel ? Colors.cyan : Colors.orange
                     font.pixelSize: 9
                     elide: Text.ElideRight
-                    text: root.hardwareViewOpen
-                        ? "P2C SYSFS = ESTIMATE // NOT MODEL CAPACITY OR PERMISSION"
-                        : root.lastScannedModel
+                    text: root.lastScannedModel
                             ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
                             : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"
                 }
@@ -1763,6 +1717,87 @@ PanelWindow {
                     // a selected B0 model is not an authorized session.
                 }
 
+            }
+        }
+
+        // Separate top-deck diagnostic popup. Both menus may stay open.
+        // Leave the model selector's right-side footprint clear at every stage.
+        Rectangle {
+            id: forestDiagnosticsPopup
+            visible: root.diagnosticsOpen
+            z: 40
+            anchors.top: header.bottom
+            anchors.topMargin: 7
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.bottom: footer.top
+            anchors.bottomMargin: 7
+            width: Math.max(0, Math.min(390, chatPane.x + modelPopup.x - 20))
+            color: "#110319"
+            border.width: 1
+            border.color: Colors.magenta
+            clip: true
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                onPressed: function(mouse) { mouse.accepted = true; }
+                onWheel: function(wheel) { wheel.accepted = true; }
+            }
+
+            Item {
+                id: diagnosticsHeader
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 7
+                height: 34
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.right: diagnosticsClose.left
+                    anchors.rightMargin: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "FOREST // DIAGNOSTICS"
+                    font.pixelSize: 12
+                    color: Colors.magenta
+                    elide: Text.ElideRight
+                }
+                CloseButton {
+                    id: diagnosticsClose
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 28
+                    Accessible.name: "Close Forest diagnostics"
+                    onCloseRequested: root.diagnosticsOpen = false
+                }
+            }
+            GohuText {
+                id: diagnosticsStatus
+                anchors.top: diagnosticsHeader.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 7
+                anchors.rightMargin: 7
+                height: 19
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                color: capacityView.snapshotStatus === "OBSERVED" ? Colors.green : Colors.orange
+                text: capacityView.checking ? "P2C // CHECKING"
+                    : capacityView.snapshotStatus === "OBSERVED"
+                        ? "P2C CHECKED " + capacityView.lastObservedLocalTime + " / READ ONLY"
+                    : capacityView.snapshotStatus === "STALE"
+                        ? "P2C STALE // CHECK AGAIN (LAST " + capacityView.lastObservedLocalTime + ")"
+                    : capacityView.snapshotStatus === "NOT_CHECKED" ? "P2C // NOT CHECKED"
+                    : "P2C // UNAVAILABLE"
+            }
+            ForestHardwareCapacityView {
+                id: capacityView
+                selectedModelName: root.selectedLocalModel
+                anchors.top: diagnosticsStatus.bottom
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 7
             }
         }
 

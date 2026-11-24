@@ -642,7 +642,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
         self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
-        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
+        # The only permitted toggle signal is the shared diagnostics button.
+        diagnostic_toggle = "onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen"
+        self.assertEqual(view.count(diagnostic_toggle), 1)
+        self.assertNotRegex(view.replace(diagnostic_toggle, "", 1), r"(?m)^\s*onToggleRequested\s*:")
 
         # These markers come from the real SelectorSlider implementation.
         for source in (
@@ -883,7 +886,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
         self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
-        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
+        # The only permitted toggle signal is the shared diagnostics button.
+        diagnostic_toggle = "onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen"
+        self.assertEqual(view.count(diagnostic_toggle), 1)
+        self.assertNotRegex(view.replace(diagnostic_toggle, "", 1), r"(?m)^\s*onToggleRequested\s*:")
 
     def test_forest_prompt_reuses_voice_and_ask_send_without_permissions(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
@@ -973,7 +979,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED", view)
         self.assertIn("SEND LOCKED // HOST NOT CONNECTED", view)
         self.assertIn("SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED", view)
-        self.assertNotRegex(view, r"(?m)^\s*onToggleRequested\s*:")
+        # The only permitted toggle signal is the shared diagnostics button.
+        diagnostic_toggle = "onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen"
+        self.assertEqual(view.count(diagnostic_toggle), 1)
+        self.assertNotRegex(view.replace(diagnostic_toggle, "", 1), r"(?m)^\s*onToggleRequested\s*:")
         self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
         self.assertNotRegex(view, r"(?m)^\s*onSecondaryRequested\s*:")
         self.assertNotIn("HospitalSpeechInputService {", view)
@@ -1204,7 +1213,12 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("id: modelList", view)
         self.assertIn("clip: true", view)
         self.assertIn("boundsBehavior: Flickable.StopAtBounds", view)
-        self.assertIn('text: root.hardwareViewOpen ? "FOREST // HARDWARE" : "FOREST // MODELS"', view)
+        self.assertIn('text: "FOREST // MODELS"', view)
+        self.assertIn("DiagnosticsDockButton {", view)
+        self.assertIn("anchors.right: forestDiagnosticsButton.left", view)
+        self.assertIn("onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen", view)
+        self.assertIn("visible: root.diagnosticsOpen", view)
+        self.assertNotIn("hardwareViewOpen", view)
         self.assertIn('text: "FOUND"', view)
         self.assertIn(': "LIVE ?"', view)
         self.assertIn('text: "ACCESS ?"', view)

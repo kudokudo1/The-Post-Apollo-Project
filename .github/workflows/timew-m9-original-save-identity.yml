@@ -1,0 +1,33 @@
+name: TimeW M9 original local Save identity (no live wiring)
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3OriginalSaveIdentity.py'
+      - 'services/time/MachineGeometryStoreV2.py'
+      - 'tests/timew/test_machine_v9_original_save_identity.py'
+      - 'docs/timew-m9-original-save-identity.md'
+      - '.github/workflows/timew-m9-original-save-identity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-save-identity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original identity, atomic pair and abrupt interruption
+        run: python3 -B -I tests/timew/test_machine_v9_original_save_identity.py
+      - name: Preserve existing Save and local recovery
+        run: |
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v8_local_fractional_attempt_journal.py
+          python3 -B -I tests/timew/test_machine_v7_local_save_recovery.py
+          python3 -B -I tests/timew/test_machine_v6_local_exact_checkpoint_admission.py
+          python3 -B -I tests/timew/test_machine_v3_local_exact_capture_store.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

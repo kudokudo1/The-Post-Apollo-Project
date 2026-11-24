@@ -92,8 +92,22 @@ def fd_links(pid):
             continue
     return values
 
+def check_live_pidfd(fd, pid):
+    """A controller-owned kernel handle, not a caller's asserted PID."""
+    if type(fd) is not int or fd < 0 or type(pid) is not int or pid <= 0:
+        raise Refused("C4B_FOREST_INVALID_LIFETIME_HANDLE_HOLD")
+    fields = Path("/proc/self/fdinfo", str(fd)).read_text().splitlines()
+    value = next((line.split()[1] for line in fields
+                  if line.startswith("Pid:")), None)
+    poller = select.poll()
+    poller.register(fd, select.POLLIN)
+    if value != str(pid) or poller.poll(0):
+        raise Refused("C4B_FOREST_ORIGINAL_PROCESS_NOT_LIVE_HOLD")
+
+
 def observe(*, pid, host_fd, host_inode, renderer_pid, renderer_inode,
-            start, boot, source_sha, uid):
+            start, boot, source_sha, uid, host_pidfd, renderer_pidfd,
+            renderer_start, renderer_fd, renderer_gate, token):
     """A pinned disposable CI source observation; never a protected identity."""
     try:
         if (type(pid) is not int or type(uid) is not int or
@@ -103,6 +117,12 @@ def observe(*, pid, host_fd, host_inode, renderer_pid, renderer_inode,
                 uid != OWNER or start != ticks(pid) or boot != boot_id() or
                 source_sha != SHA or installed_sha() != SHA):
             raise Refused("C4B_FOREST_SOURCE_PIN_MISMATCH_HOLD")
+        if (type(renderer_start) is not int or type(renderer_fd) is not int
+                or type(renderer_gate) is not int or type(token) is not str
+                or token not in TOKENS or renderer_start != ticks(renderer_pid)):
+            raise Refused("C4B_FOREST_RECIPIENT_PIN_MISMATCH_HOLD")
+        check_live_pidfd(host_pidfd, pid)
+        check_live_pidfd(renderer_pidfd, renderer_pid)
         p = Path("/proc", str(pid))
         q = Path("/proc", str(renderer_pid))
         if (ids(pid) != {"Uid": (OWNER,) * 4, "Gid": (OWNER,) * 4} or
@@ -115,12 +135,26 @@ def observe(*, pid, host_fd, host_inode, renderer_pid, renderer_inode,
         if argv != [PYTHON.encode(), b"-I", b"-B", str(HOST).encode(),
                     b"--disposable-test-fd", str(host_fd).encode()]:
             raise Refused("C4B_FOREST_NOT_ORIGINAL_INSTALLED_SCRIPT_HOLD")
+        renderer_argv = (q / "cmdline").read_bytes().rstrip(b"\0").split(b"\0")
+        if renderer_argv != [
+                PYTHON.encode(), b"-I", b"-B", SELF.encode(), b"--renderer",
+                str(renderer_fd).encode(), str(renderer_gate).encode(),
+                token.encode()]:
+            raise Refused("C4B_FOREST_NOT_ORIGINAL_RENDERER_SCRIPT_HOLD")
         if (os.readlink(p / "fd" / str(host_fd)) != f"socket:[{host_inode}]" or
+                os.readlink(q / "fd" / str(renderer_fd))
+                != f"socket:[{renderer_inode}]" or
                 f"socket:[{renderer_inode}]" in fd_links(pid) or
                 f"socket:[{host_inode}]" in fd_links(renderer_pid) or
                 f"socket:[{renderer_inode}]" not in fd_links(renderer_pid) or
                 not (p / "cgroup").read_text().strip()):
             raise Refused("C4B_FOREST_ORIGINAL_CHANNEL_NOT_PINNED_HOLD")
+        # Recheck the same kernel handles and both starts after inspection.
+        # This brackets a snapshot; it is not an atomic send/receive fence.
+        check_live_pidfd(host_pidfd, pid)
+        check_live_pidfd(renderer_pidfd, renderer_pid)
+        if ticks(pid) != start or ticks(renderer_pid) != renderer_start:
+            raise Refused("C4B_FOREST_PROCESS_LIFETIME_CHANGED_HOLD")
     except Refused:
         raise
     except (OSError, ValueError, IndexError, StopIteration) as error:
@@ -131,6 +165,7 @@ def observe(*, pid, host_fd, host_inode, renderer_pid, renderer_inode,
         "ciOnlyActualInstalledSourceBytesMatch": True,
         "ciOnlyKernelProcessAndFdObserved": True,
         "ciOnlyDistinctRendererUidObserved": True,
+        "ciOnlyBothProcessLifetimesObserved": True,
         **DENIED,
     }
 
@@ -189,11 +224,11 @@ class C4bActualInstalledSourceCI(unittest.TestCase):
         if installed_sha() != SHA:
             raise RuntimeError("C4B_SOURCE_CHECKOUT_AND_RPM_BYTES_DIFFER")
 
-    def scenario(self, token, negative=None):
+    def scenario(self, token, negative=None, exit_before_gate=None):
         a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         gate_read, gate_write = os.pipe()
         host = renderer = None
-        pidfd = None
+        pidfd = renderer_pidfd = None
         try:
             host_fd, renderer_fd = b.fileno(), a.fileno()
             host_inode, renderer_inode = os.fstat(host_fd).st_ino, os.fstat(renderer_fd).st_ino
@@ -204,21 +239,42 @@ class C4bActualInstalledSourceCI(unittest.TestCase):
                              (renderer_fd, gate_read))
             a.close()
             b.close()
+            renderer_gate = gate_read
             os.close(gate_read)
             gate_read = -1
             pidfd = os.pidfd_open(host.pid)
+            renderer_pidfd = os.pidfd_open(renderer.pid)
             poller = select.poll()
             poller.register(pidfd, select.POLLIN)
             self.assertEqual(poller.poll(0), [])
             pinned_boot, pinned_ticks = boot_id(), ticks(host.pid)
             args = dict(pid=host.pid, host_fd=host_fd, host_inode=host_inode,
                         renderer_pid=renderer.pid, renderer_inode=renderer_inode,
-                        start=pinned_ticks, boot=pinned_boot, source_sha=SHA, uid=OWNER)
+                        start=pinned_ticks, boot=pinned_boot, source_sha=SHA, uid=OWNER,
+                        host_pidfd=pidfd, renderer_pidfd=renderer_pidfd,
+                        renderer_start=ticks(renderer.pid), renderer_fd=renderer_fd,
+                        renderer_gate=renderer_gate, token=token)
             record = observe(**args)
             for flag in DENIED:
                 self.assertIs(record[flag], False, flag)
+            self.assertIs(record["ciOnlyBothProcessLifetimesObserved"], True)
             if negative:
                 negative(args)
+            if exit_before_gate is not None:
+                target = host if exit_before_gate == "host" else renderer
+                target_fd = pidfd if exit_before_gate == "host" else renderer_pidfd
+                target.kill()
+                self.assertLess(wait(target), 0)
+                with self.assertRaises(Refused):
+                    check_live_pidfd(target_fd, target.pid)
+                with self.assertRaises(Refused):
+                    observe(**args)
+                # Close, never release the send gate after a lost endpoint.
+                os.close(gate_write)
+                gate_write = -1
+                survivor = renderer if exit_before_gate == "host" else host
+                self.assertEqual(wait(survivor), 2)
+                return
             self.assertEqual(observe(**args), record)  # second LIVE observation
             os.write(gate_write, b"G")
             os.close(gate_write)
@@ -226,6 +282,9 @@ class C4bActualInstalledSourceCI(unittest.TestCase):
             self.assertEqual(wait(renderer), 0, "RENDERER_FAILED")
             self.assertEqual(wait(host), TOKENS[token][0], "ORIGINAL_HOST_FAILED")
             self.assertTrue(poller.poll(1000), "ORIGINAL_PIDFD_NOT_TERMINATED")
+            renderer_poller = select.poll()
+            renderer_poller.register(renderer_pidfd, select.POLLIN)
+            self.assertTrue(renderer_poller.poll(1000), "RENDERER_PIDFD_NOT_TERMINATED")
             self.assertEqual(installed_sha(), SHA)
             self.assertEqual(boot_id(), pinned_boot)
         finally:
@@ -237,6 +296,8 @@ class C4bActualInstalledSourceCI(unittest.TestCase):
             b.close()
             if pidfd is not None:
                 os.close(pidfd)
+            if renderer_pidfd is not None:
+                os.close(renderer_pidfd)
             for child in (renderer, host):
                 if child:
                     if child.poll() is None:
@@ -279,6 +340,25 @@ class C4bActualInstalledSourceCI(unittest.TestCase):
                 with self.subTest(pin=k), self.assertRaises(Refused):
                     observe(**{**a, k: bad})
         self.scenario("STATUS", negative)
+
+    def test_09_recipient_start_exact_descriptor_and_pidfd_refusal(self):
+        def negative(a):
+            for k, bad in (
+                    ("renderer_start", a["renderer_start"] + 1),
+                    ("renderer_fd", a["renderer_fd"] + 200),
+                    ("renderer_gate", a["renderer_gate"] + 200),
+                    ("renderer_pidfd", a["host_pidfd"]),
+                    ("host_pidfd", a["renderer_pidfd"]),
+                    ("token", "LIST_SESSIONS")):
+                with self.subTest(pin=k), self.assertRaises(Refused):
+                    observe(**{**a, k: bad})
+        self.scenario("STATUS", negative)
+
+    def test_10_actual_renderer_exit_before_send_gate_refused(self):
+        self.scenario("STATUS", exit_before_gate="renderer")
+
+    def test_11_actual_installed_host_exit_before_send_gate_refused(self):
+        self.scenario("STATUS", exit_before_gate="host")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--renderer":

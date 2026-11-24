@@ -4,6 +4,8 @@ import Quickshell.Wayland
 import "../components"
 import qs.services.notifications
 import qs.services.time
+import qs.services.diagnostics
+import "../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as DiagnosticPolicy
 import "../services/notifications/NotificationFacets.js" as NotificationFacets
 import "../services/notifications/BrowserSiteIdentity.js" as BrowserSiteIdentity
 import "../services/notifications/NotificationPopupInteraction.js" as PopupInteraction
@@ -248,8 +250,49 @@ PanelWindow {
                     && NotificationsService.notificationsRevision >= 0
                     ? ClockAlarmNotificationActions.optionsFor(notificationCard.notificationId)
                     : []
+                readonly property var diagnosticReference: DiagnosticPolicy.referenceFor({
+                    id: notificationCard.notificationId, sourceId: notificationCard.sourceId,
+                    context: notificationCard.context
+                })
+                readonly property var diagnosticReport: {
+                    const revision = CpuPlusDiagnostics.reports;
+                    const ref = diagnosticReference;
+                    return ref ? CpuPlusDiagnostics.reportFor(ref.kind, ref.id) : null;
+                }
+                property string copiedReportId: ""
+                readonly property var diagnosticActions: {
+                    if (!diagnosticReport) return [];
+                    const actions = [{identifier: "open-diag", label: "OPEN DIAG"}];
+                    if (diagnosticReport.text.length > 0)
+                        actions.push({identifier: "copy-diag", label:
+                            copiedReportId === diagnosticReport.id ? "COPY REQUESTED" : "COPY REPORT"});
+                    return actions;
+                }
                 readonly property var popupActions:
-                    clockAlarmActions.length > 0 ? clockAlarmActions : externalActions
+                    diagnosticReference ? diagnosticActions
+                    : clockAlarmActions.length > 0 ? clockAlarmActions : externalActions
+
+                // TextEdit copies via Qt's clipboard without focusing/opening
+                // CPU++. No shell command or persisted raw report is needed.
+                TextEdit {
+                    id: diagnosticClipboard
+                    visible: false
+                    readOnly: true
+                    textFormat: TextEdit.PlainText
+                }
+
+                function exactActiveDiagnostic() {
+                    const model = NotificationsService.activeNotifications;
+                    for (let i = 0; i < model.count; ++i) {
+                        const entry = model.get(i);
+                        if (String(entry.id) !== notificationCard.notificationId) continue;
+                        const ref = DiagnosticPolicy.referenceFor(entry);
+                        if (!ref) return null;
+                        const report = CpuPlusDiagnostics.reportFor(ref.kind, ref.id);
+                        return report ? {ref: ref, report: report} : null;
+                    }
+                    return null;
+                }
 
                 anchors.fill: parent
 
@@ -497,6 +540,23 @@ PanelWindow {
                                 onClicked: {
                                     const identifier = String(nativeActionButton.modelData.identifier || "");
                                     const label = String(nativeActionButton.modelData.label || "");
+                                    if (notificationCard.diagnosticReference) {
+                                        const exact = notificationCard.exactActiveDiagnostic();
+                                        if (!exact) return;
+                                        if (identifier === "copy-diag" && exact.report.text.length > 0) {
+                                            notificationCard.clearOpenIntent();
+                                            diagnosticClipboard.text = exact.report.text;
+                                            diagnosticClipboard.selectAll();
+                                            diagnosticClipboard.copy();
+                                            diagnosticClipboard.deselect();
+                                            diagnosticClipboard.text = "";
+                                            notificationCard.copiedReportId = exact.report.id;
+                                        } else if (identifier === "open-diag"
+                                                && notificationCard.confirmOpenIntent("destination")) {
+                                            NotificationsService.requestApolloDestination(notificationCard.notificationId);
+                                        }
+                                        return;
+                                    }
                                     if (notificationCard.clockAlarmActions.length > 0) {
                                         // Direct one-click action on the exact
                                         // live occurrence, never an old alert.

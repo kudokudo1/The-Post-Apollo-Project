@@ -12,6 +12,17 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property bool paneActive: true
+    property int completions: 0
+    property string completedId: ""
+    Connections {
+        target: CpuPlusDiagnostics
+        function onCaptureFinished(job, reportId) {
+            if (job === "inventory") {
+                root.completions += 1;
+                root.completedId = reportId;
+            }
+        }
+    }
 
     function check(ok, message) {
         if (!ok) {
@@ -72,6 +83,11 @@ ShellRoot {
                 if (!root.check(report && report.status === "COMPLETE",
                                 "scan failed // " + CpuPlusDiagnostics.feedback)) return;
                 if (!root.check(report.summary.indexOf("826 files") >= 0, "wrong report")) return;
+                if (!root.check(root.completions === 1 && root.completedId === report.id,
+                                "terminal signal or capture identity mismatch")) return;
+                if (!root.check(CpuPlusDiagnostics.reportFor("inventory", report.id) === report
+                                && CpuPlusDiagnostics.reportFor("inventory", "stale") === null,
+                                "exact report resolution")) return;
                 root.paneActive = true;
                 root.phase = 4;
                 return;

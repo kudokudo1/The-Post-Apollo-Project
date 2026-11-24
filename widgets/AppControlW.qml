@@ -14506,9 +14506,11 @@ PanelWindow {
                                 appControlWindow.taskMiniDisplayRevision
                             property int graphEpoch: 0
                             property var historyValues: []
-                            property var combiHistories: ({
+                            readonly property var emptyCombiHistories: ({
                                 cpu: [], mem: [], io: [], age: []
                             })
+                            property var combiHistories: emptyCombiHistories
+                            property bool graphReady: false
                             property real graphScrollOffset: 0
 
                             NumberAnimation {
@@ -14550,6 +14552,27 @@ PanelWindow {
                                 { metric: "age", label: "AGE", accent: Colors.white }
                             ]
 
+                            // Local copies remain mandatory for active COMBI
+                            // readers, but other modes do not consume these series.
+                            function snapshotCombiHistory(live) {
+                                if (!combiView)
+                                    return emptyCombiHistories;
+                                return ({
+                                    cpu: taskGraphController.miniHunterHistoryForMetric(
+                                             live, "cpu"
+                                         ).slice(),
+                                    mem: taskGraphController.miniHunterHistoryForMetric(
+                                             live, "mem"
+                                         ).slice(),
+                                    io: taskGraphController.miniHunterHistoryForMetric(
+                                            live, "io"
+                                        ).slice(),
+                                    age: taskGraphController.miniHunterHistoryForMetric(
+                                             live, "age"
+                                         ).slice()
+                                });
+                            }
+
                             function refreshHistory(animateScroll) {
                                 const live =
                                     taskGraphController.liveTaskForMiniGraph(
@@ -14567,20 +14590,7 @@ PanelWindow {
                                           live
                                       );
 
-                                const nextCombi = ({
-                                    cpu: taskGraphController.miniHunterHistoryForMetric(
-                                             live, "cpu"
-                                         ).slice(),
-                                    mem: taskGraphController.miniHunterHistoryForMetric(
-                                             live, "mem"
-                                         ).slice(),
-                                    io: taskGraphController.miniHunterHistoryForMetric(
-                                            live, "io"
-                                        ).slice(),
-                                    age: taskGraphController.miniHunterHistoryForMetric(
-                                             live, "age"
-                                         ).slice()
-                                });
+                                const nextCombi = snapshotCombiHistory(live);
 
                                 // Set the one-slot right offset before exposing the new
                                 // sample arrays. The new Nth point therefore initially
@@ -14596,7 +14606,8 @@ PanelWindow {
                                 historyValues = Array.isArray(next)
                                                 ? next.slice()
                                                 : [];
-                                combiHistories = nextCombi;
+                                if (combiHistories !== nextCombi)
+                                    combiHistories = nextCombi;
                                 graphEpoch += 1;
                             }
 
@@ -14628,7 +14639,18 @@ PanelWindow {
                                 }
                             }
 
-                            Component.onCompleted: refreshHistory(false)
+                            // COMBI can change without a telemetry revision
+                            // (mode/view selection). Populate immediately on entry
+                            // and discard unused local copies on exit.
+                            onCombiViewChanged: {
+                                if (graphReady)
+                                    refreshHistory(false);
+                            }
+
+                            Component.onCompleted: {
+                                graphReady = true;
+                                refreshHistory(false);
+                            }
 
                             // Keep the same three-quarter grid used by MEMORY HISTORY
                             // so every mini graph has a stable visual scale reference.

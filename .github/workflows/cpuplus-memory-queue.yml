@@ -1,0 +1,17 @@
+name: CPU++ durable memory queue contract
+on:
+  pull_request:
+    paths:
+      - 'services/memory/memory_adjustment_queue.py'
+      - 'tests/cpuplus_memory_queue_test.py'
+      - '.github/workflows/cpuplus-memory-queue.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Durable intent tests (temporary SQLite fixtures only)
+        run: python3 -B tests/cpuplus_memory_queue_test.py

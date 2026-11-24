@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k + M4l + M4m + M4n + M4o + M4p
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k + M4l + M4m + M4n + M4o + M4p + M4q
 
 on:
   pull_request:
@@ -38,6 +38,8 @@ on:
       - 'scripts/finance/banking_manual_archive.py'
       - 'tests/finance/test_banking_manual_archive_m4p.py'
       - 'tests/finance/test_banking_manual_archive_m4p_contracts.py'
+      - 'scripts/finance/banking_manual_recovery.py'
+      - 'tests/finance/test_banking_manual_recovery_m4q.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -107,6 +109,8 @@ on:
       - 'scripts/finance/banking_manual_archive.py'
       - 'tests/finance/test_banking_manual_archive_m4p.py'
       - 'tests/finance/test_banking_manual_archive_m4p_contracts.py'
+      - 'scripts/finance/banking_manual_recovery.py'
+      - 'tests/finance/test_banking_manual_recovery_m4q.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -237,3 +241,5 @@ jobs:
         run: python3 -B tests/finance/test_banking_manual_archive_m4p.py
       - name: Test M4p no-export-path and no-UI-activation source contracts
         run: python3 -B tests/finance/test_banking_manual_archive_m4p_contracts.py
+      - name: Test M4q damaged primary recovery and quarantine retry
+        run: python3 -B tests/finance/test_banking_manual_recovery_m4q.py

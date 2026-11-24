@@ -7,6 +7,7 @@ import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
 import "../services/forest/ForestInventoryPolicy.js" as InventoryPolicy
 import "../services/forest/ForestModelFormPolicy.js" as ModelFormPolicy
+import "../services/forest/ForestPreferencePolicy.js" as Preferences
 
 // FOREST V0: self-contained visual workspace. No model, PX or Hospital calls.
 PanelWindow {
@@ -34,13 +35,38 @@ PanelWindow {
     // Per-Tree local visual preference only. No Ollama/Hermes transport
     // consumes this setting while the trusted Forest host is disconnected.
     property var selectedTreeReasoningSteps: [0, 0, 0, 0, 0]
+    readonly property var preferenceKeys: treeSlots.map(function(tree) { return tree.sessionKey; })
+    readonly property var currentPreferences: Preferences.pack(
+        preferenceKeys, selectedTreeEquipment, selectedTreeReasoningSteps)
+    readonly property bool preferenceDirty: preferenceStore.committed
+        ? !Preferences.same(currentPreferences, preferenceStore.committed.trees) : false
+    ForestPreferenceStore {
+        id: preferenceStore
+        onLoaded: function(trees) {
+            const projected = Preferences.unpack(root.preferenceKeys, trees);
+            if (projected) {
+                root.selectedTreeEquipment = projected.equipment;
+                root.selectedTreeReasoningSteps = projected.reasoning;
+            }
+        }
+    }
+    Component.onCompleted: preferenceStore.load()
+    function saveModelPreferences() {
+        if (!menuOpen || !modelPopupOpen || preferenceStore.busy)
+            return false;
+        if (preferenceStore.status !== "READY")
+            return preferenceStore.load(); // explicit retry/reload, never overwrite unknown data
+        if (!preferenceDirty)
+            return false;
+        return preferenceStore.save(currentPreferences);
+    }
     // One visual toggle for both opening and closing the reasoning rail.
     // Reasoning choices remain per-Tree even when the rail is compact.
     property bool reasoningRailExpanded: false
     readonly property int selectedReasoningStep:
         selectedTreeReasoningSteps[selectedTreeIndex] || 0
     function chooseTreeReasoningStep(step) {
-        if (!Number.isInteger(step) || step < 0 || step > 3)
+        if (preferenceStore.busy || !Number.isInteger(step) || step < 0 || step > 3)
             return;
         const steps = selectedTreeReasoningSteps.slice();
         steps[selectedTreeIndex] = step;
@@ -79,7 +105,7 @@ PanelWindow {
     }
 
     function equipLocalModel(slot, name) {
-        if (!menuOpen || !modelPopupOpen || localInventory.scanning)
+        if (!menuOpen || !modelPopupOpen || preferenceStore.busy || localInventory.scanning)
             return false;
         const next = ModelFormPolicy.equip(selectedTreeEquipment, selectedTreeIndex,
             slot, name, localInventory.status, localInventory.models);
@@ -89,7 +115,7 @@ PanelWindow {
         return true;
     }
     function clearLocalModel(slot) {
-        if (!menuOpen || !modelPopupOpen)
+        if (!menuOpen || !modelPopupOpen || preferenceStore.busy)
             return false;
         const next = ModelFormPolicy.clearSlot(selectedTreeEquipment, selectedTreeIndex, slot);
         if (!next)
@@ -98,7 +124,7 @@ PanelWindow {
         return true;
     }
     function chooseModelForm(form) {
-        if (!menuOpen || !modelPopupOpen)
+        if (!menuOpen || !modelPopupOpen || preferenceStore.busy)
             return false;
         const next = ModelFormPolicy.chooseForm(selectedTreeEquipment, selectedTreeIndex, form);
         if (!next)
@@ -804,7 +830,7 @@ PanelWindow {
                     GohuText {
                         anchors.left: parent.left
                         anchors.leftMargin: 9
-                        anchors.right: scanAllButton.left
+                        anchors.right: preferenceSaveButton.left
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter
                         text: "FOREST // MODELS"
@@ -813,6 +839,37 @@ PanelWindow {
                         elide: Text.ElideRight
                     }
 
+                    Rectangle {
+                        id: preferenceSaveButton
+                        anchors.right: scanAllButton.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 49
+                        height: 23
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: preferenceStore.status === "FAILED" ? Colors.red
+                            : root.preferenceDirty ? Colors.yellow : Colors.cyan
+                        Accessible.name: preferenceStore.status === "READY"
+                            ? "Save all five Trees' local equipment and reasoning preferences"
+                            : "Load saved preferences, replacing current local choices"
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: preferenceStore.busy ? "..."
+                                : preferenceStore.status !== "READY" ? "LOAD"
+                                : root.preferenceDirty ? "SAVE"
+                                : preferenceStore.committed.revision > 0 ? "SAVED" : "DEFAULT"
+                            font.pixelSize: 8
+                            color: preferenceSaveButton.border.color
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: !preferenceStore.busy
+                                && (preferenceStore.status !== "READY" || root.preferenceDirty)
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: root.saveModelPreferences()
+                        }
+                    }
                     Rectangle {
                         id: scanAllButton
                         anchors.right: closeModelPopupButton.left

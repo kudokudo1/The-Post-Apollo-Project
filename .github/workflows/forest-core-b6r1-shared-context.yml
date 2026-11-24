@@ -1,0 +1,34 @@
+name: Forest Core B6-R1 Shared Context CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'scripts/forest/SHARED_CONTEXT_B6R1.md'
+      - 'tests/forest/test_shared_context_b6r1.py'
+      - '.github/workflows/forest-core-b6r1-shared-context.yml'
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/resource_governor_p1.py'
+permissions:
+  contents: read
+jobs:
+  shared-context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Shared semantic context
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_shared_context_b6r1.py' -v
+      - name: B1 journal regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: B3 turn bridge regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a admission regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: P1 resource governor regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - name: Compile
+        run: python3 -m py_compile scripts/forest/shared_context_b6r1.py tests/forest/test_shared_context_b6r1.py

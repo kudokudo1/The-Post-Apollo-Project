@@ -1,3 +1,44 @@
+function validKind(kind) {
+    return ["memory", "inventory", "threads", "census"].indexOf(kind) >= 0;
+}
+
+function validReportId(id) {
+    return typeof id === "string" && /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*$/.test(id)
+        && id.length <= 128;
+}
+
+function noticeFor(job, report) {
+    if (!validKind(job) || !report || !validReportId(report.id)
+            || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
+        return null;
+    const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS"};
+    return {
+        id: "apollo-cpu-diag-" + report.id,
+        source: "CPU++",
+        sourceId: "cpu-plus-diagnostics",
+        category: "internal",
+        severity: report.status === "COMPLETE" ? "normal" : "warning",
+        title: labels[job] + " // " + report.status,
+        message: report.status === "COMPLETE" ? "Capture ready. Open DIAG or copy report."
+            : report.status === "CANCELLED" ? "Stopped early. Partial output may be available."
+            : "Capture not verified. Open DIAG for status.",
+        tags: ["cpu-plus", "system", "diagnostics"],
+        context: {origin: "apollo", domain: "system", eventType: "diagnostic-result",
+                  reportKind: job, reportId: report.id}
+    };
+}
+
+function referenceFor(entry) {
+    if (!entry || entry.sourceId !== "cpu-plus-diagnostics") return null;
+    const ctx = entry.context;
+    if (!ctx || ctx.eventType !== "diagnostic-result" || ctx.origin !== "apollo"
+            || ctx.domain !== "system" || !validKind(ctx.reportKind)
+            || !validReportId(ctx.reportId)
+            || entry.id !== "apollo-cpu-diag-" + ctx.reportId) return null;
+    return {kind: ctx.reportKind, id: ctx.reportId};
+}
+
 // Fixed, read-only diagnostic catalog. No caller-supplied arguments.
 function argumentsFor(kind, resolvePath) {
     const prefix = ["/usr/bin/timeout", "--kill-after=3s", "145s",

@@ -47,6 +47,10 @@ Dedicated CI runs 20 new hostile v1 signature/receipt/session cases, the 20 #223
 
 Attack cases cover exact signed session substitution, record/receipt swap, wrong principal/model/attempt/Tree/turn, forged signature or role, v0 wire/role/receipt refusal, replayed journal counter, wrong predecessor, cross-audience/phase, bad original expiry and late receipt, noncanonical/duplicate fields, and all false flags even after consistent signatures.
 
+### V1 input-hardening follow-up
+
+The independently reviewed #2431 hardens the separate v0 reference boundary. V1 also accepted caller-owned dictionary keys before bounding cardinality or checking exact key type; it compared candidate values before checking exact scalar type. The V1 checker now refuses those inputs before comparison, and emits fixed parse/signature refusals outside the lower-level exception handlers. Four additional tests cover malformed intent/role/receipt bytes, hostile key and value equality, and invalid signature cause/context. The existing valid V1 fixture status, schema, signed session field and deny-only flags are unchanged. Expected current-base count: 24 V1 + 127 inherited = 151, or 154 if the separately reviewed #2431 is merged into the tested base. Actual CI counts must be read from exact-head logs. This is not native session authentication, private data erasure from traceback locals or proof of a production incident. The original B3 persisted-session provenance remains unresolved.
+
 ## WATCH OUT FOR
 
 ### Forest B4d is a separate read-only recovery observation

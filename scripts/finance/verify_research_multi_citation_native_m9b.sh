@@ -21,7 +21,7 @@ trap cleanup EXIT
 install -d -m 700 "$work/home" "$work/run" "$work/data" \
   "$work/cache" "$work/config-root" "$work/config/widgets" \
   "$work/config/services/finance" "$work/config/scripts/finance"
-cp "$repo_root/tests/finance/fixtures/M9bResearchScratchNativeShell.qml" \
+cp "$repo_root/tests/finance/fixtures/M9bResearchMultiCitationNativeShell.qml" \
   "$work/config/shell.qml"
 cp -a "$repo_root/components" "$work/config/components"
 for file in FinanceResearchEvidenceCandidatePicker.qml \

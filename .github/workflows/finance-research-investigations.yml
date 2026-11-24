@@ -14,6 +14,7 @@ on:
       - "scripts/finance/research_evidence_candidates.mjs"
       - "scripts/finance/research_candidate_preview_bridge.mjs"
       - "scripts/finance/research_candidate_draft_preview.mjs"
+      - "scripts/finance/research_scratch_citation_preview.mjs"
       - "scripts/finance/RESEARCH_INVESTIGATIONS_M*_README.md"
       - "widgets/FinanceResearchInvestigationsPane.qml"
       - "widgets/FinanceResearchInvestigationsReadHost.qml"
@@ -25,6 +26,7 @@ on:
       - "services/finance/FinanceResearchInvestigationReadService.qml"
       - "services/finance/FinanceResearchCandidatePreviewService.qml"
       - "services/finance/FinanceResearchCandidateDraftService.qml"
+      - "services/finance/FinanceResearchScratchEvidenceService.qml"
       - "tests/finance/test_research_investigations.mjs"
       - "tests/finance/test_research_investigation_store.mjs"
       - "tests/finance/test_research_investigation_read_bridge.mjs"
@@ -36,6 +38,8 @@ on:
       - "tests/finance/test_research_evidence_candidates.mjs"
       - "tests/finance/test_research_candidate_preview_bridge.mjs"
       - "tests/finance/test_research_candidate_draft_preview.mjs"
+      - "tests/finance/test_research_scratch_citation_preview.mjs"
+      - "tests/finance/test_research_m9b_multi_scratch_contract.py"
       - "tests/finance/test_research_m9_editor_contract.py"
       - "tests/finance/test_research_m9a_scratch_contract.py"
       - "tests/finance/test_research_candidate_picker_contract.py"
@@ -59,6 +63,7 @@ on:
       - "scripts/finance/research_evidence_candidates.mjs"
       - "scripts/finance/research_candidate_preview_bridge.mjs"
       - "scripts/finance/research_candidate_draft_preview.mjs"
+      - "scripts/finance/research_scratch_citation_preview.mjs"
       - "widgets/FinanceResearchInvestigationsPane.qml"
       - "widgets/FinanceResearchInvestigationsReadHost.qml"
       - "widgets/FinanceResearchWriteOutcomePanel.qml"
@@ -69,6 +74,7 @@ on:
       - "services/finance/FinanceResearchInvestigationReadService.qml"
       - "services/finance/FinanceResearchCandidatePreviewService.qml"
       - "services/finance/FinanceResearchCandidateDraftService.qml"
+      - "services/finance/FinanceResearchScratchEvidenceService.qml"
       - "tests/finance/test_research_investigations.mjs"
       - "tests/finance/test_research_investigation_store.mjs"
       - "tests/finance/test_research_investigation_read_bridge.mjs"
@@ -80,6 +86,8 @@ on:
       - "tests/finance/test_research_evidence_candidates.mjs"
       - "tests/finance/test_research_candidate_preview_bridge.mjs"
       - "tests/finance/test_research_candidate_draft_preview.mjs"
+      - "tests/finance/test_research_scratch_citation_preview.mjs"
+      - "tests/finance/test_research_m9b_multi_scratch_contract.py"
       - "tests/finance/test_research_m9_editor_contract.py"
       - "tests/finance/test_research_m9a_scratch_contract.py"
       - "tests/finance/test_research_candidate_picker_contract.py"
@@ -116,6 +124,7 @@ jobs:
           node --check scripts/finance/research_evidence_candidates.mjs
           node --check scripts/finance/research_candidate_preview_bridge.mjs
           node --check scripts/finance/research_candidate_draft_preview.mjs
+          node --check scripts/finance/research_scratch_citation_preview.mjs
           node --check tests/finance/test_research_investigations.mjs
           node --check tests/finance/test_research_investigation_store.mjs
           node --check tests/finance/test_research_investigation_read_bridge.mjs
@@ -127,6 +136,7 @@ jobs:
           node --check tests/finance/test_research_evidence_candidates.mjs
           node --check tests/finance/test_research_candidate_preview_bridge.mjs
           node --check tests/finance/test_research_candidate_draft_preview.mjs
+          node --check tests/finance/test_research_scratch_citation_preview.mjs
       - name: Investigation model and local-store offline tests
         run: |
           node tests/finance/test_research_investigations.mjs
@@ -140,6 +150,7 @@ jobs:
           node tests/finance/test_research_evidence_candidates.mjs
           node tests/finance/test_research_candidate_preview_bridge.mjs
           node tests/finance/test_research_candidate_draft_preview.mjs
+          node tests/finance/test_research_scratch_citation_preview.mjs
       - name: Isolated Research pane source contract
         run: python3 -B tests/finance/test_research_investigations_pane_contract.py
       - name: Research M4 isolated QML read-only controller contract
@@ -156,3 +167,5 @@ jobs:
         run: python3 -B tests/finance/test_research_m9_editor_contract.py
       - name: M9a in-memory scratch case and hard writer HOLD contract
         run: python3 -B tests/finance/test_research_m9a_scratch_contract.py
+      - name: M9b multiple scratch citations source and no-writer contract
+        run: python3 -B tests/finance/test_research_m9b_multi_scratch_contract.py

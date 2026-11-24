@@ -44,15 +44,17 @@ def _hold(code: str) -> None:
 
 
 def _local_view(outbox: object) -> tuple[dict, str]:
-    if type(outbox) is not dict or set(outbox) != OUTBOX_FIELDS:
+    if not L._exact_fields(outbox, OUTBOX_FIELDS):
         _hold("LOCAL_OUTBOX_EXACT_FIELDS_REQUIRED")
-    if (outbox["schema"] != OUTBOX_SCHEMA or
+    if (type(outbox["schema"]) is not str or
+            outbox["schema"] != OUTBOX_SCHEMA or
             type(outbox["attemptId"]) is not str or
             type(outbox["sessionId"]) is not str or
             type(outbox["forestWriteState"]) is not str or
             outbox["forestWriteState"] not in L.LOCAL_STATES or
             type(outbox["localTerminalEvent"]) is not str or
             outbox["localTerminalEvent"] not in LOCAL_TERMINAL or
+            type(outbox["c5Settlement"]) is not str or
             outbox["c5Settlement"] != "UNKNOWN_HOLD"):
         _hold("LOCAL_OUTBOX_SHAPE_OR_STATUS_INVALID")
     for name in (
@@ -110,10 +112,10 @@ def compare_untrusted_b4f_event_and_v1_fixture(
         base = L.compare_untrusted_local_with_v1_claim(
             local, v1_fixture_diagnostic, original_v1_intent_wire
         )
-    except L.RecoveryComparisonHold as exc:
-        raise B4fC5Hold(
-            "FOREST_B4F_C5_UNKNOWN_HOLD // V1_OR_ORIGINAL_ATTEMPT_MISMATCH"
-        ) from exc
+    except L.RecoveryComparisonHold:
+        base = None
+    if base is None:
+        _hold("V1_OR_ORIGINAL_ATTEMPT_MISMATCH")
     if event == "LOCAL_EVENT_NOT_OBSERVED":
         # Missing cannot be classified as legacy or corruption without a
         # separately durable, trusted 'instrumented at reserve' provenance.

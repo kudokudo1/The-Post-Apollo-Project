@@ -292,5 +292,54 @@ class B4fC5LocalOutboxComparisonTests(unittest.TestCase):
             self.assertNotIn(forbidden, source)
 
 
+
+    def test_21_outbox_keys_and_count_checked_before_equality(self):
+        class HostileKey(str):
+            armed = False
+            __hash__ = str.__hash__
+
+            def __eq__(self, other):
+                if self.armed:
+                    raise AssertionError("unexpected outbox key comparison")
+                return super().__eq__(other)
+
+        local = self.observe()
+        key = HostileKey("schema")
+        local[key] = local.pop("schema")
+        key.armed = True
+        self.expect_hold("LOCAL_OUTBOX_EXACT_FIELDS_REQUIRED", local=local)
+        local = self.observe()
+        local.update({f"extra{i}": None for i in range(2048)})
+        self.expect_hold("LOCAL_OUTBOX_EXACT_FIELDS_REQUIRED", local=local)
+
+    def test_22_outbox_scalar_types_precede_comparison(self):
+        class HostileValue:
+            def __eq__(self, other):
+                raise AssertionError("unexpected outbox value equality")
+
+            def __ne__(self, other):
+                raise AssertionError("unexpected outbox value inequality")
+
+        for field in ("schema", "c5Settlement", "attemptId",
+                      "sessionId", "forestWriteState", "localTerminalEvent"):
+            with self.subTest(field=field):
+                self.expect_hold("LOCAL_OUTBOX_SHAPE_OR_STATUS_INVALID",
+                                 local=dict(self.observe(), **{field: HostileValue()}))
+        self.assert_no_authority(self.compare())
+
+    def test_23_nested_recovery_refusal_does_not_chain(self):
+        signed, _ = self.v1_claim()
+        for wire in (b'{"private":"SYNTHETIC_PRIVATE',
+                     b'{"private":"SYNTHETIC_PRIVATE\xff"}'):
+            with self.subTest(size=len(wire)):
+                with self.assertRaises(C.B4fC5Hold) as caught:
+                    self.compare(claimed=signed, wire=wire)
+                self.assertEqual(str(caught.exception),
+                                 "FOREST_B4F_C5_UNKNOWN_HOLD // "
+                                 "V1_OR_ORIGINAL_ATTEMPT_MISMATCH")
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+
+
 if __name__ == "__main__":
     unittest.main()

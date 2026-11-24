@@ -64,3 +64,7 @@ The negative cases explicitly demonstrate:
 ## DECISIONS
 
 **Development only.** V1 wire, Forest B4f DB/schema/code, original C3e/C4b trust, Hospital, TimeW and live desktop untouched. All C5 protected operations remain HOLD. This work is evidence of unresolved native custody, not a substitute for it.
+
+## B4e/B4f recovery-input hardening follow-up
+
+After DOC 3 #2431 and #2440, the existing B4e and B4f recovery comparison entrypoints now require exact plain dictionary keys and field cardinality before set equality, and exact scalar types before comparing schema, status, settlement or terminal claims. A nonempty safeActions list is refused without inspecting its elements. Fixed public recovery refusals are raised after leaving nested V1/B4e exception handlers. Six new test methods (three per comparator) exercise hostile Python keys/values, excess fields and malformed original intent refusal chains, using the existing disposable SQLite test harnesses. This is a narrow source-level input-safety correction, not a production incident or erasure of traceback locals. Existing valid diagnostic shape, original-attempt correlation, conflict classification and UNKNOWN_HOLD remain unchanged. No receipt settlement, retry, new signer, source enrollment or protected recovery authority. DOC 1 F1–F6 and the Core-owned protected original effect interface remain pending. #2431 and #2440 are independent PRs and must not be modified by this work.

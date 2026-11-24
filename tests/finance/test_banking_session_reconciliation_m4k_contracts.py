@@ -56,7 +56,7 @@ for item in (
     "manager.review.unlinkedNetCents",
     "DECLARED TRANSFERS CANCEL ONLY ACROSS THE COMPLETE SESSION",
     "UNLINKED IS NOT VERIFIED INCOME OR SPENDING",
-    'LOCAL SESSION ONLY // USD // NO BANK CONNECTION // NOT SAVED',
+    'MANUAL USD ACCOUNTS // NO BANK CONNECTION // CHANGES NOT SAVED AUTOMATICALLY',
     'Accounts.snapshot(session)',
     "Accounts.addManualTransfer(session,{",
     "Accounts.correctManualTransfer(session,{",

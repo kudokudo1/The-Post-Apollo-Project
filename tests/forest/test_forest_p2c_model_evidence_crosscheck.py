@@ -34,7 +34,8 @@ class ForestP2CModelEvidenceCrosscheckTests(unittest.TestCase):
         self.assertNotIn("modelResidency.status = capacityView",view)
         self.assertIn("readonly property bool chatHostTrusted: false",view)
         self.assertIn("readonly property bool voiceHostTrusted: false",view)
-        for bad in ("Timer {", "/api/chat", "Component.onCompleted: inspectCapacity",
+        for bad in ("repeat: true", "onTriggered: capacity.inspectCapacity",
+                    "/api/chat", "Component.onCompleted: inspectCapacity",
                     "onVisibleChanged: inspectCapacity", "execDetached"):
             self.assertNotIn(bad,ui+"\n"+adapter)
 

@@ -367,6 +367,8 @@ Scope {
     // A stable gate for the whole authorization session. Never unload the
     // Polkit agent in between changing the pending and running properties.
     property bool authSessionActive: false
+    // Shared-agent interlock only; not an authorization grant.
+    property bool externalSystemAuthBusy: false
     property string authFlowStage: "NO REQUEST RECEIVED"
     property string authActionId: ""
 
@@ -542,7 +544,7 @@ Scope {
     }
 
     function prepareResync() {
-        if (resyncProcess.running || authSessionActive || resyncAuthPending
+        if (externalSystemAuthBusy || resyncProcess.running || authSessionActive || resyncAuthPending
                 || resyncStatus === "working")
             return;
         resyncConfirmRequired = true;
@@ -562,7 +564,7 @@ Scope {
     // When the native agent registers, or an existing desktop agent is
     // expected, launchResyncAfterAgentReady() starts the original fixed argv.
     function requestResync() {
-        if (!resyncConfirmRequired || resyncProcess.running
+        if (externalSystemAuthBusy || !resyncConfirmRequired || resyncProcess.running
                 || resyncAuthPending || authSessionActive)
             return;
         resyncConfirmRequired = false;
@@ -628,7 +630,7 @@ Scope {
     }
 
     function prepareTimezone(zoneId) {
-        if (authSessionActive || timezoneStatus === "working"
+        if (externalSystemAuthBusy || authSessionActive || timezoneStatus === "working"
                 || !ZoneSearch.contains(zoneCatalog, zoneId))
             return false;
         zoneChoice = zoneId;
@@ -656,7 +658,7 @@ Scope {
     }
 
     function requestTimezone() {
-        if (!timezoneConfirmRequired || authSessionActive
+        if (externalSystemAuthBusy || !timezoneConfirmRequired || authSessionActive
                 || !ZoneSearch.contains(zoneCatalog, zoneChoice))
             return;
         timezoneConfirmRequired = false;

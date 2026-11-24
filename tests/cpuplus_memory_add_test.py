@@ -23,6 +23,33 @@ class SwapAddTests(unittest.TestCase):
             with patch.object(m, "run", return_value=raw), self.assertRaises(RuntimeError):
                 m.mount_info()
 
+    def test_native_verify_is_read_only(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "active_swap", return_value={"sizeKiB": 16777212, "priority": 10}), patch.object(m, "run") as run:
+            m.verify_authorized()
+            run.assert_not_called()
+
+    def test_native_verify_requires_root(self):
+        with patch.object(m.os, "geteuid", return_value=1000), patch.object(m, "active_swap") as active:
+            with self.assertRaises(PermissionError):
+                m.verify_authorized()
+            active.assert_not_called()
+
+    def test_native_verify_inactive_refuses(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "active_swap", return_value=None):
+            with self.assertRaises(RuntimeError):
+                m.verify_authorized()
+
+    def test_native_add_nonroot_refuses(self):
+        with patch.object(m.os, "geteuid", return_value=1000), patch.object(m, "run") as run:
+            with self.assertRaises(PermissionError):
+                m.allocate(16, interactive=False)
+            run.assert_not_called()
+
+    def test_native_command_grammar(self):
+        with patch.object(m, "allocate") as allocate:
+            self.assertEqual(m.main(["add-authorized", "16"]), 0)
+            allocate.assert_called_once_with(16, interactive=False)
+
     def test_size_choices(self):
         for size in range(4, 65, 4):
             self.assertEqual(m.parse_size(str(size)), size)

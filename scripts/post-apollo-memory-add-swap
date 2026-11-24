@@ -55,7 +55,7 @@ def status():
     available = usage.f_bavail * usage.f_frsize
     reserve = max(32 * GIB, (usage.f_blocks * usage.f_frsize + 9) // 10)
     existing = os.path.lexists(DIRECTORY)
-    return {"filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"nativeAuthVersion": 1, "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": active_swap(),
@@ -66,15 +66,15 @@ def validate_request(size, observed):
     if not observed["candidate"] or size > observed["maximumGiB"]:
         raise RuntimeError("Unsupported filesystem, existing allocation, or insufficient reserved space")
 
-def allocate(size):
+def allocate(size, *, interactive=True):
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
-    if not sys.stdin.isatty():
+    if interactive and not sys.stdin.isatty():
         raise RuntimeError("Interactive terminal confirmation required")
     validate_request(size, status())
     print(f"Reserve {size} GiB in {SWAPFILE} (Btrfs /var/lib).", flush=True)
     print("Temporary swap, priority 10. No existing swap will be removed.", flush=True)
-    if input(f"Type ADD {size} to confirm: ") != f"ADD {size}":
+    if interactive and input(f"Type ADD {size} to confirm: ") != f"ADD {size}":
         raise RuntimeError("Cancelled; no allocation attempted")
     current = status()
     validate_request(size, current)
@@ -95,14 +95,28 @@ def allocate(size):
         raise RuntimeError("Activation not verified; inspect swapon --show before recovery")
     print("VERIFIED ACTIVE:", json.dumps(observed), flush=True)
 
+def verify_authorized():
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    secure_parent()
+    observed = active_swap()
+    if not observed or observed["priority"] != 10:
+        raise RuntimeError("Managed swap is not active at priority 10")
+    print("VERIFIED ACTIVE:", json.dumps(observed), flush=True)
+
 def main(args):
     try:
         if args == ["status"]:
             print(json.dumps(status()))
         elif len(args) == 2 and args[0] == "add":
             allocate(parse_size(args[1]))
+        elif len(args) == 2 and args[0] == "add-authorized":
+            # pkexec/root authorization is the authority, not UI state.
+            allocate(parse_size(args[1]), interactive=False)
+        elif args == ["verify-authorized"]:
+            verify_authorized()
         else:
-            raise ValueError("Usage: status | add GIB")
+            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized")
         return 0
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
         print("REFUSED/FAILED:", error, file=sys.stderr)

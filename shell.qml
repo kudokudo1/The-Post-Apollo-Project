@@ -18,6 +18,7 @@ import "services/audio" as AudioOwner
 import qs.services.hub
 import qs.services.location
 import qs.services.time
+import qs.services.memory
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
@@ -61,6 +62,7 @@ PanelWindow {
         active: TimeSettings.authSessionActive
                 || TimeSettings.resyncAuthPending
                 || TimeSettings.timezoneAuthPending
+                || MemoryOperation.busy
         source: Quickshell.shellPath("widgets/TimeResyncAuthW.qml")
     }
 

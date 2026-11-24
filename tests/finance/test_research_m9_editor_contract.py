@@ -45,7 +45,7 @@ for marker in (
     "onLoadRequested: readService.load()",
     'label: "BACK"',
     'label: host.width < 430 ? "PREPARE" : "PREPARE UNSAVED"',
-    "reviewActions.availableWidth * 0.34",
+    "reviewActions.availableWidth * (host.scratchSelected",
     "reviewActions.availableWidth * (host.scratchSelected",
     "caseEditor.draftEvidenceTitle = data.fields.title;",
     "caseEditor.draftEvidenceSummary = data.fields.summary;",

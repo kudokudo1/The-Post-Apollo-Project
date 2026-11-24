@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
-import "../../../components" as Shared
+import "./components" as Shared
 
 // Real shared QML, fixed public messages, no adapters or transport.
 ShellRoot {
@@ -24,16 +24,26 @@ ShellRoot {
         check(list.visible && list.count === 2, "messages retained");
     }
     function child(name) {
-        return feed.children.find(function (item) { return item.objectName === name; });
+        for (let i = 0; i < feed.children.length; ++i) {
+            if (feed.children[i].objectName === name)
+                return feed.children[i];
+        }
+        return null;
     }
     readonly property var header: child("conversationHeader")
     readonly property var composer: child("conversationComposer")
     readonly property var viewport: child("conversationViewport")
     readonly property var list: child("conversationMessages")
     readonly property var sendError: child("conversationSendError")
-    readonly property var input: composer ? composer.children.find(function (item) {
-        return item.objectName === "conversationInput";
-    }) : null
+    readonly property var input: {
+        if (composer) {
+            for (let i = 0; i < composer.children.length; ++i) {
+                if (composer.children[i].objectName === "conversationInput")
+                    return composer.children[i];
+            }
+        }
+        return null;
+    }
 
     Window {
         id: scene

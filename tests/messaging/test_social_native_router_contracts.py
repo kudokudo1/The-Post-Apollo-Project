@@ -99,11 +99,12 @@ class NativeIntegrationContracts(unittest.TestCase):
             'if (!pending || sendSuccessSerial <= pending.serial)',
             'if (messageInput.text.trim() === pending.text)',
             'delete pendingByScope[effectiveScope];',
-            'if (!conversation || !sendEnabled || sending || !effectiveScope)',
+            'property bool showComposer: true',
+            'if (!showComposer || !conversation || !sendEnabled || sending || !effectiveScope)',
             'pendingByScope[effectiveScope] = { serial: sendSuccessSerial, text: text };',
             'onSendSuccessSerialChanged: finishConfirmedSend()',
-            'enabled: !chatFeed.sending && chatFeed.sendEnabled',
-            'property bool canSend: chatFeed.sendEnabled && !chatFeed.sending',
+            'enabled: chatFeed.showComposer && !chatFeed.sending && chatFeed.sendEnabled',
+            'property bool canSend: chatFeed.showComposer && chatFeed.sendEnabled && !chatFeed.sending',
         ):
             self.assertIn(item, feed)
 

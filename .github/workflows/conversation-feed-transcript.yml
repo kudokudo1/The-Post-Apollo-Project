@@ -5,6 +5,8 @@ on:
       - 'components/ConversationFeed.qml'
       - 'components/NeonScrollBar.qml'
       - 'components/SafeDropShadow.qml'
+      - 'components/Colors.qml'
+      - 'components/qmldir'
       - 'tests/components/conversation_feed_transcript/**'
       - '.github/workflows/conversation-feed-transcript.yml'
 permissions:
@@ -40,6 +42,17 @@ jobs:
           export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/run"
           mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
-          timeout 30s dbus-run-session -- xvfb-run -a "$RUNNER_TEMP/feed-qs/quickshell/bin/quickshell" --path "$GITHUB_WORKSPACE/tests/components/conversation_feed_transcript/shell.qml" --no-color 2>&1 | tee "$work/output"
-          ! grep -q FEED_TRANSCRIPT_FAIL "$work/output"
+          # Quickshell confines QML imports to the config root. Stage exact
+          # production dependencies under it, not a ../../../ escape or stub.
+          mkdir -p "$work/config/feed/components"
+          scene="$work/config/feed"
+          cp "$GITHUB_WORKSPACE/tests/components/conversation_feed_transcript/shell.qml" "$scene/shell.qml"
+          for file in ConversationFeed.qml NeonScrollBar.qml SafeDropShadow.qml Colors.qml; do
+            cp "$GITHUB_WORKSPACE/components/$file" "$scene/components/$file"
+            cmp "$GITHUB_WORKSPACE/components/$file" "$scene/components/$file"
+          done
+          grep -E '^(singleton Colors|ConversationFeed|NeonScrollBar|SafeDropShadow) ' "$GITHUB_WORKSPACE/components/qmldir" > "$scene/components/qmldir"
+          test "$(wc -l < "$scene/components/qmldir")" -eq 4
+          timeout 30s dbus-run-session -- xvfb-run -a "$RUNNER_TEMP/feed-qs/quickshell/bin/quickshell" --path "$scene/shell.qml" --no-color 2>&1 | tee "$work/output"
+          if grep -q FEED_TRANSCRIPT_FAIL "$work/output"; then exit 1; fi
           grep -q FEED_TRANSCRIPT_NATIVE_PASS "$work/output"

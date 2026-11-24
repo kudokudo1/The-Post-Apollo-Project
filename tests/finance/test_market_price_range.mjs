@@ -211,3 +211,6 @@ await import("./test_market_m33_observed_step.mjs");
 
 // M34: normalized historical paths and shared observed-step geometry.
 await import("./test_market_m34_normalized_chart.mjs");
+
+// M35: normalized chart observed-step cursor and read-only detail.
+await import("./test_market_m35_normalized_step.mjs");

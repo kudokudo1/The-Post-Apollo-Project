@@ -51,6 +51,10 @@ ShellRoot {
                 const slider = smoke.find(pane, "cpuplusCapacitySelector");
                 if (!smoke.check(rail && footer && scroll && slider, "missing pane controls")) return;
                 const pinned = smoke.find(pane, "cpuplusMemoryPinned");
+                const bottomRail = smoke.find(pane, "cpuplusCapBottomRail");
+                if (pane.page === "CAP" && !smoke.check(bottomRail && bottomRail.visible
+                    && Math.abs(bottomRail.mapToItem(pane, 0, bottomRail.height).y - pane.height) < 2,
+                    "CAP bottom rail not stapled")) return;
                 if (pane.width <= 0 || pane.height <= 0 || footer.height <= 0) return;
                 if (!smoke.check(rail.height > 0 && scroll.y >= rail.y + rail.height
                         && scroll.y + scroll.height <= footer.y + 1,
@@ -101,6 +105,11 @@ ShellRoot {
                 if (smoke.phase === 1) {
                     const dial = smoke.find(pane, "cpuplusSwappinessDial");
                     if (!dial) return;
+                    const actions = smoke.find(pane, "cpuplusPolicyActions");
+                    const refresh = smoke.find(pane, "cpuplusPolicyRefresh");
+                    if (!smoke.check(actions && refresh && actions.width > 60
+                        && actions.mapToItem(pane,0,0).x >= dial.mapToItem(pane,dial.width,0).x
+                        && !bottomRail.visible, "POL side actions geometry")) return;
                     if (!smoke.check(!dial.interactive && MemoryOperation.busy, "in-flight continuity")) return;
                     MemoryOperation.busy = false;
                     dial.valueRequested(150);

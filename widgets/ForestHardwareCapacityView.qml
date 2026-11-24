@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "../services/forest"
+import "../services/forest/ForestCapacityPolicy.js" as CapacityPolicy
 
 // Read-only P2C hardware view inside Forest's independent diagnostics popup.
 // CHECK is an explicit local diagnostic, NOT a model readiness/admission gate.
@@ -17,6 +18,24 @@ Item {
         && capacity.data.model.matched === true
     readonly property var memoryPlacement: currentModelObservation
         ? capacity.data.model.placement : {state:"UNKNOWN",share:null,label:"?"}
+    // Explicitly retained samples are historical, not current resource hints.
+    property var observationA: null
+    property var observationB: null
+    readonly property var captureCandidate: currentModelObservation && !capacity.scanning
+        ? CapacityPolicy.holdMemoryObservation(capacity.status, selectedModelName,
+            capacity.data, capacity.observationSequence, capacity.lastObservedLocalTime) : null
+    function clearObservations() {
+        observationA = null;
+        observationB = null;
+    }
+    onSelectedModelNameChanged: clearObservations()
+    function captureObservation(slot) {
+        if (!captureCandidate || !visible) return false;
+        if (slot === "A") observationA = captureCandidate;
+        else if (slot === "B") observationB = captureCandidate;
+        else return false;
+        return true;
+    }
     readonly property string snapshotStatus: capacity.status
     readonly property string lastObservedLocalTime: capacity.lastObservedLocalTime
     readonly property bool checking: capacity.scanning
@@ -210,6 +229,105 @@ Item {
                     GohuText {
                         width: parent.width
                         text: "MEMORY COUNTERS ONLY // NOT GPU UTILIZATION OR HOST RAM SHARE"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+            Rectangle {
+                width: parent.width
+                height: sampleColumn.implicitHeight + 12
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                Column {
+                    id: sampleColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    spacing: 4
+                    GohuText {
+                        width: parent.width
+                        text: "CONTEXT // MEMORY OBSERVATIONS"
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: hardware.currentModelObservation
+                            && capacity.data.model.contextTokens !== null
+                            ? "REPORTED CONTEXT // " + capacity.data.model.contextTokens + " TOKENS"
+                            : "REPORTED CONTEXT // UNKNOWN"
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Row {
+                        width: parent.width
+                        spacing: 3
+                        Repeater {
+                            model: ["HOLD A", "HOLD B", "CLEAR"]
+                            delegate: Rectangle {
+                                required property string modelData
+                                width: (sampleColumn.width - 6) / 3
+                                height: 23
+                                readonly property bool available: modelData === "CLEAR"
+                                    ? !!hardware.observationA || !!hardware.observationB
+                                    : !!hardware.captureCandidate
+                                color: Colors.black
+                                border.width: 1
+                                border.color: available ? Colors.cyan : Colors.orange
+                                Accessible.name: modelData + " historical resident memory observation"
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: parent.modelData
+                                    font.pixelSize: 9
+                                    color: parent.available ? Colors.cyan : Colors.orange
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: parent.available
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: {
+                                        if (parent.modelData === "CLEAR") hardware.clearObservations();
+                                        else hardware.captureObservation(parent.modelData === "HOLD A" ? "A" : "B");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Repeater {
+                        model: [hardware.observationA, hardware.observationB]
+                        delegate: GohuText {
+                            required property var modelData
+                            required property int index
+                            width: sampleColumn.width
+                            text: (index === 0 ? "A" : "B") + " // " + (modelData
+                                ? modelData.model + " / CHECK " + modelData.sequence
+                                    + " / " + modelData.time + " / OLLAMA " + modelData.version
+                                    + "\nCTX " + (modelData.contextTokens === null ? "?" : modelData.contextTokens)
+                                    + " / RES " + CapacityPolicy.memoryObservationLabel(modelData.residentBytes)
+                                    + " / VRAM " + CapacityPolicy.memoryObservationLabel(modelData.vramBytes)
+                                : "NO HELD OBSERVATION")
+                            textFormat: Text.PlainText
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                            wrapMode: Text.WrapAnywhere
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: CapacityPolicy.observationComparison(hardware.observationA, hardware.observationB)
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "HISTORICAL COUNTERS ONLY // NO PEAK OR MINIMUM REQUIREMENT"
                         font.pixelSize: 9
                         color: Colors.orange
                         wrapMode: Text.WordWrap

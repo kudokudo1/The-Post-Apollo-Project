@@ -14,6 +14,8 @@ Scope {
     property string reason: ""
     // Local display clock, never a second P2C/Ollama measurement.
     property string lastObservedLocalTime: ""
+    // Identifies distinct completed local checks, not a trusted clock.
+    property double observationSequence: 0
     property string requestedModel: ""
     property var data: CapacityPolicy.beginScan().data
     property var scanState: CapacityPolicy.beginScan()
@@ -57,6 +59,7 @@ Scope {
         scanning = false;
         if (next.status === "OBSERVED") {
             lastObservedLocalTime = Qt.formatTime(new Date(), "HH:mm:ss");
+            observationSequence += 1;
             expiryTimer.restart(); // five-minute local cache expiry only
         } else {
             lastObservedLocalTime = "";

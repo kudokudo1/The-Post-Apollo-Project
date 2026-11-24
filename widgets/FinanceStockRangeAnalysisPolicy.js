@@ -477,3 +477,50 @@ function compareStockReferences(reference, current, cik, symbol) {
         pairs:pairs,readOnly:true,noProviderCalls:true
     };
 }
+
+// M37: rebase both stocks to 100 at their first COMMON observed closing
+// date. The x axis is ordinal common-date observations, not calendar time.
+// Accept only the ready output of the existing M36 comparison.
+function crossStockNormalizedChart(comparison) {
+    if (!comparison || comparison.state !== "ready"
+            || comparison.readOnly !== true || comparison.noProviderCalls !== true
+            || typeof comparison.referenceSymbol !== "string"
+            || typeof comparison.currentSymbol !== "string"
+            || comparison.referenceSymbol === comparison.currentSymbol
+            || !["CLOSE","ADJUSTED CLOSE"].includes(comparison.priceBasis)
+            || !Array.isArray(comparison.pairs)
+            || comparison.pairs.length < 2 || comparison.pairs.length > 132
+            || comparison.matched !== comparison.pairs.length)
+        return null;
+    const pairs=comparison.pairs;
+    let previous="";
+    for (const pair of pairs) {
+        if (!pair || !calendarDay(pair.date) || pair.date <= previous
+                || !Number.isFinite(pair.referencePrice) || pair.referencePrice <= 0
+                || !Number.isFinite(pair.currentPrice) || pair.currentPrice <= 0
+                || pair.referencePrice >= 10000000 || pair.currentPrice >= 10000000)
+            return null;
+        previous=pair.date;
+    }
+    if (pairs[0].date !== comparison.from
+            || pairs[pairs.length-1].date !== comparison.to) return null;
+    const first=[],second=[];
+    for (let i=0;i<pairs.length;i++) {
+        const row=pairs[i];
+        const a=i===0 ? 100 : row.referencePrice/pairs[0].referencePrice*100;
+        const b=i===0 ? 100 : row.currentPrice/pairs[0].currentPrice*100;
+        if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0)
+            return null;
+        first.push({step:i,date:row.date,value:a});
+        second.push({step:i,date:row.date,value:b});
+    }
+    const values=first.concat(second).map(p=>p.value);
+    return {
+        first:first,second:second,
+        low:Math.min.apply(null,values),high:Math.max.apply(null,values),
+        maxSteps:pairs.length-1,from:comparison.from,to:comparison.to,
+        referenceSymbol:comparison.referenceSymbol,currentSymbol:comparison.currentSymbol,
+        priceBasis:comparison.priceBasis,source:"loaded-eodhd-common-dates-only",
+        readOnly:true,noProviderCalls:true
+    };
+}

@@ -15,9 +15,10 @@ with tempfile.TemporaryDirectory(prefix="cpu-memory-ui-") as tmp:
     config.mkdir()
     shutil.copytree(ROOT / "components", config / "components")
     (config / "widgets/cpuplus").mkdir(parents=True)
-    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js"):
+    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusDiagnosticsPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
     shutil.copy2(ROOT / "tests/fixtures/CpuPlusMemoryUiNative.qml", config / "smoke.qml")
+    shutil.copytree(ROOT / "services/diagnostics", config / "services/diagnostics")
     service = config / "services/memory"
     service.mkdir(parents=True)
     (service / "qmldir").write_text("module qs.services.memory\n\nsingleton MemoryOperation 1.0 MemoryOperation.qml\n")

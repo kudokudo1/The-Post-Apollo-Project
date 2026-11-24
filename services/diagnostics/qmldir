@@ -1,0 +1,3 @@
+module qs.services.diagnostics
+
+singleton CpuPlusDiagnostics 1.0 CpuPlusDiagnostics.qml

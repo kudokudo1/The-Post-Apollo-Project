@@ -6,6 +6,7 @@ on:
       - "widgets/cpuplus/CpuPlusDiagnosticsPane.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
       - "tests/cpuplus/test_diagnostic_controls.cjs"
+      - "tests/cpuplus/test_diagnostic_comparison.cjs"
       - "tests/cpuplus/test_diagnostic_notifications.cjs"
       - "modules/Notifications.qml"
       - "services/notifications/ApolloNotificationRoute.js"
@@ -26,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node tests/cpuplus/test_diagnostic_controls.cjs
+      - run: node tests/cpuplus/test_diagnostic_comparison.cjs
       - run: node tests/cpuplus/test_diagnostic_notifications.cjs
       - run: python3 -B tests/cpuplus/test_process_census.py
       - run: python3 -B tests/cpuplus/test_diagnostic_archive.py

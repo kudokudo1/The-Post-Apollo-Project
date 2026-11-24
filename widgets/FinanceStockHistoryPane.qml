@@ -80,6 +80,10 @@ Item {
     readonly property var intervalComparison: savedIntervalValid && pinnedInterval !== null
         ? RangeAnalysisPolicy.compareHistoricalIntervals(snapshot, savedIntervalA,
             savedIntervalB, pinnedPointIndex, selectedPointIndex) : null
+    // M34: use the existing same-snapshot A/B comparison validity.
+    readonly property var normalizedComparison: intervalComparison !== null
+        ? RangeAnalysisPolicy.normalizedIntervalChart(snapshot, savedIntervalA,
+            savedIntervalB, pinnedPointIndex, selectedPointIndex) : null
     function clearSavedInterval() {
         savedIntervalSnapshot = null;
         savedIntervalA = -1;
@@ -1016,6 +1020,105 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 11
                 color: Colors.cyan
+            }
+            GohuText {
+                width: parent.width
+                visible: stocks.normalizedComparison !== null
+                text: "NORMALIZED INTERVALS // START = 100"
+                color: Colors.cyan
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+            GohuText {
+                width: parent.width
+                visible: stocks.normalizedComparison !== null
+                text: stocks.normalizedComparison
+                    ? ("CYAN = INTERVAL 1 // MAGENTA = INTERVAL 2"
+                        + "\nINDEX HIGH " + stocks.normalizedComparison.high.toPrecision(5)
+                        + " // LOW " + stocks.normalizedComparison.low.toPrecision(5)
+                        + " // REFERENCE 100")
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.white
+            }
+            Rectangle {
+                objectName: "marketNormalizedIntervalChart"
+                width: parent.width
+                visible: stocks.normalizedComparison !== null
+                height: visible ? 174 : 0
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.cyan
+                Canvas {
+                    id: normalizedCanvas
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    property var plot: stocks.normalizedComparison
+                    onPlotChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onVisibleChanged: { if (visible) requestPaint(); }
+                    onPaint: {
+                        const ctx = getContext("2d");
+                        ctx.clearRect(0,0,width,height);
+                        const chart = plot;
+                        if (!chart || width < 5 || height < 5) return;
+                        const pointAt = function(p) {
+                            return RangeAnalysisPolicy.normalizedChartPoint(
+                                chart, p, width, height);
+                        };
+                        const base = pointAt({step:0,value:100});
+                        if (!base) return;
+                        ctx.beginPath();
+                        ctx.moveTo(0,base.y);
+                        ctx.lineTo(width-1,base.y);
+                        ctx.strokeStyle = "#808080";
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        const draw = function(points,color) {
+                            ctx.beginPath();
+                            for (let i=0; i<points.length; i++) {
+                                const p = pointAt(points[i]);
+                                if (!p) return;
+                                if (i===0) ctx.moveTo(p.x,p.y);
+                                else ctx.lineTo(p.x,p.y);
+                            }
+                            ctx.strokeStyle=color;
+                            ctx.lineWidth=1.8;
+                            ctx.stroke();
+                            const last = pointAt(points[points.length-1]);
+                            if (!last) return;
+                            ctx.beginPath();
+                            ctx.arc(last.x,last.y,3,0,Math.PI*2);
+                            ctx.fillStyle=color;
+                            ctx.fill();
+                        };
+                        draw(chart.first,"#55CFCA");
+                        draw(chart.second,"#C74EC7");
+                    }
+                }
+            }
+            GohuText {
+                objectName: "marketNormalizedIntervalLegend"
+                width: parent.width
+                visible: stocks.normalizedComparison !== null
+                text: stocks.normalizedComparison
+                    ? ("OBSERVED STEPS // 0 TO " + stocks.normalizedComparison.maxSteps
+                        + "\n1 ENDS AT STEP " + (stocks.normalizedComparison.first.length-1)
+                        + " // INDEX "
+                        + stocks.normalizedComparison.first[stocks.normalizedComparison.first.length-1].value.toPrecision(5)
+                        + "\n2 ENDS AT STEP " + (stocks.normalizedComparison.second.length-1)
+                        + " // INDEX "
+                        + stocks.normalizedComparison.second[stocks.normalizedComparison.second.length-1].value.toPrecision(5)
+                        + "\nEACH LINE STOPS AT ITS LAST OBSERVED CLOSE"
+                        + " // NOT CALENDAR TIME // NO NEW REQUEST")
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.orange
             }
             ActionButton {
                 id: openSelectedInDay

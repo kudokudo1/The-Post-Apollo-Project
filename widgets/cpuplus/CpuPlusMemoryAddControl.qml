@@ -96,6 +96,7 @@ Column {
     ActionButton {
         width: parent.width
         height: 34
+        visible: !control.observedActive
         label: control.armed ? "CONFIRM // AUTHORIZE" : "PREPARE ADD " + control.stagedGiB + " GiB"
         labelPixelSize: 10
         available: control.eligible

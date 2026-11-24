@@ -32,3 +32,21 @@ function parseSnapshot(raw) {
     return {total:total, available:available, swap:swap, free:free,
             some:Number(some[1]), full:Number(full[1]), swappiness:Number(swappiness[1]), rows:rows};
 }
+
+// The slider denotes desired managed NVMe capacity, not an extra allocation.
+function capacityPlan(sample, targetGiB) {
+    if (!sample || !Array.isArray(sample.rows) || !Number.isInteger(targetGiB)
+            || targetGiB < 0 || targetGiB > 64 || targetGiB % 4 !== 0) return null;
+    const rows = sample.rows.filter(row => row.name === "/var/lib/post-apollo-memory-swap/swapfile");
+    if (rows.length > 1) return null;
+    const row = rows.length ? rows[0] : null;
+    const actualKiB = row ? row.size : 0;
+    const actualGiB = actualKiB / 1048576;
+    const targetKiB = targetGiB * 1048576;
+    const unchanged = row && targetKiB >= actualKiB && targetKiB - actualKiB <= 1024;
+    return {active: !!row, actualKiB: actualKiB, actualGiB: actualGiB,
+        usedKiB: row ? row.used : 0, targetGiB: targetGiB,
+        projectedKiB: unchanged ? sample.swap : Math.max(0, sample.swap - actualKiB + targetKiB),
+        direction: unchanged || (!row && !targetGiB) ? "unchanged"
+            : targetKiB > actualKiB ? (row ? "expand" : "add") : "reduce"};
+}

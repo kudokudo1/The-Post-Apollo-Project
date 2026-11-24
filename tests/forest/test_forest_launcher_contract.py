@@ -1204,7 +1204,7 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("id: modelList", view)
         self.assertIn("clip: true", view)
         self.assertIn("boundsBehavior: Flickable.StopAtBounds", view)
-        self.assertIn('text: "FOREST // MODELS"', view)
+        self.assertIn('text: root.hardwareViewOpen ? "FOREST // HARDWARE" : "FOREST // MODELS"', view)
         self.assertIn('text: "FOUND"', view)
         self.assertIn(': "LIVE ?"', view)
         self.assertIn('text: "ACCESS ?"', view)

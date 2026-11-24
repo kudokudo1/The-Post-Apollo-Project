@@ -85,12 +85,12 @@ def inspect_original_attempt_once(
     recorded_signed_frame: bytes | None,
     pinned_receipt_key: Ed25519PublicKey | None,
 ) -> OriginalAttemptRecoveryInspection:
-    """Fail original-binding mismatch BEFORE any candidate source invocation.
+    """Legacy CI-only callback path. Do NOT wire to native commands.
 
-    The result is always UNKNOWN_HOLD. This function cannot authenticate an
-    independent issuer/source, current protected history or the C5 spend.
-    Caller-supplied Ed25519 pins, recorded frames and provider responses
-    are diagnostic inputs, not proof of external custody.
+    The injected candidate_provider may execute arbitrary Python and is not
+    guaranteed read-only. The output is always UNKNOWN_HOLD, but this does
+    not make invoking the provider safe for privileged recovery. Use the
+    callback-free inspect_original_attempt_snapshot() for pure comparisons.
     """
     check = _correlate_original(
         attempted=attempted, original=original,

@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 from collections.abc import Callable
-from typing import Any
 
 SCHEMA = "post-apollo.identity.outcome-candidate.untrusted-v0"
 _ACTIONS = frozenset(("BEGIN", "STATUS", "CANCEL", "RECOVER"))
@@ -123,8 +122,34 @@ def inspect_candidate_once(
     except Exception:
         return _held("PROVIDER_FAILED_OR_UNAVAILABLE", 1)
 
+    return _inspect_supplied(original, candidate, 1)
+
+
+def inspect_supplied_candidate(
+    *,
+    original: OriginalCommandBinding,
+    candidate: object,
+) -> UntrustedOutcomeInspection:
+    """Pure snapshot-only validation; NO external provider execution.
+
+    A caller must already possess the value. This module neither queries nor
+    attests its source; lookup_count is always zero in this path.
+    Even valid matching candidate contents grant zero authority.
+    """
+    if type(original) is not OriginalCommandBinding:
+        raise CandidateRefused("Original native command identity required")
+    if candidate is None:
+        return _held("SUPPLIED_CANDIDATE_NOT_AVAILABLE", 0)
+    return _inspect_supplied(original, candidate, 0)
+
+
+def _inspect_supplied(
+    original: OriginalCommandBinding, candidate: object, lookups: int,
+) -> UntrustedOutcomeInspection:
+    # This helper only compares supplied values. It cannot prove that an
+    # independently protected issuer supplied or freshly signed anything.
     if type(candidate) is not dict or set(candidate) != _CANDIDATE_FIELDS:
-        return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+        return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
     if (type(candidate["schema"]) is not str
             or candidate["schema"] != SCHEMA
             or type(candidate["attemptId"]) is not str
@@ -137,17 +162,17 @@ def inspect_candidate_once(
             or candidate["issuerEpoch"] <= 0
             or type(candidate["sequence"]) is not int
             or candidate["sequence"] <= 0):
-        return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+        return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
 
     for field in ("nonceDigest", "hostInstanceDigest", "seatDigest",
                   "sessionDigest", "challengeDigest", "historyDigest"):
         if (type(candidate[field]) is not str
                 or not _HEX64.fullmatch(candidate[field])):
-            return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+            return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
     if (candidate["requestDigest"] is not None
             and (type(candidate["requestDigest"]) is not str
                  or not _HEX64.fullmatch(candidate["requestDigest"]))):
-        return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+        return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
 
     comparison = (
         (candidate["attemptId"], original.attempt_id),
@@ -163,8 +188,8 @@ def inspect_candidate_once(
     )
     if (any(actual != expected for actual, expected in comparison)
             or candidate["sequence"] < original.minimum_sequence):
-        return _held("CONFLICTING_UNTRUSTED_CANDIDATE", 1)
+        return _held("CONFLICTING_UNTRUSTED_CANDIDATE", lookups)
 
     # Even a matching "no effect" is a *self-report*. It cannot justify
     # reissuing an uncertain BEGIN, CANCEL or RECOVER.
-    return _held("MATCHED_CLAIM_STILL_UNTRUSTED", 1)
+    return _held("MATCHED_CLAIM_STILL_UNTRUSTED", lookups)

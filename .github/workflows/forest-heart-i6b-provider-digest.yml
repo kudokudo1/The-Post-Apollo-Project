@@ -1,0 +1,24 @@
+name: Forest Heart I6b provider digest CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/**'
+      - 'tests/forest/test_provider_digest_i6b.py'
+      - '.github/workflows/forest-heart-i6b-provider-digest.yml'
+permissions:
+  contents: read
+jobs:
+  provider-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_provider_digest_i6b.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_ollama_inventory.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_performance_capacity_p2c.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_runtime_membership_i6.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_binding_i2.py' -v
+      - run: python3 -m py_compile scripts/forest/provider_digest_i6b.py tests/forest/test_provider_digest_i6b.py

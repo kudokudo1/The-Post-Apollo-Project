@@ -68,15 +68,17 @@ chmod 0600 /usr/local/libexec/postapollo-memory-ci-helper.sha256
 cat > /etc/systemd/system/postapollo-memory-ci-cycle.service <<'CPU_MEMORY_UNIT'
 [Unit]
 Description=Disposable CPU++ memory native cycle and reboot fixture
-After=local-fs.target swap.target
+After=local-fs.target swap.target dev-ttyS1.device
+Requires=dev-ttyS1.device
 ConditionPathExists=/etc/postapollo-memory-ci-only
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/bash -c 'exec /usr/bin/bash /usr/local/libexec/postapollo-memory-ci-phase.sh >/dev/ttyS0 2>&1'
-TimeoutStartSec=900
+ExecStart=/usr/bin/bash -c 'exec /usr/bin/bash /usr/local/libexec/postapollo-memory-ci-phase.sh >/dev/ttyS1 2>&1'
+TimeoutStartSec=600
 [Install]
 WantedBy=multi-user.target
 CPU_MEMORY_UNIT
+systemctl mask serial-getty@ttyS1.service
 systemctl enable postapollo-memory-ci-cycle.service
 systemctl set-default multi-user.target
 echo CPU_MEM_NATIVE_INSTALLER_STAGED >/dev/ttyS0
@@ -114,28 +116,30 @@ grep -aFq CPU_MEM_NATIVE_INSTALLER_STAGED "$tmp/install-serial.log" || {
 # guest-authored marker alone as success: each phase must exit normally, and
 # phase two independently checks the kernel boot ID and preserved state.
 run_phase() {
-    local stage="$1" log="$tmp/guest-$1-serial.log"
+    local stage="$1" log="$tmp/guest-$1-serial.log" console="$tmp/guest-$1-console.log"
     qemu-system-x86_64 -machine accel=kvm -m 6144 -smp 3 -display none -monitor none \
-      -serial "file:$log" \
+      -serial "file:$console" -serial "file:$log" \
       -drive "file=$tmp/guest.qcow2,if=virtio,format=qcow2" \
       -nic none -no-reboot >"$tmp/guest-$stage-qemu.log" 2>&1 &
     pid="$!"
-    for ((n=0;n<600;n++)); do
+    for ((n=0;n<360;n++)); do
         if grep -aEq 'CPU_MEM_(NATIVE|FAULT)_FAIL //' "$log" 2>/dev/null; then
             tail -n 80 "$log" || true
+            tail -n 30 "$console" || true
             echo "CPU_MEM_NATIVE_BLOCKED // GUEST_FAILURE phase=$stage"
             return 2
         fi
         if ! kill -0 "$pid" 2>/dev/null; then break; fi
         if (( n % 30 == 0 )); then
             echo "CPU_MEM_NATIVE_STAGE // phase=$stage poll=$n"
-            grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|STAGE) //' "$log" 2>/dev/null | tail -n 10 || true
+            grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|STAGE|DIAG) //' "$log" 2>/dev/null | tail -n 14 || true
         fi
         sleep 2
     done
     if kill -0 "$pid" 2>/dev/null; then
         echo "CPU_MEM_NATIVE_BLOCKED // GUEST_SHUTDOWN_TIMEOUT phase=$stage"
         tail -n 80 "$log" || true
+        tail -n 35 "$console" || true
         return 2
     fi
     if ! wait "$pid"; then
@@ -145,7 +149,7 @@ run_phase() {
         return 2
     fi
     pid=
-    grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|BLOCKED|STAGE) //|VERIFIED (ACTIVE|PERSISTENCE|EXPANSION|REDUCTION|REACTIVATION|CYCLE ARCHIVE):|RECOVERY INSPECTION:|REDUCTION (BLOCKED|RECOVERY):|REFUSED/FAILED:' "$log" | tail -n 100 || true
+    grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|BLOCKED|STAGE|DIAG) //|VERIFIED (ACTIVE|PERSISTENCE|EXPANSION|REDUCTION|REACTIVATION|CYCLE ARCHIVE):|RECOVERY INSPECTION:|REDUCTION (BLOCKED|RECOVERY):|REFUSED/FAILED:' "$log" | tail -n 100 || true
     ! grep -aEq 'CPU_MEM_(NATIVE|FAULT)_FAIL //' "$log"
 }
 require_marker() {

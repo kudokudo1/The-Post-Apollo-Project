@@ -7,3 +7,7 @@ The same fresh virtual disk boots twice. The first boot runs the original two-cy
 This fixture runs only inside the offline dedicated VM with both root-owned test markers. Never create the markers or run the test on an operator workstation. Only a fresh qcow2 and read-only installation media are attached. No host disk passthrough, shared guest filesystem or guest network.
 
 Limits: real SIGKILL is injected in archive retirement, not the util-linux kernel call. Clean reboot is not power-loss proof. Pressure, actual native command interruption, external root/systemd contention, protected installer and reclamation gates remain. No storage deletion, automatic retry or production installation. Production HOLD.
+
+## Failure localization follow-up
+
+#2469 reproduced two complete native cycles, then timed out on the first boot after the third activation kernel message. No fault PASS or second-boot evidence was recorded. The exact stalled instruction is unknown. This correction separates COM2 fixture evidence from COM1 kernel/login output, logs before and after helper commands and child SIGKILL boundaries, and emits bounded read-only process/pressure diagnostics and Python traceback samples. The archive child inherits evidence output instead of captured pipes. No changes to the reviewed helper or success criteria; no forced kernel-command cancellation or production action. Both guest boot phases still must finish normally. A timeout remains BLOCKED.

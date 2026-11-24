@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -I
 """CI-only Silverblue guest recovery fault fixture; not a workstation tool."""
 import hashlib
+import faulthandler
 import importlib.machinery
 import importlib.util
 import json
@@ -114,9 +115,22 @@ def history():
         result[path.name] = hashlib.sha256(raw).hexdigest()
     return result
 
+def stage(name):
+    print("CPU_MEM_FAULT_STAGE // " + name, flush=True)
+
 def helper(*args):
-    return subprocess.run([str(HELPER), *args], text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, cwd="/")
+    # Expose the exact last in-flight command, without changing its behavior.
+    # Do not set a timeout that kills an uncertain kernel operation.
+    stage("HELPER_BEGIN " + args[0])
+    result = subprocess.run([str(HELPER), *args], text=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, cwd="/")
+    stage("HELPER_END " + args[0] + " rc=" + str(result.returncode))
+    if result.returncode != 0:
+        # Bounded fixture diagnostics only; no host or user data.
+        for name, data in (("stdout", result.stdout), ("stderr", result.stderr)):
+            if data:
+                print("CPU_MEM_FAULT_DIAG // " + name + " " + repr(data[-1200:]), flush=True)
+    return result
 
 def success(*args, prefix):
     result = helper(*args)
@@ -145,20 +159,25 @@ def crash_archive():
     # Import the exact reviewed helper only inside the fixture process.
     # The sole injection occurs immediately after the first journal unlink.
     # No helper logic, kernel command or journal content is substituted.
+    stage("CRASH_CHILD_IMPORT_BEGIN")
     loader = importlib.machinery.SourceFileLoader("cpu_memory_ci", str(HELPER))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
+    stage("CRASH_CHILD_IMPORT_END")
     original_unlink = Path.unlink
     def interrupted(path, *args, **kwargs):
         original_unlink(path, *args, **kwargs)
         if path == EXT / RECORD_NAMES[0]:
+            stage("CRASH_CHILD_FIRST_UNLINK_COMPLETE")
             os.kill(os.getpid(), signal.SIGKILL)
     Path.unlink = interrupted
+    stage("CRASH_CHILD_ARCHIVE_BEGIN")
     module.archive_cycle_authorized()
     raise RuntimeError("fault injection did not terminate archive")
 
 def prepare():
+    stage("PREPARE_BEGIN")
     require(not os.path.lexists(WITNESS), "fixture already prepared")
     verify_swap(True)
     previous = history()
@@ -170,10 +189,15 @@ def prepare():
     success("reactivate-authorized", "8", prefix="VERIFIED REACTIVATION: ")
     verify_swap(True)
     originals = {name: digest_file(EXT / name) for name in RECORD_NAMES}
+    stage("CRASH_CHILD_SPAWN")
+    # Inherit the dedicated evidence descriptor. No private output pipe
+    # can hide progress or keep the parent waiting for an unrelated writer.
     child = subprocess.run([sys.executable, "-I", "-B", str(Path(__file__).resolve()),
-                            "crash-archive"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                            "crash-archive"], stdin=subprocess.DEVNULL)
+    stage("CRASH_CHILD_EXIT rc=" + str(child.returncode))
     require(child.returncode == -signal.SIGKILL, "archive process did not die at injected boundary")
     require(not os.path.lexists(EXT / RECORD_NAMES[0]), "first retirement did not happen")
+    stage("PENDING_VALIDATION_BEGIN")
     pending = json.loads(protected_bytes(PENDING))
     require(pending["state"] == "ARCHIVE_PENDING", "archive fence missing")
     retained = history()
@@ -187,6 +211,7 @@ def prepare():
     require(observation["code"] == "ARCHIVE_PENDING" and observation["mutationAllowed"] is False,
             "pending archive inspection incorrect")
     print("CPU_MEM_FAULT_PASS // REAL_SIGKILL_PARTIAL_RETIREMENT_FENCED", flush=True)
+    stage("EXPLICIT_RESUME_BEGIN")
     success("archive-cycle-authorized", prefix="VERIFIED CYCLE ARCHIVE: ")
     require(history() == retained and not os.path.lexists(PENDING)
             and not any(os.path.lexists(EXT / name) for name in RECORD_NAMES),
@@ -213,6 +238,7 @@ def prepare():
     # Host harness controls VM shutdown/reboot. This script never calls reboot.
 
 def after_reboot():
+    stage("AFTER_REBOOT_BEGIN")
     witness = json.loads(protected_bytes(WITNESS))
     require(witness["version"] == 1 and witness["bootId"] != boot_id(), "real reboot not observed")
     verify_swap(False)
@@ -247,10 +273,17 @@ def after_reboot():
 
 def main():
     guard()
+    # Tracebacks identify the waiting Python frame without terminating a
+    # swap syscall or retrying any command. Output remains in disposable CI.
+    faulthandler.dump_traceback_later(30, repeat=True)
     require(len(sys.argv) == 2, "explicit fixture phase required")
     phases = {"prepare": prepare, "after-reboot": after_reboot, "crash-archive": crash_archive}
     require(sys.argv[1] in phases, "unknown fixture phase")
-    phases[sys.argv[1]]()
+    stage("PHASE_BEGIN " + sys.argv[1])
+    try:
+        phases[sys.argv[1]]()
+    finally:
+        faulthandler.cancel_dump_traceback_later()
 
 if __name__ == "__main__":
     try:

@@ -264,6 +264,59 @@ class SignedCustodianCandidateNegativeTests(unittest.TestCase):
         with self.assertRaisesRegex(M.Refused, "BAD_TEST_SIGNATURE"):
             self.inspect(resp=res)
 
+    def test_31_hostile_keys_refused_without_comparison(self):
+        class HostileKey(str):
+            __hash__ = str.__hash__
+            def __eq__(self, other):
+                raise AssertionError("caller equality must not execute")
+
+        for target in ("request", "response"):
+            original = self.request if target == "request" else self.resp
+            # Construct an exact-size dict with a single non-plain key.
+            bad = {HostileKey(k) if k == "schema" else k: v
+                   for k, v in original.items()}
+            with self.subTest(target=target):
+                with self.assertRaisesRegex(M.Refused, "FIELDS_REFUSED"):
+                    self.inspect(**({"req": bad} if target == "request"
+                                    else {"resp": bad}))
+
+    def test_32_hostile_values_refused_before_equality(self):
+        class HostileValue(str):
+            def __eq__(self, other):
+                raise AssertionError("caller equality must not execute")
+            def __ne__(self, other):
+                raise AssertionError("caller inequality must not execute")
+
+        for key in self.request:
+            with self.subTest(request=key):
+                with self.assertRaisesRegex(M.Refused, "QUERY_DOMAIN"):
+                    self.inspect(req=dict(self.request, **{key: HostileValue("x")}))
+        for key in self.resp:
+            with self.subTest(response=key):
+                with self.assertRaises(M.Refused):
+                    self.inspect(resp=dict(self.resp, **{key: HostileValue("x")}))
+        with self.assertRaises(M.Refused):
+            self.pair(right=dict(self.resp, kind=HostileValue("UNAVAILABLE")))
+
+    def test_33_denial_defaults_and_signature_errors_remain_fixed(self):
+        with self.assertRaises(TypeError):
+            M.DENIED["productionSignInAllowed"] = True
+        out = self.inspect()
+        out["productionSignInAllowed"] = True
+        out["safeActions"].append("SIGN_IN")
+        self.denied(self.inspect())
+        self.denied(self.pair(), pair=True)
+        with self.assertRaisesRegex(M.Refused, "BAD_TEST_SIGNATURE") as caught:
+            self.inspect(resp=dict(self.resp, observedHeadSha256="a"*64))
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+        with mock.patch.object(M.base64, "urlsafe_b64decode",
+                               side_effect=ValueError("private fixture")):
+            with self.assertRaisesRegex(M.Refused, "SIGNATURE_MALFORMED") as caught:
+                self.inspect()
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

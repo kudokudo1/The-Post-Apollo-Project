@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'tests/connections/c3e_release_trust/C3eCustodianWireDenialCI.py'
+      - 'tests/connections/c3e_release_trust/C3eSignedCustodianCandidateCI.py'
+      - 'tests/connections/test_connections_c3e_signed_custodian_candidate_ci.py'
       - 'tests/connections/test_connections_c3e_custodian_wire_signed_denial.py'
       - '.github/workflows/connections-c3e-custodian-wire-signed-denial-ci.yml'
       - 'docs/connections-c3e-custodian-wire-signed-denial-ci.md'
@@ -61,7 +63,7 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in b
           print("C3E_SIGNED_WIRE_CI // NO_PROTECTED_CUSTODIAN")
           PY
-      - name: 35 real signed-denial, bounded receive and SCM_RIGHTS cleanup cases
+      - name: 36 real signed-denial, bounded receive and SCM_RIGHTS cleanup cases
         shell: bash
         run: |
           set -euo pipefail
@@ -72,7 +74,7 @@ jobs:
             "$(command -v python3)" -B \
             tests/connections/test_connections_c3e_custodian_wire_signed_denial.py
           echo "C3E_SIGNED_WIRE // NO_ACK_NEVER_AUTORETRY"
-      - name: Preserve original 233 signed-candidate and C3e rollback regressions
+      - name: Preserve 236 signed-candidate and C3e rollback regressions
         shell: bash
         run: |
           set -euo pipefail

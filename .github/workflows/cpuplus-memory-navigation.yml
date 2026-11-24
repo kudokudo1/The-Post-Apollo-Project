@@ -1,0 +1,17 @@
+name: CPU++ memory navigation contract
+on:
+  pull_request:
+    paths:
+      - 'widgets/cpuplus/CpuPlusMemoryActuatorPane.qml'
+      - 'widgets/cpuplus/CpuPlusMemoryAddControl.qml'
+      - 'tests/cpuplus_memory_navigation_test.js'
+      - '.github/workflows/cpuplus-memory-navigation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus_memory_navigation_test.js

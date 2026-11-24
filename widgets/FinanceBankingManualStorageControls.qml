@@ -9,6 +9,7 @@ import "FinanceBankingAccountsPolicy.js" as Accounts
 Item {
     id: persistence
     property var manualSession: Accounts.emptyState()
+    property bool active: false
     property bool initialized: false
     property bool saveArmed: false
     property bool clearArmed: false
@@ -29,6 +30,7 @@ Item {
     }
     FinanceServices.FinanceBankingManualStore {
         id: localStore
+        monitoring: persistence.active
         onSessionLoaded: {
             // Load only once per component lifetime. Later refreshes cannot
             // silently replace manual edits in the visible account session.

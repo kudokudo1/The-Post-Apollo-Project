@@ -82,9 +82,30 @@ class ManifestTests(unittest.TestCase):
 
     def test_strict_json(self):
         for raw in (b'{"schemaVersion":2,"schemaVersion":2}', b'{"x":NaN}',
-                    b'\xff', b'not JSON', b'['*5000+b']'*5000):
+                    b'\xff', b'not JSON', b'{"x": [1,]}', b'{"x":'):
             with self.assertRaisesRegex(M.ManifestRefusal, "INVALID_MANIFEST_JSON"):
                 M.inspect_manifest(raw, hashlib.sha256(raw).hexdigest())
+
+    def test_valid_nested_json_is_not_a_manifest(self):
+        raw = b"[[[]]]"
+        with self.assertRaisesRegex(M.ManifestRefusal, "^UNSUPPORTED_MANIFEST_LAYOUT$"):
+            M.inspect_manifest(raw, hashlib.sha256(raw).hexdigest())
+
+    def test_deep_json_refuses_without_depth_assumption(self):
+        # Parser recursion behavior varies with Python build/runtime.
+        # The security invariant is refusal, regardless of which layer
+        # rejects this valid but unsupported nested array.
+        raw = b"[" * 5000 + b"]" * 5000
+        digest = hashlib.sha256(raw).hexdigest()
+        with self.assertRaisesRegex(
+                M.ManifestRefusal, "^(INVALID_MANIFEST_JSON|UNSUPPORTED_MANIFEST_LAYOUT)$"):
+            M.inspect_manifest(raw, digest)
+        result = M.public_status(raw, digest)
+        self.assertEqual(result["status"], "UNAVAILABLE")
+        self.assertFalse(result["single_weight_reference_observed"])
+        self.assertIsNone(result["weight_size_bytes_declared"])
+        self.assertFalse(result["production_authority"])
+        self.assertEqual(result["safe_actions"], [])
 
     def test_unsupported_layouts(self):
         for mutation in (

@@ -7,6 +7,7 @@ import "../../widgets/FinanceBankingAccountsPolicy.js" as Accounts
 // No bank/Actual/Connections credentials, network or automatic financial write.
 Scope {
     id: store
+    property bool monitoring: false
     property string state: "idle" // idle | loading | pending | ready | failed
     property string message: "LOCAL MANUAL BANKING NOT LOADED"
     property int revision: 0
@@ -22,9 +23,15 @@ Scope {
     signal sessionCleared()
     signal storeUnavailable()
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: {
+        if(monitoring)refresh();
+    }
+    onMonitoringChanged: {
+        if(monitoring && state==="idle")refresh();
+    }
 
     function refresh() {
+        if(!monitoring)return false;
         if(worker.running || state==="pending" || state==="loading") {
             pendingReload=true;
             return false;
@@ -42,7 +49,7 @@ Scope {
                        confirmClear:true});
     }
     function invoke(command) {
-        if(worker.running || state==="pending" || state==="loading")return false;
+        if(!monitoring || worker.running || state==="pending" || state==="loading")return false;
         activeAction=command.action;
         frame=JSON.stringify(command)+"\n";
         output="";

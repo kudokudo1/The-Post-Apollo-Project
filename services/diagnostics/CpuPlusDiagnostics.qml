@@ -16,6 +16,21 @@ Scope {
     property int captureSequence: 0
     property string captureId: ""
     signal captureFinished(string job, string reportId)
+    property string selectedArchiveId: ""
+    readonly property var archiveRows: archive.rows
+    readonly property string archiveStatus: archive.status
+    readonly property bool archiveBusy: archive.busy
+    DiagnosticReportArchive { id: archive }
+
+    function loadHistory() {
+        if (busy) return false;
+        return archive.invoke({action: "list"});
+    }
+    function selectLatest(job) {
+        if (!Policy.validKind(job)) return;
+        selectedArchiveId = "";
+        selectedReport = job;
+    }
     property bool busy: false
     property bool faulted: false
     property string kind: ""
@@ -30,13 +45,13 @@ Scope {
     readonly property int maximumReport: 65536
 
     function request(job) {
-        if (busy || faulted || worker.running) return false;
+        if (busy || faulted || worker.running || archive.busy) return false;
         const args = Policy.argumentsFor(job, path => Quickshell.shellPath(path));
         if (!args) return false;
         kind = job;
         captureSequence += 1;
         captureId = sessionTag + "-" + captureSequence;
-        selectedReport = job;
+        selectLatest(job);
         received = false;
         exited = false;
         exitOk = false;
@@ -61,12 +76,14 @@ Scope {
         if (!Policy.validKind(job) || typeof reportId !== "string" || !reportId)
             return null;
         const report = reports[job];
-        return report && report.id === reportId ? report : null;
+        if (report && report.id === reportId) return report;
+        return archiveRows.find(row => row.kind === job && row.id === reportId) || null;
     }
 
     function selectExactReport(job, reportId) {
         if (!reportFor(job, reportId)) return false;
         selectedReport = job;
+        selectedArchiveId = reports[job] && reports[job].id === reportId ? "" : reportId;
         memoryMenuIndex = 4;
         return true;
     }
@@ -76,6 +93,7 @@ Scope {
         next[kind] = {id: captureId, status: status, summary: summary,
                       text: text, finishedAt: new Date().toISOString()};
         reports = next;
+        archive.invoke({action: "save", record: Object.assign({kind: kind}, next[kind])});
         feedback = status + " // " + kind.toUpperCase();
         output = "";
         busy = false;

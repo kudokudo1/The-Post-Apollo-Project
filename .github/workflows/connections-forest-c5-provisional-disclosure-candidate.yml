@@ -65,7 +65,7 @@ jobs:
               assert "ForestC5ProvisionalDisclosurePreflight" not in Path(owner_file).read_text()
           print("C5_DISCLOSURE_CANDIDATE_SOURCE_ONLY // NO_PERMISSION_ISSUANCE")
           PY
-      - name: 26 adversarial candidate and real B3 DELTA drop tests
+      - name: 32 adversarial candidate and real B3 DELTA drop tests
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

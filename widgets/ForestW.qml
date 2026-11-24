@@ -43,6 +43,8 @@ PanelWindow {
         selectedTreeReasoningSteps = steps;
     }
     property bool modelPopupOpen: false
+    // Popup-only navigation. No new window, host service or scan on tab switch.
+    property bool hardwareViewOpen: false
     property string pendingModelScan: ""
     property string lastScannedModel: ""
     property string lastModelScanResult: ""
@@ -108,6 +110,8 @@ PanelWindow {
             lastModelScanResult = "";
             if (!localInventory.scanning && !modelResidency.scanning)
                 refreshLocalModelEvidence();
+        } else {
+            hardwareViewOpen = false;
         }
     }
     onMenuOpenChanged: {
@@ -769,21 +773,47 @@ PanelWindow {
                     GohuText {
                         anchors.left: parent.left
                         anchors.leftMargin: 9
-                        anchors.right: scanAllButton.left
+                        anchors.right: hardwareViewButton.left
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "FOREST // MODELS"
+                        text: root.hardwareViewOpen ? "FOREST // HARDWARE" : "FOREST // MODELS"
                         color: Colors.magenta
                         font.pixelSize: 12
                         elide: Text.ElideRight
                     }
 
                     Rectangle {
+                        id: hardwareViewButton
+                        anchors.right: scanAllButton.left
+                        anchors.rightMargin: 5
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 63
+                        height: 23
+                        color: root.hardwareViewOpen ? Colors.dark : Colors.black
+                        border.width: 1
+                        border.color: root.hardwareViewOpen ? Colors.magenta : Colors.cyan
+                        Accessible.name: root.hardwareViewOpen
+                            ? "Back to Forest model list"
+                            : "Open read-only Forest hardware capacity page"
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: root.hardwareViewOpen ? "MODELS" : "HARDWARE"
+                            font.pixelSize: 9
+                            color: root.hardwareViewOpen ? Colors.magenta : Colors.cyan
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.hardwareViewOpen = !root.hardwareViewOpen
+                        }
+                    }
+                    Rectangle {
                         id: scanAllButton
                         anchors.right: closeModelPopupButton.left
                         anchors.rightMargin: 5
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 66
+                        width: root.hardwareViewOpen ? 0 : 66
+                        visible: !root.hardwareViewOpen
                         height: 23
                         color: Colors.dark
                         border.width: 1
@@ -830,8 +860,15 @@ PanelWindow {
                     height: 19
                     font.pixelSize: 9
                     elide: Text.ElideRight
-                    color: localInventory.status === "REACHABLE" ? Colors.green : Colors.orange
-                    text: localInventory.scanning ? "OLLAMA // SCANNING"
+                    color: root.hardwareViewOpen
+                        ? (capacityView.snapshotStatus === "OBSERVED" ? Colors.green : Colors.orange)
+                        : (localInventory.status === "REACHABLE" ? Colors.green : Colors.orange)
+                    text: root.hardwareViewOpen
+                        ? (capacityView.checking ? "P2C // CHECKING"
+                            : capacityView.snapshotStatus === "OBSERVED" ? "P2C // OBSERVED / READ ONLY"
+                            : capacityView.snapshotStatus === "NOT_CHECKED" ? "P2C // NOT CHECKED"
+                            : "P2C // UNAVAILABLE")
+                        : localInventory.scanning ? "OLLAMA // SCANNING"
                         : localInventory.status === "REACHABLE"
                             ? "OLLAMA // " + localInventory.modelCount + " DISCOVERED"
                         : localInventory.status === "NOT_CHECKED"
@@ -850,7 +887,7 @@ PanelWindow {
                     anchors.leftMargin: 7
                     anchors.right: parent.right
                     anchors.rightMargin: 7
-                    height: modelPopup.height >= 270 ? 48 : 0
+                    height: !root.hardwareViewOpen && modelPopup.height >= 270 ? 48 : 0
                     visible: height > 0
                     color: Colors.dark
                     border.width: 1
@@ -894,6 +931,7 @@ PanelWindow {
 
                 ListView {
                     id: modelList
+                    visible: !root.hardwareViewOpen
                     anchors.top: selectedModelProfilePanel.bottom
                     anchors.topMargin: selectedModelProfilePanel.visible ? 3 : 2
                     anchors.bottom: popupFoot.top
@@ -905,7 +943,8 @@ PanelWindow {
                     clip: true
                     spacing: 5
                     boundsBehavior: Flickable.StopAtBounds
-                    model: localInventory.status === "REACHABLE" ? localInventory.models : []
+                    model: !root.hardwareViewOpen && localInventory.status === "REACHABLE"
+                        ? localInventory.models : []
                     delegate: Rectangle {
                         id: modelEntry
                         property string modelName: String(modelData.name || "")
@@ -1046,7 +1085,7 @@ PanelWindow {
                 }
 
                 GohuText {
-                    visible: localInventory.modelCount === 0
+                    visible: !root.hardwareViewOpen && localInventory.modelCount === 0
                     anchors.centerIn: modelList
                     width: modelList.width - 12
                     text: localInventory.scanning ? "SCANNING INVENTORY"
@@ -1057,6 +1096,19 @@ PanelWindow {
                     font.pixelSize: 10
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
+                }
+
+                ForestHardwareCapacityView {
+                    id: capacityView
+                    visible: root.hardwareViewOpen
+                    anchors.top: popupProviderStatus.bottom
+                    anchors.topMargin: 3
+                    anchors.bottom: popupFoot.top
+                    anchors.bottomMargin: 3
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
                 }
 
                 GohuText {
@@ -1071,9 +1123,11 @@ PanelWindow {
                     color: root.lastScannedModel ? Colors.cyan : Colors.orange
                     font.pixelSize: 9
                     elide: Text.ElideRight
-                    text: root.lastScannedModel
-                        ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
-                        : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"
+                    text: root.hardwareViewOpen
+                        ? "P2C SYSFS = ESTIMATE // NOT MODEL CAPACITY OR PERMISSION"
+                        : root.lastScannedModel
+                            ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
+                            : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"
                 }
             }
             // Compact empty-session state remains below the chat heading.

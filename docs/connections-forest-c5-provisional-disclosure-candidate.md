@@ -42,6 +42,26 @@ A real ForestW option should **not** be exposed yet. Do not tell the user that a
 4. A fully matching candidate never grants streaming. A syntactically valid B3 \`DELTA\` is dropped and not included in the return value.
 5. The original B3 generator can still yield bytes internally. In a disposable demonstration, the C5 reference suppresses an external sink even when the later final COMMIT check denies; local Forest B3/B4f abort remains unchanged. This is NOT an approved host integration.
 
+### Later diagnostic privacy hardening
+
+The source-level candidate and native-handoff refusal boundaries no longer
+chain lower-level decoder errors. Those errors can retain the entire rejected
+JSON document (`JSONDecodeError.doc`) or provisional text (`UnicodeError.object`)
+even when their printable message is fixed. Both boundaries now leave the
+exception handler before raising the fixed HOLD error. Oversized DELTA strings
+are refused by codepoint count before allocating a UTF-8 copy; the existing
+UTF-8 byte cap still applies after encoding. Five regression cases cover
+malformed candidate, original intent and handoff records, invalid Unicode and
+both length limits.
+
+This limits retention through the **nested exception cause/context path** in
+ordinary calls, not all Python object retention. Traceback frames and a
+debugger or logger that captures caller/local variables can still retain the
+input. A future installed host must emit only approved fixed error codes,
+never serialize exception objects, raw packets, traceback locals, prompts
+or provisional text. This does not change the signed C5 V1 wire, introduce
+native authority or prove protected runtime logging.
+
 ## WATCH OUT FOR // Real native implementation is a separate owner-approved workstream
 
 **No real provisional-disclosure authority exists here.** Before any live release, Forest Nurse 2 and Forest Core/ForestW must agree with the operator on a product policy, and Connections Nurse 2 / DOC 1/2/3 must define the actual custodian.

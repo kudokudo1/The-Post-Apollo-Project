@@ -51,14 +51,23 @@ def _hold(reason: str) -> None:
     raise RecoveryComparisonHold("FOREST_C5_RECOVERY_UNKNOWN_HOLD // " + reason)
 
 
+def _exact_fields(value: object, fields: frozenset) -> bool:
+    """Refuse arbitrary key comparison and excess cardinality before set equality."""
+    return (type(value) is dict and len(value) == len(fields)
+            and all(type(key) is str for key in value)
+            and set(value) == fields)
+
+
 def _check_local(value: object) -> dict:
-    if type(value) is not dict or set(value) != LOCAL_FIELDS:
+    if not _exact_fields(value, LOCAL_FIELDS):
         _hold("LOCAL_EXACT_FIELDS_REQUIRED")
-    if (value["schema"] != LOCAL_SCHEMA or
+    if (type(value["schema"]) is not str or
+            value["schema"] != LOCAL_SCHEMA or
             type(value["attemptId"]) is not str or
             type(value["sessionId"]) is not str or
             type(value["forestWriteState"]) is not str or
             value["forestWriteState"] not in LOCAL_STATES or
+            type(value["c5Settlement"]) is not str or
             value["c5Settlement"] != "UNKNOWN_HOLD"):
         _hold("LOCAL_SCHEMA_OR_STATE_UNTRUSTED")
     for name in (
@@ -72,20 +81,23 @@ def _check_local(value: object) -> dict:
 
 
 def _check_signed(value: object) -> dict:
-    if type(value) is not dict or set(value) != SIGNED_FIELDS:
+    if not _exact_fields(value, SIGNED_FIELDS):
         _hold("SIGNED_EXACT_FIELDS_REQUIRED")
-    if (value["schema"] != V.RESULT_SCHEMA or
+    if (type(value["schema"]) is not str or
+            value["schema"] != V.RESULT_SCHEMA or
+            type(value["status"]) is not str or
             value["status"] != "V1_SESSION_BOUND_FIXTURE_CONSISTENT_NOT_AUTHENTICATED" or
             value["claimedForestBindingCallerControlled"] is not True or
             value["claimedSignerKeysAndJournalCallerControlled"] is not True or
             type(value["safeActions"]) is not list or
-            value["safeActions"] != []):
+            len(value["safeActions"]) != 0):
         _hold("SIGNED_NOT_UNTRUSTED_DIAGNOSTIC")
     if (type(value["claimedSessionIdUntrusted"]) is not str or
             type(value["claimedIntentSha256Untrusted"]) is not str or
             type(value["claimedReceiptSha256Untrusted"]) is not str or
             type(value["claimedWriterJournalCounterUntrusted"]) is not int or
             value["claimedWriterJournalCounterUntrusted"] < 1 or
+            type(value["claimedTerminalOutcomeUntrusted"]) is not str or
             value["claimedTerminalOutcomeUntrusted"] not in
             ("COMMIT_CONFIRMED", "ROLLBACK_CONFIRMED")):
         _hold("SIGNED_DIAGNOSTIC_INVALID")
@@ -111,10 +123,10 @@ def compare_untrusted_local_with_v1_claim(
     signed = _check_signed(signed_fixture_diagnostic)
     try:
         intent, digest = V._intent(original_v1_intent_wire)
-    except V.V1Hold as exc:
-        raise RecoveryComparisonHold(
-            "FOREST_C5_RECOVERY_UNKNOWN_HOLD // INTENT_V1_UNTRUSTED_OR_MALFORMED"
-        ) from exc
+    except V.V1Hold:
+        intent = None
+    if intent is None:
+        _hold("INTENT_V1_UNTRUSTED_OR_MALFORMED")
     if (local["attemptId"] != intent["attempt"] or
             local["sessionId"] != intent["sessionId"] or
             signed["claimedSessionIdUntrusted"] != intent["sessionId"] or

@@ -1,0 +1,73 @@
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+path = Path(__file__).resolve().parents[1] / "scripts/post-apollo-memory-add-swap"
+loader = importlib.machinery.SourceFileLoader("memory_add", str(path))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+m = importlib.util.module_from_spec(spec)
+loader.exec_module(m)
+
+GOOD = {"candidate": True, "maximumGiB": 64}
+
+class SwapAddTests(unittest.TestCase):
+    def test_size_choices(self):
+        for size in range(4, 65, 4):
+            self.assertEqual(m.parse_size(str(size)), size)
+
+    def test_invalid_sizes(self):
+        for value in ("0", "3", "7", "65", "128", "04", "-4", "4G", "4;id", "4\n", " 4"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                m.parse_size(value)
+
+    def test_existing_and_insufficient_refuse(self):
+        for candidate in ({"candidate": False, "maximumGiB": 64},
+                          {"candidate": True, "maximumGiB": 12}):
+            with self.assertRaises(RuntimeError):
+                m.validate_request(16, candidate)
+
+    def test_nonroot_never_writes(self):
+        with patch.object(m.os, "geteuid", return_value=1000), patch.object(m, "run") as run:
+            with self.assertRaises(PermissionError):
+                m.allocate(16)
+            run.assert_not_called()
+
+    def test_noninteractive_refuses(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=False), patch.object(m, "run") as run:
+            with self.assertRaises(RuntimeError):
+                m.allocate(16)
+            run.assert_not_called()
+
+    def test_cancel_never_writes(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="cancel"), patch.object(m, "run") as run:
+            with self.assertRaises(RuntimeError):
+                m.allocate(16)
+            run.assert_not_called()
+
+    def test_recheck_refuses_changed_state(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", side_effect=[GOOD, {"candidate": False, "maximumGiB": 64}]), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run") as run:
+            with self.assertRaises(RuntimeError):
+                m.allocate(16)
+            run.assert_not_called()
+
+    def test_multidevice_refusal(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run", return_value="Total devices 2") as run:
+            with self.assertRaises(RuntimeError):
+                m.allocate(16)
+            run.assert_called_once_with("/usr/bin/btrfs", "filesystem", "show", "--raw", "/var/lib")
+
+    def test_positive_exact_argv_and_readback(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run", return_value="Total devices 1") as run, patch.object(m.os, "umask"), patch.object(Path, "chmod"), patch.object(m, "active_swap", return_value={"sizeKiB": 16 * 1024**2 - 4, "priority": 10}):
+            m.allocate(16)
+            self.assertEqual(run.call_count, 5)
+            self.assertEqual(run.call_args_list[-1].args, ("/usr/sbin/swapon", "--priority", "10", "--", str(m.SWAPFILE)))
+
+    def test_failed_readback_not_success(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run", return_value="Total devices 1"), patch.object(m.os, "umask"), patch.object(Path, "chmod"), patch.object(m, "active_swap", return_value=None):
+            with self.assertRaises(RuntimeError):
+                m.allocate(16)
+
+if __name__ == "__main__":
+    unittest.main()

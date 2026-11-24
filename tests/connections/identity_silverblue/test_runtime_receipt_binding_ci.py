@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+import subprocess
+import tempfile
 from pathlib import Path
 import sys
 import unittest
@@ -205,6 +207,29 @@ class RuntimeReceiptBindingTests(unittest.TestCase):
         self.assertEqual(B.I.PACKAGE, "post-apollo-identity-silverblue-ci")
         self.assertEqual(B.I.UNIT, "post-apollo-identity-silverblue-ci.service")
         self.assertEqual(len(B.I.FILES), 9)
+
+
+    def test_26_idle_fifo_source_refused_without_blocking(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "idle-fifo"
+            os.mkfifo(p, 0o600)
+            script = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import runtime_receipt_binding_ci as B
+try:
+    B._digest_file(Path(sys.argv[2]), ceiling=1024, mode=0o600)
+except B.Refused as error:
+    if str(error) != "C4B_BINDING_UNSAFE_SOURCE_OR_MODE":
+        raise
+else:
+    raise AssertionError("nonregular source accepted")
+"""
+            subprocess.run([sys.executable, "-B", "-c", script,
+                            str(Path(__file__).resolve().parent), str(p)],
+                           check=True, timeout=5, capture_output=True)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

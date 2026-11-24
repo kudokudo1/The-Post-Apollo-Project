@@ -80,7 +80,7 @@ assert 'def write_doc(directory: Path, doc)' in manual
 assert 'manual-session.json' in manual
 assert 'version": 1' in manual
 assert 'FinanceBankingManualStorageControls {' in ui
-assert 'FinanceBankingManualStore' in service
+assert 'Quickshell.shellPath("scripts/finance/banking_manual_store.py")' in service
 assert 'banking_manual_archive.py' not in ui
 assert 'banking_manual_archive.py' not in service
 print("Banking M4p: no arbitrary export path, local-only private archive, CAS guarded explicit restore and no UI activation contract PASS")

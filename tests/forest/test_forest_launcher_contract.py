@@ -227,7 +227,7 @@ class ForestLauncherContract(unittest.TestCase):
 
     def test_five_tree_ids_assets_and_unassigned_roles(self):
         view = (ROOT / "widgets/ForestW.qml").read_text()
-        self.assertIn('property var selectedTreeModels: ["", "", "", "", ""]', view)
+        self.assertIn("property var selectedTreeEquipment: ModelFormPolicy.emptyEquipment(5)", view)
         self.assertIn('text: "TREES // " + String(root.treeSlots.length).padStart(2, "0")', view)
         tree_profiles = (
             ("CHERRY", "cherry-outline.svg", "GENERAL // ASSISTANT",
@@ -1224,8 +1224,9 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn('text: "ACCESS ?"', view)
         self.assertIn("SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED", view)
         self.assertIn("onClicked: root.scanModel(modelEntry.modelName)", view)
-        self.assertIn("onClicked: root.chooseLocalModel(modelEntry.modelName)", view)
-        self.assertIn("property var selectedTreeModels:", view)
+        self.assertIn('onClicked: root.equipLocalModel("small", modelEntry.modelName)', view)
+        self.assertIn('onClicked: root.equipLocalModel("big", modelEntry.modelName)', view)
+        self.assertIn("property var selectedTreeEquipment:", view)
         self.assertIn("choices[selectedTreeIndex] = name", view)
         self.assertIn("onSelectedTreeIndexChanged: modelPopupOpen = false", view)
         self.assertIn("if (root.modelPopupOpen)", view)

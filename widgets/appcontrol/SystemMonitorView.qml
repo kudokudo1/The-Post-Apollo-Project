@@ -15,7 +15,7 @@ required property var controller
             readonly property string contributorSourceId: String(safeComponent.id || "")
             onContributorSourceIdChanged: resetContributorScroll()
             onVisibleChanged: if (!visible) resetContributorScroll()
-            function resetContributorScroll() { contributorScroll.contentY = 0; }
+            function resetContributorScroll() { if (contributorScroll) contributorScroll.contentY = 0; }
 
             visible:
                 controller.selectedResultIsSystemComponent()

@@ -1,0 +1,17 @@
+name: CPU++ DOC 3 memory observation
+on:
+  pull_request:
+    paths:
+      - "scripts/cpuplus_quickshell_memory_observer.py"
+      - "scripts/syntagma_quickshell_thread_sampler.py"
+      - "tests/cpuplus/test_quickshell_memory_observer.py"
+      - ".github/workflows/cpuplus-memory-observation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observation-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -B tests/cpuplus/test_quickshell_memory_observer.py

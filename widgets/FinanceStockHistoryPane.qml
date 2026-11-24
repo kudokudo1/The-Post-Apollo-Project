@@ -574,6 +574,8 @@ Item {
                 text: stocks.globalHandoffMessage || (stocks.globalHistoryActive
                     ? ("GLOBAL HISTORY // " + stocks.historySource
                         + " // LOADED RANGE ONLY"
+                        + (stocks.globalHistory.bars.length === 0 ? " // NO SESSIONS" : "")
+                        + "\nUSER-CHOSEN LISTING // FIGI MATCH NOT VERIFIED"
                         + (stocks.globalHistory.compactMayBeTruncated
                             ? "\nWARNING // COMPACT HISTORY MAY OMIT EARLIER DATES" : "")
                         + "\nSEARCH TO LOAD ANOTHER RANGE // ADVANCED TOOLS PENDING")
@@ -581,7 +583,8 @@ Item {
                     : "STOCK HISTORY SOURCE UNAVAILABLE")
                 textFormat: Text.PlainText
                 font.pixelSize: 9
-                color: stocks.stockFeed && stocks.stockFeed.state === "failed"
+                color: stocks.globalHandoffMessage.length > 0
+                    || (!stocks.globalHistoryActive && stocks.stockFeed && stocks.stockFeed.state === "failed")
                     ? Colors.red : Colors.orange
                 wrapMode: Text.WordWrap
             }
@@ -1337,7 +1340,9 @@ Item {
                 GohuText {
                     width: parent.width
                     visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                    text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
+                    text: stocks.globalHistoryActive
+                        ? "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED"
+                        : "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
                     textFormat: Text.PlainText
                     wrapMode: Text.WordWrap
                     font.pixelSize: 9

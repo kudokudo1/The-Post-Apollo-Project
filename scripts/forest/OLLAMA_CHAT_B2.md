@@ -16,8 +16,10 @@ newline-delimited JSON chunks, and emits machine-readable events:
 
 The Python API raises ChatRefusal on error instead of yielding REFUSED.
 A partially streamed answer must be marked incomplete and must NEVER be
-silently committed as a successful assistant response. Retry and cancellation
-are owned by a future session host, not by this transport.
+silently committed as a successful assistant response. Retry and cancellation ownership remain with the session host. B2 accepts
+an optional host-owned, one-operation threading.Event; setting it interrupts
+this request's connected socket and yields no further successful completion
+once cancellation is observed. The host must never clear or reuse the event.
 
 ## How to run an explicit local trial
 
@@ -38,7 +40,9 @@ Default safety/resource limits:
 - Only HTTP on literal IPv4/IPv6 loopback, never redirect or nonlocal host.
 - Max 16 user/assistant messages, 4096 bytes each, 16384 bytes combined.
 - Response line 65536 bytes, response stream 1 MiB, answer text 32768 bytes.
-- 6-second socket timeout and 120-second aggregate checked deadline.
+- 6-second socket inactivity/connect timeout and 120-second aggregate I/O
+  deadline, enforced by a per-exchange socket shutdown watchdog. Literal
+  loopback connect is bounded separately and checked before dispatch.
 - 256 predicted tokens and 4096-token context by default; accepted bounds
   max_predict 1..512, num_ctx 512..8192. Smaller context is NOT Hermes agent
   readiness; direct Ollama does not need Hermes's 64K minimum.
@@ -67,3 +71,16 @@ session owner and revision, and append assistant content ONLY after a COMPLETE
 event. A protected storage host, privacy review, and user authorization are
 required for durable real conversation history. No ForestW source was edited
 and no Hospital/PX worker authority is inherited.
+
+## DOC 2F interruptible transport checkpoint
+
+The watchdog only shuts down a duplicate of this request's TCP socket. It
+never kills, unloads or retries a model. The generator owner closes the
+response and joins the watchdog on exit. STOP is an observed local transport
+interruption, not proof of remote inference termination or resource release.
+A STOP racing with COMPLETE requires host-owned terminal reconciliation;
+B2 cannot revoke a durable turn, grant disclosure or settle an unknown B3
+attempt. B3 integration is deliberately unchanged pending shared ownership
+agreement. The focused tests exercise pre-dispatch refusal, stalled headers,
+partial-line cancellation, deadline and cancellation between events using
+public disposable loopback fixtures only.

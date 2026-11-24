@@ -7,6 +7,7 @@ import json
 import sys
 import threading
 import unittest
+from unittest.mock import patch
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -230,6 +231,99 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(next(generator)["event"], "STARTED")
         generator.close()
         self.assertEqual(len(FakeOllama.observed), 1)
+
+    def test_pre_cancelled_or_invalid_event_never_dispatches(self):
+        token = threading.Event()
+        token.set()
+        with self.assertRaisesRegex(chat.ChatRefusal, "OLLAMA_CANCELLED"):
+            self.run_chat(cancel_event=token)
+        with self.assertRaisesRegex(chat.ChatRefusal, "INVALID_CANCEL_EVENT"):
+            self.run_chat(cancel_event=True)
+        self.assertEqual(FakeOllama.observed, [])
+
+    def _stalled_exchange(self, *, headers, cancel):
+        reached = threading.Event()
+        release = threading.Event()
+        token = threading.Event()
+        events = []
+        errors = []
+
+        class Stalled(FakeOllama):
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                try:
+                    if headers:
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/x-ndjson")
+                        self.end_headers()
+                        self.wfile.write(packet("partial"))
+                        self.wfile.write(b'{"message":')
+                        self.wfile.flush()
+                    reached.set()
+                    release.wait(5)
+                except OSError:
+                    pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Stalled)
+        serving = threading.Thread(target=server.serve_forever, daemon=True)
+        serving.start()
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+
+        def consume():
+            try:
+                events.extend(chat.stream_chat(
+                    model="qwen3:1.7b", endpoint=endpoint,
+                    messages=[{"role": "user", "content": "public fixture"}],
+                    cancel_event=token))
+            except Exception as exc:
+                errors.append(exc)
+
+        worker = threading.Thread(target=consume, daemon=True)
+        try:
+            worker.start()
+            self.assertTrue(reached.wait(2), "fixture did not receive request")
+            if cancel:
+                token.set()
+            worker.join(2)
+            self.assertFalse(worker.is_alive(), "blocked exchange not interrupted")
+            self.assertEqual(len(errors), 1)
+            self.assertIsInstance(errors[0], chat.ChatRefusal)
+            self.assertEqual(errors[0].code, "OLLAMA_CANCELLED" if cancel
+                             else "OLLAMA_STREAM_DEADLINE")
+            self.assertNotIn("COMPLETE", [e["event"] for e in events])
+        finally:
+            release.set()
+            worker.join(7)
+            server.shutdown()
+            server.server_close()
+            serving.join(2)
+
+    def test_cancel_interrupts_wait_for_headers(self):
+        self._stalled_exchange(headers=False, cancel=True)
+
+    def test_cancel_interrupts_partial_line(self):
+        self._stalled_exchange(headers=True, cancel=True)
+        # A separate operation must still succeed.
+        self.assertEqual(self.run_chat()[-1]["event"], "COMPLETE")
+
+    def test_deadline_interrupts_blocked_read_before_socket_timeout(self):
+        with patch.object(chat, "TOTAL_SECONDS", 0.5):
+            self._stalled_exchange(headers=True, cancel=False)
+
+    def test_cancel_after_delta_prevents_complete(self):
+        token = threading.Event()
+        generator = chat.stream_chat(
+            model="qwen3:1.7b",
+            messages=[{"role": "user", "content": "hi"}],
+            endpoint=self.endpoint, cancel_event=token)
+        try:
+            self.assertEqual(next(generator)["event"], "STARTED")
+            self.assertEqual(next(generator)["event"], "DELTA")
+            token.set()
+            with self.assertRaisesRegex(chat.ChatRefusal, "OLLAMA_CANCELLED"):
+                next(generator)
+        finally:
+            generator.close()
 
     def test_cli_streams_json_and_does_not_require_user_files(self):
         input_stream = io.StringIO("hello")

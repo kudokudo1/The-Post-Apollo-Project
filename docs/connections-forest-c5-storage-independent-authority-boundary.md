@@ -44,6 +44,10 @@ ForestC5SignedEvidencePreflight.INTENT_FIELDS binds signed principal, tree, user
 
 **Owner decision required:** Forest backend and Connections DOC 3 must ACCEPT/REVISE/HOLD between (A) adding the exact durable Forest session ID in a future **versioned** signed COMMIT intent or (B) formally proving and independently authenticating the original signed attempt_id -> persisted session_id mapping in the protected writer/issuer contract. Both require native negative tests for mismatched sessions, replay, altered persisted rows and source substitution. Do not silently alter #2171's wire schema, cross-audience grants or Forest-owned source in this PR. The current v0 signed intent cannot be promoted without this missing identity proof.
 
+### B6 reference-boundary hardening
+
+Following [#2427](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2427), the current deny-only C5 reference inspector now checks exact dictionary cardinality and plain string keys before building a set. It raises the same fixed malformed-intent refusal after leaving the parser exception handler, avoiding ordinary nested exception links retaining rejected JSON/Unicode inputs. This does not erase traceback locals, externally active exception context, or establish a production incident. Tests consume actual merged B6-R1/R2 reference and selected Workshop values, and verify no permission from either C5 mode. No changes to the Forest registry, wire format, protected issuer, storage or live runtime integration. Existing independent issuer/host dependencies remain HOLD.
+
 ## HOW TO USE
 
 For source review / disposable CI only. New test:
@@ -54,7 +58,7 @@ No UI, host installation, protected issuer, remote service, local database, key 
 
 ## VERIFY
 
-Dedicated CI runs 26 hostile boundary tests, including 6 new independent LIST_SESSIONS/title denial cases, plus previous signed receipt/roles/custody/interop/two-DB fence/B4b suites (86 inherited security checks). It also runs the 15-case Forest B4c two-phase synthetic consumer test. Expected combined count: **127** if all suites complete, with independent check-run verification required. Static gate confirms no signer, SQLite connector, sockets, credential actuation, false-to-true authority change or import into the Forest runtime.
+Dedicated CI runs 29 hostile boundary tests, including 6 independent LIST_SESSIONS/title denial cases and 3 reference hardening/B6 regression cases, plus previous signed receipt/roles/custody/interop/two-DB fence/B4b suites (86 inherited security checks). It also runs the 15-case Forest B4c two-phase synthetic consumer test. Expected combined count: **130** if all suites complete, with independent check-run verification required. Static gate confirms no signer, SQLite connector, sockets, credential actuation, false-to-true authority change or import into the Forest runtime.
 
 Checks cover:
 - protected mode never accepting an injected caller backend, local development ledger, URL or public root

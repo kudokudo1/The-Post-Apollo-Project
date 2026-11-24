@@ -74,6 +74,9 @@ PanelWindow {
     }
     property bool modelPopupOpen: false
     property bool autoPreviewOpen: false
+    property bool benchmarkReportsOpen: false
+    onAutoPreviewOpenChanged: if (autoPreviewOpen) benchmarkReportsOpen = false
+    onBenchmarkReportsOpenChanged: if (benchmarkReportsOpen) autoPreviewOpen = false
     // Independent in-widget diagnostic menu; opening it does not scan.
     property bool diagnosticsOpen: false
     property string pendingModelScan: ""
@@ -149,6 +152,7 @@ PanelWindow {
     // Forest or loading this QML component never scans automatically.
     onModelPopupOpenChanged: {
         autoPreviewOpen = false;
+        benchmarkReportsOpen = false;
         if (modelPopupOpen) {
             pendingModelScan = "";
             lastScannedModel = "";
@@ -1103,7 +1107,7 @@ PanelWindow {
 
                 ListView {
                     id: modelList
-                    visible: !root.autoPreviewOpen
+                    visible: !root.autoPreviewOpen && !root.benchmarkReportsOpen
                     anchors.top: selectedModelProfilePanel.bottom
                     anchors.topMargin: selectedModelProfilePanel.visible ? 3 : 2
                     anchors.bottom: popupFoot.top
@@ -1390,7 +1394,7 @@ PanelWindow {
                 }
 
                 GohuText {
-                    visible: !root.autoPreviewOpen && localInventory.modelCount === 0
+                    visible: !root.autoPreviewOpen && !root.benchmarkReportsOpen && localInventory.modelCount === 0
                     anchors.centerIn: modelList
                     width: modelList.width - 12
                     text: localInventory.scanning ? "SCANNING INVENTORY"
@@ -1435,11 +1439,40 @@ PanelWindow {
                         onClicked: root.autoPreviewOpen = !root.autoPreviewOpen
                     }
                 }
+                ForestBenchmarkReportView {
+                    id: benchmarkReportView
+                    visible: root.modelPopupOpen && root.benchmarkReportsOpen
+                    anchors.fill: modelList
+                }
+                Rectangle {
+                    id: benchmarkReportsButton
+                    anchors.right: autoPreviewButton.left
+                    anchors.rightMargin: 4
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 4
+                    width: 55
+                    height: 17
+                    color: root.benchmarkReportsOpen ? Colors.yellow : Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+                    Accessible.name: "Toggle imported benchmark report comparison"
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: root.benchmarkReportsOpen ? "MODELS" : "BENCH"
+                        color: root.benchmarkReportsOpen ? Colors.magenta : Colors.cyan
+                        font.pixelSize: 8
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.benchmarkReportsOpen = !root.benchmarkReportsOpen
+                    }
+                }
                 GohuText {
                     id: popupFoot
                     anchors.left: parent.left
                     anchors.leftMargin: 8
-                    anchors.right: autoPreviewButton.left
+                    anchors.right: benchmarkReportsButton.left
                     anchors.rightMargin: 4
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 4
@@ -1447,7 +1480,8 @@ PanelWindow {
                     color: root.lastScannedModel ? Colors.cyan : Colors.orange
                     font.pixelSize: 9
                     elide: Text.ElideRight
-                    text: root.autoPreviewOpen ? "EXAMPLE ONLY // NOT ROUTED"
+                    text: root.benchmarkReportsOpen ? "IMPORTED REPORTS // UNVERIFIED"
+                        : root.autoPreviewOpen ? "EXAMPLE ONLY // NOT ROUTED"
                         : root.lastScannedModel
                             ? "SCAN // " + root.lastScannedModel + " // " + root.lastModelScanResult
                             : "SCAN = OLLAMA INVENTORY + P0 RESIDENCY // ACCESS UNVERIFIED"

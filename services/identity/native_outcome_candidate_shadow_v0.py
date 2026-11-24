@@ -1,12 +1,14 @@
 """DOC 6 Identity V5 negative-only native command outcome candidate shadow.
 
 A caller-injected, one-shot provider may report a *candidate* history/command
-outcome. This pure semantic comparator cannot authenticate that provider,
+outcome. Invoking that arbitrary provider is NOT necessarily read-only.
+The snapshot-only comparator is pure but cannot authenticate source custody,
 the original host, an external history head, an operator seat, or C5 consent.
 Even a perfect candidate match remains UNKNOWN_HOLD with zero safe actions.
 
-No socket, signer, UI, native client, storage, retry, reconciliation or IdP
-operation exists in this module. This is NOT a deployable issuer interface.
+This module has no built-in socket, signer, UI, native client, storage, retry,
+reconciliation or IdP operation, but a caller-injected callback can do those
+things itself. This is NOT a deployable issuer interface.
 """
 from __future__ import annotations
 

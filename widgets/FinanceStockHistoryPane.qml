@@ -996,7 +996,21 @@ Item {
                         + stocks.intervalComparison.first.maxDrawdownPct.toFixed(2) + "% // 2 "
                         + stocks.intervalComparison.second.maxDrawdownPct.toFixed(2) + "%"
                         + (stocks.intervalComparison.overlaps ? "\nINTERVALS OVERLAP" : "\nINTERVALS DO NOT OVERLAP")
-                        + "\nRAW RETURNS // NOT TIME-NORMALIZED // NO NEW REQUEST")
+                        + "\nRAW RETURNS // NOT TIME-NORMALIZED // NO NEW REQUEST"
+                        + "\nGEOMETRIC CHANGE PER OBSERVED STEP"
+                        + "\n1 // " + (stocks.intervalComparison.firstStepPct === null
+                            ? "N/A" : stocks.intervalComparison.firstStepPct.toFixed(4) + "%")
+                        + " // 2 // " + (stocks.intervalComparison.secondStepPct === null
+                            ? "N/A" : stocks.intervalComparison.secondStepPct.toFixed(4) + "%")
+                        + "\nSTEP CHANGE DIFFERENCE (2 MINUS 1) "
+                        + (stocks.intervalComparison.stepGapPoints === null
+                            ? "N/A" : stocks.intervalComparison.stepGapPoints.toFixed(4)
+                                + " PERCENTAGE POINTS")
+                        + (stocks.intervalComparison.sameStepCount
+                            ? "\nSAME OBSERVED STEP COUNT"
+                            : "\nDIFFERENT OBSERVED STEP COUNTS")
+                        + "\nOBSERVED CLOSE TRANSITIONS ONLY // NOT CALENDAR TIME"
+                        + " // NOT A FORECAST")
                     : "INTERVAL 1 SAVED // CHOOSE ANOTHER A/B PAIR"
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap

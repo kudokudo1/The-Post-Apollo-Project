@@ -345,5 +345,22 @@ class ForestC5NativeDisclosureHandoffNegativeTests(unittest.TestCase):
         self.assertIn('"emittedBytes": 0',source)
 
 
+    def test_34_malformed_handoff_wires_do_not_retain_decoder_error_chain(self):
+        raw = ('{"private":"' + PRIVATE_TEXT + '",').encode("ascii")
+        for field, reason in (
+            ("raw_issuer", "INVALID_ISSUER_WIRE"),
+            ("raw_recipient", "INVALID_RECIPIENT_WIRE"),
+            ("raw_revocation", "INVALID_REVOCATION_WIRE"),
+            ("candidate", "ORIGINAL_CANDIDATE_INVALID"),
+            ("original", "ORIGINAL_CANDIDATE_INVALID"),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(H.HandoffHold, reason) as exc:
+                    self.inspect(**{field: raw})
+                self.assertIsNone(exc.exception.__cause__)
+                self.assertIsNone(exc.exception.__context__)
+                self.assertNotIn(PRIVATE_TEXT, str(exc.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

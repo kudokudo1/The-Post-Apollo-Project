@@ -5,7 +5,8 @@ var SCHEMA = "post-apollo.forest.performance-capacity.readonly-p2c";
 var MAX_BYTES = 1048576;
 var MAX_GPUS = 8;
 var NO_MODEL = {name:"",installed:false,resident:false,matched:false,
-                artifactMiB:"?",residentMiB:"?",vramMiB:"?",calibrated:false};
+                artifactMiB:"?",residentMiB:"?",vramMiB:"?",calibrated:false,
+                placement:{state:"UNKNOWN",share:null,label:"?"}};
 var EMPTY = {hostRam:"?",cpuVisible:"?",cpuAffinity:"?",gpuCards:[],
              gpuCount:0,gpuHint:"UNKNOWN",ollamaVersion:"?",model:NO_MODEL};
 function _count(x) {
@@ -61,6 +62,24 @@ function _modelLists(installed, resident, requested) {
             ? loaded[requested] : null
     };
 }
+// Only a mathematical relationship between two reported byte counters.
+// No CPU/GPU execution share, process attribution, device mapping or
+// model-specific capacity requirement can be derived from these values.
+function reportedPlacement(resident, total, vram) {
+    if (resident !== true)
+        return {state:"NOT_RESIDENT",share:null,label:"?"};
+    if (!_count(total) || !_count(vram) || total === 0 || vram > total)
+        return {state:"UNKNOWN",share:null,label:"?"};
+    var share = vram / total;
+    var state = vram === 0 ? "ZERO_VRAM_REPORTED"
+        : vram === total ? "EQUAL_COUNTERS" : "PARTIAL_REPORTED_SHARE";
+    // Preserve nonzero/nonfull distinctions near display rounding limits.
+    var label = vram === 0 ? "0%" : vram === total ? "100%"
+        : share * 100 < 0.1 ? "<0.1%"
+        : share * 100 > 99.9 ? ">99.9%"
+        : (share * 100).toFixed(1) + "%";
+    return {state:state,share:share,label:label};
+}
 function selectedRecord(record, requested, lists) {
     if (!lists) return null;
     if (requested === "")
@@ -95,6 +114,8 @@ function selectedRecord(record, requested, lists) {
             artifactMiB:_mb(record.installed_artifact_bytes_reported),
             residentMiB:_mb(record.resident_memory_bytes_reported),
             vramMiB:_mb(record.resident_vram_bytes_reported),
+            placement:reportedPlacement(record.resident,
+                record.resident_memory_bytes_reported, record.resident_vram_bytes_reported),
             calibrated:false};
 }
 function _hold(reason) {

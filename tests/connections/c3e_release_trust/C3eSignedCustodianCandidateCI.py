@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+from types import MappingProxyType
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -36,7 +37,7 @@ RESPONSE_FIELDS = frozenset({
     *QUERY_FIELDS, "signerRole", "kind", "settlement", "challengeState",
     "observedHeadSha256", "observedSequence", "signatureB64url",
 })
-DENIED = {
+DENIED = MappingProxyType({
     "operatorEnrolledHistoryRootVerified": False,
     "independentCurrentHistoryVerified": False,
     "independentChallengeIssuedVerified": False,
@@ -47,7 +48,7 @@ DENIED = {
     "identityC5ConsentVerified": False,
     "safeToRetry": False,
     "productionSignInAllowed": False,
-}
+})
 
 
 class Refused(ValueError):
@@ -66,7 +67,9 @@ def _ci():
 
 
 def _exact(doc, keys, code):
-    if type(doc) is not dict or set(doc) != keys:
+    if (type(doc) is not dict or len(doc) != len(keys)
+            or any(type(key) is not str for key in doc)
+            or set(doc) != keys):
         _deny(code)
 
 
@@ -85,7 +88,9 @@ def _canonical(body):
 
 def _query(request):
     _exact(request, QUERY_FIELDS, "C3E_CUSTODIAN_QUERY_FIELDS_REFUSED")
-    if (request["schema"] != REQUEST_SCHEMA
+    if (type(request["schema"]) is not str
+            or type(request["purpose"]) is not str
+            or request["schema"] != REQUEST_SCHEMA
             or request["purpose"] != PURPOSE
             or not _hex(request["requestId"], HEX32)
             or not _hex(request["challengeHex"], HEX64)
@@ -98,9 +103,11 @@ def _query(request):
 def _candidate(request, response):
     _exact(response, RESPONSE_FIELDS, "C3E_CUSTODIAN_RESPONSE_FIELDS_REFUSED")
     for key in QUERY_FIELDS - {"schema"}:
-        if response[key] != request[key] or type(response[key]) is not type(request[key]):
+        if type(response[key]) is not type(request[key]) or response[key] != request[key]:
             _deny("C3E_CUSTODIAN_RESPONSE_REQUEST_BINDING_REFUSED")
-    if (response["schema"] != RESPONSE_SCHEMA
+    if (any(type(response[key]) is not str for key in
+            ("schema", "signerRole", "kind", "settlement", "challengeState"))
+            or response["schema"] != RESPONSE_SCHEMA
             or response["signerRole"] != ROLE
             or response["kind"] != "UNAVAILABLE"
             or response["settlement"] != "NONE"
@@ -111,10 +118,13 @@ def _candidate(request, response):
     signature = response["signatureB64url"]
     if type(signature) is not str or BASE64_64.fullmatch(signature) is None:
         _deny("C3E_CUSTODIAN_SIGNATURE_CANONICAL_BASE64URL_REQUIRED")
+    malformed = False
     try:
         sig = base64.urlsafe_b64decode(signature + "==")
-    except (ValueError, base64.binascii.Error) as exc:
-        raise Refused("C3E_CUSTODIAN_SIGNATURE_MALFORMED") from exc
+    except (ValueError, base64.binascii.Error):
+        malformed = True
+    if malformed:
+        _deny("C3E_CUSTODIAN_SIGNATURE_MALFORMED")
     if len(sig) != 64 or base64.urlsafe_b64encode(sig).decode("ascii").rstrip("=") != signature:
         _deny("C3E_CUSTODIAN_SIGNATURE_NONCANONICAL")
     return sig
@@ -138,10 +148,13 @@ def _verified(request, response, test_public_key):
         _deny("C3E_CUSTODIAN_EXACT_TEST_PUBLIC_KEY_REQUIRED")
     body = {k:v for k,v in response.items() if k != "signatureB64url"}
     signed = b"POSTAPOLLO_C3E_CUSTODIAN_CANDIDATE_CI_V1\x00" + _canonical(body)
+    invalid_signature = False
     try:
         Ed25519PublicKey.from_public_bytes(test_public_key).verify(signature, signed)
-    except (InvalidSignature, ValueError) as exc:
-        raise Refused("C3E_CUSTODIAN_BAD_TEST_SIGNATURE") from exc
+    except (InvalidSignature, ValueError):
+        invalid_signature = True
+    if invalid_signature:
+        _deny("C3E_CUSTODIAN_BAD_TEST_SIGNATURE")
     return body
 
 

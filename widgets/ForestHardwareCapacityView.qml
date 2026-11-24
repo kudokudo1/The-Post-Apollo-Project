@@ -429,6 +429,9 @@ Item {
                     }
                 }
             }
+            ForestGroupObservationView {
+                width: parent.width
+            }
             ForestResourceFitExample {
                 width: parent.width
             }

@@ -12,6 +12,9 @@ on:
       - 'scripts/forest/model_form_routing_i1.py'
       - 'widgets/ForestBenchmarkReportView.qml'
       - 'widgets/ForestResourceFitExample.qml'
+      - 'widgets/ForestGroupObservationView.qml'
+      - 'widgets/ForestHardwareCapacityView.qml'
+      - 'scripts/forest/cgroup_observation_i5.py'
       - 'widgets/ForestWorkshopReferenceView.qml'
       - 'scripts/forest/ui_workshop_reference.py'
       - 'scripts/forest/capability_registry_b6r2.py'
@@ -41,6 +44,9 @@ on:
       - 'scripts/forest/model_form_routing_i1.py'
       - 'widgets/ForestBenchmarkReportView.qml'
       - 'widgets/ForestResourceFitExample.qml'
+      - 'widgets/ForestGroupObservationView.qml'
+      - 'widgets/ForestHardwareCapacityView.qml'
+      - 'scripts/forest/cgroup_observation_i5.py'
       - 'widgets/ForestWorkshopReferenceView.qml'
       - 'scripts/forest/ui_workshop_reference.py'
       - 'scripts/forest/capability_registry_b6r2.py'
@@ -83,4 +89,5 @@ jobs:
           python3 tests/forest/test_forest_binding_preview_i2.py
           python3 tests/forest/test_forest_benchmark_report_view.py
           python3 tests/forest/test_forest_resource_fit_example.py
+          python3 tests/forest/test_forest_group_observation_i5.py
           python3 tests/forest/test_forest_workshop_reference.py

@@ -91,3 +91,7 @@ Suggested requirements for the **future installed host**, not implemented:
 ## DECISIONS
 
 This candidate is NOT permission issuance. Neither streaming nor COMMIT is enabled, V1 stays unchanged, and Forest production remains HOLD. Owner decision and Nurse 2 independent review precede any merger or live connection.
+
+### DELTA input-boundary correction
+
+The existing drop-only sink now requires the exact three-field plain dictionary, checks cardinality and plain string keys before set equality, and checks the exact string type of the event tag before comparison. This prevents the tested custom Python key/tag equality methods from running on malformed inputs. Two regression methods extend the current candidate suite from 30 to 32 tests; the existing UTF-8 cap, fixed refusal codes, zero-byte result, no permission and no model/runtime integration remain unchanged. This is a narrow input safety correction, not an in-process sandbox, actual egress fence, streaming permission or policy acceptance.

@@ -80,6 +80,13 @@ ShellRoot {
             const scroll = smoke.find(view,"systemMonitorContributorScroll");
             if (!fixed || !actions || !scroll || scroll.contentHeight <= 0) return;
             if (smoke.phase === 0) {
+                const combined = smoke.find(view, "systemMonitorCombinedMemory");
+                const available = smoke.find(view, "systemMonitorAvailableMemory");
+                const used = smoke.find(view, "systemMonitorUsedMemory");
+                if (!smoke.check(combined && combined.visible && available && used
+                    && available.text === "AVAILABLE 10 GiB" && used.text === "22 GiB / 32 GiB"
+                    && available.x < used.x && used.x + used.width <= combined.width + 1,
+                    "combined available-first memory row")) return;
                 if (!smoke.check(scroll.height > 50 && scroll.contentHeight > scroll.height && scroll.interactive,
                     "contributor viewport " + scroll.height + "/" + scroll.contentHeight)) return;
                 smoke.fixedY = fixed.mapToItem(view,0,0).y;
@@ -107,6 +114,7 @@ ShellRoot {
                 smoke.phase++;
                 return;
             }
+            if (!smoke.check(!smoke.find(view, "systemMonitorCombinedMemory").visible, "legacy memory layout changed")) return;
             if (!smoke.check(!scroll.interactive && Math.abs(scroll.height-scroll.contentHeight)<1,
                 "legacy full-height flow")) return;
             console.log("SYSTEM_PIN_NATIVE_PASS");

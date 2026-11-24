@@ -60,3 +60,7 @@ Nurse 2 independently reviews the exact source head and raw logs, then the opera
 ## DECISIONS
 
 A test-key signature can be valid while the entire operation remains untrusted. This milestone advances **cryptographic field binding** in DOC 1's lane without choosing, installing, or activating a real protected custodian. No production Sign-In.
+
+## Follow-up // Exact primitive validation and immutable denial defaults
+
+Existing candidate input paths now check plain dictionary cardinality and key types before set comparison, and primitive scalar types before any caller-controlled equality. Candidate and wire modules expose read-only denial mappings; each returned diagnostic remains a fresh dictionary. Fixed base64/signature refusals are raised outside nested handlers. This is defense against unintended callback execution and accidental mapping mutation in the existing disposable CI API, not a sandbox for arbitrary same-interpreter code, concurrency guarantees, traceback-local erasure, or evidence of a production incident. Three candidate and one real-wire regression methods are added. The wire CI now explicitly triggers on candidate source/test changes; expected 33 candidate +203 inherited, 36 wire +236 inherited (overlap, not additive). No schema, signing bytes, existing receiver timeout/FD cleanup, protected admission or production permissions change. NAS and second PC remain deferred. Independent exact-head review and CI required.

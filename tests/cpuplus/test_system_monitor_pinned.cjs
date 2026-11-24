@@ -19,4 +19,7 @@ assert.match(scrollBlock, /visible: !\(cpuPlusWindow.selectedModeIndex === 6/);
 assert.match(scrollBlock, /&& cpuPlusWindow.selectedModeIndex !== 3/);
 for (const sub of ["TIME", "CONNECTIONS", "LOCATION"]) assert.ok(scrollBlock.includes('settingsSubMode === "' + sub + '"'));
 assert.match(cpu, /height: visible \? \(showingSystem \? 74 : 122\) : 0/);
+assert.match(view, /compactMemoryReading: pinnedInstrument && categoryName === "MEMORY"/);
+assert.match(view, /id: combinedMemory[\s\S]*?id: availableMemory[\s\S]*?safeComponent.detail[\s\S]*?id: memoryDivider[\s\S]*?text: " \/\/ "[\s\S]*?id: usedMemory[\s\S]*?safeComponent.secondary/);
+assert.equal((view.match(/visible: !systemMonitorBody.compactMemoryReading/g)||[]).length,2);
 console.log("CPU++ fixed system instruments / contributor scroll source PASS");

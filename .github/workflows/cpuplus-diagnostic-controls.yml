@@ -6,6 +6,8 @@ on:
       - "widgets/cpuplus/CpuPlusDiagnosticsPane.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
       - "tests/cpuplus/test_diagnostic_controls.cjs"
+      - "scripts/cpuplus_process_census.py"
+      - "tests/cpuplus/test_process_census.py"
       - "tests/cpuplus/test_diagnostic_continuity_native.py"
       - "tests/cpuplus/fixtures/DiagnosticContinuityNative.qml"
       - "shell.qml"
@@ -19,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node tests/cpuplus/test_diagnostic_controls.cjs
+      - run: python3 -B tests/cpuplus/test_process_census.py
   native-continuity:
     runs-on: ubuntu-latest
     timeout-minutes: 12

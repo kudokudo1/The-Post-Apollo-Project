@@ -365,5 +365,51 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
             self.block(text="\u00e9" * (D.MAX_CANDIDATE_BYTES // 2 + 1))
 
 
+
+    def test_31_event_key_count_and_types_checked_before_equality(self):
+        class HostileKey(str):
+            armed = False
+            __hash__ = str.__hash__
+
+            def __eq__(self, other):
+                if self.armed:
+                    raise AssertionError("unexpected key comparison")
+                return super().__eq__(other)
+
+        key = HostileKey("event")
+        event = {key: "DELTA", "text": SECRET, "provisional": True}
+        key.armed = True
+        oversized = {"event": "DELTA", "text": SECRET, "provisional": True}
+        oversized.update({f"extra{i}": None for i in range(2048)})
+        for bad in (event, oversized):
+            with self.assertRaisesRegex(
+                D.DisclosureHold, "ONLY_UNTRUSTED_PROVISIONAL_DELTA_IS_INSPECTABLE"
+            ) as caught:
+                D.block_provisional_delta(
+                    self.wire(), self.commit_wire, bad, now_ms=1000)
+            self.assertNotIn(SECRET, str(caught.exception))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+
+    def test_32_event_tag_rejects_custom_comparison_without_execution(self):
+        class HostileTag(str):
+            def __eq__(self, other):
+                raise AssertionError("unexpected event tag equality")
+
+            def __ne__(self, other):
+                raise AssertionError("unexpected event tag inequality")
+
+        for tag in (HostileTag("DELTA"), 1, None):
+            with self.subTest(kind=type(tag).__name__):
+                with self.assertRaisesRegex(
+                    D.DisclosureHold, "ONLY_UNTRUSTED_PROVISIONAL_DELTA_IS_INSPECTABLE"
+                ):
+                    D.block_provisional_delta(
+                        self.wire(), self.commit_wire,
+                        {"event": tag, "text": SECRET, "provisional": True},
+                        now_ms=1000)
+        self.no_grant(self.block())
+
+
 if __name__ == "__main__":
     unittest.main()

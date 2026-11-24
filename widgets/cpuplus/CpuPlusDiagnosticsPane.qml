@@ -7,7 +7,7 @@ Column {
     id: root
     objectName: "cpuplusDiagnosticControls"
     spacing: 6
-    property string selectedReport: "memory"
+    readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
     readonly property var report: CpuPlusDiagnostics.reports[selectedReport] || null
 
@@ -39,7 +39,6 @@ Column {
             available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.faulted
             onLeftClicked: {
                 if (CpuPlusDiagnostics.request(modelData.kind)) {
-                    root.selectedReport = modelData.kind;
                     root.showReport = false;
                 }
             }
@@ -73,7 +72,7 @@ Column {
                 labelPixelSize: 9
                 selected: root.selectedReport === modelData
                 onLeftClicked: {
-                    root.selectedReport = modelData;
+                    CpuPlusDiagnostics.selectedReport = modelData;
                     root.showReport = false;
                 }
             }

@@ -1,9 +1,12 @@
-name: FinanceW Market M26-M42 historical range and pinned interval analysis
+name: FinanceW Market M26-M43 historical range and pinned interval analysis
 
 on:
   pull_request:
     paths:
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceStockDiscoveryPane.qml"
+      - "widgets/FinanceGlobalPricePane.qml"
+      - "widgets/FinanceAlphaVantageFreePane.qml"
       - "widgets/FinanceStockRangeAnalysisPolicy.js"
       - "tests/finance/test_market_m26_range_analysis.mjs"
       - "tests/finance/test_market_m28_moving_averages.mjs"
@@ -21,6 +24,7 @@ on:
       - "tests/finance/test_market_m40_relative_gap.mjs"
       - "tests/finance/test_market_m41_research_views.mjs"
       - "tests/finance/test_market_m42_compact_navigation.mjs"
+      - "tests/finance/test_market_m43_global_handoff.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
@@ -36,6 +40,9 @@ on:
     branches: [main]
     paths:
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceStockDiscoveryPane.qml"
+      - "widgets/FinanceGlobalPricePane.qml"
+      - "widgets/FinanceAlphaVantageFreePane.qml"
       - "widgets/FinanceStockRangeAnalysisPolicy.js"
       - "tests/finance/test_market_m26_range_analysis.mjs"
       - "tests/finance/test_market_m28_moving_averages.mjs"
@@ -53,6 +60,7 @@ on:
       - "tests/finance/test_market_m40_relative_gap.mjs"
       - "tests/finance/test_market_m41_research_views.mjs"
       - "tests/finance/test_market_m42_compact_navigation.mjs"
+      - "tests/finance/test_market_m43_global_handoff.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
@@ -81,5 +89,5 @@ jobs:
           node-version: "22"
       - name: Pure Market M26-M27 range movement/selected compare and malformed data
         run: node tests/finance/test_market_m26_range_analysis.mjs
-      - name: Existing M10-M42 Market price-range regression chain
+      - name: Existing M10-M43 Market price-range regression chain
         run: node tests/finance/test_market_price_range.mjs

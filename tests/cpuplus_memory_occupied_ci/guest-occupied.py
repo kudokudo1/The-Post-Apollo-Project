@@ -5,6 +5,8 @@ import importlib.util
 import json
 import mmap
 import os
+import platform
+import sys
 from pathlib import Path
 import re
 import stat
@@ -36,6 +38,18 @@ def load_guard():
     require(module.protected_bytes(MARKER).strip() ==
             b"DISPOSABLE_CPU_MEMORY_OCCUPIED_V1", "occupied fixture marker absent")
     return module
+
+def pageout_advice(*, platform_name, machine, exported, supports_madvise):
+    # Linux x86-64 UAPI asm-generic/mman-common.h defines MADV_PAGEOUT
+    # as 21. CPython may omit the named constant at build time while still
+    # accepting that integer through mmap.madvise(). Never substitute
+    # MADV_DONTNEED (which would discard pages instead of testing swap).
+    require(platform_name == "linux" and machine == "x86_64",
+            "unsupported MADV_PAGEOUT ABI")
+    require(supports_madvise, "Python mmap.madvise unavailable")
+    require(exported is None or type(exported) is int and exported == 21,
+            "unexpected MADV_PAGEOUT constant")
+    return 21
 
 def memory_available():
     fields = {}
@@ -122,7 +136,10 @@ def run():
     require(re.search(r"\bTotal devices\s+1\b",
                       guard.command("/usr/bin/btrfs", "filesystem", "show", "--raw", mount)),
             "single-device Btrfs required")
-    require(hasattr(mmap, "MADV_PAGEOUT"), "Python MADV_PAGEOUT unavailable")
+    advice = pageout_advice(platform_name=sys.platform, machine=platform.machine(),
+                            exported=getattr(mmap, "MADV_PAGEOUT", None),
+                            supports_madvise=callable(getattr(mmap.mmap, "madvise", None)))
+    stage("LINUX_PAGEOUT_ADVICE=" + str(advice))
     require(memory_available() >= 4 * GIB + WORKLOAD, "insufficient fixture RAM")
     os.umask(0o077)
     create_fixture_swap(guard, guard.EXTRA, 9)
@@ -140,7 +157,7 @@ def run():
             region[offset] = 1
         for attempt in range(4):
             require(memory_available() >= 4 * GIB, "fixture RAM floor breached")
-            region.madvise(mmap.MADV_PAGEOUT)
+            region.madvise(advice)
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 observed = guard.rows()

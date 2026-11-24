@@ -52,3 +52,32 @@ function capacityPlan(sample, targetGiB) {
         direction: unchanged || (!row && !extra && !targetGiB) ? "unchanged"
             : targetKiB > actualKiB ? (row || extra ? "expand" : "add") : "reduce"};
 }
+
+// Same kernel rows as the capacity control. Never assign projected bytes to
+// live usage. Unmanaged swap remains visible, rather than being mislabeled.
+function swapComposition(sample) {
+    if (!sample || !Array.isArray(sample.rows)) return null;
+    const groups = [
+        {id:"zram", label:"ZRAM", size:0, used:0},
+        {id:"base", label:"BASE NVMe", size:0, used:0},
+        {id:"extension", label:"EXTENSION", size:0, used:0},
+        {id:"other", label:"OTHER SWAP", size:0, used:0}
+    ];
+    const names = [];
+    for (const row of sample.rows) {
+        if (names.indexOf(row.name) !== -1 || !Number.isSafeInteger(row.size)
+                || !Number.isSafeInteger(row.used) || row.size <= 0
+                || row.used < 0 || row.used > row.size) return null;
+        names.push(row.name);
+        const i = /^\/dev\/zram\d+$/.test(row.name) ? 0
+            : row.name === "/var/lib/post-apollo-memory-swap/swapfile" ? 1
+            : row.name === "/var/lib/post-apollo-memory-extension/swapfile" ? 2 : 3;
+        groups[i].size += row.size;
+        groups[i].used += row.used;
+    }
+    const total = groups.reduce((n,g)=>n+g.size,0);
+    const used = groups.reduce((n,g)=>n+g.used,0);
+    if (!Number.isSafeInteger(total) || !Number.isSafeInteger(used)) return null;
+    return {groups:groups, total:total, used:used,
+        capacityMatches:total === sample.swap};
+}

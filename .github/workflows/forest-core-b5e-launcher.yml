@@ -1,0 +1,52 @@
+name: Forest Core B5e Installed Launcher CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/disposable_launcher_b5e.py'
+      - 'scripts/forest/LAUNCHER_B5E.md'
+      - 'scripts/forest/native_host_candidate_b5b.py'
+      - 'tests/forest/native_ci/**'
+      - '.github/workflows/forest-core-b5e-launcher.yml'
+permissions:
+  contents: read
+jobs:
+  installed-launcher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build original B5c package
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum scripts/forest/native_host_candidate_b5b.py | cut -d ' ' -f1)"
+          mkdir "$RUNNER_TEMP/forest-b5e"
+          printf '%s\n' "$expected" > "$RUNNER_TEMP/forest-b5e.sha"
+          docker run --rm -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+            -v "$PWD:/source:ro" -v "$RUNNER_TEMP/forest-b5e:/out" \
+            fedora:44 bash /source/tests/forest/native_ci/build_forest_host_ci.sh
+      - name: Verify installed host launcher and descriptor inheritance
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(cat "$RUNNER_TEMP/forest-b5e.sha")"
+          docker run --rm -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+            -v "$RUNNER_TEMP/forest-b5e:/input:ro" \
+            -v "$PWD/tests/forest/native_ci:/tests:ro" \
+            -v "$PWD/scripts/forest/disposable_launcher_b5e.py:/launcher/disposable_launcher_b5e.py:ro" \
+            fedora:44 bash /tests/verify_forest_launcher_b5e.sh
+  inherited:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: B5b native socket
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_native_host_candidate_b5b.py' -v
+      - name: B5a storage
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_boundary_fixture_b5a.py' -v
+      - name: Compile
+        run: python3 -m py_compile scripts/forest/disposable_launcher_b5e.py tests/forest/native_ci/test_disposable_launcher_b5e.py

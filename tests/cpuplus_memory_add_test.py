@@ -638,8 +638,50 @@ class CycleArchiveTests(unittest.TestCase):
             self.assertIn(m.ARCHIVE_PENDING,storage)
             self.assertNotIn(paths[0],storage)
             self.assertEqual(events[:3],[("write",destination),("fsync",destination),("write",m.ARCHIVE_PENDING)])
+            self.assertEqual(events[3:5],[("fsync",m.ARCHIVE_PENDING),("unlink",paths[0])])
+            resume_start = len(events)
             m.archive_cycle_authorized()
+            self.assertEqual(events[resume_start:resume_start+3],
+                             [("fsync",destination),("fsync",m.ARCHIVE_PENDING),("unlink",paths[1])])
             self.assertEqual(storage,{destination:bundle})
+            run.assert_not_called()
+
+    def test_resume_pending_sync_failure_never_retires_records(self):
+        identity,records,before,after = self.fixture()
+        bundle = m.cycle_archive_plan(records,identity,before)
+        paths = m.cycle_paths()
+        destination = m.archive_path(bundle["digest"])
+        pending = {"version":1,"state":"ARCHIVE_PENDING","digest":bundle["digest"]}
+        storage = dict(zip(paths[1:],records[1:]))
+        storage[destination] = bundle
+        storage[m.ARCHIVE_PENDING] = pending
+        original = dict(storage)
+        events = []
+        def sync(path):
+            events.append(path)
+            if path == m.ARCHIVE_PENDING:
+                raise OSError("pending durability unavailable")
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"read_reduction_snapshot",return_value=before),patch.object(m,"read_protected_record",side_effect=lambda path,**kwargs:storage.get(path)),patch.object(m,"archive_directory"),patch.object(m,"sync_archive",side_effect=sync),patch.object(Path,"unlink") as unlink,patch.object(m,"run") as run:
+            with self.assertRaisesRegex(m.ReductionRecovery,"ARCHIVE_RECONCILIATION_REQUIRED"):
+                m.archive_cycle_authorized()
+            self.assertEqual(events,[destination,m.ARCHIVE_PENDING])
+            self.assertEqual(storage,original)
+            unlink.assert_not_called()
+            run.assert_not_called()
+
+    def test_pending_change_after_sync_refuses_retirement(self):
+        identity,records,before,after = self.fixture()
+        bundle = m.cycle_archive_plan(records,identity,before)
+        storage = dict(zip(m.cycle_paths(),records))
+        storage[m.archive_path(bundle["digest"])] = bundle
+        storage[m.ARCHIVE_PENDING] = {"version":1,"state":"ARCHIVE_PENDING","digest":bundle["digest"]}
+        def sync(path):
+            if path == m.ARCHIVE_PENDING:
+                storage[path] = {"version":1,"state":"ARCHIVE_PENDING","digest":"a"*64}
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"read_reduction_snapshot",return_value=before),patch.object(m,"read_protected_record",side_effect=lambda path,**kwargs:storage.get(path)),patch.object(m,"archive_directory"),patch.object(m,"sync_archive",side_effect=sync),patch.object(Path,"unlink") as unlink,patch.object(m,"run") as run:
+            with self.assertRaises(m.ReductionRecovery):
+                m.archive_cycle_authorized()
+            unlink.assert_not_called()
             run.assert_not_called()
 
     def test_resume_refuses_mismatched_remaining_record(self):

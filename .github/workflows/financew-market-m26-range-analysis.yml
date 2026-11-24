@@ -1,4 +1,4 @@
-name: FinanceW Market M26-M34 historical range and pinned interval analysis
+name: FinanceW Market M26-M35 historical range and pinned interval analysis
 
 on:
   pull_request:
@@ -13,6 +13,7 @@ on:
       - "tests/finance/test_market_m32_interval_compare.mjs"
       - "tests/finance/test_market_m33_observed_step.mjs"
       - "tests/finance/test_market_m34_normalized_chart.mjs"
+      - "tests/finance/test_market_m35_normalized_step.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
@@ -22,6 +23,7 @@ on:
       - "scripts/finance/MARKET_M31_PINNED_INTERVAL_README.md"
       - "scripts/finance/MARKET_M33_OBSERVED_STEP_README.md"
       - "scripts/finance/MARKET_M34_NORMALIZED_CHART_README.md"
+      - "scripts/finance/MARKET_M35_NORMALIZED_STEP_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   push:
     branches: [main]
@@ -36,6 +38,7 @@ on:
       - "tests/finance/test_market_m32_interval_compare.mjs"
       - "tests/finance/test_market_m33_observed_step.mjs"
       - "tests/finance/test_market_m34_normalized_chart.mjs"
+      - "tests/finance/test_market_m35_normalized_step.mjs"
       - "tests/finance/test_market_price_range.mjs"
       - "scripts/finance/MARKET_M26_RANGE_ANALYSIS_README.md"
       - "scripts/finance/MARKET_M27_SELECTED_CLOSE_COMPARISON_README.md"
@@ -45,6 +48,7 @@ on:
       - "scripts/finance/MARKET_M31_PINNED_INTERVAL_README.md"
       - "scripts/finance/MARKET_M33_OBSERVED_STEP_README.md"
       - "scripts/finance/MARKET_M34_NORMALIZED_CHART_README.md"
+      - "scripts/finance/MARKET_M35_NORMALIZED_STEP_README.md"
       - ".github/workflows/financew-market-m26-range-analysis.yml"
   workflow_dispatch:
 
@@ -63,5 +67,5 @@ jobs:
           node-version: "22"
       - name: Pure Market M26-M27 range movement/selected compare and malformed data
         run: node tests/finance/test_market_m26_range_analysis.mjs
-      - name: Existing M10-M34 Market price-range regression chain
+      - name: Existing M10-M35 Market price-range regression chain
         run: node tests/finance/test_market_price_range.mjs

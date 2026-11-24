@@ -417,6 +417,13 @@ Item {
                     wrapMode: Text.Wrap
                 }
             }
+            Loader {
+                width: parent.width
+                height: active && item ? item.implicitHeight : 0
+                active: root.page === "DIAG"
+                visible: active
+                sourceComponent: CpuPlusDiagnosticsPane {}
+            }
             Column {
                 width: parent.width
                 spacing: 6
@@ -540,10 +547,9 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: root.page !== "CAP" && root.page !== "POL"
+                visible: root.page !== "CAP" && root.page !== "POL" && root.page !== "DIAG"
                 text: root.page === "PROC" ? "PROCESS CONTROLS // NOT CONNECTED"
                     : root.page === "AUTO" ? "DEFERRED REQUESTS // NOT CONNECTED"
-                    : root.page === "DIAG" ? "LIVE SNAPSHOT // EXTENDED DIAGNOSTICS NOT CONNECTED"
                     : "PROFILE CONTROLS // NOT CONNECTED"
                 color: Colors.orange
                 font.pixelSize: 11

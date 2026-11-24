@@ -123,8 +123,9 @@ def observe(*, pid, host_fd, host_inode, renderer_pid, renderer_inode,
             raise Refused("C4B_FOREST_ORIGINAL_CHANNEL_NOT_PINNED_HOLD")
     except Refused:
         raise
-    except (OSError, ValueError, IndexError, StopIteration):
-        raise Refused("C4B_FOREST_KERNEL_EVIDENCE_UNAVAILABLE_HOLD") from None
+    except (OSError, ValueError, IndexError, StopIteration) as error:
+        # CI-only diagnostics: retain the real kernel refusal as exception cause.
+        raise Refused("C4B_FOREST_KERNEL_EVIDENCE_UNAVAILABLE_HOLD") from error
     return {
         "status": "ACTUAL_CI_HOST_PROCESS_OBSERVED_NOT_ENROLLED_HOLD",
         "ciOnlyActualInstalledSourceBytesMatch": True,

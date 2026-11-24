@@ -131,6 +131,8 @@ class ForestSelectedPreflightP2CTests(unittest.TestCase):
                 resident_vram_bytes_reported:null,
                 runtime_requirement_calibrated:false
             };
+            unloaded.installed_models=[];
+            unloaded.installed_model_count=0;
             unloaded.resident_models=[];
             unloaded.resident_model_count=0;
             const absent=p.parseSnapshot(JSON.stringify(unloaded),model);
@@ -142,6 +144,8 @@ class ForestSelectedPreflightP2CTests(unittest.TestCase):
             assert.strictEqual(absent.data.model.vramMiB,"?");
             const partial=payload();
             partial.selected_model.resident_vram_bytes_reported=null;
+            // P2C's selected summary comes from this SAME residency record.
+            partial.resident_models[0].vram_bytes_reported=null;
             const unknown=p.parseSnapshot(JSON.stringify(partial),model);
             assert.strictEqual(unknown.valid,true);
             assert.strictEqual(unknown.data.model.vramMiB,"?");

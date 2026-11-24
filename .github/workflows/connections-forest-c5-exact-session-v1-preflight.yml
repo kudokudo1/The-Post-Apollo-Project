@@ -68,7 +68,7 @@ jobs:
               assert 'ForestC5ExactSessionV1Preflight' not in Path(path).read_text()
           print('FOREST_C5_V1_ONLY_FIXTURE_CONSISTENCY // NO_NATIVE_AUTHORITY_OR_SETTLEMENT')
           PY
-      - name: Twenty new V1 exact-session negative and signed role tests
+      - name: Twenty-four V1 exact-session and input-hardening tests
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

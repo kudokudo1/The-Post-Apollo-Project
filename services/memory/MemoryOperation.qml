@@ -35,10 +35,11 @@ Scope {
         gotExit = false;
         exitOk = false;
         output = "";
-        waiting = true;
+        TimeSettings.externalSystemAuthBusy = true;
         busy = true;
-        feedback = "WAITING FOR SYSTEM AUTHORIZATION AGENT";
-        agentTimeout.restart();
+        waiting = true;
+        if (waiting) feedback = "WAITING FOR SYSTEM AUTHORIZATION AGENT";
+        if (waiting) agentTimeout.restart();
     }
     function agentReady() {
         if (!busy || !waiting || operation.running) return;
@@ -60,6 +61,7 @@ Scope {
         agentTimeout.stop();
         waiting = false;
         busy = false;
+        TimeSettings.externalSystemAuthBusy = false;
         feedback = message;
     }
     function finish() {
@@ -78,6 +80,7 @@ Scope {
             ? "VERIFIED ACTIVE // REFRESHING KERNEL SWAP"
             : "NOT VERIFIED // CHECK HOST AND KERNEL SWAP; NO AUTO RETRY";
         busy = false;
+        TimeSettings.externalSystemAuthBusy = false;
         revision++;
     }
     Timer {

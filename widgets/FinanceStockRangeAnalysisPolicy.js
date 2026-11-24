@@ -279,3 +279,23 @@ function summarizePinnedInterval(snapshot, firstIndex, secondIndex) {
         readOnly:true,noProviderCalls:true
     };
 }
+
+// M32: compare two inclusive historical segments in the same loaded RANGE.
+// Both segment returns are chronological, irrespective of selection direction.
+function compareHistoricalIntervals(snapshot, a, b, c, d) {
+    const first = summarizePinnedInterval(snapshot, a, b);
+    const second = summarizePinnedInterval(snapshot, c, d);
+    if (!first || !second || a === b || c === d) return null;
+    const r1 = (first.to.price / first.from.price - 1) * 100;
+    const r2 = (second.to.price / second.from.price - 1) * 100;
+    const gap = r2 - r1;
+    if (![r1, r2, gap].every(Number.isFinite)) return null;
+    return {
+        first:first, second:second,
+        firstReturnPct:roundPct(r1), secondReturnPct:roundPct(r2),
+        returnGapPoints:roundPct(gap),
+        overlaps:Math.max(Math.min(a,b),Math.min(c,d))
+            <= Math.min(Math.max(a,b),Math.max(c,d)),
+        readOnly:true,noProviderCalls:true
+    };
+}

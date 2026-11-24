@@ -256,5 +256,36 @@ class ForestC5WriterTerminalReceiptTests(unittest.TestCase):
         self.assertNotIn("commit_response", dir(R))
 
 
+
+    def test_17_denial_constants_and_result_isolation(self):
+        for key in R.RECEIPT_NO_AUTHORITY:
+            with self.assertRaises(TypeError):
+                R.RECEIPT_NO_AUTHORITY[key] = True
+        result = self.check()
+        result["terminalOutcomeAuthenticated"] = True
+        result["safeActions"].append("SETTLE")
+        fresh = self.check()
+        self.assertFalse(fresh["terminalOutcomeAuthenticated"])
+        self.assertEqual(fresh["safeActions"], [])
+
+    def test_18_terminal_refusals_do_not_chain(self):
+        wire, sig = self.signed()
+        for malformed, reason in (
+            (b'{"private":"SYNTHETIC_PRIVATE', "INVALID_JSON"),
+            (b'{"private":"SYNTHETIC_PRIVATE\xff"}', "INVALID_JSON"),
+            (b'{"schema":"a","schema":"b"}', "DUPLICATE_JSON_KEY"),
+        ):
+            with self.assertRaises(R.ReceiptHold) as caught:
+                self.check(malformed, sig)
+            self.assertIn(reason, str(caught.exception))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+        with self.assertRaises(R.ReceiptHold) as caught:
+            self.check(wire, bytes([sig[0] ^ 1]) + sig[1:])
+        self.assertIn("INVALID_SIGNATURE", str(caught.exception))
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+
+
 if __name__ == "__main__":
     unittest.main()

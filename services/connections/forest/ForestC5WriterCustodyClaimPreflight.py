@@ -10,6 +10,7 @@ issuer is present. NEVER use this result as a settlement/authorization decision.
 from __future__ import annotations
 
 import hashlib
+from types import MappingProxyType
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -35,14 +36,14 @@ CUSTODY_FIELDS = frozenset((
 ))
 
 # No untrusted caller can elevate these outputs by fabricating more signatures.
-NO_AUTHORITY = {
+NO_AUTHORITY = MappingProxyType({
     **R.RECEIPT_NO_AUTHORITY,
     "writerEnrollmentIndependentlyAuthenticated": False,
     "journalCustodianIndependentlyAuthenticated": False,
     "nativeWriterPeerAndSeatVerified": False,
     "historicalWriterKeyRevocationChecked": False,
     "custodyAntirollbackVerified": False,
-}
+})
 
 
 class CustodyHold(ValueError):
@@ -68,10 +69,11 @@ def _public(public: object, signature: object, label: str) -> str:
 def _signature(public: bytes, signature: bytes, wire: bytes, label: str) -> None:
     try:
         Ed25519PublicKey.from_public_bytes(public).verify(signature, wire)
-    except (InvalidSignature, ValueError) as exc:
-        raise CustodyHold(
-            "FOREST_C5_WRITER_CUSTODY_HOLD // " + label + "_INVALID_SIGNATURE"
-        ) from exc
+    except (InvalidSignature, ValueError):
+        pass
+    else:
+        return
+    _hold(label + "_INVALID_SIGNATURE")
 
 
 def verify_unenrolled_custody_claims(
@@ -87,6 +89,9 @@ def verify_unenrolled_custody_claims(
     Receipt arrival after the original consent expires is valid for *inspection*
     only. No result here can settle UNKNOWN_HOLD.
     """
+    # Reject invalid original intent bytes before hashing or verification.
+    if type(intent_wire) is not bytes or not 0 < len(intent_wire) <= S.MAX_WIRE:
+        _hold("INTENT_WIRE_BOUNDS")
     try:
         enrollment = S._parse_exact(enrollment_wire, ENROLLMENT_FIELDS)
         custody = S._parse_exact(custody_wire, CUSTODY_FIELDS)
@@ -163,7 +168,11 @@ def verify_unenrolled_custody_claims(
             expected_minimum_journal_counter=claimed_counter_floor,
         )
     except (S.EvidenceHold, R.ReceiptHold) as exc:
-        raise CustodyHold("FOREST_C5_WRITER_CUSTODY_HOLD // " + str(exc)) from exc
+        refusal = str(exc)
+    else:
+        refusal = None
+    if refusal is not None:
+        _hold(refusal)
 
     return {
         "schema": "postapollo.forest.unenrolled-custody-consistency.v0",

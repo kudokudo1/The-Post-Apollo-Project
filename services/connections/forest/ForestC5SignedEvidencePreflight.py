@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from types import MappingProxyType
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -40,7 +41,7 @@ RECORD_FIELDS = frozenset((
     "schema", "audience", "role", "decision", "intentSha256",
     "signerKeySha256", "consentEpoch", "challenge",
 ))
-NO_AUTHORITY = {
+NO_AUTHORITY = MappingProxyType({
     "installedRequesterVerified": False,
     "installedCommitHostVerified": False,
     "activeOperatorSeatVerified": False,
@@ -52,7 +53,7 @@ NO_AUTHORITY = {
     "forestReadSessionAllowed": False,
     "forestToolExecutionAllowed": False,
     "productionAuthority": False,
-}
+})
 
 
 class EvidenceHold(ValueError):
@@ -80,8 +81,10 @@ def canonical_bytes(value: object) -> bytes:
             value, ensure_ascii=True, allow_nan=False, sort_keys=True,
             separators=(",", ":"),
         ).encode("ascii")
-    except (TypeError, ValueError, UnicodeError, OverflowError) as exc:
-        raise EvidenceHold("FOREST_B4C_EVIDENCE_HOLD // INVALID_CANONICAL_JSON") from exc
+    except (TypeError, ValueError, UnicodeError, OverflowError, RecursionError):
+        raw = None
+    if raw is None:
+        _hold("INVALID_CANONICAL_JSON")
     if not 0 < len(raw) <= MAX_WIRE:
         _hold("WIRE_BOUNDS")
     return raw
@@ -95,12 +98,16 @@ def _parse_exact(wire: object, expected_fields: frozenset[str]) -> dict:
             wire.decode("utf-8"), object_pairs_hook=_pairs_unique,
             parse_constant=lambda _: _hold("JSON_CONSTANT_REFUSED"),
         )
-    except EvidenceHold:
-        # Duplicate-field/constant refusal is already a specific fail-closed
-        # result. Do not mask it as generic malformed JSON.
-        raise
-    except (ValueError, UnicodeError, RecursionError) as exc:
-        raise EvidenceHold("FOREST_B4C_EVIDENCE_HOLD // INVALID_JSON") from exc
+    except EvidenceHold as exc:
+        # Preserve fixed duplicate-field and constant refusal codes, not the
+        # original hook exception or its underlying rejected data.
+        refusal = str(exc)
+    except (ValueError, UnicodeError, RecursionError):
+        refusal = "FOREST_B4C_EVIDENCE_HOLD // INVALID_JSON"
+    else:
+        refusal = None
+    if refusal is not None:
+        raise EvidenceHold(refusal)
     if type(value) is not dict or set(value) != expected_fields:
         _hold("EXACT_FIELDS_REQUIRED")
     if canonical_bytes(value) != wire:
@@ -197,9 +204,12 @@ def verify_unenrolled_role_consistency(
             requester_signature, requester_record)
         Ed25519PublicKey.from_public_bytes(reviewer_public).verify(
             reviewer_signature, reviewer_record)
-    except (InvalidSignature, ValueError) as exc:
-        raise EvidenceHold(
-            "FOREST_B4C_EVIDENCE_HOLD // SIGNATURE_INVALID") from exc
+    except (InvalidSignature, ValueError):
+        signature_valid = False
+    else:
+        signature_valid = True
+    if not signature_valid:
+        _hold("SIGNATURE_INVALID")
     return {
         "schema": RESULT_SCHEMA,
         "status": "TWO_SIGNED_ROLES_MATCH_UNENROLLED_FIXTURE",

@@ -27,8 +27,7 @@ function checkDir(st,{privateLeaf=false}={}){
   const writable=(st.mode & 0o022)!==0;
   // Linux /tmp and /var/tmp: root-owned sticky directories protect named
   // entries from other users despite world-writable directory permissions.
-  const safeSticky=st.uid===0 && (st.mode & 0o1000)!==0
-    && (st.mode & 0o020)===0;
+  const safeSticky=st.uid===0 && (st.mode & 0o1000)!==0;
   if(writable && !safeSticky)refuse("untrusted-directory");
   if(privateLeaf && (st.uid!==uid || (st.mode & 0o077)!==0))
     refuse("untrusted-private-directory");

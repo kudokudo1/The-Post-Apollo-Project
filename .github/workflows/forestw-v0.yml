@@ -46,3 +46,4 @@ jobs:
           python3 tests/forest/test_forest_selected_model_preflight_p2c.py
           python3 tests/forest/test_forest_p2c_model_evidence_crosscheck.py
           python3 tests/forest/test_forest_observation_freshness.py
+          python3 tests/forest/test_forest_model_disk_comparison.py

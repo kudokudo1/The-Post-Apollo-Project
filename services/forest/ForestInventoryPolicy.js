@@ -140,3 +140,57 @@ function captureExitScan(state, code, exitStatus) {
     }
     return finishScan(s);
 }
+
+// Display-only comparison of provider-reported model artifact bytes from
+// the same successful B0 inventory. No free-space, deduplication, intelligence,
+// allocation, memory, or model-form inference is made from these numbers.
+function diskComparison(status, models) {
+    var unknown = { observed: false, largest: 0, sizes: Object.create(null) };
+    if (status !== "REACHABLE" || !Array.isArray(models)
+            || models.length > 256)
+        return unknown;
+    var sizes = Object.create(null);
+    var largest = 0;
+    for (var i = 0; i < models.length; i++) {
+        var entry = models[i];
+        if (!entry || typeof entry.name !== "string"
+                || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(entry.name)
+                || sizes[entry.name] !== undefined
+                || !Number.isSafeInteger(entry.size_bytes) || entry.size_bytes < 0)
+            return unknown;
+        sizes[entry.name] = entry.size_bytes;
+        largest = Math.max(largest, entry.size_bytes);
+    }
+    return { observed: true, largest: largest, sizes: sizes };
+}
+
+function artifactSizeLabel(bytes) {
+    if (!Number.isSafeInteger(bytes) || bytes < 0)
+        return "?";
+    if (bytes >= 1073741824)
+        return (bytes / 1073741824).toFixed(2) + " GiB";
+    if (bytes >= 1048576)
+        return (bytes / 1048576).toFixed(1) + " MiB";
+    if (bytes >= 1024)
+        return (bytes / 1024).toFixed(1) + " KiB";
+    return String(bytes) + " B";
+}
+
+function diskProfile(comparison, name) {
+    var unknown = { observed: false, label: "?", ratio: 0, comparable: false };
+    if (!comparison || comparison.observed !== true
+            || !comparison.sizes || typeof name !== "string"
+            || !Object.prototype.hasOwnProperty.call(comparison.sizes, name))
+        return unknown;
+    var bytes = comparison.sizes[name];
+    if (!Number.isSafeInteger(bytes) || bytes < 0
+            || !Number.isSafeInteger(comparison.largest)
+            || comparison.largest < bytes)
+        return unknown;
+    return {
+        observed: true,
+        label: artifactSizeLabel(bytes),
+        comparable: comparison.largest > 0,
+        ratio: comparison.largest > 0 ? bytes / comparison.largest : 0
+    };
+}

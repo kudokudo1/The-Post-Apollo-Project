@@ -5,6 +5,7 @@ import "../components"
 import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
+import "../services/forest/ForestInventoryPolicy.js" as InventoryPolicy
 
 // FOREST V0: self-contained visual workspace. No model, PX or Hospital calls.
 PanelWindow {
@@ -58,6 +59,10 @@ PanelWindow {
         }
         return "";
     }
+
+    // All relative disk bars use the same published B0 inventory.
+    readonly property var modelDiskComparison:
+        InventoryPolicy.diskComparison(localInventory.status, localInventory.models)
 
     // Last explicit P0 snapshot drives BOTH badge and popup rows.
     readonly property string selectedModelLoadState: ResidencyPolicy.modelState(
@@ -935,6 +940,8 @@ PanelWindow {
                     delegate: Rectangle {
                         id: modelEntry
                         property string modelName: String(modelData.name || "")
+                        readonly property var diskProfile:
+                            InventoryPolicy.diskProfile(root.modelDiskComparison, modelName)
                         width: modelList.width
                         height: 82
                         color: root.selectedLocalModel === modelName ? Colors.dark : Colors.black
@@ -1002,6 +1009,47 @@ PanelWindow {
                                 enabled: !localInventory.scanning && !modelResidency.scanning
                                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onClicked: root.scanModel(modelEntry.modelName)
+                            }
+                        }
+
+                        // Reported artifact size, normalized to the largest listed model.
+                        // This is not intelligence, unique disk consumption, or VRAM.
+                        GohuText {
+                            id: diskSizeLabel
+                            anchors.left: parent.left
+                            anchors.leftMargin: 7
+                            anchors.right: parent.right
+                            anchors.rightMargin: 7
+                            anchors.top: parent.top
+                            anchors.topMargin: 29
+                            height: 12
+                            text: "DISK REP // " + modelEntry.diskProfile.label
+                                + (modelEntry.diskProfile.comparable ? " / REL MAX" : "")
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                        }
+                        Rectangle {
+                            id: diskSizeTrack
+                            anchors.left: diskSizeLabel.left
+                            anchors.right: diskSizeLabel.right
+                            anchors.top: diskSizeLabel.bottom
+                            anchors.topMargin: 2
+                            height: 5
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
+                            Accessible.name: "Provider-reported artifact size relative to largest listed model, not intelligence"
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 1
+                                anchors.top: parent.top
+                                anchors.topMargin: 1
+                                height: Math.max(0, parent.height - 2)
+                                width: Math.max(0, parent.width - 2) * modelEntry.diskProfile.ratio
+                                visible: modelEntry.diskProfile.comparable
+                                color: Colors.cyan
                             }
                         }
 

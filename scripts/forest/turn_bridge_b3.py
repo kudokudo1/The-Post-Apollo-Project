@@ -21,6 +21,12 @@ from ollama_chat_transport import (
     MIN_CONTEXT, MAX_CONTEXT, MAX_OUTPUT_TOKENS,
 )
 from ollama_inventory import InventoryFailure, _target
+from context_first_tree_m2 import (
+    ContextRefusal, SessionContextRef, snapshot_in_transaction,
+)
+from capability_registry_b6r2 import SelectionPlan
+from runtime_stop_control_r2 import RuntimeStopControl, StopArbitrationRefusal
+from shared_context_b6r1 import ContractRefusal
 from local_terminal_outbox_b4f import (
     append_terminal_in_writer_transaction, require_local_outbox,
     OutboxRefusal,
@@ -137,7 +143,11 @@ class ForestTurnBridge:
             raise BridgeRefusal("ATTEMPT_SCHEMA_MISSING")
 
     def _reserve(self, owner: str, session_id: str, revision: int,
-                 model: str) -> tuple[str, list[dict[str, str]]]:
+                 model: str, *,
+                 context_ref: SessionContextRef | None = None,
+                 current_context_ref: SessionContextRef | None = None,
+                 capability_plan: SelectionPlan | None = None,
+                 ) -> tuple[str, list[dict[str, str]]]:
         if type(revision) is not int or revision < 0:
             raise BridgeRefusal("INVALID_REVISION")
         owner, session_id, model = _key(owner), _key(session_id), _model_name(model)
@@ -145,28 +155,44 @@ class ForestTurnBridge:
         attempt_id = "a_" + uuid.uuid4().hex
 
         with _write(self.db):
-            current = self.journal.session(owner, session_id)
-            if current["state"] != "OPEN":
-                raise BridgeRefusal("SESSION_NOT_OPEN")
-            if current["revision"] != revision:
-                raise BridgeRefusal("STALE_REVISION")
-            if now < current["updated_at_ms"]:
-                raise BridgeRefusal("TIME_ROLLBACK")
-
-            rows = self.db.execute(
-                "SELECT turn_id,role,body FROM forest_turns "
-                "WHERE session_id=? ORDER BY ordinal DESC LIMIT 16",
-                (session_id,),
-            ).fetchall()
-            if not rows or rows[0][1] != "user":
-                raise BridgeRefusal("USER_TURN_REQUIRED")
-            messages = [
-                {"role": role, "content": body}
-                for _, role, body in reversed(rows)
-            ]
-            # Reuse B2's exact prompt constraints before making reservation.
-            _messages(messages)
-            user_turn_id = rows[0][0]
+            if context_ref is not None:
+                # M2 validates exact owner/Tree/session/revision/latest user
+                # and selects a bounded suffix in THIS reservation transaction.
+                snapshot = snapshot_in_transaction(
+                    self.journal, context_ref, current=current_context_ref,
+                    capability_plan=capability_plan)
+                updated = self.db.execute(
+                    "SELECT updated_at_ms FROM forest_sessions WHERE "
+                    "owner_key=? AND tree_key=? AND session_id=?",
+                    (owner, context_ref.context.tree_key, session_id),
+                ).fetchone()
+                if updated is None or now < updated[0]:
+                    raise BridgeRefusal("TIME_ROLLBACK")
+                messages = snapshot.transport_messages()
+                user_turn_id = snapshot.ref.user_turn_id
+            else:
+                current = self.journal.session(owner, session_id)
+                if current["state"] != "OPEN":
+                    raise BridgeRefusal("SESSION_NOT_OPEN")
+                if current["revision"] != revision:
+                    raise BridgeRefusal("STALE_REVISION")
+                if now < current["updated_at_ms"]:
+                    raise BridgeRefusal("TIME_ROLLBACK")
+    
+                rows = self.db.execute(
+                    "SELECT turn_id,role,body FROM forest_turns "
+                    "WHERE session_id=? ORDER BY ordinal DESC LIMIT 16",
+                    (session_id,),
+                ).fetchall()
+                if not rows or rows[0][1] != "user":
+                    raise BridgeRefusal("USER_TURN_REQUIRED")
+                messages = [
+                    {"role": role, "content": body}
+                    for _, role, body in reversed(rows)
+                ]
+                # Reuse B2's exact prompt constraints before making reservation.
+                _messages(messages)
+                user_turn_id = rows[0][0]
             try:
                 # B4g: store the expectation in the SAME INSERT as the
                 # original reservation. A missing marker never proves legacy.
@@ -215,7 +241,8 @@ class ForestTurnBridge:
 
     def _commit_fenced(self, binding: SyntheticCommitBinding,
                        response: str, pre_commit: Callable[[], bool],
-                       fence_factory: Callable) -> dict[str, object]:
+                       fence_factory: Callable, *,
+                       expected_tree: str | None = None) -> dict[str, object]:
         """B4c test seam: keep injected permit around real SQLite COMMIT.
 
         The injected permit is a synthetic fixture. A production host must
@@ -235,7 +262,7 @@ class ForestTurnBridge:
                 result = self._commit(
                     binding.owner_key, binding.session_id, binding.attempt_id,
                     binding.expected_revision, binding.model_key, response,
-                    pre_commit=pre_commit)
+                    pre_commit=pre_commit, expected_tree=expected_tree)
                 wrote_reply = True
                 # Happens after SQLite transaction has exited. An unavailable
                 # terminal receipt must NOT advertise COMMITTED to the client.
@@ -254,15 +281,28 @@ class ForestTurnBridge:
 
     def _commit(self, owner: str, session_id: str, attempt_id: str,
                 revision: int, model: str, response: str,
-                pre_commit: Callable[[], bool] | None = None) -> dict[str, object]:
+                pre_commit: Callable[[], bool] | None = None, *,
+                expected_tree: str | None = None) -> dict[str, object]:
         # Never persist an unbounded output even if the model stream allows it.
         answer = _text(response, MAX_BODY)
         now = _time(self.clock_ms())
         with _write(self.db):
-            session = self.journal.session(owner, session_id)
-            if (session["state"] != "OPEN" or session["revision"] != revision):
+            if expected_tree is None:
+                session = self.journal.session(owner, session_id)
+                state, current_revision, updated = (
+                    session["state"], session["revision"], session["updated_at_ms"])
+            else:
+                scoped = self.db.execute(
+                    "SELECT state,revision,updated_at_ms FROM forest_sessions "
+                    "WHERE owner_key=? AND tree_key=? AND session_id=?",
+                    (owner, expected_tree, session_id),
+                ).fetchone()
+                if scoped is None:
+                    raise BridgeRefusal("SESSION_SCOPE_MISMATCH")
+                state, current_revision, updated = scoped
+            if state != "OPEN" or current_revision != revision:
                 raise BridgeRefusal("STALE_OR_CLOSED_SESSION")
-            if now < session["updated_at_ms"]:
+            if now < updated:
                 raise BridgeRefusal("TIME_ROLLBACK")
 
             attempt = self.db.execute(
@@ -363,6 +403,12 @@ class ForestTurnBridge:
                  pre_commit: Callable[[], bool] | None = None,
                  fence_factory: Callable | None = None,
                  fence_request_id: str | None = None,
+                 context_ref: SessionContextRef | None = None,
+                 current_context_ref: SessionContextRef | None = None,
+                 resolve_current_context: Callable[[], SessionContextRef] | None = None,
+                 capability_plan: SelectionPlan | None = None,
+                 stop_control: RuntimeStopControl | None = None,
+                 operation_id: str | None = None,
                  ) -> Iterator[dict[str, object]]:
         """Provisional DELTA events; COMMITTED only after atomic durable write.
 
@@ -372,7 +418,46 @@ class ForestTurnBridge:
         reserved = ""
         completed = False
         transport = None
+        control_claimed = False
+        bound_attempt = None
+        expected_tree = None
+
+        def check_current():
+            if context_ref is not None:
+                try:
+                    current = resolve_current_context()
+                except Exception as exc:
+                    raise BridgeRefusal("CONTEXT_CURRENTNESS_UNAVAILABLE") from exc
+                if type(current) is not SessionContextRef or current != context_ref:
+                    raise BridgeRefusal("CONTEXT_CHANGED")
+                return current
+            return None
+
+        def check_stop():
+            if stop_control is not None and stop_control.transport_event.is_set():
+                raise BridgeRefusal("OLLAMA_CANCELLED")
+
         try:
+            if context_ref is not None or current_context_ref is not None:
+                if (type(context_ref) is not SessionContextRef
+                        or type(current_context_ref) is not SessionContextRef
+                        or context_ref != current_context_ref
+                        or owner != context_ref.context.principal_key
+                        or session_id != context_ref.session_id
+                        or expected_revision != context_ref.expected_revision
+                        or not callable(resolve_current_context)):
+                    raise BridgeRefusal("CONTEXT_BINDING_MISMATCH")
+                expected_tree = context_ref.context.tree_key
+            elif any(x is not None for x in (resolve_current_context,
+                     capability_plan, stop_control, operation_id)):
+                raise BridgeRefusal("CONTEXT_REQUIRED")
+            if stop_control is not None or operation_id is not None:
+                if (type(stop_control) is not RuntimeStopControl
+                        or type(operation_id) is not str):
+                    raise BridgeRefusal("INVALID_STOP_CONTROL")
+                stop_control.claim_exchange(context_ref.context, operation_id)
+                control_claimed = True
+                check_stop()
             if pre_commit is not None and not callable(pre_commit):
                 raise BridgeRefusal("INVALID_PRE_COMMIT_HOOK")
             if fence_factory is not None:
@@ -395,18 +480,36 @@ class ForestTurnBridge:
                 _target(endpoint)
             except InventoryFailure as exc:
                 raise BridgeRefusal(exc.reason) from exc
-            reserved, messages = self._reserve(
-                owner, session_id, expected_revision, model)
+            current = check_current()
+            check_stop()
+            if context_ref is None:
+                reserved, messages = self._reserve(
+                    owner, session_id, expected_revision, model)
+            else:
+                reserved, messages = self._reserve(
+                    owner, session_id, expected_revision, model,
+                    context_ref=context_ref, current_context_ref=current,
+                    capability_plan=capability_plan)
+            if stop_control is not None:
+                stop_control.bind_reserved_attempt(
+                    context_ref.context, operation_id, reserved)
+                bound_attempt = reserved
             yield {"event": "RESERVED", "attempt_id": reserved}
+            check_current()
+            check_stop()
+            transport_options = {}
+            if stop_control is not None:
+                transport_options["cancel_event"] = stop_control.transport_event
             transport = iter(self.streamer(
                 model=model, messages=messages, endpoint=endpoint,
-                max_predict=max_predict, num_ctx=num_ctx,
+                max_predict=max_predict, num_ctx=num_ctx, **transport_options,
             ))
             state = "INITIAL"
             parts: list[str] = []
             size = 0
             completed_text = None
             for item in transport:
+                check_stop()
                 if type(item) is not dict:
                     raise BridgeRefusal("INVALID_STREAM_EVENT")
                 event = item.get("event")
@@ -445,35 +548,48 @@ class ForestTurnBridge:
             # No output can follow COMPLETE. Response must end cleanly.
             if state != "TERMINAL" or completed_text is None:
                 raise BridgeRefusal("INCOMPLETE_STREAM")
+            check_current()
+            check_stop()
+            if stop_control is not None and not stop_control.try_enter_commit(
+                    context_ref.context, operation_id, reserved):
+                raise BridgeRefusal("OLLAMA_CANCELLED")
             if fence_factory is not None:
                 binding = self._commit_binding(
                     _key(owner), _key(session_id), reserved,
                     fence_request_id, _model_name(model), expected_revision)
                 receipt = self._commit_fenced(
-                    binding, completed_text, pre_commit, fence_factory)
+                    binding, completed_text, pre_commit, fence_factory,
+                    expected_tree=expected_tree)
             else:
                 # Legacy B3/B4b remains synthetic and NOT production-authorized.
                 receipt = self._commit(
                     _key(owner), _key(session_id), reserved,
                     expected_revision, _model_name(model), completed_text,
-                    pre_commit=pre_commit)
+                    pre_commit=pre_commit, expected_tree=expected_tree)
             completed = True
             yield receipt
+        except (ContextRefusal, StopArbitrationRefusal, ContractRefusal) as exc:
+            # These existing fixture validators use fixed reason strings.
+            raise BridgeRefusal(str(exc)) from exc
         except (BridgeRefusal, ChatRefusal, JournalRefusal) as exc:
             code = getattr(exc, "code", "INVALID_REQUEST")
             raise BridgeRefusal(code) from exc
         except (sqlite3.Error, UnicodeError, ValueError, TypeError) as exc:
             raise BridgeRefusal("BRIDGE_STORAGE_OR_STREAM_ERROR") from exc
         finally:
-            if transport is not None and callable(getattr(transport, "close", None)):
-                transport.close()
-            if reserved and not completed:
-                # Leave a durable no-auto-retry record. If storage is lost here
-                # the original RESERVED row also blocks automatic replay.
+            try:
+                if transport is not None and callable(getattr(transport, "close", None)):
+                    transport.close()
+            finally:
                 try:
-                    self._abort(reserved)
-                except (sqlite3.Error, JournalRefusal, BridgeRefusal):
-                    # A failing local outbox ABORT must not replace the
-                    # original stream/authorization failure. RESERVED still
-                    # blocks any automatic repeat of the same user turn.
-                    pass
+                    if reserved and not completed:
+                        # Preserve the original durable no-retry reservation
+                        # even when abort/outbox evidence cannot be written.
+                        try:
+                            self._abort(reserved)
+                        except (sqlite3.Error, JournalRefusal, BridgeRefusal):
+                            pass
+                finally:
+                    if control_claimed:
+                        stop_control.close(context_ref.context, operation_id,
+                                           bound_attempt)

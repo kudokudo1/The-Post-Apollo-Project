@@ -10,6 +10,7 @@ A valid signature shows only byte consistency with those supplied inputs.
 from __future__ import annotations
 
 import hashlib
+from types import MappingProxyType
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -26,7 +27,7 @@ RECEIPT_FIELDS = frozenset((
     "writerKeySha256", "writerJournalCounter", "previousJournalSha256",
     "terminalOutcome", "storageTxnId", "recordedAtMs",
 ))
-RECEIPT_NO_AUTHORITY = {
+RECEIPT_NO_AUTHORITY = MappingProxyType({
     "writerRootIndependentlyEnrolled": False,
     "protectedWriterProcessAuthenticated": False,
     "writerJournalDurabilityVerified": False,
@@ -37,7 +38,7 @@ RECEIPT_NO_AUTHORITY = {
     "forestReadSessionAllowed": False,
     "forestToolExecutionAllowed": False,
     "productionAuthority": False,
-}
+})
 
 
 class ReceiptHold(ValueError):
@@ -99,8 +100,12 @@ def verify_unenrolled_terminal_receipt(
         )
         receipt = S._parse_exact(receipt_wire, RECEIPT_FIELDS)
     except S.EvidenceHold as exc:
-        # One public fail-closed exception contract for all receipt inputs.
-        raise ReceiptHold("FOREST_B4C_WRITER_RECEIPT_HOLD // " + str(exc)) from exc
+        # Keep the existing fixed reason, without retaining a parser object.
+        refusal = str(exc)
+    else:
+        refusal = None
+    if refusal is not None:
+        _hold(refusal)
     if (receipt["schema"] != RECEIPT_SCHEMA or
             receipt["audience"] != S.AUDIENCE or
             receipt["role"] != WRITER_ROLE):
@@ -157,10 +162,12 @@ def verify_unenrolled_terminal_receipt(
     try:
         Ed25519PublicKey.from_public_bytes(writer_public).verify(
             writer_signature, receipt_wire)
-    except (InvalidSignature, ValueError) as exc:
-        raise ReceiptHold(
-            "FOREST_B4C_WRITER_RECEIPT_HOLD // INVALID_SIGNATURE"
-        ) from exc
+    except (InvalidSignature, ValueError):
+        signature_valid = False
+    else:
+        signature_valid = True
+    if not signature_valid:
+        _hold("INVALID_SIGNATURE")
     return {
         "schema": "postapollo.forest.unenrolled-terminal-consistency.v0",
         "status": "UNENROLLED_RECEIPT_SIGNATURE_CONSISTENT_NOT_SETTLED",

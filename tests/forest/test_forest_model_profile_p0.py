@@ -16,7 +16,7 @@ class ForestSelectedProfileTests(unittest.TestCase):
         self.assertIn("readonly property var selectedModelProfile:", view)
         self.assertIn("modelResidency.status, modelResidency.records, selectedLocalModel", view)
         self.assertIn("id: selectedModelProfilePanel", view)
-        self.assertIn("height: modelPopup.height >= 270 ? 48 : 0", view)
+        self.assertIn("height: !root.hardwareViewOpen && modelPopup.height >= 270 ? 48 : 0", view)
         self.assertIn("anchors.top: selectedModelProfilePanel.bottom", view)
         self.assertIn("root.selectedModelProfile.sizeMiB", view)
         self.assertIn("root.selectedModelProfile.vramMiB", view)

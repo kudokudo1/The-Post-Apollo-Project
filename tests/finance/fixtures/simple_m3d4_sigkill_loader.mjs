@@ -30,7 +30,7 @@ export async function load(url,context,nextLoad){
   if(source.indexOf(original)<0 || source.indexOf(original)!==source.lastIndexOf(original))
     throw new Error("m3d4-expected-single-policy-checkpoint");
   const replacement=point==="after-attempt"
-    ? original+"\\n"+pause(point)
-    : pause(point)+"\\n"+original;
+    ? original+"\n"+pause(point)
+    : pause(point)+"\n"+original;
   return {...result,source:source.replace(original,replacement)};
 }

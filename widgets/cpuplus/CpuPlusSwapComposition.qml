@@ -7,9 +7,10 @@ Column {
     id: root
     required property var sample
     required property var capacity
+    property bool compact: false
     readonly property var composition: Snapshot.swapComposition(sample)
     readonly property var segments: composition ? composition.groups.filter(g => g.size > 0) : []
-    spacing: 6
+    spacing: compact ? 3 : 6
 
     function accent(id) {
         return id === "zram" ? Colors.cyan : id === "base" ? Colors.yellow
@@ -23,15 +24,15 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "SWAP // LIVE COMPOSITION"
+        text: root.compact ? "SWAP // USED / ACTIVE" : "SWAP // LIVE COMPOSITION"
         color: Colors.magenta
         font.pixelSize: 12
         wrapMode: Text.WordWrap
     }
     GohuText {
         width: parent.width
-        text: root.composition ? "ACTIVE // " + root.amount(root.composition.total)
-              + "   USED // " + root.amount(root.composition.used)
+        text: root.composition ? (root.compact ? root.amount(root.composition.used) + " / " + root.amount(root.composition.total)
+              : "ACTIVE // " + root.amount(root.composition.total) + "   USED // " + root.amount(root.composition.used))
             : "SOURCE UNAVAILABLE"
         color: Colors.cyan
         font.pixelSize: 10
@@ -82,13 +83,14 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: !root.compact
         text: "BRIGHT = USED   DIM = AVAILABLE"
         color: Colors.white
         font.pixelSize: 9
         wrapMode: Text.WordWrap
     }
     Repeater {
-        model: root.segments
+        model: root.compact ? [] : root.segments
         delegate: Column {
             id: legend
             required property var modelData
@@ -110,6 +112,20 @@ Column {
             }
         }
     }
+    Flow {
+        width: parent.width
+        spacing: 5
+        visible: root.compact
+        Repeater {
+            model: root.compact ? root.segments : []
+            delegate: GohuText {
+                required property var modelData
+                text: modelData.label + " " + root.amount(modelData.size)
+                color: root.accent(modelData.id)
+                font.pixelSize: 10
+            }
+        }
+    }
     GohuText {
         visible: root.composition !== null && !root.composition.capacityMatches
         width: parent.width
@@ -119,7 +135,7 @@ Column {
         wrapMode: Text.WordWrap
     }
     GohuText {
-        visible: root.capacity !== null && root.capacity.direction !== "unchanged"
+        visible: !root.compact && root.capacity !== null && root.capacity.direction !== "unchanged"
         width: parent.width
         text: root.capacity ? "TARGET PREVIEW // " + root.amount(root.capacity.projectedKiB)
             + " TOTAL; LIVE BAR UNCHANGED" : ""
@@ -129,6 +145,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: !root.compact
         text: "ZRAM CAPACITY IS LOGICAL COMPRESSED SWAP, NOT EXTRA PHYSICAL RAM."
         color: Colors.white
         font.pixelSize: 9

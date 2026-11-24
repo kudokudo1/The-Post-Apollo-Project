@@ -105,6 +105,8 @@ class Queue:
     """
     def __init__(self, path):
         self.path = Path(path).absolute()
+        self._identity = None
+        self._check_parent()
         created = False
         try:
             fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -115,9 +117,7 @@ class Queue:
         except OSError as exc:
             raise QueueError("QUEUE_UNAVAILABLE") from exc
         try:
-            meta = self.path.lstat()
-            if not stat.S_ISREG(meta.st_mode) or meta.st_uid != os.getuid() or meta.st_mode & 0o077:
-                raise QueueError("UNSAFE_QUEUE_FILE")
+            self._identity = self._check_file()
             with self._transaction(write=created, initializing=created) as db:
                 if created:
                     db.execute("""CREATE TABLE requests (
@@ -129,22 +129,56 @@ class Queue:
                     db.execute("PRAGMA user_version=1")
                 if db.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
                     raise QueueError("CORRUPT_QUEUE")
-                self._pending(db)
+                self._history(db)
+            if created:
+                fd = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        except OSError as exc:
+            raise QueueError("QUEUE_UNAVAILABLE") from exc
+
+    def _check_parent(self):
+        try:
+            meta = self.path.parent.lstat()
+            if (not stat.S_ISDIR(meta.st_mode) or meta.st_uid != os.getuid()
+                    or meta.st_mode & 0o077):
+                raise QueueError("UNSAFE_QUEUE_PARENT")
+            if self.path.parent.resolve() != self.path.parent:
+                raise QueueError("UNSAFE_QUEUE_PARENT")
+        except OSError as exc:
+            raise QueueError("QUEUE_UNAVAILABLE") from exc
+
+    def _check_file(self):
+        self._check_parent()
+        try:
+            meta = self.path.lstat()
+            if (not stat.S_ISREG(meta.st_mode) or meta.st_uid != os.getuid()
+                    or meta.st_mode & 0o077 or meta.st_nlink != 1):
+                raise QueueError("UNSAFE_QUEUE_FILE")
+            identity = (meta.st_dev, meta.st_ino)
+            if self._identity is not None and identity != self._identity:
+                raise QueueError("QUEUE_FILE_REPLACED")
+            return identity
         except OSError as exc:
             raise QueueError("QUEUE_UNAVAILABLE") from exc
 
     @contextlib.contextmanager
     def _transaction(self, write=False, initializing=False):
+        self._check_file()
         try:
             with contextlib.closing(sqlite3.connect(self.path.as_uri() + "?mode=rw",
                                                      uri=True, timeout=1,
                                                      isolation_level=None)) as db:
+                self._check_file()
                 db.execute("PRAGMA synchronous=FULL")
                 db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
                 try:
                     if not initializing and db.execute("PRAGMA user_version").fetchone() != (1,):
                         raise QueueError("UNSUPPORTED_QUEUE_SCHEMA")
                     yield db
+                    self._check_file()
                     db.commit()
                 except BaseException:
                     db.rollback()
@@ -168,6 +202,45 @@ class Queue:
         if len(rows) > 1:
             raise QueueError("MULTIPLE_PENDING")
         return cls._decode(rows[0]) if rows else None
+
+    @classmethod
+    def _history(cls, db):
+        records = {}
+        incoming = set()
+        pending = 0
+        for row in db.execute("SELECT id,state,payload FROM requests"):
+            record = cls._decode(row)
+            if record["id"] in records:
+                raise QueueError("DUPLICATE_REQUEST")
+            records[record["id"]] = record
+            pending += record["state"] == "QUEUED"
+        if pending > 1:
+            raise QueueError("MULTIPLE_PENDING")
+        for record in records.values():
+            if record["state"] != "REPLACED":
+                continue
+            successor = record["replaced_by"]
+            target = records.get(successor)
+            if (target is None or successor in incoming
+                    or target["requested_at"] != record["changed_at"]):
+                raise QueueError("BROKEN_REPLACEMENT_CHAIN")
+            incoming.add(successor)
+        visited = set()
+        for root in records.keys() - incoming:
+            current = root
+            while current is not None:
+                if current in visited:
+                    raise QueueError("BROKEN_REPLACEMENT_CHAIN")
+                visited.add(current)
+                current = records[current]["replaced_by"]
+        if len(visited) != len(records):
+            raise QueueError("BROKEN_REPLACEMENT_CHAIN")
+        return list(records.values())
+
+    def audit_history(self):
+        """Explicit full-history integrity check, not a polling operation."""
+        with self._transaction() as db:
+            return self._history(db)
 
     @staticmethod
     def _insert(db, record):

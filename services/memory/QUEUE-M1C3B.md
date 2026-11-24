@@ -31,3 +31,26 @@ DOC 1 owns safety/preflight and mutation. DOC 2 owns UI and explicit user action
 DOC 3 owns diagnostics. Connections owns any protected reusable grant (#2412).
 DOC 4 owns queue state and future monitoring/notification adapter. Nurse 2
 reviews. No production integration or local-machine changes authorized here.
+
+## M1c.3b.3 // advisory readiness and storage review follow-up
+
+Nurse 2 review of #2439: private parent (same UID, mode 0700 or stricter,
+no symlink path components), single-link DB, identity rechecks on transaction,
+initial directory fsync, full history audit on reopen and explicit audit_history().
+These reduce accidental replacement and history corruption, not same-UID attacks,
+ancestor replacement races, hostile SQLite files, or full native power-loss risks.
+Existing unsafe paths are refused, not repaired. Production path selection remains
+an integration decision; recommend a dedicated private directory beneath the
+operator's XDG state directory, not a shared database. Native crash tests pending.
+
+memory_queue_advisory.evaluate is a pure version-1 display projection using DOC 1's
+reduction-preflight v1 response, caller-bound boot/source IDs and an explicit
+sample age limit. A previous sample from the same observer is needed; this is
+only two observations, not a calibrated stability interval. Discard it on restart.
+Unknown, expired, stale, mismatched and busy observations refuse readiness.
+The request remains QUEUED; READY_ADVISORY always has can_execute=false. No
+persisted readiness or replay, no operation invocation, no monitor or QML adapter.
+Caller must provide actual independent observations and an operation-state witness;
+no protected file identity collection or root lock witness is implemented here.
+Only bounded reduction advisory is supported. Expansion and other operations are
+not inferred from a missing reduction result. The storage schema stays v1.

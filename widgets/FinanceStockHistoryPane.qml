@@ -13,6 +13,12 @@ Item {
     // M41: presentation only. Both research views retain the same data and
     // controls; changing views must not change the provider or selections.
     property string researchView: "price"
+    // M42: disclosure is not a mode or a data action.
+    property bool controlsExpanded: false
+    function toggleResearchControls() {
+        controlsExpanded = !controlsExpanded;
+        if (controlsExpanded) scroll.contentY = 0;
+    }
     function selectResearchView(view) {
         if ((view !== "price" && view !== "compare") || researchView === view) return;
         researchView = view;
@@ -180,90 +186,49 @@ Item {
     }
     onSelectedPointIndexChanged: priceCanvas.requestPaint()
 
-    GohuText {
-        id: title
+    Row {
+        id: stockCommandRail
+        objectName: "marketStockCommandRail"
         anchors.top: parent.top
-        anchors.topMargin: 11
-        anchors.left: parent.left
-        anchors.right: discoveryToggle.left
-        anchors.rightMargin: 7
-        text: "STOCKS // HISTORICAL DAILY PRICES"
-        color: Colors.cyan
-        font.pixelSize: 13
-        font.bold: true
-        elide: Text.ElideRight
-    }
-    ActionButton {
-        id: discoveryToggle
-        anchors.top: parent.top
-        anchors.topMargin: 6
-        anchors.right: quotaToggle.left
-        anchors.rightMargin: 6
-        width: 121
-        height: 28
-        label: "GLOBAL SEARCH"
-        labelPixelSize: 9
-        accentColor: Colors.magenta
-        onLeftClicked: {
-            stocks.quotaOpen = false;
-            stocks.discoveryOpen = true;
-        }
-    }
-    ActionButton {
-        id: quotaToggle
-        anchors.top: parent.top
-        anchors.topMargin: 6
-        anchors.right: parent.right
-        width: 112
-        height: 28
-        label: "QUOTA STATUS"
-        labelPixelSize: 9
-        accentColor: Colors.orange
-        onLeftClicked: {
-            stocks.discoveryOpen = false;
-            stocks.quotaOpen = true;
-        }
-    }
-    Grid {
-        id: issuers
-        anchors.top: title.bottom
-        anchors.topMargin: 13
+        anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        columns: width >= 590 ? 6 : 3
-        height: columns === 6 ? 30 : 62
-        columnSpacing: 6
-        rowSpacing: 6
-        Repeater {
-            model: StockModePolicy.stockItems()
-            delegate: ActionButton {
-                required property var modelData
-                width: Math.max(0, (issuers.width - (issuers.columns - 1) * 6)
-                    / issuers.columns)
-                height: 28
-                label: modelData.symbol
-                labelPixelSize: 10
-                selected: stocks.stockFeed
-                    && stocks.stockFeed.selectedCik === modelData.cik
-                accentColor: Colors.cyan
-                onLeftClicked: {
-                    if (stocks.stockFeed)
-                        stocks.stockFeed.selectIssuer(modelData.cik);
-                }
+        height: 29
+        spacing: 5
+        ActionButton {
+            id: discoveryToggle
+            width: Math.max(0,(stockCommandRail.width-stockCommandRail.spacing)/2)
+            height: 28
+            label: "GLOBAL SEARCH"
+            labelPixelSize: 9
+            accentColor: Colors.magenta
+            onLeftClicked: {
+                stocks.quotaOpen = false;
+                stocks.discoveryOpen = true;
             }
         }
+        ActionButton {
+            objectName: "marketResearchControlsToggle"
+            width: Math.max(0,(stockCommandRail.width-stockCommandRail.spacing)/2)
+            height: 28
+            label: stocks.controlsExpanded ? "HIDE CONTROLS" : "CONTROLS"
+            labelPixelSize: 9
+            accentColor: Colors.orange
+            selected: stocks.controlsExpanded
+            onLeftClicked: stocks.toggleResearchControls()
+        }
     }
-
     Row {
         id: modeControls
-        anchors.top: issuers.bottom
-        anchors.topMargin: 9
+        objectName: "marketDayRangeRail"
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 2
         anchors.left: parent.left
         anchors.right: parent.right
         height: 28
         spacing: 6
         ActionButton {
-            width: 92
+            width: Math.max(0,(modeControls.width-modeControls.spacing)/2)
             height: 27
             label: "DAY"
             labelPixelSize: 10
@@ -275,7 +240,7 @@ Item {
             }
         }
         ActionButton {
-            width: 92
+            width: Math.max(0,(modeControls.width-modeControls.spacing)/2)
             height: 27
             label: "RANGE"
             labelPixelSize: 10
@@ -288,193 +253,10 @@ Item {
         }
     }
     Row {
-        id: rangePresets
-        anchors.top: modeControls.bottom
-        anchors.topMargin: visible ? 8 : 0
-        anchors.left: parent.left
-        anchors.right: parent.right
-        visible: !stocks.dayMode
-        height: visible ? 27 : 0
-        spacing: 6
-        Repeater {
-            model: [
-                {days:7,label:"7D"},
-                {days:30,label:"30D"},
-                {days:90,label:"90D"},
-                {days:180,label:"180D"}
-            ]
-            delegate: ActionButton {
-                required property var modelData
-                width: Math.max(0, (rangePresets.width - 18) / 4)
-                height: 26
-                label: modelData.label
-                labelPixelSize: 10
-                accentColor: Colors.cyan
-                selected: stocks.stockFeed
-                    && stocks.stockFeed.rangeDays === modelData.days - 1
-                    && stocks.stockFeed.endDate === stocks.stockFeed.dateOffset(0)
-                available: stocks.stockFeed && stocks.stockFeed.monitoring
-                    && !stocks.stockFeed.loading
-                onLeftClicked: {
-                    if (stocks.stockFeed)
-                        stocks.stockFeed.selectPresetRange(modelData.days);
-                }
-            }
-        }
-    }
-    GohuText {
-        id: dateLabel
-        anchors.top: rangePresets.bottom
-        anchors.topMargin: 10
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text: stocks.dayMode
-            ? "SINGLE DAY // WEEKENDS/HOLIDAYS MAY HAVE NO SESSION"
-            : "HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS"
-        font.pixelSize: 10
-        color: Colors.orange
-    }
-    Item {
-        id: dateControls
-        anchors.top: dateLabel.bottom
-        anchors.topMargin: 6
-        anchors.left: parent.left
-        anchors.right: parent.right
-        readonly property bool sideBySide: width >= 640
-        height: stocks.dayMode ? 66 : (sideBySide ? 66 : 136)
-        Column {
-            id: dayGroup
-            visible: stocks.dayMode
-            anchors.left: parent.left
-            anchors.top: parent.top
-            width: parent.width
-            spacing: 4
-            GohuText {
-                text: "DAY DATE"
-                font.pixelSize: 9
-                color: Colors.cyan
-            }
-            FinanceDateInput {
-                width: parent.width
-                height: 48
-                value: stocks.stockFeed ? stocks.stockFeed.dayDate : ""
-                fallbackDate: stocks.stockFeed ? stocks.stockFeed.dayDate : ""
-                canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
-                onValueEdited: function(value) {
-                    if (stocks.stockFeed) stocks.stockFeed.selectDayDate(value);
-                }
-            }
-        }
-        Column {
-            id: fromGroup
-            visible: !stocks.dayMode
-            anchors.top: parent.top
-            anchors.left: parent.left
-            width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
-            spacing: 4
-            GohuText {
-                text: "START DATE"
-                font.pixelSize: 9
-                color: Colors.cyan
-            }
-            FinanceDateInput {
-                width: parent.width
-                height: 48
-                value: stocks.stockFeed ? stocks.stockFeed.startDate : ""
-                fallbackDate: stocks.stockFeed ? stocks.stockFeed.startDate : ""
-                canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
-                onValueEdited: function(value) {
-                    if(stocks.stockFeed) stocks.stockFeed.selectStartDate(value);
-                }
-            }
-        }
-        Column {
-            visible: !stocks.dayMode
-            anchors.top: dateControls.sideBySide ? parent.top : fromGroup.bottom
-            anchors.topMargin: dateControls.sideBySide ? 0 : 8
-            anchors.left: dateControls.sideBySide ? fromGroup.right : parent.left
-            anchors.leftMargin: dateControls.sideBySide ? 12 : 0
-            width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
-            spacing: 4
-            GohuText {
-                text: "END DATE"
-                font.pixelSize: 9
-                color: Colors.cyan
-            }
-            FinanceDateInput {
-                width: parent.width
-                height: 48
-                value: stocks.stockFeed ? stocks.stockFeed.endDate : ""
-                fallbackDate: stocks.stockFeed ? stocks.stockFeed.endDate : ""
-                canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
-                onValueEdited: function(value) {
-                    if(stocks.stockFeed) stocks.stockFeed.selectEndDate(value);
-                }
-            }
-        }
-    }
-    Row {
-        id: fetchControls
-        anchors.top: dateControls.bottom
-        anchors.topMargin: 11
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 30
-        spacing: 8
-        ActionButton {
-            id: load
-            width: 122
-            height: 28
-            label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"
-                : stocks.dayMode
-                    ? (stocks.snapshot ? "REFRESH DAY" : "LOAD DAY")
-                    : (stocks.snapshot ? "REFRESH RANGE" : "LOAD RANGE")
-            labelPixelSize: 9
-            accentColor: Colors.magenta
-            available: stocks.stockFeed && stocks.stockFeed.monitoring
-                && stocks.stockFeed.validSelection && !stocks.stockFeed.loading
-            onLeftClicked: {
-                if (stocks.stockFeed) stocks.stockFeed.refresh();
-            }
-        }
-        GohuText {
-            width: Math.max(0,fetchControls.width - load.width - 8)
-            height: fetchControls.height
-            verticalAlignment: Text.AlignVCenter
-            text: stocks.stockFeed
-                ? stocks.stockFeed.selectedCik === "0001045810"
-                    ? "NVDA // TOKEN REQUIRED"
-                  : stocks.stockFeed.selectedCik === "0000789019"
-                    ? "MSFT // DEMO TRIAL"
-                  : stocks.stockFeed.selectedCik === "0000320193"
-                    ? "AAPL // DEMO"
-                    : StockModePolicy.stockSymbol(stocks.stockFeed.selectedCik)
-                      + " // TOKEN REQUIRED"
-                : "NO STOCK SOURCE"
-            font.pixelSize: 9
-            color: Colors.orange
-            elide: Text.ElideRight
-        }
-    }
-    GohuText {
-        id: status
-        anchors.top: fetchControls.bottom
-        anchors.topMargin: 11
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text: stocks.stockFeed ? stocks.stockFeed.message
-            : "STOCK HISTORY SOURCE UNAVAILABLE"
-        textFormat: Text.PlainText
-        font.pixelSize: 9
-        color: stocks.stockFeed && stocks.stockFeed.state === "failed"
-            ? Colors.red : Colors.orange
-        wrapMode: Text.WordWrap
-    }
-    Row {
         id: researchRail
         objectName: "marketResearchViewRail"
-        anchors.top: status.bottom
-        anchors.topMargin: visible ? 7 : 0
+        anchors.bottom: modeControls.top
+        anchors.bottomMargin: visible ? 4 : 0
         anchors.left: parent.left
         anchors.right: parent.right
         visible: !stocks.dayMode
@@ -503,11 +285,12 @@ Item {
     }
     Flickable {
         id: scroll
-        anchors.top: researchRail.bottom
-        anchors.topMargin: 9
+        anchors.top: stockCommandRail.bottom
+        anchors.topMargin: 6
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.bottom: researchRail.top
+        anchors.bottomMargin: 5
         contentWidth: width
         contentHeight: body.implicitHeight
         clip: true
@@ -516,9 +299,238 @@ Item {
             id: body
             // Reserve an unobstructed right gutter for the proportional rail.
             width: Math.max(0, scroll.width - 24)
-            spacing: 13
+            spacing: 8
+            Column {
+                objectName: "marketResearchControlsSection"
+                width: parent.width
+                visible: stocks.controlsExpanded
+                height: visible ? implicitHeight : 0
+                spacing: 6
+                Grid {
+                    id: issuers
+                    width: parent.width
+                    columns: width >= 590 ? 6 : 3
+                    height: columns === 6 ? 30 : 62
+                    columnSpacing: 6
+                    rowSpacing: 6
+                    Repeater {
+                        model: StockModePolicy.stockItems()
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: Math.max(0, (issuers.width - (issuers.columns - 1) * 6)
+                                / issuers.columns)
+                            height: 28
+                            label: modelData.symbol
+                            labelPixelSize: 10
+                            selected: stocks.stockFeed
+                                && stocks.stockFeed.selectedCik === modelData.cik
+                            accentColor: Colors.cyan
+                            onLeftClicked: {
+                                if (stocks.stockFeed)
+                                    stocks.stockFeed.selectIssuer(modelData.cik);
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    id: rangePresets
+                    width: parent.width
+                    visible: !stocks.dayMode
+                    height: visible ? 27 : 0
+                    spacing: 6
+                    Repeater {
+                        model: [
+                            {days:7,label:"7D"},
+                            {days:30,label:"30D"},
+                            {days:90,label:"90D"},
+                            {days:180,label:"180D"}
+                        ]
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: Math.max(0, (rangePresets.width - 18) / 4)
+                            height: 26
+                            label: modelData.label
+                            labelPixelSize: 10
+                            accentColor: Colors.cyan
+                            selected: stocks.stockFeed
+                                && stocks.stockFeed.rangeDays === modelData.days - 1
+                                && stocks.stockFeed.endDate === stocks.stockFeed.dateOffset(0)
+                            available: stocks.stockFeed && stocks.stockFeed.monitoring
+                                && !stocks.stockFeed.loading
+                            onLeftClicked: {
+                                if (stocks.stockFeed)
+                                    stocks.stockFeed.selectPresetRange(modelData.days);
+                            }
+                        }
+                    }
+                }
+                GohuText {
+                    id: dateLabel
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: stocks.dayMode
+                        ? "SINGLE DAY // WEEKENDS/HOLIDAYS MAY HAVE NO SESSION"
+                        : "HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+                Item {
+                    id: dateControls
+                    width: parent.width
+                    readonly property bool sideBySide: width >= 640
+                    height: stocks.dayMode ? 66 : (sideBySide ? 66 : 136)
+                    Column {
+                        id: dayGroup
+                        visible: stocks.dayMode
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        width: parent.width
+                        spacing: 4
+                        GohuText {
+                            text: "DAY DATE"
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                        }
+                        FinanceDateInput {
+                            width: parent.width
+                            height: 48
+                            value: stocks.stockFeed ? stocks.stockFeed.dayDate : ""
+                            fallbackDate: stocks.stockFeed ? stocks.stockFeed.dayDate : ""
+                            canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
+                            onValueEdited: function(value) {
+                                if (stocks.stockFeed) stocks.stockFeed.selectDayDate(value);
+                            }
+                        }
+                    }
+                    Column {
+                        id: fromGroup
+                        visible: !stocks.dayMode
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
+                        spacing: 4
+                        GohuText {
+                            text: "START DATE"
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                        }
+                        FinanceDateInput {
+                            width: parent.width
+                            height: 48
+                            value: stocks.stockFeed ? stocks.stockFeed.startDate : ""
+                            fallbackDate: stocks.stockFeed ? stocks.stockFeed.startDate : ""
+                            canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
+                            onValueEdited: function(value) {
+                                if(stocks.stockFeed) stocks.stockFeed.selectStartDate(value);
+                            }
+                        }
+                    }
+                    Column {
+                        visible: !stocks.dayMode
+                        anchors.top: dateControls.sideBySide ? parent.top : fromGroup.bottom
+                        anchors.topMargin: dateControls.sideBySide ? 0 : 8
+                        anchors.left: dateControls.sideBySide ? fromGroup.right : parent.left
+                        anchors.leftMargin: dateControls.sideBySide ? 12 : 0
+                        width: dateControls.sideBySide ? (dateControls.width-12)/2 : dateControls.width
+                        spacing: 4
+                        GohuText {
+                            text: "END DATE"
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                        }
+                        FinanceDateInput {
+                            width: parent.width
+                            height: 48
+                            value: stocks.stockFeed ? stocks.stockFeed.endDate : ""
+                            fallbackDate: stocks.stockFeed ? stocks.stockFeed.endDate : ""
+                            canEdit: !!stocks.stockFeed && !stocks.stockFeed.loading
+                            onValueEdited: function(value) {
+                                if(stocks.stockFeed) stocks.stockFeed.selectEndDate(value);
+                            }
+                        }
+                    }
+                }
+                ActionButton {
+                    id: quotaToggle
+                    width: Math.min(parent.width, 140)
+                    height: 28
+                    label: "QUOTA STATUS"
+                    labelPixelSize: 9
+                    accentColor: Colors.orange
+                    onLeftClicked: {
+                        stocks.discoveryOpen = false;
+                        stocks.quotaOpen = true;
+                    }
+                }
+            }
+            GohuText {
+                objectName: "marketCompactSelection"
+                width: parent.width
+                text: stocks.stockFeed
+                    ? ((StockModePolicy.stockSymbol(stocks.stockFeed.selectedCik) || "NO STOCK")
+                        + " // " + (stocks.dayMode ? stocks.stockFeed.dayDate
+                            : stocks.stockFeed.startDate + " TO " + stocks.stockFeed.endDate))
+                    : "NO STOCK SOURCE"
+                color: Colors.cyan
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+            }
+            Row {
+                id: fetchControls
+                width: parent.width
+                height: 30
+                spacing: 8
+                ActionButton {
+                    id: load
+                    width: 122
+                    height: 28
+                    label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"
+                        : stocks.dayMode
+                            ? (stocks.snapshot ? "REFRESH DAY" : "LOAD DAY")
+                            : (stocks.snapshot ? "REFRESH RANGE" : "LOAD RANGE")
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    available: stocks.stockFeed && stocks.stockFeed.monitoring
+                        && stocks.stockFeed.validSelection && !stocks.stockFeed.loading
+                    onLeftClicked: {
+                        if (stocks.stockFeed) stocks.stockFeed.refresh();
+                    }
+                }
+                GohuText {
+                    width: Math.max(0,fetchControls.width - load.width - 8)
+                    height: fetchControls.height
+                    verticalAlignment: Text.AlignVCenter
+                    text: stocks.stockFeed
+                        ? stocks.stockFeed.selectedCik === "0001045810"
+                            ? "NVDA // TOKEN REQUIRED"
+                          : stocks.stockFeed.selectedCik === "0000789019"
+                            ? "MSFT // DEMO TRIAL"
+                          : stocks.stockFeed.selectedCik === "0000320193"
+                            ? "AAPL // DEMO"
+                            : StockModePolicy.stockSymbol(stocks.stockFeed.selectedCik)
+                              + " // TOKEN REQUIRED"
+                        : "NO STOCK SOURCE"
+                    font.pixelSize: 9
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+            }
+            GohuText {
+                id: status
+                width: parent.width
+                text: stocks.stockFeed ? stocks.stockFeed.message
+                    : "STOCK HISTORY SOURCE UNAVAILABLE"
+                textFormat: Text.PlainText
+                font.pixelSize: 9
+                color: stocks.stockFeed && stocks.stockFeed.state === "failed"
+                    ? Colors.red : Colors.orange
+                wrapMode: Text.WordWrap
+            }
             GohuText {
                 width: parent.width
+                visible: stocks.controlsExpanded
                 text: stocks.dayMode
                     ? "Choose a calendar day and LOAD DAY. Weekends and market holidays may return NO TRADING SESSION."
                     : "Select an issuer and START/END dates, or choose 7D/30D/90D/180D ending today. Then LOAD RANGE. Only actual trading sessions appear."
@@ -529,7 +541,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: !!stocks.snapshot
+                visible: !!stocks.snapshot && stocks.controlsExpanded
                 text: stocks.snapshot
                     ? stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
                         + " // SOURCE EODHD EOD"
@@ -562,7 +574,8 @@ Item {
                                   ? "NO TRADING SESSION" : "INVALID DATA")
                           + "\nCLOSE " + (stocks.dayResult && stocks.dayResult.state === "session"
                               ? "$" + stocks.dayResult.close.toFixed(2) : "N/A")
-                        : "REQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
+                        : stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
+                          + "\nREQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
                           + "\nSESSIONS " + stocks.snapshot.bars.length
                           + "\nFIRST CLOSE " + (stocks.snapshot.first
                               ? stocks.snapshot.first.date + " // $"
@@ -982,7 +995,7 @@ Item {
                 Rectangle {
                     objectName: "marketRangeAnalysisPanel"
                     width: parent.width
-                    visible: !stocks.dayMode && stocks.rangeAnalysis !== null
+                    visible: !stocks.dayMode && stocks.rangeAnalysis !== null && stocks.controlsExpanded
                     height: visible ? analysisCopy.implicitHeight + analysisNote.implicitHeight + 30 : 0
                     color: Colors.dark
                     border.width: 1

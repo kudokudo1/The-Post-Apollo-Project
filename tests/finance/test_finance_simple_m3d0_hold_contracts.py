@@ -22,6 +22,10 @@ assert "if (!reviewed || categoryPreviewArmed" in draft
 assert 'if(!transactionDraftPane.categoryPreviewArmed)' in menu
 assert 'categorized-expense-writes-enabled' in writer
 assert 'if (group.is_income) continue;' in projection
-assert 'groupRows.push({id:group.id,name:group.name});' in projection
+assert 'groupRows.push({' in projection
+assert 'hidden:observedBoolean(group.hidden)' in projection
+assert 'isIncome:observedBoolean(group.is_income)' in projection
+assert 'hidden: observedBoolean(category.hidden)' in projection
+assert 'return typeof value === "boolean" ? value : null;' in projection
 assert 'categoryRows.push({' in projection
 print("M3d0 read-only handoff staged, existing Save guard preserved: PASS")

@@ -5,6 +5,7 @@ trap 'echo "CPU_MEM_FAULT_FAIL // phase wrapper line=$LINENO"' ERR
 [[ $EUID == 0 && -f /run/ostree-booted ]]
 [[ "$(cat /etc/postapollo-memory-ci-only)" == DISPOSABLE_CPU_MEMORY_NATIVE_V1 ]]
 [[ "$(cat /etc/postapollo-memory-native-fault-ci-only)" == DISPOSABLE_CPU_MEMORY_FAULT_V1 ]]
+[[ "$(cat /etc/postapollo-memory-native-headroom-ci-only)" == DISPOSABLE_CPU_MEMORY_HEADROOM_V1 ]]
 [[ "$(systemd-detect-virt --vm)" =~ ^(kvm|qemu)$ ]]
 [[ "$(getenforce)" == Enforcing ]]
 # Dedicated COM2 evidence, separate from kernel console and login getty.
@@ -29,6 +30,8 @@ if [[ -e "$witness" || -L "$witness" ]]; then
     echo "CPU_MEM_FAULT_STAGE // REQUEST_GUEST_POWEROFF_REBOOT"
 else
     /usr/bin/bash /usr/local/libexec/postapollo-memory-ci-cycle.sh
+    echo "CPU_MEM_HEADROOM_STAGE // BEGIN_AFTER_NORMAL_CYCLES"
+    /usr/bin/python3 -I -B /usr/local/libexec/postapollo-memory-ci-headroom.py
     echo "CPU_MEM_FAULT_STAGE // NORMAL_CYCLES_COMPLETE_PREPARE_NEXT"
     /usr/bin/python3 -I -B /usr/local/libexec/postapollo-memory-ci-fault.py prepare
     echo "CPU_MEM_FAULT_STAGE // REQUEST_GUEST_POWEROFF_INITIAL"

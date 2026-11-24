@@ -61,7 +61,10 @@ UNIT_CONTENT = (
 )
 
 def trusted_unit_directory():
-    for path in (Path("/etc"), Path("/etc/systemd"), UNIT_DIR):
+    paths = [Path("/etc"), Path("/etc/systemd"), UNIT_DIR]
+    if os.path.lexists(WANTS.parent):
+        paths.append(WANTS.parent)
+    for path in paths:
         info = path.lstat()
         if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
             raise RuntimeError("Unsafe systemd directory: " + str(path))
@@ -117,10 +120,13 @@ def persist_authorized():
         return
     if state != "off":
         raise RuntimeError("Existing or incomplete boot configuration; inspect before recovery")
+    if os.path.lexists(UNIT_DIR / (UNIT_NAME + ".d")):
+        raise RuntimeError("Existing local swap unit overrides")
     for directory in ("/run/systemd/system", "/usr/lib/systemd/system",
                       "/usr/local/lib/systemd/system", "/run/systemd/generator",
                       "/run/systemd/generator.early", "/run/systemd/generator.late"):
-        if os.path.lexists(Path(directory) / UNIT_NAME):
+        if (os.path.lexists(Path(directory) / UNIT_NAME)
+                or os.path.lexists(Path(directory) / (UNIT_NAME + ".d"))):
             # systemd may synthesize a transient unit from the active kernel swap.
             # No on-disk conflicting unit is accepted.
             raise RuntimeError("Conflicting existing swap unit: " + directory)
@@ -137,6 +143,11 @@ def persist_authorized():
         os.link(temp, UNIT_PATH)
     finally:
         os.unlink(temp)
+    dirfd = os.open(UNIT_DIR, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(dirfd)
+    finally:
+        os.close(dirfd)
     # No --now, no start, no stop: only boot enablement.
     run("/usr/bin/systemctl", "enable", UNIT_NAME)
     if persistence_state() != "enabled":

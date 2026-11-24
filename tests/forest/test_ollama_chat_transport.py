@@ -344,8 +344,8 @@ class TransportTests(unittest.TestCase):
                 key = data["messages"][-1]["content"]
 
                 def chunk(data):
-                    self.wfile.write(("%x\\r\\n" % len(data)).encode()
-                                     + data + b"\\r\\n")
+                    self.wfile.write(("%x\r\n" % len(data)).encode()
+                                     + data + b"\r\n")
                     self.wfile.flush()
 
                 try:
@@ -357,7 +357,7 @@ class TransportTests(unittest.TestCase):
                     received[key].set()
                     if release.wait(5):
                         chunk(packet(" complete", done=True))
-                        self.wfile.write(b"0\\r\\n\\r\\n")
+                        self.wfile.write(b"0\r\n\r\n")
                         self.wfile.flush()
                 except OSError:
                     pass

@@ -67,7 +67,8 @@ def _digest_file(path: Path, *, ceiling: int, mode: int):
         _deny("C4B_BINDING_NONABSOLUTE_SOURCE_PATH")
     fd = None
     try:
-        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC |
+                     os.O_NONBLOCK)
         before = os.fstat(fd)
         if (not stat.S_ISREG(before.st_mode) or
                 before.st_uid != 0 or before.st_gid != 0 or

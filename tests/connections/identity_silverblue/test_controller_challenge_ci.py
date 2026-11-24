@@ -240,5 +240,48 @@ class ControllerFreshChallengeTests(unittest.TestCase):
         self.assertIs(report["freshControllerNonceInActualSignedBeginDenialInCI"], True)
         self.refused(serial=b"console fragment\r\n\r"+self.serial.replace(b"\n", b"\r\n"))
 
+
+    def test_29_idle_fifo_nonce_and_serial_refused_without_blocking(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "idle-fifo"
+            os.mkfifo(p, 0o600)
+            # A child timeout makes the regression deterministic even on
+            # the old blocking-open implementation. No writer is opened.
+            script = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import verify_controller_challenge_ci as V
+for read, expected in (
+    (V._read_nonce_file, "C4B_CONTROLLER_CHALLENGE_FILE_UNSAFE"),
+    (V._read_serial_file, "C4B_CONTROLLER_GUEST_SERIAL_UNSAFE"),
+):
+    try:
+        read(Path(sys.argv[2]))
+    except V.Refused as error:
+        if str(error) != expected:
+            raise
+    else:
+        raise AssertionError("nonregular input accepted")
+"""
+            subprocess.run([sys.executable, "-B", "-c", script,
+                            str(Path(__file__).resolve().parent), str(p)],
+                           check=True, timeout=5, capture_output=True)
+
+    def test_30_serial_regular_file_and_symlink_boundary(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "serial"
+            p.write_bytes(self.serial)
+            self.assertEqual(V._read_serial_file(p), self.serial)
+            self.assertIs(self.check(serial=V._read_serial_file(p))[
+                "hostAuthenticated"], False)
+            link = Path(d) / "alias"
+            link.symlink_to(p)
+            with self.assertRaises(V.Refused):
+                V._read_serial_file(link)
+            with self.assertRaises(V.Refused):
+                V._read_serial_file(Path(d))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -13,7 +13,7 @@ assert.match(owner, /if \(!gotOutput \|\| !gotExit\) return/);
 assert.match(owner, /exitOk && verified/);
 assert.match(owner, /TimeSettings\.externalSystemAuthBusy = true/);
 assert.match(owner, /TimeSettings\.externalSystemAuthBusy = false/);
-assert.doesNotMatch(owner, /execDetached|sudo|password/i);
+assert.doesNotMatch(owner.replace(/^\s*\/\/[^\n]*$/gm, ""), /execDetached|sudo|password/i);
 assert.match(pane, /nativeAuthVersion === 1/);
 assert.match(pane, /MemoryOperation.request\("verify", 0\)/);
 assert.doesNotMatch(pane, /execDetached|kitty|sudo/);

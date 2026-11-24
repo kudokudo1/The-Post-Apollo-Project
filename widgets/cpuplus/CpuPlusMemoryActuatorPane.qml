@@ -10,11 +10,22 @@ Item {
     property var sample: null
     property string status: "READING"
     property bool received: false
+    property bool exited: false
+    property bool exitOk: false
+    property var pendingSample: null
+    function finish() {
+        if (!received || !exited) return;
+        sample = exitOk ? pendingSample : null;
+        status = sample ? "OBSERVED" : "UNAVAILABLE";
+    }
     property int stagedGiB: 16
     function gib(kib) { return (kib / 1048576).toFixed(2) + " GiB"; }
     function refresh() {
-        if (probe.running) return;
+        if (probe.running || (status === "READING" && (received || exited))) return;
         received = false;
+        exited = false;
+        exitOk = false;
+        pendingSample = null;
         sample = null;
         status = "READING";
         probe.running = true;
@@ -33,16 +44,15 @@ Item {
                   "/proc/pressure/memory", "/proc/sys/vm/swappiness"]
         stdout: StdioCollector {
             onStreamFinished: {
-                root.sample = Snapshot.parseSnapshot(this.text);
-                root.received = root.sample !== null;
-                root.status = root.received ? "OBSERVED" : "UNAVAILABLE";
+                root.pendingSample = Snapshot.parseSnapshot(this.text);
+                root.received = true;
+                root.finish();
             }
         }
         onExited: function(code, exitStatus) {
-            if (code !== 0 || !root.received) {
-                root.sample = null;
-                root.status = "UNAVAILABLE";
-            }
+            root.exited = true;
+            root.exitOk = code === 0 && exitStatus === 0;
+            root.finish();
         }
     }
     Flickable {

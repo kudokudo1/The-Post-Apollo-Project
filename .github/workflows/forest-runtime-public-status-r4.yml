@@ -1,0 +1,25 @@
+name: Forest Runtime R4 public status
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/runtime_public_status_r4.py'
+      - 'scripts/forest/runtime_events_r3.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'tests/forest/test_runtime_public_status_r4.py'
+      - 'tests/forest/test_runtime_events_r3.py'
+      - 'scripts/forest/RUNTIME_PUBLIC_STATUS_R4.md'
+      - '.github/workflows/forest-runtime-public-status-r4.yml'
+  push:
+    paths:
+      - 'scripts/forest/runtime_public_status_r4.py'
+      - 'tests/forest/test_runtime_public_status_r4.py'
+      - 'scripts/forest/RUNTIME_PUBLIC_STATUS_R4.md'
+      - '.github/workflows/forest-runtime-public-status-r4.yml'
+jobs:
+  disposable-public-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests/forest -p 'test_runtime_public_status_r4.py' -v
+      - run: python3 -m unittest discover -s tests/forest -p 'test_runtime_events_r3.py' -v
+      - run: python3 -m py_compile scripts/forest/runtime_public_status_r4.py tests/forest/test_runtime_public_status_r4.py

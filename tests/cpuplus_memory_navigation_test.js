@@ -17,9 +17,13 @@ assert.match(pane, /CpuPlusMemoryAddControl\s*\{\s*id: addControl\s*width: paren
 assert.match(pane, /CpuPlusSwapComposition\s*\{\s*width: parent.width\s*sample: root.sample\s*capacity: root.capacity/);
 assert.match(pane, /CpuPlusMemoryCapacitySlider\s*\{/);
 const slider = fs.readFileSync(path.join(__dirname, "../widgets/cpuplus/CpuPlusMemoryCapacitySlider.qml"), "utf8");
-assert.match(slider, /orientation: Qt.Horizontal/);
-assert.match(slider, /stepSize: 4/);
-assert.match(slider, /onMoved: if \(root.enabledSlider\) root.valueRequested/);
+assert.match(slider, /SelectorSlider\s*\{/);
+assert.match(slider, /rotation: 90/);
+assert.match(slider, /horizontalStepPresentation: true/);
+assert.match(slider, /selectorProfile: "step"/);
+assert.match(slider, /valueStep: 4/);
+assert.match(slider, /if \(root.enabledSlider\) root.valueRequested\(value\)/);
+assert.doesNotMatch(slider, /Controls\.Slider|MouseArea\s*\{/);
 assert.match(pane, /onValueRequested: function\(value\) \{ root.stageCapacity\(value\); \}/);
 assert.match(pane, /SelectorDial\s*\{/);
 assert.match(pane, /active: root.page === "POL"/);

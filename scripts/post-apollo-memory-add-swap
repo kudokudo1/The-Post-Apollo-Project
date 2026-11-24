@@ -55,7 +55,7 @@ def status():
     available = usage.f_bavail * usage.f_frsize
     reserve = max(32 * GIB, (usage.f_blocks * usage.f_frsize + 9) // 10)
     existing = os.path.lexists(DIRECTORY)
-    return {"filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"nativeAuthVersion": 1, "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": active_swap(),

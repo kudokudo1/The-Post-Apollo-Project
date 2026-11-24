@@ -160,11 +160,19 @@ class Monitor:
         self._due = self._valid_until
         return self._publish("READY_ADVISORY", "FRESH_AUTH_AND_ROOT_CHECK_REQUIRED")
 
-    def tick(self):
-        """Serialized caller; a concurrent call never returns cached readiness."""
+    def tick(self, *, recheck=False):
+        """Serialized caller; explicit recheck discards sampled continuity.
+
+        A manual check cannot accelerate the scheduled stability window.
+        """
+        if type(recheck) is not bool:
+            raise QueueError("INVALID_RECHECK")
         if not self._lock.acquire(blocking=False):
             raise QueueError("MONITOR_BUSY")
         try:
+            if recheck:
+                self._reset_sequence()
+                self._due = None
             return self._poll()
         finally:
             self._lock.release()

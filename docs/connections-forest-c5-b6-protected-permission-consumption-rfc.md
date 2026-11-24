@@ -86,3 +86,37 @@ Obtain owner responses; preserve current DENY ONLY. No further synthetic authori
 ## DECISIONS
 
 Operator-approved development direction: shared Forest architecture and DOC 3 continuation. Proposed consumer join and title policy remain pending owner review; production HOLD. No runtime change, key, deployment, merge or workstation action.
+
+
+## First-Tree DISCLOSURE interface addendum (DOC 3F proposal)
+
+Operator-approved responsibility split: [first-Tree decision](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2161#issuecomment-7139439017) and [UI addendum](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2161#issuecomment-7139466477). This section proposes exact semantic fields for owner agreement, not a new signed wire or runtime implementation. It extends the existing C5 contract and does not supersede independently reviewed denial behavior.
+
+### Input and ownership
+
+| Group | Proposed fields (reuse existing names at their owner boundary) | Producer |
+| --- | --- | --- |
+| Original context | principal_key, tree_key, clone_key (null means base Tree), task_id, execution_context_id, generation, origin | DOC4F resolves existing B6 TaskContext |
+| Original operation | request_id, session_id, user_turn_id, attempt_id, expected_revision, operation, original_request_digest | DOC2F / DOC4F original attempt; no UI-created authority |
+| Recipient | bark_id, requester_id, release_id, seat_id, recipient_id, view_generation, attachment state | Host + Connections DOC2, existing B6 BarkAttachment references alone are not evidence |
+| Output unit | event_kind, sequence, exact serialized byte length and digest, projection/snapshot identity where applicable | DOC2F actual serializer; DOC4F history projection |
+| Permission evidence | original purpose-specific permit identity, issuer/current history, expiry, consent/revocation generation, bound recipient and scope, durable spend evidence | Connections DOC1/2 and C5; never supplied as a trusted UI Boolean |
+
+Each group is bound to the same original operation. No duplicate context registry or task ID allocator. Exact field types/limits and transport serialization must be agreed with producers; existing V1 signatures are not silently extended. Runtime-private identifiers and digests are not public UI fields.
+
+### Behavior and final-send seam
+
+- DOC2F keeps B3 RESERVED/STARTED/DELTA/COMMITTED internal. B3 DELTA precedes the final commit check. Neither model output, local COMMITTED, capability selection nor a valid presentation shape grants disclosure.
+- Separate purpose permissions: LIST_SESSIONS, DISCLOSE_SESSION_TITLES, READ_SESSION, GENERATE, DISCLOSE_PROVISIONAL, COMMIT_GENERATE and SEND where applicable. Final committed reply access must be covered by its own accepted read/release policy; do not assume COMMIT grants display.
+- Proposed host-facing disposition: HOLD (zero private bytes), UNKNOWN_HOLD (uncertain original effect; no retry), or future protected release only through the actual owner-controlled final send. No currently enabled positive release result. A positive Boolean returned to an unrestricted caller would not be a final-send fence.
+- At protected admission verify scope before storage/model access. At actual send, independently verify current source, recipient/attachment, scope, lease, cumulative serialized UTF-8 byte budget and chunk sequence. Serialize send admission against revoke; independently durable one-use stream/operation spend before first irreversible submission. Subsequent chunks require current scoped lease/fence and monotonic sequence, not a new replayable grant. No automatic retry after uncertain send; original receipt lookup only. Send completion is not recipient display or protected terminal proof.
+- STOP requests cancellation; detach invalidates recipient delivery; revoke withdraws permission. They are distinct, and cancellation/close/EOF is not a revoke ACK. Already submitted bytes cannot be recalled. Unknown outcomes remain unknown.
+- Public-only disposable development is a separate explicit host-controlled scope using known synthetic/public input and isolated journal, no private history/tools/credentials and no caller-selected public flag. No fabricated issuer or positive protected permit; real local model execution needs its separate approval. UI2.1 can use public fixtures before protected integration.
+
+### Presentation agreement
+
+Existing LIST consumer returns exactly session_id,title,revision,updated_at_ms for OPEN rows, whereas chat-list policy consumes seven raw B1 fields. DOC4F/UI2 should agree a separate validated four-field presentation projection with request/Tree/view correlation in the enclosing response, without padding missing raw fields or asserting authentication. The title-bearing projection remains protected in production: canonical owner+Tree/Clone before LIMIT, distinct TITLE grant before title selection, bind canonical query/page/snapshot/projection and recipient to original operation (DOC1 correction #7138250815). Until an opaque-only policy is approved, missing TITLE permission yields public HOLD. UI may clear withdrawn/stale presentation; this is not retroactive erasure or revocation settlement.
+
+### Acceptance gates
+
+Owner agreement requested: DOC2F on exact event envelope, serializer and actual send location; DOC4F on resolved context/session/revision and query snapshot/projection; UI2 on presentation correlation, fixed status and STOP/detach semantics; Connections DOC1/2 on independent evidence and original spend; Nurse 2F independent integrated review. Test disposable public-only first Tree, wrong Tree/Clone/task/recipient, stale view/context, revoked/expired lease, missing title permission, DELTA before commit, cancellation, disconnect, duplicate/late chunk, unknown send and no retry. No protected production acceptance until real enrolled authority and native final-send verification. NAS/second-PC deferred. No other owner files modified.

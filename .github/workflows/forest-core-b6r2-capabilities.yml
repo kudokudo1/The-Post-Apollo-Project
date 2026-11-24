@@ -1,0 +1,28 @@
+name: Forest Core B6-R2 Capability Registry CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/capability_registry_b6r2.py'
+      - 'scripts/forest/CAPABILITY_REGISTRY_B6R2.md'
+      - 'tests/forest/test_capability_registry_b6r2.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'scripts/forest/resource_governor_p1.py'
+      - '.github/workflows/forest-core-b6r2-capabilities.yml'
+permissions:
+  contents: read
+jobs:
+  capability-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Registry and Workshop selection
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_capability_registry_b6r2.py' -v
+      - name: R1 shared context regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_shared_context_b6r1.py' -v
+      - name: P1 resource governor regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - name: Compile
+        run: python3 -m py_compile scripts/forest/capability_registry_b6r2.py tests/forest/test_capability_registry_b6r2.py

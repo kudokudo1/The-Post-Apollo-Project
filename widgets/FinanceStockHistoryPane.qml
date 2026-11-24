@@ -84,6 +84,12 @@ Item {
     readonly property var normalizedComparison: intervalComparison !== null
         ? RangeAnalysisPolicy.normalizedIntervalChart(snapshot, savedIntervalA,
             savedIntervalB, pinnedPointIndex, selectedPointIndex) : null
+    // M35: cursor is local to this comparison, never carried across a new pair.
+    property int normalizedSelectedStep: -1
+    readonly property var normalizedStepDetail: normalizedComparison !== null
+        ? RangeAnalysisPolicy.inspectNormalizedStep(normalizedComparison,
+            normalizedSelectedStep) : null
+    onNormalizedComparisonChanged: normalizedSelectedStep = -1
     function clearSavedInterval() {
         savedIntervalSnapshot = null;
         savedIntervalA = -1;
@@ -1056,6 +1062,8 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 9
                     property var plot: stocks.normalizedComparison
+                    property var stepDetail: stocks.normalizedStepDetail
+                    onStepDetailChanged: requestPaint()
                     onPlotChanged: requestPaint()
                     onWidthChanged: requestPaint()
                     onHeightChanged: requestPaint()
@@ -1097,6 +1105,43 @@ Item {
                         };
                         draw(chart.first,"#55CFCA");
                         draw(chart.second,"#C74EC7");
+                        const selected = stepDetail;
+                        if (selected) {
+                            const x = selected.step/chart.maxSteps*(width-1);
+                            ctx.beginPath();
+                            ctx.moveTo(x,0);
+                            ctx.lineTo(x,height-1);
+                            ctx.strokeStyle="#F2D24D";
+                            ctx.lineWidth=1;
+                            ctx.stroke();
+                            function mark(observation,color) {
+                                if (!observation) return;
+                                const p=pointAt(observation);
+                                if (!p) return;
+                                ctx.beginPath();
+                                ctx.arc(p.x,p.y,4,0,Math.PI*2);
+                                ctx.fillStyle=color;
+                                ctx.fill();
+                                ctx.strokeStyle="#F2D24D";
+                                ctx.lineWidth=1.5;
+                                ctx.stroke();
+                            }
+                            mark(selected.first,"#55CFCA");
+                            mark(selected.second,"#C74EC7");
+                        }
+                    }
+                    MouseArea {
+                        objectName: "marketNormalizedStepPicker"
+                        anchors.fill: parent
+                        enabled: stocks.normalizedComparison !== null
+                        acceptedButtons: Qt.LeftButton
+                        onClicked: function(mouse) {
+                            const step=RangeAnalysisPolicy.normalizedStepAtX(
+                                normalizedCanvas.plot, normalizedCanvas.width,
+                                Math.min(mouse.x,normalizedCanvas.width-1));
+                            stocks.normalizedSelectedStep =
+                                step === stocks.normalizedSelectedStep ? -1 : step;
+                        }
                     }
                 }
             }
@@ -1119,6 +1164,31 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
                 color: Colors.orange
+            }
+            GohuText {
+                objectName: "marketNormalizedStepDetail"
+                width: parent.width
+                visible: stocks.normalizedComparison !== null
+                text: {
+                    const d=stocks.normalizedStepDetail;
+                    if (!d) return "CLICK NORMALIZED CHART TO INSPECT A SHARED STEP";
+                    function describe(p) {
+                        return p ? (p.date + " // INDEX " + p.value.toPrecision(6)
+                            + " // " + p.changePct.toFixed(4) + "% FROM START")
+                            : "N/A // INTERVAL ALREADY ENDED";
+                    }
+                    return "OBSERVED STEP " + d.step
+                        + "\n1 // " + describe(d.first)
+                        + "\n2 // " + describe(d.second)
+                        + "\n2 MINUS 1 // " + (d.gapPoints === null
+                            ? "N/A // NO SHARED OBSERVATION"
+                            : d.gapPoints.toFixed(4) + " PERCENTAGE POINTS")
+                        + "\nSAME STEP, NOT NECESSARILY SAME DATE // CLICK AGAIN TO CLEAR";
+                }
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 11
+                color: Colors.white
             }
             ActionButton {
                 id: openSelectedInDay

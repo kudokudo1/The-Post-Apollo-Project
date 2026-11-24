@@ -60,6 +60,9 @@ PanelWindow {
     // Last explicit P0 snapshot drives BOTH badge and popup rows.
     readonly property string selectedModelLoadState: ResidencyPolicy.modelState(
         modelResidency.status, modelResidency.models, selectedLocalModel)
+    // P0-only resident details; same scan and provider as selectedModelLoadState.
+    readonly property var selectedModelProfile: ResidencyPolicy.modelProfile(
+        modelResidency.status, modelResidency.records, selectedLocalModel)
     function refreshLocalModelEvidence() {
         // One user gesture. Both fixed GET helpers target local Ollama.
         if (localInventory.scanning || modelResidency.scanning)
@@ -836,10 +839,63 @@ PanelWindow {
                         : "OLLAMA // NOT CONNECTED"
                 }
 
-                ListView {
-                    id: modelList
+                // Read-only profile from the SAME P0 observation as the
+                // header LOAD/IDLE badge; never perform a second model probe.
+                // Compact popup stages reserve list height over decoration.
+                Rectangle {
+                    id: selectedModelProfilePanel
                     anchors.top: popupProviderStatus.bottom
                     anchors.topMargin: 2
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    height: modelPopup.height >= 270 ? 48 : 0
+                    visible: height > 0
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.cyan
+                    Accessible.name: "Last observed Ollama P0 model profile, not verified GPU execution or permission"
+                    GohuText {
+                        anchors.top: parent.top
+                        anchors.topMargin: 7
+                        anchors.left: parent.left
+                        anchors.leftMargin: 7
+                        anchors.right: parent.right
+                        anchors.rightMargin: 7
+                        text: root.selectedLocalModel
+                            ? "PROFILE // " + root.selectedLocalModel
+                            : "PROFILE // NO SELECTED MODEL"
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                    }
+                    GohuText {
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 7
+                        anchors.left: parent.left
+                        anchors.leftMargin: 7
+                        anchors.right: parent.right
+                        anchors.rightMargin: 7
+                        text: root.selectedModelProfile.state === "LOADED"
+                            ? ("SIZE " + root.selectedModelProfile.sizeMiB
+                                + " MiB / VRAM REP " + root.selectedModelProfile.vramMiB
+                                + " MiB / CTX " + root.selectedModelProfile.context)
+                            : root.selectedModelProfile.state === "NOT_LOADED"
+                                ? "NOT LOADED // NO RESIDENT METRICS"
+                                : "P0 STATUS UNKNOWN // SCAN TO UPDATE"
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+                }
+
+                ListView {
+                    id: modelList
+                    anchors.top: selectedModelProfilePanel.bottom
+                    anchors.topMargin: selectedModelProfilePanel.visible ? 3 : 2
                     anchors.bottom: popupFoot.top
                     anchors.bottomMargin: 3
                     anchors.left: parent.left

@@ -10,6 +10,8 @@ on:
       - "modules/Notifications.qml"
       - "services/notifications/ApolloNotificationRoute.js"
       - "scripts/cpuplus_process_census.py"
+      - "scripts/cpuplus_diagnostic_archive.py"
+      - "tests/cpuplus/test_diagnostic_archive.py"
       - "tests/cpuplus/test_process_census.py"
       - "tests/cpuplus/test_diagnostic_continuity_native.py"
       - "tests/cpuplus/fixtures/DiagnosticContinuityNative.qml"
@@ -26,6 +28,7 @@ jobs:
       - run: node tests/cpuplus/test_diagnostic_controls.cjs
       - run: node tests/cpuplus/test_diagnostic_notifications.cjs
       - run: python3 -B tests/cpuplus/test_process_census.py
+      - run: python3 -B tests/cpuplus/test_diagnostic_archive.py
   native-continuity:
     runs-on: ubuntu-latest
     timeout-minutes: 12

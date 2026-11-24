@@ -78,7 +78,7 @@ ShellRoot {
                 return;
             }
             if (root.phase === 3) {
-                if (CpuPlusDiagnostics.busy) return;
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
                 const report = CpuPlusDiagnostics.reports.inventory;
                 if (!root.check(report && report.status === "COMPLETE",
                                 "scan failed // " + CpuPlusDiagnostics.feedback)) return;
@@ -88,6 +88,19 @@ ShellRoot {
                 if (!root.check(CpuPlusDiagnostics.reportFor("inventory", report.id) === report
                                 && CpuPlusDiagnostics.reportFor("inventory", "stale") === null,
                                 "exact report resolution")) return;
+                if (!root.check(CpuPlusDiagnostics.archiveStatus === "READY"
+                        && CpuPlusDiagnostics.archiveRows.length === 1
+                        && CpuPlusDiagnostics.archiveRows[0].id === report.id,
+                        "archive save receipt")) return;
+                if (!root.check(CpuPlusDiagnostics.loadHistory(), "archive reload request")) return;
+                root.phase = 5;
+                return;
+            }
+            if (root.phase === 5) {
+                if (CpuPlusDiagnostics.archiveBusy) return;
+                if (!root.check(CpuPlusDiagnostics.archiveStatus === "READY"
+                        && CpuPlusDiagnostics.archiveRows[0].id === root.completedId,
+                        "archive reload receipt")) return;
                 root.paneActive = true;
                 root.phase = 4;
                 return;

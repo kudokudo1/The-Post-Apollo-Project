@@ -1,3 +1,24 @@
+function archiveResponse(doc, submitted) {
+    if (!doc || doc.schema !== "post-apollo-diagnostic-archive-v1"
+            || !Array.isArray(doc.rows) || doc.rows.length > 8 || !submitted) return null;
+    const ids = [];
+    for (const row of doc.rows) {
+        if (!row || !validKind(row.kind) || !validReportId(row.id) || ids.indexOf(row.id) >= 0
+                || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(row.status) < 0
+                || typeof row.summary !== "string" || row.summary.length > 4096
+                || typeof row.text !== "string" || row.text.length > 65536
+                || typeof row.finishedAt !== "string"
+                || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.finishedAt)) return null;
+        ids.push(row.id);
+    }
+    if (submitted.action === "list") return doc.savedId === null ? doc.rows : null;
+    if (submitted.action !== "save" || !submitted.record || doc.savedId !== submitted.record.id) return null;
+    const exact = doc.rows.find(row => row.id === doc.savedId);
+    if (!exact || ["kind","id","status","summary","text","finishedAt"].some(
+            key => exact[key] !== submitted.record[key])) return null;
+    return doc.rows;
+}
+
 function validKind(kind) {
     return ["memory", "inventory", "threads", "census"].indexOf(kind) >= 0;
 }

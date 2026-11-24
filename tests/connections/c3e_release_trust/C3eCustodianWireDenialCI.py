@@ -16,6 +16,7 @@ from pathlib import Path
 import socket
 import struct
 import sys
+from types import MappingProxyType
 
 HERE = Path(__file__).resolve().parent
 
@@ -37,7 +38,7 @@ SCHEMA = "postapollo.connections.c3e-wire-signed-denial-ci-v1"
 STATUS = "WIRE_TEST_SIGNATURE_VALID_NOT_ENROLLED_CUSTODIAN"
 MAX_PACKET = 4096
 MAX_RECEIVE_TIMEOUT_SECONDS = 5.0
-DENIED = {
+DENIED = MappingProxyType({
     **C.DENIED,
     "actualIndependentCustodianVerified": False,
     "realOneUseChallengeSettled": False,
@@ -47,7 +48,7 @@ DENIED = {
     "credentialActionsAllowed": False,
     "safeToRetry": False,
     "productionSignInAllowed": False,
-}
+})
 
 
 class Refused(ValueError):

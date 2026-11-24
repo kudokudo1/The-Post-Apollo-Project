@@ -55,7 +55,7 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in broker
           print("C3E_SYNTHETIC_CUSTODIAN_CI // SIGNATURE_IS_NOT_ENROLLED_CUSTODY")
           PY
-      - name: 30 signing, tamper, same-key fork, replay and protected HOLD cases
+      - name: 33 signing, tamper, exact primitive types, replay and protected HOLD cases
         shell: bash
         run: |
           set -euo pipefail

@@ -465,6 +465,16 @@ class RealProcessCustodianWireDenialTests(unittest.TestCase):
         self.assertIsNone(caught.exception.__cause__)
         self.assertIsNone(caught.exception.__context__)
 
+    def test_36_denial_defaults_and_returned_results_are_isolated(self):
+        with self.assertRaises(TypeError):
+            M.DENIED["safeToRetry"] = True
+        with self.assertRaises(TypeError):
+            M.C.DENIED["productionSignInAllowed"] = True
+        out = self.run_one()
+        out["safeToRetry"] = True
+        out["safeActions"].append("SIGN_IN")
+        self.denied(self.run_one())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

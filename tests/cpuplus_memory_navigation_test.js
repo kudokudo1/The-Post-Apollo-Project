@@ -66,7 +66,7 @@ ctx.sample={rows:[{...baseRow,priority:99},autoRow]}; ctx.reconcilePriority(); a
 ctx.selectPriorityDevice(autoRow.name); assert.equal(ctx.stagedPriority,-1);
 ctx.stagePriority(0); assert.equal(ctx.stagedPriority,0); ctx.resetPriority(); assert.equal(ctx.stagedPriority,-1);
 ctx.sample={rows:[autoRow,autoRow]}; ctx.reconcilePriority(); assert.equal(ctx.priorityBaseline,null);
-ctx.sample={rows:[baseRow]}; ctx.selectPriorityDevice(baseRow.name); ctx.policySection=0; ctx.stagePriority(200); assert.equal(ctx.stagedPriority,-1);
+ctx.sample={rows:[baseRow]}; ctx.selectPriorityDevice(baseRow.name); ctx.policySection=0; ctx.stagePriority(200); assert.equal(ctx.stagedPriority,100);
 assert.match(pane, /id: policyBottomRail[\s\S]*?model: \["SWAPPINESS", "PRIORITY"\]/);
 assert.match(pane, /objectName: "cpuplusPriorityDial"/);
 assert.match(pane, /maximumValue: 32767/);

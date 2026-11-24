@@ -811,6 +811,7 @@ Item {
                             options: ["0", "8K", "16K", "24K", "32767"]
                             numericReferenceValues: [0, 8192, 16384, 24576, 32767]
                             currentValue: Math.max(0, root.stagedPriority)
+                            readoutText: root.stagedPriority < 0 && !rotating ? "—" : String(Math.round(previewNumericValue))
                             interactive: root.priorityEditable
                             enabled: interactive
                             onValueRequested: function(value) { root.stagePriority(Math.round(value)); }

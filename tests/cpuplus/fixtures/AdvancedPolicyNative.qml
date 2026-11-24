@@ -62,6 +62,18 @@ ShellRoot {
                     && pane.cards[2].value === "2097152 B" && pane.cards[3].value === "DISABLED"
                     && pane.cards[4].value === "30.00 s" && pane.observedAt > 0,
                     "actual rendering model")) return;
+                pane.selectPreview("background");
+                pane.stagePreview(15);
+                if (!smoke.check(pane.stagedValue === 15 && pane.observation.background.ratio === 10,
+                    "ratio preview separate from observed")) return;
+                pane.stagePreview(101);
+                if (!smoke.check(pane.stagedValue === 15,"out of range refusal")) return;
+                pane.resetPreview();
+                if (!smoke.check(pane.stagedValue === 10,"reset actual")) return;
+                pane.selectPreview("writer");
+                pane.stagePreview(3145728);
+                if (!smoke.check(pane.stagedValue === 3145728 && pane.observation.writer.bytes === 2097152,
+                    "byte preview separate from observed")) return;
                 pane.raw = "invalid";
                 pane.exitOk = true;
                 pane.finish();
@@ -69,7 +81,7 @@ ShellRoot {
                 return;
             }
             if (!smoke.check(pane.cards.length === 0 && pane.observedAt === 0
-                && pane.status === "UNAVAILABLE // RECHECK","invalid result clears values")) return;
+                && pane.status === "UNAVAILABLE // RECHECK" && pane.stagedValue === null && pane.selectedKey === "","invalid result clears values")) return;
             console.log("ADVANCED_POLICY_NATIVE_PASS");
             smoke.done = true;
             Qt.quit();

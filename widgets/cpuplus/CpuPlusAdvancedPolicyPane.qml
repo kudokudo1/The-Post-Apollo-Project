@@ -15,21 +15,45 @@ Column {
     property bool exitOk: false
     property string raw: ""
     property double observedAt: 0
+    property string selectedKey: ""
+    property var stagedValue: null
+    readonly property var selectedSpec: Policy.previewSpec(observation, selectedKey)
+    readonly property bool canStage: visible && !busy && selectedSpec !== null
+    function selectPreview(key) {
+        if (!visible || busy) return;
+        const spec = Policy.previewSpec(observation, key);
+        if (!spec || !Policy.validPreview(spec,spec.value)) return;
+        selectedKey = key;
+        stagedValue = spec.value;
+    }
+    function stagePreview(value) {
+        if (!canStage || !Policy.validPreview(selectedSpec,value)) return;
+        stagedValue = value;
+    }
+    function resetPreview() {
+        if (canStage) stagePreview(selectedSpec.value);
+    }
+    function clearPreview() {
+        selectedKey = "";
+        stagedValue = null;
+    }
+    onVisibleChanged: if (!visible) clearPreview()
     readonly property bool busy: reader.running || status === "READING"
     readonly property var cards: observation ? [
-        {label:"METADATA CACHE PRESSURE", value:String(observation.cachePressure),
+        {key:"cachePressure",label:"METADATA CACHE PRESSURE", value:String(observation.cachePressure),
             detail:"Inode / directory-entry reclaim preference; not RAM usage."},
-        {label:"BACKGROUND WRITEBACK", value:Policy.pairLabel(observation.background),
+        {key:"background",label:"BACKGROUND WRITEBACK", value:Policy.pairLabel(observation.background),
             detail:"RATIO " + observation.background.ratio + "% // BYTES " + observation.background.bytes + " B"},
-        {label:"WRITER WRITEBACK", value:Policy.pairLabel(observation.writer),
+        {key:"writer",label:"WRITER WRITEBACK", value:Policy.pairLabel(observation.writer),
             detail:"RATIO " + observation.writer.ratio + "% // BYTES " + observation.writer.bytes + " B"},
-        {label:"FLUSH INTERVAL", value:observation.writebackCentisecs === 0 ? "DISABLED" : Policy.seconds(observation.writebackCentisecs),
+        {key:"writebackCentisecs",label:"FLUSH INTERVAL", value:observation.writebackCentisecs === 0 ? "DISABLED" : Policy.seconds(observation.writebackCentisecs),
             detail:"Periodic flusher wake interval."},
-        {label:"DIRTY DATA AGE", value:Policy.seconds(observation.expireCentisecs),
+        {key:"expireCentisecs",label:"DIRTY DATA AGE", value:Policy.seconds(observation.expireCentisecs),
             detail:"Age at which dirty data becomes eligible for writeout."}
     ] : []
     function refresh() {
         if (!visible || busy) return;
+        clearPreview();
         observation = null;
         observedAt = 0;
         received = false;
@@ -41,6 +65,7 @@ Column {
     }
     function finish() {
         if (!received || !exited) return;
+        clearPreview();
         observation = exitOk ? Policy.parse(raw) : null;
         observedAt = observation ? Date.now() : 0;
         status = observation ? "OBSERVED // EXPLICIT READ" : "UNAVAILABLE // RECHECK";
@@ -100,6 +125,7 @@ Column {
     Repeater {
         model: root.cards
         delegate: Rectangle {
+            id: policyCard
             required property var modelData
             width: root.width
             height: cardBody.implicitHeight + 8
@@ -135,19 +161,77 @@ Column {
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
                 }
+                ActionButton {
+                    width: parent.width
+                    height: 26
+                    label: "TARGET"
+                    selected: root.selectedKey === modelData.key
+                    available: !root.busy && Policy.previewSpec(root.observation,modelData.key) !== null
+                    onLeftClicked: root.selectPreview(modelData.key)
+                }
+                Column {
+                    width: parent.width
+                    spacing: 4
+                    visible: root.selectedKey === modelData.key && root.selectedSpec !== null
+                    GohuText {
+                        width: parent.width
+                        text: "TARGET // " + Policy.previewLabel(root.selectedSpec,root.stagedValue)
+                        color: Colors.yellow
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
+                    Grid {
+                        width: parent.width
+                        columns: 2
+                        spacing: 4
+                        Repeater {
+                            model: root.selectedSpec ? [-root.selectedSpec.coarse,-root.selectedSpec.step,
+                                root.selectedSpec.step,root.selectedSpec.coarse] : []
+                            delegate: ActionButton {
+                                required property real modelData
+                                width: Math.max(0,(parent.width-4)/2)
+                                height: 26
+                                label: (modelData > 0 ? "+" : "-") + (root.selectedSpec && root.selectedSpec.unit === "B"
+                                    ? Math.abs(modelData)/1048576 + " MiB"
+                                    : root.selectedSpec && root.selectedSpec.unit === "cs"
+                                    ? Math.abs(modelData)/100 + " s" : Math.abs(modelData))
+                                labelFontSizeMode: Text.HorizontalFit
+                                contentPadding: 2
+                                available: root.canStage && root.selectedKey === policyCard.modelData.key
+                                    && Policy.validPreview(root.selectedSpec,root.stagedValue + modelData)
+                                onLeftClicked: root.stagePreview(root.stagedValue + modelData)
+                            }
+                        }
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 26
+                        label: "RESET TARGET"
+                        available: root.canStage
+                        onLeftClicked: root.resetPreview()
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: Policy.pairWarning(root.observation,root.selectedKey,root.stagedValue)
+                        visible: text.length > 0
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                }
             }
         }
     }
     GohuText {
         width: parent.width
-        text: "ACTUAL ONLY // TARGET / DEFAULT / APPLY NOT CONNECTED"
+        text: "PREVIEW ONLY // DEFAULT / APPLY NOT CONNECTED"
         color: Colors.orange
         font.pixelSize: 11
         wrapMode: Text.WordWrap
     }
     GohuText {
         width: parent.width
-        text: "Dirty limits use ratio OR bytes, not both. Ratios refer to kernel-eligible memory, not installed RAM. Reads are sequential, not an atomic snapshot. Zero / conflicting pairs are shown without guessing."
+        text: "Dirty limits use ratio OR bytes, not both. Ratios refer to kernel-eligible memory, not installed RAM. Reads are sequential, not an atomic snapshot. Zero / conflicting pairs are shown without guessing. Preview stays in the observed unit; refresh or selecting another card discards it. Preview bounds are not kernel safety approval."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

@@ -22,7 +22,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False dnf5-plugins
           dnf copr enable -y errornointernet/quickshell
-          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui qt6-qtsvg git coreutils findutils
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui qt6-qtsvg git coreutils findutils diffutils grep
           quickshell --version
           quickshell --version | grep '0.3.'
       - uses: actions/checkout@v4

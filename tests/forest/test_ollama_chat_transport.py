@@ -325,6 +325,115 @@ class TransportTests(unittest.TestCase):
         finally:
             generator.close()
 
+    def test_stop_isolates_overlapping_chunked_exchanges(self):
+        # Both requests use one server and one model. Distinct connections
+        # and host-owned tokens are the only cancellation boundary here.
+        tokens = {key: threading.Event() for key in ("A", "B")}
+        received = {key: threading.Event() for key in tokens}
+        started = {key: threading.Event() for key in tokens}
+        release = threading.Event()
+        events = {key: [] for key in tokens}
+        errors = {key: [] for key in tokens}
+
+        class Chunked(FakeOllama):
+            protocol_version = "HTTP/1.1"
+
+            def do_POST(self):
+                data = json.loads(self.rfile.read(
+                    int(self.headers["Content-Length"])))
+                key = data["messages"][-1]["content"]
+
+                def chunk(data):
+                    self.wfile.write(("%x\\r\\n" % len(data)).encode()
+                                     + data + b"\\r\\n")
+                    self.wfile.flush()
+
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/x-ndjson")
+                    self.send_header("Transfer-Encoding", "chunked")
+                    self.end_headers()
+                    chunk(packet(key + " partial"))
+                    received[key].set()
+                    if release.wait(5):
+                        chunk(packet(" complete", done=True))
+                        self.wfile.write(b"0\\r\\n\\r\\n")
+                        self.wfile.flush()
+                except OSError:
+                    pass
+                finally:
+                    self.close_connection = True
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Chunked)
+        serving = threading.Thread(target=server.serve_forever, daemon=True)
+        serving.start()
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+
+        def consume(key):
+            try:
+                for event in chat.stream_chat(
+                        model="qwen3:1.7b", endpoint=endpoint,
+                        messages=[{"role": "user", "content": key}],
+                        cancel_event=tokens[key]):
+                    events[key].append(event)
+                    if event["event"] == "DELTA":
+                        started[key].set()
+            except Exception as exc:
+                errors[key].append(exc)
+
+        workers = {key: threading.Thread(target=consume, args=(key,),
+                                         daemon=True) for key in tokens}
+        before = {t.ident for t in threading.enumerate()
+                  if t.name == "forest-b2-watch"}
+        try:
+            for worker in workers.values():
+                worker.start()
+            for key in tokens:
+                self.assertTrue(received[key].wait(2))
+                self.assertTrue(started[key].wait(2))
+            tokens["A"].set()
+            workers["A"].join(2)
+            self.assertFalse(workers["A"].is_alive())
+            self.assertEqual(len(errors["A"]), 1)
+            self.assertIsInstance(errors["A"][0], chat.ChatRefusal)
+            self.assertEqual(errors["A"][0].code, "OLLAMA_CANCELLED")
+            self.assertNotIn("COMPLETE", [e["event"] for e in events["A"]])
+            self.assertTrue(workers["B"].is_alive())
+            self.assertFalse(tokens["B"].is_set())
+            release.set()
+            workers["B"].join(2)
+            self.assertFalse(workers["B"].is_alive())
+            self.assertEqual(errors["B"], [])
+            self.assertEqual(events["B"][-1]["text"], "B partial complete")
+            self.assertEqual(events["B"][-1]["event"], "COMPLETE")
+            after = {t.ident for t in threading.enumerate()
+                     if t.name == "forest-b2-watch"}
+            self.assertEqual(after, before)
+        finally:
+            release.set()
+            for worker in workers.values():
+                if worker.ident is not None:
+                    worker.join(7)
+            server.shutdown()
+            server.server_close()
+            serving.join(2)
+
+    def test_cancel_after_final_packet_delta_prevents_complete(self):
+        FakeOllama.lines = [packet("final", done=True)]
+        token = threading.Event()
+        generator = chat.stream_chat(
+            model="qwen3:1.7b",
+            messages=[{"role": "user", "content": "hi"}],
+            endpoint=self.endpoint, cancel_event=token)
+        try:
+            self.assertEqual(next(generator)["event"], "STARTED")
+            self.assertEqual(next(generator)["event"], "DELTA")
+            token.set()
+            with self.assertRaisesRegex(chat.ChatRefusal, "OLLAMA_CANCELLED"):
+                next(generator)
+        finally:
+            generator.close()
+
     def test_cli_streams_json_and_does_not_require_user_files(self):
         input_stream = io.StringIO("hello")
         output_stream = io.StringIO()

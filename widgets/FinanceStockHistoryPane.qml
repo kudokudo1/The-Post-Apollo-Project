@@ -109,6 +109,10 @@ Item {
     // M39: cumulative leadership uses only the same matched close dates.
     readonly property var crossStockLeadership: crossStockChart !== null
         ? RangeAnalysisPolicy.summarizeCrossStockLeadership(crossStockComparison) : null
+    // M40: optional zero-centered gap chart; shares M38's selected date.
+    property bool showCrossStockGap: false
+    readonly property var crossStockGap: crossStockChart !== null
+        ? RangeAnalysisPolicy.crossStockGapChart(crossStockComparison) : null
     function saveStockReference() {
         if (rangeAnalysis === null || !stockFeed) return;
         const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
@@ -789,6 +793,129 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 11
                 color: Colors.cyan
+            }
+            ActionButton {
+                objectName: "marketCrossStockGapToggle"
+                width: Math.min(parent.width, 210)
+                height: visible ? 28 : 0
+                visible: stocks.crossStockGap !== null
+                available: visible
+                label: stocks.showCrossStockGap ? "HIDE GAP CHART" : "SHOW GAP CHART"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                selected: stocks.showCrossStockGap
+                onLeftClicked: stocks.showCrossStockGap = !stocks.showCrossStockGap
+            }
+            GohuText {
+                width: parent.width
+                visible: stocks.showCrossStockGap && stocks.crossStockGap !== null
+                text: stocks.crossStockGap
+                    ? ("PERFORMANCE GAP // " + stocks.crossStockGap.currentSymbol
+                        + " MINUS " + stocks.crossStockGap.referenceSymbol
+                        + "\nPOSITIVE = CURRENT LEADS // NEGATIVE = REFERENCE LEADS"
+                        + "\nSCALE +/- " + stocks.crossStockGap.extent.toPrecision(5)
+                        + " PERCENTAGE POINTS // ZERO = EQUAL")
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+            Rectangle {
+                objectName: "marketCrossStockGapChart"
+                width: parent.width
+                visible: stocks.showCrossStockGap && stocks.crossStockGap !== null
+                height: visible ? 140 : 0
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.cyan
+                Canvas {
+                    id: crossStockGapCanvas
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    property var plot: stocks.crossStockGap
+                    property int selectedStep: stocks.crossStockSelectedStep
+                    onPlotChanged: requestPaint()
+                    onSelectedStepChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onVisibleChanged: { if (visible) requestPaint(); }
+                    onPaint: {
+                        const ctx=getContext("2d");
+                        ctx.clearRect(0,0,width,height);
+                        const chart=plot;
+                        if (!chart || width < 5 || height < 5) return;
+                        const pointAt=function(p) {
+                            return RangeAnalysisPolicy.crossStockGapPoint(chart,p,width,height);
+                        };
+                        const zero=pointAt({step:0,value:0});
+                        if (!zero) return;
+                        ctx.beginPath();
+                        ctx.moveTo(0,zero.y);
+                        ctx.lineTo(width-1,zero.y);
+                        ctx.strokeStyle="#808080";
+                        ctx.lineWidth=1;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        for (let i=0;i<chart.points.length;i++) {
+                            const p=pointAt(chart.points[i]);
+                            if (!p) return;
+                            if (i===0) ctx.moveTo(p.x,p.y);
+                            else ctx.lineTo(p.x,p.y);
+                        }
+                        ctx.strokeStyle="#ED981A";
+                        ctx.lineWidth=1.8;
+                        ctx.stroke();
+                        if (selectedStep >= 0 && selectedStep < chart.points.length) {
+                            const p=pointAt(chart.points[selectedStep]);
+                            if (!p) return;
+                            ctx.beginPath();
+                            ctx.moveTo(p.x,0);
+                            ctx.lineTo(p.x,height-1);
+                            ctx.strokeStyle="#F2D24D";
+                            ctx.lineWidth=1;
+                            ctx.stroke();
+                            ctx.beginPath();
+                            ctx.arc(p.x,p.y,4,0,Math.PI*2);
+                            ctx.fillStyle="#F2D24D";
+                            ctx.fill();
+                        }
+                    }
+                    MouseArea {
+                        objectName: "marketCrossStockGapPicker"
+                        anchors.fill: parent
+                        enabled: stocks.showCrossStockGap && stocks.crossStockGap !== null
+                        acceptedButtons: Qt.LeftButton
+                        onClicked: function(mouse) {
+                            const step=RangeAnalysisPolicy.normalizedStepAtX(
+                                crossStockGapCanvas.plot,crossStockGapCanvas.width,
+                                Math.min(mouse.x,crossStockGapCanvas.width-1));
+                            stocks.crossStockSelectedStep =
+                                step === stocks.crossStockSelectedStep ? -1 : step;
+                        }
+                    }
+                }
+            }
+            GohuText {
+                objectName: "marketCrossStockGapDetail"
+                width: parent.width
+                visible: stocks.showCrossStockGap && stocks.crossStockGap !== null
+                text: {
+                    const d=stocks.crossStockGap;
+                    if (!d) return "";
+                    const step=stocks.crossStockSelectedStep;
+                    const p=step>=0 && step<d.points.length ? d.points[step] : d.points[d.maxSteps];
+                    return (step>=0 ? "SELECTED " : "LAST OBSERVED ") + p.date
+                        + " // GAP " + p.value.toFixed(4) + " PP"
+                        + "\n" + d.from + " TO " + d.to
+                        + " // " + d.points.length + " COMMON CLOSE DATES"
+                        + "\nCLICK EITHER CHART // SHARED CURSOR"
+                        + "\nCUMULATIVE GAP // NOT DAILY RETURNS OR CALENDAR SPACING";
+                }
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.white
             }
             Rectangle {
                 objectName: "marketRangeAnalysisPanel"

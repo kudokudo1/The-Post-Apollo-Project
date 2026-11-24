@@ -80,6 +80,15 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(self.read()["rows"], [record(1)])
         self.assertEqual(sorted(p.name for p in self.folder.iterdir()), ["archive.lock","reports.json"])
 
+    def test_abandoned_private_staging_recovered(self):
+        self.save(record(1))
+        pending = self.folder / ".pending"
+        pending.write_bytes(b"interrupted write")
+        pending.chmod(0o600)
+        self.save(record(2))
+        self.assertFalse(pending.exists())
+        self.assertEqual(self.read()["rows"], [record(2), record(1)])
+
     def test_insecure_mode_and_duplicate_id_refused(self):
         self.save(record(1))
         (self.folder/"reports.json").chmod(0o644)

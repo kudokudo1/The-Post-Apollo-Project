@@ -12,7 +12,7 @@ Scope {
     property int memoryMenuIndex: 0
     property string selectedReport: "memory"
     // Opaque session-scoped capture identity; never used as authorization.
-    readonly property string sessionTag: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + "-" + Math.random().toString(36).slice(2)
+    readonly property string sessionTag: Date.now().toString(36) + "-" + (Math.random().toString(36).slice(2) || "0") + "-" + (Math.random().toString(36).slice(2) || "0")
     property int captureSequence: 0
     property string captureId: ""
     signal captureFinished(string job, string reportId)
@@ -101,9 +101,9 @@ Scope {
             // Missing exit/stream notification: refuse another run rather than
             // accepting late output under a new request identity.
             owner.faulted = true;
-            worker.running = false;
             owner.publishResult("NOT VERIFIED", "RUNNER UNAVAILABLE // COMPLETION NOT OBSERVED",
                                 owner.output.length <= owner.maximumReport ? owner.output : "");
+            worker.running = false;
         }
     }
 

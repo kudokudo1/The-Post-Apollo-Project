@@ -1,3 +1,5 @@
 module qs.services.diagnostics
 
 singleton CpuPlusDiagnostics 1.0 CpuPlusDiagnostics.qml
+
+DiagnosticReportArchive 1.0 DiagnosticReportArchive.qml

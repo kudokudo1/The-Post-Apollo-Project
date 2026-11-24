@@ -217,3 +217,6 @@ await import("./test_market_m35_normalized_step.mjs");
 
 // M36: detached cross-stock comparison on actual matching dates.
 await import("./test_market_m36_cross_stock.mjs");
+
+// M37: normalized cross-stock chart on actual common closing dates.
+await import("./test_market_m37_cross_stock_chart.mjs");

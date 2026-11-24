@@ -11,7 +11,7 @@ assert.equal(args("arbitrary"), null);
 assert.deepEqual(args("memory").slice(-4), ["--duration", "120", "--interval", "10"]);
 assert.equal(args("inventory").at(-1), "/local/scripts/cpuplus_qml_workload_inventory.py");
 assert.deepEqual(args("threads").slice(-6), ["--duration", "30", "--interval", "1", "--top", "4"]);
-for (const kind of ["memory", "inventory", "threads"]) {
+for (const kind of ["memory", "inventory", "threads", "census"]) {
     assert.equal(args(kind)[0], "/usr/bin/timeout");
     assert.ok(args(kind).includes("/usr/bin/python3"));
 }
@@ -43,3 +43,16 @@ assert.match(ui,/reportText.copy\(\)/);
 assert.match(parent,/active: root.page === "DIAG"\s+visible: active\s+sourceComponent: CpuPlusDiagnosticsPane/);
 assert.doesNotMatch(ui,/Process\s*\{|Timer\s*\{/);
 console.log("CPU++ on-demand diagnostics policy and integration contracts PASS");
+
+assert.deepEqual(args("census").slice(-4), ["--duration","30","--interval","10"]);
+const censusRow = {pid:12,name:"quickshell",rssKiB:1048576,cpuPct:90,readBps:null,writeBps:2048};
+const sample = {schema:"post-apollo-process-census-v1",event:"census",sequence:1,scope:"same-user",
+    observed:1,cpuMeasured:1,ioMeasured:0,coverage:{truncated:false},previousCoverage:{truncated:false},rows:[censusRow]};
+const end = {schema:sample.schema,event:"complete",samples:1};
+assert.match(policy.summarize("census",jsonl([sample,end])), /TOP CPU \/\/ quickshell #12 90.0%/);
+assert.equal(policy.summarize("census",jsonl([sample])),null);
+assert.equal(policy.summarize("census",jsonl([sample,{...end,samples:2}])),null);
+assert.equal(policy.summarize("census",jsonl([{...sample,sequence:2},end])),null);
+assert.equal(policy.summarize("census",jsonl([{...sample,rows:[{...censusRow,writeBps:-1}]},end])),null);
+assert.match(policy.summarize("census",jsonl([{...sample,coverage:{truncated:true}},end])), /SCAN LIMIT REACHED/);
+assert.match(ui,/PROCESS CENSUS \/\/ 30s/);

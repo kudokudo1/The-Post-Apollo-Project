@@ -41,14 +41,21 @@ def active_swap():
                 return {"sizeKiB": int(fields[2]), "priority": int(fields[4])}
     return None
 
+def mount_info():
+    raw = run("/usr/bin/findmnt", "--json", "--target", str(PARENT), "--output", "TARGET,FSTYPE")
+    rows = json.loads(raw).get("filesystems", [])
+    if len(rows) != 1 or rows[0].get("target") not in ("/", "/var", "/var/lib"):
+        raise RuntimeError("Cannot identify trusted mount for /var/lib")
+    return rows[0]["target"], rows[0].get("fstype")
+
 def status():
     secure_parent()
-    fs = run("/usr/bin/findmnt", "-n", "-o", "FSTYPE", "-T", str(PARENT)).strip()
+    mountpoint, fs = mount_info()
     usage = os.statvfs(PARENT)
     available = usage.f_bavail * usage.f_frsize
     reserve = max(32 * GIB, (usage.f_blocks * usage.f_frsize + 9) // 10)
     existing = os.path.lexists(DIRECTORY)
-    return {"filesystem": fs, "availableGiB": available // GIB,
+    return {"filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": active_swap(),
@@ -69,8 +76,9 @@ def allocate(size):
     print("Temporary swap, priority 10. No existing swap will be removed.", flush=True)
     if input(f"Type ADD {size} to confirm: ") != f"ADD {size}":
         raise RuntimeError("Cancelled; no allocation attempted")
-    validate_request(size, status())
-    devices = run("/usr/bin/btrfs", "filesystem", "show", "--raw", str(PARENT))
+    current = status()
+    validate_request(size, current)
+    devices = run("/usr/bin/btrfs", "filesystem", "show", "--raw", current["mountpoint"])
     if not re.search(r"\bTotal devices\s+1\b", devices):
         raise RuntimeError("Only single-device Btrfs is supported")
     os.umask(0o077)

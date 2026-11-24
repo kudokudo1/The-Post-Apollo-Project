@@ -1,0 +1,20 @@
+name: Forest UI2.1 Public Display
+on:
+  pull_request:
+    paths:
+      - 'widgets/forest/ui2/**'
+      - 'widgets/ForestChatSessionPolicy.js'
+      - 'services/forest/ForestSessionListConsumerPolicy.js'
+      - 'tests/forest/test_ui21_public_display.js'
+      - '.github/workflows/forest-ui2-public-display.yml'
+permissions:
+  contents: read
+jobs:
+  display-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node tests/forest/test_ui21_public_display.js

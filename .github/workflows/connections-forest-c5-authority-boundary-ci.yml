@@ -11,6 +11,8 @@ on:
       - 'services/connections/forest/ForestC5TerminalReceiptPreflight.py'
       - 'scripts/forest/turn_bridge_b3.py'
       - 'scripts/forest/host_admission_b4a.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'scripts/forest/capability_registry_b6r2.py'
   workflow_dispatch:
 
 permissions:
@@ -71,7 +73,7 @@ jobs:
               assert 'ForestC5AuthorityBoundary' not in Path(path).read_text()
           print('FOREST_C5_AUTHORITY_BOUNDARY // NO_LOCAL_FALLBACK_OR_PRODUCTION_AUTHORITY')
           PY
-      - name: Twenty-six Forest C5 refusal tests including separate list/title permissions
+      - name: Twenty-nine Forest C5 refusal and B6 nonauthority tests
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

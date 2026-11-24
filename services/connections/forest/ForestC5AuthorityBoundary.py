@@ -105,7 +105,12 @@ class ForestC5AuthorityBoundary:
         """
         if self._mode != MODE_REFERENCE:
             _deny("PROTECTED_MODE_REFUSES_UNTRUSTED_REFERENCE_INSPECTION")
-        if type(forest_binding) is not dict or set(forest_binding) != BINDING_FIELDS:
+        # Bound work and refuse non-plain keys before set equality can invoke
+        # caller-controlled equality/hash implementations.
+        if (type(forest_binding) is not dict
+                or len(forest_binding) != len(BINDING_FIELDS)
+                or any(type(key) is not str for key in forest_binding)
+                or set(forest_binding) != BINDING_FIELDS):
             _deny("EXACT_FOREST_BINDING_FIELDS_REQUIRED")
         for name in (
                 "owner_key", "tree_key", "session_id", "user_turn_id",
@@ -119,15 +124,18 @@ class ForestC5AuthorityBoundary:
         if (type(forest_binding["expected_revision"]) is not int or
                 not 0 <= forest_binding["expected_revision"] < 2**63):
             _deny("INVALID_EXPECTED_REVISION")
+        invalid_intent = False
         try:
             original = S._parse_exact(intent_wire, S.INTENT_FIELDS)
             intent, intent_sha = S._intent(
                 intent_wire, now_ms=original["issuedAtMs"]
             )
-        except (S.EvidenceHold, TypeError, KeyError) as exc:
-            raise ForestC5Hold(
-                "FOREST_C5_AUTHORITY_HOLD // UNTRUSTED_INTENT_INVALID"
-            ) from exc
+        except (S.EvidenceHold, TypeError, KeyError):
+            invalid_intent = True
+        # Raise outside the handler: lower-level JSON/Unicode exceptions can
+        # retain the rejected input, even if their messages are not displayed.
+        if invalid_intent:
+            _deny("UNTRUSTED_INTENT_INVALID")
         for field, intended in SIGNED_EQUIVALENTS.items():
             if forest_binding[field] != intent[intended]:
                 _deny("REFERENCE_BINDING_MISMATCH_" + field)

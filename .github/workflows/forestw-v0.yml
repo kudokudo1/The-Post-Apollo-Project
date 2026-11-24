@@ -42,3 +42,4 @@ jobs:
           python3 tests/forest/test_forest_session_list_consumer_v1.py
           python3 tests/forest/test_forest_model_residency_ui.py
           python3 tests/forest/test_forest_model_profile_p0.py
+          python3 tests/forest/test_forest_hardware_capacity_view_p2c.py

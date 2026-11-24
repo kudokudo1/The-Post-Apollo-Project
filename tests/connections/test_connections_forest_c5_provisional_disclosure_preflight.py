@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts/forest"))
 
 from services.connections.forest import ForestC5ProvisionalDisclosurePreflight as D
+from services.connections.forest import ForestC5AuthorityBoundary as C
 from services.connections.forest import ForestC5SignedEvidencePreflight as S
 from services.connections.forest import ForestC5ExactSessionV1Preflight as V
 import session_journal_v0 as b1
@@ -28,6 +29,7 @@ import ollama_chat_transport as chat
 import native_host_candidate_b5b as native
 from shared_context_b6r1 import TaskContext
 from runtime_stop_control_r2 import RuntimeStopControl
+from context_first_tree_m2 import SessionContextRef
 sys.path.insert(0, str(ROOT / "tests/connections"))
 from test_connections_forest_c5_provisional_delta_disclosure import FakePermit
 sys.path.insert(0, str(ROOT / "tests/forest"))
@@ -455,15 +457,12 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                     operation = "fixture_operation_1234567890"
                     control = RuntimeStopControl(context, operation)
                     attempt_id = None
-                    # Reuse actual R2 arbitration at the existing fixture
-                    # hooks; the shared B3 production seam is not edited.
-                    def local_transport(**kwargs):
-                        return chat.stream_chat(
-                            **kwargs, cancel_event=control.transport_event)
+                    ref = SessionContextRef(context, sid, 1, uid)
+                    authority = C.ForestC5AuthorityBoundary(required_mode=C.MODE_PROTECTED)
 
                     def pre_commit():
-                        if not control.try_enter_commit(context, operation, attempt_id):
-                            return False
+                        # B3 now owns commit entry; this remains an injected
+                        # synthetic B4 policy hook, not protected authority.
                         if lost_ack:
                             self.assertEqual(control.request_stop(
                                 context, operation, attempt_id),
@@ -475,17 +474,20 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                                    fence_request_id=operation) if lost_ack else {})
 
                     bridge = b3.ForestTurnBridge(
-                        journal, clock_ms=lambda: 200, streamer=local_transport,
+                        journal, clock_ms=lambda: 200, streamer=chat.stream_chat,
                         synthetic_terminal_outbox=True)
                     with contextlib.closing(bridge.exchange(
                         owner="fixture_owner", session_id=sid,
                         expected_revision=1, model="qwen3:1.7b",
-                        endpoint=endpoint, pre_commit=pre_commit, **fences
+                        endpoint=endpoint, pre_commit=pre_commit,
+                        context_ref=ref, current_context_ref=ref,
+                        resolve_current_context=lambda: ref,
+                        stop_control=control, operation_id=operation, **fences
                     )) as stream:
                         res = next(stream)
                         self.assertEqual(res["event"], "RESERVED")
                         attempt_id = res["attempt_id"]
-                        control.bind_reserved_attempt(context, operation, attempt_id)
+                        # Actual B3 now binds the reserved attempt itself.
                         started = next(stream)
                         self.assertEqual(started["event"], "STARTED")
                         delta = next(stream)
@@ -503,6 +505,11 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                         self.no_grant(result)
                         self.assertIsNone(result["emitEvent"])
                         self.assertEqual(result["emittedBytes"], 0)
+                        with self.assertRaisesRegex(
+                            C.ForestC5Hold, "PROVISIONAL_OUTPUT_SEPARATE_PROTECTED_PERMISSION_REQUIRED"
+                        ) as denied:
+                            authority.authorize_disclose_provisional(delta, cw)
+                        self.assertNotIn(SECRET, str(denied.exception))
                         if cancel:
                             self.assertEqual(control.request_stop(
                                 context, operation, attempt_id), "STOP_LATCHED")
@@ -526,12 +533,17 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                             ) as caught:
                                 D.block_provisional_delta(cw, iw, terminal, now_ms=200)
                             self.assertNotIn(SECRET, str(caught.exception))
-                            with self.assertRaises(StopIteration):
-                                next(stream)
+                            with self.assertRaisesRegex(
+                                C.ForestC5Hold, "COMMITTED_REPLY_PROTECTED_RELEASE_POLICY_REQUIRED"
+                            ) as denied:
+                                authority.authorize_release_committed_reply(terminal)
+                            self.assertNotIn(SECRET, str(denied.exception))
                             self.assertEqual(control.request_stop(
                                 context, operation, attempt_id),
                                 "COMMIT_ENTRY_ALREADY_WON")
-                        control.close(context, operation, attempt_id)
+                            with self.assertRaises(StopIteration):
+                                next(stream)
+                        # Actual B3 finally block closes the one-shot control.
                         self.assertEqual(control.request_stop(
                             context, operation, attempt_id), "CONTROL_CLOSED")
                         # The existing native candidate can submit only its
@@ -568,6 +580,11 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                         self.assertEqual(len(journal.turns("fixture_owner", sid)),
                                          1 if cancel else 2)
                         self.assertEqual(len(PublicFixture.observed), 1)
+                        self.assertEqual(PublicFixture.observed[0][2]["messages"],
+                                         [{"role": "user", "content": "Public synthetic question"}])
+                        self.assertEqual(authority.status()["safeActions"], [])
+                        for field in C.NO_AUTHORITY:
+                            self.assertIs(authority.status()[field], False, field)
         finally:
             server.shutdown()
             server.server_close()

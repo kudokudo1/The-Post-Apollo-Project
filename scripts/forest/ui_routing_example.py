@@ -15,7 +15,7 @@ SIGNALS = (
 )
 
 
-def evaluate(args):
+def recommendation(args):
     if (len(args) != 5 or args[0] not in ("auto", "small", "big")
             or args[1] not in ("light", "normal", "deep")
             or any(v not in allowed for v, (_, allowed) in zip(args[2:], SIGNALS))):
@@ -26,7 +26,11 @@ def evaluate(args):
     reasoning = ReasoningReference(scope, args[1], "explicit")
     evidence = tuple(SemanticEvidence(scope, name, value, "example-input")
                      for value, (name, _) in zip(args[2:], SIGNALS) if value != "unset")
-    result = recommend(RoutingInput(scope, args[0], reasoning, evidence))
+    return recommend(RoutingInput(scope, args[0], reasoning, evidence))
+
+
+def evaluate(args):
+    result = recommendation(args)
     return {"schema": "post-apollo.forest.ui-routing-example.i1",
             "inputs": args, "reference": presentation_reference(result)}
 

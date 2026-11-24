@@ -1,0 +1,28 @@
+name: Forest Core I5 Cgroup Observation CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/cgroup_observation_i5.py'
+      - 'scripts/forest/CGROUP_OBSERVATION_I5.md'
+      - 'tests/forest/test_cgroup_observation_i5.py'
+      - 'scripts/forest/process_observation_i4.py'
+      - 'scripts/forest/resource_calibration_i3.py'
+      - 'scripts/forest/resource_governor_p1.py'
+      - 'scripts/forest/performance_capacity_p2c.py'
+      - '.github/workflows/forest-core-i5-cgroup-observation.yml'
+permissions:
+  contents: read
+jobs:
+  cgroup-observation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_cgroup_observation_i5.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_process_observation_i4.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_calibration_i3.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_governor_p1.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_performance_capacity_p2c.py' -v
+      - run: python3 -m py_compile scripts/forest/cgroup_observation_i5.py tests/forest/test_cgroup_observation_i5.py

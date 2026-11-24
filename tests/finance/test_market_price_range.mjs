@@ -226,3 +226,6 @@ await import("./test_market_m38_cross_stock_date.mjs");
 
 // M39: cumulative relative leadership across shared closing dates.
 await import("./test_market_m39_relative_leadership.mjs");
+
+// M40: common-date cumulative performance gap chart.
+await import("./test_market_m40_relative_gap.mjs");

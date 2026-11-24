@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path
 import re
-import secrets
 import stat
 import sys
 
@@ -85,7 +84,16 @@ def commit(directory, rows):
     raw = encode({"schema": SCHEMA, "rows": rows})
     if len(raw) > MAX_FILE:
         raise ValueError("archive size")
-    name = ".pending-" + secrets.token_hex(16)
+    # The caller holds the archive lock. Reclaim only our fixed, private
+    # staging file after an interrupted save; refuse unsafe filesystem types.
+    name = ".pending"
+    try:
+        stale = open_private(directory, name, os.O_RDONLY)
+    except FileNotFoundError:
+        pass
+    else:
+        os.close(stale)
+        os.unlink(name, dir_fd=directory)
     fd = open_private(directory, name, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
     try:
         with os.fdopen(fd, "wb") as handle:

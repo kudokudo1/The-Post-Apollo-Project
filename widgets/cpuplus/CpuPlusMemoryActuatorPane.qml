@@ -110,6 +110,7 @@ Item {
 
     Grid {
         id: menuRail
+        objectName: "cpuplusMemoryMenuRail"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -136,6 +137,7 @@ Item {
     }
     Column {
         id: footer
+        objectName: "cpuplusMemoryFooter"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -159,6 +161,7 @@ Item {
     }
     Flickable {
         id: scroll
+        objectName: "cpuplusMemoryScroll"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: menuRail.bottom

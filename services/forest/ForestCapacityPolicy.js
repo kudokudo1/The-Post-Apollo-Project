@@ -6,6 +6,7 @@ var MAX_BYTES = 1048576;
 var MAX_GPUS = 8;
 var NO_MODEL = {name:"",installed:false,resident:false,matched:false,
                 artifactMiB:"?",residentMiB:"?",vramMiB:"?",calibrated:false,
+                residentBytes:null,vramBytes:null,contextTokens:null,
                 placement:{state:"UNKNOWN",share:null,label:"?"}};
 var EMPTY = {hostRam:"?",cpuVisible:"?",cpuAffinity:"?",gpuCards:[],
              gpuCount:0,gpuHint:"UNKNOWN",ollamaVersion:"?",model:NO_MODEL};
@@ -52,7 +53,8 @@ function _modelLists(installed, resident, requested) {
             return null;
         loaded[record.model]={
             size:record.size_bytes_reported,
-            vram:record.vram_bytes_reported
+            vram:record.vram_bytes_reported,
+            context:record.context_length_reported
         };
     }
     return {
@@ -114,9 +116,44 @@ function selectedRecord(record, requested, lists) {
             artifactMiB:_mb(record.installed_artifact_bytes_reported),
             residentMiB:_mb(record.resident_memory_bytes_reported),
             vramMiB:_mb(record.resident_vram_bytes_reported),
+            residentBytes:record.resident_memory_bytes_reported,
+            vramBytes:record.resident_vram_bytes_reported,
+            contextTokens:lists.resident === null ? null : lists.resident.context,
             placement:reportedPlacement(record.resident,
                 record.resident_memory_bytes_reported, record.resident_vram_bytes_reported),
             calibrated:false};
+}
+// Copy a bounded, explicitly held historical observation. Never a minimum
+// requirement, current resource availability, benchmark, or permission.
+function holdMemoryObservation(status, requested, data, sequence, localTime) {
+    if (status !== "OBSERVED" || !validModelName(requested) ||
+        !_count(sequence) || sequence === 0 ||
+        typeof localTime !== "string" || !/^\d{2}:\d{2}:\d{2}$/.test(localTime) ||
+        !data || !data.model || data.model.name !== requested ||
+        data.model.matched !== true || data.model.resident !== true ||
+        !_count(data.model.residentBytes) || !_optional(data.model.vramBytes,false) ||
+        !_optional(data.model.contextTokens,true) ||
+        typeof data.ollamaVersion !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(data.ollamaVersion))
+        return null;
+    return {model:requested,version:data.ollamaVersion,sequence:sequence,time:localTime,
+        residentBytes:data.model.residentBytes,vramBytes:data.model.vramBytes,
+        contextTokens:data.model.contextTokens};
+}
+function observationComparison(a,b) {
+    if (!a || !b) return "CAPTURE TWO RESIDENT OBSERVATIONS";
+    if (a.model !== b.model || a.version !== b.version)
+        return "DIFFERENT MODEL OR OLLAMA VERSION // NOT COMPARABLE";
+    if (a.sequence === b.sequence)
+        return "SAME CHECK // CHECK AGAIN FOR ANOTHER OBSERVATION";
+    if (a.contextTokens === null || b.contextTokens === null)
+        return "CONTEXT UNKNOWN // NO CONTEXT COMPARISON";
+    if (a.contextTokens === b.contextTokens)
+        return "SAME REPORTED CONTEXT // NOT A CONTEXT-SIZE TRIAL";
+    return "DIFFERENT REPORTED CONTEXTS // WORKLOAD EQUIVALENCE UNKNOWN";
+}
+function memoryObservationLabel(bytes) {
+    return bytes === null ? "?" : (bytes / 1048576).toFixed(2) + " MiB";
 }
 function _hold(reason) {
     return {valid:false,status:"UNAVAILABLE",reason:reason,

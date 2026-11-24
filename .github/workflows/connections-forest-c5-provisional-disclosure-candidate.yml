@@ -9,6 +9,9 @@ on:
       - ".github/workflows/connections-forest-c5-provisional-disclosure-candidate.yml"
       - "services/connections/forest/ForestC5ExactSessionV1Preflight.py"
       - "scripts/forest/turn_bridge_b3.py"
+      - "scripts/forest/ollama_chat_transport.py"
+      - "scripts/forest/native_host_candidate_b5b.py"
+      - "tests/forest/test_ollama_chat_transport.py"
   workflow_dispatch:
 
 permissions:
@@ -65,7 +68,7 @@ jobs:
               assert "ForestC5ProvisionalDisclosurePreflight" not in Path(owner_file).read_text()
           print("C5_DISCLOSURE_CANDIDATE_SOURCE_ONLY // NO_PERMISSION_ISSUANCE")
           PY
-      - name: 32 adversarial candidate and real B3 DELTA drop tests
+      - name: 34 candidate and existing B2/B3/B5b boundary tests
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

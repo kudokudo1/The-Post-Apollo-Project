@@ -1,0 +1,45 @@
+name: ConversationFeed transcript compatibility
+on:
+  pull_request:
+    paths:
+      - 'components/ConversationFeed.qml'
+      - 'components/NeonScrollBar.qml'
+      - 'components/SafeDropShadow.qml'
+      - 'tests/components/conversation_feed_transcript/**'
+      - '.github/workflows/conversation-feed-transcript.yml'
+permissions:
+  contents: read
+jobs:
+  native-feed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare isolated Qt runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb dbus-x11 libxcb-cursor0 libxkbcommon-x11-0 libgl1 libegl1 libgles2 libopengl0 libpipewire-0.3-0 libwayland-client0
+      - name: Download pinned Quickshell (same release as Hospital lifecycle CI)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/feed-qs"
+          curl --proto '=https' --tlsv1.2 -fLSs --retry 2 https://github.com/actions-precompiled/quickshell-bin/releases/download/v0.3.0/quickshell-0.3.0-linux-amd64.tar.gz -o "$RUNNER_TEMP/feed-qs/qs.tar.gz"
+          printf '%s  %s\n' 3de3ac310a856a635fb6ed2d9850370ab7c4c06f7a4ecbc70773a93b4d0dd0b9 "$RUNNER_TEMP/feed-qs/qs.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/feed-qs/qs.tar.gz" -C "$RUNNER_TEMP/feed-qs"
+      - name: Native layout, draft, send and focus regressions
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/run"
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          timeout 30s dbus-run-session -- xvfb-run -a "$RUNNER_TEMP/feed-qs/quickshell/bin/quickshell" --path "$GITHUB_WORKSPACE/tests/components/conversation_feed_transcript/shell.qml" --no-color 2>&1 | tee "$work/output"
+          ! grep -q FEED_TRANSCRIPT_FAIL "$work/output"
+          grep -q FEED_TRANSCRIPT_NATIVE_PASS "$work/output"

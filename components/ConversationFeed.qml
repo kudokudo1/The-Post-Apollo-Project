@@ -44,6 +44,16 @@ Rectangle {
     property string sendingLabel: "SENDING"
     property bool richMessageActions: false
 
+    // Independent, default-preserving presentation options for embedded feeds.
+    // These are UI controls only, not a transport or authorization boundary.
+    property bool showHeader: true
+    property bool showComposer: true
+
+    onShowComposerChanged: {
+        if (!showComposer && messageInput)
+            messageInput.focus = false;
+    }
+
     function firstCodeBlock(value) {
         const text = String(value || "");
         const match = /\`\`\`[^\n]*\n([\s\S]*?)\`\`\`/.exec(text);
@@ -113,6 +123,7 @@ Rectangle {
 
     Rectangle {
         id: header
+        objectName: "conversationHeader"
 
         anchors {
             top: parent.top
@@ -122,7 +133,7 @@ Rectangle {
 
         height: 60
 
-        visible: !chatFeed.discordMode
+        visible: chatFeed.showHeader && !chatFeed.discordMode
 
         color: Colors.dark
         radius: 0
@@ -266,9 +277,10 @@ Rectangle {
 
     Rectangle {
         id: messageViewport
+        objectName: "conversationViewport"
 
         anchors {
-            top: header.bottom
+            top: chatFeed.showHeader ? header.bottom : parent.top
             left: parent.left
             right: parent.right
             bottom: composer.visible ? composer.top : parent.bottom
@@ -290,6 +302,7 @@ Rectangle {
 
     ListView {
         id: messageList
+        objectName: "conversationMessages"
 
         anchors {
             fill: messageViewport
@@ -298,7 +311,7 @@ Rectangle {
             leftMargin: 16
             rightMargin: 16
 
-            bottomMargin: chatFeed.sendError !== "" ? 30 : 16
+            bottomMargin: chatFeed.showComposer && chatFeed.sendError !== "" ? 30 : 16
         }
 
         z: 2
@@ -625,6 +638,7 @@ Rectangle {
 
     Rectangle {
         id: composer
+        objectName: "conversationComposer"
 
         anchors {
             left: parent.left
@@ -638,7 +652,8 @@ Rectangle {
 
         height: 54
 
-        visible: !chatFeed.discordMode && chatFeed.conversation !== null
+        visible: chatFeed.showComposer && !chatFeed.discordMode && chatFeed.conversation !== null
+        enabled: chatFeed.showComposer
 
         color: Colors.dark
         radius: 0
@@ -675,6 +690,7 @@ Rectangle {
 
         TextInput {
             id: messageInput
+            objectName: "conversationInput"
 
             anchors {
                 left: parent.left
@@ -691,7 +707,7 @@ Rectangle {
 
             clip: true
 
-            enabled: !chatFeed.sending && chatFeed.sendEnabled
+            enabled: chatFeed.showComposer && !chatFeed.sending && chatFeed.sendEnabled
 
             color: enabled ? Colors.white : Colors.cyan
 
@@ -752,7 +768,7 @@ Rectangle {
 
             radius: 0
 
-            property bool canSend: chatFeed.sendEnabled && !chatFeed.sending && messageInput.text.trim() !== ""
+            property bool canSend: chatFeed.showComposer && chatFeed.sendEnabled && !chatFeed.sending && messageInput.text.trim() !== ""
 
             property bool isHovered: sendMouse.containsMouse && canSend
 
@@ -849,6 +865,7 @@ Rectangle {
 
     Text {
         id: sendErrorText
+        objectName: "conversationSendError"
 
         anchors {
             left: parent.left
@@ -860,7 +877,7 @@ Rectangle {
             bottomMargin: 6
         }
 
-        visible: !chatFeed.discordMode && chatFeed.sendError !== ""
+        visible: chatFeed.showComposer && !chatFeed.discordMode && chatFeed.sendError !== ""
 
         z: 5
 
@@ -943,7 +960,8 @@ Rectangle {
             draftByScope[effectiveScope] = "";
         }
         delete pendingByScope[effectiveScope];
-        messageInput.forceActiveFocus();
+        if (showComposer)
+            messageInput.forceActiveFocus();
         Qt.callLater(function () {
             if (messageList.count > 0 && effectiveScope !== "")
                 messageList.positionViewAtEnd();
@@ -951,7 +969,7 @@ Rectangle {
     }
 
     function trySend() {
-        if (!conversation || !sendEnabled || sending || !effectiveScope)
+        if (!showComposer || !conversation || !sendEnabled || sending || !effectiveScope)
             return;
 
         const text = messageInput.text.trim();
@@ -965,11 +983,12 @@ Rectangle {
     onSendSuccessSerialChanged: finishConfirmedSend()
 
     function focusMessageInput() {
-        if (!conversation)
+        if (!showComposer || !conversation)
             return;
 
         Qt.callLater(function () {
-            messageInput.forceActiveFocus();
+            if (chatFeed.showComposer)
+                messageInput.forceActiveFocus();
         });
     }
 

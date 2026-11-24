@@ -115,3 +115,39 @@ after historyReady; existing policy/source routing is retained. No edits to
 notifications service or QML producer here. Ownership and exact delivery
 semantics still require coordination. Production event age and recurrence
 policy not approved. Tests use private temporary SQLite fixtures only.
+
+## M1c.3d.2 // one-attempt reservation and Hub adapter
+
+NotificationsService.pushRich invokes appendNotification but returns no
+durable acknowledgement. History saves asynchronously (one-second debounce),
+same-ID calls update retained history and can reappear as popups, and BLOCK
+suppresses history while DND/ZZ suppress popups. History may be cleared/pruned
+or disabled. Therefore absence from the Hub is not proof of non-delivery.
+
+Delivery(events).attempt(event_id, read_status=..., clock=..., max_age_ms=...,
+offer=...) is an opt-in synchronous one-attempt fence. It revalidates the
+candidate against the exact pending intent and fresh matching monitor status
+(or a persisted terminal request), reserves the ID in the same SQLite DB,
+then revalidates before a single offer call. The owner supplies live status
+and Unix/monotonic milliseconds in Monitor's clock domain. No DB transaction
+is held across the call. The reservation is consumed before any offer and
+never cleared/retried automatically, including crash, suppression, unavailable
+Hub or unknown outcome. This favors avoiding duplicate attempts over guaranteed
+delivery. Reservation is not evidence of delivery. There is no atomic
+transaction across Hub, monitor and queue; a final race remains possible.
+The caller should check Hub readiness before reserving, and serialize queue
+mutations, monitor refresh and offer as far as its runtime permits.
+
+MemoryQueueNotificationAdapter.js is the isolated QML-importable Hub offer
+function. It checks the short-lived reservation packet and Hub readiness,
+refuses blocked or duplicate retained IDs, uses pushRich with source
+cpu-plus-memory-queue, and delegates DND/ZZ and history behavior to the Hub.
+HISTORY_OBSERVED is only in-memory presence; never call it a durable receipt
+or a popup/read confirmation. The packet is ephemeral and must never be saved,
+queued, replayed or bridged asynchronously. Pass Date.now() immediately on
+the QML offer side; no cross-process bridge, shell registration, or route
+change is implemented. Ready message is historical advisory, not permission.
+No auto-replay from history, completion receipt, new notification backend or
+privileged operation. The attempt ledger is user-owned, not protected
+against same-UID edits or restoration of an older DB. Native bridge/owner
+coordination, crash tests, policy acceptance and production activation pending.

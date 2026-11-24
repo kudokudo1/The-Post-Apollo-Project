@@ -43,7 +43,7 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         view = (ROOT / "widgets/ForestW.qml").read_text()
         slider = (ROOT / "components/SelectorSlider.qml").read_text()
         rail = view.split("id: modelFormSlider", 1)[1].split(
-            "visible: !root.autoPreviewOpen && localInventory.modelCount === 0", 1)[0]
+            "visible: !root.autoPreviewOpen && !root.benchmarkReportsOpen && localInventory.modelCount === 0", 1)[0]
         self.assertEqual(view.count("SelectorSlider {"), 2)
         self.assertIn('indexInteraction: "preview-release"', rail)
         self.assertIn('optionLabels: ["BIG", "AUTO", "SMALL"]', rail)

@@ -17,6 +17,17 @@ Scope {
     property string captureId: ""
     signal captureFinished(string job, string reportId)
     property string selectedArchiveId: ""
+    property string compareBeforeId: ""
+    property string compareAfterId: ""
+    function selectComparison(side, reportId) {
+        if (archiveBusy || archiveStatus !== "READY") return false;
+        const row = archiveRows.find(item => item.id === reportId);
+        if (!row || row.status !== "COMPLETE") return false;
+        if (side === "before") compareBeforeId = row.id;
+        else if (side === "after") compareAfterId = row.id;
+        else return false;
+        return true;
+    }
     readonly property var archiveRows: archive.rows
     readonly property string archiveStatus: archive.status
     readonly property bool archiveBusy: archive.busy

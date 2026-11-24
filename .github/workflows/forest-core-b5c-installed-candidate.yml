@@ -1,0 +1,60 @@
+name: Forest Core B5c Installed Candidate CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/native_host_candidate_b5b.py'
+      - 'scripts/forest/INSTALLED_HOST_B5C.md'
+      - 'tests/forest/native_ci/**'
+      - '.github/workflows/forest-core-b5c-installed-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fedora-rpm-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build exact B5b candidate in disposable Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(sha256sum scripts/forest/native_host_candidate_b5b.py | cut -d ' ' -f1)"
+          mkdir "$RUNNER_TEMP/forest-b5c"
+          printf '%s\n' "$expected" > "$RUNNER_TEMP/forest-b5c-source.sha"
+          docker run --rm \
+            -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+            -v "$PWD:/source:ro" -v "$RUNNER_TEMP/forest-b5c:/out" \
+            fedora:44 bash /source/tests/forest/native_ci/build_forest_host_ci.sh
+      - name: Install, observe and remove in fresh disposable Fedora container
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(cat "$RUNNER_TEMP/forest-b5c-source.sha")"
+          docker run --rm \
+            -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+            -v "$RUNNER_TEMP/forest-b5c:/input:ro" \
+            -v "$PWD/tests/forest/native_ci:/ci:ro" \
+            fedora:44 bash /ci/verify_forest_host_ci.sh
+  inherited-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: B5b native socket contract
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_native_host_candidate_b5b.py' -v
+      - name: B5a disposable boundary
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_boundary_fixture_b5a.py' -v
+      - name: B1 journal
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: B3 turn bridge
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a admission
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: ForestW session consumer
+        run: python3 -B tests/forest/test_forest_session_list_consumer_v1.py

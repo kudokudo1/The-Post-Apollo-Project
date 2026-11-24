@@ -22,6 +22,14 @@ The adapter is a *reader*, not a connector or daemon. Tests create and dispose o
 
 Both results are always \`KernelRecoveryObservation\` with **all** protected C5/current history/H0/native signer/terminal/production/command/retry/undo fields \`False\` and \`safe_actions=()\`. Failed kernel observation returns HOLD without calling the comparator. A successful kernel observation preserves only the **already non-authorizing** original #2350 diagnostic and remains \`KERNEL_OBSERVED_UNENROLLED_TWO_RETURNS_UNKNOWN_HOLD\`.
 
+## CORRECTIVE HARDENING // Packet snapshot and receiver identity
+
+The original CI adapter encoded caller-owned response dictionaries before observing packets, then compared the original mutable dictionaries afterward. A mutation between these steps could change the diagnostic without changing the matched packet. The corrected adapter takes a bounded private flat copy of each response before encoding either packet and passes those same private copies to the comparator. Accepted values are immutable plain scalar values or a four-integer tuple (binary64 bits); nested mutable values, custom objects, oversized field counts and unbounded integers are refused before receiving. This is not an atomic cross-source snapshot or a trusted production wire.
+
+The original distinct-receiver check also compared Python object identity, which did not exclude two different file descriptors for the same Linux socket. The correction additionally compares the live descriptor's device/inode identity and refuses aliases before consuming any packet. This is an isolated CI check, not a lifetime pin against concurrent caller-controlled descriptor replacement.
+
+Regression cases observe real kernel packets while deliberately changing caller-owned C5 history or native timeout values after the read. The result must still describe the matched original bytes. A real duplicated descriptor carrying both role packets is refused before read. All existing no-authority flags and the private test encoding for valid fixture responses remain unchanged. No new issuer, service, hardware setup, production interface or native permission.
+
 ## HOW TO USE
 
 In GitHub, review the four added files and the dedicated workflow. The real Linux tests run **only** under root on a disposable GitHub-hosted Ubuntu runner. The workflow guards against outside forks and does not run on the operator's machine.

@@ -263,6 +263,9 @@ def expand_authorized(target):
           "basePriority": 10, "extensionPriority": 9, "temporary": True}), flush=True)
 
 
+class ReductionRecovery(RuntimeError):
+    """Durable intent exists; no further withdrawal without reconciliation."""
+
 class ReductionBlocked(RuntimeError):
     def __init__(self, code, evidence=None):
         super().__init__(code)
@@ -421,7 +424,7 @@ def withdraw_authorized(target):
         raise PermissionError("Administrator authentication required")
     identity = extension_identity()
     if os.path.lexists(WITHDRAW_MARKER) or os.path.lexists(WITHDRAW_MARKER.with_name("withdrawal-result.json")):
-        raise ReductionBlocked("RECOVERY_REQUIRED")
+        raise ReductionRecovery("RECOVERY_REQUIRED")
     check_extension_boot_policy()
     first = reduction_plan(target, read_reduction_snapshot())
     time.sleep(2)
@@ -434,7 +437,10 @@ def withdraw_authorized(target):
             raise ReductionBlocked("CAPACITY_CHANGED")
     record = {"version": REDUCTION_VERSION, "state": "PREPARED", "targetGiB": target,
               "identity": identity, "timeNs": time.time_ns(), "evidence": second}
-    durable_withdrawal_record(record, initial=True)
+    try:
+        durable_withdrawal_record(record, initial=True)
+    except (OSError, ValueError) as error:
+        raise ReductionRecovery("INTENT_PUBLICATION_UNVERIFIED") from error
     # Last live check after durable intent. A workload can still race the kernel;
     # never force, delete, retry or assume the call completed on interruption.
     try:
@@ -444,19 +450,27 @@ def withdraw_authorized(target):
         if any(final[key] != second[key] for key in ("baseSizeKiB", "extensionSizeKiB")):
             raise ReductionBlocked("CAPACITY_CHANGED")
     except ReductionBlocked as error:
-        durable_withdrawal_record({"state": "NOT_STARTED", "code": error.code})
-        raise
-    run("/usr/sbin/swapoff", "--", str(EXT_FILE))
-    observed = read_reduction_snapshot()["rows"]
-    base = observed.get(str(SWAPFILE))
-    if (str(EXT_FILE) in observed or not base or base["kind"] != "file"
-            or base["priority"] != 10 or base["sizeKiB"] != second["baseSizeKiB"]
-            or extension_identity() != identity):
-        raise RuntimeError("Withdrawal outcome unknown; inspect kernel and retained intent")
-    result = {"version": REDUCTION_VERSION, "state": "VERIFIED", "targetGiB": target,
-              "sizeKiB": base["sizeKiB"], "basePriority": 10,
-              "extensionActive": False, "fileRetained": True, "timeNs": time.time_ns()}
-    durable_withdrawal_record(result)
+        try:
+            durable_withdrawal_record({"state": "NOT_STARTED", "code": error.code})
+        except (OSError, ValueError) as write_error:
+            raise ReductionRecovery("FINAL_CHECK_RECORD_UNVERIFIED") from write_error
+        raise ReductionRecovery("NOT_STARTED_" + error.code) from error
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        raise ReductionRecovery("FINAL_CHECK_UNKNOWN") from error
+    try:
+        run("/usr/sbin/swapoff", "--", str(EXT_FILE))
+        observed = read_reduction_snapshot()["rows"]
+        base = observed.get(str(SWAPFILE))
+        if (str(EXT_FILE) in observed or not base or base["kind"] != "file"
+                or base["priority"] != 10 or base["sizeKiB"] != second["baseSizeKiB"]
+                or extension_identity() != identity):
+            raise RuntimeError("Withdrawal readback mismatch")
+        result = {"version": REDUCTION_VERSION, "state": "VERIFIED", "targetGiB": target,
+                  "sizeKiB": base["sizeKiB"], "basePriority": 10,
+                  "extensionActive": False, "fileRetained": True, "timeNs": time.time_ns()}
+        durable_withdrawal_record(result)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        raise ReductionRecovery("WITHDRAWAL_OUTCOME_UNKNOWN") from error
     print("VERIFIED REDUCTION:", json.dumps(result), flush=True)
 
 
@@ -496,6 +510,9 @@ def main(args):
         else:
             raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB")
         return 0
+    except ReductionRecovery as error:
+        print("REDUCTION RECOVERY:", json.dumps({"version": REDUCTION_VERSION, "state": "RECOVERY_REQUIRED", "code": str(error)}), flush=True)
+        return 3
     except ReductionBlocked as error:
         print("REDUCTION BLOCKED:", json.dumps({"version": REDUCTION_VERSION, "state": "WAITING", "code": error.code, "evidence": error.evidence}), flush=True)
         return 2

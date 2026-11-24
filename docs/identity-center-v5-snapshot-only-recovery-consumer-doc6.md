@@ -31,7 +31,7 @@ The native caller must not use the legacy callable API for real protected recove
 
 ## VERIFY
 
-The extended suite (43 original-attempt tests: 26 inherited plus 17 new) covers genuine synthetic Ed25519 signed BEGIN, STATUS, CANCEL and RECOVER fixture values; actual signed `AUTHENTICATED` and `UNAVAILABLE` status; missing/malformed/sideloaded candidate values; executable Python callable and active dict subclass refusal without executing them; changed original command/nonce/frame/seat/history/epoch; wrong receipt key; stale sequence; replay; no raw secret data; legacy output compatibility; and a static assertion that the new snapshot entrypoint never references the callback-based comparator.
+The extended suite (45 original-attempt tests: 26 inherited plus 19 new) covers genuine synthetic Ed25519 signed BEGIN, STATUS, CANCEL and RECOVER fixture values; actual signed `AUTHENTICATED` and `UNAVAILABLE` status; missing/malformed/sideloaded candidate values; executable Python callable and active dict subclass and hostile plain-dict key/str-subclass key refusal **before hash/equality dispatch**; changed original command/nonce/frame/seat/history/epoch; wrong receipt key; stale sequence; replay; no raw secret data; legacy output compatibility; and a static assertion that the new snapshot entrypoint never references the callback-based comparator.
 
 The workflow also reruns the inherited 16 candidate, 19 recorded signed-receipt, 16 local HOLD, 54 signed native-client and 2 mandatory adapter-only tests, plus CPU++ offline protection. Exact-head logs and all required checks must be verified after PR creation. **No CI PASS is asserted before inspection.**
 
@@ -46,7 +46,7 @@ DOC 1's [#2432 Forest F1–F6](https://github.com/kudokudo1/The-Post-Apollo-Proj
 ## CHECKLIST
 
 - [x] Recheck current Syntagma, shared source, main, reviews, DOC 1/2 ownership and Identity C5 gap.
-- [x] Add callback-free candidate validation, pure original-attempt snapshot join and adversarial regressions.
+- [x] Add callback-free candidate validation, reject executable dictionary keys before hashing, pure original-attempt snapshot join and adversarial regressions.
 - [x] Preserve legacy fixture and mandatory native adapter boundaries.
 - [ ] Exact-head GitHub CI and raw result verification.
 - [ ] Independent Nurse 2 **pre-merge** source/security review.

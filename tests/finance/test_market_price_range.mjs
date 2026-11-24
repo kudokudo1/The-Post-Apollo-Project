@@ -220,3 +220,6 @@ await import("./test_market_m36_cross_stock.mjs");
 
 // M37: normalized cross-stock chart on actual common closing dates.
 await import("./test_market_m37_cross_stock_chart.mjs");
+
+// M38: cross-stock common-date selection and exact closing prices.
+await import("./test_market_m38_cross_stock_date.mjs");

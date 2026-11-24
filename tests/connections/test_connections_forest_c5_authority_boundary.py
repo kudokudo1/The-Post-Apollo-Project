@@ -193,7 +193,8 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
             "acquire_commit_permit", "lookup_terminal_outcome",
             "settle_terminal_receipt", "request_revocation",
             "authorize_read_session", "authorize_list_sessions",
-            "authorize_disclose_session_titles", "authorize_tool_execution",
+            "authorize_disclose_session_titles", "authorize_disclose_provisional",
+            "authorize_release_committed_reply", "authorize_tool_execution",
             "production_admission",
         )
         for obj in (self.local, self.protected):
@@ -382,6 +383,64 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(C.ForestC5Hold,
                                     "PROTECTED_MODE_REFUSES_UNTRUSTED"):
             self.protected.inspect_reference_binding(self.intentwire, original)
+
+
+    def test_30_provisional_and_committed_output_have_distinct_refusals(self):
+        marker = "SYNTHETIC_PRIVATE_REPLY"
+        cases = (
+            ("authorize_disclose_provisional",
+             "PROVISIONAL_OUTPUT_SEPARATE_PROTECTED_PERMISSION_REQUIRED",
+             {"event": "DELTA", "text": marker, "provisional": True}),
+            ("authorize_release_committed_reply",
+             "COMMITTED_REPLY_PROTECTED_RELEASE_POLICY_REQUIRED",
+             {"event": "COMMITTED", "text": marker, "revision": 2}),
+        )
+        for authority in (self.local, self.protected):
+            for method, code, event in cases:
+                with self.subTest(method=method, mode=authority.status()["requiredMode"]):
+                    with self.assertRaises(C.ForestC5Hold) as caught:
+                        getattr(authority, method)(
+                            event, self.intentwire, self.binding,
+                            permissionGranted=True, commitReceiptAuthenticated=True)
+                    self.assertEqual(str(caught.exception),
+                                     "FOREST_C5_AUTHORITY_HOLD // " + code)
+                    self.assertNotIn(marker, str(caught.exception))
+                    self.assertIsNone(caught.exception.__cause__)
+                    self.assertIsNone(caught.exception.__context__)
+                    self.assert_denied(authority.status())
+
+    def test_31_missing_authority_does_not_inspect_or_serialize_output(self):
+        class Untouchable:
+            def __getattribute__(self, name):
+                raise AssertionError("caller attribute access")
+
+            def __bool__(self):
+                raise AssertionError("caller truthiness")
+
+            def __iter__(self):
+                raise AssertionError("caller iteration")
+
+            def __len__(self):
+                raise AssertionError("caller length")
+
+            def __eq__(self, other):
+                raise AssertionError("caller equality")
+
+            def __repr__(self):
+                raise AssertionError("caller representation")
+
+            def __bytes__(self):
+                raise AssertionError("caller bytes conversion")
+
+        for authority in (self.local, self.protected):
+            for method in ("authorize_disclose_provisional",
+                           "authorize_release_committed_reply"):
+                with self.subTest(method=method):
+                    with self.assertRaises(C.ForestC5Hold):
+                        getattr(authority, method)(
+                            Untouchable(), evidence=Untouchable(),
+                            serialized_output=Untouchable())
+                    self.assert_denied(authority.status())
 
 
 if __name__ == "__main__":

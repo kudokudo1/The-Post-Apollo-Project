@@ -183,6 +183,22 @@ class ForestC5AuthorityBoundary:
         """Title disclosure requires its own protected consent, not LIST alone."""
         _deny("SESSION_TITLES_SEPARATE_PROTECTED_CONSENT_REQUIRED")
 
+    def authorize_disclose_provisional(self, *_args, **_kwargs):
+        """Independent streaming permission; no protected release exists.
+
+        Do not inspect, copy, serialize or hash caller-provided output or
+        purported evidence merely to refuse missing authority.
+        """
+        _deny("PROVISIONAL_OUTPUT_SEPARATE_PROTECTED_PERMISSION_REQUIRED")
+
+    def authorize_release_committed_reply(self, *_args, **_kwargs):
+        """Local COMMITTED is not authorization to deliver the reply.
+
+        The eventual committed-read/release policy is still an owner
+        decision. No new signed action, schema or positive grant here.
+        """
+        _deny("COMMITTED_REPLY_PROTECTED_RELEASE_POLICY_REQUIRED")
+
     def authorize_tool_execution(self, *_args, **_kwargs):
         _deny("FOREST_TOOL_EXECUTION_DISABLED")
 

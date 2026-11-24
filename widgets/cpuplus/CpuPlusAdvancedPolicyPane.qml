@@ -185,7 +185,7 @@ Column {
                         columns: 2
                         spacing: 4
                         Repeater {
-                            model: root.selectedSpec ? [-root.selectedSpec.coarse,-root.selectedSpec.step,
+                            model: root.selectedKey === policyCard.modelData.key && root.selectedSpec ? [-root.selectedSpec.coarse,-root.selectedSpec.step,
                                 root.selectedSpec.step,root.selectedSpec.coarse] : []
                             delegate: ActionButton {
                                 required property real modelData
@@ -199,7 +199,10 @@ Column {
                                 contentPadding: 2
                                 available: root.canStage && root.selectedKey === policyCard.modelData.key
                                     && Policy.validPreview(root.selectedSpec,root.stagedValue + modelData)
-                                onLeftClicked: root.stagePreview(root.stagedValue + modelData)
+                                onLeftClicked: {
+                                    if (root.selectedKey === policyCard.modelData.key)
+                                        root.stagePreview(root.stagedValue + modelData);
+                                }
                             }
                         }
                     }
@@ -207,8 +210,10 @@ Column {
                         width: parent.width
                         height: 26
                         label: "RESET TARGET"
-                        available: root.canStage
-                        onLeftClicked: root.resetPreview()
+                        available: root.canStage && root.selectedKey === policyCard.modelData.key
+                        onLeftClicked: {
+                            if (root.selectedKey === policyCard.modelData.key) root.resetPreview();
+                        }
                     }
                     GohuText {
                         width: parent.width

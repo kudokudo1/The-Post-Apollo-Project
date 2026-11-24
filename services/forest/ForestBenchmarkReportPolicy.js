@@ -60,3 +60,41 @@ function metric(value, unit) {
     if (value === null || value === undefined) return "?";
     return (unit === "tokens" ? String(value) : value.toFixed(3)) + " " + unit;
 }
+
+// P2B metadata is historical and unverified. Do not treat prompt_eval_count,
+// optional cached count or eval_count as current context occupancy, or assume
+// prompt_eval_count includes/excludes cached tokens in every provider version.
+function coldWarmContext(a,b) {
+    var empty = {state:"PAIR REQUIRED",cold:null,warm:null};
+    if (!a || !b) return empty;
+    if (a.model !== b.model || a.ollama_version !== b.ollama_version)
+        return {state:"MODEL OR VERSION MISMATCH",cold:null,warm:null};
+    if (a.scenario === b.scenario)
+        return {state:"ONE COLD AND ONE WARM REPORT REQUIRED",cold:null,warm:null};
+    var cold = a.scenario === "cold" ? a : b;
+    var warm = a.scenario === "warm" ? a : b;
+    if (cold.scenario !== "cold" || warm.scenario !== "warm" ||
+        cold.requested_context_tokens !== warm.requested_context_tokens ||
+        cold.requested_output_tokens !== warm.requested_output_tokens ||
+        cold.requested_thinking !== warm.requested_thinking ||
+        cold.concurrency !== warm.concurrency)
+        return {state:"REQUEST SETTINGS MISMATCH",cold:null,warm:null};
+    function project(r) {
+        return {context:r.requested_context_tokens,outputCap:r.requested_output_tokens,
+            prompt:r.provider_prompt_eval_count,cached:r.provider_prompt_cached_count,
+            generated:r.provider_eval_count,promptMs:r.provider_prompt_eval_ms,
+            loadMs:r.provider_load_ms,firstMs:r.first_visible_content_ms};
+    }
+    return {state:"MATCHED REPORT LABELS // EQUIVALENCE UNKNOWN",
+        cold:project(cold),warm:project(warm)};
+}
+function warmMinusCold(pair,key) {
+    if (!pair || !pair.cold || !pair.warm ||
+        ["cached","promptMs","loadMs","firstMs"].indexOf(key) < 0)
+        return "?";
+    var c=pair.cold[key], w=pair.warm[key];
+    if (!numberIn(c,1000000000) || !numberIn(w,1000000000)) return "?";
+    var diff=w-c;
+    return (diff>0?"+":"") + (key==="cached"?String(diff):diff.toFixed(3))
+        + (key==="cached"?" tokens":" ms");
+}

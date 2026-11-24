@@ -8,6 +8,7 @@ Item {
     id: pane
     property var reportA: null
     property var reportB: null
+    readonly property var contextPair: Reports.coldWarmContext(reportA, reportB)
     property string importStatus: "NO REPORTS"
     function importReport(slot) {
         if (slot !== "A" && slot !== "B")
@@ -136,7 +137,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "FIXED P2B // CTX 2048 / OUTPUT CAP 32 / THINK OFF / ONE REQUEST"
+                text: "FIXED P2B // REQUESTED CTX 2048 / OUTPUT CAP 32 / THINK OFF / ONE REQUEST"
                 color: Colors.cyan
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap
@@ -185,6 +186,82 @@ Item {
                             font.pixelSize: 9
                             wrapMode: Text.WrapAnywhere
                         }
+                    }
+                }
+            }
+            Rectangle {
+                width: parent.width
+                height: cacheColumn.implicitHeight + 12
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                Column {
+                    id: cacheColumn
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: 6
+                    spacing: 4
+                    GohuText {
+                        width: parent.width
+                        text: "CONTEXT / CACHE // COLD VS WARM"
+                        color: Colors.magenta
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: pane.contextPair.state
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Same reported model and version, one cold and one warm report. Deltas are warm minus cold."
+                        color: Colors.cyan
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    Column {
+                        width: parent.width
+                        visible: !!pane.contextPair.cold && !!pane.contextPair.warm
+                        spacing: 3
+                        Repeater {
+                            model: [
+                                {label:"PROMPT EVAL TIME",key:"promptMs",unit:"ms"},
+                                {label:"MODEL LOAD TIME",key:"loadMs",unit:"ms"},
+                                {label:"FIRST VISIBLE CONTENT",key:"firstMs",unit:"ms"},
+                                {label:"CACHED PROMPT COUNT (REPORTED)",key:"cached",unit:"tokens"}
+                            ]
+                            delegate: GohuText {
+                                required property var modelData
+                                width: cacheColumn.width
+                                text: modelData.label + "\nCOLD " +
+                                    Reports.metric(pane.contextPair.cold ? pane.contextPair.cold[modelData.key] : null,modelData.unit) +
+                                    " / WARM " +
+                                    Reports.metric(pane.contextPair.warm ? pane.contextPair.warm[modelData.key] : null,modelData.unit) +
+                                    "\nDELTA " + Reports.warmMinusCold(pane.contextPair,modelData.key)
+                                textFormat: Text.PlainText
+                                color: Colors.cyan
+                                font.pixelSize: 9
+                                wrapMode: Text.WrapAnywhere
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "CONTEXT OCCUPANCY / KV CACHE BYTES / CACHE HIT RATE // UNKNOWN"
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Counts are per report. Missing cache count is unknown, not zero. Warm residency alone does not prove prompt-cache reuse. No causal speed or memory claim."
+                        color: Colors.orange
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
                     }
                 }
             }

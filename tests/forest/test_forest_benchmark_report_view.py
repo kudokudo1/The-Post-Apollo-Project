@@ -22,6 +22,10 @@ class ForestBenchmarkReportsTests(unittest.TestCase):
         self.assertIn("maximumLength: 8193",pane)
         self.assertIn("onVisibleChanged: if (!visible) clearReports()",pane)
         self.assertIn("NO QUALITY SCORE, HARDWARE PROOF, OR SPEED WINNER",pane)
+        self.assertIn("Reports.coldWarmContext(reportA, reportB)",pane)
+        self.assertIn("Reports.warmMinusCold(pane.contextPair,modelData.key)",pane)
+        self.assertIn("CONTEXT OCCUPANCY / KV CACHE BYTES / CACHE HIT RATE // UNKNOWN",pane)
+        self.assertIn("Missing cache count is unknown, not zero",pane)
         for forbidden in ("Process {","Timer {","XMLHttpRequest","FileView {",
                           "performance_benchmark_p2b.py","forestPromptInput",
                           "chooseModelForm(","equipLocalModel(","saveModelPreferences("):
@@ -41,7 +45,19 @@ class ForestBenchmarkReportsTests(unittest.TestCase):
             fixture.Handler.ps_rows=[[],[fixture.resident()]]
             fixture.Handler.ps_calls=0
             cold=case.run_one(scenario="cold")
-            self.assertEqual(len(fixture.Handler.post_payloads),2)
+            # Actual P2B reports with explicit zero and nonzero cache counters.
+            cached_reports=[]
+            for scenario,cached,load_ms in [("cold",0,900),("warm",12,100)]:
+                fixture.Handler.ps_rows=([[],[fixture.resident()]] if scenario=="cold"
+                    else [[fixture.resident()],[fixture.resident()]])
+                fixture.Handler.ps_calls=0
+                fixture.Handler.post_body=fixture.stream(
+                    {"model":fixture.MODEL,"done":False,
+                     "message":{"role":"assistant","content":"READY"}},
+                    fixture.final(prompt_eval_cached_count=cached,
+                        load_duration=load_ms*1000000))
+                cached_reports.append(case.run_one(scenario=scenario))
+            self.assertEqual(len(fixture.Handler.post_payloads),4)
         finally:
             case.doCleanups()
             cls.tearDownClass()
@@ -60,6 +76,28 @@ assert.strictEqual(p.comparison(a,b),"DIFFERENT COLD/WARM SCENARIOS");
 assert(p.comparison(a,a).includes("EQUIVALENCE UNKNOWN"));
 assert(p.comparison(a,{...a,ollama_version:"1.0"}).includes("DIFFERENT OLLAMA VERSIONS"));
 assert.strictEqual(p.comparison(a,null),"TWO COMPLETE REPORTS REQUIRED");
+const pair=p.coldWarmContext(a,b);
+assert.strictEqual(pair.cold.context,2048);
+assert.strictEqual(pair.warm.context,2048);
+assert.strictEqual(pair.cold.cached,null);
+assert.strictEqual(p.warmMinusCold(pair,"cached"),"?");
+assert.strictEqual(p.coldWarmContext(b,a).cold.prompt,pair.cold.prompt);
+assert.strictEqual(p.coldWarmContext(a,a).cold,null);
+assert.strictEqual(p.coldWarmContext(a,{...b,model:"other:model"}).cold,null);
+assert.strictEqual(p.coldWarmContext(a,{...b,ollama_version:"1.0"}).warm,null);
+assert.strictEqual(p.coldWarmContext(a,null).warm,null);
+assert.strictEqual(p.coldWarmContext(a,{...b,requested_context_tokens:4096}).cold,null);
+const cache=JSON.parse(process.argv[4]).map(x=>p.parseReport(JSON.stringify(x)));
+assert(cache.every(Boolean));
+const matched=p.coldWarmContext(cache[0],cache[1]);
+assert.strictEqual(matched.cold.cached,0);
+assert.strictEqual(matched.warm.cached,12);
+assert.strictEqual(p.warmMinusCold(matched,"cached"),"+12 tokens");
+assert.strictEqual(p.warmMinusCold(matched,"loadMs"),"-800.000 ms");
+assert.strictEqual(p.warmMinusCold(matched,"prompt"),"?");
+assert(!Object.hasOwn(matched.warm,"occupancy"));
+assert(!Object.hasOwn(matched.warm,"cacheHitRate"));
+assert.strictEqual(p.warmMinusCold(p.coldWarmContext(a,a),"loadMs"),"?");
 for(const [k,v] of [
  ["status","REFUSED"],["permission_granted",true],["production_authority",true],
  ["model","../bad"],["requested_thinking",true],["requested_context_tokens",4096],
@@ -77,7 +115,7 @@ assert.strictEqual(p.parseReport("x".repeat(8193)),null);
 assert.strictEqual(p.parseReport(JSON.stringify({...a,provider_eval_count:0,provider_generated_tokens_per_second:10})),null);
 """
         run=subprocess.run(["node","-e",js,str(ROOT/"services/forest/ForestBenchmarkReportPolicy.js"),
-                            json.dumps(warm),json.dumps(cold)],capture_output=True,text=True,check=False)
+                            json.dumps(warm),json.dumps(cold),json.dumps(cached_reports)],capture_output=True,text=True,check=False)
         self.assertEqual(run.returncode,0,run.stderr)
 
 

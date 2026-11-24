@@ -35,7 +35,6 @@ for snippet in (
     'CONFIRM_DELETE_REQUIRED',
     'WRITE_BUSY',
     'UNSAFE_BACKUP',
-    'UNSAFE_DIRECTORY',
     'os.O_NOFOLLOW',
     'os.O_NONBLOCK',
     'os.O_EXCL',
@@ -70,6 +69,11 @@ for forbidden in (
 ):
     assert forbidden not in archive, forbidden
 
+# The directory privacy refusal is implemented in the shared M4o helper,
+# which M4p calls rather than cloning filesystem ownership rules.
+assert 'UNSAFE_DIRECTORY' in manual
+assert 'manual.private_dir(directory, True)' in archive
+assert 'manual.private_dir(directory, False)' in archive
 assert 'FINANCEW_BANKING_MANUAL_' in manual
 assert 'def validate_session(session)' in manual
 assert 'def write_doc(directory: Path, doc)' in manual

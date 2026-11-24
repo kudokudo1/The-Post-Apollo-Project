@@ -1,0 +1,31 @@
+name: Forest UI2.1b Public Preview Lifecycle
+on:
+  pull_request:
+    paths:
+      - 'widgets/forest/ui2/**'
+      - 'tests/forest/test_ui21b_preview_gate_qt.py'
+      - '.github/workflows/forest-ui2-preview-lifecycle.yml'
+permissions:
+  contents: read
+jobs:
+  qt-preview-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install headless Qt prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install Qt bindings (existing Post Apollo smoke-test range)
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Actual QML preview lifecycle
+        run: python tests/forest/test_ui21b_preview_gate_qt.py

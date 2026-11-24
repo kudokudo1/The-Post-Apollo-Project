@@ -99,12 +99,33 @@ class NativeHostCandidateTests(unittest.TestCase):
     def test_second_control_cannot_trigger_second_submission(self):
         channel, proc, _, _ = self.launch()
         channel.sendall(b"STATUS")
+        self.assert_hold(channel.recv(4096))
+        self.finish(proc, 0)
+        # The first exchange has ended. A later control cannot reopen it.
+        with self.assertRaises((BrokenPipeError, ConnectionResetError)):
+            channel.sendall(b"LIST_SESSIONS")
+        self.read_closed(channel)
+
+    def test_pipelined_controls_at_most_one_public_packet(self):
+        channel, proc, _, _ = self.launch()
+        channel.sendall(b"STATUS")
         try:
             channel.sendall(b"LIST_SESSIONS")
         except (BrokenPipeError, ConnectionResetError):
             pass
-        self.assert_hold(channel.recv(4096))
-        self.read_closed(channel)
+        # Closing with unread SEQPACKET input can reset the peer and
+        # discard its first response. Receipt is not guaranteed by send.
+        frames = []
+        try:
+            while True:
+                packet = channel.recv(4096)
+                if not packet:
+                    break
+                frames.append(packet)
+                self.assertLessEqual(len(frames), 1)
+                self.assert_hold(packet)
+        except ConnectionResetError:
+            pass
         self.finish(proc, 0)
 
     def test_empty_packet_refuses(self):

@@ -16,6 +16,7 @@ Item {
         && capacity.data.model.name === selectedModelName
         && capacity.data.model.matched === true
     readonly property string snapshotStatus: capacity.status
+    readonly property string lastObservedLocalTime: capacity.lastObservedLocalTime
     readonly property bool checking: capacity.scanning
     readonly property var snapshot: capacity.data
     function checkNow() {
@@ -53,7 +54,9 @@ Item {
                     anchors.rightMargin: 6
                     anchors.verticalCenter: parent.verticalCenter
                     text: capacity.scanning ? "READING LOCAL DIAGNOSTICS"
-                        : capacity.status === "OBSERVED" ? "LAST P2C SNAPSHOT"
+                        : capacity.status === "OBSERVED"
+                            ? "P2C OBSERVED " + capacity.lastObservedLocalTime
+                        : capacity.status === "STALE" ? "P2C SNAPSHOT EXPIRED"
                         : capacity.status === "NOT_CHECKED" ? "PRESS CHECK"
                         : "OBSERVATION UNAVAILABLE"
                     font.pixelSize: 10

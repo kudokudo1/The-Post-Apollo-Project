@@ -50,7 +50,8 @@ class ForestHardwareViewP2CTests(unittest.TestCase):
         self.assertIn('selectedModelName: root.selectedLocalModel', view)
         self.assertEqual(adapter.count("Process {"), 1)
         for forbidden in (
-            "Timer {", "Component.onCompleted: inspectCapacity",
+            "repeat: true", "onTriggered: capacity.inspectCapacity",
+            "Component.onCompleted: inspectCapacity",
             "onVisibleChanged: inspectCapacity", "execDetached",
             '"/api/chat"', "modelResidency.scanResidency()",
             "localInventory.scanModels()",

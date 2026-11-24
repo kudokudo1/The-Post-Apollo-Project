@@ -36,7 +36,7 @@ class ForestModelResidencyUITests(unittest.TestCase):
         self.assertIn('model_load_requested !== false', policy)
         self.assertIn('generation_requested !== false', policy)
         # No implicit background refresh, external provider, generation or permission.
-        for forbidden in ("Timer {", "onCompleted: scanResidency", "/api/chat",
+        for forbidden in ("repeat: true", "onTriggered: residency.scanResidency", "onCompleted: scanResidency", "/api/chat",
                           "ollama_chat_transport", "execDetached", "Hermes"):
             self.assertNotIn(forbidden, adapter)
         for protected in (

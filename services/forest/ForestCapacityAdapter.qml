@@ -12,6 +12,8 @@ Scope {
     property bool scanning: false
     property string status: "NOT_CHECKED"
     property string reason: ""
+    // Local display clock, never a second P2C/Ollama measurement.
+    property string lastObservedLocalTime: ""
     property string requestedModel: ""
     property var data: CapacityPolicy.beginScan().data
     property var scanState: CapacityPolicy.beginScan()
@@ -24,10 +26,12 @@ Scope {
         const pending = CapacityPolicy.beginScan(wanted);
         if (!pending)
             return false;
+        expiryTimer.stop();
         scanState = pending;
         requestedModel = wanted;
         status = "CHECKING";
         reason = "";
+        lastObservedLocalTime = "";
         data = scanState.data;
         scanning = true;
         const argv = [
@@ -51,6 +55,28 @@ Scope {
         reason = next.reason;
         data = next.data;
         scanning = false;
+        if (next.status === "OBSERVED") {
+            lastObservedLocalTime = Qt.formatTime(new Date(), "HH:mm:ss");
+            expiryTimer.restart(); // five-minute local cache expiry only
+        } else {
+            lastObservedLocalTime = "";
+            expiryTimer.stop();
+        }
+    }
+    function expireObserved() {
+        if (scanning || status !== "OBSERVED")
+            return;
+        status = "STALE";
+        reason = "SNAPSHOT_EXPIRED";
+        data = CapacityPolicy.beginScan().data; // clear old resource hints
+        // Retain last observation time to explain expired data.
+    }
+    Timer {
+        id: expiryTimer
+        interval: 300000
+        repeat: false
+        running: false
+        onTriggered: capacity.expireObserved()
     }
 
     Process {

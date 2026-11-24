@@ -398,6 +398,11 @@ PanelWindow {
                     Accessible.name: root.selectedLocalModel
                         ? ("Selected model " + root.selectedLocalModel
                             + " // " + root.selectedModelLoadState
+                            + " // P0 "
+                            + (modelResidency.status === "STALE" ? "STALE" :
+                               modelResidency.status === "OBSERVED"
+                                   ? "observed locally at " + modelResidency.lastObservedLocalTime
+                                   : "UNVERIFIED")
                             + " // last Ollama residency scan, not active inference")
                         : "No selected local model // model residency unknown"
 
@@ -862,13 +867,23 @@ PanelWindow {
                     elide: Text.ElideRight
                     color: root.hardwareViewOpen
                         ? (capacityView.snapshotStatus === "OBSERVED" ? Colors.green : Colors.orange)
-                        : (localInventory.status === "REACHABLE" ? Colors.green : Colors.orange)
+                        : (modelResidency.status === "STALE" ? Colors.orange
+                            : localInventory.status === "REACHABLE" ? Colors.green : Colors.orange)
                     text: root.hardwareViewOpen
                         ? (capacityView.checking ? "P2C // CHECKING"
-                            : capacityView.snapshotStatus === "OBSERVED" ? "P2C // OBSERVED / READ ONLY"
+                            : capacityView.snapshotStatus === "OBSERVED"
+                                ? "P2C CHECKED " + capacityView.lastObservedLocalTime + " / READ ONLY"
+                            : capacityView.snapshotStatus === "STALE"
+                                ? "P2C STALE // CHECK AGAIN (LAST " + capacityView.lastObservedLocalTime + ")"
                             : capacityView.snapshotStatus === "NOT_CHECKED" ? "P2C // NOT CHECKED"
                             : "P2C // UNAVAILABLE")
-                        : localInventory.scanning ? "OLLAMA // SCANNING"
+                        : modelResidency.status === "STALE"
+                            ? "P0 STALE // SCAN AGAIN (LAST " + modelResidency.lastObservedLocalTime + ")"
+                        : modelResidency.status === "OBSERVED"
+                            ? "P0 CHECKED " + modelResidency.lastObservedLocalTime
+                                + " // OLLAMA " + localInventory.modelCount + " DISCOVERED"
+                        : localInventory.scanning || modelResidency.scanning
+                            ? "OLLAMA // SCANNING"
                         : localInventory.status === "REACHABLE"
                             ? "OLLAMA // " + localInventory.modelCount + " DISCOVERED"
                         : localInventory.status === "NOT_CHECKED"

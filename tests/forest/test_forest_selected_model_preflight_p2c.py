@@ -39,7 +39,8 @@ class ForestSelectedPreflightP2CTests(unittest.TestCase):
         self.assertIn("modelResidency.status, modelResidency.models, selectedLocalModel", view)
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
-        for forbidden in ("Timer {", "onVisibleChanged: inspectCapacity",
+        for forbidden in ("repeat: true", "onTriggered: capacity.inspectCapacity",
+                          "onVisibleChanged: inspectCapacity",
                           "Component.onCompleted: inspectCapacity",
                           "/api/chat", "generation", "execDetached"):
             self.assertNotIn(forbidden, ui + adapter)

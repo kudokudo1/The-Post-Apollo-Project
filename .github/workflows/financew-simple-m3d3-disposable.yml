@@ -1,0 +1,40 @@
+name: FinanceW Simple M3d3 disposable categorized expense Actual
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/finance/disposable_categorized_expense_roundtrip.mjs"
+      - "tests/finance/test_finance_simple_m3d3_ci_isolation.py"
+      - ".github/workflows/financew-simple-m3d3-disposable.yml"
+      - "scripts/finance/SIMPLE_MODE_M3D3_DISPOSABLE_README.md"
+  push:
+    paths:
+      - "scripts/finance/disposable_categorized_expense_roundtrip.mjs"
+      - "tests/finance/test_finance_simple_m3d3_ci_isolation.py"
+      - ".github/workflows/financew-simple-m3d3-disposable.yml"
+      - "scripts/finance/SIMPLE_MODE_M3D3_DISPOSABLE_README.md"
+
+permissions:
+  contents: read
+
+jobs:
+  m3d3-disposable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FINANCEW_DISPOSABLE_TEST: "yes"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify CI and production boundary
+        run: python3 -B tests/finance/test_finance_simple_m3d3_ci_isolation.py
+      - name: Install pinned Actual API and server in isolated checkout
+        run: |
+          npm install --prefix scripts/finance --no-save --package-lock=false --no-audit --no-fund @actual-app/api@26.10.0 @actual-app/sync-server@26.10.0
+      - name: Verify new source syntax
+        run: node --check scripts/finance/disposable_categorized_expense_roundtrip.mjs
+      - name: Run real Actual 26.10.0 categorized writer and uncertainty rehearsal on fictional budget
+        run: node scripts/finance/disposable_categorized_expense_roundtrip.mjs

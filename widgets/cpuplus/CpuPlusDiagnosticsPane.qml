@@ -9,7 +9,10 @@ Column {
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
-    readonly property var report: CpuPlusDiagnostics.reports[selectedReport] || null
+    readonly property var report: CpuPlusDiagnostics.selectedArchiveId
+        ? CpuPlusDiagnostics.reportFor(selectedReport, CpuPlusDiagnostics.selectedArchiveId)
+        : CpuPlusDiagnostics.reports[selectedReport] || null
+    property bool showHistory: false
 
     GohuText {
         width: parent.width
@@ -37,7 +40,7 @@ Column {
             height: 30
             label: modelData.label
             labelPixelSize: 10
-            available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.faulted
+            available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.faulted && !CpuPlusDiagnostics.archiveBusy
             onLeftClicked: {
                 if (CpuPlusDiagnostics.request(modelData.kind)) {
                     root.showReport = false;
@@ -73,7 +76,7 @@ Column {
                 labelPixelSize: 9
                 selected: root.selectedReport === modelData
                 onLeftClicked: {
-                    CpuPlusDiagnostics.selectedReport = modelData;
+                    CpuPlusDiagnostics.selectLatest(modelData);
                     root.showReport = false;
                 }
             }
@@ -82,7 +85,7 @@ Column {
     GohuText {
         width: parent.width
         text: root.report ? root.report.status + " // " + root.report.finishedAt
-            + "\n" + root.report.summary : "NO CAPTURE // THIS SESSION"
+            + "\n" + root.report.summary : "NO CAPTURE SELECTED"
         color: root.report && root.report.status === "COMPLETE" ? Colors.cyan : Colors.orange
         font.pixelSize: 10
         wrapMode: Text.Wrap
@@ -122,7 +125,40 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "Latest result per tool retained until shell exit. Copy before restarting. No automatic uploads, storage changes or privileged actions."
+        text: "LOCAL ARCHIVE // " + CpuPlusDiagnostics.archiveStatus
+        color: CpuPlusDiagnostics.archiveStatus === "READY" ? Colors.cyan : Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.Wrap
+    }
+    ActionButton {
+        width: parent.width
+        height: 28
+        label: root.showHistory ? "HIDE HISTORY" : "LOAD HISTORY"
+        available: root.showHistory || (!CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
+        onLeftClicked: {
+            if (root.showHistory) root.showHistory = false;
+            else if (CpuPlusDiagnostics.loadHistory()) root.showHistory = true;
+        }
+    }
+    Repeater {
+        model: root.showHistory ? CpuPlusDiagnostics.archiveRows : []
+        delegate: ActionButton {
+            required property var modelData
+            width: root.width
+            height: 30
+            label: modelData.kind.toUpperCase() + " // " + modelData.finishedAt.slice(5, 16)
+            labelPixelSize: 9
+            selected: root.report !== null && root.report.id === modelData.id
+            onLeftClicked: {
+                if (CpuPlusDiagnostics.selectExactReport(modelData.kind, modelData.id)) {
+                    root.showReport = false;
+                }
+            }
+        }
+    }
+    GohuText {
+        width: parent.width
+        text: "Last 8 terminal captures saved locally; oldest replaced on the next save. Session captures remain available if archive write fails. No automatic uploads or privileged actions."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

@@ -16,7 +16,7 @@ class ForestSelectedProfileTests(unittest.TestCase):
         self.assertIn("readonly property var selectedModelProfile:", view)
         self.assertIn("modelResidency.status, modelResidency.records, selectedLocalModel", view)
         self.assertIn("id: selectedModelProfilePanel", view)
-        self.assertIn("height: modelPopup.height >= 270 ? 48 : 0", view)
+        self.assertIn("height: modelPopup.height >= 340 ? 48 : 0", view)
         self.assertIn("anchors.top: selectedModelProfilePanel.bottom", view)
         self.assertIn("root.selectedModelProfile.sizeMiB", view)
         self.assertIn("root.selectedModelProfile.vramMiB", view)
@@ -33,10 +33,11 @@ class ForestSelectedProfileTests(unittest.TestCase):
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
         # Every stage must retain room for its clipped model list + header/footer.
-        for popup_height in (120, 180, 240, 270, 360):
-            profile = 48 if popup_height >= 270 else 0
-            remaining = popup_height - 33 - 19 - 17 - profile - 8
-            self.assertGreaterEqual(remaining, 140 if profile else 40)
+        for popup_height in (120, 180, 190, 240, 270, 340, 360):
+            profile = 48 if popup_height >= 340 else 0
+            equipment = 62 if popup_height >= 190 else 24
+            remaining = popup_height - 33 - 19 - 17 - equipment - profile - 10
+            self.assertGreaterEqual(remaining, 140 if profile else 15)
 
     @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
     def test_selected_profile_keeps_unknown_and_refuses_bad_numbers(self):

@@ -61,7 +61,7 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in b
           print("C3E_SIGNED_WIRE_CI // NO_PROTECTED_CUSTODIAN")
           PY
-      - name: 32 real signed-denial and empty-payload SCM_RIGHTS cleanup cases
+      - name: 35 real signed-denial, bounded receive and SCM_RIGHTS cleanup cases
         shell: bash
         run: |
           set -euo pipefail

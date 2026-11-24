@@ -13,6 +13,7 @@ import signal
 import socket
 import struct
 import sys
+import traceback
 import unittest
 from unittest import mock
 
@@ -394,6 +395,75 @@ class RealProcessCustodianWireDenialTests(unittest.TestCase):
         self.denied(self.run_one())
         with self.assertRaisesRegex(M.Refused, "NO_INDEPENDENT_CUSTODIAN"):
             M.protected_admission()
+
+    def test_33_unbounded_receive_preserves_queued_packet_and_unknown(self):
+        # Queue valid bytes so a regression cannot hang the test itself.
+        # Neither a default blocking socket nor an excessive finite timeout
+        # is accepted, even when data is already waiting.
+        wire = _packet(self.response)
+        for timeout in (None, M.MAX_RECEIVE_TIMEOUT_SECONDS + 1):
+            with self.subTest(timeout=timeout):
+                a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+                with a, b:
+                    a.settimeout(timeout)
+                    b.sendall(wire)
+                    with self.assertRaisesRegex(
+                            M.UnknownAfterSend,
+                            "BOUNDED_RECEIVE_REQUIRED_UNKNOWN_HOLD_NO_AUTO_RETRY"
+                    ) as caught:
+                        M.verify_one_denial_ci_only(
+                            a, request=self.request, prior_test_public_key=self.pub)
+                    self.assertIsNone(caught.exception.__cause__)
+                    self.assertIsNone(caught.exception.__context__)
+                    self.assertEqual(a.gettimeout(), timeout)
+                    a.setblocking(False)
+                    self.assertEqual(a.recv(M.MAX_PACKET), wire)
+
+    def test_34_nonblocking_receive_valid_packet_or_fixed_unknown(self):
+        a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        with a, b:
+            a.setblocking(False)
+            with self.assertRaisesRegex(
+                    M.UnknownAfterSend, "NO_TERMINAL_ACK_UNKNOWN_HOLD"
+            ) as caught:
+                M.verify_one_denial_ci_only(
+                    a, request=self.request, prior_test_public_key=self.pub)
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+            b.sendall(_packet(self.response))
+            self.denied(M.verify_one_denial_ci_only(
+                a, request=self.request, prior_test_public_key=self.pub))
+            self.assertEqual(a.gettimeout(), 0.0)
+
+    def test_35_wire_refusals_do_not_retain_nested_decoder_or_candidate_errors(self):
+        marker = b"PRIVATE_TEST_PACKET_NOT_FOR_DIAGNOSTICS"
+        for payload, code in (
+            (b'{"title":"' + marker, "INVALID_JSON_REFUSED"),
+            (b'{"title":"' + marker + b'\xff"}', "INVALID_JSON_REFUSED"),
+            (b'{"' + marker + b'":0,"' + marker + b'":1}',
+             "DUPLICATE_JSON_KEY_REFUSED"),
+            (b'{"' + marker + b'":NaN}', "NONFINITE_JSON_REFUSED"),
+        ):
+            with self.subTest(code=code):
+                wire = struct.pack(">I", len(payload)) + payload
+                with self.assertRaisesRegex(M.Refused, code) as caught:
+                    self.run_one(raw=wire)
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+                self.assertNotIn(marker.decode("ascii"),
+                                 "".join(traceback.format_exception(caught.exception)))
+        # Exercise the exceptional recursion path deterministically rather
+        # than assuming that a particular valid nesting depth exceeds the
+        # JSON implementation's current recursion limit.
+        with mock.patch.object(M.json, "loads", side_effect=RecursionError("fixture")):
+            with self.assertRaisesRegex(M.Refused, "INVALID_JSON_REFUSED") as caught:
+                M._frame_decode(_packet(self.response))
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+        with self.assertRaisesRegex(M.Refused, "ORIGINAL_SIGNED_CANDIDATE") as caught:
+            self.run_one(response=dict(self.response, observedHeadSha256="e"*64))
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
 
 
 if __name__ == "__main__":

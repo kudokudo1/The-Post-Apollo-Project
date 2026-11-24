@@ -591,3 +591,42 @@ function summarizeCrossStockLeadership(comparison) {
         observations:observations,source:chart.source,readOnly:true,noProviderCalls:true
     };
 }
+
+// M40: signed difference in cumulative close-price movement (current minus
+// reference), in percentage points, from the same first common date.
+// Use unrounded differences to agree with M38, not M39's tie tolerance.
+function crossStockGapChart(comparison) {
+    const chart=crossStockNormalizedChart(comparison);
+    if (!chart) return null;
+    const points=[];
+    let extent=1;
+    for (let i=0;i<=chart.maxSteps;i++) {
+        const a=chart.first[i], b=chart.second[i];
+        const gap=b.value-a.value;
+        if (!Number.isFinite(gap)) return null;
+        points.push({step:i,date:a.date,value:gap});
+        extent=Math.max(extent,Math.abs(gap));
+    }
+    return {
+        points:points,extent:extent,maxSteps:chart.maxSteps,
+        from:chart.from,to:chart.to,referenceSymbol:chart.referenceSymbol,
+        currentSymbol:chart.currentSymbol,priceBasis:chart.priceBasis,
+        source:chart.source,readOnly:true,noProviderCalls:true
+    };
+}
+
+// Symmetric scale keeps zero centered, including flat/all-positive data.
+function crossStockGapPoint(chart, point, width, height) {
+    if (!chart || !point || !Number.isInteger(chart.maxSteps)
+            || chart.maxSteps < 1 || chart.maxSteps > 131
+            || !Number.isFinite(chart.extent) || chart.extent < 1
+            || !Number.isFinite(width) || !Number.isFinite(height)
+            || width < 5 || height < 5 || !Number.isInteger(point.step)
+            || point.step < 0 || point.step > chart.maxSteps
+            || !Number.isFinite(point.value) || Math.abs(point.value)>chart.extent)
+        return null;
+    return {
+        x:point.step/chart.maxSteps*(width-1),
+        y:(1-point.value/chart.extent)*(height-1)/2
+    };
+}

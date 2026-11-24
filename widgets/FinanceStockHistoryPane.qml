@@ -106,6 +106,9 @@ Item {
         ? RangeAnalysisPolicy.inspectCrossStockDate(crossStockComparison,
             crossStockSelectedStep) : null
     onCrossStockChartChanged: crossStockSelectedStep = -1
+    // M39: cumulative leadership uses only the same matched close dates.
+    readonly property var crossStockLeadership: crossStockChart !== null
+        ? RangeAnalysisPolicy.summarizeCrossStockLeadership(crossStockComparison) : null
     function saveStockReference() {
         if (rangeAnalysis === null || !stockFeed) return;
         const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
@@ -746,6 +749,46 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 11
                 color: Colors.white
+            }
+            GohuText {
+                objectName: "marketCrossStockLeadership"
+                width: parent.width
+                visible: stocks.crossStockLeadership !== null
+                text: {
+                    const d=stocks.crossStockLeadership;
+                    if (!d) return "";
+                    function symbolFor(leader) {
+                        return leader === "REFERENCE" ? d.referenceSymbol
+                            : leader === "CURRENT" ? d.currentSymbol : "TIE";
+                    }
+                    function advantage(a) {
+                        return a ? (a.advantagePoints.toFixed(4)
+                            + " PP // " + a.date) : "NONE OBSERVED";
+                    }
+                    const selected=stocks.crossStockDateDetail;
+                    const observed=selected ? d.observations[selected.step] : null;
+                    return "RELATIVE LEADERSHIP // FROM FIRST COMMON CLOSE"
+                        + "\nLAST OBSERVED " + d.latest.date + " // " + symbolFor(d.latest.leader)
+                        + "\n" + d.referenceSymbol + " LED " + d.referenceDates
+                        + " // " + d.currentSymbol + " LED " + d.currentDates
+                        + " // TIES " + d.tieDates + " / " + d.matched
+                        + "\nLARGEST ADVANTAGE " + d.referenceSymbol + " // "
+                        + advantage(d.largestReference)
+                        + "\nLARGEST ADVANTAGE " + d.currentSymbol + " // "
+                        + advantage(d.largestCurrent)
+                        + "\nOBSERVED LEAD CHANGES " + d.changes
+                        + "\nLAST CHANGE " + (d.lastChange
+                            ? d.lastChange.date + " // " + symbolFor(d.lastChange.leader)
+                            : "NONE OBSERVED")
+                        + (observed ? "\nSELECTED " + observed.date + " // "
+                            + symbolFor(observed.leader) : "")
+                        + "\nTIES INCLUDE BASE DATE // CUMULATIVE, NOT DAILY WINNERS"
+                        + "\nCOMMON OBSERVATIONS ONLY // NO NEW REQUEST";
+                }
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 11
+                color: Colors.cyan
             }
             Rectangle {
                 objectName: "marketRangeAnalysisPanel"

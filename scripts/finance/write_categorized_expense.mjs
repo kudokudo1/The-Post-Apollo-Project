@@ -3,12 +3,12 @@
 // One addTransactions create includes category ID; readback must prove exact ID.
 // A post-attempt failure stays UNCERTAIN and blocks every FinanceW writer.
 // Separate operator permit; never provision it here. No argv secrets or retry.
-import {readFile,writeFile,readdir,lstat,mkdir,open,mkdtemp,rm,chmod}
-  from "node:fs/promises";
+import {readdir,open,mkdtemp,rm,chmod} from "node:fs/promises";
 import {homedir,tmpdir} from "node:os";
 import {join} from "node:path";
 import {createHash} from "node:crypto";
-import {readActualServerURL} from "./source_config.mjs";
+import {openTrustedDirectory,readTrustedPrivateFile,readPrivateEntry,dirEntryPath}
+  from "./categorized_expense_file_trust.mjs";
 import {validateCategorizedExpenseCommand,executeCategorizedExpense,CategorizedExpenseRefusal}
   from "./categorized_expense_guard.mjs";
 
@@ -19,11 +19,9 @@ function errorCode(error){
   return error instanceof CategorizedExpenseRefusal?error.code:"operation-failed";
 }
 async function privateFile(path) {
-  let info;
-  try {info=await lstat(path);} catch {refusal("private-file-unavailable");}
-  if(!info.isFile() || (info.mode & 0o077)!==0)
-    refusal("unsafe-private-file");
-  return (await readFile(path,"utf8")).trim();
+  // No pathname lstat/readFile split: open each parent without following
+  // symlinks, then fstat/read the exact private descriptor.
+  return readTrustedPrivateFile(path);
 }
 async function readCommand(){
   let data="";
@@ -38,9 +36,10 @@ async function readCommand(){
   try{command=JSON.parse(data.slice(0,-1));}catch{refusal("invalid-json");}
   return validateCategorizedExpenseCommand(command);
 }
-async function fsyncDirectory(path){
-  const dir=await open(path,"r");
-  try{await dir.sync();}finally{await dir.close();}
+async function fsyncDirectory(dir){
+  // The directory was opened and verified before the shared lock. Sync
+  // this same descriptor rather than re-resolving a mutable pathname.
+  await dir.sync();
 }
 async function run(){
   // This file is NEVER created by widget, CI, README or installation.
@@ -51,17 +50,24 @@ async function run(){
   if(permit!=="FINANCEW_CATEGORIZED_EXPENSE_WRITES_APPROVED")
     refusal("writes-disabled");
   const command=await readCommand();
-  await mkdir(journalDir,{recursive:true,mode:0o700});
-  const info=await lstat(journalDir);
-  if(!info.isDirectory() || (info.mode & 0o077)!==0)
-    refusal("unsafe-journal-directory");
-  const lockPath=join(journalDir,".write-lock");
+  let journal;
+  try{journal=await openTrustedDirectory(journalDir,{
+    create:true,privateLeaf:true
+  });}
+  catch{refusal("unsafe-journal-directory");}
+  const lockPath=dirEntryPath(journal,".write-lock");
   let lock;
   try{lock=await open(lockPath,"wx",0o600);}
-  catch{refusal("write-in-progress-or-recovery-needed");}
-  let api,working,attempted=false;
+  catch{
+    await journal.close();
+    refusal("write-in-progress-or-recovery-needed");
+  }
+  let api,working,attempted=false,attemptedFile=null;
   try{
-    const serverURL=await readActualServerURL();
+    // The read-only source_config module allows environment overrides and
+    // pathname reads. This financial writer instead requires a trusted
+    // private config file and a fixed loopback endpoint.
+    const serverURL=await privateFile(join(config,"actual-server-url"));
     if(serverURL!=="http://127.0.0.1:5006")
       refusal("unsupported-write-server");
     const password=await privateFile(join(config,"actual-password"));
@@ -73,11 +79,11 @@ async function run(){
 
     // Includes D9 transaction and M2b envelope-move journals. One unresolved operation anywhere
     // blocks every FinanceW write; no automatic lock or journal cleanup.
-    const priorNames=await readdir(journalDir);
+    const priorNames=await readdir("/proc/self/fd/"+journal.fd);
     for(const filename of priorNames){
       if(!filename.endsWith(".json"))continue;
       let entry;
-      try{entry=JSON.parse(await privateFile(join(journalDir,filename)));}
+      try{entry=JSON.parse(await readPrivateEntry(journal,filename));}
       catch{refusal("recovery-needed");}
       if(!entry || entry.status!=="committed")refusal("recovery-needed");
     }
@@ -89,22 +95,19 @@ async function run(){
         || priorNames.some(name=>name.endsWith("-"+command.requestId+".json"))
         || priorNames.includes(command.requestId+".json"))
       refusal("operation-already-attempted");
-    const path=join(journalDir,journalName);
+    const path=dirEntryPath(journal,journalName);
     const digest=createHash("sha256").update(JSON.stringify(command)).digest("hex");
     const recordAttempt=async()=>{
-      let file;
-      try{file=await open(path,"wx",0o600);}
+      try{attemptedFile=await open(path,"wx",0o600);}
       catch{refusal("operation-already-attempted");}
-      try{
-        await file.writeFile(JSON.stringify({
-          version:1,status:"attempted",hash:digest,
-          action:"transaction:create-categorized-expense",attemptedAt:new Date().toISOString()
-        })+"\n");
-        await file.sync();
-        // Persist directory entry before invoking any Actual mutation.
-        await fsyncDirectory(journalDir);
-        attempted=true;
-      }finally{await file.close();}
+      await attemptedFile.writeFile(JSON.stringify({
+        version:1,status:"attempted",hash:digest,
+        action:"transaction:create-categorized-expense",attemptedAt:new Date().toISOString()
+      })+"\n");
+      await attemptedFile.sync();
+      // Persist this exact directory entry before any Actual mutation.
+      await fsyncDirectory(journal);
+      attempted=true;
     };
     working=await mkdtemp(join(tmpdir(),"financew-categorized-expense-"));
     await chmod(working,0o700);
@@ -119,10 +122,19 @@ async function run(){
     });
     const record={version:1,status:"committed",hash:digest,
       action:"transaction:create-categorized-expense",completedAt:new Date().toISOString()};
-    await writeFile(path,JSON.stringify(record)+"\n",{mode:0o600});
-    const receipt=await open(path,"r");
-    try{await receipt.sync();}finally{await receipt.close();}
-    await fsyncDirectory(journalDir);
+    // Commit using the SAME descriptor as ATTEMPTED, never reopen the
+    // journal by name after an external Actual write.
+    const receipt=Buffer.from(JSON.stringify(record)+"\n","utf8");
+    await attemptedFile.truncate(0);
+    let written=0;
+    while(written<receipt.length){
+      const {bytesWritten}=await attemptedFile.write(
+        receipt,written,receipt.length-written,written);
+      if(bytesWritten<=0)throw Error("journal-commit-incomplete");
+      written+=bytesWritten;
+    }
+    await attemptedFile.sync();
+    await fsyncDirectory(journal);
     return result.status;
   }catch(error){
     // Only an explicit persisted attempted journal gives an uncertain outcome.
@@ -132,8 +144,10 @@ async function run(){
   }finally{
     if(api){try{await api.shutdown();}catch{/* no retries */}}
     if(working)await rm(working,{recursive:true,force:true});
+    if(attemptedFile)await attemptedFile.close();
     if(lock)await lock.close();
     await rm(lockPath,{force:true});
+    await journal.close();
   }
 }
 try{

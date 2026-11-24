@@ -214,6 +214,43 @@ async function main(){
   assert.deepEqual(await api.getTransactions(accountId,month+"-01",month+"-31"),[]);
   const baseCommand=commandFrom(raw,accountId,categoryId,sourceKey,
     "a".repeat(32),-1250);
+  stage="real-actual-negative-visibility";
+  // Use the freshly downloaded Actual budget and account data, changing
+  // only the response fields supplied to the policy; never modify the
+  // fictional Actual server during these negative admissions.
+  for(const target of ["group","category"]){
+    for(const form of ["missing","null","string","true"]){
+      let attemptedMutation=false;
+      const guarded={
+        getAccounts:(...args)=>api.getAccounts(...args),
+        getTransactions:(...args)=>api.getTransactions(...args),
+        getBudgetMonth:async(...args)=>{
+          const fresh=await api.getBudgetMonth(...args);
+          const related=fresh.categoryGroups.find(g=>
+            g.categories?.some(c=>c.id===categoryId));
+          assert.ok(related);
+          const item=target==="group"?related
+            :related.categories.find(c=>c.id===categoryId);
+          if(form==="missing")delete item.hidden;
+          else item.hidden=form==="null"?null
+            :form==="string"?"false":true;
+          return fresh;
+        },
+        addTransactions:async()=>{attemptedMutation=true;
+          throw Error("forbidden-test-mutation");},
+        sync:async()=>{attemptedMutation=true;
+          throw Error("forbidden-test-sync");}
+      };
+      let recorded=false;
+      await assert.rejects(()=>executeCategorizedExpense({
+        api:guarded,input:baseCommand,
+        recordAttempt:async()=>{recorded=true;}
+      }),error=>error?.code==="hidden-category",
+        "real-Actual visibility must fail before journal/add");
+      assert.equal(recorded,false,"negative-admission-no-attempt");
+      assert.equal(attemptedMutation,false,"negative-admission-no-add");
+    }
+  }
   await endClient();
 
   stage="operator-permit-off";

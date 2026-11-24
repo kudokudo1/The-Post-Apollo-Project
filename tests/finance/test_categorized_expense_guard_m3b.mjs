@@ -15,25 +15,34 @@ function command(overrides={}) {
 }
 function budget(){
   return {toBudget:12000,categoryGroups:[
-    {name:"Needs",is_income:false,categories:[
-      {id:categoryId,name:"Groceries",budgeted:10000,balance:7500,spent:-2500}
+    {name:"Needs",is_income:false,hidden:false,categories:[
+      {id:categoryId,name:"Groceries",hidden:false,budgeted:10000,balance:7500,spent:-2500}
     ]},
-    {name:"Income",is_income:true,categories:[
+    {name:"Income",is_income:true,hidden:false,categories:[
       {id:"fictional-income",name:"Income",budgeted:0,balance:0,spent:0}
     ]}
   ]};
 }
 function mock({ack="ok",failBeforeAdd=false,failSync=false,
                wrongCategory=false,noId=false,missingImported=false,
-               badAfterBudget=false}={}){
+               badAfterBudget=false,afterBudgetVisibility=null}={}){
   const state={accounts:[{id:accountId,name:"Checking",offbudget:false,closed:false}],
     budget:budget(),transactions:[],events:[]};
   const api={
     async getAccounts(){state.events.push("get-accounts");return structuredClone(state.accounts);},
-    async getBudgetMonth(){state.events.push("get-budget");return badAfterBudget
-      &&state.transactions.length
-      ? {...structuredClone(state.budget),categoryGroups:[]}
-      : structuredClone(state.budget);},
+    async getBudgetMonth(){
+      state.events.push("get-budget");
+      if(badAfterBudget && state.transactions.length)
+        return {...structuredClone(state.budget),categoryGroups:[]};
+      const result=structuredClone(state.budget);
+      if(afterBudgetVisibility!==null && state.transactions.length){
+        const group=result.categoryGroups[0],cat=group.categories[0];
+        const target=afterBudgetVisibility.target==="group"?group:cat;
+        if(afterBudgetVisibility.form==="missing")delete target.hidden;
+        else target.hidden=afterBudgetVisibility.value;
+      }
+      return result;
+    },
     async getTransactions(){state.events.push("get-rows");return structuredClone(state.transactions);},
     async addTransactions(account,records,options){
       state.events.push("add");
@@ -180,4 +189,40 @@ test("matching API 'ok' and [id] accepted; unknown acknowledgments refused",asyn
   const failed=mock({ack:[id,"extra"]});
   await refusal("uncertain-write",()=>executeCategorizedExpense({
     api:failed.api,input:req,recordAttempt:failed.recordAttempt}));
+});
+
+test("both group and category visibility must be proven false before ATTEMPTED",async()=>{
+  for(const target of ["group","category"]){
+    for(const form of [
+      {kind:"missing"},{kind:"present",value:null},
+      {kind:"present",value:true},{kind:"present",value:"false"},
+      {kind:"present",value:0},{kind:"present",value:{}}
+    ]){
+      const m=mock();
+      const group=m.state.budget.categoryGroups[0],cat=group.categories[0];
+      const current=target==="group"?group:cat;
+      if(form.kind==="missing")delete current.hidden;
+      else current.hidden=form.value;
+      await refusal("hidden-category",()=>executeCategorizedExpense({
+        api:m.api,input:command(),recordAttempt:m.recordAttempt
+      }));
+      assert.equal(m.state.events.includes("attempted"),false);
+      assert.equal(m.state.events.includes("add"),false);
+    }
+  }
+});
+test("post-add visibility loss stays uncertain; no false committed receipt",async()=>{
+  for(const target of ["group","category"])
+    for(const form of [
+      {form:"missing"},{form:"present",value:null},
+      {form:"present",value:true},{form:"present",value:"false"}
+    ]){
+      const m=mock({afterBudgetVisibility:{target,...form}});
+      await refusal("uncertain-write",()=>executeCategorizedExpense({
+        api:m.api,input:command(),recordAttempt:m.recordAttempt
+      }));
+      assert.ok(m.state.events.includes("attempted"));
+      assert.equal(m.state.events.filter(e=>e==="add").length,1);
+      assert.equal(m.state.events.filter(e=>e==="sync").length,1);
+    }
 });

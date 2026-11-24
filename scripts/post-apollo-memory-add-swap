@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -I
 """Bounded managed Btrfs swap allocation and boot policy."""
 import json
+import hashlib
 from contextlib import contextmanager
 import fcntl
 import time
@@ -19,6 +20,8 @@ EXT_DIRECTORY = PARENT / "post-apollo-memory-extension"
 EXT_FILE = EXT_DIRECTORY / "swapfile"
 LOCK = Path("/run/post-apollo-memory.lock")
 WITHDRAW_MARKER = EXT_DIRECTORY / "withdrawal.json"
+REACTIVATE_MARKER = EXT_DIRECTORY / "reactivation.json"
+REACTIVATE_RESULT = EXT_DIRECTORY / "reactivation-result.json"
 REDUCTION_VERSION = 1
 # Single-threaded helper; ownership remains with the open file description.
 _mutation_fd = None
@@ -179,7 +182,7 @@ def status():
     base = active_swap()
     extension = active_swap(EXT_FILE)
     extension_exists = os.path.lexists(EXT_DIRECTORY)
-    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "recoveryInspectionVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "recoveryInspectionVersion": 1, "reactivationVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": base,
@@ -288,7 +291,8 @@ def check_recovery_fence():
         raise ReductionRecovery("UNTRUSTED_EXTENSION_DIRECTORY")
     # Existence alone is sufficient, including partial/corrupt records and
     # orphan result files. Do not parse or clear them on the mutation path.
-    for path in (WITHDRAW_MARKER, WITHDRAW_MARKER.with_name("withdrawal-result.json")):
+    for path in (WITHDRAW_MARKER, WITHDRAW_MARKER.with_name("withdrawal-result.json"),
+                 REACTIVATE_MARKER, REACTIVATE_RESULT):
         try:
             path.lstat()
         except FileNotFoundError:
@@ -440,6 +444,9 @@ def durable_withdrawal_record(data, *, initial=False):
     # Keep the original intent marker forever until an explicit recovery stage.
     # Subsequent outcome is a separate exclusive file, never overwrites intent.
     path = WITHDRAW_MARKER if initial else WITHDRAW_MARKER.with_name("withdrawal-result.json")
+    write_protected_record(path, data)
+
+def write_protected_record(path, data):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w", encoding="ascii") as stream:
         json.dump(data, stream, sort_keys=True)
@@ -601,6 +608,130 @@ def classify_recovery(intent, result, identity, snapshot):
         return report("INVALID_RESULT")
     return report("RESULT_CONTRADICTS_KERNEL" if extra else "RECORDED_VERIFIED_INACTIVE")
 
+
+def withdrawal_digest(intent, outcome):
+    raw = json.dumps([intent, outcome], sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=True, allow_nan=False).encode("ascii")
+    return hashlib.sha256(raw).hexdigest()
+
+def reactivation_plan(target, intent, outcome, identity, snapshot):
+    observed = classify_recovery(intent, outcome, identity, snapshot)
+    if observed["code"] != "RECORDED_VERIFIED_INACTIVE":
+        raise ReductionRecovery("REACTIVATION_" + observed["code"])
+    evidence = intent["evidence"]
+    nominal = nominal_capacity({"sizeKiB": evidence["baseSizeKiB"]}) + nominal_capacity(
+        {"sizeKiB": evidence["extensionSizeKiB"]})
+    if type(target) is not int or target != nominal:
+        raise ReductionBlocked("REACTIVATION_TARGET_MISMATCH", {"retainedTargetGiB": nominal})
+    return {"version": 1, "state": "PREPARED", "targetGiB": target,
+            "identity": [list(row) for row in identity],
+            "withdrawalDigest": withdrawal_digest(intent, outcome),
+            "baseSizeKiB": evidence["baseSizeKiB"], "extensionSizeKiB": evidence["extensionSizeKiB"]}
+
+def reactivation_records():
+    return (read_protected_record(REACTIVATE_MARKER), read_protected_record(REACTIVATE_RESULT))
+
+def classify_reactivation(intent, outcome, prepared, receipt, identity, snapshot):
+    # Reconstruct the inactive observation for validating the predecessor only.
+    # Current kernel state is separately required to agree with the new receipt.
+    observation = classify_recovery(intent, outcome, identity, snapshot)
+    def report(code):
+        return dict(observation, code=code)
+    if prepared is None:
+        return report("REACTIVATION_ORPHAN_RESULT")
+    inactive = dict(snapshot, rows=dict(snapshot["rows"]))
+    inactive["rows"].pop(str(EXT_FILE), None)
+    try:
+        expected = reactivation_plan(prepared.get("targetGiB"), intent, outcome, identity, inactive)
+    except (ReductionRecovery, ReductionBlocked, ValueError, KeyError, TypeError):
+        return report("REACTIVATION_PREDECESSOR_UNVERIFIED")
+    if (any(prepared.get(key) != value for key, value in expected.items())
+            or type(prepared.get("version")) is not int
+            or type(prepared.get("timeNs")) is not int or prepared["timeNs"] <= 0):
+        return report("REACTIVATION_INVALID_INTENT")
+    if receipt is None:
+        return report("REACTIVATION_INTENT_ONLY_ACTIVE" if observation["extensionActive"]
+                      else "REACTIVATION_INTENT_ONLY_INACTIVE")
+    if (type(receipt.get("version")) is not int or receipt["version"] != 1
+            or receipt.get("state") != "VERIFIED"
+            or type(receipt.get("targetGiB")) is not int or receipt["targetGiB"] != expected["targetGiB"]
+            or receipt.get("withdrawalDigest") != expected["withdrawalDigest"]
+            or receipt.get("identity") != expected["identity"]
+            or type(receipt.get("baseSizeKiB")) is not int or receipt["baseSizeKiB"] != expected["baseSizeKiB"]
+            or type(receipt.get("extensionSizeKiB")) is not int or receipt["extensionSizeKiB"] != expected["extensionSizeKiB"]
+            or type(receipt.get("sizeKiB")) is not int
+            or receipt["sizeKiB"] != expected["baseSizeKiB"] + expected["extensionSizeKiB"]
+            or type(receipt.get("basePriority")) is not int or receipt["basePriority"] != 10
+            or type(receipt.get("extensionPriority")) is not int or receipt["extensionPriority"] != 9
+            or receipt.get("extensionActive") is not True or receipt.get("fileRetained") is not True
+            or receipt.get("temporary") is not True
+            or type(receipt.get("timeNs")) is not int or receipt["timeNs"] < prepared["timeNs"]):
+        return report("REACTIVATION_INVALID_RESULT")
+    if (observation["code"] != "RESULT_CONTRADICTS_KERNEL"
+            or not observation["extensionActive"]):
+        return report("REACTIVATION_RESULT_CONTRADICTS_KERNEL")
+    return report("REACTIVATION_RECORDED_VERIFIED_ACTIVE")
+
+def reactivate_authorized(target):
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    # Deliberately enter the retained-journal inspection lock path, but
+    # authorize this single mutation only after strict predecessor validation.
+    with mutation_lock(inspection=True):
+        identity = extension_identity()
+        if reactivation_records() != (None, None):
+            raise ReductionRecovery("REACTIVATION_RECOVERY_REQUIRED")
+        intent = read_protected_record(WITHDRAW_MARKER)
+        outcome = read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json"))
+        check_extension_boot_policy()
+        planned = reactivation_plan(target, intent, outcome, identity, read_reduction_snapshot())
+        mountpoint, filesystem = mount_info()
+        if filesystem != "btrfs":
+            raise ReductionBlocked("UNSUPPORTED_FILESYSTEM")
+        devices = run("/usr/bin/btrfs", "filesystem", "show", "--raw", mountpoint)
+        if not re.search(r"\bTotal devices\s+1\b", devices):
+            raise ReductionBlocked("UNSUPPORTED_FILESYSTEM")
+        # Verify existing mapping; do not create, format or resize anything.
+        run("/usr/bin/btrfs", "inspect-internal", "map-swapfile", str(EXT_FILE))
+        def recheck():
+            if (extension_identity() != identity
+                    or read_protected_record(WITHDRAW_MARKER) != intent
+                    or read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json")) != outcome):
+                raise ReductionRecovery("REACTIVATION_EVIDENCE_CHANGED")
+            check_extension_boot_policy()
+            if reactivation_plan(target, intent, outcome, identity, read_reduction_snapshot()) != planned:
+                raise ReductionRecovery("REACTIVATION_EVIDENCE_CHANGED")
+        recheck()
+        if reactivation_records() != (None, None):
+            raise ReductionRecovery("REACTIVATION_RECOVERY_REQUIRED")
+        prepared = dict(planned, timeNs=time.time_ns())
+        try:
+            write_protected_record(REACTIVATE_MARKER, prepared)
+        except (OSError, ValueError) as error:
+            raise ReductionRecovery("REACTIVATION_INTENT_UNVERIFIED") from error
+        try:
+            recheck()
+            if reactivation_records() != (prepared, None):
+                raise ReductionRecovery("REACTIVATION_EVIDENCE_CHANGED")
+            run("/usr/sbin/swapon", "--priority", "9", "--", str(EXT_FILE))
+            observed = read_reduction_snapshot()
+            receipt = dict(planned, state="VERIFIED", timeNs=time.time_ns(),
+                           sizeKiB=planned["baseSizeKiB"] + planned["extensionSizeKiB"],
+                           basePriority=10, extensionPriority=9,
+                           extensionActive=True, fileRetained=True, temporary=True)
+            if (extension_identity() != identity
+                    or read_protected_record(WITHDRAW_MARKER) != intent
+                    or read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json")) != outcome
+                    or reactivation_records() != (prepared, None)
+                    or classify_reactivation(intent, outcome, prepared, receipt, identity, observed)["code"]
+                        != "REACTIVATION_RECORDED_VERIFIED_ACTIVE"):
+                raise RuntimeError("Reactivation readback mismatch")
+            write_protected_record(REACTIVATE_RESULT, receipt)
+        except (OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.SubprocessError) as error:
+            raise ReductionRecovery("REACTIVATION_OUTCOME_UNKNOWN") from error
+        print("VERIFIED REACTIVATION:", json.dumps(receipt), flush=True)
+
+
 def inspect_recovery_authorized():
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
@@ -629,7 +760,13 @@ def inspect_recovery_authorized():
                         or read_protected_record(WITHDRAW_MARKER) != intent
                         or read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json")) != outcome):
                     raise ValueError("Recovery observations changed")
-                result = classify_recovery(intent, outcome, identity, second)
+                prepared, receipt = reactivation_records()
+                if prepared is not None or receipt is not None:
+                    if reactivation_records() != (prepared, receipt):
+                        raise ValueError("Reactivation observations changed")
+                    result = classify_reactivation(intent, outcome, prepared, receipt, identity, second)
+                else:
+                    result = classify_recovery(intent, outcome, identity, second)
         except (OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.SubprocessError):
             result = {"version":1, "state":"RECOVERY_REQUIRED", "code":"INSPECTION_UNVERIFIED",
                       "mutationAllowed":False, "recordCleared":False}
@@ -668,11 +805,13 @@ def main(args):
             print(json.dumps(reduction_preflight(parse_size(args[1]))))
         elif args == ["inspect-recovery-authorized"]:
             inspect_recovery_authorized()
+        elif len(args) == 2 and args[0] == "reactivate-authorized":
+            reactivate_authorized(parse_size(args[1]))
         elif len(args) == 2 and args[0] == "withdraw-authorized":
             with mutation_lock():
                 withdraw_authorized(parse_size(args[1]))
         else:
-            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB | inspect-recovery-authorized")
+            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB | inspect-recovery-authorized | reactivate-authorized GIB")
         return 0
     except ReductionRecovery as error:
         print("REDUCTION RECOVERY:", json.dumps({"version": REDUCTION_VERSION, "state": "RECOVERY_REQUIRED", "code": str(error)}), flush=True)

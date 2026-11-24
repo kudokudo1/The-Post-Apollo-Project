@@ -298,7 +298,8 @@ class CrashFenceTests(unittest.TestCase):
 
     def test_fence_refuses_partial_or_orphan_record(self):
         directory = SimpleNamespace(st_mode=0o40700, st_uid=0)
-        for marker in (m.WITHDRAW_MARKER, m.WITHDRAW_MARKER.with_name("withdrawal-result.json")):
+        for marker in (m.WITHDRAW_MARKER, m.WITHDRAW_MARKER.with_name("withdrawal-result.json"),
+                       m.REACTIVATE_MARKER, m.REACTIVATE_RESULT):
             def lstat(path):
                 if path == m.EXT_DIRECTORY:
                     return directory
@@ -474,6 +475,109 @@ class RecoveryInspectionTests(unittest.TestCase):
         with patch.object(m,"inspect_recovery_authorized") as inspect:
             self.assertEqual(m.main(["inspect-recovery-authorized"]),0)
             inspect.assert_called_once_with()
+
+
+class ReactivationTests(unittest.TestCase):
+    def fixture(self):
+        return RecoveryInspectionTests().fixture()
+
+    def test_exact_target_and_provenance(self):
+        identity,intent,outcome,before,after = self.fixture()
+        plan = m.reactivation_plan(24,intent,outcome,identity,after)
+        self.assertEqual(plan["targetGiB"],24)
+        self.assertEqual(plan["extensionSizeKiB"],8388604)
+        for target in (16,20,28,32):
+            with self.assertRaises(m.ReductionBlocked):
+                m.reactivation_plan(target,intent,outcome,identity,after)
+        for i,o,s in ((None,None,after),(intent,None,after),(intent,outcome,before),
+                      (intent,dict(outcome,sizeKiB=1),after)):
+            with self.assertRaises(m.ReductionRecovery):
+                m.reactivation_plan(24,i,o,identity,s)
+
+    def test_new_receipt_requires_exact_kernel_and_predecessor(self):
+        identity,intent,outcome,before,after = self.fixture()
+        prepared = dict(m.reactivation_plan(24,intent,outcome,identity,after),timeNs=102)
+        receipt = dict(prepared,state="VERIFIED",timeNs=103,sizeKiB=25165816,
+                       basePriority=10,extensionPriority=9,extensionActive=True,fileRetained=True,temporary=True)
+        self.assertEqual(m.classify_reactivation(intent,outcome,prepared,receipt,identity,before)["code"],
+                         "REACTIVATION_RECORDED_VERIFIED_ACTIVE")
+        self.assertEqual(m.classify_reactivation(intent,outcome,prepared,receipt,identity,after)["code"],
+                         "REACTIVATION_RESULT_CONTRADICTS_KERNEL")
+        self.assertEqual(m.classify_reactivation(intent,outcome,prepared,None,identity,before)["code"],
+                         "REACTIVATION_INTENT_ONLY_ACTIVE")
+        self.assertEqual(m.classify_reactivation(intent,outcome,None,receipt,identity,before)["code"],
+                         "REACTIVATION_ORPHAN_RESULT")
+        self.assertEqual(m.classify_reactivation(intent,outcome,prepared,dict(receipt,withdrawalDigest="other"),identity,before)["code"],
+                         "REACTIVATION_INVALID_RESULT")
+        self.assertFalse(m.classify_reactivation(intent,outcome,prepared,receipt,identity,before)["mutationAllowed"])
+
+    def test_nonroot_refusal(self):
+        with patch.object(m.os,"geteuid",return_value=1000),patch.object(m,"mutation_lock") as lock:
+            with self.assertRaises(PermissionError):
+                m.reactivate_authorized(24)
+            lock.assert_not_called()
+
+    def test_one_fixed_activation_and_durable_receipt(self):
+        identity,intent,outcome,before,after = self.fixture()
+        records = {m.WITHDRAW_MARKER:intent,m.WITHDRAW_MARKER.with_name("withdrawal-result.json"):outcome}
+        def publish(path,data):
+            self.assertNotIn(path,records)
+            records[path]=data
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()) as lock,patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"mount_info",return_value=("/var","btrfs")),patch.object(m,"read_protected_record",side_effect=records.get),patch.object(m,"read_reduction_snapshot",side_effect=[after,after,after,before]),patch.object(m,"write_protected_record",side_effect=publish) as write,patch.object(m,"run",return_value="Total devices 1") as run:
+            m.reactivate_authorized(24)
+            lock.assert_called_once_with(inspection=True)
+            self.assertEqual(run.call_args_list[-1].args,("/usr/sbin/swapon","--priority","9","--",str(m.EXT_FILE)))
+            self.assertEqual(run.call_count,3)
+            self.assertEqual(write.call_count,2)
+            self.assertEqual(records[m.REACTIVATE_MARKER]["state"],"PREPARED")
+            self.assertEqual(records[m.REACTIVATE_RESULT]["state"],"VERIFIED")
+            self.assertEqual(records[m.WITHDRAW_MARKER],intent)
+            self.assertEqual(records[m.WITHDRAW_MARKER.with_name("withdrawal-result.json")],outcome)
+
+    def test_failed_activation_never_replays(self):
+        identity,intent,outcome,before,after = self.fixture()
+        records = {m.WITHDRAW_MARKER:intent,m.WITHDRAW_MARKER.with_name("withdrawal-result.json"):outcome}
+        def command(*argv):
+            if argv[0]=="/usr/sbin/swapon":
+                raise m.subprocess.CalledProcessError(1,"swapon")
+            return "Total devices 1"
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"mount_info",return_value=("/var","btrfs")),patch.object(m,"read_protected_record",side_effect=records.get),patch.object(m,"read_reduction_snapshot",return_value=after),patch.object(m,"write_protected_record",side_effect=records.__setitem__) as write,patch.object(m,"run",side_effect=command) as run:
+            with self.assertRaises(m.ReductionRecovery) as error:
+                m.reactivate_authorized(24)
+            self.assertEqual(str(error.exception),"REACTIVATION_OUTCOME_UNKNOWN")
+            self.assertNotIn(m.REACTIVATE_RESULT,records)
+            write.assert_called_once()
+            run.reset_mock()
+            with self.assertRaises(m.ReductionRecovery) as error:
+                m.reactivate_authorized(24)
+            self.assertEqual(str(error.exception),"REACTIVATION_RECOVERY_REQUIRED")
+            run.assert_not_called()
+
+    def test_changed_kernel_after_intent_never_calls_swapon(self):
+        identity,intent,outcome,before,after = self.fixture()
+        records = {m.WITHDRAW_MARKER:intent,m.WITHDRAW_MARKER.with_name("withdrawal-result.json"):outcome}
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"mount_info",return_value=("/var","btrfs")),patch.object(m,"read_protected_record",side_effect=records.get),patch.object(m,"read_reduction_snapshot",side_effect=[after,after,before]),patch.object(m,"write_protected_record",side_effect=records.__setitem__),patch.object(m,"run",return_value="Total devices 1") as run:
+            with self.assertRaises(m.ReductionRecovery):
+                m.reactivate_authorized(24)
+            self.assertEqual(run.call_count,2)
+            self.assertIn(m.REACTIVATE_MARKER,records)
+            self.assertNotIn(m.REACTIVATE_RESULT,records)
+
+    def test_wrong_readback_retains_intent_only(self):
+        identity,intent,outcome,before,after = self.fixture()
+        records = {m.WITHDRAW_MARKER:intent,m.WITHDRAW_MARKER.with_name("withdrawal-result.json"):outcome}
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"mount_info",return_value=("/var","btrfs")),patch.object(m,"read_protected_record",side_effect=records.get),patch.object(m,"read_reduction_snapshot",return_value=after),patch.object(m,"write_protected_record",side_effect=records.__setitem__),patch.object(m,"run",return_value="Total devices 1"):
+            with self.assertRaises(m.ReductionRecovery):
+                m.reactivate_authorized(24)
+            self.assertIn(m.REACTIVATE_MARKER,records)
+            self.assertNotIn(m.REACTIVATE_RESULT,records)
+
+    def test_command_grammar(self):
+        with patch.object(m,"reactivate_authorized") as reactivate:
+            self.assertEqual(m.main(["reactivate-authorized","24"]),0)
+            reactivate.assert_called_once_with(24)
+            self.assertEqual(m.main(["reactivate-authorized","0"]),1)
+            reactivate.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

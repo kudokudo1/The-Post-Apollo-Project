@@ -8,6 +8,9 @@ import "CpuPlusDiagnosticsPolicy.js" as Policy
 // No process or timer runs until an explicit button request.
 Scope {
     id: owner
+    // Session presentation state; never stores an armed capacity request.
+    property int memoryMenuIndex: 0
+    property string selectedReport: "memory"
     property bool busy: false
     property bool faulted: false
     property string kind: ""
@@ -16,6 +19,7 @@ Scope {
     property bool received: false
     property bool exited: false
     property bool exitOk: false
+    property int exitCode: -1
     property bool cancelled: false
     property string output: ""
     readonly property int maximumReport: 65536
@@ -25,9 +29,11 @@ Scope {
         const args = Policy.argumentsFor(job, path => Quickshell.shellPath(path));
         if (!args) return false;
         kind = job;
+        selectedReport = job;
         received = false;
         exited = false;
         exitOk = false;
+        exitCode = -1;
         cancelled = false;
         output = "";
         busy = true;
@@ -52,7 +58,7 @@ Scope {
         const next = Object.assign({}, reports);
         next[kind] = {
             status: cancelled ? "CANCELLED" : summary ? "COMPLETE" : "NOT VERIFIED",
-            summary: summary || "NO VERIFIED RESULT // PARTIAL OUTPUT MAY BE AVAILABLE",
+            summary: summary || (cancelled ? "CAPTURE STOPPED" : "NO VERIFIED RESULT // EXIT " + exitCode),
             text: output.length <= maximumReport ? output : "",
             finishedAt: new Date().toISOString()
         };
@@ -90,6 +96,7 @@ Scope {
         }
         onExited: function(code, exitStatus) {
             if (!owner.busy) return;
+            owner.exitCode = code;
             owner.exitOk = code === 0 && exitStatus === 0;
             owner.exited = true;
             owner.finish();

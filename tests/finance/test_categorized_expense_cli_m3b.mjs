@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {createHash} from "node:crypto";
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,statSync,
-        existsSync,rmSync,chmodSync} from "node:fs";
+        existsSync,rmSync,chmodSync,symlinkSync,unlinkSync,renameSync,linkSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -182,5 +182,80 @@ test("uncertain post-attempt outcomes retain durable journal; no retry or rollba
       assert.ok(d.transactions.length<=1);
       assert.ok(d.transactions.every(x=>x.category!=="fictional-income"));
     } finally {cleanup(f);}
+  }
+});
+
+test("symlinked or untrusted permit and configuration directories deny authority",()=>{
+  for(const target of ["permit","directory"]){
+    const f=setup();
+    try {
+      if(target==="permit"){
+        renameSync(join(f.config,"categorized-expense-writes-enabled"),
+          join(f.config,"sequestered-permit"));
+        symlinkSync("sequestered-permit",
+          join(f.config,"categorized-expense-writes-enabled"));
+      } else {
+        renameSync(f.config,f.config+"-real");
+        symlinkSync("financew-real",f.config);
+      }
+      outcome(invoke(f,cmd()),"blocked:writes-disabled",1);
+      assert.equal(data(f).transactions.length,0);
+      assert.equal(existsSync(receipt(f)),false);
+    }finally{cleanup(f);}
+  }
+});
+test("symlinked or writable journal path ancestors refuse before mutation",()=>{
+  for(const mode of ["symlink-parent","symlink-leaf","writable-parent"]){
+    const f=setup();
+    try {
+      const local=join(f.home,".local");
+      const state=join(local,"state");
+      if(mode==="symlink-parent"){
+        mkdirSync(join(f.home,"elsewhere"),{mode:0o700});
+        symlinkSync("elsewhere",local);
+      }else if(mode==="symlink-leaf"){
+        mkdirSync(join(f.home,"elsewhere"),{mode:0o700});
+        mkdirSync(join(f.home,".local","state","financew"),
+          {recursive:true,mode:0o700});
+        symlinkSync(join(f.home,"elsewhere"),f.journal);
+      }else{
+        mkdirSync(state,{recursive:true,mode:0o700});
+        chmodSync(state,0o770);
+      }
+      outcome(invoke(f,cmd()),"blocked:unsafe-journal-directory",1);
+      assert.equal(data(f).transactions.length,0);
+      assert.equal(existsSync(receipt(f)),false);
+    }finally{cleanup(f);}
+  }
+});
+test("symlinked, hardlinked or readable prior journal never bypasses recovery",()=>{
+  for(const mode of ["symlink","hardlink","world-readable"]){
+    const f=setup();
+    try{
+      mkdirSync(f.journal,{recursive:true,mode:0o700});
+      const source=join(f.home,"external-prior");
+      const prior=join(f.journal,"allocation-"+"b".repeat(32)+".json");
+      writeFileSync(source,'{"status":"committed"}\n',{mode:0o600});
+      if(mode==="symlink")symlinkSync(source,prior);
+      else if(mode==="hardlink")linkSync(source,prior);
+      else writeFileSync(prior,'{"status":"committed"}\n',{mode:0o644});
+      outcome(invoke(f,cmd()),"blocked:recovery-needed",1);
+      assert.equal(data(f).transactions.length,0);
+      assert.equal(existsSync(receipt(f)),false);
+    }finally{cleanup(f);}
+  }
+});
+test("a swapped private credential or source file is refused before Actual add",()=>{
+  for(const name of ["actual-password","actual-sync-id","actual-server-url"]){
+    const f=setup();
+    try {
+      renameSync(join(f.config,name),join(f.config,name+"-real"));
+      symlinkSync(name+"-real",join(f.config,name));
+      const result=invoke(f,cmd());
+      assert.equal(result.status,1);
+      assert.equal(result.stdout,"FINANCEW_CATEGORIZED_EXPENSE_RESULT blocked:operation-failed\n");
+      assert.equal(data(f).transactions.length,0);
+      assert.equal(existsSync(receipt(f)),false);
+    }finally{cleanup(f);}
   }
 });

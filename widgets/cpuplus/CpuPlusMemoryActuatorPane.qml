@@ -122,7 +122,7 @@ Item {
             }
             Rectangle { width: parent.width; height: 1; color: Colors.cyan }
             GohuText {
-                text: "MEMORY EXPANSION // PREVIEW ONLY"
+                text: "MEMORY EXPANSION // ADD"
                 width: parent.width
                 wrapMode: Text.WordWrap
                 color: Colors.magenta
@@ -156,17 +156,15 @@ Item {
             GohuText {
                 width: parent.width
                 text: "Would reserve " + root.stagedGiB
-                      + " GiB of disk storage. Not physical RAM. Storage eligibility, free space and authorization are not checked in this preview."
+                      + " GiB of disk storage. Not physical RAM. Check the host below before requesting allocation."
                 color: Colors.white
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
             }
-            GohuText {
+            CpuPlusMemoryAddControl {
                 width: parent.width
-                text: "APPLY // HOLD — NO SYSTEM WRITES"
-                color: Colors.orange
-                wrapMode: Text.WordWrap
-                font.pixelSize: 10
+                stagedGiB: root.stagedGiB
+                sample: root.sample
             }
         }
     }

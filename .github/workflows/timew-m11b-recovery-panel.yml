@@ -1,0 +1,37 @@
+name: TimeW M11b read-only recovery panel lifecycle
+on:
+  pull_request:
+    paths:
+      - 'widgets/MachineSaveRecoveryPanel.qml'
+      - 'widgets/TimeW.qml'
+      - 'services/time/MachineV3LocalSaveRecoveryUiRead.py'
+      - 'services/time/MachineV3LocalSaveRecoveryPolicy.js'
+      - 'tests/timew/test_machine_v11b_recovery_panel.cjs'
+      - 'docs/timew-m11b-recovery-panel.md'
+      - '.github/workflows/timew-m11b-recovery-panel.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery-panel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise actual panel handler bodies and read-only bridge
+        run: |
+          node tests/timew/test_machine_v11b_recovery_panel.cjs
+          python3 -B -I tests/timew/test_machine_v11_recovery_ui_read.py
+          node tests/timew/test_machine_v11_recovery_display_policy.cjs
+      - name: Preserve current Save and recovery behavior
+        run: |
+          python3 -B -I tests/timew/test_machine_save_ui_contract.py
+          python3 -B -I tests/timew/test_machine_persistent_mark_ui.py
+          python3 -B -I tests/timew/test_machine_v10_coordinated_local_save.py
+          python3 -B -I tests/timew/test_machine_v5_local_preview_ui_bridge.py
+          node tests/timew/test_machine_v5_local_preview_policy.cjs

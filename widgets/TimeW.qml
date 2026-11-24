@@ -5619,6 +5619,15 @@ PanelWindow {
                             wrapMode: Text.Wrap
                         }
 
+                        MachineSaveRecoveryPanel {
+                            width: parent.width
+                            contextActive: timew.menuOpen && timew.selectedMode === "machine"
+                                           && !timew.machineStoredViewOpen
+                            blocked: timew.machineSaveBridgeBusy || timew.machineStoreBusy
+                                     || timew.machineAutoRestoreBusy || timew.machineApplyBusy
+                                     || timew.machineCaptureBusy || timew.machineNotesDirty
+                        }
+
                         // Manually copy the browser-side signature here if desired.
                         // This is a visual hint only, never a Sway window match,
                         // a stored tab list, or a prerequisite to SAVE/RESTORE.

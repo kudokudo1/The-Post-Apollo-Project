@@ -7,6 +7,14 @@ package=/input/forest-host-ci.rpm
 name=post-apollo-forest-host-ci
 host=/usr/libexec/post-apollo/forest-ci/forest-host
 dnf -y install python3
+# Only this disposable container gets SYS_PTRACE to inspect different test UIDs.
+# Never grant this capability to a production service based on CI success.
+python3 - <<'PY'
+from pathlib import Path
+lines = Path("/proc/self/status").read_text().splitlines()
+mask = int(next(s.split()[1] for s in lines if s.startswith("CapEff:")), 16)
+assert mask & (1 << 19), "C4B_CI_CROSS_UID_PROC_SOURCE_REQUIRES_SYS_PTRACE"
+PY
 [[ -f "$package" && ! -e "$host" ]]
 [[ "$(rpm -qp --qf '%{NAME}' "$package")" == "$name" ]]
 [[ -z "$(rpm -qp --scripts "$package")" && -z "$(rpm -qp --triggers "$package")" ]]

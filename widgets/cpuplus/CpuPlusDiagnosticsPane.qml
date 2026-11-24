@@ -1,5 +1,7 @@
 import QtQuick
 import qs.services.diagnostics
+import "../../services/diagnostics/DiagnosticComparison.js" as Compare
+import "../../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as Policy
 import "../../components"
 
 // UI only. Session owner survives CPU++ closing or changing pages.
@@ -13,6 +15,21 @@ Column {
         ? CpuPlusDiagnostics.reportFor(selectedReport, CpuPlusDiagnostics.selectedArchiveId)
         : CpuPlusDiagnostics.reports[selectedReport] || null
     property bool showHistory: false
+    property bool showComparison: false
+    readonly property var archiveRows: CpuPlusDiagnostics.archiveStatus === "READY" && !CpuPlusDiagnostics.archiveBusy
+        ? CpuPlusDiagnostics.archiveRows : []
+    readonly property var beforeRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareBeforeId) || null
+    readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
+    readonly property bool canChooseComparison: report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
+    readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize) : null
+    function comparisonLabel(row) {
+        return row ? row.kind.toUpperCase() + " // " + row.finishedAt.slice(0, 19).replace("T", " ") + " UTC" : "NOT SELECTED / NO LONGER RETAINED";
+    }
+    function valueLabel(value, digits, unit, delta) {
+        if (value === null) return "N/A";
+        return (delta && value > 0 ? "+" : "") + value.toFixed(digits)
+            + (unit ? " " + (delta && unit === "%" ? "pp" : unit) : "");
+    }
 
     GohuText {
         width: parent.width
@@ -155,6 +172,86 @@ Column {
                 }
             }
         }
+    }
+    GohuText {
+        width: parent.width
+        text: "COMPARE // SELECT A COMPLETED ARCHIVE REPORT"
+        color: Colors.magenta
+        font.pixelSize: 11
+        wrapMode: Text.Wrap
+    }
+    Row {
+        width: parent.width
+        spacing: 4
+        ActionButton {
+            width: Math.max(0, (root.width - 4) / 2)
+            height: 30
+            label: "SET BEFORE"
+            available: root.canChooseComparison
+            onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
+        }
+        ActionButton {
+            width: Math.max(0, (root.width - 4) / 2)
+            height: 30
+            label: "SET AFTER"
+            available: root.canChooseComparison
+            onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
+        }
+    }
+    GohuText {
+        width: parent.width
+        text: "BEFORE // " + root.comparisonLabel(root.beforeRecord)
+            + "\nAFTER // " + root.comparisonLabel(root.afterRecord)
+        color: Colors.cyan
+        font.pixelSize: 10
+        wrapMode: Text.Wrap
+        textFormat: Text.PlainText
+    }
+    ActionButton {
+        width: parent.width
+        height: 30
+        label: root.showComparison ? "HIDE COMPARISON" : "COMPARE CAPTURES"
+        available: root.showComparison || (root.beforeRecord !== null && root.afterRecord !== null)
+        onLeftClicked: root.showComparison = !root.showComparison
+    }
+    GohuText {
+        width: parent.width
+        visible: root.showComparison && root.comparison !== null && root.comparison.error !== ""
+        text: visible ? root.comparison.error : ""
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.Wrap
+    }
+    Repeater {
+        model: root.comparison ? root.comparison.rows : []
+        delegate: Column {
+            required property var modelData
+            width: root.width
+            spacing: 2
+            GohuText {
+                width: parent.width
+                text: modelData.label
+                color: Colors.magenta
+                font.pixelSize: 10
+            }
+            GohuText {
+                width: parent.width
+                text: "B " + root.valueLabel(modelData.before, modelData.digits, modelData.unit, false)
+                    + "  /  A " + root.valueLabel(modelData.after, modelData.digits, modelData.unit, false)
+                    + "\nCHANGE // " + root.valueLabel(modelData.delta, modelData.digits, modelData.unit, true)
+                color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
+        }
+    }
+    GohuText {
+        width: parent.width
+        visible: root.comparison !== null && root.comparison.note !== ""
+        text: visible ? root.comparison.note : ""
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.Wrap
     }
     GohuText {
         width: parent.width

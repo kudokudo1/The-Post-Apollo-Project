@@ -211,3 +211,78 @@ test('AppControl six stage markers remain opt-in and preserve model assignment',
     assert.ok(body.includes('taskMiniHistoryRevision += 1;'));
     assert.ok(body.includes('taskMiniDisplayRevision += 1;'));
 });
+
+test('mini graph lookup preserves old scan results and rebuilds on snapshot replacement', () => {
+    const start = graph.indexOf('    function sourceItem(entry) {');
+    const end = graph.indexOf('    // Hidden state', start);
+    assert.ok(start >= 0 && end > start);
+    const create = new Function('rows', 'count', graph.slice(start, end) + `
+        const originalIdentity = persistentIdentity;
+        persistentIdentity = function(entry) {
+            count.calls++;
+            return originalIdentity(entry);
+        };
+        const miniTaskLookup = buildMiniTaskLookup(rows);
+        return { resolve: liveTaskForMiniGraph, identity: originalIdentity,
+                 entryIdentity: identityForEntry, source: sourceItem };
+    `);
+    const row = (pid, comm, cpu) => ({pid, comm, cpu, _taskRecord: true});
+    const favorite = (source, key) => ({_favoriteRecord: true,
+        _favoriteType: 'task', _favoriteKey: 'task|' + encodeURIComponent(key),
+        _sourceItem: source});
+    const first = row(9, 'Brave', 4);
+    const tied = row(10, 'BRAVE', 8);
+    const rows = [null, first, row(9, 'other', 100), tied,
+        row(11, 'brave', 8), row(1, 'init', 1), row(0, 'brave', 999),
+        row(14, '__proto__', 7), {pid: 15, args: '/usr/bin/tool --x',
+            cpu: 3, _taskRecord: true}];
+    const entries = [...rows, {}, row(999, 'brave', 9),
+        favorite(row(999, 'old', 0), 'BRAVE'),
+        favorite(row(9, 'old', 0), 'brave'),
+        favorite(row(999, 'old', 0), '__proto__'),
+        favorite(row(999, 'old', 0), 'tool'),
+        favorite(row(999, 'old', 0), 'missing'),
+        favorite(row(0, 'init', 0), 'init')];
+    function oldScan(entry, rows, helpers) {
+        const source = helpers.source(entry) || entry;
+        if (!source || !source._taskRecord) return null;
+        const pid = Number(source.pid || 0);
+        if (pid > 1) {
+            for (const exact of rows) {
+                if (Number(exact && exact.pid || 0) === pid) return exact;
+            }
+            if (!entry._favoriteRecord) return source;
+        }
+        const identity = helpers.entryIdentity(entry);
+        if (identity) {
+            let best = null;
+            for (const candidate of rows) {
+                if (helpers.identity(candidate) !== identity) continue;
+                if (Number(candidate.pid || 0) <= 0) continue;
+                if (!best || Number(candidate.cpu || 0) > Number(best.cpu || 0))
+                    best = candidate;
+            }
+            if (best) return best;
+        }
+        return source;
+    }
+    const count = {calls: 0};
+    const indexed = create(rows, count);
+    assert.equal(count.calls, rows.length, 'one index pass');
+    for (const entry of entries)
+        assert.equal(indexed.resolve(entry), oldScan(entry, rows, indexed));
+    assert.equal(indexed.resolve(favorite(row(999, 'old', 0), 'brave')), tied);
+    assert.equal(indexed.resolve(first), first, 'first duplicate PID wins');
+    count.calls = 0;
+    for (let repeat = 0; repeat < 100; repeat++)
+        assert.equal(indexed.resolve(first), first);
+    assert.equal(count.calls, 0, 'exact-PID readers do not rescan identities');
+    const replacement = [row(25, 'brave', 100)];
+    const updated = create(replacement, {calls: 0});
+    const stale = favorite(first, 'brave');
+    assert.equal(updated.resolve(stale), replacement[0]);
+    assert.equal(indexed.resolve(stale), first);
+    assert.match(graph, /readonly property var miniTaskLookup:\s*buildMiniTaskLookup\(taskRows\)/);
+    assert.match(app, /taskRows:\s*appControlWindow\.taskRows/);
+    assert.match(app, /taskRows = snapshotRows;/);
+});

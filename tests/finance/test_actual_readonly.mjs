@@ -42,9 +42,11 @@ test("snapshot contains the original fictional $250 / $50 / $200 values", () => 
   ]);
   assert.deepEqual(result.categories, [{
     id:"spotify",name:"Spotify Subscription",group:"Usual Expenses",
-    groupId:"group-expenses",budgetedCents:5000,spentCents:0,availableCents:5000
+    groupId:"group-expenses",hidden:null,budgetedCents:5000,spentCents:0,availableCents:5000
   }]);
-  assert.deepEqual(result.categoryGroups,[{id:"group-expenses",name:"Usual Expenses"}]);
+  assert.deepEqual(result.categoryGroups,[{
+    id:"group-expenses",name:"Usual Expenses",hidden:null,isIncome:false
+  }]);
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.transactionsCount, 3);
   assert.deepEqual(result.transactions.map(x=>x.date),

@@ -327,3 +327,54 @@ function compareHistoricalIntervals(snapshot, a, b, c, d) {
         readOnly:true,noProviderCalls:true
     };
 }
+
+// M34: both chronological intervals start at index value 100. The x axis
+// is observed close-to-close steps, shared across unequal-length intervals.
+// Shorter series stop at their own last actual observation; no padding.
+function normalizedIntervalChart(snapshot, a, b, c, d) {
+    const comparison = compareHistoricalIntervals(snapshot, a, b, c, d);
+    if (!comparison) return null;
+    function series(left, right) {
+        const lo = Math.min(left, right), hi = Math.max(left, right);
+        const base = snapshot.bars[lo].price;
+        const points = [];
+        for (let i=lo; i<=hi; i++) {
+            const bar = snapshot.bars[i];
+            const value = i === lo ? 100 : (bar.price / base) * 100;
+            if (!Number.isFinite(value) || value <= 0) return null;
+            points.push({step:i-lo, date:bar.date, value:value});
+        }
+        return points;
+    }
+    const first = series(a,b), second = series(c,d);
+    if (!first || !second) return null;
+    const values = first.concat(second).map(p => p.value);
+    const low = Math.min.apply(null, values);
+    const high = Math.max.apply(null, values);
+    return {
+        first:first, second:second, low:low, high:high,
+        maxSteps:Math.max(first.length,second.length)-1,
+        priceBasis:comparison.first.priceBasis,
+        source:"loaded-eodhd-range-only",
+        readOnly:true,noProviderCalls:true
+    };
+}
+
+// Coordinates shared by the two series and the base-100 reference line.
+function normalizedChartPoint(chart, point, width, height) {
+    if (!chart || !point || !Number.isFinite(width)
+            || !Number.isFinite(height) || width < 5 || height < 5
+            || !Number.isInteger(chart.maxSteps) || chart.maxSteps < 1
+            || !Number.isInteger(point.step) || point.step < 0
+            || point.step > chart.maxSteps
+            || !Number.isFinite(chart.low) || !Number.isFinite(chart.high)
+            || chart.low <= 0 || chart.high < chart.low
+            || !Number.isFinite(point.value)
+            || point.value < chart.low || point.value > chart.high)
+        return null;
+    return {
+        x:point.step / chart.maxSteps * (width - 1),
+        y:chart.high === chart.low ? (height - 1)/2
+            : (1 - (point.value-chart.low)/(chart.high-chart.low))*(height-1)
+    };
+}

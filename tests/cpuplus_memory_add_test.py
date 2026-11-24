@@ -243,24 +243,26 @@ class ReductionTests(unittest.TestCase):
     def test_final_spike_blocks_without_swapoff(self):
         before = self.sample()
         with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,self.sample(used=1)]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
-            with self.assertRaises(m.ReductionBlocked):
+            with self.assertRaises(m.ReductionRecovery) as error:
                 m.withdraw_authorized(16)
+            self.assertEqual(str(error.exception), "NOT_STARTED_EXTENSION_OCCUPIED")
             run.assert_not_called()
             self.assertEqual(record.call_args_list[1].args[0]["state"], "NOT_STARTED")
 
     def test_failed_kernel_command_preserves_prepared_record(self):
         before = self.sample()
         with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", return_value=before), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run", side_effect=m.subprocess.CalledProcessError(1,"swapoff")):
-            with self.assertRaises(m.subprocess.CalledProcessError):
+            with self.assertRaises(m.ReductionRecovery) as error:
                 m.withdraw_authorized(16)
+            self.assertEqual(str(error.exception), "WITHDRAWAL_OUTCOME_UNKNOWN")
             record.assert_called_once()
             self.assertEqual(record.call_args.args[0]["state"], "PREPARED")
 
     def test_prior_intent_blocks_replay(self):
         with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[]), patch.object(m.os.path, "lexists", return_value=True), patch.object(m, "run") as run:
-            with self.assertRaises(m.ReductionBlocked) as error:
+            with self.assertRaises(m.ReductionRecovery) as error:
                 m.withdraw_authorized(16)
-            self.assertEqual(error.exception.code, "RECOVERY_REQUIRED")
+            self.assertEqual(str(error.exception), "RECOVERY_REQUIRED")
             run.assert_not_called()
 
     def test_marker_is_exclusive_and_durable(self):

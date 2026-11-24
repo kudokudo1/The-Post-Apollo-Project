@@ -27,6 +27,12 @@ function cents(value, label) {
   return value;
 }
 
+// An absent/malformed Actual flag is UNKNOWN, not false. The M3d0
+// handoff inspector refuses unknown category visibility before any future Save.
+function observedBoolean(value) {
+  return typeof value === "boolean" ? value : null;
+}
+
 export function normalizeSnapshot({month, budget, accounts, balances,
                                    transactionSets = new Map(), payees = []}) {
   if (!validMonth(month)) throw new Error("invalid-month");
@@ -46,7 +52,11 @@ export function normalizeSnapshot({month, budget, accounts, balances,
     if (typeof group.id !== "string" || !group.id
         || typeof group.name !== "string" || !group.name.trim())
       throw new Error("unexpected-category-group-identity");
-    groupRows.push({id:group.id,name:group.name});
+    groupRows.push({
+      id:group.id,name:group.name,
+      hidden:observedBoolean(group.hidden),
+      isIncome:observedBoolean(group.is_income)
+    });
     for (const category of group.categories) {
       if (!category || typeof category.name !== "string"
           || typeof category.id !== "string") {
@@ -57,6 +67,7 @@ export function normalizeSnapshot({month, budget, accounts, balances,
         name: category.name,
         group: group.name,
         groupId: group.id,
+        hidden: observedBoolean(category.hidden),
         budgetedCents: cents(category.budgeted, "budgeted"),
         spentCents: cents(category.spent, "spent"),
         availableCents: cents(category.balance, "balance")

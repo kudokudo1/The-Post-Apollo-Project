@@ -20,6 +20,7 @@ import qs.services.location
 import qs.services.time
 import qs.services.memory
 import qs.services.diagnostics
+import "services/diagnostics/CpuPlusDiagnosticsPolicy.js" as DiagnosticPolicy
 import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy
 import "services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
@@ -35,6 +36,13 @@ PanelWindow {
 
     // Keep the idle diagnostic session referenced by the root, not a transient pane.
     readonly property var diagnosticSessionOwner: CpuPlusDiagnostics
+    Connections {
+        target: CpuPlusDiagnostics
+        function onCaptureFinished(job, reportId) {
+            const notice = DiagnosticPolicy.noticeFor(job, CpuPlusDiagnostics.reportFor(job, reportId));
+            if (notice) NotificationsService.pushRich(notice);
+        }
+    }
 
     // This shell is developed by multiple concurrent writers. Quickshell's
     // automatic file watcher can reload partially-updated QML graphs while
@@ -184,6 +192,14 @@ PanelWindow {
         const route = destination || {};
         const widget = String(route.widget || "");
         if (widget === "cpu") {
+            if (route.view === "diagnostics") {
+                if (!CpuPlusDiagnostics.selectExactReport(route.reportKind, route.reportId)) return false;
+                if (!cpuPlusWindow.menuOpen) cpuPlusWindow.open();
+                cpuPlusWindow.selectMode(3);
+                cpuPlusWindow.selectSystemSubMode("MEMORY");
+                shellRoot.requestControlKeyboard("cpu", "notification-route");
+                return true;
+            }
             if (!cpuPlusWindow.menuOpen)
                 cpuPlusWindow.open();
             if (route.mode === "thermal") {

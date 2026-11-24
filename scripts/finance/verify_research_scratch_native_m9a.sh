@@ -31,12 +31,14 @@ for file in FinanceResearchEvidenceCandidatePicker.qml \
 done
 for file in FinanceResearchCandidatePreviewService.qml \
   FinanceResearchCandidateDraftService.qml \
+  FinanceResearchScratchEvidenceService.qml \
   FinanceResearchInvestigationReadService.qml; do
   cp "$repo_root/services/finance/$file" \
     "$work/config/services/finance/$file"
 done
 for file in research_candidate_preview_bridge.mjs \
   research_candidate_draft_preview.mjs \
+  research_scratch_citation_preview.mjs \
   research_investigation_read_bridge.mjs \
   research_investigation_store.mjs \
   research_evidence_candidates.mjs \

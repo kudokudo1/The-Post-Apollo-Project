@@ -48,6 +48,103 @@ def mount_info():
         raise RuntimeError("Cannot identify trusted mount for /var/lib")
     return rows[0]["target"], rows[0].get("fstype")
 
+# Separate boot policy: never restart or deactivate existing swap.
+UNIT_NAME = r"var-lib-post\x2dapollo\x2dmemory\x2dswap-swapfile.swap"
+UNIT_DIR = Path("/etc/systemd/system")
+UNIT_PATH = UNIT_DIR / UNIT_NAME
+WANTS = UNIT_DIR / "swap.target.wants" / UNIT_NAME
+UNIT_CONTENT = (
+    "[Unit]\nDescription=Post-Apollo managed NVMe swap\n"
+    "ConditionPathExists=/var/lib/post-apollo-memory-swap/swapfile\n"
+    "\n[Swap]\nWhat=/var/lib/post-apollo-memory-swap/swapfile\nPriority=10\n"
+    "\n[Install]\nWantedBy=swap.target\n"
+)
+
+def trusted_unit_directory():
+    for path in (Path("/etc"), Path("/etc/systemd"), UNIT_DIR):
+        info = path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise RuntimeError("Unsafe systemd directory: " + str(path))
+
+def trusted_swap_file():
+    for path, kind in ((DIRECTORY, stat.S_ISDIR), (SWAPFILE, stat.S_ISREG)):
+        info = path.lstat()
+        if not kind(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+            raise RuntimeError("Unexpected managed swap ownership or mode")
+    if SWAPFILE.stat().st_nlink != 1:
+        raise RuntimeError("Unexpected swap hard link")
+
+def persistence_state():
+    if not os.path.lexists(UNIT_PATH):
+        return "conflict" if os.path.lexists(WANTS) else "off"
+    try:
+        info = UNIT_PATH.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            return "conflict"
+        if UNIT_PATH.read_text(encoding="ascii") != UNIT_CONTENT:
+            return "conflict"
+        if not os.path.lexists(WANTS):
+            return "incomplete"
+        if not WANTS.is_symlink() or WANTS.resolve() != UNIT_PATH:
+            return "conflict"
+        # Confirm systemd recognizes the persistent enablement, not just a file.
+        enabled = run("/usr/bin/systemctl", "is-enabled", UNIT_NAME).strip()
+        return "enabled" if enabled == "enabled" else "conflict"
+    except (OSError, UnicodeError, subprocess.SubprocessError):
+        return "unknown"
+
+def persist_authorized():
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    secure_parent()
+    trusted_unit_directory()
+    trusted_swap_file()
+    observed = active_swap()
+    if not observed or observed["priority"] != 10:
+        raise RuntimeError("Activate managed swap at priority 10 first")
+    if mount_info()[1] != "btrfs":
+        raise RuntimeError("Unexpected swap filesystem")
+    expected = run("/usr/bin/systemd-escape", "--path", "--suffix=swap", str(SWAPFILE)).strip()
+    if expected != UNIT_NAME:
+        raise RuntimeError("Unexpected systemd swap unit identity")
+    # Refuse pre-existing fstab management or another unit definition.
+    with open("/etc/fstab", encoding="utf-8") as stream:
+        if any(line.split("#", 1)[0].split()[:1] == [str(SWAPFILE)] for line in stream):
+            raise RuntimeError("Existing fstab entry; no duplicate configuration")
+    state = persistence_state()
+    if state == "enabled":
+        print("VERIFIED PERSISTENCE:", json.dumps({"enabled": True}), flush=True)
+        return
+    if state != "off":
+        raise RuntimeError("Existing or incomplete boot configuration; inspect before recovery")
+    for directory in ("/run/systemd/system", "/usr/lib/systemd/system",
+                      "/usr/local/lib/systemd/system", "/run/systemd/generator",
+                      "/run/systemd/generator.early", "/run/systemd/generator.late"):
+        if os.path.lexists(Path(directory) / UNIT_NAME):
+            # systemd may synthesize a transient unit from the active kernel swap.
+            # No on-disk conflicting unit is accepted.
+            raise RuntimeError("Conflicting existing swap unit: " + directory)
+    run("/usr/bin/btrfs", "inspect-internal", "map-swapfile", str(SWAPFILE))
+    # Publish complete contents atomically, never replace an existing unit.
+    import tempfile
+    fd, temp = tempfile.mkstemp(prefix=".post-apollo-swap-", dir=UNIT_DIR)
+    try:
+        with os.fdopen(fd, "w", encoding="ascii") as stream:
+            stream.write(UNIT_CONTENT)
+            stream.flush()
+            os.fchmod(stream.fileno(), 0o644)
+            os.fsync(stream.fileno())
+        os.link(temp, UNIT_PATH)
+    finally:
+        os.unlink(temp)
+    # No --now, no start, no stop: only boot enablement.
+    run("/usr/bin/systemctl", "enable", UNIT_NAME)
+    if persistence_state() != "enabled":
+        raise RuntimeError("Boot enablement not verified; inspect existing configuration")
+    if active_swap() != observed:
+        raise RuntimeError("Boot policy created but active swap changed; inspect kernel state")
+    print("VERIFIED PERSISTENCE:", json.dumps({"enabled": True}), flush=True)
+
 def status():
     secure_parent()
     mountpoint, fs = mount_info()
@@ -55,7 +152,7 @@ def status():
     available = usage.f_bavail * usage.f_frsize
     reserve = max(32 * GIB, (usage.f_blocks * usage.f_frsize + 9) // 10)
     existing = os.path.lexists(DIRECTORY)
-    return {"nativeAuthVersion": 1, "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": active_swap(),
@@ -115,8 +212,10 @@ def main(args):
             allocate(parse_size(args[1]), interactive=False)
         elif args == ["verify-authorized"]:
             verify_authorized()
+        elif args == ["persist-authorized"]:
+            persist_authorized()
         else:
-            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized")
+            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized")
         return 0
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
         print("REFUSED/FAILED:", error, file=sys.stderr)

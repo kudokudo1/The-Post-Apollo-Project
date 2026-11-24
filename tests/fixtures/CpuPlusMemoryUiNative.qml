@@ -151,7 +151,36 @@ ShellRoot {
                         && MemoryOperation.requests === 0,"ZRAM synthetic preview")) return;
                     zram.stageAlgorithm("invalid");
                     if (!smoke.check(zram.targetAlgorithm === "zstd","ZRAM invalid target refusal")) return;
+                    pane.selectPolicySection(3);
+                    smoke.phase = 12;
+                    return;
+                }
+                if (smoke.phase === 12) {
+                    const adv = smoke.find(pane,"cpuplusAdvancedPolicyPane");
+                    const policyRail = smoke.find(pane,"cpuplusPolicyBottomRail");
+                    if (!adv) return;
+                    if (!smoke.check(policyRail && policyRail.visible
+                        && Math.abs(policyRail.mapToItem(pane,0,policyRail.height).y-pane.height)<2
+                        && !smoke.find(pane,"cpuplusZramPolicyPane")
+                        && adv.status === "NOT CHECKED" && !adv.busy
+                        && adv.cards.length === 0, "ADV demand-loaded, no automatic read")) return;
+                    adv.raw = "100\n10\n0\n20\n0\n500\n3000\n";
+                    adv.received = true;
+                    adv.exited = true;
+                    adv.exitOk = true;
+                    adv.finish();
+                    adv.selectPreview("background");
+                    adv.stagePreview(15);
+                    if (!smoke.check(adv.stagedValue === 15 && adv.observation.background.ratio === 10
+                        && MemoryOperation.requests === 0, "ADV actual versus preview")) return;
                     pane.selectPolicySection(0);
+                    smoke.phase = 13;
+                    return;
+                }
+                if (smoke.phase === 13) {
+                    if (!smoke.check(!smoke.find(pane,"cpuplusAdvancedPolicyPane")
+                        && pane.stagedSwappiness === 150 && pane.stagedPriority === 101,
+                        "ADV unload and prior targets retained")) return;
                     win.width = 220;
                     pane.selectMenu(2);
                     smoke.phase = 2;

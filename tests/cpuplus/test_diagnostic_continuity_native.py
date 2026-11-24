@@ -20,7 +20,9 @@ with tempfile.TemporaryDirectory(prefix="cpu-diag-native-") as temporary:
     destination.mkdir(parents=True)
     for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusMemoryCapacitySlider.qml",
                  "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml",
-                 "CpuPlusMemorySnapshot.js", "CpuPlusDiagnosticsPane.qml"):
+                 "CpuPlusMemorySnapshot.js", "CpuPlusDiagnosticsPane.qml",
+                 "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js",
+                 "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, destination / name)
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/DiagnosticContinuityNative.qml", config / "smoke.qml")
     memory = config / "services/memory"

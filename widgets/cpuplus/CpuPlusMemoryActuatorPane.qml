@@ -30,7 +30,7 @@ Item {
         initializedTarget = true;
     }
     property int stagedSwappiness: -1
-    property int policySection: 0 // SWAPPINESS / PRIORITY / ZRAM
+    property int policySection: 0 // SWAPPINESS / PRIORITY / ZRAM / ADV
     property var priorityBaseline: null
     property int stagedPriority: -1 // no explicit target for kernel-assigned priorities
     readonly property var priorityRows: priorityObservations(sample)
@@ -57,7 +57,7 @@ Item {
             && row.priority === baseline.priority) || null;
     }
     function selectPolicySection(index) {
-        if (page !== "POL" || (!Number.isInteger(index) || index < 0 || index > 2) || index === policySection) return;
+        if (page !== "POL" || (!Number.isInteger(index) || index < 0 || index > 3) || index === policySection) return;
         policySection = index;
         scroll.contentY = 0;
     }
@@ -269,14 +269,16 @@ Item {
             width: parent.width
             spacing: 4
             Repeater {
-                model: ["SWAPPINESS", "PRIORITY", "ZRAM"]
+                model: ["SWAPPINESS", "PRIORITY", "ZRAM", "ADV"]
                 delegate: ActionButton {
                     required property string modelData
                     required property int index
-                    width: Math.max(0, (policyBottomRail.width - 8) / 3)
+                    width: Math.max(0, (policyBottomRail.width - 12) / 4)
                     height: 28
                     label: modelData
                     contentPadding: 2
+                    labelFontSizeMode: Text.HorizontalFit
+                    labelMinimumPixelSize: 8
                     selected: root.policySection === index
                     acceptedButtons: Qt.LeftButton
                     keyboardActivationSignal: "leftClicked"
@@ -872,6 +874,13 @@ Item {
                     sample: root.sample
                     operationBusy: MemoryOperation.busy
                 }
+            }
+            Loader {
+                width: parent.width
+                height: active && item ? item.implicitHeight : 0
+                active: root.page === "POL" && root.policySection === 3
+                visible: active
+                sourceComponent: CpuPlusAdvancedPolicyPane {}
             }
             GohuText {
                 width: parent.width

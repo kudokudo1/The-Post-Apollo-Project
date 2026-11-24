@@ -67,7 +67,7 @@ ctx.selectPriorityDevice(autoRow.name); assert.equal(ctx.stagedPriority,-1);
 ctx.stagePriority(0); assert.equal(ctx.stagedPriority,0); ctx.resetPriority(); assert.equal(ctx.stagedPriority,-1);
 ctx.sample={rows:[autoRow,autoRow]}; ctx.reconcilePriority(); assert.equal(ctx.priorityBaseline,null);
 ctx.sample={rows:[baseRow]}; ctx.selectPriorityDevice(baseRow.name); ctx.policySection=0; ctx.stagePriority(200); assert.equal(ctx.stagedPriority,100);
-assert.match(pane, /id: policyBottomRail[\s\S]*?model: \["SWAPPINESS", "PRIORITY", "ZRAM"\]/);
+assert.match(pane, /id: policyBottomRail[\s\S]*?model: \["SWAPPINESS", "PRIORITY", "ZRAM", "ADV"\]/);
 assert.match(pane, /objectName: "cpuplusPriorityDial"/);
 assert.match(pane, /maximumValue: 32767/);
 assert.match(pane, /QUEUE \/\/ NOT CONNECTED/);
@@ -99,4 +99,12 @@ const zram=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusZramPo
 assert.match(zram,/reader.command = \["\/usr\/bin\/cat", path\]/);
 assert.doesNotMatch(zram,/\b(?:Timer|pkexec|sudo|swapoff|swapon|execDetached)\b/);
 assert.match(zram,/if \(!canStage \|\| !observation.options.includes\(name\)\) return;/);
+assert.match(pane,/active: root.page === "POL" && root.policySection === 3\s+visible: active\s+sourceComponent: CpuPlusAdvancedPolicyPane/);
+assert.match(pane,/\(policyBottomRail.width - 12\) \/ 4/);
+const diagRunner=fs.readFileSync(path.join(__dirname,"cpuplus/test_diagnostic_continuity_native.py"),"utf8");
+const memoryRunner=fs.readFileSync(path.join(__dirname,"cpuplus_memory_ui_native.py"),"utf8");
+for (const name of ["CpuPlusZramPolicyPane.qml","CpuPlusZramPolicy.js","CpuPlusAdvancedPolicyPane.qml","CpuPlusAdvancedPolicy.js"]) {
+    assert.ok(diagRunner.includes('"'+name+'"'),"diagnostic fixture missing "+name);
+    assert.ok(memoryRunner.includes('"'+name+'"'),"memory fixture missing "+name);
+}
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

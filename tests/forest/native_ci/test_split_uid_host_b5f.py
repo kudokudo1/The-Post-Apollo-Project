@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import select
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -96,27 +97,31 @@ def observed_uid(proc):
 
 
 class SplitUIDInstalledHostTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         storage.require_ci()
         if os.getuid() != 0 or os.geteuid() != 0:
             raise RuntimeError("CI_CONTROLLER_REQUIRED")
-        cls.temp = tempfile.TemporaryDirectory(prefix="forest-b5f-ci-")
-        cls.addClassCleanup(cls.temp.cleanup)
-        root = Path(cls.temp.name)
+        # Each test owns fresh writer processes and databases. A read-only
+        # SQLite backup open can create backup.db-wal and backup.db-shm;
+        # those sidecars must not contaminate another exchange baseline.
+        self.temp = tempfile.TemporaryDirectory(prefix="forest-b5f-ci-")
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
         root.chmod(0o755)
-        cls.paths = {}
+        self.paths = {}
         for uid in (storage.OWNER_A, storage.OWNER_B):
             path = root / ("fixture-" + str(uid))
             path.mkdir(mode=0o700)
             os.chown(path, uid, uid)
-            cls.paths[uid] = path
+            self.paths[uid] = path
             writer = storage.StorageDACExperiment.launch(uid, "writer", path)
-            cls.addClassCleanup(storage.StorageDACExperiment.stop_writer, writer)
+            self.addCleanup(storage.StorageDACExperiment.stop_writer, writer)
             if not select.select([writer.stdout], [], [], 10)[0]:
                 raise RuntimeError("FIXTURE_WRITER_TIMEOUT")
             if writer.stdout.readline() != b"READY\n":
                 raise RuntimeError("FIXTURE_WRITER_NOT_READY")
+        # Retain the exact roster check; no sidecar exclusion.
+        self.snapshot()
 
     def snapshot(self):
         result = {}
@@ -196,6 +201,30 @@ class SplitUIDInstalledHostTests(unittest.TestCase):
             proc = storage.StorageDACExperiment.launch(uid, "read-own", path)
             out, err = proc.communicate(timeout=10)
             self.assertEqual((proc.returncode, out, err), (0, b"", b""))
+            # SQLite may legitimately create these backup sidecars during
+            # the explicit readback. Check their ownership/modes too, but
+            # never share these modified fixtures with exchange tests.
+            allowed = set(storage.FILES) | {"backup.db-wal", "backup.db-shm"}
+            actual = set(p.name for p in path.iterdir())
+            self.assertTrue(set(storage.FILES) <= actual <= allowed)
+            for name in actual:
+                info = (path / name).lstat()
+                self.assertTrue(stat.S_ISREG(info.st_mode))
+                self.assertEqual((info.st_uid, info.st_gid,
+                                  stat.S_IMODE(info.st_mode)), (uid, uid, 0o600))
+
+    def test_exchange_snapshot_still_rejects_unexpected_sidecar(self):
+        # A foreign file must fail the strict exchange baseline rather
+        # than being filtered out to make the original failure disappear.
+        extra = self.paths[storage.OWNER_A] / "backup.db-wal"
+        self.assertFalse(extra.exists())
+        extra.touch(mode=0o600)
+        try:
+            with self.assertRaises(AssertionError):
+                self.snapshot()
+        finally:
+            extra.unlink()
+        self.snapshot()
 
 
 if __name__ == "__main__":

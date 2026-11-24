@@ -11,6 +11,8 @@ Scope {
     property bool scanning: false
     property string status: "NOT_CHECKED"
     property string reason: ""
+    // Local display metadata only. This clock is NOT an Ollama status source.
+    property string lastObservedLocalTime: ""
     property var models: []
     property var records: [] // The same P0 snapshot, no extra query.
     property var scanState: ResidencyPolicy.beginScan()
@@ -18,10 +20,12 @@ Scope {
     function scanResidency() {
         if (scanning || residencyProcess.running)
             return false;
+        expiryTimer.stop();
         scanState = ResidencyPolicy.beginScan();
         scanning = true;
         status = "CHECKING";
         reason = "";
+        lastObservedLocalTime = "";
         models = []; // A previous scan cannot appear current during refresh.
         records = [];
         residencyProcess.exec([
@@ -34,8 +38,10 @@ Scope {
     function invalidate() {
         if (scanning || residencyProcess.running)
             return;
+        expiryTimer.stop();
         status = "UNAVAILABLE";
         reason = "REFRESH_NOT_STARTED";
+        lastObservedLocalTime = "";
         models = [];
         records = [];
     }
@@ -50,6 +56,31 @@ Scope {
         models = next.models;
         records = next.records;
         scanning = false;
+        if (next.status === "OBSERVED") {
+            // Stamp only a successfully validated, fully exited P0 scan.
+            lastObservedLocalTime = Qt.formatTime(new Date(), "HH:mm:ss");
+            expiryTimer.restart(); // one-shot local expiry, no re-probe
+        } else {
+            lastObservedLocalTime = "";
+            expiryTimer.stop();
+        }
+    }
+    function expireObserved() {
+        if (scanning || status !== "OBSERVED")
+            return;
+        // Cached model residency expires, it is NOT remeasured.
+        status = "STALE";
+        reason = "SNAPSHOT_EXPIRED";
+        models = [];
+        records = [];
+        // Keep the former observation time visible to explain staleness.
+    }
+    Timer {
+        id: expiryTimer
+        interval: 300000 // five minutes; no repeating or background GET
+        repeat: false
+        running: false
+        onTriggered: residency.expireObserved()
     }
     Process {
         id: residencyProcess

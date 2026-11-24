@@ -11,6 +11,11 @@ Scope {
     // Session presentation state; never stores an armed capacity request.
     property int memoryMenuIndex: 0
     property string selectedReport: "memory"
+    // Opaque session-scoped capture identity; never used as authorization.
+    readonly property string sessionTag: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + "-" + Math.random().toString(36).slice(2)
+    property int captureSequence: 0
+    property string captureId: ""
+    signal captureFinished(string job, string reportId)
     property bool busy: false
     property bool faulted: false
     property string kind: ""
@@ -29,6 +34,8 @@ Scope {
         const args = Policy.argumentsFor(job, path => Quickshell.shellPath(path));
         if (!args) return false;
         kind = job;
+        captureSequence += 1;
+        captureId = sessionTag + "-" + captureSequence;
         selectedReport = job;
         received = false;
         exited = false;
@@ -50,22 +57,39 @@ Scope {
         worker.running = false;
     }
 
+    function reportFor(job, reportId) {
+        if (!Policy.validKind(job) || typeof reportId !== "string" || !reportId)
+            return null;
+        const report = reports[job];
+        return report && report.id === reportId ? report : null;
+    }
+
+    function selectExactReport(job, reportId) {
+        if (!reportFor(job, reportId)) return false;
+        selectedReport = job;
+        memoryMenuIndex = 4;
+        return true;
+    }
+
+    function publishResult(status, summary, text) {
+        const next = Object.assign({}, reports);
+        next[kind] = {id: captureId, status: status, summary: summary,
+                      text: text, finishedAt: new Date().toISOString()};
+        reports = next;
+        feedback = status + " // " + kind.toUpperCase();
+        output = "";
+        busy = false;
+        captureFinished(kind, captureId);
+    }
+
     function finish() {
         if (!busy || !received || !exited) return;
         deadline.stop();
         const summary = !cancelled && exitOk && output.length <= maximumReport
             ? Policy.summarize(kind, output) : null;
-        const next = Object.assign({}, reports);
-        next[kind] = {
-            status: cancelled ? "CANCELLED" : summary ? "COMPLETE" : "NOT VERIFIED",
-            summary: summary || (cancelled ? "CAPTURE STOPPED" : "NO VERIFIED RESULT // EXIT " + exitCode),
-            text: output.length <= maximumReport ? output : "",
-            finishedAt: new Date().toISOString()
-        };
-        reports = next;
-        feedback = next[kind].status + " // " + kind.toUpperCase();
-        output = "";
-        busy = false;
+        publishResult(cancelled ? "CANCELLED" : summary ? "COMPLETE" : "NOT VERIFIED",
+                      summary || (cancelled ? "CAPTURE STOPPED" : "NO VERIFIED RESULT // EXIT " + exitCode),
+                      output.length <= maximumReport ? output : "");
     }
 
     Timer {
@@ -77,10 +101,9 @@ Scope {
             // Missing exit/stream notification: refuse another run rather than
             // accepting late output under a new request identity.
             owner.faulted = true;
-            owner.busy = false;
-            owner.output = "";
-            owner.feedback = "RUNNER UNAVAILABLE // COMPLETION NOT OBSERVED";
             worker.running = false;
+            owner.publishResult("NOT VERIFIED", "RUNNER UNAVAILABLE // COMPLETION NOT OBSERVED",
+                                owner.output.length <= owner.maximumReport ? owner.output : "");
         }
     }
 

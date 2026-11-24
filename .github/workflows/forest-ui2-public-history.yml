@@ -9,6 +9,7 @@ on:
       - 'scripts/forest/shared_context_b6r1.py'
       - 'tests/forest/ui2_m4_public_fixture.py'
       - 'tests/forest/test_ui23a_public_history.js'
+      - 'tests/forest/test_ui23b_history_controller.js'
       - '.github/workflows/forest-ui2-public-history.yml'
 permissions:
   contents: read
@@ -21,3 +22,5 @@ jobs:
         with:
           persist-credentials: false
       - run: node tests/forest/test_ui23a_public_history.js
+
+      - run: node tests/forest/test_ui23b_history_controller.js

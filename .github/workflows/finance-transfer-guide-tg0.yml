@@ -1,4 +1,4 @@
-name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k + M4l + M4m + M4n + M4o + M4p + M4q
+name: FinanceW Banking TG0 + M1 + M2 + M3 + M4 + M4b + M4c + M4d + M4e + M4f + M4g + M4h + Shared Date + M4i + M4j + M4k + M4l + M4m + M4n + M4o + M4p + M4q + M4r
 
 on:
   pull_request:
@@ -40,6 +40,9 @@ on:
       - 'tests/finance/test_banking_manual_archive_m4p_contracts.py'
       - 'scripts/finance/banking_manual_recovery.py'
       - 'tests/finance/test_banking_manual_recovery_m4q.py'
+      - 'scripts/finance/banking_manual_portable.py'
+      - 'scripts/finance/banking_portable_crypto.mjs'
+      - 'tests/finance/test_banking_manual_portable_m4r.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -111,6 +114,9 @@ on:
       - 'tests/finance/test_banking_manual_archive_m4p_contracts.py'
       - 'scripts/finance/banking_manual_recovery.py'
       - 'tests/finance/test_banking_manual_recovery_m4q.py'
+      - 'scripts/finance/banking_manual_portable.py'
+      - 'scripts/finance/banking_portable_crypto.mjs'
+      - 'tests/finance/test_banking_manual_portable_m4r.py'
       - 'widgets/FinanceBankingProviderPolicy.js'
       - 'widgets/FinanceBankingSessionJournalPolicy.js'
       - 'tests/finance/test_banking_session_journal_m4e.mjs'
@@ -243,3 +249,5 @@ jobs:
         run: python3 -B tests/finance/test_banking_manual_archive_m4p_contracts.py
       - name: Test M4q damaged primary recovery and quarantine retry
         run: python3 -B tests/finance/test_banking_manual_recovery_m4q.py
+      - name: Test M4r real encrypted portable export and guarded import
+        run: python3 -B tests/finance/test_banking_manual_portable_m4r.py

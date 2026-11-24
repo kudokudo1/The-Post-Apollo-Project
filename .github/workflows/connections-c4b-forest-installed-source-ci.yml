@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           expected="$(cat "$RUNNER_TEMP/c4b-forest.sha")"
-          docker run --rm -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
+          docker run --rm --cap-add=SYS_PTRACE -e GITHUB_ACTIONS=true -e EXPECTED_SOURCE_SHA="$expected" \
             -v "$RUNNER_TEMP/c4b-forest:/input:ro" \
             -v "$PWD/tests/connections/c4b_forest_native:/ci:ro" \
             fedora:44 bash /ci/verify_c4b_forest_installed_source_ci.sh

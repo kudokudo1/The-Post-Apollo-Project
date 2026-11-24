@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import threading
 
 from heart_dispatch_reference_h1 import (
-    DispatchSnapshot, DispatchRefusal, compare_dispatch, _key, _time,
+    DispatchRefusal, MAX_AGE_NS, compare_dispatch, _key, _time,
 )
 from shared_context_b6r1 import TaskContext
 from resource_governor_p1 import ResourceAvailability
@@ -118,12 +118,13 @@ class ResourceCustody:
         if type(attempt) is not AttemptRef or attempt != self._active:
             raise CustodyRefusal("ATTEMPT_MISMATCH")
 
-    def observe_terminal_reference(self, attempt, *, outcome, observed_ns):
+    def observe_terminal_reference(self, attempt, *, outcome, clock_domain, observed_ns):
         """Fixture terminal report; STOP/EOF/COMMIT entry are not outcomes."""
         if type(outcome) is not str or outcome not in (
                 "NOT_DISPATCHED", "COMMITTED", "CANCELLED", "FAILED", "UNKNOWN"):
             raise CustodyRefusal("INVALID_TERMINAL_REFERENCE")
         try:
+            _key(clock_domain)
             _time(observed_ns)
         except DispatchRefusal:
             raise CustodyRefusal("INVALID_CLOCK_REFERENCE") from None
@@ -131,7 +132,7 @@ class ResourceCustody:
             self._match(attempt)
             if self._state == "UNKNOWN_HOLD":
                 return "UNKNOWN_HOLD"
-            if observed_ns < self._last_ns:
+            if clock_domain != self._clock_domain or observed_ns < self._last_ns:
                 return "TERMINAL_CLOCK_HOLD"
             if self._state != "REFERENCE_HELD":
                 # Contradictory or repeated terminal evidence cannot clear custody.
@@ -154,7 +155,6 @@ class ResourceCustody:
             self._match(observation.attempt)
             if self._state != "TERMINAL_REFERENCE_HELD":
                 return "TERMINAL_REQUIRED_HOLD"
-            from heart_dispatch_reference_h1 import MAX_AGE_NS
             if (observation.clock_domain != self._clock_domain
                     or not self._terminal_ns < observation.observed_ns <= now_ns
                     or now_ns - observation.observed_ns > MAX_AGE_NS):

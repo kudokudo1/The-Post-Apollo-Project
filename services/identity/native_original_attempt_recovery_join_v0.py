@@ -6,7 +6,9 @@ the original strict native command serializer, the untrusted outcome-candidate
 inspector and the existing signed-receipt shadow. All sources are caller
 supplied; even two matching checks cannot establish independent custody.
 
-No network I/O, database, sender, provider login, or native command action.
+The snapshot-only entrypoint never invokes an injected callback or IO. The
+legacy once-provider entrypoint is retained for disposable test compatibility;
+it MUST NOT be used for trusted recovery or wired to native commands.
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from native_attempt_fingerprint_v0 import AttemptedWireFingerprint
 from native_outcome_candidate_shadow_v0 import (
-    OriginalCommandBinding, inspect_candidate_once,
+    OriginalCommandBinding, inspect_candidate_once, inspect_supplied_candidate,
 )
 from native_recorded_signed_receipt_shadow_v0 import (
     inspect_recorded_signed_receipt,
@@ -83,13 +85,75 @@ def inspect_original_attempt_once(
     recorded_signed_frame: bytes | None,
     pinned_receipt_key: Ed25519PublicKey | None,
 ) -> OriginalAttemptRecoveryInspection:
-    """Fail original-binding mismatch BEFORE any candidate source invocation.
+    """Legacy CI-only callback path. Do NOT wire to native commands.
 
-    The result is always UNKNOWN_HOLD. This function cannot authenticate an
-    independent issuer/source, current protected history or the C5 spend.
-    Caller-supplied Ed25519 pins, recorded frames and provider responses
-    are diagnostic inputs, not proof of external custody.
+    The injected candidate_provider may execute arbitrary Python and is not
+    guaranteed read-only. The output is always UNKNOWN_HOLD, but this does
+    not make invoking the provider safe for privileged recovery. Use the
+    callback-free inspect_original_attempt_snapshot() for pure comparisons.
     """
+    check = _correlate_original(
+        attempted=attempted, original=original,
+        original_client_nonce=original_client_nonce,
+        original_request_id=original_request_id,
+    )
+    if check is not None:
+        return check
+
+    # One optional untrusted provider query, no retries or alternate source.
+    candidate = inspect_candidate_once(
+        original=original, provider=candidate_provider
+    )
+    signed = inspect_recorded_signed_receipt(
+        original=original, recorded_frame=recorded_signed_frame,
+        pinned_receipt_key=pinned_receipt_key,
+        original_request_id=original_request_id,
+        original_client_nonce=original_client_nonce,
+    )
+
+    return _summarize(candidate, signed)
+
+
+def inspect_original_attempt_snapshot(
+    *,
+    attempted: AttemptedWireFingerprint | None,
+    original: OriginalCommandBinding,
+    original_client_nonce: str | None,
+    original_request_id: str | None,
+    candidate_snapshot: object,
+    recorded_signed_frame: bytes | None,
+    pinned_receipt_key: Ed25519PublicKey | None,
+) -> OriginalAttemptRecoveryInspection:
+    """Compare already-collected data ONLY. No injected provider is invoked.
+
+    This cannot attest independent issuer history or terminal results and
+    does not itself fetch the candidate. It neither opens files/sockets nor
+    executes caller-supplied callables. All output remains UNKNOWN_HOLD.
+    """
+    check = _correlate_original(
+        attempted=attempted, original=original,
+        original_client_nonce=original_client_nonce,
+        original_request_id=original_request_id,
+    )
+    if check is not None:
+        return check
+
+    candidate = inspect_supplied_candidate(
+        original=original, candidate=candidate_snapshot
+    )
+    signed = inspect_recorded_signed_receipt(
+        original=original, recorded_frame=recorded_signed_frame,
+        pinned_receipt_key=pinned_receipt_key,
+        original_request_id=original_request_id,
+        original_client_nonce=original_client_nonce,
+    )
+    return _summarize(candidate, signed)
+
+
+def _correlate_original(
+    *, attempted, original, original_client_nonce, original_request_id,
+) -> OriginalAttemptRecoveryInspection | None:
+    """Validate source-local correlation; mismatch blocks further inspection."""
     if type(original) is not OriginalCommandBinding:
         return _held("MISSING_OR_INVALID_ORIGINAL_BINDING")
     if type(attempted) is not AttemptedWireFingerprint:
@@ -116,17 +180,10 @@ def inspect_original_attempt_once(
     if _sha(wire) != attempted.frame_sha256:
         return _held("ORIGINAL_SERIALIZED_FRAME_CONFLICT")
 
-    # One optional untrusted provider query, no retries or alternate source.
-    candidate = inspect_candidate_once(
-        original=original, provider=candidate_provider
-    )
-    signed = inspect_recorded_signed_receipt(
-        original=original, recorded_frame=recorded_signed_frame,
-        pinned_receipt_key=pinned_receipt_key,
-        original_request_id=original_request_id,
-        original_client_nonce=original_client_nonce,
-    )
+    return None
 
+
+def _summarize(candidate, signed) -> OriginalAttemptRecoveryInspection:
     # Local equality is never enough to trust a source or infer no effect.
     if candidate.reason == "CONFLICTING_UNTRUSTED_CANDIDATE":
         reason = "RECOVERY_CANDIDATE_CONFLICTS_WITH_ORIGINAL"

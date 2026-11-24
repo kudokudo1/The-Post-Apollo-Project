@@ -16,10 +16,10 @@ sys.path.insert(0, str(ROOT / "services" / "identity"))
 
 from desktop_signed_command_client_v0 import AttemptedWireFingerprint
 from native_outcome_candidate_shadow_v0 import (
-    OriginalCommandBinding, SCHEMA as CANDIDATE_SCHEMA,
+    OriginalCommandBinding, SCHEMA as CANDIDATE_SCHEMA, inspect_supplied_candidate,
 )
 from native_original_attempt_recovery_join_v0 import (
-    SCHEMA, inspect_original_attempt_once,
+    SCHEMA, inspect_original_attempt_once, inspect_original_attempt_snapshot,
 )
 from signed_command_receipt_v0 import (
     LEGACY_RECEIPT_SCHEMA, ReceiptIssuer, build_request,
@@ -94,6 +94,15 @@ class OriginalAttemptJoinTests(unittest.TestCase):
             candidate_provider=(
                 (lambda _: self.lookup(candidate)) if provider else None))
 
+    def inspect_snapshot(self, attempted, original, rid, frame, candidate,
+                         nonce=None, key=None):
+        return inspect_original_attempt_snapshot(
+            attempted=attempted, original=original,
+            original_client_nonce=self.nonce if nonce is None else nonce,
+            original_request_id=rid, candidate_snapshot=candidate,
+            recorded_signed_frame=frame,
+            pinned_receipt_key=self.private.public_key() if key is None else key)
+
     def hold(self, value, *, checked=None, calls=None, matched=None):
         self.assertEqual(value.schema, SCHEMA)
         self.assertEqual(value.state, "UNKNOWN_HOLD")
@@ -110,6 +119,227 @@ class OriginalAttemptJoinTests(unittest.TestCase):
                      "independent_issuer_enrolled", "human_one_use_consent",
                      "terminal_outcome_settled", "production_authority"):
             self.assertIs(getattr(value, prop), False)
+
+    def test_snapshot_matching_two_sources_still_unknown_and_zero_lookup(self):
+        result = self.inspect_snapshot(*self.evidence())
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.reason,
+                         "MATCHING_UNTRUSTED_SOURCES_STILL_NOT_SETTLEMENT")
+        self.assertEqual(result.candidate_reason, "MATCHED_CLAIM_STILL_UNTRUSTED")
+        self.assertEqual(self.calls, [])
+
+    def test_snapshot_all_actions_no_new_native_command(self):
+        for action in ("BEGIN", "STATUS", "CANCEL", "RECOVER"):
+            with self.subTest(action=action):
+                result = self.inspect_snapshot(*self.evidence(action))
+                self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(self.calls, [])
+
+    def test_snapshot_old_fixture_semantics_agree_without_lookup(self):
+        data = self.evidence()
+        pure = self.inspect_snapshot(*data)
+        old = self.inspect(*data)
+        self.hold(pure, matched=True, checked=True, calls=0)
+        self.hold(old, matched=True, checked=True, calls=1)
+        self.assertEqual(pure.reason, old.reason)
+        self.assertEqual(pure.candidate_reason, old.candidate_reason)
+        self.assertEqual(pure.signed_frame_reason, old.signed_frame_reason)
+        self.assertEqual(self.calls, [True])
+
+    def test_snapshot_callable_is_never_invoked(self):
+        class Executable:
+            def __init__(self):
+                self.count = 0
+            def __call__(self, *_):
+                self.count += 1
+                raise RuntimeError("would have run arbitrary Python")
+        payload = Executable()
+        attempted, original, rid, frame, _ = self.evidence()
+        result = self.inspect_snapshot(attempted, original, rid, frame, payload)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+        self.assertEqual(payload.count, 0)
+
+    def test_snapshot_dict_subclass_with_side_effecting_access_refused(self):
+        class ActiveDict(dict):
+            def __getitem__(self, key):
+                raise RuntimeError("untrusted subclass side effect")
+        attempted, original, rid, frame, candidate = self.evidence()
+        result = self.inspect_snapshot(
+            attempted, original, rid, frame, ActiveDict(candidate))
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+
+    def test_snapshot_non_string_dict_key_never_executes_custom_hash(self):
+        class ActiveKey:
+            def __init__(self):
+                self.calls = 0
+            def __hash__(self):
+                self.calls += 1
+                return 982451653
+            def __eq__(self, other):
+                self.calls += 100
+                return False
+        attempted, original, rid, frame, candidate = self.evidence()
+        value = candidate.pop("schema")
+        key = ActiveKey()
+        candidate[key] = value
+        key.calls = 0  # Ignore the necessary one-time dict construction hash.
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+        self.assertEqual(key.calls, 0)
+
+    def test_snapshot_str_subclass_key_never_executes_custom_hash(self):
+        class ActiveString(str):
+            def __new__(cls, value):
+                obj = super().__new__(cls, value)
+                obj.calls = 0
+                return obj
+            def __hash__(self):
+                self.calls += 1
+                return super().__hash__()
+            def __eq__(self, other):
+                self.calls += 100
+                return super().__eq__(other)
+        attempted, original, rid, frame, candidate = self.evidence()
+        value = candidate.pop("schema")
+        key = ActiveString("schema")
+        candidate[key] = value
+        key.calls = 0
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+        self.assertEqual(key.calls, 0)
+
+    def test_snapshot_absent_candidate_is_no_provider_not_failure(self):
+        attempted, original, rid, frame, _ = self.evidence()
+        result = self.inspect_snapshot(attempted, original, rid, frame, None)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "SUPPLIED_CANDIDATE_NOT_AVAILABLE")
+
+    def test_snapshot_invalid_original_fails_before_candidate_read(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        for changed in (None, replace(attempted, action="STATUS"),
+                        replace(attempted, frame_sha256="f" * 64)):
+            with self.subTest(changed=repr(changed)[:50]):
+                result = self.inspect_snapshot(
+                    changed, original, rid, frame, candidate)
+                self.hold(result, matched=False, checked=False, calls=0)
+                self.assertEqual(result.candidate_reason, "NOT_INSPECTED")
+        self.assertEqual(self.calls, [])
+
+    def test_snapshot_request_and_nonce_drift_never_inspects_source(self):
+        attempted, original, rid, frame, candidate = self.evidence("STATUS")
+        for altered_rid, altered_nonce in (
+            ("OTHER_HOST_REQUEST_00002", self.nonce),
+            (rid, secrets.token_urlsafe(32)),
+            ("∑", self.nonce),
+        ):
+            with self.subTest(rid=repr(altered_rid)):
+                result = self.inspect_snapshot(
+                    attempted, original, altered_rid, frame, candidate,
+                    nonce=altered_nonce)
+                self.hold(result, matched=False, checked=False, calls=0)
+        self.assertEqual(self.calls, [])
+
+    def test_snapshot_forged_authority_flag_never_grants(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        candidate["canRetry"] = True
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.candidate_reason,
+                         "MALFORMED_UNTRUSTED_CANDIDATE")
+
+    def test_snapshot_history_and_seat_mismatch_do_not_settle(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        for field, replacement in (("historyDigest", "0"*64),
+                                   ("seatDigest", "1"*64),
+                                   ("issuerEpoch", 100)):
+            with self.subTest(field=field):
+                changed = dict(candidate, **{field: replacement})
+                result = self.inspect_snapshot(
+                    attempted, original, rid, frame, changed)
+                self.hold(result, matched=True, checked=True, calls=0)
+                self.assertEqual(result.reason,
+                                 "RECOVERY_CANDIDATE_CONFLICTS_WITH_ORIGINAL")
+
+    def test_snapshot_signed_authenticated_and_unavailable_stay_hold(self):
+        for action, state in (("STATUS", "AUTHENTICATED"),
+                              ("BEGIN", "UNAVAILABLE")):
+            with self.subTest(state=state):
+                result = self.inspect_snapshot(
+                    *self.evidence(action, state=state))
+                self.hold(result, matched=True, checked=True, calls=0)
+                self.assertFalse(hasattr(result, "access_token"))
+
+    def test_snapshot_unpinned_or_wrong_key_stays_hold(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        wrong = Ed25519PrivateKey.generate().public_key()
+        for key in (wrong, False):
+            with self.subTest(key=repr(key)):
+                result = self.inspect_snapshot(
+                    attempted, original, rid, frame, candidate, key=key)
+                self.hold(result, matched=True, checked=False, calls=0)
+                self.assertFalse(result.terminal_outcome_settled)
+
+    def test_snapshot_stale_signed_sequence_remains_hold(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        original = replace(original, minimum_sequence=2)
+        candidate["sequence"] = 2
+        result = self.inspect_snapshot(attempted, original, rid, frame, candidate)
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertEqual(result.reason,
+                         "SIGNED_RECEIPT_CONFLICTS_WITH_ORIGINAL")
+
+    def test_snapshot_replay_does_not_change_prior_unknown(self):
+        data = self.evidence()
+        a = self.inspect_snapshot(*data)
+        b = self.inspect_snapshot(*data)
+        self.hold(a, matched=True, checked=True, calls=0)
+        self.hold(b, matched=True, checked=True, calls=0)
+        self.assertEqual(a, b)
+        self.assertEqual(self.calls, [])
+
+    def test_snapshot_output_does_not_contain_raw_secret_or_command(self):
+        result = self.inspect_snapshot(*self.evidence("STATUS"))
+        self.hold(result, matched=True, checked=True, calls=0)
+        self.assertNotIn(self.nonce, repr(result))
+        self.assertNotIn(self.rid, repr(result))
+        for value in ("command", "raw_nonce", "raw_frame", "authorization",
+                      "approve", "retry", "settle"):
+            self.assertFalse(hasattr(result, value))
+        with self.assertRaises(FrozenInstanceError):
+            result.production_authority = True
+
+    def test_direct_supplied_comparator_does_not_invoke_candidate(self):
+        attempted, original, rid, frame, candidate = self.evidence()
+        result = inspect_supplied_candidate(original=original, candidate=candidate)
+        self.assertEqual(result.state, "UNKNOWN_HOLD")
+        self.assertEqual(result.lookup_count, 0)
+        self.assertEqual(result.reason, "MATCHED_CLAIM_STILL_UNTRUSTED")
+        self.assertEqual(self.calls, [])
+
+    def test_snapshot_entrypoint_has_no_provider_or_network_call(self):
+        import ast
+        root = ROOT / "services" / "identity"
+        join = ast.parse((root / "native_original_attempt_recovery_join_v0.py"
+                          ).read_text())
+        entry = next(n for n in join.body if isinstance(n, ast.FunctionDef)
+                     and n.name == "inspect_original_attempt_snapshot")
+        self.assertNotIn("candidate_provider",
+                         [arg.arg for arg in entry.args.kwonlyargs])
+        self.assertNotIn("inspect_candidate_once",
+                         [n.id for n in ast.walk(entry)
+                          if isinstance(n, ast.Name)])
+        self.assertIn("inspect_supplied_candidate",
+                      [n.id for n in ast.walk(entry) if isinstance(n, ast.Name)])
+        self.assertEqual(self.calls, [])
 
     def test_real_signed_fixture_and_matching_claim_do_not_settle(self):
         data = self.evidence()

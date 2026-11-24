@@ -1,19 +1,20 @@
 """DOC 6 Identity V5 negative-only native command outcome candidate shadow.
 
 A caller-injected, one-shot provider may report a *candidate* history/command
-outcome. This pure semantic comparator cannot authenticate that provider,
+outcome. Invoking that arbitrary provider is NOT necessarily read-only.
+The snapshot-only comparator is pure but cannot authenticate source custody,
 the original host, an external history head, an operator seat, or C5 consent.
 Even a perfect candidate match remains UNKNOWN_HOLD with zero safe actions.
 
-No socket, signer, UI, native client, storage, retry, reconciliation or IdP
-operation exists in this module. This is NOT a deployable issuer interface.
+This module has no built-in socket, signer, UI, native client, storage, retry,
+reconciliation or IdP operation, but a caller-injected callback can do those
+things itself. This is NOT a deployable issuer interface.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import re
 from collections.abc import Callable
-from typing import Any
 
 SCHEMA = "post-apollo.identity.outcome-candidate.untrusted-v0"
 _ACTIONS = frozenset(("BEGIN", "STATUS", "CANCEL", "RECOVER"))
@@ -106,11 +107,13 @@ def inspect_candidate_once(
     original: OriginalCommandBinding,
     provider: Callable[[OriginalCommandBinding], object] | None,
 ) -> UntrustedOutcomeInspection:
-    """One read-only candidate lookup, no fallback and no permission output.
+    """Legacy CI-only injected callback: execution is NOT guaranteed read-only.
 
-    A callback can forge every field. Neither a source named 'independent'
-    nor its claimed signed terminal status can make this output authoritative.
-    The caller must NOT connect this shadow to a privileged native command.
+    The arbitrary provider can run any caller-supplied Python; this path is
+    retained for existing disposable tests only, not a native recovery consumer.
+    Use inspect_supplied_candidate() for callback-free comparison. Neither a
+    claimed independent source nor signature makes a terminal result trusted.
+    No return value can authorize a command or clear UNKNOWN_HOLD.
     """
     if type(original) is not OriginalCommandBinding:
         raise CandidateRefused("Original native command identity required")
@@ -123,8 +126,40 @@ def inspect_candidate_once(
     except Exception:
         return _held("PROVIDER_FAILED_OR_UNAVAILABLE", 1)
 
-    if type(candidate) is not dict or set(candidate) != _CANDIDATE_FIELDS:
-        return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+    return _inspect_supplied(original, candidate, 1)
+
+
+def inspect_supplied_candidate(
+    *,
+    original: OriginalCommandBinding,
+    candidate: object,
+) -> UntrustedOutcomeInspection:
+    """Pure snapshot-only validation; NO external provider execution.
+
+    A caller must already possess the value. This module neither queries nor
+    attests its source; lookup_count is always zero in this path.
+    Even valid matching candidate contents grant zero authority.
+    """
+    if type(original) is not OriginalCommandBinding:
+        raise CandidateRefused("Original native command identity required")
+    if candidate is None:
+        return _held("SUPPLIED_CANDIDATE_NOT_AVAILABLE", 0)
+    return _inspect_supplied(original, candidate, 0)
+
+
+def _inspect_supplied(
+    original: OriginalCommandBinding, candidate: object, lookups: int,
+) -> UntrustedOutcomeInspection:
+    # This helper only compares supplied values. It cannot prove that an
+    # independently protected issuer supplied or freshly signed anything.
+    # A plain dict can still contain hostile key objects with custom
+    # __hash__/__eq__. Reject them BEFORE constructing a set of the keys;
+    # otherwise a supposedly data-only comparison could invoke their code.
+    if (type(candidate) is not dict
+            or len(candidate) != len(_CANDIDATE_FIELDS)
+            or any(type(key) is not str for key in candidate)
+            or set(candidate) != _CANDIDATE_FIELDS):
+        return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
     if (type(candidate["schema"]) is not str
             or candidate["schema"] != SCHEMA
             or type(candidate["attemptId"]) is not str
@@ -137,17 +172,17 @@ def inspect_candidate_once(
             or candidate["issuerEpoch"] <= 0
             or type(candidate["sequence"]) is not int
             or candidate["sequence"] <= 0):
-        return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+        return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
 
     for field in ("nonceDigest", "hostInstanceDigest", "seatDigest",
                   "sessionDigest", "challengeDigest", "historyDigest"):
         if (type(candidate[field]) is not str
                 or not _HEX64.fullmatch(candidate[field])):
-            return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+            return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
     if (candidate["requestDigest"] is not None
             and (type(candidate["requestDigest"]) is not str
                  or not _HEX64.fullmatch(candidate["requestDigest"]))):
-        return _held("MALFORMED_UNTRUSTED_CANDIDATE", 1)
+        return _held("MALFORMED_UNTRUSTED_CANDIDATE", lookups)
 
     comparison = (
         (candidate["attemptId"], original.attempt_id),
@@ -163,8 +198,8 @@ def inspect_candidate_once(
     )
     if (any(actual != expected for actual, expected in comparison)
             or candidate["sequence"] < original.minimum_sequence):
-        return _held("CONFLICTING_UNTRUSTED_CANDIDATE", 1)
+        return _held("CONFLICTING_UNTRUSTED_CANDIDATE", lookups)
 
     # Even a matching "no effect" is a *self-report*. It cannot justify
     # reissuing an uncertain BEGIN, CANCEL or RECOVER.
-    return _held("MATCHED_CLAIM_STILL_UNTRUSTED", 1)
+    return _held("MATCHED_CLAIM_STILL_UNTRUSTED", lookups)

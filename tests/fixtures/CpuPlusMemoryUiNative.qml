@@ -115,10 +115,10 @@ ShellRoot {
                     dial.valueRequested(150);
                     if (!smoke.check(pane.stagedSwappiness === 150 && pane.sample.swappiness === 60, "policy target versus actual")) return;
                     pane.selectPolicySection(1);
-                    smoke.phase = 6;
+                    smoke.phase = 10;
                     return;
                 }
-                if (smoke.phase === 6) {
+                if (smoke.phase === 10) {
                     const priority = smoke.find(pane, "cpuplusPriorityDial");
                     const priorityRail = smoke.find(pane, "cpuplusPolicyBottomRail");
                     if (!priority) return;
@@ -130,6 +130,27 @@ ShellRoot {
                     priority.valueRequested(101);
                     if (!smoke.check(pane.stagedPriority === 101 && pane.priorityRow.priority === 100
                         && MemoryOperation.requests === 0, "priority preview only")) return;
+                    pane.selectPolicySection(2);
+                    smoke.phase = 11;
+                    return;
+                }
+                if (smoke.phase === 11) {
+                    const zram = smoke.find(pane,"cpuplusZramPolicyPane");
+                    if (!zram) return;
+                    if (!smoke.check(zram.devices.length === 1 && !zram.canStage
+                        && zram.selectedDevice === "", "ZRAM no auto read or target")) return;
+                    zram.selectedDevice = "/dev/zram0";
+                    zram.selectedSize = 8388608;
+                    zram.raw = "lzo [lz4] zstd";
+                    zram.received = true;
+                    zram.exited = true;
+                    zram.exitOk = true;
+                    zram.finish();
+                    zram.stageAlgorithm("zstd");
+                    if (!smoke.check(zram.observation.actual === "lz4" && zram.targetAlgorithm === "zstd"
+                        && MemoryOperation.requests === 0,"ZRAM synthetic preview")) return;
+                    zram.stageAlgorithm("invalid");
+                    if (!smoke.check(zram.targetAlgorithm === "zstd","ZRAM invalid target refusal")) return;
                     pane.selectPolicySection(0);
                     win.width = 220;
                     pane.selectMenu(2);
@@ -161,7 +182,7 @@ ShellRoot {
         running: smoke.armed && !smoke.done
         onTriggered: {
             if (++smoke.ticks > 60) {
-                smoke.check(false, "timeout");
+                smoke.check(false, "timeout phase=" + smoke.phase);
                 return;
             }
             if (scene.item) scene.item.testStep();

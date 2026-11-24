@@ -67,7 +67,7 @@ ctx.selectPriorityDevice(autoRow.name); assert.equal(ctx.stagedPriority,-1);
 ctx.stagePriority(0); assert.equal(ctx.stagedPriority,0); ctx.resetPriority(); assert.equal(ctx.stagedPriority,-1);
 ctx.sample={rows:[autoRow,autoRow]}; ctx.reconcilePriority(); assert.equal(ctx.priorityBaseline,null);
 ctx.sample={rows:[baseRow]}; ctx.selectPriorityDevice(baseRow.name); ctx.policySection=0; ctx.stagePriority(200); assert.equal(ctx.stagedPriority,100);
-assert.match(pane, /id: policyBottomRail[\s\S]*?model: \["SWAPPINESS", "PRIORITY"\]/);
+assert.match(pane, /id: policyBottomRail[\s\S]*?model: \["SWAPPINESS", "PRIORITY", "ZRAM"\]/);
 assert.match(pane, /objectName: "cpuplusPriorityDial"/);
 assert.match(pane, /maximumValue: 32767/);
 assert.match(pane, /QUEUE \/\/ NOT CONNECTED/);
@@ -85,4 +85,18 @@ for (const name of ["cpuplusCapRefresh", "cpuplusPolicyRefresh"]) {
     const button = pane.split('objectName: "' + name + '"')[1].split("onLeftClicked:")[0];
     assert.match(button, /idleFillColor: Colors.yellow/);
 }
+const zctx = vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusZramPolicy.js"),"utf8"),zctx);
+assert.equal(zctx.parseAlgorithms("lzo [lz4] zstd\n").actual,"lz4");
+assert.equal(zctx.parseAlgorithms("[zstd]").options.length,1);
+for (const raw of ["", "lz4 zstd", "[lz4] [zstd]", "[lz4] lz4", "[../x]", "[lz4] x;y"]) assert.equal(zctx.parseAlgorithms(raw),null);
+assert.equal(zctx.algorithmPath("/dev/zram0"),"/sys/block/zram0/comp_algorithm");
+assert.equal(zctx.algorithmPath("/dev/zram0/../../etc"),null);
+assert.equal(zctx.activeDevices({rows:[baseRow,autoRow]}).length,1);
+assert.equal(zctx.activeDevices({rows:[baseRow,baseRow]}).length,0);
+assert.equal(zctx.observedDevice({rows:[baseRow]},baseRow.name,baseRow.size+1),null);
+const zram=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusZramPolicyPane.qml"),"utf8");
+assert.match(zram,/reader.command = \["\/usr\/bin\/cat", path\]/);
+assert.doesNotMatch(zram,/\b(?:Timer|pkexec|sudo|swapoff|swapon|execDetached)\b/);
+assert.match(zram,/if \(!canStage \|\| !observation.options.includes\(name\)\) return;/);
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

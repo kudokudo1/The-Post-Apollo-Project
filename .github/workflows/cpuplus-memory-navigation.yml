@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'widgets/cpuplus/CpuPlusMemoryActuatorPane.qml'
+      - 'widgets/cpuplus/CpuPlusZramPolicyPane.qml'
+      - 'widgets/cpuplus/CpuPlusZramPolicy.js'
       - 'widgets/cpuplus/CpuPlusMemoryAddControl.qml'
       - 'tests/cpuplus_memory_navigation_test.js'
       - 'tests/cpuplus_memory_ui_native.py'

@@ -104,6 +104,14 @@ function extract(report, validate) {
     if (report.kind === "memory") return memoryMetrics(rows, final);
     if (report.kind === "threads") return threadMetrics(rows, final);
     if (report.kind === "census") return censusMetrics(rows);
+    if (report.kind === "storage") {
+        const last = rows[rows.length - 1];
+        return [metric("OBSERVED TIME", last.elapsedMs / 1000, "s", 1),
+                metric("SAMPLED INTERVALS", last.intervals, "", 0),
+                ...last.rows.map(row => metric(row.id + " CHANGED INTERVALS",
+                    row.unavailableIntervals === 0 && row.initialState === "present"
+                        && row.finalState === "present" ? row.changedIntervals : null, "", 0))];
+    }
     return null;
 }
 
@@ -131,6 +139,7 @@ function compare(before, after, validate) {
         if (before.kind === "inventory") note = "Source declaration counts only; not running objects or performance. " + note;
         if (before.kind === "memory") note = "PSS mean is a time-weighted trapezoid estimate; CPU mean is interval-weighted. " + note;
         if (before.kind === "threads") note = "Thread sums may omit exiting threads. " + note;
+        if (before.kind === "storage") note = "Sampled metadata changes only; not writes, transactions or writer identity. Missing/unavailable endpoints are N/A. " + note;
         if (before.kind === "census") note = "Final intervals only; RSS is not PSS. Top-N rows are not totals. QS requires one returned exact-name match; identity and absence of omitted matches are not proven. " + note;
         const duration = rows.find(r => r.label === "OBSERVED TIME");
         if (duration && Math.abs(duration.delta) > Math.max(2, duration.before * 0.1))

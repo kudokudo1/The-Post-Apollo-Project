@@ -117,7 +117,7 @@ Item {
             GohuText {
                 width: parent.width
                 text: "DRM GPU // " + capacity.data.gpuHint
-                    + " (" + capacity.data.gpuCount + " CARDS)"
+                    + " (" + capacity.data.gpuCount + " COUNTER SETS)"
                 textFormat: Text.PlainText
                 font.pixelSize: 10
                 color: Colors.orange

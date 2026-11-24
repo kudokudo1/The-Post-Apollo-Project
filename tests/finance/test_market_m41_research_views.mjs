@@ -14,7 +14,10 @@ for(const token of ['visible: !stocks.dayMode','height: visible ? 29 : 0',
     'width: Math.max(0,(researchRail.width-researchRail.spacing)/2)'])
     assert.ok(rail.includes(token),token);
 assert.ok(qml.includes('property string researchView: "price"'));
-assert.ok(qml.includes('anchors.top: researchRail.bottom'));
+// M42 deliberately moves the persistent navigation rails below the workspace.
+assert.ok(qml.includes('anchors.bottom: modeControls.top'));
+assert.ok(qml.includes('anchors.bottom: researchRail.top'));
+assert.ok(qml.includes('anchors.top: stockCommandRail.bottom'));
 const selector=part('function selectResearchView(view) {','onVisibleChanged:');
 const fn=selector.slice(0,selector.indexOf("\n    }")+6);
 const ctx={researchView:"price",scroll:{contentY:100}};

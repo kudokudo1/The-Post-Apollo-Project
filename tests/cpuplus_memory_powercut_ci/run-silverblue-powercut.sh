@@ -191,9 +191,12 @@ run_cut_phase() {
             require_marker initial "CPU_MEM_NATIVE_PASS // TWO_REAL_CYCLES_HISTORY_RETAINED"
             require_marker initial "CPU_MEM_POWERCUT_STAGE // EXACT_CANDIDATE 6bac8be7b1de6883f480a95944d6ba1130852270"
             # Confirm exact owned QEMU process and private disk before SIGKILL.
-            [[ "$(readlink "/proc/$pid/exe")" == */qemu-system-x86_64 ]]
+            [[ "$(readlink -f "/proc/$pid/exe")" == "$(readlink -f "$(command -v qemu-system-x86_64)")" ]]
             tr '\0' '\n' <"/proc/$pid/cmdline" | grep -Fx "file=$tmp/guest.qcow2,if=virtio,format=qcow2,cache=none"
-            ! grep -aFq 'REQUEST_GUEST_POWEROFF' "$log"
+            if grep -aFq 'REQUEST_GUEST_POWEROFF' "$log"; then
+                echo "CPU_MEM_POWERCUT_FAIL // UNEXPECTED_CLEAN_SHUTDOWN_REQUEST"
+                return 2
+            fi
             kill -KILL "$pid"
             rc=0
             wait "$pid" || rc="$?"
@@ -215,7 +218,9 @@ require_marker reboot "CPU_MEM_POWERCUT_STAGE // EXACT_CANDIDATE 6bac8be7b1de688
 require_marker reboot "CPU_MEM_POWERCUT_PASS // REAL_NEW_BOOT_PENDING_AND_JOURNALS_RETAINED"
 require_marker reboot "CPU_MEM_POWERCUT_PASS // BASE_ACTIVE_EXTENSION_INACTIVE_NO_REPLAY"
 require_marker reboot "CPU_MEM_POWERCUT_STAGE // REQUEST_GUEST_POWEROFF_REBOOT"
-! grep -aFq 'CPU_MEM_NATIVE_PASS // CYCLE_1_VERIFIED' "$tmp/guest-reboot-serial.log"
-! grep -aFq 'CUT_READY_PENDING_SYNCED_BEFORE_RETIREMENT' "$tmp/guest-reboot-serial.log"
+if grep -aEq 'CPU_MEM_NATIVE_PASS // CYCLE_1_VERIFIED|CUT_READY_PENDING_SYNCED_BEFORE_RETIREMENT' "$tmp/guest-reboot-serial.log"; then
+    echo "CPU_MEM_POWERCUT_FAIL // UNEXPECTED_REPLAY_ON_REBOOT"
+    exit 2
+fi
 echo "CPU_MEM_POWERCUT_PASS // EXACT_CANDIDATE_ABRUPT_VM_LOSS_FENCED"
 echo "CPU_MEM_POWERCUT_LIMITATION // QEMU_PROCESS_LOSS_NOT_PHYSICAL_SSD_POWER_LOSS_OR_IN_KERNEL_INTERRUPTION"

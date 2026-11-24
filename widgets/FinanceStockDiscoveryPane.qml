@@ -8,6 +8,7 @@ Rectangle {
     property bool active: false
     property bool priceOptionsOpen: false
     signal exitRequested()
+    signal historyChosen(var identity, var listing, var snapshot)
     onActiveChanged: {
         if (!active) priceOptionsOpen = false;
     }
@@ -268,6 +269,10 @@ Rectangle {
         active: discovery.active && discovery.priceOptionsOpen
         z: 30
         onExitRequested: discovery.priceOptionsOpen = false
+        onHistoryChosen: function(identity, listing, snapshot) {
+            if (discovery.active && discovery.priceOptionsOpen)
+                discovery.historyChosen(identity,listing,snapshot);
+        }
     }
     NeonScrollBar {
         id: discoveryScrollBar

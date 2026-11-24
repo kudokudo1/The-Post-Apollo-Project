@@ -30,11 +30,42 @@ Item {
             quotaOpen = false;
         }
     }
-    readonly property var snapshot: stockFeed && stockFeed.ready
-        ? stockFeed.snapshot : null
+    // M43: an explicit, detached provider history replaces the chart input,
+    // not the legacy service. No fabricated CIK or automatic refresh.
+    property var globalHistory: null
+    property string globalHandoffMessage: ""
+    readonly property bool globalHistoryActive: globalHistory !== null
+    readonly property var snapshot: globalHistoryActive ? globalHistory
+        : stockFeed && stockFeed.ready ? stockFeed.snapshot : null
+    function acceptGlobalHistory(identity, listing, data) {
+        if (!discoveryOpen || !visible || !stockFeed || !stockFeed.monitoring) return false;
+        const captured=RangeAnalysisPolicy.captureGlobalHistory(identity,listing,data);
+        if (!captured) {
+            globalHandoffMessage="GLOBAL HISTORY REFUSED // INVALID DATA OR LISTING";
+            discoveryOpen=false;
+            scroll.contentY=0;
+            return false;
+        }
+        globalHistory=captured;
+        globalHandoffMessage="";
+        controlsExpanded=false;
+        researchView="price";
+        discoveryOpen=false;
+        scroll.contentY=0;
+        return true;
+    }
+    function returnToLegacyHistory() {
+        globalHistory=null;
+        globalHandoffMessage="";
+        scroll.contentY=0;
+    }
+    readonly property string priceUnit: globalHistoryActive ? globalHistory.currency+" " : "$"
+    readonly property string historySource: globalHistoryActive
+        ? (globalHistory.source === "eodhd-eod" ? "EODHD" : "ALPHA VANTAGE")
+        : "EODHD"
     readonly property var priceBars: snapshot && Array.isArray(snapshot.bars)
         ? snapshot.bars : []
-    readonly property bool dayMode: stockFeed && stockFeed.displayMode === "day"
+    readonly property bool dayMode: !globalHistoryActive && stockFeed && stockFeed.displayMode === "day"
     readonly property var dayResult: dayMode && snapshot
         ? StockModePolicy.daySession(snapshot, stockFeed.dayDate) : null
     property int selectedPointIndex: -1
@@ -51,7 +82,7 @@ Item {
         ? ChartPointPolicy.selectedBar(priceBars, selectedPointIndex) : null
     // M26: recompute locally only from the current, loaded RANGE snapshot.
     // No QML service, provider request, local file, timer or persistent state.
-    readonly property var rangeAnalysis: !dayMode && snapshot
+    readonly property var rangeAnalysis: !globalHistoryActive && !dayMode && snapshot
         && stockFeed && snapshot.cik === stockFeed.selectedCik
         && snapshot.from === stockFeed.startDate
         && snapshot.to === stockFeed.endDate
@@ -204,6 +235,7 @@ Item {
             accentColor: Colors.magenta
             onLeftClicked: {
                 stocks.quotaOpen = false;
+                stocks.globalHandoffMessage = "";
                 stocks.discoveryOpen = true;
             }
         }
@@ -234,9 +266,9 @@ Item {
             labelPixelSize: 10
             accentColor: Colors.magenta
             selected: stocks.dayMode
-            available: stocks.stockFeed && !stocks.stockFeed.loading
+            available: !stocks.globalHistoryActive && stocks.stockFeed && !stocks.stockFeed.loading
             onLeftClicked: {
-                if (stocks.stockFeed) stocks.stockFeed.selectMode("day");
+                if (!stocks.globalHistoryActive && stocks.stockFeed) stocks.stockFeed.selectMode("day");
             }
         }
         ActionButton {
@@ -246,9 +278,9 @@ Item {
             labelPixelSize: 10
             accentColor: Colors.magenta
             selected: !stocks.dayMode
-            available: stocks.stockFeed && !stocks.stockFeed.loading
+            available: !stocks.globalHistoryActive && stocks.stockFeed && !stocks.stockFeed.loading
             onLeftClicked: {
-                if (stocks.stockFeed) stocks.stockFeed.selectMode("range");
+                if (!stocks.globalHistoryActive && stocks.stockFeed) stocks.stockFeed.selectMode("range");
             }
         }
     }
@@ -280,7 +312,8 @@ Item {
             labelPixelSize: 10
             accentColor: Colors.magenta
             selected: stocks.researchView === "compare"
-            onLeftClicked: stocks.selectResearchView("compare")
+            available: !stocks.globalHistoryActive
+            onLeftClicked: { if (!stocks.globalHistoryActive) stocks.selectResearchView("compare"); }
         }
     }
     Flickable {
@@ -309,6 +342,7 @@ Item {
                 Grid {
                     id: issuers
                     width: parent.width
+                    visible: !stocks.globalHistoryActive
                     columns: width >= 590 ? 6 : 3
                     height: columns === 6 ? 30 : 62
                     columnSpacing: 6
@@ -336,7 +370,7 @@ Item {
                 Row {
                     id: rangePresets
                     width: parent.width
-                    visible: !stocks.dayMode
+                    visible: !stocks.globalHistoryActive && !stocks.dayMode
                     height: visible ? 27 : 0
                     spacing: 6
                     Repeater {
@@ -368,6 +402,7 @@ Item {
                 GohuText {
                     id: dateLabel
                     width: parent.width
+                    visible: !stocks.globalHistoryActive
                     wrapMode: Text.WordWrap
                     text: stocks.dayMode
                         ? "SINGLE DAY // WEEKENDS/HOLIDAYS MAY HAVE NO SESSION"
@@ -378,6 +413,7 @@ Item {
                 Item {
                     id: dateControls
                     width: parent.width
+                    visible: !stocks.globalHistoryActive
                     readonly property bool sideBySide: width >= 640
                     height: stocks.dayMode ? 66 : (sideBySide ? 66 : 136)
                     Column {
@@ -452,6 +488,16 @@ Item {
                     }
                 }
                 ActionButton {
+                    objectName: "marketReturnLegacyHistory"
+                    width: Math.min(parent.width, 180)
+                    height: visible ? 28 : 0
+                    visible: stocks.globalHistoryActive
+                    label: "RETURN TO LEGACY STOCKS"
+                    labelPixelSize: 9
+                    accentColor: Colors.magenta
+                    onLeftClicked: stocks.returnToLegacyHistory()
+                }
+                ActionButton {
                     id: quotaToggle
                     width: Math.min(parent.width, 140)
                     height: 28
@@ -467,7 +513,11 @@ Item {
             GohuText {
                 objectName: "marketCompactSelection"
                 width: parent.width
-                text: stocks.stockFeed
+                text: stocks.globalHistoryActive
+                    ? (stocks.globalHistory.listing.name + " // " + stocks.globalHistory.symbol
+                        + " // " + stocks.globalHistory.listing.venue + " // " + stocks.globalHistory.currency
+                        + "\n" + stocks.globalHistory.from + " TO " + stocks.globalHistory.to)
+                    : stocks.stockFeed
                     ? ((StockModePolicy.stockSymbol(stocks.stockFeed.selectedCik) || "NO STOCK")
                         + " // " + (stocks.dayMode ? stocks.stockFeed.dayDate
                             : stocks.stockFeed.startDate + " TO " + stocks.stockFeed.endDate))
@@ -480,7 +530,8 @@ Item {
             Row {
                 id: fetchControls
                 width: parent.width
-                height: 30
+                visible: !stocks.globalHistoryActive
+                height: visible ? 30 : 0
                 spacing: 8
                 ActionButton {
                     id: load
@@ -492,10 +543,10 @@ Item {
                             : (stocks.snapshot ? "REFRESH RANGE" : "LOAD RANGE")
                     labelPixelSize: 9
                     accentColor: Colors.magenta
-                    available: stocks.stockFeed && stocks.stockFeed.monitoring
+                    available: !stocks.globalHistoryActive && stocks.stockFeed && stocks.stockFeed.monitoring
                         && stocks.stockFeed.validSelection && !stocks.stockFeed.loading
                     onLeftClicked: {
-                        if (stocks.stockFeed) stocks.stockFeed.refresh();
+                        if (!stocks.globalHistoryActive && stocks.stockFeed) stocks.stockFeed.refresh();
                     }
                 }
                 GohuText {
@@ -520,17 +571,26 @@ Item {
             GohuText {
                 id: status
                 width: parent.width
-                text: stocks.stockFeed ? stocks.stockFeed.message
-                    : "STOCK HISTORY SOURCE UNAVAILABLE"
+                text: stocks.globalHandoffMessage || (stocks.globalHistoryActive
+                    ? ("GLOBAL HISTORY // " + stocks.historySource
+                        + " // LOADED RANGE ONLY"
+                        + (stocks.globalHistory.bars.length === 0 ? " // NO SESSIONS" : "")
+                        + "\nUSER-CHOSEN LISTING // FIGI MATCH NOT VERIFIED"
+                        + (stocks.globalHistory.compactMayBeTruncated
+                            ? "\nWARNING // COMPACT HISTORY MAY OMIT EARLIER DATES" : "")
+                        + "\nSEARCH TO LOAD ANOTHER RANGE // ADVANCED TOOLS PENDING")
+                    : stocks.stockFeed ? stocks.stockFeed.message
+                    : "STOCK HISTORY SOURCE UNAVAILABLE")
                 textFormat: Text.PlainText
                 font.pixelSize: 9
-                color: stocks.stockFeed && stocks.stockFeed.state === "failed"
+                color: stocks.globalHandoffMessage.length > 0
+                    || (!stocks.globalHistoryActive && stocks.stockFeed && stocks.stockFeed.state === "failed")
                     ? Colors.red : Colors.orange
                 wrapMode: Text.WordWrap
             }
             GohuText {
                 width: parent.width
-                visible: stocks.controlsExpanded
+                visible: stocks.controlsExpanded && !stocks.globalHistoryActive
                 text: stocks.dayMode
                     ? "Choose a calendar day and LOAD DAY. Weekends and market holidays may return NO TRADING SESSION."
                     : "Select an issuer and START/END dates, or choose 7D/30D/90D/180D ending today. Then LOAD RANGE. Only actual trading sessions appear."
@@ -541,7 +601,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: !!stocks.snapshot && stocks.controlsExpanded
+                visible: !!stocks.snapshot && stocks.controlsExpanded && !stocks.globalHistoryActive
                 text: stocks.snapshot
                     ? stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
                         + " // SOURCE EODHD EOD"
@@ -563,6 +623,23 @@ Item {
                 color: Colors.cyan
             }
             GohuText {
+                objectName: "marketGlobalHistoryProvenance"
+                width: parent.width
+                visible: stocks.globalHistoryActive && stocks.controlsExpanded
+                text: stocks.globalHistoryActive
+                    ? ("OPENFIGI SEARCH IDENTITY " + stocks.globalHistory.identity.figi
+                        + " // " + stocks.globalHistory.identity.name
+                        + "\nPROVIDER LISTING CHOSEN BY USER // FIGI MATCH NOT VERIFIED"
+                        + "\n" + stocks.globalHistory.listing.venue + " // CURRENCY FROM "
+                        + stocks.globalHistory.currencySource
+                        + "\nRETRIEVED " + stocks.globalHistory.retrievedAt)
+                    : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 10
+                color: Colors.orange
+            }
+            GohuText {
                 width: parent.width
                 visible: !!stocks.snapshot
                 text: stocks.snapshot
@@ -576,19 +653,19 @@ Item {
                               ? "$" + stocks.dayResult.close.toFixed(2) : "N/A")
                         : !stocks.controlsExpanded
                             ? (stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
-                                + " // EODHD"
+                                + " // " + stocks.historySource
                                 + "\n" + stocks.snapshot.bars.length + " SESSIONS // LAST "
-                                + (stocks.snapshot.last ? "$" + stocks.snapshot.last.price.toFixed(2) : "N/A")
+                                + (stocks.snapshot.last ? stocks.priceUnit + stocks.snapshot.last.price.toFixed(2) : "N/A")
                                 + " // " + (stocks.snapshot.changePct === null
                                     ? "N/A" : stocks.snapshot.changePct.toFixed(2) + "% FIRST TO LAST"))
                             : stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
                           + "\nREQUESTED " + stocks.snapshot.from + " to " + stocks.snapshot.to
                           + "\nSESSIONS " + stocks.snapshot.bars.length
                           + "\nFIRST CLOSE " + (stocks.snapshot.first
-                              ? stocks.snapshot.first.date + " // $"
+                              ? stocks.snapshot.first.date + " // " + stocks.priceUnit
                                   + stocks.snapshot.first.price.toFixed(2) : "UNAVAILABLE")
                           + "\nLAST CLOSE " + (stocks.snapshot.last
-                              ? stocks.snapshot.last.date + " // $"
+                              ? stocks.snapshot.last.date + " // " + stocks.priceUnit
                                   + stocks.snapshot.last.price.toFixed(2) : "UNAVAILABLE")
                           + "\nLAST VS FIRST " + (stocks.snapshot.changePct === null
                               ? "N/A" : stocks.snapshot.changePct.toFixed(2) + "%"))
@@ -1263,7 +1340,9 @@ Item {
                 GohuText {
                     width: parent.width
                     visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                    text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
+                    text: stocks.globalHistoryActive
+                        ? "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED"
+                        : "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
                     textFormat: Text.PlainText
                     wrapMode: Text.WordWrap
                     font.pixelSize: 9
@@ -1274,7 +1353,7 @@ Item {
                     visible: !stocks.dayMode && stocks.inspectedPoint !== null
                     text: stocks.inspectedPoint
                         ? "SELECTED SESSION // " + stocks.inspectedPoint.date
-                          + "\n" + stocks.snapshot.priceBasis + " // $"
+                          + "\n" + stocks.snapshot.priceBasis + " // " + stocks.priceUnit
                           + stocks.inspectedPoint.price.toFixed(2)
                           + " // " + stocks.snapshot.symbol
                         : ""
@@ -1684,7 +1763,7 @@ Item {
                 }
                 ActionButton {
                     id: openSelectedInDay
-                    visible: !stocks.dayMode && stocks.inspectedPoint !== null
+                    visible: !stocks.globalHistoryActive && !stocks.dayMode && stocks.inspectedPoint !== null
                     width: 136
                     height: visible ? 28 : 0
                     label: "OPEN IN DAY"
@@ -1694,7 +1773,7 @@ Item {
                         && stocks.stockFeed.ready && !stocks.stockFeed.loading
                         && stocks.inspectedPoint !== null
                     onLeftClicked: {
-                        if (stocks.stockFeed && stocks.inspectedPoint)
+                        if (!stocks.globalHistoryActive && stocks.stockFeed && stocks.inspectedPoint)
                             stocks.stockFeed.openRangePointInDay(
                                 stocks.selectedPointIndex, stocks.inspectedPoint.date);
                     }
@@ -1719,6 +1798,9 @@ Item {
             && stocks.stockFeed && stocks.stockFeed.monitoring
         z: 20
         onExitRequested: stocks.discoveryOpen = false
+        onHistoryChosen: function(identity, listing, snapshot) {
+            stocks.acceptGlobalHistory(identity,listing,snapshot);
+        }
     }
 
     FinanceMarketQuotaStatusPane {

@@ -8,6 +8,7 @@ Rectangle {
     id: avPane
     property bool active: false
     signal exitRequested()
+    signal historyChosen(var identity, var listing, var snapshot)
     color: Colors.black
     border.color: Colors.magenta
     border.width: 1
@@ -275,6 +276,20 @@ Rectangle {
                 font.pixelSize: 10
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
+            }
+            ActionButton {
+                objectName: "marketUseAlphaInStocks"
+                width: content.width
+                height: visible ? 29 : 0
+                visible: av.ready
+                available: avPane.active && av.ready && !av.loading
+                label: "USE IN STOCKS"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                onLeftClicked: {
+                    if (avPane.active && av.ready && !av.loading)
+                        avPane.historyChosen(av.identity,av.selectedListing,av.snapshot);
+                }
             }
             Rectangle {
                 width: content.width

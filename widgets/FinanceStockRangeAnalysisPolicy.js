@@ -630,3 +630,58 @@ function crossStockGapPoint(chart, point, width, height) {
         y:(1-point.value/chart.extent)*(height-1)/2
     };
 }
+
+// M43: retain a detached, explicitly selected provider listing and its
+// already-validated history. Never invent a CIK or assert FIGI equivalence.
+function captureGlobalHistory(identity, listing, data) {
+    if (!identity || !listing || !data || data.schemaVersion !== 1
+            || data.readOnly !== true || data.identityVerified !== false
+            || typeof identity.figi !== "string" || !/^BBG[A-Z0-9]{9}$/.test(identity.figi)
+            || ![identity.ticker,identity.name,identity.exchCode,listing.name].every(
+                x=>typeof x==="string" && x.trim().length>0 && x.length<=200)
+            || typeof listing.symbol !== "string" || !/^[A-Z0-9][A-Z0-9_.-]{0,44}$/.test(listing.symbol)
+            || listing.symbol !== data.symbol || listing.currency !== data.currency
+            || !/^[A-Z]{3}$/.test(data.currency)
+            || typeof data.retrievedAt !== "string" || !Number.isFinite(Date.parse(data.retrievedAt))
+            || !calendarDay(data.from) || !calendarDay(data.to) || data.from>data.to
+            || (Date.parse(data.to)-Date.parse(data.from))/86400000>180
+            || !Array.isArray(data.bars))
+        return null;
+    const eod=data.source==="eodhd-eod", alpha=data.source==="alpha-vantage-daily-compact";
+    if ((!eod && !alpha) || (eod && (data.currencySource!=="eodhd-search"
+            || !["CLOSE","ADJUSTED CLOSE"].includes(data.priceBasis)
+            || typeof listing.exchange!=="string" || !listing.exchange
+            || listing.symbol!==listing.code+"."+listing.exchange || listing.code!==identity.ticker))
+            || (alpha && (data.currencySource!=="alpha-vantage-symbol-search"
+                || data.priceBasis!=="CLOSE" || typeof listing.region!=="string" || !listing.region
+                || !(listing.symbol===identity.ticker || listing.symbol.indexOf(identity.ticker+".")===0)
+                || data.compactMaxBars!==100 || typeof data.compactMayBeTruncated!=="boolean"
+                || !Number.isInteger(data.returnedBars) || data.returnedBars<1 || data.returnedBars>100
+                || data.bars.length>data.returnedBars))
+            || data.bars.length>(eod?132:100)) return null;
+    let previous="";
+    const bars=[];
+    for (const row of data.bars) {
+        if (!row || !calendarDay(row.date) || row.date<=previous || row.date<data.from
+                || row.date>data.to || !Number.isFinite(row.price) || row.price<=0 || row.price>=10000000)
+            return null;
+        bars.push({date:row.date,price:row.price});
+        previous=row.date;
+    }
+    if (bars.length ? (!sameBar(data.first,bars[0]) || !sameBar(data.last,bars[bars.length-1]))
+        : (data.first!==null || data.last!==null)) return null;
+    const changePct=bars.length>1?(bars[bars.length-1].price/bars[0].price-1)*100:null;
+    if (changePct!==null && !Number.isFinite(changePct)) return null;
+    return {
+        schemaVersion:1,readOnly:true,identityVerified:false,source:data.source,
+        symbol:data.symbol,currency:data.currency,currencySource:data.currencySource,
+        priceBasis:data.priceBasis,from:data.from,to:data.to,retrievedAt:data.retrievedAt,
+        identity:{figi:identity.figi,ticker:identity.ticker,name:identity.name,exchCode:identity.exchCode},
+        listing:{symbol:listing.symbol,name:listing.name,currency:listing.currency,
+            venue:eod?listing.exchange:listing.region},
+        compactMayBeTruncated:alpha && data.compactMayBeTruncated,
+        bars:bars,first:bars.length?{...bars[0]}:null,
+        last:bars.length?{...bars[bars.length-1]}:null,changePct:changePct,
+        noProviderCalls:true
+    };
+}

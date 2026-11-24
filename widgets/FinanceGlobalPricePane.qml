@@ -9,6 +9,7 @@ Rectangle {
     property bool active: false
     property bool alphaOpen: false
     signal exitRequested()
+    signal historyChosen(var identity, var listing, var snapshot)
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
@@ -320,6 +321,20 @@ Rectangle {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
             }
+            ActionButton {
+                objectName: "marketUseEodhdInStocks"
+                width: body.width
+                height: visible ? 29 : 0
+                visible: priceFeed.ready
+                available: priceView.active && priceFeed.ready && !priceFeed.loading
+                label: "USE IN STOCKS"
+                labelPixelSize: 10
+                accentColor: Colors.magenta
+                onLeftClicked: {
+                    if (priceView.active && priceFeed.ready && !priceFeed.loading)
+                        priceView.historyChosen(priceFeed.identity,priceFeed.selectedListing,priceFeed.snapshot);
+                }
+            }
             Rectangle {
                 width: body.width
                 height: visible ? 166 : 0
@@ -376,6 +391,10 @@ Rectangle {
         active: priceView.active && priceView.alphaOpen
         z: 30
         onExitRequested: priceView.alphaOpen=false
+        onHistoryChosen: function(identity, listing, snapshot) {
+            if (priceView.active && priceView.alphaOpen)
+                priceView.historyChosen(identity,listing,snapshot);
+        }
     }
     NeonScrollBar {
         id: priceScrollBar

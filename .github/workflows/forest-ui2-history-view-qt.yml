@@ -1,0 +1,38 @@
+name: Forest UI2.3c History View Qt
+on:
+  pull_request:
+    paths:
+      - 'widgets/forest/ui2/PublicHistoryViewState.qml'
+      - 'widgets/forest/ui2/PublicHistoryDisplay.js'
+      - 'scripts/forest/history_public_fixture_m4.py'
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/context_first_tree_m2.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'tests/forest/ui2_m4_public_fixture.py'
+      - 'tests/forest/ui23c_history_qml_harness.qml'
+      - 'tests/forest/test_ui23c_history_view_qt.py'
+      - '.github/workflows/forest-ui2-history-view-qt.yml'
+permissions:
+  contents: read
+jobs:
+  qt-history-view:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install headless Qt prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install Qt bindings (existing Post Apollo smoke-test range)
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Actual QML history state and M4 fixture
+        run: python tests/forest/test_ui23c_history_view_qt.py

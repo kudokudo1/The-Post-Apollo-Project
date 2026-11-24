@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as Controls
 import Quickshell.Io
+import qs.services.memory
 import "../../components"
 import "CpuPlusMemorySnapshot.js" as Snapshot
 
@@ -41,6 +42,10 @@ Item {
         probe.running = true;
     }
     Component.onCompleted: refresh()
+    Connections {
+        target: MemoryOperation
+        function onRevisionChanged() { root.refresh(); }
+    }
     Timer {
         interval: 10000
         repeat: true
@@ -154,7 +159,7 @@ Item {
             }
             Controls.Slider {
                 width: parent.width
-                enabled: root.capacity !== null
+                enabled: root.capacity !== null && !MemoryOperation.busy
                 from: 0
                 to: 64
                 stepSize: 4
@@ -175,6 +180,8 @@ Item {
                 width: parent.width
                 text: !root.capacity ? "WAITING FOR LIVE CAPACITY"
                     : root.capacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
+                    : root.capacity.direction === "expand" && root.capacity.baseActive && !root.capacity.extensionActive
+                        ? "EXPANSION // ADD SEPARATE TEMPORARY SWAP"
                     : root.capacity.active ? "PREVIEW ONLY // RESIZE NOT AVAILABLE YET"
                     : "Would reserve " + root.stagedGiB + " GiB of storage. Not physical RAM."
                 color: Colors.white

@@ -37,16 +37,18 @@ function parseSnapshot(raw) {
 function capacityPlan(sample, targetGiB) {
     if (!sample || !Array.isArray(sample.rows) || !Number.isInteger(targetGiB)
             || targetGiB < 0 || targetGiB > 64 || targetGiB % 4 !== 0) return null;
-    const rows = sample.rows.filter(row => row.name === "/var/lib/post-apollo-memory-swap/swapfile");
-    if (rows.length > 1) return null;
-    const row = rows.length ? rows[0] : null;
-    const actualKiB = row ? row.size : 0;
+    const bases = sample.rows.filter(row => row.name === "/var/lib/post-apollo-memory-swap/swapfile");
+    const extras = sample.rows.filter(row => row.name === "/var/lib/post-apollo-memory-extension/swapfile");
+    if (bases.length > 1 || extras.length > 1) return null;
+    const row = bases.length ? bases[0] : null;
+    const extra = extras.length ? extras[0] : null;
+    const actualKiB = (row ? row.size : 0) + (extra ? extra.size : 0);
     const actualGiB = actualKiB / 1048576;
     const targetKiB = targetGiB * 1048576;
-    const unchanged = row && targetKiB >= actualKiB && targetKiB - actualKiB <= 1024;
-    return {active: !!row, actualKiB: actualKiB, actualGiB: actualGiB,
-        usedKiB: row ? row.used : 0, targetGiB: targetGiB,
+    const unchanged = (row || extra) && targetKiB >= actualKiB && targetKiB - actualKiB <= 2048;
+    return {active: !!row || !!extra, baseActive: !!row, extensionActive: !!extra, actualKiB: actualKiB, actualGiB: actualGiB,
+        usedKiB: (row ? row.used : 0) + (extra ? extra.used : 0), targetGiB: targetGiB,
         projectedKiB: unchanged ? sample.swap : Math.max(0, sample.swap - actualKiB + targetKiB),
-        direction: unchanged || (!row && !targetGiB) ? "unchanged"
-            : targetKiB > actualKiB ? (row ? "expand" : "add") : "reduce"};
+        direction: unchanged || (!row && !extra && !targetGiB) ? "unchanged"
+            : targetKiB > actualKiB ? (row || extra ? "expand" : "add") : "reduce"};
 }

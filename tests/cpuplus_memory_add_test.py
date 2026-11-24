@@ -97,6 +97,45 @@ class SwapAddTests(unittest.TestCase):
                 m.persist_authorized()
             self.assertEqual(run.call_count, 1)
 
+    def test_expansion_delta(self):
+        base = {"sizeKiB": 16777212, "priority": 10}
+        state = {"expansionCandidate": True, "active": base, "maximumGiB": 32}
+        self.assertEqual(m.expansion_delta(24, state), 8)
+        for target in (16, 12, 64):
+            with self.assertRaises(RuntimeError):
+                m.expansion_delta(target, state)
+        with self.assertRaises(RuntimeError):
+            m.expansion_delta(24, dict(state, expansionCandidate=False))
+
+    def test_expand_nonroot_refuses(self):
+        with patch.object(m.os, "geteuid", return_value=1000), patch.object(m, "run") as run:
+            with self.assertRaises(PermissionError):
+                m.expand_authorized(24)
+            run.assert_not_called()
+
+    def test_expand_preserves_base_exact_commands(self):
+        base = {"sizeKiB": 16777212, "priority": 10}
+        extra = {"sizeKiB": 8388604, "priority": 9}
+        state = {"expansionCandidate": True, "active": base, "maximumGiB": 32, "mountpoint": "/var"}
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "trusted_swap_file"), patch.object(m, "status", return_value=state), patch.object(m, "run", return_value="Total devices 1") as run, patch.object(m.os, "umask"), patch.object(Path, "chmod"), patch.object(m, "active_swap", side_effect=[base, extra]):
+            m.expand_authorized(24)
+            self.assertEqual(run.call_count, 5)
+            self.assertEqual(run.call_args_list[-1].args, ("/usr/sbin/swapon", "--priority", "9", "--", str(m.EXT_FILE)))
+            self.assertNotIn(str(m.SWAPFILE), [x for call in run.call_args_list for x in call.args])
+
+    def test_expand_changed_base_refuses(self):
+        base = {"sizeKiB": 16777212, "priority": 10}
+        state = {"expansionCandidate": True, "active": base, "maximumGiB": 32, "mountpoint": "/var"}
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "trusted_swap_file"), patch.object(m, "status", side_effect=[state, dict(state, expansionCandidate=False)]), patch.object(m, "run", return_value="Total devices 1") as run:
+            with self.assertRaises(RuntimeError):
+                m.expand_authorized(24)
+            self.assertEqual(run.call_count, 1)
+
+    def test_expand_command_grammar(self):
+        with patch.object(m, "expand_authorized") as expand:
+            self.assertEqual(m.main(["expand-authorized", "24"]), 0)
+            expand.assert_called_once_with(24)
+
     def test_size_choices(self):
         for size in range(4, 65, 4):
             self.assertEqual(m.parse_size(str(size)), size)

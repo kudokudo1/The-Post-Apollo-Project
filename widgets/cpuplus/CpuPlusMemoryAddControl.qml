@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.services.memory
+import "CpuPlusMemorySnapshot.js" as Snapshot
 import "../../components"
 
 // Native system authorization; installed helper validates all privileged operations.
@@ -16,6 +17,13 @@ Column {
     property bool exitOk: false
     property bool armed: false
     property bool persistArmed: false
+    property bool expandArmed: false
+    readonly property var capacity: Snapshot.capacityPlan(sample, stagedGiB)
+    readonly property bool canExpand: nativeReady && host.expansionVersion === 1
+        && host.expansionCandidate === true && capacity !== null && capacity.baseActive
+        && !capacity.extensionActive && capacity.direction === "expand"
+        && stagedGiB - Math.round(capacity.actualGiB) <= host.maximumGiB
+        && !MemoryOperation.busy && !check.running
     property string feedback: ""
     readonly property string helperPath: "/usr/local/sbin/post-apollo-memory-add-swap"
     readonly property bool observedActive: sample !== null && sample.rows.some(
@@ -24,11 +32,11 @@ Column {
     readonly property bool eligible: nativeReady && host.candidate === true
         && host.filesystem === "btrfs" && Number.isInteger(host.maximumGiB)
         && stagedGiB >= 4 && stagedGiB <= host.maximumGiB && stagedGiB % 4 === 0
-        && sample !== null && !observedActive && !check.running
+        && sample !== null && capacity !== null && !capacity.active && !check.running
         && !MemoryOperation.busy
 
     spacing: 8
-    onStagedGiBChanged: armed = false
+    onStagedGiBChanged: { armed = false; expandArmed = false; }
     onObservedActiveChanged: if (observedActive) armed = false
     function finishCheck() {
         if (!gotOutput || !gotExit) return;
@@ -38,6 +46,7 @@ Column {
         if (check.running) return;
         armed = false;
         persistArmed = false;
+        expandArmed = false;
         host = null;
         pendingHost = null;
         gotOutput = false;
@@ -96,7 +105,7 @@ Column {
     ActionButton {
         width: parent.width
         height: 34
-        visible: !control.observedActive
+        visible: control.capacity !== null && !control.capacity.active
         label: control.armed ? "CONFIRM // AUTHORIZE" : "PREPARE ADD " + control.stagedGiB + " GiB"
         labelPixelSize: 10
         available: control.eligible
@@ -155,8 +164,40 @@ Column {
         onLeftClicked: control.persistArmed = false
     }
     GohuText {
+        visible: control.observedActive
         width: parent.width
-        text: MemoryOperation.feedback + "\nNO SWAP REMOVAL OR RESIZE"
+        text: !control.host || control.host.expansionVersion !== 1 ? "EXPANSION // HELPER UPDATE REQUIRED"
+            : control.capacity && control.capacity.extensionActive ? "EXTENSION ACTIVE // TEMPORARY UNTIL REBOOT"
+            : control.host.extensionExists ? "EXTENSION EXISTS // RECOVERY REQUIRED"
+            : "EXPANSION // TEMPORARY; BASE BOOT POLICY UNCHANGED"
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+    ActionButton {
+        visible: control.capacity !== null && control.capacity.baseActive && control.capacity.direction === "expand"
+        width: parent.width
+        height: 34
+        label: control.expandArmed ? "CONFIRM // TEMPORARY EXPANSION" : "EXPAND TO " + control.stagedGiB + " GiB"
+        labelPixelSize: 10
+        available: control.canExpand
+        onLeftClicked: {
+            if (!control.canExpand) return;
+            if (!control.expandArmed) { control.expandArmed = true; return; }
+            control.expandArmed = false;
+            MemoryOperation.request("expand", control.stagedGiB);
+        }
+    }
+    ActionButton {
+        visible: control.expandArmed
+        width: parent.width
+        height: 30
+        label: "CANCEL EXPANSION"
+        onLeftClicked: control.expandArmed = false
+    }
+    GohuText {
+        width: parent.width
+        text: MemoryOperation.feedback + "\nREDUCTION NOT AVAILABLE YET"
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

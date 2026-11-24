@@ -2,6 +2,7 @@ import importlib.machinery
 import importlib.util
 from pathlib import Path
 import unittest
+from contextlib import nullcontext
 import tempfile
 from unittest.mock import mock_open
 from unittest.mock import patch
@@ -48,7 +49,7 @@ class SwapAddTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_native_command_grammar(self):
-        with patch.object(m, "allocate") as allocate:
+        with patch.object(m, "mutation_lock", return_value=nullcontext()), patch.object(m, "allocate") as allocate:
             self.assertEqual(m.main(["add-authorized", "16"]), 0)
             allocate.assert_called_once_with(16, interactive=False)
 
@@ -65,7 +66,7 @@ class SwapAddTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_persist_command_grammar(self):
-        with patch.object(m, "persist_authorized") as persist:
+        with patch.object(m, "mutation_lock", return_value=nullcontext()), patch.object(m, "persist_authorized") as persist:
             self.assertEqual(m.main(["persist-authorized"]), 0)
             persist.assert_called_once_with()
 
@@ -132,7 +133,7 @@ class SwapAddTests(unittest.TestCase):
             self.assertEqual(run.call_count, 1)
 
     def test_expand_command_grammar(self):
-        with patch.object(m, "expand_authorized") as expand:
+        with patch.object(m, "mutation_lock", return_value=nullcontext()), patch.object(m, "expand_authorized") as expand:
             self.assertEqual(m.main(["expand-authorized", "24"]), 0)
             expand.assert_called_once_with(24)
 
@@ -192,6 +193,92 @@ class SwapAddTests(unittest.TestCase):
         with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run", return_value="Total devices 1"), patch.object(m.os, "umask"), patch.object(Path, "chmod"), patch.object(m, "active_swap", return_value=None):
             with self.assertRaises(RuntimeError):
                 m.allocate(16)
+
+
+class ReductionTests(unittest.TestCase):
+    def sample(self, used=0, available=9*1024**2, base_used=0, some=0, full=0):
+        return {"rows": {
+            str(m.SWAPFILE): {"kind":"file", "sizeKiB":16777212, "usedKiB":base_used, "priority":10},
+            str(m.EXT_FILE): {"kind":"file", "sizeKiB":8388604, "usedKiB":used, "priority":9}},
+            "totalKiB":32*1024**2, "availableKiB":available, "someAvg10":some, "fullAvg10":full}
+
+    def test_advisory_ready_and_blockers(self):
+        self.assertEqual(m.reduction_plan(16, self.sample())["extensionUsedKiB"], 0)
+        for sample, code in ((self.sample(used=1), "EXTENSION_OCCUPIED"),
+                             (self.sample(available=7*1024**2), "RAM_HEADROOM"),
+                             (self.sample(base_used=15*1024**2), "BASE_HEADROOM"),
+                             (self.sample(some=1.1), "MEMORY_PRESSURE"),
+                             (self.sample(full=0.01), "MEMORY_PRESSURE")):
+            with self.subTest(code=code), self.assertRaises(m.ReductionBlocked) as error:
+                m.reduction_plan(16, sample)
+            self.assertEqual(error.exception.code, code)
+
+    def test_target_must_equal_base(self):
+        for target in (0, 8, 12, 20, 24):
+            with self.assertRaises(m.ReductionBlocked) as error:
+                m.reduction_plan(target, self.sample())
+            self.assertEqual(error.exception.code, "UNSUPPORTED_TARGET")
+
+    def test_missing_observation_never_ready(self):
+        with patch.object(m, "read_reduction_snapshot", side_effect=ValueError("bad read")):
+            self.assertEqual(m.reduction_preflight(16)["code"], "OBSERVATION_UNAVAILABLE")
+
+    def test_nonroot_no_mutation(self):
+        with patch.object(m.os, "geteuid", return_value=1000), patch.object(m, "run") as run:
+            with self.assertRaises(PermissionError):
+                m.withdraw_authorized(16)
+            run.assert_not_called()
+
+    def test_withdraw_exact_argv_retains_files(self):
+        before = self.sample()
+        after = self.sample()
+        del after["rows"][str(m.EXT_FILE)]
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,before,after]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
+            m.withdraw_authorized(16)
+            run.assert_called_once_with("/usr/sbin/swapoff", "--", str(m.EXT_FILE))
+            self.assertEqual(record.call_args_list[0].args[0]["state"], "PREPARED")
+            self.assertEqual(record.call_args_list[1].args[0]["state"], "VERIFIED")
+            self.assertTrue(record.call_args_list[1].args[0]["fileRetained"])
+
+    def test_final_spike_blocks_without_swapoff(self):
+        before = self.sample()
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,self.sample(used=1)]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
+            with self.assertRaises(m.ReductionRecovery) as error:
+                m.withdraw_authorized(16)
+            self.assertEqual(str(error.exception), "NOT_STARTED_EXTENSION_OCCUPIED")
+            run.assert_not_called()
+            self.assertEqual(record.call_args_list[1].args[0]["state"], "NOT_STARTED")
+
+    def test_failed_kernel_command_preserves_prepared_record(self):
+        before = self.sample()
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", return_value=before), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run", side_effect=m.subprocess.CalledProcessError(1,"swapoff")):
+            with self.assertRaises(m.ReductionRecovery) as error:
+                m.withdraw_authorized(16)
+            self.assertEqual(str(error.exception), "WITHDRAWAL_OUTCOME_UNKNOWN")
+            record.assert_called_once()
+            self.assertEqual(record.call_args.args[0]["state"], "PREPARED")
+
+    def test_prior_intent_blocks_replay(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[]), patch.object(m.os.path, "lexists", return_value=True), patch.object(m, "run") as run:
+            with self.assertRaises(m.ReductionRecovery) as error:
+                m.withdraw_authorized(16)
+            self.assertEqual(str(error.exception), "RECOVERY_REQUIRED")
+            run.assert_not_called()
+
+    def test_marker_is_exclusive_and_durable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            marker = directory / "withdrawal.json"
+            with patch.object(m, "EXT_DIRECTORY", directory), patch.object(m, "WITHDRAW_MARKER", marker):
+                m.durable_withdrawal_record({"state":"PREPARED"}, initial=True)
+                with self.assertRaises(FileExistsError):
+                    m.durable_withdrawal_record({"state":"OTHER"}, initial=True)
+                self.assertEqual(m.json.loads(marker.read_text())["state"], "PREPARED")
+
+    def test_withdraw_command_grammar(self):
+        with patch.object(m, "mutation_lock", return_value=nullcontext()), patch.object(m, "withdraw_authorized") as withdraw:
+            self.assertEqual(m.main(["withdraw-authorized", "16"]), 0)
+            withdraw.assert_called_once_with(16)
 
 if __name__ == "__main__":
     unittest.main()

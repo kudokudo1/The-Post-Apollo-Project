@@ -1,8 +1,9 @@
-name: CPU++ memory disposable Silverblue cycle smoke (production HOLD)
+name: CPU++ memory disposable Silverblue cycle and recovery reboot (production HOLD)
 on:
   pull_request:
     paths:
       - 'tests/cpuplus_memory_native/**'
+      - 'tests/cpuplus_memory_native_faults/**'
       - '.github/workflows/cpuplus-memory-native-cycle.yml'
   workflow_dispatch:
 permissions:
@@ -11,7 +12,7 @@ jobs:
   native-cycle:
     if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
-    timeout-minutes: 70
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,11 +36,13 @@ jobs:
           test "$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)" -ge 7000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_RAM"; exit 2; }
           bash -n tests/cpuplus_memory_native/guest-cycle.sh
           bash -n tests/cpuplus_memory_native/run-silverblue-cycle.sh
+          bash -n tests/cpuplus_memory_native_faults/guest-phase.sh
+          python3 -B -m py_compile tests/cpuplus_memory_native_faults/guest-recovery.py
       - name: Run isolated offline KVM guest, no host swap changes
         shell: bash
         run: |
           set -euo pipefail
-          timeout 3900s docker run --rm --device=/dev/kvm \
+          timeout 5100s docker run --rm --device=/dev/kvm \
             --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted \
             --env GITHUB_ACTOR="$GITHUB_ACTOR" --env POST_APOLLO_MEMORY_NATIVE_CI_ONLY=1 \
             --mount "type=bind,src=$PWD,dst=/src,readonly" \

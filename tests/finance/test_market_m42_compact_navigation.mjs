@@ -28,7 +28,7 @@ assert.equal(disclosure.split("FinanceDateInput {").length-1,3);
 assert.ok(!disclosure.includes("stockFeed.refresh()"));
 const always=section('objectName: "marketCompactSelection"','objectName: "marketResearchCrossStockSection"');
 for(const token of ["id: load",'stocks.stockFeed.refresh()',"id: status","stocks.stockFeed.message",
-    "!stocks.controlsExpanded","// EODHD"])
+    "!stocks.controlsExpanded","stocks.historySource"])
     assert.ok(always.includes(token),token);
 assert.ok(qml.includes("property bool controlsExpanded: false"));
 const f=section("function toggleResearchControls() {","function selectResearchView(view) {").trim();

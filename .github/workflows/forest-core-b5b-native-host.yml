@@ -1,0 +1,34 @@
+name: Forest Core B5b Native Host Candidate
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/native_host_candidate_b5b.py'
+      - 'scripts/forest/NATIVE_HOST_B5B.md'
+      - 'tests/forest/test_native_host_candidate_b5b.py'
+      - '.github/workflows/forest-core-b5b-native-host.yml'
+  push:
+    paths:
+      - 'scripts/forest/native_host_candidate_b5b.py'
+      - 'scripts/forest/NATIVE_HOST_B5B.md'
+      - 'tests/forest/test_native_host_candidate_b5b.py'
+      - '.github/workflows/forest-core-b5b-native-host.yml'
+jobs:
+  disposable-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: B5b native process and FD
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_native_host_candidate_b5b.py' -v
+      - name: B5a disposable boundary
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_boundary_fixture_b5a.py' -v
+      - name: B1 journal
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: B3 turn bridge
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: B4a admission
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_admission_b4a.py' -v
+      - name: ForestW session consumer
+        run: python3 -B tests/forest/test_forest_session_list_consumer_v1.py
+      - name: Compile
+        run: python3 -m py_compile scripts/forest/native_host_candidate_b5b.py tests/forest/test_native_host_candidate_b5b.py

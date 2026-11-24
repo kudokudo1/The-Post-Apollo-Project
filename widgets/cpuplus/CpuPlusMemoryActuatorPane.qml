@@ -882,11 +882,21 @@ Item {
                 visible: active
                 sourceComponent: CpuPlusAdvancedPolicyPane {}
             }
+            Loader {
+                width: parent.width
+                height: active && item ? item.implicitHeight : 0
+                active: root.page === "AUTO"
+                visible: active
+                sourceComponent: CpuPlusQueuePane {
+                    observedDiskKiB: root.capacity ? root.capacity.actualKiB : null
+                    capacityTargetGiB: root.stagedGiB
+                    runtimeProjection: null
+                }
+            }
             GohuText {
                 width: parent.width
-                visible: root.page !== "CAP" && root.page !== "POL" && root.page !== "DIAG"
+                visible: root.page === "PROC" || root.page === "PROF"
                 text: root.page === "PROC" ? "PROCESS CONTROLS // NOT CONNECTED"
-                    : root.page === "AUTO" ? "DEFERRED REQUESTS // NOT CONNECTED"
                     : "PROFILE CONTROLS // NOT CONNECTED"
                 color: Colors.orange
                 font.pixelSize: 11

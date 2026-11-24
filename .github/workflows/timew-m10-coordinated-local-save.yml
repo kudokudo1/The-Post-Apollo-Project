@@ -1,0 +1,36 @@
+name: TimeW M10 coordinated local Save (no live wiring)
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3CoordinatedLocalSave.py'
+      - 'services/time/MachineV3OriginalSaveIdentity.py'
+      - 'services/time/MachineV3LocalFractionalAttemptJournal.py'
+      - 'services/time/MachineV3LocalSaveRecovery.py'
+      - 'services/time/MachineV3LocalCheckpointAdmission.py'
+      - 'tests/timew/test_machine_v10_coordinated_local_save.py'
+      - 'docs/timew-m10-coordinated-local-save.md'
+      - '.github/workflows/timew-m10-coordinated-local-save.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  coordinated-local-save:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify coordinated original Save and fractional failure recovery
+        run: python3 -B -I tests/timew/test_machine_v10_coordinated_local_save.py
+      - name: Preserve existing Save owners and recovery boundaries
+        run: |
+          python3 -B -I tests/timew/test_machine_v9_original_save_identity.py
+          python3 -B -I tests/timew/test_machine_v8_local_fractional_attempt_journal.py
+          python3 -B -I tests/timew/test_machine_v7_local_save_recovery.py
+          python3 -B -I tests/timew/test_machine_v6_local_exact_checkpoint_admission.py
+          python3 -B -I tests/timew/test_machine_geometry_store_v2.py
+          python3 -B -I tests/timew/test_machine_v2_geometry_journal.py

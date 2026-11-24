@@ -254,6 +254,31 @@ def _checkpoint_id(value):
     return _id(value)
 
 
+def _insert_pair(conn, *, cid, now, legacy_doc, raw_v1, raw_v2, digest,
+                 stage_hook=None):
+    """Shared insertion seam; caller owns the surrounding transaction."""
+    conn.execute(f"""CREATE TABLE IF NOT EXISTS {TABLE} (
+        checkpoint_id TEXT PRIMARY KEY
+            REFERENCES checkpoints(id) ON DELETE RESTRICT,
+        schema_version INTEGER NOT NULL CHECK(schema_version=2),
+        geometry_json TEXT NOT NULL,
+        geometry_sha256 TEXT NOT NULL
+    )""")
+    conn.execute(
+        "INSERT INTO checkpoints (id, schema_version, label, saved_at_utc, "
+        "captured_at_utc, document_json) VALUES (?, ?, ?, ?, ?, ?)",
+        (cid, legacy.SCHEMA_VERSION, legacy_doc["label"], now,
+         legacy_doc["captured_at_utc"], raw_v1))
+    if stage_hook is not None:
+        stage_hook("after_v1_insert")
+    conn.execute(
+        f"INSERT INTO {TABLE} (checkpoint_id, schema_version, "
+        "geometry_json, geometry_sha256) VALUES (?, 2, ?, ?)",
+        (cid, raw_v2, digest))
+    if stage_hook is not None:
+        stage_hook("after_geometry_insert")
+
+
 def save_pair(v1_document, geometry_document, *, stage_hook=None):
     """Atomically commit v1 compatibility and v2 geometry, never half a save.
 
@@ -274,26 +299,9 @@ def save_pair(v1_document, geometry_document, *, stage_hook=None):
     try:
         conn.execute("PRAGMA foreign_keys=ON")
         with conn:
-            conn.execute(f"""CREATE TABLE IF NOT EXISTS {TABLE} (
-                checkpoint_id TEXT PRIMARY KEY
-                    REFERENCES checkpoints(id) ON DELETE RESTRICT,
-                schema_version INTEGER NOT NULL CHECK(schema_version=2),
-                geometry_json TEXT NOT NULL,
-                geometry_sha256 TEXT NOT NULL
-            )""")
-            conn.execute(
-                "INSERT INTO checkpoints (id, schema_version, label, saved_at_utc, "
-                "captured_at_utc, document_json) VALUES (?, ?, ?, ?, ?, ?)",
-                (cid, legacy.SCHEMA_VERSION, legacy_doc["label"], now,
-                 legacy_doc["captured_at_utc"], raw_v1))
-            if stage_hook is not None:
-                stage_hook("after_v1_insert")
-            conn.execute(
-                f"INSERT INTO {TABLE} (checkpoint_id, schema_version, "
-                "geometry_json, geometry_sha256) VALUES (?, 2, ?, ?)",
-                (cid, raw_v2, digest))
-            if stage_hook is not None:
-                stage_hook("after_geometry_insert")
+            _insert_pair(conn, cid=cid, now=now, legacy_doc=legacy_doc,
+                         raw_v1=raw_v1, raw_v2=raw_v2, digest=digest,
+                         stage_hook=stage_hook)
         row = conn.execute("SELECT * FROM checkpoints WHERE id=?", (cid,)).fetchone()
         if row is None:
             raise GeometryStoreError("ATOMIC CHECKPOINT NOT VERIFIED")

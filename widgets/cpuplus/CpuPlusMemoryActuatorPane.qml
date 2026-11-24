@@ -195,6 +195,11 @@ Item {
                 label: "RESET TARGET TO ACTIVE"
                 onLeftClicked: root.stagedGiB = Math.max(4, Math.min(64, Math.round(root.capacity.actualGiB / 4) * 4))
             }
+            CpuPlusSwapComposition {
+                width: parent.width
+                sample: root.sample
+                capacity: root.capacity
+            }
             CpuPlusMemoryAddControl {
                 width: parent.width
                 stagedGiB: root.stagedGiB

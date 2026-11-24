@@ -25,6 +25,7 @@ xorriso -osirrox on -indev "$tmp/$iso" -extract /images/pxeboot/vmlinuz "$tmp/px
 payload="$(base64 -w0 "$repo/tests/cpuplus_memory_native/guest-cycle.sh")"
 fault_payload="$(base64 -w0 "$repo/tests/cpuplus_memory_native_faults/guest-recovery.py")"
 phase_payload="$(base64 -w0 "$repo/tests/cpuplus_memory_native_faults/guest-phase.sh")"
+headroom_payload="$(base64 -w0 "$repo/tests/cpuplus_memory_pressure_ci/guest-headroom.py")"
 helper_payload="$(base64 -w0 "$helper")"
 helper_sha="$(sha256sum "$helper" | cut -d' ' -f1)"
 cat >"$tmp/seed/ks.cfg" <<EOF
@@ -50,6 +51,8 @@ printf '%s\n' DISPOSABLE_CPU_MEMORY_NATIVE_V1 > /etc/postapollo-memory-ci-only
 chmod 0600 /etc/postapollo-memory-ci-only
 printf '%s\n' DISPOSABLE_CPU_MEMORY_FAULT_V1 > /etc/postapollo-memory-native-fault-ci-only
 chmod 0600 /etc/postapollo-memory-native-fault-ci-only
+printf '%s\n' DISPOSABLE_CPU_MEMORY_HEADROOM_V1 > /etc/postapollo-memory-native-headroom-ci-only
+chmod 0600 /etc/postapollo-memory-native-headroom-ci-only
 base64 -d >/usr/local/libexec/postapollo-memory-ci-helper <<'CPU_MEMORY_HELPER'
 $helper_payload
 CPU_MEMORY_HELPER
@@ -62,6 +65,10 @@ CPU_MEMORY_FAULT
 base64 -d >/usr/local/libexec/postapollo-memory-ci-phase.sh <<'CPU_MEMORY_PHASE'
 $phase_payload
 CPU_MEMORY_PHASE
+base64 -d >/usr/local/libexec/postapollo-memory-ci-headroom.py <<'CPU_MEMORY_HEADROOM'
+$headroom_payload
+CPU_MEMORY_HEADROOM
+chmod 0700 /usr/local/libexec/postapollo-memory-ci-headroom.py
 chmod 0700 /usr/local/libexec/postapollo-memory-ci-helper /usr/local/libexec/postapollo-memory-ci-cycle.sh /usr/local/libexec/postapollo-memory-ci-fault.py /usr/local/libexec/postapollo-memory-ci-phase.sh
 printf '%s  %s\n' "$helper_sha" postapollo-memory-ci-helper >/usr/local/libexec/postapollo-memory-ci-helper.sha256
 chmod 0600 /usr/local/libexec/postapollo-memory-ci-helper.sha256
@@ -123,7 +130,7 @@ run_phase() {
       -nic none -no-reboot >"$tmp/guest-$stage-qemu.log" 2>&1 &
     pid="$!"
     for ((n=0;n<360;n++)); do
-        if grep -aEq 'CPU_MEM_(NATIVE|FAULT)_FAIL //' "$log" 2>/dev/null; then
+        if grep -aEq 'CPU_MEM_(NATIVE|FAULT|HEADROOM)_FAIL //' "$log" 2>/dev/null; then
             tail -n 80 "$log" || true
             tail -n 30 "$console" || true
             echo "CPU_MEM_NATIVE_BLOCKED // GUEST_FAILURE phase=$stage"
@@ -132,7 +139,7 @@ run_phase() {
         if ! kill -0 "$pid" 2>/dev/null; then break; fi
         if (( n % 30 == 0 )); then
             echo "CPU_MEM_NATIVE_STAGE // phase=$stage poll=$n"
-            grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|STAGE|DIAG) //' "$log" 2>/dev/null | tail -n 14 || true
+            grep -aE 'CPU_MEM_(NATIVE|FAULT|HEADROOM)_(PASS|FAIL|STAGE|DIAG) //' "$log" 2>/dev/null | tail -n 14 || true
         fi
         sleep 2
     done
@@ -149,8 +156,8 @@ run_phase() {
         return 2
     fi
     pid=
-    grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|BLOCKED|STAGE|DIAG) //|VERIFIED (ACTIVE|PERSISTENCE|EXPANSION|REDUCTION|REACTIVATION|CYCLE ARCHIVE):|RECOVERY INSPECTION:|REDUCTION (BLOCKED|RECOVERY):|REFUSED/FAILED:' "$log" | tail -n 100 || true
-    ! grep -aEq 'CPU_MEM_(NATIVE|FAULT)_FAIL //' "$log"
+    grep -aE 'CPU_MEM_(NATIVE|FAULT|HEADROOM)_(PASS|FAIL|BLOCKED|STAGE|DIAG) //|VERIFIED (ACTIVE|PERSISTENCE|EXPANSION|REDUCTION|REACTIVATION|CYCLE ARCHIVE):|RECOVERY INSPECTION:|REDUCTION (BLOCKED|RECOVERY):|REFUSED/FAILED:' "$log" | tail -n 100 || true
+    ! grep -aEq 'CPU_MEM_(NATIVE|FAULT|HEADROOM)_FAIL //' "$log"
 }
 require_marker() {
     local stage="$1" marker="$2"
@@ -167,6 +174,8 @@ done
 for marker in REAL_SIGKILL_PARTIAL_RETIREMENT_FENCED EXPLICIT_ARCHIVE_RESUME_HISTORY_INTACT REBOOT_WITNESS_DURABLE; do
     require_marker initial "CPU_MEM_FAULT_PASS // $marker"
 done
+require_marker initial "CPU_MEM_HEADROOM_PASS // ADVISORY_AND_PRIVILEGED_REFUSAL_NO_MUTATION"
+require_marker initial "CPU_MEM_HEADROOM_PASS // READY_ADVISORY_AFTER_RELEASE_NO_REPLAY"
 require_marker initial "CPU_MEM_FAULT_STAGE // REQUEST_GUEST_POWEROFF_INITIAL"
 ! grep -aFq 'CPU_MEM_FAULT_PASS // REAL_REBOOT_BASE_ACTIVE_EXTENSION_INACTIVE' "$tmp/guest-initial-serial.log"
 echo "CPU_MEM_NATIVE_PASS // FIRST_GUEST_SHUTDOWN_VERIFIED"
@@ -176,5 +185,7 @@ require_marker reboot "CPU_MEM_FAULT_PASS // JOURNALS_AND_HISTORY_PRESERVED_NO_R
 require_marker reboot "CPU_MEM_FAULT_STAGE // REQUEST_GUEST_POWEROFF_REBOOT"
 ! grep -aFq 'CPU_MEM_NATIVE_PASS // CYCLE_1_VERIFIED' "$tmp/guest-reboot-serial.log"
 ! grep -aFq 'CPU_MEM_FAULT_PASS // REBOOT_WITNESS_DURABLE' "$tmp/guest-reboot-serial.log"
+! grep -aFq 'CPU_MEM_HEADROOM_PASS //' "$tmp/guest-reboot-serial.log"
 echo "CPU_MEM_NATIVE_PASS // OFFLINE_GUEST_ARCHIVE_SIGKILL_AND_CLEAN_REBOOT"
-echo "CPU_MEM_NATIVE_LIMITATION // NO_UTIL_LINUX_INTERRUPTION_PRESSURE_OR_HARD_POWER_LOSS_ACCEPTANCE"
+echo "CPU_MEM_NATIVE_PASS // REAL_RAM_HEADROOM_REFUSAL_AND_ADVISORY_RECOVERY"
+echo "CPU_MEM_NATIVE_LIMITATION // NO_UTIL_LINUX_INTERRUPTION_OCCUPIED_EXTENSION_PSI_OR_HARD_POWER_LOSS_ACCEPTANCE"

@@ -6,6 +6,9 @@ on:
       - "widgets/cpuplus/CpuPlusDiagnosticsPane.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
       - "tests/cpuplus/test_diagnostic_controls.cjs"
+      - "tests/cpuplus/test_diagnostic_notifications.cjs"
+      - "modules/Notifications.qml"
+      - "services/notifications/ApolloNotificationRoute.js"
       - "scripts/cpuplus_process_census.py"
       - "tests/cpuplus/test_process_census.py"
       - "tests/cpuplus/test_diagnostic_continuity_native.py"
@@ -21,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node tests/cpuplus/test_diagnostic_controls.cjs
+      - run: node tests/cpuplus/test_diagnostic_notifications.cjs
       - run: python3 -B tests/cpuplus/test_process_census.py
   native-continuity:
     runs-on: ubuntu-latest

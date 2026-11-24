@@ -1,9 +1,10 @@
-name: CPU++ memory disposable Silverblue cycle and recovery reboot (production HOLD)
+name: CPU++ memory disposable Silverblue cycle headroom and recovery reboot (production HOLD)
 on:
   pull_request:
     paths:
       - 'tests/cpuplus_memory_native/**'
       - 'tests/cpuplus_memory_native_faults/**'
+      - 'tests/cpuplus_memory_pressure_ci/**'
       - '.github/workflows/cpuplus-memory-native-cycle.yml'
   workflow_dispatch:
 permissions:
@@ -37,7 +38,8 @@ jobs:
           bash -n tests/cpuplus_memory_native/guest-cycle.sh
           bash -n tests/cpuplus_memory_native/run-silverblue-cycle.sh
           bash -n tests/cpuplus_memory_native_faults/guest-phase.sh
-          python3 -B -m py_compile tests/cpuplus_memory_native_faults/guest-recovery.py
+          python3 -B -m py_compile tests/cpuplus_memory_native_faults/guest-recovery.py tests/cpuplus_memory_pressure_ci/guest-headroom.py
+          python3 -B tests/cpuplus_memory_pressure_ci/test_headroom_bounds.py
       - name: Run isolated offline KVM guest, no host swap changes
         shell: bash
         run: |

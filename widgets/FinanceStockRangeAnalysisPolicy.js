@@ -378,3 +378,45 @@ function normalizedChartPoint(chart, point, width, height) {
             : (1 - (point.value-chart.low)/(chart.high-chart.low))*(height-1)
     };
 }
+
+// M35: choose an observed step on the existing common horizontal axis.
+// This is an ordinal comparison, not synchronization by calendar date.
+function normalizedStepAtX(chart, width, x) {
+    if (!chart || !Number.isInteger(chart.maxSteps) || chart.maxSteps < 1
+            || chart.maxSteps > 131 || !Number.isFinite(width) || width < 5
+            || !Number.isFinite(x) || x < 0 || x > width - 1)
+        return -1;
+    return Math.round(x / (width - 1) * chart.maxSteps);
+}
+
+function inspectNormalizedStep(chart, step) {
+    if (!chart || chart.source !== "loaded-eodhd-range-only"
+            || chart.readOnly !== true || chart.noProviderCalls !== true
+            || !Number.isInteger(chart.maxSteps) || chart.maxSteps < 1
+            || chart.maxSteps > 131 || !Number.isInteger(step)
+            || step < 0 || step > chart.maxSteps
+            || !Array.isArray(chart.first) || !Array.isArray(chart.second)
+            || Math.max(chart.first.length,chart.second.length) !== chart.maxSteps+1
+            || chart.first.length < 2 || chart.second.length < 2)
+        return null;
+    function observation(series) {
+        if (step >= series.length) return null;
+        const p = series[step];
+        if (!p || p.step !== step || !calendarDay(p.date)
+                || !Number.isFinite(p.value) || p.value <= 0)
+            return null;
+        return {step:step,date:p.date,value:p.value,changePct:p.value-100};
+    }
+    const first = observation(chart.first), second = observation(chart.second);
+    // A missing in-bounds observation is invalid, not an ended series.
+    if ((step < chart.first.length && !first)
+            || (step < chart.second.length && !second)
+            || (!first && !second)) return null;
+    const gap = first && second ? second.value-first.value : null;
+    if (gap !== null && !Number.isFinite(gap)) return null;
+    return {
+        step:step,first:first,second:second,
+        gapPoints:gap,sharedObservation:first !== null && second !== null,
+        readOnly:true,noProviderCalls:true
+    };
+}

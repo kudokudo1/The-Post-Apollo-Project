@@ -1,6 +1,9 @@
 #!/usr/bin/python3 -I
 """Bounded managed Btrfs swap allocation and boot policy."""
 import json
+from contextlib import contextmanager
+import fcntl
+import time
 import os
 from pathlib import Path
 import re
@@ -14,6 +17,9 @@ DIRECTORY = PARENT / "post-apollo-memory-swap"
 SWAPFILE = DIRECTORY / "swapfile"
 EXT_DIRECTORY = PARENT / "post-apollo-memory-extension"
 EXT_FILE = EXT_DIRECTORY / "swapfile"
+LOCK = Path("/run/post-apollo-memory.lock")
+WITHDRAW_MARKER = EXT_DIRECTORY / "withdrawal.json"
+REDUCTION_VERSION = 1
 ENV = {"PATH": "/usr/sbin:/usr/bin", "LC_ALL": "C"}
 
 def run(*argv):
@@ -168,7 +174,7 @@ def status():
     base = active_swap()
     extension = active_swap(EXT_FILE)
     extension_exists = os.path.lexists(EXT_DIRECTORY)
-    return {"nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"reductionVersion": REDUCTION_VERSION, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": base,
@@ -256,6 +262,204 @@ def expand_authorized(target):
     print("VERIFIED EXPANSION:", json.dumps({"sizeKiB": base["sizeKiB"] + extra["sizeKiB"],
           "basePriority": 10, "extensionPriority": 9, "temporary": True}), flush=True)
 
+
+class ReductionBlocked(RuntimeError):
+    def __init__(self, code, evidence=None):
+        super().__init__(code)
+        self.code = code
+        self.evidence = evidence or {}
+
+@contextmanager
+def mutation_lock():
+    # Shared by all helper mutations; this does not serialize external root tools.
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    info = LOCK.parent.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+        raise RuntimeError("Unsafe runtime directory")
+    fd = os.open(LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                or info.st_mode & 0o077 or info.st_nlink != 1):
+            raise RuntimeError("Unsafe operation lock")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ReductionBlocked("OPERATION_BUSY") from error
+        yield
+    finally:
+        os.close(fd)
+
+def read_reduction_snapshot():
+    rows = {}
+    with open("/proc/swaps", encoding="ascii") as stream:
+        if next(stream, "").split() != ["Filename", "Type", "Size", "Used", "Priority"]:
+            raise ValueError("Unexpected swap header")
+        for line in stream:
+            path, kind, size, used, priority = line.split()
+            size, used, priority = int(size), int(used), int(priority)
+            if path in rows or kind not in ("file", "partition") or not 0 <= used <= size or size <= 0:
+                raise ValueError("Invalid swap row")
+            rows[path] = {"kind": kind, "sizeKiB": size, "usedKiB": used, "priority": priority}
+    mem = Path("/proc/meminfo").read_text(encoding="ascii")
+    psi = Path("/proc/pressure/memory").read_text(encoding="ascii")
+    def metric(name):
+        matches = re.findall(r"^" + name + r":\s+(\d+)\s+kB\s*$", mem, re.M)
+        if len(matches) != 1:
+            raise ValueError("Missing or duplicate memory metric")
+        return int(matches[0])
+    def pressure(name):
+        matches = re.findall(r"^" + name + r" avg10=(\d+(?:\.\d+)?) ", psi, re.M)
+        if len(matches) != 1 or not 0 <= float(matches[0]) <= 100:
+            raise ValueError("Invalid pressure observation")
+        return float(matches[0])
+    total, available = metric("MemTotal"), metric("MemAvailable")
+    if not 0 <= available <= total or total <= 0:
+        raise ValueError("Invalid memory capacity")
+    return {"rows": rows, "totalKiB": total, "availableKiB": available,
+            "someAvg10": pressure("some"), "fullAvg10": pressure("full")}
+
+def nominal_capacity(row):
+    size = row["sizeKiB"]
+    nominal = (size + 1024) // (4 * GIB // 1024) * 4
+    if not 4 <= nominal <= 64 or not 0 <= nominal * GIB // 1024 - size <= 1024:
+        raise ReductionBlocked("UNEXPECTED_CAPACITY")
+    return nominal
+
+def reduction_plan(target, snapshot):
+    """Advisory only; exact base target, unused extension, conservative headroom."""
+    rows = snapshot["rows"]
+    base, extra = rows.get(str(SWAPFILE)), rows.get(str(EXT_FILE))
+    if not base or not extra:
+        raise ReductionBlocked("BASE_OR_EXTENSION_INACTIVE")
+    if base["kind"] != "file" or extra["kind"] != "file" or base["priority"] != 10 or extra["priority"] != 9:
+        raise ReductionBlocked("UNEXPECTED_SWAP_IDENTITY")
+    base_gib, extra_gib = nominal_capacity(base), nominal_capacity(extra)
+    if base_gib + extra_gib > 64 or target != base_gib:
+        raise ReductionBlocked("UNSUPPORTED_TARGET", {"baseGiB": base_gib, "extensionGiB": extra_gib})
+    required_ram = max(4 * GIB // 1024, (snapshot["totalKiB"] + 3) // 4)
+    # Do not count ZRAM logical free slots as independent physical headroom.
+    remaining_base = base["sizeKiB"] - base["usedKiB"]
+    evidence = {"targetGiB": target, "baseSizeKiB": base["sizeKiB"],
+                "extensionSizeKiB": extra["sizeKiB"], "extensionUsedKiB": extra["usedKiB"],
+                "availableKiB": snapshot["availableKiB"], "requiredRamKiB": required_ram,
+                "baseFreeKiB": remaining_base, "requiredBaseFreeKiB": 2 * GIB // 1024,
+                "someAvg10": snapshot["someAvg10"], "fullAvg10": snapshot["fullAvg10"]}
+    if extra["usedKiB"] != 0:
+        raise ReductionBlocked("EXTENSION_OCCUPIED", evidence)
+    if snapshot["availableKiB"] < required_ram:
+        raise ReductionBlocked("RAM_HEADROOM", evidence)
+    if remaining_base < evidence["requiredBaseFreeKiB"]:
+        raise ReductionBlocked("BASE_HEADROOM", evidence)
+    if snapshot["fullAvg10"] != 0 or snapshot["someAvg10"] > 1:
+        raise ReductionBlocked("MEMORY_PRESSURE", evidence)
+    return evidence
+
+def reduction_preflight(target):
+    try:
+        evidence = reduction_plan(target, read_reduction_snapshot())
+        return {"version": REDUCTION_VERSION, "state": "READY_ADVISORY",
+                "code": "FRESH_AUTH_AND_ROOT_CHECK_REQUIRED", "evidence": evidence}
+    except ReductionBlocked as error:
+        return {"version": REDUCTION_VERSION, "state": "WAITING",
+                "code": error.code, "evidence": error.evidence}
+    except (OSError, ValueError, KeyError):
+        return {"version": REDUCTION_VERSION, "state": "WAITING",
+                "code": "OBSERVATION_UNAVAILABLE", "evidence": {}}
+
+def extension_identity():
+    secure_parent()
+    trusted_swap_file()
+    identities = []
+    for path, kind in ((DIRECTORY, stat.S_ISDIR), (SWAPFILE, stat.S_ISREG),
+                       (EXT_DIRECTORY, stat.S_ISDIR), (EXT_FILE, stat.S_ISREG)):
+        info = path.lstat()
+        if not kind(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+            raise ReductionBlocked("UNTRUSTED_FILE")
+        if kind is stat.S_ISREG and info.st_nlink != 1:
+            raise ReductionBlocked("UNTRUSTED_FILE")
+        identities.append((info.st_dev, info.st_ino, info.st_size if kind is stat.S_ISREG else 0))
+    if mount_info()[1] != "btrfs":
+        raise ReductionBlocked("UNSUPPORTED_FILESYSTEM")
+    return identities
+
+def check_extension_boot_policy():
+    trusted_unit_directory()
+    name = run("/usr/bin/systemd-escape", "--path", "--suffix=swap", str(EXT_FILE)).strip()
+    expected = r"var-lib-post\x2dapollo\x2dmemory\x2dextension-swapfile.swap"
+    if name != expected:
+        raise ReductionBlocked("UNEXPECTED_UNIT")
+    with open("/etc/fstab", encoding="utf-8") as stream:
+        if any(line.split("#", 1)[0].split()[:1] == [str(EXT_FILE)] for line in stream):
+            raise ReductionBlocked("EXTENSION_BOOT_POLICY")
+    for directory in (UNIT_DIR, UNIT_DIR / "swap.target.wants", Path("/run/systemd/system"),
+                      Path("/usr/lib/systemd/system"), Path("/usr/local/lib/systemd/system"),
+                      Path("/run/systemd/generator"), Path("/run/systemd/generator.early"),
+                      Path("/run/systemd/generator.late"), Path("/run/systemd/transient"),
+                      Path("/etc/systemd/system.control"), Path("/run/systemd/system.control")):
+        if os.path.lexists(directory / name) or os.path.lexists(directory / (name + ".d")):
+            raise ReductionBlocked("EXTENSION_BOOT_POLICY")
+
+def durable_withdrawal_record(data, *, initial=False):
+    # Keep the original intent marker forever until an explicit recovery stage.
+    # Subsequent outcome is a separate exclusive file, never overwrites intent.
+    path = WITHDRAW_MARKER if initial else WITHDRAW_MARKER.with_name("withdrawal-result.json")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="ascii") as stream:
+        json.dump(data, stream, sort_keys=True)
+        stream.flush()
+        os.fsync(stream.fileno())
+    fd = os.open(EXT_DIRECTORY, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+def withdraw_authorized(target):
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    identity = extension_identity()
+    if os.path.lexists(WITHDRAW_MARKER) or os.path.lexists(WITHDRAW_MARKER.with_name("withdrawal-result.json")):
+        raise ReductionBlocked("RECOVERY_REQUIRED")
+    check_extension_boot_policy()
+    first = reduction_plan(target, read_reduction_snapshot())
+    time.sleep(2)
+    if extension_identity() != identity:
+        raise ReductionBlocked("FILE_IDENTITY_CHANGED")
+    check_extension_boot_policy()
+    second = reduction_plan(target, read_reduction_snapshot())
+    for key in ("baseSizeKiB", "extensionSizeKiB"):
+        if first[key] != second[key]:
+            raise ReductionBlocked("CAPACITY_CHANGED")
+    record = {"version": REDUCTION_VERSION, "state": "PREPARED", "targetGiB": target,
+              "identity": identity, "timeNs": time.time_ns(), "evidence": second}
+    durable_withdrawal_record(record, initial=True)
+    # Last live check after durable intent. A workload can still race the kernel;
+    # never force, delete, retry or assume the call completed on interruption.
+    try:
+        if extension_identity() != identity:
+            raise ReductionBlocked("FILE_IDENTITY_CHANGED")
+        final = reduction_plan(target, read_reduction_snapshot())
+        if any(final[key] != second[key] for key in ("baseSizeKiB", "extensionSizeKiB")):
+            raise ReductionBlocked("CAPACITY_CHANGED")
+    except ReductionBlocked as error:
+        durable_withdrawal_record({"state": "NOT_STARTED", "code": error.code})
+        raise
+    run("/usr/sbin/swapoff", "--", str(EXT_FILE))
+    observed = read_reduction_snapshot()["rows"]
+    base = observed.get(str(SWAPFILE))
+    if (str(EXT_FILE) in observed or not base or base["kind"] != "file"
+            or base["priority"] != 10 or base["sizeKiB"] != second["baseSizeKiB"]
+            or extension_identity() != identity):
+        raise RuntimeError("Withdrawal outcome unknown; inspect kernel and retained intent")
+    result = {"version": REDUCTION_VERSION, "state": "VERIFIED", "targetGiB": target,
+              "sizeKiB": base["sizeKiB"], "basePriority": 10,
+              "extensionActive": False, "fileRetained": True, "timeNs": time.time_ns()}
+    durable_withdrawal_record(result)
+    print("VERIFIED REDUCTION:", json.dumps(result), flush=True)
+
+
 def verify_authorized():
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
@@ -270,19 +474,31 @@ def main(args):
         if args == ["status"]:
             print(json.dumps(status()))
         elif len(args) == 2 and args[0] == "add":
-            allocate(parse_size(args[1]))
+            with mutation_lock():
+                allocate(parse_size(args[1]))
         elif len(args) == 2 and args[0] == "add-authorized":
             # pkexec/root authorization is the authority, not UI state.
-            allocate(parse_size(args[1]), interactive=False)
+            with mutation_lock():
+                allocate(parse_size(args[1]), interactive=False)
         elif args == ["verify-authorized"]:
             verify_authorized()
         elif args == ["persist-authorized"]:
-            persist_authorized()
+            with mutation_lock():
+                persist_authorized()
         elif len(args) == 2 and args[0] == "expand-authorized":
-            expand_authorized(parse_size(args[1]))
+            with mutation_lock():
+                expand_authorized(parse_size(args[1]))
+        elif len(args) == 2 and args[0] == "reduction-preflight":
+            print(json.dumps(reduction_preflight(parse_size(args[1]))))
+        elif len(args) == 2 and args[0] == "withdraw-authorized":
+            with mutation_lock():
+                withdraw_authorized(parse_size(args[1]))
         else:
-            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB")
+            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB")
         return 0
+    except ReductionBlocked as error:
+        print("REDUCTION BLOCKED:", json.dumps({"version": REDUCTION_VERSION, "state": "WAITING", "code": error.code, "evidence": error.evidence}), flush=True)
+        return 2
     except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
         print("REFUSED/FAILED:", error, file=sys.stderr)
         if isinstance(error, subprocess.CalledProcessError) and error.stderr:

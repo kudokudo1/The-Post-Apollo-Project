@@ -1,0 +1,30 @@
+name: FinanceW Simple M3d2 offline categorized review
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/simple_m3d2_offline_review.mjs"
+      - "tests/finance/test_finance_simple_m3d2_offline_review.mjs"
+      - "tests/finance/test_finance_simple_m3d2_source_hold.py"
+      - ".github/workflows/financew-simple-m3d2-offline-review.yml"
+  push:
+    paths:
+      - "scripts/finance/simple_m3d2_offline_review.mjs"
+      - "tests/finance/test_finance_simple_m3d2_offline_review.mjs"
+      - "tests/finance/test_finance_simple_m3d2_source_hold.py"
+      - ".github/workflows/financew-simple-m3d2-offline-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test fictional staged review and M3b strict command shape
+        run: node --test tests/finance/test_finance_simple_m3d2_offline_review.mjs
+      - name: Verify no UI or write activation
+        run: python3 -B tests/finance/test_finance_simple_m3d2_source_hold.py

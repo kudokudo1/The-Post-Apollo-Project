@@ -1,0 +1,41 @@
+name: Finance Research M9b multi-citation scratch native smoke
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceResearchInvestigationsPane.qml"
+      - "widgets/FinanceResearchEvidenceCandidatePreviewHost.qml"
+      - "services/finance/FinanceResearchCandidateDraftService.qml"
+      - "services/finance/FinanceResearchScratchEvidenceService.qml"
+      - "scripts/finance/research_candidate_draft_preview.mjs"
+      - "scripts/finance/research_scratch_citation_preview.mjs"
+      - "scripts/finance/verify_research_multi_citation_native_m9b.sh"
+      - "tests/finance/fixtures/M9bResearchMultiCitationNativeShell.qml"
+      - "tests/finance/test_research_m9b_multi_scratch_contract.py"
+      - "tests/finance/test_research_m9_editor_contract.py"
+      - ".github/workflows/finance-research-multi-citation-native-m9b.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-scratch:
+    name: M9b two SEC citations, duplicate refusal and zero-write native acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
+    steps:
+      - name: Install isolated Fedora Quickshell and test dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils \
+            xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Verify two SEC citations in one volatile case, duplicate refusal and no writes
+        run: bash scripts/finance/verify_research_multi_citation_native_m9b.sh

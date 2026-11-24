@@ -114,6 +114,23 @@ ShellRoot {
                     MemoryOperation.busy = false;
                     dial.valueRequested(150);
                     if (!smoke.check(pane.stagedSwappiness === 150 && pane.sample.swappiness === 60, "policy target versus actual")) return;
+                    pane.selectPolicySection(1);
+                    smoke.phase = 6;
+                    return;
+                }
+                if (smoke.phase === 6) {
+                    const priority = smoke.find(pane, "cpuplusPriorityDial");
+                    const priorityRail = smoke.find(pane, "cpuplusPolicyBottomRail");
+                    if (!priority) return;
+                    if (!smoke.check(priorityRail && priorityRail.visible
+                        && Math.abs(priorityRail.mapToItem(pane,0,priorityRail.height).y - pane.height)<2
+                        && !smoke.find(pane,"cpuplusSwappinessDial"), "POL pinned priority navigation")) return;
+                    pane.selectPriorityDevice("/dev/zram0");
+                    if (!smoke.check(pane.stagedPriority === 100 && priority.interactive, "priority observed target")) return;
+                    priority.valueRequested(101);
+                    if (!smoke.check(pane.stagedPriority === 101 && pane.priorityRow.priority === 100
+                        && MemoryOperation.requests === 0, "priority preview only")) return;
+                    pane.selectPolicySection(0);
                     win.width = 220;
                     pane.selectMenu(2);
                     smoke.phase = 2;

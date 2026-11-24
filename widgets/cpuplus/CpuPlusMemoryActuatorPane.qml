@@ -30,6 +30,71 @@ Item {
         initializedTarget = true;
     }
     property int stagedSwappiness: -1
+    property int policySection: 0 // SWAPPINESS / PRIORITY
+    property var priorityBaseline: null
+    property int stagedPriority: -1 // no explicit target for kernel-assigned priorities
+    readonly property var priorityRows: priorityObservations(sample)
+    readonly property var priorityRow: matchingPriorityRow(priorityBaseline, priorityRows)
+    readonly property bool priorityEditable: page === "POL" && policySection === 1
+        && priorityRow !== null && !MemoryOperation.busy
+
+    function priorityObservations(observation) {
+        if (!observation || !Array.isArray(observation.rows)) return [];
+        const rows = [];
+        for (const row of observation.rows) {
+            if (!row || typeof row.name !== "string" || !row.name.length
+                || !Number.isSafeInteger(row.size) || row.size <= 0
+                || !Number.isSafeInteger(row.used) || row.used < 0 || row.used > row.size
+                || !Number.isSafeInteger(row.priority) || row.priority < -32768 || row.priority > 32767
+                || rows.some(entry => entry.name === row.name)) return [];
+            rows.push(row);
+        }
+        return rows;
+    }
+    function matchingPriorityRow(baseline, rows) {
+        if (!baseline) return null;
+        return rows.find(row => row.name === baseline.name && row.size === baseline.size
+            && row.priority === baseline.priority) || null;
+    }
+    function selectPolicySection(index) {
+        if (page !== "POL" || (index !== 0 && index !== 1) || index === policySection) return;
+        policySection = index;
+        scroll.contentY = 0;
+    }
+    function selectPriorityDevice(name) {
+        if (page !== "POL" || policySection !== 1 || !sample || MemoryOperation.busy) return;
+        const row = priorityObservations(sample).find(entry => entry.name === name);
+        if (!row) return;
+        if (matchingPriorityRow(priorityBaseline, [row])) return;
+        priorityBaseline = {name:row.name, size:row.size, priority:row.priority};
+        stagedPriority = row.priority >= 0 ? row.priority : -1;
+    }
+    function reconcilePriority() {
+        // A transient refresh does not erase a preview. A completed observation
+        // that no longer matches its baseline invalidates it. This is not
+        // protected device identity or permission to act.
+        if (priorityBaseline && sample
+                && !matchingPriorityRow(priorityBaseline, priorityObservations(sample))) {
+            priorityBaseline = null;
+            stagedPriority = -1;
+        }
+    }
+    function stagePriority(value) {
+        if (page !== "POL" || policySection !== 1 || !sample || MemoryOperation.busy
+            || !matchingPriorityRow(priorityBaseline, priorityObservations(sample))
+            || !Number.isInteger(value) || value < 0 || value > 32767) return;
+        stagedPriority = value;
+    }
+    function resetPriority() {
+        if (page !== "POL" || policySection !== 1 || !sample || MemoryOperation.busy) return;
+        const row = matchingPriorityRow(priorityBaseline, priorityObservations(sample));
+        if (row) stagedPriority = row.priority >= 0 ? row.priority : -1;
+    }
+    function priorityName(row) {
+        if (row.name === "/var/lib/post-apollo-memory-swap/swapfile") return "BASE NVMe";
+        if (row.name === "/var/lib/post-apollo-memory-extension/swapfile") return "EXTENSION";
+        return row.name;
+    }
     function stageCapacity(value) {
         if (page !== "CAP" || capSection !== 0 || !capacity || MemoryOperation.busy
                 || !Number.isInteger(value) || value < 0 || value > 64 || value % 4 !== 0)
@@ -37,13 +102,14 @@ Item {
         stagedGiB = value;
     }
     function stagePolicy(value) {
-        if (page !== "POL" || !sample || MemoryOperation.busy
+        if (page !== "POL" || policySection !== 0 || !sample || MemoryOperation.busy
                 || !Number.isInteger(value) || value < 0 || value > 200)
             return;
         stagedSwappiness = value;
     }
     onSampleChanged: {
         adoptActual();
+        reconcilePriority();
         if (sample && stagedSwappiness < 0)
             stagedSwappiness = sample.swappiness;
     }
@@ -192,6 +258,29 @@ Item {
                     acceptedButtons: Qt.LeftButton
                     keyboardActivationSignal: "leftClicked"
                     onLeftClicked: root.selectCapSection(index)
+                }
+            }
+        }
+        Row {
+            id: policyBottomRail
+            objectName: "cpuplusPolicyBottomRail"
+            visible: root.page === "POL"
+            height: visible ? 28 : 0
+            width: parent.width
+            spacing: 4
+            Repeater {
+                model: ["SWAPPINESS", "PRIORITY"]
+                delegate: ActionButton {
+                    required property string modelData
+                    required property int index
+                    width: Math.max(0, (policyBottomRail.width - 4) / 2)
+                    height: 28
+                    label: modelData
+                    contentPadding: 2
+                    selected: root.policySection === index
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectPolicySection(index)
                 }
             }
         }
@@ -496,7 +585,7 @@ Item {
                 width: parent.width
                 height: active && item ? item.implicitHeight : 0
                 visible: active
-                active: root.page === "POL"
+                active: root.page === "POL" && root.policySection === 0
                 sourceComponent: Column {
                     spacing: 8
                     GohuText {
@@ -541,7 +630,7 @@ Item {
                             snapContinuousToStep: true
                             options: ["0", "50", "100", "150", "200"]
                             numericReferenceValues: [0, 50, 100, 150, 200]
-                            interactive: root.page === "POL" && root.sample !== null
+                            interactive: root.page === "POL" && root.policySection === 0 && root.sample !== null
                                          && root.stagedSwappiness >= 0 && !MemoryOperation.busy
                             enabled: interactive
                             onValueRequested: function(value) { root.stagePolicy(Math.round(value)); }
@@ -590,6 +679,185 @@ Item {
                         text: "PREVIEW ONLY // APPLY NOT CONNECTED"
                         color: Colors.orange
                         font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+            Loader {
+                width: parent.width
+                height: active && item ? item.implicitHeight : 0
+                active: root.page === "POL" && root.policySection === 1
+                visible: active
+                sourceComponent: Column {
+                    objectName: "cpuplusPriorityPane"
+                    spacing: 6
+                    Row {
+                        width: parent.width
+                        height: 28
+                        spacing: 4
+                        GohuText {
+                            width: Math.max(0, parent.width - priorityRefresh.width - parent.spacing)
+                            height: parent.height
+                            verticalAlignment: Text.AlignVCenter
+                            text: "SWAP PRIORITY"
+                            color: Colors.magenta
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                        }
+                        ActionButton {
+                            id: priorityRefresh
+                            width: 78
+                            height: parent.height
+                            label: "REFRESH"
+                            accentColor: Colors.yellow
+                            idleFillColor: Colors.yellow
+                            idleForegroundColor: Colors.magenta
+                            idleBorderColor: Colors.orange
+                            contentPadding: 2
+                            available: !probe.running
+                            onLeftClicked: root.refresh()
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        visible: root.priorityRows.length === 0
+                        text: root.sample ? "NO VALID ACTIVE DEVICES" : "LIVE DATA UNAVAILABLE"
+                        color: Colors.orange
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    Repeater {
+                        model: root.priorityRows
+                        delegate: ActionButton {
+                            required property var modelData
+                            width: parent.width
+                            height: 30
+                            label: root.priorityName(modelData) + " // " + modelData.priority
+                            labelFontSizeMode: Text.HorizontalFit
+                            contentPadding: 3
+                            selected: root.priorityRow !== null && root.priorityRow.name === modelData.name
+                            available: !MemoryOperation.busy
+                            onLeftClicked: root.selectPriorityDevice(modelData.name)
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: root.priorityRow ? root.priorityRow.name : "SELECT ACTIVE DEVICE"
+                        textFormat: Text.PlainText
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                    Row {
+                        width: parent.width
+                        spacing: 4
+                        Repeater {
+                            model: [
+                                {label:"ACTUAL", value:root.priorityRow ? String(root.priorityRow.priority) : "—", color:Colors.cyan},
+                                {label:"TARGET", value:root.priorityRow && root.stagedPriority >= 0 ? String(root.stagedPriority) : "—", color:Colors.yellow}
+                            ]
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: Math.max(0, (parent.width - 4) / 2)
+                                height: 38
+                                color: Colors.black
+                                border.color: modelData.color
+                                border.width: 1
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 3
+                                    GohuText {
+                                        width: parent.width
+                                        text: modelData.label
+                                        color: Colors.white
+                                        font.pixelSize: 10
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        text: modelData.value
+                                        color: modelData.color
+                                        font.pixelSize: 14
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        visible: root.priorityRow !== null && root.priorityRow.priority < 0
+                        text: "NEGATIVE PRIORITY // KERNEL ASSIGNED"
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    Row {
+                        width: parent.width
+                        height: 160
+                        spacing: 8
+                        SelectorDial {
+                            id: priorityDial
+                            objectName: "cpuplusPriorityDial"
+                            width: 136
+                            height: 160
+                            labelText: "PRIORITY"
+                            selectorMode: "continuous"
+                            minimumValue: 0
+                            maximumValue: 32767
+                            valueStep: 1
+                            valueDecimals: 0
+                            snapContinuousToStep: true
+                            options: ["0", "8K", "16K", "24K", "32767"]
+                            numericReferenceValues: [0, 8192, 16384, 24576, 32767]
+                            currentValue: Math.max(0, root.stagedPriority)
+                            interactive: root.priorityEditable
+                            enabled: interactive
+                            onValueRequested: function(value) { root.stagePriority(Math.round(value)); }
+                        }
+                        Column {
+                            width: Math.max(0, parent.width - priorityDial.width - parent.spacing)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 5
+                            Repeater {
+                                model: [-10, -1, 1, 10]
+                                delegate: ActionButton {
+                                    required property int modelData
+                                    width: parent.width
+                                    height: 24
+                                    label: modelData > 0 ? "+" + modelData : String(modelData)
+                                    contentPadding: 2
+                                    available: root.priorityEditable && root.stagedPriority >= 0
+                                        && root.stagedPriority + modelData >= 0
+                                        && root.stagedPriority + modelData <= 32767
+                                    onLeftClicked: root.stagePriority(root.stagedPriority + modelData)
+                                }
+                            }
+                            ActionButton {
+                                width: parent.width
+                                height: 26
+                                label: root.stagedPriority < 0 ? "SET 0" : "RESET"
+                                contentPadding: 2
+                                available: root.priorityEditable
+                                onLeftClicked: {
+                                    if (root.stagedPriority < 0) root.stagePriority(0);
+                                    else root.resetPriority();
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "PREVIEW ONLY // APPLY NOT CONNECTED"
+                        color: Colors.orange
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Higher priority is preferred for new swap allocation. Equal priorities share allocation. Changing an active device may require safe deactivation."
+                        color: Colors.white
+                        font.pixelSize: 10
                         wrapMode: Text.WordWrap
                     }
                 }

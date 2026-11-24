@@ -33,3 +33,19 @@ VERIFY:
 
 NEXT: independent Nurse 2F review and explicit B3 shared seam agreement.
 No production, native execution, private storage or UI integration.
+
+## M5 // Task-local Workshop composition
+
+WorkshopContextRef binds the original SessionContextRef (including user
+turn and revision), B6 TreeProfile, explicit Workshop and individual
+General/Ready selections. snapshot_with_workshop_in_transaction compares
+original/current host fixture references and recomputes B6 plan selection
+before using the original M2 snapshot function in the same transaction.
+A changed profile or selection refuses even if the new selection would fit.
+No supplied SelectionPlan, sticky inheritance, tool definitions loaded,
+activation, prompt injection or new permissions. Existing M2 optional
+metadata entry point remains unchanged for its established callers; it
+only checks context equality and is not policy evidence. M5 is the stricter
+composed fixture entry point for future host integration, not a replacement
+B3 API. No real adapter availability, authorization or token-fit claim.
+B3 owner and independent review must approve any use in shared execution.

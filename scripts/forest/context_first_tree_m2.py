@@ -9,7 +9,9 @@ import sqlite3
 
 from shared_context_b6r1 import TaskContext
 from session_journal_v0 import ForestSessionJournal, KEY, MAX_BODY, MAX_PAGE
-from capability_registry_b6r2 import SelectionPlan
+from capability_registry_b6r2 import (
+    SelectionPlan, TreeProfile, CapabilityRefusal, plan_selection,
+)
 from ollama_chat_transport import (
     MAX_HISTORY, MAX_MESSAGE_BYTES, MAX_TOTAL_PROMPT_BYTES,
     ChatRefusal, _messages,
@@ -185,6 +187,54 @@ def snapshot_in_transaction(journal, requested, *, current, capability_plan=None
                               capability_plan=capability_plan)
     except sqlite3.Error as exc:
         raise ContextRefusal("STORAGE_REFUSED") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class WorkshopContextRef:
+    """M5 host-owned fixture selection reference, not an activation grant.
+
+    Bind workshop selection to the exact session/user turn as well as the
+    task-scoped profile. No sticky inheritance until host custody is defined.
+    """
+    session: SessionContextRef
+    profile: TreeProfile
+    workshop: str
+    general: tuple[str, ...] = ()
+    ready: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        if (type(self.session) is not SessionContextRef
+                or type(self.profile) is not TreeProfile
+                or self.profile.scope != self.session.context):
+            raise ContextRefusal("WORKSHOP_CONTEXT_MISMATCH")
+        try:
+            plan_selection(self.profile, self.session.context, self.workshop,
+                           general=self.general, ready=self.ready)
+        except CapabilityRefusal as exc:
+            raise ContextRefusal("WORKSHOP_SELECTION_REFUSED") from exc
+
+
+def snapshot_with_workshop_in_transaction(journal, requested, *, current):
+    """Compose B6 selection and M2 snapshot in the existing transaction.
+
+    Compare independent host fixture references including exact profile and
+    selection. Recompute the plan from current policy, never accept a
+    supplied SelectionPlan or carry prior sticky selections. Reference
+    equality does not establish host authority or independent currentness.
+    Metadata stays internal; transport messages remain role/content only.
+    """
+    if (type(requested) is not WorkshopContextRef
+            or type(current) is not WorkshopContextRef
+            or requested != current):
+        raise ContextRefusal("WORKSHOP_REFERENCE_CHANGED")
+    try:
+        plan = plan_selection(current.profile, current.session.context,
+                              current.workshop, general=current.general,
+                              ready=current.ready)
+    except CapabilityRefusal as exc:
+        raise ContextRefusal("WORKSHOP_SELECTION_REFUSED") from exc
+    return snapshot_in_transaction(journal, requested.session,
+                                   current=current.session, capability_plan=plan)
 
 
 def list_open_metadata_fixture(journal, context, *, limit=MAX_PAGE):

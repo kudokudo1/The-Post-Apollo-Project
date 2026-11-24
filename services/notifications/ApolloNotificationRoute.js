@@ -33,6 +33,18 @@ function routeFor(entry) {
         return null;
     }
 
+    if (id === "cpu-plus-diagnostics" && event === "diagnostic-result") {
+        const reportId = ctx.reportId;
+        if (["memory", "inventory", "threads", "census"].indexOf(ctx.reportKind) >= 0
+                && typeof reportId === "string" && reportId.length <= 128
+                && /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*$/.test(reportId)
+                && ctx.origin === "apollo" && ctx.domain === "system"
+                && entry.id === "apollo-cpu-diag-" + reportId)
+            return {widget: "cpu", view: "diagnostics", reportKind: ctx.reportKind,
+                    reportId: reportId};
+        return null;
+    }
+
     if (id === "cpu-plus" && event === "hardware-thermal-limit")
         return { widget: "cpu", mode: "thermal", subMode: "temp" };
     if (id === "cpu-plus-fan-health"

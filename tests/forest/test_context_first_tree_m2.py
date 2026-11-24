@@ -21,7 +21,7 @@ class ContextTests(unittest.TestCase):
         self.addCleanup(self.db.close)
         bootstrap_synthetic(self.db)
         self.journal = ForestSessionJournal(self.db)
-        self.context = TaskContext("fixture-owner", "BRISTLECONE_PINE", None,
+        self.context = TaskContext("fixture-owner", "bristlecone", None,
                                    "task-1", "execution-1", 1, "INTERACTIVE")
         self.sid = self.journal.create_session(
             self.context.principal_key, self.context.tree_key, "Public fixture",
@@ -188,6 +188,19 @@ class ContextTests(unittest.TestCase):
         for limit in (0, 101, True):
             with self.assertRaises(ContextRefusal):
                 list_open_metadata_fixture(self.journal, self.context, limit=limit)
+
+    def test_capability_plan_is_exact_context_metadata(self):
+        plan = plan_selection(bristlecone_reference_profile(self.context),
+                              self.context, "research")
+        snapshot = self.read(capability_plan=plan)
+        self.assertIs(snapshot.capability_plan, plan)
+        self.assertFalse(plan.permission_granted)
+        self.assertEqual(set(snapshot.transport_messages()[0]), {"role", "content"})
+        other = replace(self.context, generation=2)
+        other_plan = plan_selection(bristlecone_reference_profile(other),
+                                    other, "research")
+        with self.assertRaisesRegex(ContextRefusal, "CAPABILITY_CONTEXT_MISMATCH"):
+            self.read(capability_plan=other_plan)
 
     def test_snapshot_does_not_write(self):
         before = self.db.total_changes

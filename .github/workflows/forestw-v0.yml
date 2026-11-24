@@ -8,6 +8,10 @@ on:
       - 'widgets/ForestAutoPolicyPreview.qml'
       - 'widgets/ForestBenchmarkReportView.qml'
       - 'widgets/ForestResourceFitExample.qml'
+      - 'widgets/ForestWorkshopReferenceView.qml'
+      - 'scripts/forest/ui_workshop_reference.py'
+      - 'scripts/forest/capability_registry_b6r2.py'
+      - 'scripts/forest/shared_context_b6r1.py'
       - 'scripts/forest/ui_resource_fit_example.py'
       - 'scripts/forest/resource_governor_p1.py'
       - 'scripts/forest/performance_benchmark_p2b.py'
@@ -29,6 +33,10 @@ on:
       - 'widgets/ForestAutoPolicyPreview.qml'
       - 'widgets/ForestBenchmarkReportView.qml'
       - 'widgets/ForestResourceFitExample.qml'
+      - 'widgets/ForestWorkshopReferenceView.qml'
+      - 'scripts/forest/ui_workshop_reference.py'
+      - 'scripts/forest/capability_registry_b6r2.py'
+      - 'scripts/forest/shared_context_b6r1.py'
       - 'scripts/forest/ui_resource_fit_example.py'
       - 'scripts/forest/resource_governor_p1.py'
       - 'scripts/forest/performance_benchmark_p2b.py'
@@ -66,3 +74,4 @@ jobs:
           python3 tests/forest/test_forest_auto_policy_preview.py
           python3 tests/forest/test_forest_benchmark_report_view.py
           python3 tests/forest/test_forest_resource_fit_example.py
+          python3 tests/forest/test_forest_workshop_reference.py

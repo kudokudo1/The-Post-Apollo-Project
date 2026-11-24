@@ -4,7 +4,7 @@
 var SCHEMA = "post-apollo.forest.performance-capacity.readonly-p2c";
 var MAX_BYTES = 1048576;
 var MAX_GPUS = 8;
-var NO_MODEL = {name:"",installed:false,resident:false,
+var NO_MODEL = {name:"",installed:false,resident:false,matched:false,
                 artifactMiB:"?",residentMiB:"?",vramMiB:"?",calibrated:false};
 var EMPTY = {hostRam:"?",cpuVisible:"?",cpuAffinity:"?",gpuCards:[],
              gpuCount:0,gpuHint:"UNKNOWN",ollamaVersion:"?",model:NO_MODEL};
@@ -25,7 +25,44 @@ function validModelName(name) {
 // Exactly one model selected for this explicit P2C request; NEVER permission.
 // The artifact is installed disk size and resident VRAM is reported usage,
 // NOT a calibrated memory requirement or proof of GPU assignment.
-function selectedRecord(record, requested) {
+// P2C creates selected_model from these two arrays. Validate that claim
+// against the arrays in this SAME response, never by querying another host.
+// They are two observations over time, NOT independently trusted identity.
+function _modelLists(installed, resident, requested) {
+    var known = Object.create(null);
+    var loaded = Object.create(null);
+    for (var i=0;i<installed.length;i++) {
+        var entry=installed[i];
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)
+                || !validModelName(entry.name)
+                || !_count(entry.size_bytes)
+                || known[entry.name] !== undefined)
+            return null;
+        known[entry.name]=entry.size_bytes;
+    }
+    for (var j=0;j<resident.length;j++) {
+        var record=resident[j];
+        if (!record || typeof record !== "object" || Array.isArray(record)
+                || !validModelName(record.model)
+                || !_count(record.size_bytes_reported)
+                || !_optional(record.vram_bytes_reported,false)
+                || !_optional(record.context_length_reported,true)
+                || loaded[record.model] !== undefined)
+            return null;
+        loaded[record.model]={
+            size:record.size_bytes_reported,
+            vram:record.vram_bytes_reported
+        };
+    }
+    return {
+        installed:requested !== "" && known[requested] !== undefined
+            ? known[requested] : null,
+        resident:requested !== "" && loaded[requested] !== undefined
+            ? loaded[requested] : null
+    };
+}
+function selectedRecord(record, requested, lists) {
+    if (!lists) return null;
     if (requested === "")
         return record === null ? NO_MODEL : null;
     if (!record || typeof record !== "object" || Array.isArray(record)
@@ -42,10 +79,19 @@ function selectedRecord(record, requested) {
             || (record.resident
                 ? record.resident_memory_bytes_reported === null
                 : record.resident_memory_bytes_reported !== null
-                    || record.resident_vram_bytes_reported !== null))
+                    || record.resident_vram_bytes_reported !== null)
+            // Selected summary MUST agree exactly with source array entries,
+            // including the null distinction, not merely the Boolean flags.
+            || record.installed !== (lists.installed !== null)
+            || record.resident !== (lists.resident !== null)
+            || record.installed_artifact_bytes_reported !== lists.installed
+            || record.resident_memory_bytes_reported
+                !== (lists.resident === null ? null : lists.resident.size)
+            || record.resident_vram_bytes_reported
+                !== (lists.resident === null ? null : lists.resident.vram))
         return null;
     return {name:requested,installed:record.installed,
-            resident:record.resident,
+            resident:record.resident,matched:true,
             artifactMiB:_mb(record.installed_artifact_bytes_reported),
             residentMiB:_mb(record.resident_memory_bytes_reported),
             vramMiB:_mb(record.resident_vram_bytes_reported),
@@ -106,7 +152,8 @@ function parseSnapshot(raw, requestedModel) {
             || obj.gpu_sysfs_status !== (obj.gpu_devices.length
                                         ? "COUNTERS_OBSERVED" : "UNAVAILABLE"))
         return invalid;
-    var model = selectedRecord(obj.selected_model, requested);
+    var lists = _modelLists(obj.installed_models, obj.resident_models, requested);
+    var model = selectedRecord(obj.selected_model, requested, lists);
     if (model === null) return invalid;
     var rows = [];
     var seen = Object.create(null);

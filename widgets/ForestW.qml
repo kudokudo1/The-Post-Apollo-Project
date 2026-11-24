@@ -997,7 +997,7 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.leftMargin: 7
                     anchors.right: parent.right
-                    anchors.rightMargin: 7
+                    anchors.rightMargin: modelFormSlider.visible ? 53 : 7
                     height: modelPopup.height >= 340 ? 48 : 0
                     visible: height > 0
                     color: Colors.dark
@@ -1051,7 +1051,7 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.leftMargin: 7
                     anchors.right: parent.right
-                    anchors.rightMargin: 7
+                    anchors.rightMargin: modelFormSlider.visible ? 53 : 7
                     clip: true
                     spacing: 5
                     boundsBehavior: Flickable.StopAtBounds
@@ -1266,6 +1266,66 @@ PanelWindow {
                                 }
                             }
                         }
+                    }
+                }
+
+                // The standard vertical SelectorSlider shares the existing
+                // Model Form preference with the direct buttons above. Keep
+                // those buttons available when the compact panel hides the rail.
+                SelectorSlider {
+                    id: modelFormSlider
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    anchors.top: modelEquipmentPanel.bottom
+                    anchors.topMargin: 2
+                    anchors.bottom: popupFoot.top
+                    anchors.bottomMargin: 3
+                    width: 40
+                    // The shared 52px thumb needs genuine travel after its
+                    // fixed 38px top and 26px bottom ruler insets.
+                    visible: root.modelPopupOpen && modelPopup.width >= 320
+                        && modelPopup.height >= 320
+                    selectorProfile: "index"
+                    indexInteraction: "preview-release"
+                    count: 3
+                    optionLabels: ["BIG", "AUTO", "SMALL"]
+                    currentIndex: root.selectedModelForm === "BIG" ? 0
+                        : root.selectedModelForm === "SMALL" ? 2 : 1
+                    showIndexReadout: false
+                    accentColor: root.activeTree.identityColor
+                    handleColor: root.activeTree.identityColor
+                    handleGradientEnabled: true
+                    handleGradientBaseColor: root.activeTree.identityColor
+                    handleGradientAccentColor: root.activeTree.gradientAccentColor
+                    handleGradientTopRight: root.activeTree.gradientTopRight
+                    handleGlowColor: root.activeTree.spiritualIdleGlowColor
+                    activityGlowColor: root.activeTree.iconIdleGlowColor
+                    enabledSlider: root.menuOpen && root.modelPopupOpen && visible
+                    Accessible.name: "Forest model form, Big, Auto or Small"
+                    Accessible.description: "Local model selection only. Auto routing is not connected."
+                    onVisibleChanged: {
+                        if (!visible)
+                            cancelIndexPreview();
+                    }
+                    onIndexRequested: function(index) {
+                        if (enabledSlider && Number.isInteger(index) && index >= 0 && index < 3)
+                            root.chooseModelForm(optionLabels[index]);
+                    }
+                    GohuText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: parent.top
+                        anchors.topMargin: 8
+                        text: "FORM"
+                        font.pixelSize: 8
+                        color: modelFormSlider.accentColor
+                    }
+                    GohuText {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 8
+                        text: root.selectedModelForm
+                        font.pixelSize: 9
+                        color: modelFormSlider.accentColor
                     }
                 }
 

@@ -54,3 +54,33 @@ Caller must provide actual independent observations and an operation-state witne
 no protected file identity collection or root lock witness is implemented here.
 Only bounded reduction advisory is supported. Expansion and other operations are
 not inferred from a missing reduction result. The storage schema stays v1.
+
+## M1c.3c.1 // caller-driven condition monitor
+
+Monitor is a synchronous in-process coordination core, with no thread, timer,
+shell process or host writer. The owner calls tick() on queue mutation/wake
+and schedules the next call only when next_check_monotonic_ms is non-null.
+No idle poller; the owner must wake it on external queue changes. A serialized
+caller and bounded observation adapter are required. The monitor rechecks the
+pending record after collection, discards results if the request changed, and
+stops scheduled checks on expiry, clock failure or storage failure until wake.
+No automatic expiry write or durable READY.
+
+The injected observe(record, observer_id) returns an advisory v1 sample. It
+must independently observe current boot, actual source identity, operation /
+recovery state and DOC 1 preflight. Never copy the request's historical source
+into a new sample or infer IDLE from process exit. The public helper preflight
+returns capacity/pressure evidence, not a protected file identity or lock /
+recovery witness. Root-owned private swap directories are not assumed readable.
+Until that interface is coordinated, no native provider or shell registration
+is included. Reuse DOC 3/1 observations rather than adding a periodic process.
+
+Explicit policy: interval_ms, max_age_ms, max_gap_ms, stable_ms. No production
+values selected. Fresh ordered samples must span stable_ms with bounded gaps.
+Sampled continuity is not proof of continuous safety. Restart, request change,
+blocker, gap or error breaks continuity. Host must invalidate displayed READY
+at the returned monotonic deadline, on queue mutation, or observer loss.
+Last check is an observation attempt, not a verified adjustment. Transition
+is in-memory edge detection only, not durable event identity or notification
+deduplication. All results are can_execute=false. Native testing and the
+operator UI/Notification Hub/protected integration remain outstanding.

@@ -192,7 +192,8 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
             "read_current_trust_snapshot", "prepare_generate",
             "acquire_commit_permit", "lookup_terminal_outcome",
             "settle_terminal_receipt", "request_revocation",
-            "authorize_read_session", "authorize_tool_execution",
+            "authorize_read_session", "authorize_list_sessions",
+            "authorize_disclose_session_titles", "authorize_tool_execution",
             "production_admission",
         )
         for obj in (self.local, self.protected):
@@ -214,6 +215,94 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
         fresh = self.ref()
         self.assert_denied(fresh)
         self.assertFalse(self.protected.status()["productionAuthority"])
+
+
+    def test_21_listing_and_title_entitlements_have_distinct_refusals(self):
+        expected = (
+            ("authorize_read_session", "READ_SESSION_SEPARATE_PROTECTED_POLICY_REQUIRED"),
+            ("authorize_list_sessions", "LIST_SESSIONS_SEPARATE_PROTECTED_POLICY_REQUIRED"),
+            ("authorize_disclose_session_titles", "SESSION_TITLES_SEPARATE_PROTECTED_CONSENT_REQUIRED"),
+        )
+        for authority in (self.local, self.protected):
+            for method, code in expected:
+                with self.subTest(mode=authority.status()["requiredMode"], action=method):
+                    with self.assertRaisesRegex(C.ForestC5Hold, code):
+                        getattr(authority, method)()
+
+    def test_22_forged_single_session_read_cannot_upgrade_to_enumeration(self):
+        forged = {
+            "action": "READ_SESSION", "requestId": "r_0123456789abcdef",
+            "sessionId": "secretSession", "authenticated": True,
+            "approved": True, "permissionGranted": True,
+            "safeActions": ["LIST_SESSIONS"],
+        }
+        for authority in (self.local, self.protected):
+            with self.assertRaisesRegex(
+                C.ForestC5Hold, "LIST_SESSIONS_SEPARATE_PROTECTED_POLICY_REQUIRED"
+            ) as refusal:
+                authority.authorize_list_sessions(forged)
+            self.assertNotIn("secretSession", str(refusal.exception))
+            self.assertFalse(authority.status()["forestListSessionsPermissionGranted"])
+
+    def test_23_forged_listing_grant_cannot_upgrade_to_private_title_read(self):
+        forged = {
+            "action": "LIST_SESSIONS", "treeKey": "CHERRY",
+            "generation": 99, "requestId": "r_0123456789abcdef",
+            "sourceAuthenticated": True, "permissionGranted": True,
+            "canReadSession": True, "mayDiscloseTitles": True,
+            "private_title": "SYNTHETIC_PRIVATE_SESSION_TITLE",
+        }
+        for authority in (self.local, self.protected):
+            with self.assertRaisesRegex(
+                C.ForestC5Hold, "SESSION_TITLES_SEPARATE_PROTECTED_CONSENT_REQUIRED"
+            ) as refusal:
+                authority.authorize_disclose_session_titles(forged)
+            self.assertNotIn(forged["private_title"], str(refusal.exception))
+            self.assertFalse(authority.status()["forestPrivateTitleDisclosureGranted"])
+
+    def test_24_valid_looking_forestw_metadata_never_sets_title_authority(self):
+        fake = {
+            "schema": "postapollo.forest.list-sessions-ui.v1",
+            "action": "LIST_SESSIONS", "status": "READ_ONLY", "complete": True,
+            "requestId": "r_0123456789abcdef", "treeKey": "CHERRY",
+            "generation": 4, "sessions": [{
+                "session_id": "sessionA", "tree_key": "CHERRY",
+                "title": "SYNTHETIC_PRIVATE_SESSION_TITLE",
+                "state": "OPEN", "revision": 3,
+                "created_at_ms": 1000, "updated_at_ms": 1001,
+            }],
+        }
+        for authority in (self.local, self.protected):
+            with self.assertRaises(C.ForestC5Hold) as result:
+                authority.authorize_list_sessions(fake, verified_peer=True)
+            with self.assertRaises(C.ForestC5Hold) as result2:
+                authority.authorize_disclose_session_titles(
+                    fake, current_consent=True, authenticated_provider=True
+                )
+            for refusal in (result.exception, result2.exception):
+                self.assertNotIn(fake["sessions"][0]["title"], str(refusal))
+            self.assert_denied(authority.status())
+
+    def test_25_diagnostic_result_mutation_does_not_promote_list_or_titles(self):
+        out = self.ref()
+        out["forestListSessionsPermissionGranted"] = True
+        out["forestPrivateTitleDisclosureGranted"] = True
+        out["safeActions"].extend(["LIST_SESSIONS", "DISCLOSE_TITLES"])
+        for authority in (self.local, self.protected):
+            fresh = authority.status()
+            self.assert_denied(fresh)
+            for name in ("authorize_list_sessions",
+                         "authorize_disclose_session_titles"):
+                with self.assertRaises(C.ForestC5Hold):
+                    getattr(authority, name)(out)
+
+    def test_26_global_list_and_title_authority_flags_are_immutable(self):
+        for name in ("forestListSessionsPermissionGranted",
+                     "forestPrivateTitleDisclosureGranted"):
+            with self.subTest(name=name):
+                self.assertFalse(C.NO_AUTHORITY[name])
+                with self.assertRaises(TypeError):
+                    C.NO_AUTHORITY[name] = True
 
 
 if __name__ == "__main__":

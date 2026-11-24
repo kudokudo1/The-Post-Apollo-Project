@@ -4,7 +4,7 @@ import Quickshell.Io
 import qs.services.memory
 import "../../components"
 
-// Fixed argv; separate terminal lifetime. Installed helper validates and confirms.
+// Native system authorization; installed helper validates all privileged operations.
 Column {
     id: control
     required property int stagedGiB
@@ -15,6 +15,7 @@ Column {
     property bool gotExit: false
     property bool exitOk: false
     property bool armed: false
+    property bool persistArmed: false
     property string feedback: ""
     readonly property string helperPath: "/usr/local/sbin/post-apollo-memory-add-swap"
     readonly property bool observedActive: sample !== null && sample.rows.some(
@@ -36,6 +37,7 @@ Column {
     function checkHost() {
         if (check.running) return;
         armed = false;
+        persistArmed = false;
         host = null;
         pendingHost = null;
         gotOutput = false;
@@ -120,8 +122,40 @@ Column {
         onLeftClicked: MemoryOperation.request("verify", 0)
     }
     GohuText {
+        visible: control.observedActive
         width: parent.width
-        text: MemoryOperation.feedback + "\nONE-TIME ADD ONLY // NO PERSISTENCE OR RESIZE"
+        text: "BOOT POLICY // " + (!control.host || control.host.persistenceVersion !== 1
+            ? "HELPER UPDATE REQUIRED"
+            : control.host.persistence === "enabled" ? "ENABLED // REBOOT VERIFICATION PENDING"
+            : control.host.persistence === "off" ? "TEMPORARY // NOT ENABLED"
+            : "CHECK CONFIGURATION // " + String(control.host.persistence))
+        color: control.host && control.host.persistence === "enabled" ? Colors.cyan : Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+    ActionButton {
+        visible: control.observedActive
+        width: parent.width
+        height: 34
+        label: control.persistArmed ? "CONFIRM // ENABLE ON BOOT" : "KEEP AFTER REBOOT"
+        available: control.observedActive && control.nativeReady && control.host.persistenceVersion === 1
+            && control.host.persistence === "off" && !MemoryOperation.busy
+        onLeftClicked: {
+            if (!control.persistArmed) { control.persistArmed = true; return; }
+            control.persistArmed = false;
+            MemoryOperation.request("persist", 0);
+        }
+    }
+    ActionButton {
+        visible: control.persistArmed
+        width: parent.width
+        height: 30
+        label: "CANCEL BOOT CHANGE"
+        onLeftClicked: control.persistArmed = false
+    }
+    GohuText {
+        width: parent.width
+        text: MemoryOperation.feedback + "\nNO SWAP REMOVAL OR RESIZE"
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

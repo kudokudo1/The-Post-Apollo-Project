@@ -235,3 +235,6 @@ await import("./test_market_m41_research_views.mjs");
 
 // M42: bottom navigation and compact control disclosure.
 await import("./test_market_m42_compact_navigation.mjs");
+
+// M43: retained global-provider history in Stocks.
+await import("./test_market_m43_global_handoff.mjs");

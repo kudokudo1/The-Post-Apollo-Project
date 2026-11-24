@@ -69,16 +69,18 @@ def _candidate(candidate_wire: object, original_v1_intent_wire: object,
     _integer(now_ms, "CURRENT_TIME", minimum=1)
     try:
         original, original_digest = V._intent(original_v1_intent_wire)
-    except (V.V1Hold, TypeError) as exc:
-        raise DisclosureHold(
-            "FOREST_C5_PROVISIONAL_DISCLOSURE_HOLD // INVALID_ORIGINAL_COMMIT_INTENT"
-        ) from exc
+    except (V.V1Hold, TypeError):
+        original = None
+    # Raise after the handler so decoder exceptions cannot escape as causes
+    # or implicit contexts (JSONDecodeError.doc / UnicodeError.object).
+    if original is None:
+        _hold("INVALID_ORIGINAL_COMMIT_INTENT")
     try:
         candidate = S._parse_exact(candidate_wire, FIELDS)
-    except S.EvidenceHold as exc:
-        raise DisclosureHold(
-            "FOREST_C5_PROVISIONAL_DISCLOSURE_HOLD // INVALID_CANDIDATE_WIRE"
-        ) from exc
+    except S.EvidenceHold:
+        candidate = None
+    if candidate is None:
+        _hold("INVALID_CANDIDATE_WIRE")
     if (candidate["schema"] != SCHEMA or candidate["audience"] != AUDIENCE
             or candidate["phase"] != PHASE or candidate["action"] != PHASE):
         _hold("WRONG_DISCLOSURE_DOMAIN_OR_ACTION")
@@ -163,12 +165,16 @@ def block_provisional_delta(
             event["event"] != "DELTA" or event["provisional"] is not True or
             type(event["text"]) is not str or not event["text"]):
         _hold("ONLY_UNTRUSTED_PROVISIONAL_DELTA_IS_INSPECTABLE")
+    # Every valid UTF-8 code point occupies at least one byte. Reject
+    # obviously oversized strings before allocating their encoded copy.
+    if len(event["text"]) > MAX_CANDIDATE_BYTES:
+        _hold("DELTA_EXCEEDS_ABSOLUTE_SOURCE_CAP")
     try:
         size = len(event["text"].encode("utf-8"))
-    except UnicodeError as exc:
-        raise DisclosureHold(
-            "FOREST_C5_PROVISIONAL_DISCLOSURE_HOLD // INVALID_DELTA_ENCODING"
-        ) from exc
+    except UnicodeError:
+        size = None
+    if size is None:
+        _hold("INVALID_DELTA_ENCODING")
     if size > MAX_CANDIDATE_BYTES:
         _hold("DELTA_EXCEEDS_ABSOLUTE_SOURCE_CAP")
     # Even a valid candidate does not establish authentication or enforce

@@ -10,9 +10,19 @@ spec = importlib.util.spec_from_loader(loader.name, loader)
 m = importlib.util.module_from_spec(spec)
 loader.exec_module(m)
 
-GOOD = {"candidate": True, "maximumGiB": 64}
+GOOD = {"candidate": True, "maximumGiB": 64, "mountpoint": "/var"}
 
 class SwapAddTests(unittest.TestCase):
+    def test_silverblue_mount(self):
+        with patch.object(m, "run", return_value='{"filesystems":[{"target":"/var","fstype":"btrfs"}]}') as run:
+            self.assertEqual(m.mount_info(), ("/var", "btrfs"))
+            run.assert_called_once_with("/usr/bin/findmnt", "--json", "--target", "/var/lib", "--output", "TARGET,FSTYPE")
+
+    def test_unexpected_mount_refused(self):
+        for raw in ('{"filesystems":[]}', '{"filesystems":[{"target":"/home","fstype":"btrfs"}]}'):
+            with patch.object(m, "run", return_value=raw), self.assertRaises(RuntimeError):
+                m.mount_info()
+
     def test_size_choices(self):
         for size in range(4, 65, 4):
             self.assertEqual(m.parse_size(str(size)), size)
@@ -56,12 +66,13 @@ class SwapAddTests(unittest.TestCase):
         with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run", return_value="Total devices 2") as run:
             with self.assertRaises(RuntimeError):
                 m.allocate(16)
-            run.assert_called_once_with("/usr/bin/btrfs", "filesystem", "show", "--raw", "/var/lib")
+            run.assert_called_once_with("/usr/bin/btrfs", "filesystem", "show", "--raw", "/var")
 
     def test_positive_exact_argv_and_readback(self):
         with patch.object(m.os, "geteuid", return_value=0), patch.object(m.sys.stdin, "isatty", return_value=True), patch.object(m, "status", return_value=GOOD), patch("builtins.input", return_value="ADD 16"), patch.object(m, "run", return_value="Total devices 1") as run, patch.object(m.os, "umask"), patch.object(Path, "chmod"), patch.object(m, "active_swap", return_value={"sizeKiB": 16 * 1024**2 - 4, "priority": 10}):
             m.allocate(16)
             self.assertEqual(run.call_count, 5)
+            self.assertEqual(run.call_args_list[0].args, ("/usr/bin/btrfs", "filesystem", "show", "--raw", "/var"))
             self.assertEqual(run.call_args_list[-1].args, ("/usr/sbin/swapon", "--priority", "10", "--", str(m.SWAPFILE)))
 
     def test_failed_readback_not_success(self):

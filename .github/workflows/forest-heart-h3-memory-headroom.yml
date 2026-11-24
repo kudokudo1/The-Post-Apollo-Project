@@ -1,0 +1,24 @@
+name: Forest Heart H3 memory headroom CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/heart_memory_headroom_h3.py'
+      - 'scripts/forest/HEART_MEMORY_HEADROOM_H3.md'
+      - 'scripts/forest/cgroup_observation_i5.py'
+      - 'scripts/forest/performance_snapshot_p0.py'
+      - 'tests/forest/test_heart_memory_headroom_h3.py'
+      - '.github/workflows/forest-heart-h3-memory-headroom.yml'
+permissions:
+  contents: read
+jobs:
+  headroom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_heart_memory_headroom_h3.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_cgroup_observation_i5.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - run: python3 -m py_compile scripts/forest/heart_memory_headroom_h3.py tests/forest/test_heart_memory_headroom_h3.py

@@ -33,11 +33,11 @@ function setup({gate=true,oldGate=false}={}){
   writeFileSync(ledger,JSON.stringify({
     events:[],accounts:[{id:"fictional-checking",offbudget:false,closed:false}],
     budget:{toBudget:12000,categoryGroups:[
-      {is_income:false,categories:[
-        {id:"fictional-groceries",name:"Groceries",budgeted:10000,
+      {is_income:false,hidden:false,categories:[
+        {id:"fictional-groceries",name:"Groceries",hidden:false,budgeted:10000,
          balance:7500,spent:-2500}
       ]},
-      {is_income:true,categories:[
+      {is_income:true,hidden:false,categories:[
         {id:"fictional-income",name:"Income",budgeted:0,balance:0,spent:0}
       ]}
     ]},

@@ -14,6 +14,7 @@ Item {
         && capacity.status === "OBSERVED"
         && capacity.requestedModel === selectedModelName
         && capacity.data.model.name === selectedModelName
+        && capacity.data.model.matched === true
     readonly property string snapshotStatus: capacity.status
     readonly property bool checking: capacity.scanning
     readonly property var snapshot: capacity.data
@@ -134,6 +135,16 @@ Item {
                     elide: Text.ElideRight
                     color: Colors.cyan
                 }
+            }
+            GohuText {
+                width: parent.width
+                text: hardware.currentModelObservation
+                    ? "P2C TAGS/PS CROSS-CHECK // MATCH (ONE RESPONSE)"
+                    : "P2C MODEL EVIDENCE // UNCHECKED OR REFUSED"
+                textFormat: Text.PlainText
+                font.pixelSize: 9
+                color: hardware.currentModelObservation ? Colors.cyan : Colors.orange
+                elide: Text.ElideRight
             }
             GohuText {
                 width: parent.width

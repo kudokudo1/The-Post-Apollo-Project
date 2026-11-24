@@ -26,11 +26,11 @@ Scope {
             feedback = "AN AUTHORIZATION REQUEST IS ALREADY ACTIVE";
             return;
         }
-        if (action !== "verify" && action !== "persist" && (action !== "add" || !Number.isInteger(size)
+        if (action !== "verify" && action !== "persist" && ((action !== "add" && action !== "expand") || !Number.isInteger(size)
                 || size < 4 || size > 64 || size % 4 !== 0))
             return;
         kind = action;
-        requestedGiB = action === "add" ? size : 0;
+        requestedGiB = action === "add" || action === "expand" ? size : 0;
         gotOutput = false;
         gotExit = false;
         exitOk = false;
@@ -53,6 +53,7 @@ Scope {
         feedback = "AUTHENTICATE // WAIT FOR SYSTEM RESULT";
         const args = ["/usr/bin/pkexec", "--disable-internal-agent", helperPath];
         if (kind === "add") args.push("add-authorized", String(requestedGiB));
+        else if (kind === "expand") args.push("expand-authorized", String(requestedGiB));
         else if (kind === "persist") args.push("persist-authorized");
         else args.push("verify-authorized");
         operation.exec(args);
@@ -70,7 +71,15 @@ Scope {
         let verified = false;
         try {
             const line = output.trim().split("\n").pop();
-            if (kind === "persist") {
+            if (kind === "expand") {
+                const result = JSON.parse(line.replace(/^VERIFIED EXPANSION: /, ""));
+                verified = line.indexOf("VERIFIED EXPANSION: ") === 0
+                    && Number.isSafeInteger(result.sizeKiB)
+                    && result.sizeKiB <= requestedGiB * 1048576
+                    && result.sizeKiB >= requestedGiB * 1048576 - 2048
+                    && result.basePriority === 10 && result.extensionPriority === 9
+                    && result.temporary === true;
+            } else if (kind === "persist") {
                 const result = JSON.parse(line.replace(/^VERIFIED PERSISTENCE: /, ""));
                 verified = line.indexOf("VERIFIED PERSISTENCE: ") === 0 && result.enabled === true;
             } else {
@@ -84,6 +93,7 @@ Scope {
         } catch (e) {}
         feedback = exitOk && verified
             ? (kind === "persist" ? "BOOT ENABLEMENT VERIFIED // REBOOT TEST PENDING"
+                : kind === "expand" ? "EXPANSION VERIFIED // TEMPORARY UNTIL REBOOT"
                 : "VERIFIED ACTIVE // REFRESHING KERNEL SWAP")
             : "NOT VERIFIED // CHECK HOST AND KERNEL SWAP; NO AUTO RETRY";
         busy = false;

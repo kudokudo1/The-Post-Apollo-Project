@@ -1,0 +1,53 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import vm from "node:vm";
+const js=readFileSync(new URL("../../widgets/FinanceStockRangeAnalysisPolicy.js",import.meta.url),"utf8");
+const qml=readFileSync(new URL("../../widgets/FinanceStockHistoryPane.qml",import.meta.url),"utf8");
+const {normalizedIntervalChart:chart,normalizedStepAtX:pick,inspectNormalizedStep:inspect}=vm.runInNewContext(js+"\n({normalizedIntervalChart,normalizedStepAtX,inspectNormalizedStep})");
+const bars=[100,110,121,200,180,160,140].map((price,i)=>Object.freeze({date:"2026-11-"+String(i+2).padStart(2,"0"),price}));
+Object.freeze(bars);
+const s=Object.freeze({schemaVersion:1,source:"eodhd-eod",readOnly:true,cik:"0000320193",symbol:"AAPL.US",priceBasis:"CLOSE",from:"2026-11-01",to:"2026-11-20",bars,first:{...bars[0]},last:{...bars.at(-1)}});
+const p=chart(s,0,2,3,6);
+assert.equal(pick(p,301,0),0);
+assert.equal(pick(p,301,101),1);
+assert.equal(pick(p,301,149),1);
+assert.equal(pick(p,301,150),2);
+assert.equal(pick(p,301,300),3);
+assert.equal(pick(p,601,400),2);
+for(const x of [-1,301,NaN,Infinity])assert.equal(pick(p,301,x),-1);
+assert.equal(pick(p,4,1),-1);
+assert.equal(pick(null,301,1),-1);
+const zero=inspect(p,0);
+assert.equal(zero.first.value,100);
+assert.equal(zero.second.value,100);
+assert.equal(zero.gapPoints,0);
+assert.equal(zero.sharedObservation,true);
+const mid=inspect(p,1);
+assert.ok(Math.abs(mid.first.value-110)<1e-9);
+assert.ok(Math.abs(mid.second.value-90)<1e-9);
+assert.ok(Math.abs(mid.gapPoints+20)<1e-9);
+assert.equal(mid.first.date,"2026-11-03");
+assert.equal(mid.second.date,"2026-11-06");
+assert.ok(Math.abs(mid.first.changePct-10)<1e-9);
+const end=inspect(p,3);
+assert.equal(end.first,null);
+assert.equal(end.second.value,70);
+assert.equal(end.gapPoints,null);
+assert.equal(end.sharedObservation,false);
+assert.equal(inspect(chart(s,3,6,0,2),3).second,null);
+assert.deepEqual(JSON.parse(JSON.stringify(inspect(chart(s,2,0,6,3),1))),JSON.parse(JSON.stringify(mid)));
+mid.first.value=0;
+assert.ok(Math.abs(p.first[1].value-110)<1e-9);
+for(const x of [-1,4,1.5,NaN,Infinity,"1",null])assert.equal(inspect(p,x),null);
+assert.equal(inspect({...p,source:"other"},1),null);
+assert.equal(inspect({...p,readOnly:false},1),null);
+assert.equal(inspect({...p,first:[p.first[0],null,p.first[2]]},1),null);
+assert.equal(inspect({...p,second:[...p.second.slice(0,3),{step:3,date:"bad",value:70}]},3),null);
+for(const token of ["onNormalizedComparisonChanged: normalizedSelectedStep = -1","onStepDetailChanged: requestPaint()",
+    'objectName: "marketNormalizedStepPicker"','objectName: "marketNormalizedStepDetail"',
+    "RangeAnalysisPolicy.normalizedStepAtX(","step === stocks.normalizedSelectedStep ? -1 : step",
+    "N/A // INTERVAL ALREADY ENDED","N/A // NO SHARED OBSERVATION",
+    "SAME STEP, NOT NECESSARILY SAME DATE","mark(selected.first","mark(selected.second"])assert.ok(qml.includes(token),token);
+const part=qml.slice(qml.indexOf('objectName: "marketNormalizedIntervalChart"'),qml.indexOf('id: openSelectedInDay'));
+for(const forbidden of ["fetch(","reserve(","stockFeed.refresh(","Process {","writeFile("])assert.ok(!part.includes(forbidden),forbidden);
+console.log("Finance Market M35 normalized shared-step selection, actual dates, unequal endpoints and no new request: PASS");

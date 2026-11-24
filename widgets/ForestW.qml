@@ -1094,7 +1094,7 @@ PanelWindow {
                         text: root.selectedModelProfile.state === "LOADED"
                             ? ("SIZE " + root.selectedModelProfile.sizeMiB
                                 + " MiB / VRAM REP " + root.selectedModelProfile.vramMiB
-                                + " MiB / CTX " + root.selectedModelProfile.context)
+                                + " MiB / CTX REP " + root.selectedModelProfile.context)
                             : root.selectedModelProfile.state === "NOT_LOADED"
                                 ? "NOT LOADED // NO RESIDENT METRICS"
                                 : "P0 STATUS UNKNOWN // SCAN TO UPDATE"
@@ -1126,6 +1126,8 @@ PanelWindow {
                         property string modelName: String(modelData.name || "")
                         readonly property var diskProfile:
                             InventoryPolicy.diskProfile(root.modelDiskComparison, modelName)
+                        readonly property var contextProfile: ResidencyPolicy.modelProfile(
+                            modelResidency.status, modelResidency.records, modelName)
                         width: modelList.width
                         height: 82
                         color: root.selectedLocalModel === modelName ? Colors.dark : Colors.black
@@ -1239,6 +1241,7 @@ PanelWindow {
                             height: 12
                             text: "DISK REP // " + modelEntry.diskProfile.label
                                 + (modelEntry.diskProfile.comparable ? " / REL MAX" : "")
+                                + " / CTX REP " + modelEntry.contextProfile.context
                             textFormat: Text.PlainText
                             elide: Text.ElideRight
                             font.pixelSize: 9

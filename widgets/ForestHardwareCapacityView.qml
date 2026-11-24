@@ -2,7 +2,7 @@ import QtQuick
 import "../components"
 import "../services/forest"
 
-// Read-only P2C hardware view inside Forest's existing model popup.
+// Read-only P2C hardware view inside Forest's independent diagnostics popup.
 // CHECK is an explicit local diagnostic, NOT a model readiness/admission gate.
 // This view does not change the shared P0 source for header/model LIVE badges.
 Item {
@@ -15,6 +15,8 @@ Item {
         && capacity.requestedModel === selectedModelName
         && capacity.data.model.name === selectedModelName
         && capacity.data.model.matched === true
+    readonly property var memoryPlacement: currentModelObservation
+        ? capacity.data.model.placement : {state:"UNKNOWN",share:null,label:"?"}
     readonly property string snapshotStatus: capacity.status
     readonly property string lastObservedLocalTime: capacity.lastObservedLocalTime
     readonly property bool checking: capacity.scanning
@@ -148,6 +150,71 @@ Item {
                 font.pixelSize: 9
                 color: hardware.currentModelObservation ? Colors.cyan : Colors.orange
                 elide: Text.ElideRight
+            }
+            Rectangle {
+                width: parent.width
+                height: placementColumn.implicitHeight + 12
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                Column {
+                    id: placementColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    spacing: 4
+                    GohuText {
+                        width: parent.width
+                        text: "MODEL MEMORY // REPORTED VRAM SHARE"
+                        font.pixelSize: 10
+                        color: Colors.magenta
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: hardware.memoryPlacement.state === "NOT_RESIDENT"
+                            ? "NOT RESIDENT // NO SHARE"
+                            : hardware.memoryPlacement.share === null
+                                ? "SHARE UNKNOWN // INSUFFICIENT COUNTERS"
+                                : "VRAM / REPORTED RESIDENT BYTES // " + hardware.memoryPlacement.label
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                        wrapMode: Text.WordWrap
+                    }
+                    Rectangle {
+                        id: placementTrack
+                        width: parent.width
+                        height: 8
+                        visible: hardware.memoryPlacement.share !== null
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 1
+                            width: Math.max(0, placementTrack.width - 2)
+                                * (hardware.memoryPlacement.share === null ? 0 : hardware.memoryPlacement.share)
+                            color: Colors.cyan
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "CPU/GPU EXECUTION SHARE // UNKNOWN"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "MEMORY COUNTERS ONLY // NOT GPU UTILIZATION OR HOST RAM SHARE"
+                        font.pixelSize: 9
+                        color: Colors.orange
+                        wrapMode: Text.WordWrap
+                    }
+                }
             }
             GohuText {
                 width: parent.width

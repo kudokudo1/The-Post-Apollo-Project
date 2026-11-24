@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Heart H3: read-only Linux hierarchy memory headroom observations.
+
+Not an admission measurement: selected cgroup is not verified Ollama;
+memory.current and MemAvailable are sampled estimates, not reservations.
+"""
+import argparse
+from contextlib import ExitStack
+from dataclasses import dataclass
+import json
+import os
+import sys
+import time
+
+import cgroup_observation_i5 as I5
+from performance_snapshot_p0 import _host_memory_available_mib
+
+SCHEMA = "post-apollo.forest.heart-memory-headroom.h3"
+MAX_WINDOW_NS = 1_000_000_000
+_MIB = 1024 * 1024
+_COUNTERS = ("memory.current", "memory.max", "memory.high")
+
+
+@dataclass(frozen=True, slots=True)
+class Level:
+    charged: int
+    hard: int | str
+    high: int | str
+
+
+def _read_level(fd):
+    values = []
+    for name in _COUNTERS:
+        counter = os.open(name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=fd)
+        try:
+            values.append(I5._scalar(I5._read_fd(counter, 64), limit=name != "memory.current"))
+        finally:
+            os.close(counter)
+    return Level(*values)
+
+
+def _summarize(first, second, host_first, host_second):
+    if not first or len(first) != len(second):
+        raise I5.CgroupRefusal("INCOMPLETE_HIERARCHY")
+    if any((a.hard, a.high) != (b.hard, b.high) for a, b in zip(first, second)):
+        raise I5.CgroupRefusal("MEMORY_LIMIT_CHANGED")
+    if any(type(x) is not int or not 0 <= x <= I5.MAX_NUMBER // _MIB
+           for x in (host_first, host_second)):
+        raise I5.CgroupRefusal("HOST_MEMORY_UNAVAILABLE")
+    hard, high = [], []
+    for a, b in zip(first, second):
+        used = max(a.charged, b.charged)
+        if type(a.hard) is int:
+            hard.append(max(0, a.hard - used))
+        if type(a.high) is int:
+            high.append(max(0, a.high - used))
+    host = min(host_first, host_second)
+    hard_min = min(hard) if hard else None
+    high_min = min(high) if high else None
+    # Round DOWN before comparing against available MiB. high is a
+    # throttling threshold, not a hard limit; use it conservatively.
+    ceiling = min([host] + [x // _MIB for x in (hard_min, high_min) if x is not None])
+    return {
+        "visible_nonroot_levels_sampled": len(first),
+        "host_available_mib_sampled_min": host,
+        "visible_hard_limit_headroom_mib": None if hard_min is None else hard_min // _MIB,
+        "visible_high_threshold_headroom_mib": None if high_min is None else high_min // _MIB,
+        "finite_hard_limit_levels": len(hard),
+        "finite_high_threshold_levels": len(high),
+        "sampled_memory_headroom_hint_mib": ceiling,
+    }
+
+
+def _base():
+    return {
+        "schema": SCHEMA,
+        "measurement_scope": "EXPLICIT_VISIBLE_CGROUP_HIERARCHY_AND_HOST",
+        "runtime_identity_verified": False,
+        "complete_host_hierarchy_verified": False,
+        "atomic_snapshot": False,
+        "allocatable_memory_established": False,
+        "resource_requirements_established": False,
+        "accelerator_availability_established": False,
+        "cpu_availability_established": False,
+        "resource_reserved": False,
+        "safe_to_start_inference": False,
+        "permission_granted": False,
+        "production_authority": False,
+        "safe_actions": [],
+    }
+
+
+def observe(path):
+    parts = I5._parts(path)
+    if sys.platform != "linux":
+        raise I5.CgroupRefusal("LINUX_REQUIRED")
+    try:
+        started = time.monotonic_ns()
+        mount = I5._mount()
+        # Hold every non-root ancestor fd open through both observations.
+        # cgroup-v2 root has no memory.max/high; host availability is
+        # separately sampled, not a claim that hidden ancestors are absent.
+        with ExitStack() as stack:
+            fds = []
+            for i in range(1, len(parts) + 1):
+                fd = I5._open_group(parts[:i])
+                stack.callback(os.close, fd)
+                fds.append(fd)
+            identities = tuple(I5._identity(fd) for fd in fds)
+            host_first = _host_memory_available_mib()
+            first = tuple(_read_level(fd) for fd in fds)
+            second = tuple(_read_level(fd) for fd in reversed(fds))[::-1]
+            host_second = _host_memory_available_mib()
+            for i, original in enumerate(identities, 1):
+                check = I5._open_group(parts[:i])
+                try:
+                    if I5._identity(check) != original:
+                        raise I5.CgroupRefusal("CGROUP_SCOPE_CHANGED")
+                finally:
+                    os.close(check)
+            if I5._mount() != mount:
+                raise I5.CgroupRefusal("CGROUP_SCOPE_CHANGED")
+            elapsed = time.monotonic_ns() - started
+            if not 0 < elapsed <= MAX_WINDOW_NS:
+                raise I5.CgroupRefusal("OBSERVATION_WINDOW_EXCEEDED")
+            result = _summarize(first, second, host_first, host_second)
+    except (OSError, OverflowError):
+        raise I5.CgroupRefusal("HIERARCHY_OBSERVATION_UNAVAILABLE") from None
+    return {**_base(), "status": "OBSERVED", "elapsed_ns": elapsed, **result}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Heart H3: read-only visible memory headroom")
+    parser.add_argument("command", choices=("observe",))
+    parser.add_argument("--cgroup", required=True)
+    args = parser.parse_args(argv)
+    try:
+        result, code = observe(args.cgroup), 0
+    except I5.CgroupRefusal as exc:
+        result, code = {**_base(), "status": "UNAVAILABLE", "reason": str(exc)}, 2
+    except KeyboardInterrupt:
+        result, code = {**_base(), "status": "UNAVAILABLE", "reason": "CANCELLED"}, 2
+    print(json.dumps(result, separators=(",", ":"), ensure_ascii=True))
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

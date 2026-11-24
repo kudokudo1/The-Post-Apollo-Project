@@ -57,7 +57,7 @@ Scope {
 
     function request(job) {
         if (busy || faulted || worker.running || archive.busy) return false;
-        const args = Policy.argumentsFor(job, path => Quickshell.shellPath(path));
+        const args = Policy.argumentsFor(job, path => Quickshell.shellPath(path), Quickshell.dataDir);
         if (!args) return false;
         kind = job;
         captureSequence += 1;

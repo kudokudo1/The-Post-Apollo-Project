@@ -57,5 +57,6 @@ function comparison(a,b) {
     return "MATCHING SCENARIO/VERSION // HARDWARE AND WORKLOAD EQUIVALENCE UNKNOWN";
 }
 function metric(value, unit) {
-    return value === null || value === undefined ? "?" : value.toFixed(3) + " " + unit;
+    if (value === null || value === undefined) return "?";
+    return (unit === "tokens" ? String(value) : value.toFixed(3)) + " " + unit;
 }

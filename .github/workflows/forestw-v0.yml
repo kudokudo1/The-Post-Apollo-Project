@@ -10,6 +10,7 @@ on:
       - 'components/VoiceToTextButton.qml'
       - 'components/AskSendButton.qml'
       - 'services/forest/**'
+      - 'scripts/forest/ui_model_preferences.py'
       - 'assets/forest/**'
       - 'widgets/ForestChassisPolicy.js'
       - 'shell.qml'
@@ -24,6 +25,7 @@ on:
       - 'components/VoiceToTextButton.qml'
       - 'components/AskSendButton.qml'
       - 'services/forest/**'
+      - 'scripts/forest/ui_model_preferences.py'
       - 'assets/forest/**'
       - 'widgets/ForestChassisPolicy.js'
       - 'shell.qml'
@@ -48,3 +50,4 @@ jobs:
           python3 tests/forest/test_forest_observation_freshness.py
           python3 tests/forest/test_forest_model_disk_comparison.py
           python3 tests/forest/test_forest_model_form_equipment.py
+          python3 tests/forest/test_forest_ui_model_preferences.py

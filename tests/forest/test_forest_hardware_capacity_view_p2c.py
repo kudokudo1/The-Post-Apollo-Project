@@ -70,6 +70,87 @@ class ForestHardwareViewP2CTests(unittest.TestCase):
         self.assertNotIn("chatHostTrusted: true", view)
         self.assertNotIn("voiceHostTrusted: true", view)
 
+    def test_context_observation_ui_is_explicit_and_historical(self):
+        ui=(ROOT/"widgets/ForestHardwareCapacityView.qml").read_text()
+        adapter=(ROOT/"services/forest/ForestCapacityAdapter.qml").read_text()
+        self.assertIn("currentModelObservation && !capacity.scanning",ui)
+        self.assertIn("CapacityPolicy.holdMemoryObservation(capacity.status, selectedModelName,",ui)
+        self.assertIn("capacity.data, capacity.observationSequence, capacity.lastObservedLocalTime",ui)
+        self.assertIn('model: ["HOLD A", "HOLD B", "CLEAR"]',ui)
+        self.assertIn("onSelectedModelNameChanged: clearObservations()",ui)
+        self.assertIn("HISTORICAL COUNTERS ONLY // NO PEAK OR MINIMUM REQUIREMENT",ui)
+        self.assertIn("MODEL MEMORY REQUIREMENTS UNCALIBRATED // BENCHMARK HOLD",ui)
+        self.assertIn("observationSequence += 1;",adapter)
+        self.assertEqual(adapter.count("Process {"),1)
+        self.assertEqual(ui.count("ForestCapacityAdapter {"),1)
+        self.assertNotIn("Process {",ui)
+        self.assertNotIn("Timer {",ui)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
+    def test_hold_actual_p2c_context_observations(self):
+        import json
+        import test_performance_capacity_p2c as fixture
+        cls=fixture.CapacityP2CTests
+        cls.setUpClass()
+        case=cls("test_selected_resident_reports_used_not_free_vram")
+        reports=[]
+        try:
+            case.setUp()
+            for context,total,vram in [(2048,1048576,524288),
+                                       (4096,2097152,1048576),
+                                       (None,2097152,None)]:
+                row={"name":fixture.MODEL,"size":total}
+                if context is not None:
+                    row["context_length"]=context
+                if vram is not None:
+                    row["size_vram"]=vram
+                fixture.Handler.resident=[row]
+                reports.append(case.inspect(model=fixture.MODEL))
+            fixture.Handler.resident=[]
+            reports.append(case.inspect(model=fixture.MODEL))
+            self.assertEqual(fixture.Handler.post_count,0)
+            self.assertEqual(len(fixture.Handler.calls),12)
+        finally:
+            case.doCleanups()
+            cls.tearDownClass()
+        js=r"""
+const fs=require("fs"),vm=require("vm"),assert=require("assert");
+const p=vm.createContext({});
+vm.runInContext(fs.readFileSync(process.argv[1],"utf8"),p);
+const reports=JSON.parse(process.argv[2]),model=process.argv[3];
+const parsed=reports.map(r=>p.parseSnapshot(JSON.stringify(r),model));
+for(const result of parsed) assert.strictEqual(result.valid,true);
+const hold=(r,seq)=>p.holdMemoryObservation(r.status,model,r.data,seq,"06:05:00");
+const a=hold(parsed[0],1),b=hold(parsed[1],2),unknown=hold(parsed[2],3);
+assert.strictEqual(a.contextTokens,2048);
+assert.strictEqual(b.contextTokens,4096);
+assert.strictEqual(a.residentBytes,1048576);
+assert.strictEqual(b.residentBytes,2097152);
+assert.strictEqual(a.vramBytes,524288);
+assert.strictEqual(unknown.contextTokens,null);
+assert.strictEqual(unknown.vramBytes,null);
+assert.strictEqual(hold(parsed[3],4),null);
+assert.strictEqual(p.memoryObservationLabel(a.residentBytes),"1.00 MiB");
+assert.strictEqual(p.memoryObservationLabel(unknown.vramBytes),"?");
+assert.strictEqual(p.observationComparison(a,b),"DIFFERENT REPORTED CONTEXTS // WORKLOAD EQUIVALENCE UNKNOWN");
+assert.strictEqual(p.observationComparison(a,a),"SAME CHECK // CHECK AGAIN FOR ANOTHER OBSERVATION");
+assert.strictEqual(p.observationComparison(a,{...a,sequence:2}),"SAME REPORTED CONTEXT // NOT A CONTEXT-SIZE TRIAL");
+assert.strictEqual(p.observationComparison(a,unknown),"CONTEXT UNKNOWN // NO CONTEXT COMPARISON");
+assert.strictEqual(p.observationComparison(a,{...b,version:"1.0"}),"DIFFERENT MODEL OR OLLAMA VERSION // NOT COMPARABLE");
+assert.strictEqual(p.observationComparison(a,{...b,model:"other:model"}),"DIFFERENT MODEL OR OLLAMA VERSION // NOT COMPARABLE");
+for(const status of ["STALE","CHECKING","NOT_CHECKED","UNAVAILABLE"])
+ assert.strictEqual(p.holdMemoryObservation(status,model,parsed[0].data,1,"06:05:00"),null);
+assert.strictEqual(p.holdMemoryObservation("OBSERVED","other:model",parsed[0].data,1,"06:05:00"),null);
+assert.strictEqual(p.holdMemoryObservation("OBSERVED",model,parsed[0].data,0,"06:05:00"),null);
+assert.strictEqual(p.holdMemoryObservation("OBSERVED",model,parsed[0].data,1,"bad"),null);
+parsed[0].data.model.contextTokens=8192;
+assert.strictEqual(a.contextTokens,2048);
+"""
+        proc=subprocess.run(["node","-e",js,str(ROOT/"services/forest/ForestCapacityPolicy.js"),
+                             json.dumps(reports),fixture.MODEL],
+                            capture_output=True,text=True,check=False)
+        self.assertEqual(proc.returncode,0,proc.stderr)
+
     def test_memory_placement_does_not_claim_compute_placement(self):
         ui=(ROOT/"widgets/ForestHardwareCapacityView.qml").read_text()
         self.assertIn("memoryPlacement: currentModelObservation",ui)

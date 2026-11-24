@@ -29,6 +29,14 @@ assert.equal(plan(activeSample,8).projectedKiB,16777216);
 assert.equal(plan(parse(fixture),16).direction,"add");
 assert.equal(plan(parse(fixture),16).projectedKiB,25165824);
 assert.equal(plan(activeSample,17),null);
+const expandedFixture = activeFixture.replace("SwapTotal: 25165820", "SwapTotal: 33554424")
+    .replace("SwapFree: 25165820", "SwapFree: 33554424")
+    .replace("some avg10=", "/var/lib/post-apollo-memory-extension/swapfile file 8388604 0 9\nsome avg10=");
+const expandedSample = parse(expandedFixture);
+assert.equal(plan(expandedSample,24).direction,"unchanged");
+assert.equal(plan(expandedSample,24).actualKiB,25165816);
+assert.equal(plan(expandedSample,16).direction,"reduce");
+assert.equal(plan(expandedSample,16).projectedKiB,25165824);
 const pane = fs.readFileSync(path.join(base,"widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"),"utf8");
 assert.match(pane, /command: \["\/usr\/bin\/cat"/);
 assert.doesNotMatch(pane, /\b(?:sudo|pkexec|swapon|swapoff|mkswap|sysctl)\b/);

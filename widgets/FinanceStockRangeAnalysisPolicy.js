@@ -545,3 +545,49 @@ function inspectCrossStockDate(comparison, step) {
         source:chart.source,readOnly:true,noProviderCalls:true
     };
 }
+
+// M39: cumulative relative leadership from the first COMMON close.
+// Count observed dates, not elapsed days or individual daily winners.
+// A tie is not a lead change; the first non-tie establishes leadership.
+function summarizeCrossStockLeadership(comparison) {
+    const chart=crossStockNormalizedChart(comparison);
+    if (!chart) return null;
+    let referenceDates=0,currentDates=0,tieDates=0,changes=0;
+    let previousLeader=null,lastChange=null,largestReference=null,largestCurrent=null;
+    const observations=[];
+    for (let i=0;i<=chart.maxSteps;i++) {
+        const a=chart.first[i],b=chart.second[i];
+        const gap=b.value-a.value;
+        if (!Number.isFinite(gap)) return null;
+        const tolerance=Math.max(a.value,b.value)*1e-10;
+        const leader=Math.abs(gap)<=tolerance ? "TIE" : gap>0 ? "CURRENT" : "REFERENCE";
+        const row={step:i,date:a.date,leader:leader,gapPoints:leader==="TIE"?0:gap};
+        observations.push(row);
+        if (leader==="TIE") tieDates++;
+        else {
+            if (leader==="REFERENCE") {
+                referenceDates++;
+                if (!largestReference || -gap>largestReference.advantagePoints)
+                    largestReference={date:a.date,advantagePoints:-gap};
+            } else {
+                currentDates++;
+                if (!largestCurrent || gap>largestCurrent.advantagePoints)
+                    largestCurrent={date:a.date,advantagePoints:gap};
+            }
+            if (previousLeader!==null && previousLeader!==leader) {
+                changes++;
+                lastChange={date:a.date,leader:leader};
+            }
+            previousLeader=leader;
+        }
+    }
+    return {
+        referenceSymbol:chart.referenceSymbol,currentSymbol:chart.currentSymbol,
+        from:chart.from,to:chart.to,priceBasis:chart.priceBasis,
+        matched:observations.length,referenceDates:referenceDates,
+        currentDates:currentDates,tieDates:tieDates,changes:changes,lastChange:lastChange,
+        latest:observations[observations.length-1],
+        largestReference:largestReference,largestCurrent:largestCurrent,
+        observations:observations,source:chart.source,readOnly:true,noProviderCalls:true
+    };
+}

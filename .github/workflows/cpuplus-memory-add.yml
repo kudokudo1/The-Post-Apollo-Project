@@ -1,0 +1,21 @@
+name: CPU++ memory add contract
+on:
+  pull_request:
+    paths:
+      - 'scripts/post-apollo-memory-add-swap'
+      - 'widgets/cpuplus/CpuPlusMemory*.qml'
+      - 'widgets/cpuplus/CpuPlusMemorySnapshot.js'
+      - 'tests/cpuplus_memory*'
+      - '.github/workflows/cpuplus-memory-add.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mocked privileged-operation contract (no real swap writes)
+        run: python3 -B tests/cpuplus_memory_add_test.py
+      - name: Inherited read-only snapshot contract
+        run: node tests/cpuplus_memory_snapshot_test.js

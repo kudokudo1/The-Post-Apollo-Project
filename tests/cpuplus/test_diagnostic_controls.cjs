@@ -71,3 +71,33 @@ const archive = read("services/diagnostics/DiagnosticReportArchive.qml");
 assert.match(archive,/stdinEnabled: true/);
 assert.match(archive,/worker.write\(store.frame\)/);
 assert.doesNotMatch(archive,/Component.onCompleted|repeat:\s*true|running:\s*true|pkexec|sudo/);
+
+const storageIds = ["notifications.history","notifications.favorites","notifications.policies","notifications.scroll",
+    "weather.cache","weather.history","weather.events","weather.places","weather.dossier",
+    "hub.layout","hub.notes","hub.todo","social.identities","git.journal","git.delta",
+    "forest.preferences","finance.manual","company.hubs"];
+const storageSample = {schema:"post-apollo-storage-observation-v1",event:"storage",sequence:1,
+    intervals:10,elapsedMs:10000,rows:storageIds.map(id=>({id,initialState:"present",finalState:"present",
+        initialBytes:100,finalBytes:100,changedIntervals:0,replacementIntervals:0,
+        unavailableIntervals:0,comparableIntervals:10}))};
+storageSample.rows[0].changedIntervals=3;
+const storageEnd={schema:storageSample.schema,event:"complete",samples:1};
+const storageText=jsonl([storageSample,storageEnd]);
+assert.match(policy.summarize("storage",storageText), /notifications.history \/\/ 3 changed intervals/);
+assert.equal(policy.summarize("storage",jsonl([storageSample])),null);
+assert.equal(policy.summarize("storage",jsonl([{...storageSample,rows:storageSample.rows.slice(1)},storageEnd])),null);
+assert.equal(policy.summarize("storage",jsonl([{...storageSample,rows:[{...storageSample.rows[0],changedIntervals:11},...storageSample.rows.slice(1)]},storageEnd])),null);
+assert.equal(policy.argumentsFor("storage",p=>"/local/"+p),null);
+assert.deepEqual(JSON.parse(JSON.stringify(policy.argumentsFor("storage",p=>"/local/"+p,"/data"))).slice(-6),
+    ["--data-dir","/data","--shell-dir","/local/.","--duration","30"]);
+assert.match(ui,/STORAGE OBSERVE \/\/ 30s/);
+assert.match(read("scripts/cpuplus_diagnostic_archive.py"),/KINDS = \{[^}]*"storage"/);
+const comparePolicy=vm.createContext({});
+vm.runInContext(read("services/diagnostics/DiagnosticComparison.js"),comparePolicy);
+const baseStorage={kind:"storage",id:"session-abc-def-1",status:"COMPLETE",text:storageText,finishedAt:"2026-11-24T12:00:00.000Z"};
+const nextStorage={...baseStorage,id:"session-abc-def-2",finishedAt:"2026-11-24T12:01:00.000Z",
+    text:jsonl([{...storageSample,rows:[{...storageSample.rows[0],changedIntervals:1},...storageSample.rows.slice(1)]},storageEnd])};
+const storageCompare=comparePolicy.compare(baseStorage,nextStorage,policy.summarize);
+assert.equal(storageCompare.error,"");
+assert.equal(storageCompare.rows.find(r=>r.label==="notifications.history CHANGED INTERVALS").delta,-2);
+assert.match(storageCompare.note,/not writes, transactions or writer identity/);

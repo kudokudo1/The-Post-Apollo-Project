@@ -223,3 +223,6 @@ await import("./test_market_m37_cross_stock_chart.mjs");
 
 // M38: cross-stock common-date selection and exact closing prices.
 await import("./test_market_m38_cross_stock_date.mjs");
+
+// M39: cumulative relative leadership across shared closing dates.
+await import("./test_market_m39_relative_leadership.mjs");

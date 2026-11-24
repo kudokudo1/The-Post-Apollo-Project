@@ -1,0 +1,29 @@
+name: CPU++ native headroom fixture source gate
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_pressure_ci/**'
+      - '.github/workflows/cpuplus-memory-headroom-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify bounded workload controls without allocating RAM
+        run: |
+          python3 -B -m py_compile tests/cpuplus_memory_pressure_ci/guest-headroom.py
+          python3 -B tests/cpuplus_memory_pressure_ci/test_headroom_bounds.py
+      - name: Refuse outside disposable guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          output="$(python3 -I -B tests/cpuplus_memory_pressure_ci/guest-headroom.py 2>&1)"
+          rc="$?"
+          set -e
+          test "$rc" = 2
+          grep -Fq 'CPU_MEM_HEADROOM_FAIL // RuntimeError: not a root Silverblue guest' <<<"$output"

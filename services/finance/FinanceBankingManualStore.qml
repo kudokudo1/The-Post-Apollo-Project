@@ -44,7 +44,8 @@ Scope {
         return invoke({action:"save",expectedRevision:revision,session:session});
     }
     function clearSaved() {
-        if(state!=="ready" || worker.running || !savedOnDisk)return false;
+        if(state!=="ready" || worker.running || !savedOnDisk
+           || savedSession.mode!=="manual")return false;
         return invoke({action:"clear",expectedRevision:revision,
                        confirmClear:true});
     }
@@ -88,7 +89,7 @@ Scope {
             savedOnDisk=result.savedOnDisk;
             savedSession=result.session;
             state="ready";
-            message=savedOnDisk
+            message=savedOnDisk && result.session.mode==="manual"
                 ?"PRIVATE LOCAL MANUAL ACCOUNTS // NOT BANK VERIFIED"
                 :"NO SAVED MANUAL ACCOUNTS // READY FOR LOCAL ENTRY";
             if(activeAction==="list")sessionLoaded();

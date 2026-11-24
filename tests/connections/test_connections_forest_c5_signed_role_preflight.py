@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives import serialization
@@ -212,7 +213,8 @@ class ForestC5SignedEvidencePreflightTests(unittest.TestCase):
         for wire, reason in (
             (b'{"private":"SYNTHETIC_PRIVATE', "INVALID_JSON"),
             (b'{"private":"SYNTHETIC_PRIVATE\xff"}', "INVALID_JSON"),
-            (b'[' * 1500 + b']' * 1500, "INVALID_JSON"),
+            (b'[' * 1500, "INVALID_JSON"),
+            (b"[]", "EXACT_FIELDS_REQUIRED"),
             (b'{"schema":"a","schema":"b"}', "DUPLICATE_JSON_KEY"),
             (b'{"schema":NaN}', "JSON_CONSTANT_REFUSED"),
         ):
@@ -226,17 +228,35 @@ class ForestC5SignedEvidencePreflightTests(unittest.TestCase):
                 self.assertIsNone(caught.exception.__cause__)
                 self.assertIsNone(caught.exception.__context__)
 
+        # Python versions have different JSON recursion limits. Exercise
+        # the actual handler with a deterministic decoder failure instead.
+        with patch.object(C.json, "loads", side_effect=RecursionError("private decoder detail")):
+            with self.assertRaises(C.EvidenceHold) as caught:
+                verify(self.pair)
+        self.assertEqual(str(caught.exception),
+                         "FOREST_B4C_EVIDENCE_HOLD // INVALID_JSON")
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+
     def test_15_canonical_serialization_and_signature_refusals_are_fixed(self):
-        nested = []
-        for _ in range(1500):
-            nested = [nested]
-        for value in ({"x": nested}, {"x": object()}, {"x": float("nan")}):
+        cyclic = []
+        cyclic.append(cyclic)
+        for value in ({"x": cyclic}, {"x": object()}, {"x": float("nan")}):
             with self.assertRaises(C.EvidenceHold) as caught:
                 C.canonical_bytes(value)
             self.assertEqual(str(caught.exception),
                              "FOREST_B4C_EVIDENCE_HOLD // INVALID_CANONICAL_JSON")
             self.assertIsNone(caught.exception.__cause__)
             self.assertIsNone(caught.exception.__context__)
+        # Explicitly exercise the encoder RecursionError handler without
+        # assuming that valid nested JSON exceeds a particular runtime limit.
+        with patch.object(C.json, "dumps", side_effect=RecursionError("private encoder detail")):
+            with self.assertRaises(C.EvidenceHold) as caught:
+                C.canonical_bytes({"x": 1})
+        self.assertEqual(str(caught.exception),
+                         "FOREST_B4C_EVIDENCE_HOLD // INVALID_CANONICAL_JSON")
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
         parts = self.pair.copy()
         parts[2] = bytes([parts[2][0] ^ 1]) + parts[2][1:]
         with self.assertRaises(C.EvidenceHold) as caught:

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "forest
 from context_first_tree_m2 import (
     ContextRefusal, SessionContextRef, HistoryTurn, select_history,
     snapshot_in_transaction, list_open_metadata_fixture,
+    WorkshopContextRef, snapshot_with_workshop_in_transaction,
 )
 from session_journal_v0 import ForestSessionJournal, bootstrap_synthetic
 from shared_context_b6r1 import TaskContext
@@ -201,6 +202,114 @@ class ContextTests(unittest.TestCase):
                                     other, "research")
         with self.assertRaisesRegex(ContextRefusal, "CAPABILITY_CONTEXT_MISMATCH"):
             self.read(capability_plan=other_plan)
+
+    def workshop_ref(self, **kwargs):
+        return WorkshopContextRef(self.ref,
+                                  bristlecone_reference_profile(self.context),
+                                  "code-debug", **kwargs)
+
+    def read_workshop(self, requested, current=None):
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            return snapshot_with_workshop_in_transaction(
+                self.journal, requested,
+                current=requested if current is None else current)
+        finally:
+            self.db.rollback()
+
+    def test_workshop_composes_current_plan_and_exact_history(self):
+        ref = self.workshop_ref(general=("todo", "leaf"), ready=("testing",))
+        snapshot = self.read_workshop(ref)
+        plan = snapshot.capability_plan
+        self.assertEqual(snapshot.ref, self.ref)
+        self.assertEqual(plan.selected, ("file", "terminal", "todo", "leaf", "testing"))
+        self.assertEqual(plan.unresolved, ("leaf",))
+        self.assertIn("debugging", plan.dormant)
+        self.assertFalse(plan.permission_granted)
+        self.assertFalse(plan.model_execution_permitted)
+        self.assertEqual(plan.safe_actions, ())
+        self.assertEqual(snapshot.transport_messages(),
+                         [{"role": "user", "content": "First public question"}])
+
+    def test_workshop_selection_is_explicit_not_sticky(self):
+        first = self.read_workshop(self.workshop_ref(ready=("testing",)))
+        next_snapshot = self.read_workshop(self.workshop_ref())
+        self.assertIn("testing", first.capability_plan.selected)
+        self.assertIn("testing", next_snapshot.capability_plan.dormant)
+        self.assertEqual(next_snapshot.capability_plan.sticky, ())
+
+    def test_workshop_changed_profile_refuses_even_if_selection_still_fits(self):
+        ref = self.workshop_ref(ready=("testing",))
+        restricted = replace(ref.profile, general_ready=("memory",))
+        current = replace(ref, profile=restricted)
+        with self.assertRaisesRegex(ContextRefusal, "WORKSHOP_REFERENCE_CHANGED"):
+            self.read_workshop(ref, current)
+
+    def test_workshop_changed_selection_refuses_before_body_read(self):
+        ref = self.workshop_ref()
+        blocked = []
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column == "body":
+                blocked.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(authorizer)
+        try:
+            for current in (replace(ref, workshop="research"),
+                            replace(ref, general=("todo",))):
+                with self.assertRaisesRegex(ContextRefusal, "WORKSHOP_REFERENCE_CHANGED"):
+                    self.read_workshop(ref, current)
+            self.assertEqual(blocked, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_workshop_other_context_profile_refused(self):
+        ref = self.workshop_ref()
+        for ctx in (replace(self.context, generation=2),
+                    replace(self.context, task_id="new-task"),
+                    replace(self.context, execution_context_id="new-exec"),
+                    replace(self.context, clone_key="clone-a"),
+                    replace(self.context, principal_key="other")):
+            with self.subTest(ctx=ctx), self.assertRaisesRegex(
+                    ContextRefusal, "WORKSHOP_CONTEXT_MISMATCH"):
+                replace(ref, profile=bristlecone_reference_profile(ctx))
+
+    def test_workshop_unowned_or_wrong_workshop_capability_refused(self):
+        for kwargs in ({"general": ("training",)}, {"ready": ("training",)},
+                       {"general": ("todo", "todo")}, {"ready": ["testing"]}):
+            with self.subTest(kwargs=kwargs), self.assertRaisesRegex(
+                    ContextRefusal, "WORKSHOP_SELECTION_REFUSED"):
+                self.workshop_ref(**kwargs)
+
+    def test_workshop_stale_revision_and_user_turn_refused(self):
+        ref = self.workshop_ref()
+        self.append("user", "New public turn")
+        with self.assertRaisesRegex(ContextRefusal, "STALE_REVISION"):
+            self.read_workshop(ref)
+        wrong = replace(self.workshop_ref(), session=replace(self.ref, user_turn_id="wrong"))
+        with self.assertRaisesRegex(ContextRefusal, "LATEST_USER_MISMATCH"):
+            self.read_workshop(wrong)
+
+    def test_workshop_session_scope_refused_even_with_valid_profile(self):
+        ref = self.workshop_ref()
+        other_ctx = replace(self.context, principal_key="other")
+        wrong = replace(ref, session=replace(self.ref, context=other_ctx),
+                        profile=bristlecone_reference_profile(other_ctx))
+        with self.assertRaisesRegex(ContextRefusal, "SESSION_SCOPE_MISMATCH"):
+            self.read_workshop(wrong)
+
+    def test_workshop_does_not_accept_supplied_plan_or_start_transaction(self):
+        ref = self.workshop_ref()
+        plan = plan_selection(ref.profile, self.context, "code-debug")
+        with self.assertRaisesRegex(ContextRefusal, "WORKSHOP_REFERENCE_CHANGED"):
+            self.read_workshop(plan)
+        with self.assertRaisesRegex(ContextRefusal, "TRANSACTION_REQUIRED"):
+            snapshot_with_workshop_in_transaction(self.journal, ref, current=ref)
+
+    def test_workshop_no_writes(self):
+        before = self.db.total_changes
+        self.read_workshop(self.workshop_ref())
+        self.assertEqual(self.db.total_changes, before)
 
     def test_snapshot_does_not_write(self):
         before = self.db.total_changes

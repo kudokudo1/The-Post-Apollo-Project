@@ -26,6 +26,10 @@ import turn_bridge_b3 as b3
 import local_terminal_outbox_b4f as b4f
 import ollama_chat_transport as chat
 import native_host_candidate_b5b as native
+from shared_context_b6r1 import TaskContext
+from runtime_stop_control_r2 import RuntimeStopControl
+sys.path.insert(0, str(ROOT / "tests/connections"))
+from test_connections_forest_c5_provisional_delta_disclosure import FakePermit
 sys.path.insert(0, str(ROOT / "tests/forest"))
 from test_ollama_chat_transport import FakeOllama, packet
 
@@ -421,7 +425,7 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
 
 
 
-    def _exercise_existing_transport_and_hold_sender(self, *, cancel):
+    def _exercise_existing_transport_and_hold_sender(self, *, cancel, lost_ack=False):
         """Join existing B2/B3/C5/B5b in a disposable test, not a host path."""
         class PublicFixture(FakeOllama):
             # Deliberately isolated public synthetic provider data.
@@ -432,7 +436,6 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
         serving = threading.Thread(target=server.serve_forever, daemon=True)
         serving.start()
         endpoint = "http://127.0.0.1:%d" % server.server_address[1]
-        stop = threading.Event()
         try:
             with tempfile.TemporaryDirectory(prefix="doc3-first-tree-") as root:
                 with contextlib.closing(sqlite3.connect(
@@ -446,10 +449,30 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                     uid = journal.append_turn(
                         "fixture_owner", sid, expected_revision=0, role="user",
                         body="Public synthetic question", now_ms=101)["turn_id"]
-                    # Test-only injection through the already existing B3
-                    # streamer seam; production B3 does not forward STOP yet.
+                    context = TaskContext("fixture_owner", "CHERRY", None,
+                                          "fixture_task", "fixture_execution",
+                                          1, "INTERACTIVE")
+                    operation = "fixture_operation_1234567890"
+                    control = RuntimeStopControl(context, operation)
+                    attempt_id = None
+                    # Reuse actual R2 arbitration at the existing fixture
+                    # hooks; the shared B3 production seam is not edited.
                     def local_transport(**kwargs):
-                        return chat.stream_chat(**kwargs, cancel_event=stop)
+                        return chat.stream_chat(
+                            **kwargs, cancel_event=control.transport_event)
+
+                    def pre_commit():
+                        if not control.try_enter_commit(context, operation, attempt_id):
+                            return False
+                        if lost_ack:
+                            self.assertEqual(control.request_stop(
+                                context, operation, attempt_id),
+                                "COMMIT_ENTRY_ALREADY_WON")
+                            self.assertFalse(control.transport_event.is_set())
+                        return True
+
+                    fences = (dict(fence_factory=lambda binding: FakePermit(binding, result=False),
+                                   fence_request_id=operation) if lost_ack else {})
 
                     bridge = b3.ForestTurnBridge(
                         journal, clock_ms=lambda: 200, streamer=local_transport,
@@ -457,10 +480,12 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                     with contextlib.closing(bridge.exchange(
                         owner="fixture_owner", session_id=sid,
                         expected_revision=1, model="qwen3:1.7b",
-                        endpoint=endpoint, pre_commit=lambda: True
+                        endpoint=endpoint, pre_commit=pre_commit, **fences
                     )) as stream:
                         res = next(stream)
                         self.assertEqual(res["event"], "RESERVED")
+                        attempt_id = res["attempt_id"]
+                        control.bind_reserved_attempt(context, operation, attempt_id)
                         started = next(stream)
                         self.assertEqual(started["event"], "STARTED")
                         delta = next(stream)
@@ -479,8 +504,14 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                         self.assertIsNone(result["emitEvent"])
                         self.assertEqual(result["emittedBytes"], 0)
                         if cancel:
-                            stop.set()
+                            self.assertEqual(control.request_stop(
+                                context, operation, attempt_id), "STOP_LATCHED")
                             with self.assertRaisesRegex(b3.BridgeRefusal, "OLLAMA_CANCELLED"):
+                                next(stream)
+                            self.assertFalse(control.try_enter_commit(
+                                context, operation, attempt_id))
+                        elif lost_ack:
+                            with self.assertRaisesRegex(b3.BridgeRefusal, "UNKNOWN_HOLD"):
                                 next(stream)
                         else:
                             terminal = next(stream)
@@ -497,6 +528,12 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                             self.assertNotIn(SECRET, str(caught.exception))
                             with self.assertRaises(StopIteration):
                                 next(stream)
+                            self.assertEqual(control.request_stop(
+                                context, operation, attempt_id),
+                                "COMMIT_ENTRY_ALREADY_WON")
+                        control.close(context, operation, attempt_id)
+                        self.assertEqual(control.request_stop(
+                            context, operation, attempt_id), "CONTROL_CLOSED")
                         # The existing native candidate can submit only its
                         # immutable public HOLD. Explicit test invocation,
                         # not an installed B3-to-Bark adapter.
@@ -541,6 +578,9 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
 
     def test_34_existing_b2_cancel_does_not_release_or_ack_revoke(self):
         self._exercise_existing_transport_and_hold_sender(cancel=True)
+
+    def test_35_r2_commit_entry_wins_but_lost_ack_stays_unknown(self):
+        self._exercise_existing_transport_and_hold_sender(cancel=False, lost_ack=True)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,12 @@ import importlib.machinery
 import importlib.util
 from pathlib import Path
 import unittest
+import os
+import fcntl
+import subprocess
+import sys
+import time
+from types import SimpleNamespace
 from contextlib import nullcontext
 import tempfile
 from unittest.mock import mock_open
@@ -279,6 +285,103 @@ class ReductionTests(unittest.TestCase):
         with patch.object(m, "mutation_lock", return_value=nullcontext()), patch.object(m, "withdraw_authorized") as withdraw:
             self.assertEqual(m.main(["withdraw-authorized", "16"]), 0)
             withdraw.assert_called_once_with(16)
+
+
+class CrashFenceTests(unittest.TestCase):
+    def test_child_inherits_lock_only_inside_operation(self):
+        with patch.object(m.subprocess, "run") as run:
+            m.run("/usr/bin/true")
+            self.assertEqual(run.call_args.kwargs["pass_fds"], ())
+            with patch.object(m, "_mutation_fd", 42):
+                m.run("/usr/bin/true")
+                self.assertEqual(run.call_args.kwargs["pass_fds"], (42,))
+
+    def test_fence_refuses_partial_or_orphan_record(self):
+        directory = SimpleNamespace(st_mode=0o40700, st_uid=0)
+        for marker in (m.WITHDRAW_MARKER, m.WITHDRAW_MARKER.with_name("withdrawal-result.json")):
+            def lstat(path):
+                if path == m.EXT_DIRECTORY:
+                    return directory
+                if path == marker:
+                    return SimpleNamespace()
+                raise FileNotFoundError(path)
+            with patch.object(m, "secure_parent"), patch.object(Path, "lstat", lstat):
+                with self.assertRaises(m.ReductionRecovery) as error:
+                    m.check_recovery_fence()
+                self.assertEqual(str(error.exception), "RECOVERY_REQUIRED")
+
+    def test_fence_absent_and_unsafe_directory(self):
+        with patch.object(m, "secure_parent"), patch.object(Path, "lstat", side_effect=FileNotFoundError):
+            m.check_recovery_fence()
+        with patch.object(m, "secure_parent"), patch.object(Path, "lstat", return_value=SimpleNamespace(st_mode=0o120777, st_uid=0)):
+            with self.assertRaises(m.ReductionRecovery):
+                m.check_recovery_fence()
+
+    def test_fence_io_error_does_not_allow_mutation(self):
+        with patch.object(m, "secure_parent"), patch.object(Path, "lstat", side_effect=PermissionError):
+            with self.assertRaises(PermissionError):
+                m.check_recovery_fence()
+
+    def test_every_mutating_entrypoint_uses_fenced_lock(self):
+        for args, name in ((["add","16"],"allocate"),(["add-authorized","16"],"allocate"),
+                           (["persist-authorized"],"persist_authorized"),(["expand-authorized","24"],"expand_authorized"),
+                           (["withdraw-authorized","16"],"withdraw_authorized")):
+            with patch.object(m,"mutation_lock",side_effect=m.ReductionRecovery("RECOVERY_REQUIRED")), patch.object(m,name) as mutation:
+                self.assertEqual(m.main(args),3)
+                mutation.assert_not_called()
+
+    def test_real_child_lock_survives_parent_sigkill(self):
+        # Unprivileged Linux process fixture. No swap or systemd commands.
+        # The driver uses the production run() function and the same flock
+        # description; the child holds it until the fixture releases it.
+        driver = """import importlib.machinery, importlib.util, os, fcntl, sys
+loader=importlib.machinery.SourceFileLoader('helper',sys.argv[1])
+spec=importlib.util.spec_from_loader(loader.name,loader)
+m=importlib.util.module_from_spec(spec); loader.exec_module(m)
+fd=os.open(sys.argv[2],os.O_RDWR|os.O_CREAT,0o600)
+fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+m._mutation_fd=fd
+m.run(sys.executable,'-c',sys.argv[3],sys.argv[4],sys.argv[5])
+"""
+        child = """import pathlib,sys,time
+ready,release=map(pathlib.Path,sys.argv[1:])
+ready.write_text('ready')
+deadline=time.monotonic()+10
+while not release.exists() and time.monotonic()<deadline:
+    time.sleep(.02)
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            lock,ready,release=(Path(tmp)/name for name in ("lock","ready","release"))
+            parent=subprocess.Popen([sys.executable,"-c",driver,str(path),str(lock),child,str(ready),str(release)],
+                                    stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            contender=None
+            try:
+                deadline=time.monotonic()+5
+                while not ready.exists() and time.monotonic()<deadline and parent.poll() is None:
+                    time.sleep(.02)
+                self.assertTrue(ready.exists(),"fixture child never started")
+                parent.kill()
+                parent.wait(timeout=5)
+                contender=os.open(lock,os.O_RDWR)
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(contender,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                release.touch()
+                deadline=time.monotonic()+5
+                while True:
+                    try:
+                        fcntl.flock(contender,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic()>=deadline:
+                            self.fail("lock not released after fixture child exit")
+                        time.sleep(.02)
+            finally:
+                release.touch()
+                if parent.poll() is None:
+                    parent.kill()
+                    parent.wait(timeout=5)
+                if contender is not None:
+                    os.close(contender)
 
 if __name__ == "__main__":
     unittest.main()

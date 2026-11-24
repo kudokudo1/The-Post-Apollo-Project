@@ -4,12 +4,16 @@ from __future__ import annotations
 import sqlite3
 import sys
 import tempfile
+from dataclasses import replace
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/forest"))
 import session_journal_v0 as journal  # noqa: E402
 import turn_bridge_b3 as b3  # noqa: E402
+from shared_context_b6r1 import TaskContext
+from context_first_tree_m2 import SessionContextRef
+from runtime_stop_control_r2 import RuntimeStopControl
 
 
 def standard_stream(*, model, messages, **kwargs):
@@ -68,6 +72,150 @@ class BridgeTests(unittest.TestCase):
             "SELECT status,reply_turn_id,expected_revision FROM "
             "forest_attempts_b3 WHERE session_id=?", (session_id,)
         ).fetchone()
+
+    def context_args(self, sid, *, revision=1):
+        latest = self.db.execute(
+            "SELECT turn_id FROM forest_turns WHERE session_id=? "
+            "ORDER BY ordinal DESC LIMIT 1", (sid,)).fetchone()[0]
+        ctx = TaskContext("owner_a", "CHERRY", None, "task", "execution",
+                          1, "INTERACTIVE")
+        ref = SessionContextRef(ctx, sid, revision, latest)
+        control = RuntimeStopControl(ctx, "operation")
+        return dict(context_ref=ref, current_context_ref=ref,
+                    resolve_current_context=lambda: ref,
+                    stop_control=control, operation_id="operation")
+
+    def test_context_bound_exchange_never_reads_title(self):
+        sid = self.new_session()
+        args = self.context_args(sid)
+
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and table == "forest_sessions" and column == "title":
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            events = list(self.exchange(sid, **args))
+        finally:
+            self.db.set_authorizer(None)
+        self.assertEqual(events[-1]["event"], "COMMITTED")
+        self.assertEqual(self.attempt(sid)[0], "COMMITTED")
+        self.assertIs(self.requests[0]["cancel_event"],
+                      args["stop_control"].transport_event)
+
+    def test_context_wrong_tree_latest_user_and_stale_generation(self):
+        for kind in ("tree", "latest", "generation"):
+            sid = self.new_session()
+            args = self.context_args(sid)
+            ref = args["context_ref"]
+            if kind == "tree":
+                ref = replace(ref, context=replace(ref.context, tree_key="other"))
+            elif kind == "latest":
+                ref = replace(ref, user_turn_id="wrong")
+            else:
+                args["resolve_current_context"] = lambda: replace(
+                    ref, context=replace(ref.context, generation=2))
+            args["context_ref"] = args["current_context_ref"] = ref
+            args["stop_control"] = RuntimeStopControl(ref.context, "operation")
+            if kind != "generation":
+                args["resolve_current_context"] = lambda: ref
+            with self.assertRaises(b3.BridgeRefusal):
+                list(self.exchange(sid, **args))
+            self.assertIsNone(self.attempt(sid))
+        self.assertEqual(self.requests, [])
+
+    def test_context_older_large_turn_omitted_without_mutating_history(self):
+        sid = self.new_session()
+        self.store.append_turn("owner_a", sid, expected_revision=1,
+            role="assistant", body="x" * 5000, provider="ollama",
+            model="qwen3:1.7b", now_ms=102)
+        self.store.append_turn("owner_a", sid, expected_revision=2,
+            role="user", body="new", now_ms=103)
+        args = self.context_args(sid, revision=3)
+        self.assertEqual(list(self.exchange(sid, revision=3, **args))[-1]["event"],
+                         "COMMITTED")
+        self.assertEqual(self.requests[0]["messages"],
+                         [{"role": "user", "content": "new"}])
+        self.assertEqual(self.store.turns("owner_a", sid)[1]["body"], "x" * 5000)
+
+    def test_context_oversized_latest_refuses_before_reservation(self):
+        sid = self.new_session()
+        self.store.append_turn("owner_a", sid, expected_revision=1,
+            role="user", body="x" * 5000, now_ms=102)
+        with self.assertRaisesRegex(b3.BridgeRefusal, "LATEST_USER_TOO_LARGE"):
+            list(self.exchange(sid, revision=2, **self.context_args(sid, revision=2)))
+        self.assertIsNone(self.attempt(sid))
+        self.assertEqual(self.requests, [])
+
+    def test_context_stop_before_reserve_and_after_reserve(self):
+        sid = self.new_session()
+        args = self.context_args(sid)
+        ref, control = args["context_ref"], args["stop_control"]
+        control.request_stop(ref.context, "operation", None)
+        with self.assertRaisesRegex(b3.BridgeRefusal, "OLLAMA_CANCELLED"):
+            list(self.exchange(sid, **args))
+        self.assertIsNone(self.attempt(sid))
+        args = self.context_args(sid)
+        ref, control = args["context_ref"], args["stop_control"]
+        gen = self.exchange(sid, **args)
+        attempt = next(gen)["attempt_id"]
+        control.request_stop(ref.context, "operation", attempt)
+        with self.assertRaisesRegex(b3.BridgeRefusal, "OLLAMA_CANCELLED"):
+            list(gen)
+        self.assertEqual(self.attempt(sid)[0], "ABORTED")
+        self.assertEqual(self.requests, [])
+
+    def test_context_stop_after_delta_aborts_without_retry(self):
+        sid = self.new_session()
+        args = self.context_args(sid)
+        ref, control = args["context_ref"], args["stop_control"]
+        gen = self.exchange(sid, **args)
+        attempt = next(gen)["attempt_id"]
+        self.assertEqual(next(gen)["event"], "STARTED")
+        self.assertEqual(next(gen)["event"], "DELTA")
+        control.request_stop(ref.context, "operation", attempt)
+        with self.assertRaisesRegex(b3.BridgeRefusal, "OLLAMA_CANCELLED"):
+            list(gen)
+        self.assertEqual(self.attempt(sid)[0], "ABORTED")
+        self.assertEqual(len(self.store.turns("owner_a", sid)), 1)
+        with self.assertRaisesRegex(b3.BridgeRefusal, "ATTEMPT_ALREADY_EXISTS"):
+            list(self.exchange(sid, **self.context_args(sid)))
+        self.assertEqual(len(self.requests), 1)
+
+    def test_context_change_after_reservation_blocks_dispatch(self):
+        sid = self.new_session()
+        args = self.context_args(sid)
+        ref = args["context_ref"]
+        current = [ref]
+        args["resolve_current_context"] = lambda: current[0]
+        gen = self.exchange(sid, **args)
+        self.assertEqual(next(gen)["event"], "RESERVED")
+        current[0] = replace(ref, context=replace(ref.context, generation=2))
+        with self.assertRaisesRegex(b3.BridgeRefusal, "CONTEXT_CHANGED"):
+            list(gen)
+        self.assertEqual(self.attempt(sid)[0], "ABORTED")
+        self.assertEqual(self.requests, [])
+
+    def test_stop_after_commit_entry_does_not_replace_authorization(self):
+        sid = self.new_session()
+        args = self.context_args(sid)
+        ref, control = args["context_ref"], args["stop_control"]
+        attempts = []
+        dispositions = []
+
+        def refuse():
+            dispositions.append(control.request_stop(
+                ref.context, "operation", attempts[0]))
+            return False
+
+        gen = self.exchange(sid, pre_commit=refuse, **args)
+        attempts.append(next(gen)["attempt_id"])
+        with self.assertRaisesRegex(b3.BridgeRefusal, "PRE_COMMIT_AUTHORIZATION_DENIED"):
+            list(gen)
+        self.assertEqual(dispositions, ["COMMIT_ENTRY_ALREADY_WON"])
+        self.assertEqual(self.attempt(sid)[0], "ABORTED")
+        self.assertEqual(len(self.store.turns("owner_a", sid)), 1)
 
     def test_complete_stream_is_one_atomic_committed_reply(self):
         sid = self.new_session()

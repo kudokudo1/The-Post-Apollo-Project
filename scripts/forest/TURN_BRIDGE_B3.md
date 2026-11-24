@@ -78,3 +78,24 @@ host IPC, cancellation and recovery are separately approved.
 NEXT: independent review, then protected host-owned identity/connection
 contract and native Linux acceptance. No automatic retry, promotion to Leaves
 memory, permission escalation or silent model switching.
+
+## R2–M3 shared fixture integration
+
+Optional context_ref/current_context_ref must be exact matching M2 references
+and agree with the existing owner/session/revision arguments. A host-owned
+resolve_current_context callback must return the currently resolved reference;
+B3 rechecks before reservation, dispatch and commit entry. These checks are
+not authentication, and the callback is not a permission grant. No context
+arguments preserves the previous synthetic path. Inside the original writer
+transaction, M2 chooses the bounded history and exact last user turn; no
+second journal or transaction. The scoped path avoids title reads at both
+reservation and commit. B2 byte bounds are not tokenizer fit evidence.
+
+Optional stop_control + operation_id require the context-bound path. A local
+one-shot claim prevents control reuse. STOP before commit entry prevents the
+write; STOP after entry does not imply rollback. Existing precommit/fence
+checks and durable attempt/terminal-outbox semantics remain in force. The
+B2 cancellation event is only passed when a control exists. Generator events
+are internal, never authorized output. Local ABORTED or COMMITTED is not
+proof of resource release or protected recipient delivery. Unknown remains
+no-retry. No model call on the operator workstation or production access.

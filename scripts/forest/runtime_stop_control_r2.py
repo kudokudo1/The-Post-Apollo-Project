@@ -31,6 +31,7 @@ class RuntimeStopControl:
         self._attempt_id = None
         self._lock = threading.Lock()
         self._event = threading.Event()
+        self._claimed = False
         self._entered = False
         self._closed = False
 
@@ -46,6 +47,14 @@ class RuntimeStopControl:
                 or (attempt_id is not None and type(attempt_id) is not str)
                 or attempt_id != self._attempt_id):
             raise StopArbitrationRefusal("OPERATION_MISMATCH")
+
+    def claim_exchange(self, context, operation_id):
+        """Reserve this local control for exactly one B3 generator."""
+        with self._lock:
+            self._match(context, operation_id, None)
+            if self._closed or self._entered or self._claimed:
+                raise StopArbitrationRefusal("CONTROL_ALREADY_USED")
+            self._claimed = True
 
     def bind_reserved_attempt(self, context, operation_id, attempt_id):
         """Only the worker calls this after actual B3 durable reservation.

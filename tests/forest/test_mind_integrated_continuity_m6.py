@@ -15,6 +15,7 @@ from turn_bridge_b3 import ForestTurnBridge, BridgeRefusal, bootstrap_attempts_s
 from shared_context_b6r1 import TaskContext, BarkAttachment
 from context_first_tree_m2 import ContextRefusal, SessionContextRef
 from runtime_stop_control_r2 import RuntimeStopControl
+from runtime_events_r3 import OperationRef, RuntimeExchange, RuntimeEventRefusal
 from history_public_fixture_m4 import (
     PublicViewRef, HistoryPageRef, history_public_fixture_in_transaction,
 )
@@ -100,6 +101,152 @@ process.stdout.write(JSON.stringify(ctx.project(frame,ref,ref)));
         self.assertEqual(events[-1]["event"], "COMMITTED")
         self.rev += 1
         return events
+
+    def resolve_fixture_context(self):
+        # Test-local owner resolves durable state anew; not a captured UI ref.
+        # This is not a production currentness/identity witness.
+        session = self.db.execute(
+            "SELECT state,revision FROM forest_sessions "
+            "WHERE owner_key=? AND tree_key=? AND session_id=?",
+            (self.context.principal_key, self.context.tree_key, self.sid),
+        ).fetchone()
+        if session is None or session[0] != "OPEN":
+            raise ContextRefusal("FIXTURE_SESSION_UNAVAILABLE")
+        user = self.db.execute(
+            "SELECT turn_id,role FROM forest_turns WHERE session_id=? "
+            "ORDER BY ordinal DESC LIMIT 1", (self.sid,),
+        ).fetchone()
+        if user is None or user[1] != "user":
+            raise ContextRefusal("FIXTURE_USER_UNAVAILABLE")
+        return SessionContextRef(self.context, self.sid, session[1], user[0])
+
+    def runtime(self, operation_id):
+        bridge = ForestTurnBridge(self.journal, clock_ms=self.tick, streamer=self.streamer)
+        op = OperationRef(self.ref, operation_id)
+        return op, RuntimeExchange(bridge, op,
+            resolve_current_context=self.resolve_fixture_context,
+            model="fixture-model")
+
+    def controller(self, pages, changed_scope=None):
+        # Only M4 history frames enter the actual UI2 controller. Internal R3
+        # payloads, original operation references and attempt IDs stay local.
+        script = """
+const fs=require("fs"), vm=require("vm"), assert=require("node:assert/strict");
+const ctx=vm.createContext({});
+vm.runInContext(fs.readFileSync(process.argv[1],"utf8"),ctx);
+const {pages,changedScope}=JSON.parse(fs.readFileSync(0,"utf8"));
+const c=ctx.createController();
+const scopeOf=r=>({treeKey:r.treeKey,generation:r.generation,
+    sessionId:r.sessionId,revision:r.revision,viewKey:"fixture-view-"+r.generation});
+const scope=scopeOf(pages[0][1]);
+const snapshots=[];
+for (let i=0;i<pages.length;i++) {
+    const [frame,ref]=pages[i];
+    const pending=i===0 ? c.open(scope,ref.requestId,ref.limit)
+                       : c.next(scope,ref.requestId,ref.limit);
+    assert.equal(pending.state,"PENDING");
+    assert.deepEqual(JSON.parse(JSON.stringify(pending.request)),ref);
+    const snapshot=c.receive(frame,scope);
+    assert.equal(snapshot.state,frame.complete?"COMPLETE":"PARTIAL");
+    assert.equal(snapshot.request,null);
+    assert.equal(snapshot.permissionGranted,false);
+    assert.equal(snapshot.sourceAuthenticated,false);
+    snapshots.push(snapshot);
+}
+if(changedScope!==null) snapshots.push(c.observe({...scope,...changedScope}));
+process.stdout.write(JSON.stringify(snapshots));
+"""
+        result = subprocess.run(["node", "-e", script,
+            str(ROOT / "widgets/forest/ui2/PublicHistoryDisplay.js")],
+            input=json.dumps({"pages":pages,"changedScope":changed_scope}, ensure_ascii=False),
+            text=True, capture_output=True, check=True, timeout=10)
+        return json.loads(result.stdout)
+
+    def test_r3_restart_followup_and_controller_reopens_committed_history(self):
+        self.append_user("Public first question")
+        op, runtime = self.runtime("original-1")
+        first = list(runtime.run())
+        self.assertEqual([f.payload["event"] for f in first],
+                         ["REQUESTED","RESERVED","STARTED","DELTA","COMMITTED"])
+        self.assertEqual([f.ordinal for f in first], list(range(1,6)))
+        self.assertTrue(all(f.operation == op for f in first))
+        self.assertIsNone(first[0].attempt_id)
+        self.assertTrue(all(f.attempt_id == first[1].attempt_id for f in first[1:]))
+        self.rev += 1
+        pages = [self.history(limit=1), self.history(after=1,limit=1)]
+        snapshots = self.controller(pages, {"generation":2})
+        self.assertEqual([s["state"] for s in snapshots],
+                         ["PARTIAL","COMPLETE","UNAVAILABLE"])
+        self.assertEqual(snapshots[-1]["messages"], [])
+        self.assertEqual([m["body"] for m in snapshots[1]["messages"]],
+                         ["Public first question","Public answer"])
+        self.db.close()
+        self.db = sqlite3.connect(self.path)
+        self.journal = ForestSessionJournal(self.db)
+        self.context = replace(self.context, task_id="task-b",
+                               execution_context_id="exec-b", generation=2)
+        reopened = self.controller([self.history()])[-1]
+        self.assertEqual(reopened["messages"], snapshots[1]["messages"])
+        self.append_user("Public follow-up")
+        self.reply = "Public second answer"
+        new_op, new_runtime = self.runtime("original-2")
+        new_frames = list(new_runtime.run())
+        self.assertEqual(new_frames[-1].payload["event"], "COMMITTED")
+        self.assertNotEqual(new_op, op)
+        self.assertNotEqual(new_frames[-1].attempt_id, first[-1].attempt_id)
+        self.rev += 1
+        self.assertEqual(self.calls[-1], [
+            {"role":"user","content":"Public first question"},
+            {"role":"assistant","content":"Public answer"},
+            {"role":"user","content":"Public follow-up"}])
+        final = self.controller([self.history(limit=2),self.history(after=2,limit=2)])[-1]
+        self.assertEqual([m["body"] for m in final["messages"]],
+                         ["Public first question","Public answer",
+                          "Public follow-up","Public second answer"])
+
+    def test_r3_stop_keeps_history_committed_and_unknown_no_replay(self):
+        self.append_user("Public question")
+        self.reply = "Public provisional text"
+        op, runtime = self.runtime("original-stop")
+        gen = runtime.run()
+        frames = [next(gen) for _ in range(4)]
+        self.assertEqual(frames[-1].payload["event"], "DELTA")
+        self.assertTrue(frames[-1].payload["provisional"])
+        before = self.controller([self.history()])[-1]
+        self.assertEqual([m["body"] for m in before["messages"]], ["Public question"])
+        self.assertEqual(runtime.request_stop(op, frames[-1].attempt_id), "STOP_LATCHED")
+        end = list(gen)[-1]
+        self.assertEqual(dict(end.payload), {"event":"UNKNOWN_HOLD"})
+        self.assertEqual(end.attempt_id, frames[-1].attempt_id)
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?", (end.attempt_id,)
+        ).fetchone()[0], "ABORTED")
+        self.assertEqual(self.controller([self.history()])[-1]["messages"], before["messages"])
+        with self.assertRaises(RuntimeEventRefusal):
+            list(runtime.run())
+        # Even constructing a second fixture exchange cannot replay the durable user turn.
+        _, second = self.runtime("different-original")
+        self.assertEqual(list(second.run())[-1].payload["event"], "UNKNOWN_HOLD")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_r3_fresh_resolver_detects_revision_change_before_dispatch(self):
+        self.append_user("Public first question")
+        op, runtime = self.runtime("original-stale")
+        gen = runtime.run()
+        self.assertEqual(next(gen).payload["event"], "REQUESTED")
+        reserved = next(gen)
+        self.assertEqual(reserved.payload["event"], "RESERVED")
+        # Change durable revision without updating the runtime's original ref.
+        self.append_user("Public newer question")
+        end = list(gen)[-1]
+        self.assertEqual(dict(end.payload), {"event":"UNKNOWN_HOLD"})
+        self.assertEqual(end.operation, op)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?", (reserved.attempt_id,)
+        ).fetchone()[0], "ABORTED")
+        self.assertEqual([m["body"] for m in self.controller([self.history()])[-1]["messages"]],
+                         ["Public first question","Public newer question"])
 
     def test_two_turns_restart_and_actual_ui_projection(self):
         self.append_user("Public first question")

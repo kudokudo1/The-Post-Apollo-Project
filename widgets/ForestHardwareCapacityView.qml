@@ -7,11 +7,20 @@ import "../services/forest"
 // This view does not change the shared P0 source for header/model LIVE badges.
 Item {
     id: hardware
+    // Selected Tree is a UI presentation choice, not a C5 access grant.
+    property string selectedModelName: ""
+    readonly property bool currentModelObservation:
+        selectedModelName !== ""
+        && capacity.status === "OBSERVED"
+        && capacity.requestedModel === selectedModelName
+        && capacity.data.model.name === selectedModelName
     readonly property string snapshotStatus: capacity.status
     readonly property bool checking: capacity.scanning
     readonly property var snapshot: capacity.data
     function checkNow() {
-        return capacity.inspectCapacity();
+        // The only P2C request for the selected model is this operator click.
+        // Switching Tree cannot reinterpret prior report as a new model.
+        return capacity.inspectCapacity(selectedModelName);
     }
 
     ForestCapacityAdapter {
@@ -74,6 +83,65 @@ Item {
                         onClicked: hardware.checkNow()
                     }
                 }
+            }
+
+            GohuText {
+                width: parent.width
+                text: "MODEL PREFLIGHT // " + (hardware.selectedModelName || "NONE SELECTED")
+                textFormat: Text.PlainText
+                font.pixelSize: 10
+                color: Colors.magenta
+                elide: Text.ElideRight
+            }
+            Rectangle {
+                width: parent.width
+                height: 48
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+                GohuText {
+                    anchors.top: parent.top
+                    anchors.topMargin: 8
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    text: hardware.currentModelObservation
+                        ? ("INSTALLED " + (capacity.data.model.installed ? "YES" : "NO")
+                            + " // RESIDENT " + (capacity.data.model.resident ? "YES" : "NO"))
+                        : hardware.selectedModelName
+                            ? "SELECTED MODEL NOT CHECKED // PRESS CHECK"
+                            : "SELECT A MODEL TO CHECK EXACT MATCH"
+                    textFormat: Text.PlainText
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    color: hardware.currentModelObservation ? Colors.green : Colors.orange
+                }
+                GohuText {
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 8
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    text: hardware.currentModelObservation
+                        ? ("ARTIFACT " + capacity.data.model.artifactMiB
+                            + " / RES MEM " + capacity.data.model.residentMiB
+                            + " / VRAM REP " + capacity.data.model.vramMiB + " MiB")
+                        : "MODEL METRICS // UNKNOWN"
+                    textFormat: Text.PlainText
+                    font.pixelSize: 9
+                    elide: Text.ElideRight
+                    color: Colors.cyan
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: "MODEL MEMORY REQUIREMENTS UNCALIBRATED // BENCHMARK HOLD"
+                textFormat: Text.PlainText
+                font.pixelSize: 9
+                color: Colors.orange
+                elide: Text.ElideRight
             }
 
             GohuText {

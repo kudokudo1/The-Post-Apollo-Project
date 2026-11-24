@@ -46,11 +46,13 @@ class ForestHardwareViewP2CTests(unittest.TestCase):
         self.assertIn("running: false", adapter)
         self.assertIn('Quickshell.shellPath("scripts/forest/performance_capacity_p2c.py")', adapter)
         self.assertIn('"inspect"', adapter)
+        self.assertIn('argv.push("--model", wanted);', adapter)
+        self.assertIn('selectedModelName: root.selectedLocalModel', view)
         self.assertEqual(adapter.count("Process {"), 1)
         for forbidden in (
             "Timer {", "Component.onCompleted: inspectCapacity",
             "onVisibleChanged: inspectCapacity", "execDetached",
-            '"/api/chat"', '"--model"', "modelResidency.scanResidency()",
+            '"/api/chat"', "modelResidency.scanResidency()",
             "localInventory.scanModels()",
         ):
             self.assertNotIn(forbidden, adapter + "\n" + ui)

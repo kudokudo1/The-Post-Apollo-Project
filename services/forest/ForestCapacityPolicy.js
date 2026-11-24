@@ -4,8 +4,10 @@
 var SCHEMA = "post-apollo.forest.performance-capacity.readonly-p2c";
 var MAX_BYTES = 1048576;
 var MAX_GPUS = 8;
+var NO_MODEL = {name:"",installed:false,resident:false,
+                artifactMiB:"?",residentMiB:"?",vramMiB:"?",calibrated:false};
 var EMPTY = {hostRam:"?",cpuVisible:"?",cpuAffinity:"?",gpuCards:[],
-             gpuCount:0,gpuHint:"UNKNOWN",ollamaVersion:"?"};
+             gpuCount:0,gpuHint:"UNKNOWN",ollamaVersion:"?",model:NO_MODEL};
 function _count(x) {
     return typeof x === "number" && isFinite(x) && x >= 0
         && Math.floor(x) === x && x <= Number.MAX_SAFE_INTEGER;
@@ -16,12 +18,47 @@ function _optional(x,positive) {
 function _mb(x) {
     return x === null ? "?" : (x / 1048576).toFixed(0);
 }
+function validModelName(name) {
+    return typeof name === "string" && name.length <= 128
+        && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(name);
+}
+// Exactly one model selected for this explicit P2C request; NEVER permission.
+// The artifact is installed disk size and resident VRAM is reported usage,
+// NOT a calibrated memory requirement or proof of GPU assignment.
+function selectedRecord(record, requested) {
+    if (requested === "")
+        return record === null ? NO_MODEL : null;
+    if (!record || typeof record !== "object" || Array.isArray(record)
+            || record.model !== requested
+            || typeof record.installed !== "boolean"
+            || typeof record.resident !== "boolean"
+            || record.runtime_requirement_calibrated !== false
+            || !_optional(record.installed_artifact_bytes_reported,false)
+            || !_optional(record.resident_memory_bytes_reported,false)
+            || !_optional(record.resident_vram_bytes_reported,false)
+            || (record.installed
+                ? record.installed_artifact_bytes_reported === null
+                : record.installed_artifact_bytes_reported !== null)
+            || (record.resident
+                ? record.resident_memory_bytes_reported === null
+                : record.resident_memory_bytes_reported !== null
+                    || record.resident_vram_bytes_reported !== null))
+        return null;
+    return {name:requested,installed:record.installed,
+            resident:record.resident,
+            artifactMiB:_mb(record.installed_artifact_bytes_reported),
+            residentMiB:_mb(record.resident_memory_bytes_reported),
+            vramMiB:_mb(record.resident_vram_bytes_reported),
+            calibrated:false};
+}
 function _hold(reason) {
     return {valid:false,status:"UNAVAILABLE",reason:reason,
             data:EMPTY,authority:false};
 }
-function parseSnapshot(raw) {
+function parseSnapshot(raw, requestedModel) {
     var invalid = _hold("INVALID_RESPONSE");
+    var requested = requestedModel === undefined ? "" : requestedModel;
+    if (requested !== "" && !validModelName(requested)) return invalid;
     if (typeof raw !== "string" || raw.length < 2 || raw.length > MAX_BYTES)
         return invalid;
     var obj;
@@ -44,7 +81,6 @@ function parseSnapshot(raw) {
     if (obj.status !== "OBSERVED" || obj.provider !== "ollama"
             || typeof obj.ollama_version !== "string"
             || !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(obj.ollama_version)
-            || obj.selected_model !== null
             || obj.gpu_metrics_are_free_allocatable_vram !== false
             || obj.ollama_device_mapping_verified !== false
             || obj.resource_budget_established !== false
@@ -70,6 +106,8 @@ function parseSnapshot(raw) {
             || obj.gpu_sysfs_status !== (obj.gpu_devices.length
                                         ? "COUNTERS_OBSERVED" : "UNAVAILABLE"))
         return invalid;
+    var model = selectedRecord(obj.selected_model, requested);
+    if (model === null) return invalid;
     var rows = [];
     var seen = Object.create(null);
     for (var i=0; i<obj.gpu_devices.length; i++) {
@@ -103,20 +141,24 @@ function parseSnapshot(raw) {
                     ? "?" : String(obj.process_affinity_cpu_threads),
             gpuCards:rows,gpuCount:rows.length,
             gpuHint:rows.length ? "DRM COUNTERS" : "GPU COUNTERS UNKNOWN",
-            ollamaVersion:obj.ollama_version
+            ollamaVersion:obj.ollama_version,
+            model:model
         }
     };
 }
 // A complete process result requires stdout + stderr + exit, in any order.
 // Never publish new measurements while a scan is underway or after failure.
-function beginScan() {
-    return {stdoutSeen:false,stderrSeen:false,exitSeen:false,
+function beginScan(requestedModel) {
+    var model = requestedModel === undefined ? "" : requestedModel;
+    if (model !== "" && !validModelName(model)) return null;
+    return {requestedModel:model,stdoutSeen:false,stderrSeen:false,exitSeen:false,
             stagedStatus:"",stagedReason:"",stagedData:EMPTY,
             exitCode:-999,exitStatus:-999,error:"",
             complete:false,status:"CHECKING",reason:"",data:EMPTY};
 }
 function _copy(s) {
-    return {stdoutSeen:s.stdoutSeen,stderrSeen:s.stderrSeen,exitSeen:s.exitSeen,
+    return {requestedModel:s.requestedModel,
+            stdoutSeen:s.stdoutSeen,stderrSeen:s.stderrSeen,exitSeen:s.exitSeen,
             stagedStatus:s.stagedStatus,stagedReason:s.stagedReason,
             stagedData:s.stagedData,exitCode:s.exitCode,
             exitStatus:s.exitStatus,error:s.error,complete:s.complete,
@@ -143,7 +185,7 @@ function captureStdout(s,raw) {
     if (n.stdoutSeen) n.error="DUPLICATE_STDOUT";
     else {
         n.stdoutSeen=true;
-        var p=parseSnapshot(raw);
+        var p=parseSnapshot(raw,n.requestedModel);
         if (!p.valid) n.error="INVALID_RESPONSE";
         else {n.stagedStatus=p.status;n.stagedReason=p.reason;n.stagedData=p.data;}
     }

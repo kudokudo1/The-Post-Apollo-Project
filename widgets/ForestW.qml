@@ -1100,6 +1100,9 @@ PanelWindow {
 
                 ForestHardwareCapacityView {
                     id: capacityView
+                    // Same exact per-Tree selection as the P0 header/popup.
+                    // P2C is manual-only and must never feed LOAD/IDLE status.
+                    selectedModelName: root.selectedLocalModel
                     visible: root.hardwareViewOpen
                     anchors.top: popupProviderStatus.bottom
                     anchors.topMargin: 3

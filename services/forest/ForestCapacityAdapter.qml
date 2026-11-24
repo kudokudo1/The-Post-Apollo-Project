@@ -4,29 +4,41 @@ import Quickshell.Io
 import "ForestCapacityPolicy.js" as CapacityPolicy
 
 // ForestW only. P2C already owns bounded Ollama and fixed /sys DRM reads.
-// One explicit CHECK. No timer, model argument, new provider, inference,
+// One explicit CHECK; optional exact model is a read-only filter, not authority.
+// No timer, new provider, inference,
 // application mutation, host authentication, C5 permission or persistence.
 Scope {
     id: capacity
     property bool scanning: false
     property string status: "NOT_CHECKED"
     property string reason: ""
+    property string requestedModel: ""
     property var data: CapacityPolicy.beginScan().data
     property var scanState: CapacityPolicy.beginScan()
 
-    function inspectCapacity() {
+    function inspectCapacity(model) {
         if (scanning || inspectProcess.running)
             return false;
-        scanState = CapacityPolicy.beginScan();
+        const wanted = model === undefined ? "" : model;
+        // Reject malformed caller values before starting a process.
+        const pending = CapacityPolicy.beginScan(wanted);
+        if (!pending)
+            return false;
+        scanState = pending;
+        requestedModel = wanted;
         status = "CHECKING";
         reason = "";
         data = scanState.data;
         scanning = true;
-        inspectProcess.exec([
+        const argv = [
             "python3",
             Quickshell.shellPath("scripts/forest/performance_capacity_p2c.py"),
             "inspect"
-        ]);
+        ];
+        // P2C owns this existing opt-in read-only exact-model CLI argument.
+        if (wanted !== "")
+            argv.push("--model", wanted);
+        inspectProcess.exec(argv);
         return true;
     }
     function acceptProgress(next) {

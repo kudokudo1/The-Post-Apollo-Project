@@ -286,3 +286,44 @@ test('mini graph lookup preserves old scan results and rebuilds on snapshot repl
     assert.match(app, /taskRows:\s*appControlWindow\.taskRows/);
     assert.match(app, /taskRows = snapshotRows;/);
 });
+
+test('mini COMBI histories copy only on demand and preserve snapshot isolation', () => {
+    const start = app.indexOf('                            function snapshotCombiHistory(live) {');
+    const end = app.indexOf('                            function refreshHistory(animateScroll) {', start);
+    assert.ok(start >= 0 && end > start, 'locate exact mini canvas helper');
+    const create = new Function('combiView', 'emptyCombiHistories', 'taskGraphController',
+        app.slice(start, end) + '\nreturn snapshotCombiHistory;');
+    const empty = {cpu: [], mem: [], io: [], age: []};
+    const source = {cpu: [1, 2, 3], mem: [4, 5], io: [0], age: [9, 10]};
+    const entry = {pid: 99};
+    let calls = [];
+    const controller = {
+        miniHunterHistoryForMetric: (live, metric) => {
+            assert.equal(live, entry);
+            calls.push(metric);
+            return source[metric];
+        }
+    };
+    const off = create(false, empty, controller);
+    for (let n = 0; n < 100; n++)
+        assert.equal(off(entry), empty, 'stable inactive history object');
+    assert.deepStrictEqual(calls, [], 'no metric retrieval or copying outside COMBI');
+    const on = create(true, empty, controller);
+    const active = on(entry);
+    assert.deepStrictEqual(calls, ['cpu', 'mem', 'io', 'age']);
+    assert.deepStrictEqual(active, source, 'all four histories preserved');
+    for (const metric of Object.keys(source))
+        assert.notEqual(active[metric], source[metric], 'local copy ' + metric);
+    source.cpu.push(4);
+    assert.deepStrictEqual(active.cpu, [1, 2, 3], 'active readers keep snapshot');
+    assert.equal(off(entry), empty, 'exit drops local copies');
+    assert.deepStrictEqual(on(entry).cpu, [1, 2, 3, 4], 're-entry sees latest samples');
+    const refresh = app.slice(end, app.indexOf('// Keep the same three-quarter grid', end));
+    assert.match(refresh, /const nextCombi = snapshotCombiHistory\(live\);/);
+    assert.match(refresh, /if \(combiHistories !== nextCombi\)\s+combiHistories = nextCombi;/);
+    assert.match(refresh, /onCombiViewChanged:\s*\{\s*if \(graphReady\)\s*refreshHistory\(false\);/);
+    assert.match(refresh, /Component\.onCompleted:\s*\{\s*graphReady = true;\s*refreshHistory\(false\);/);
+    assert.match(refresh, /onHistoryRevisionChanged: refreshHistory\(true\)/);
+    assert.match(refresh, /onTaskIdentityChanged\(\)/);
+    assert.match(refresh, /onRowItemChanged\(\)/);
+});

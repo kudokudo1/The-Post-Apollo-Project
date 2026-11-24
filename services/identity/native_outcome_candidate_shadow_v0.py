@@ -105,11 +105,13 @@ def inspect_candidate_once(
     original: OriginalCommandBinding,
     provider: Callable[[OriginalCommandBinding], object] | None,
 ) -> UntrustedOutcomeInspection:
-    """One read-only candidate lookup, no fallback and no permission output.
+    """Legacy CI-only injected callback: execution is NOT guaranteed read-only.
 
-    A callback can forge every field. Neither a source named 'independent'
-    nor its claimed signed terminal status can make this output authoritative.
-    The caller must NOT connect this shadow to a privileged native command.
+    The arbitrary provider can run any caller-supplied Python; this path is
+    retained for existing disposable tests only, not a native recovery consumer.
+    Use inspect_supplied_candidate() for callback-free comparison. Neither a
+    claimed independent source nor signature makes a terminal result trusted.
+    No return value can authorize a command or clear UNKNOWN_HOLD.
     """
     if type(original) is not OriginalCommandBinding:
         raise CandidateRefused("Original native command identity required")

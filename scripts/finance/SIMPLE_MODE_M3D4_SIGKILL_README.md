@@ -43,4 +43,4 @@ The test uses an **instrumented in-memory guard** for deterministic pauses, NOT 
 
 ## DECISIONS
 
-No user-local changes. Test-only rollback reverts these four new files. Preserve unresolved real attempts until an authorized investigation resolves them.
+No user-local changes. Test-only rollback reverts these five new files. Preserve unresolved real attempts until an authorized investigation resolves them.

@@ -51,9 +51,10 @@ def _sha(raw: bytes) -> str:
 def _parse(wire: bytes, fields: frozenset[str], name: str) -> dict:
     try:
         return S._parse_exact(wire, fields)
-    except S.EvidenceHold as exc:
-        raise V1Hold("FOREST_C5_V1_UNENROLLED_HOLD // INVALID_" + name +
-                     " // " + str(exc)) from exc
+    except S.EvidenceHold:
+        pass
+    # Do not retain the rejected wire in a nested parser exception.
+    _hold("INVALID_" + name)
 
 
 def _id(value: object, name: str) -> None:
@@ -82,9 +83,11 @@ def _public(key: object, signature: object, name: str) -> str:
 def _signature(key: bytes, signature: bytes, wire: bytes, name: str) -> None:
     try:
         Ed25519PublicKey.from_public_bytes(key).verify(signature, wire)
-    except (InvalidSignature, ValueError) as exc:
-        raise V1Hold("FOREST_C5_V1_UNENROLLED_HOLD // INVALID_" + name +
-                     "_SIGNATURE") from exc
+    except (InvalidSignature, ValueError):
+        pass
+    else:
+        return
+    _hold("INVALID_" + name + "_SIGNATURE")
 
 
 def _intent(wire: bytes) -> tuple[dict, str]:
@@ -129,7 +132,10 @@ def _role(wire: bytes, role: str, decision: str, public_digest: str,
 
 
 def _binding(intent: dict, candidate: object) -> None:
-    if type(candidate) is not dict or set(candidate) != A.BINDING_FIELDS:
+    if (type(candidate) is not dict
+            or len(candidate) != len(A.BINDING_FIELDS)
+            or any(type(key) is not str for key in candidate)
+            or set(candidate) != A.BINDING_FIELDS):
         _hold("EXACT_FOREST_B4C_BINDING_REQUIRED")
     fields = {
         "owner_key": "principal",
@@ -142,7 +148,10 @@ def _binding(intent: dict, candidate: object) -> None:
         "expected_revision": "revision",
     }
     for name, signed in fields.items():
-        if candidate[name] != intent[signed] or type(candidate[name]) is not type(intent[signed]):
+        actual, expected = candidate[name], intent[signed]
+        # Plain scalar type must precede equality: a caller object can
+        # otherwise execute custom comparison code even on a refusal path.
+        if type(actual) is not type(expected) or actual != expected:
             _hold("V1_SESSION_OR_ATTEMPT_BINDING_MISMATCH_" + name)
     # Request ID grammar comes from B4a/B4c, not from the general v0 ID.
     if not 16 <= len(candidate["request_id"]) <= 96:

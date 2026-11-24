@@ -294,5 +294,76 @@ class ForestC5V1SessionReceiptTests(unittest.TestCase):
             self.assertNotIn(forbidden, dir(V))
 
 
+
+    def test_21_private_parser_objects_are_not_chained(self):
+        marker = b"SYNTHETIC_PRIVATE_SESSION"
+        for index, label in ((0, "V1_INTENT"), (2, "V1_ROLE"),
+                             (5, "V1_ROLE"), (8, "V1_RECEIPT")):
+            for wire in (b'{"title":"' + marker,
+                         b'{"title":"' + marker + b'\xff"}',
+                         b'[' * 1500 + b']' * 1500):
+                with self.subTest(index=index, size=len(wire)):
+                    parts = self.build()
+                    parts[index] = wire
+                    with self.assertRaises(V.V1Hold) as caught:
+                        self.inspect(parts)
+                    error = caught.exception
+                    self.assertEqual(str(error),
+                                     "FOREST_C5_V1_UNENROLLED_HOLD // INVALID_" + label)
+                    self.assertIsNone(error.__cause__)
+                    self.assertIsNone(error.__context__)
+
+    def test_22_bad_binding_keys_refuse_before_custom_equality(self):
+        class HostileKey(str):
+            armed = False
+            __hash__ = str.__hash__
+
+            def __eq__(self, other):
+                if self.armed:
+                    raise AssertionError("unexpected key comparison")
+                return super().__eq__(other)
+
+        parts = self.build()
+        binding = parts[1]
+        key = HostileKey("session_id")
+        value = binding.pop("session_id")
+        binding[key] = value
+        key.armed = True
+        self.hold("EXACT_FOREST_B4C_BINDING_REQUIRED", parts)
+        parts = self.build()
+        parts[1].update({f"extra{i}": None for i in range(2048)})
+        self.hold("EXACT_FOREST_B4C_BINDING_REQUIRED", parts)
+
+    def test_23_bad_binding_values_refuse_before_custom_equality(self):
+        class HostileValue:
+            def __eq__(self, other):
+                raise AssertionError("unexpected value comparison")
+
+            def __ne__(self, other):
+                raise AssertionError("unexpected value comparison")
+
+        for field in self.build()[1]:
+            with self.subTest(field=field):
+                self.hold("V1_SESSION_OR_ATTEMPT_BINDING_MISMATCH_" + field,
+                          binding_changes={field: HostileValue()})
+        self.hold("V1_SESSION_OR_ATTEMPT_BINDING_MISMATCH_expected_revision",
+                  binding_changes={"expected_revision": True})
+        self.denied(self.inspect())
+
+    def test_24_invalid_signature_refusal_has_no_nested_exception(self):
+        for index, role in ((3, "REQUESTER"), (6, "REVIEWER"), (9, "WRITER")):
+            with self.subTest(role=role):
+                parts = self.build()
+                parts[index] = bytes([parts[index][0] ^ 1]) + parts[index][1:]
+                with self.assertRaises(V.V1Hold) as caught:
+                    self.inspect(parts)
+                error = caught.exception
+                self.assertEqual(str(error),
+                                 "FOREST_C5_V1_UNENROLLED_HOLD // INVALID_" +
+                                 role + "_SIGNATURE")
+                self.assertIsNone(error.__cause__)
+                self.assertIsNone(error.__context__)
+
+
 if __name__ == "__main__":
     unittest.main()

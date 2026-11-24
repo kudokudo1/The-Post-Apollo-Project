@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'services/identity/native_original_attempt_recovery_join_v0.py'
+      - 'services/identity/native_outcome_candidate_shadow_v0.py'
       - 'services/identity/native_attempt_fingerprint_v0.py'
       - 'services/identity/desktop_signed_command_client_v0.py'
       - 'tests/identity/test_native_original_attempt_recovery_join_v0.py'
@@ -13,6 +14,7 @@ on:
     branches: [main]
     paths:
       - 'services/identity/native_original_attempt_recovery_join_v0.py'
+      - 'services/identity/native_outcome_candidate_shadow_v0.py'
       - 'services/identity/native_attempt_fingerprint_v0.py'
       - 'services/identity/desktop_signed_command_client_v0.py'
       - 'tests/identity/test_native_original_attempt_recovery_join_v0.py'
@@ -37,8 +39,9 @@ jobs:
           python3 -m py_compile services/identity/native_attempt_fingerprint_v0.py
           python3 -m py_compile services/identity/desktop_signed_command_client_v0.py
           python3 -m py_compile services/identity/native_original_attempt_recovery_join_v0.py
+          python3 -m py_compile services/identity/native_outcome_candidate_shadow_v0.py
           python3 -m py_compile tests/identity/test_native_original_attempt_recovery_join_v0.py
-      - name: Reject forged fingerprint / signed receipt / candidate joins
+      - name: Reject executable recovery providers, forged snapshots and unsafe joins
         run: python3 -m unittest discover -s tests/identity -p 'test_native_original_attempt_recovery_join_v0.py' -v
       - name: Preserve original source evidence and signed receipt denial contracts
         run: |

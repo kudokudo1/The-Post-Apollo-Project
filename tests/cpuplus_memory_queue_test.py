@@ -119,6 +119,38 @@ class TestQueue(unittest.TestCase):
         with self.assertRaisesRegex(QueueError, "UNSAFE_QUEUE_FILE"):
             Queue(link)
 
+    def test_private_parent_required(self):
+        parent = Path(self.temp.name) / "public"
+        parent.mkdir(mode=0o755)
+        with self.assertRaisesRegex(QueueError, "UNSAFE_QUEUE_PARENT"):
+            Queue(parent / "queue.db")
+        self.assertFalse((parent / "queue.db").exists())
+
+    def test_terminal_corruption_detected_on_reopen(self):
+        record = self.enqueue()
+        self.queue.cancel(record["id"], now=101)
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE requests SET payload='{}'")
+        with self.assertRaises(QueueError):
+            Queue(self.path)
+        with self.assertRaises(QueueError):
+            self.queue.audit_history()
+
+    def test_broken_replacement_detected(self):
+        record = self.enqueue()
+        new = self.queue.replace(record["id"], target_gib=20, source=SOURCE, now=101, expires_at=201)
+        with sqlite3.connect(self.path) as db:
+            db.execute("DELETE FROM requests WHERE id=?", (new["id"],))
+        with self.assertRaisesRegex(QueueError, "BROKEN_REPLACEMENT_CHAIN"):
+            Queue(self.path)
+
+    def test_path_replacement_refused(self):
+        old = self.path.with_suffix(".old")
+        self.path.rename(old)
+        Queue(self.path)
+        with self.assertRaisesRegex(QueueError, "QUEUE_FILE_REPLACED"):
+            self.queue.pending()
+
     def test_observation_is_not_live(self):
         source = copy.deepcopy(SOURCE)
         record = self.enqueue(source=source, target_gib=0)

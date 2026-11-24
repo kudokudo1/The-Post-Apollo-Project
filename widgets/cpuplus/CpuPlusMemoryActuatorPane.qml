@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls as Controls
 import Quickshell.Io
 import qs.services.memory
 import "../../components"
@@ -29,7 +28,24 @@ Item {
         if (plan.active) stagedGiB = Math.max(4, Math.min(64, Math.round(plan.actualGiB / 4) * 4));
         initializedTarget = true;
     }
-    onSampleChanged: adoptActual()
+    property int stagedSwappiness: -1
+    function stageCapacity(value) {
+        if (page !== "CAP" || !capacity || MemoryOperation.busy
+                || !Number.isInteger(value) || value < 0 || value > 64 || value % 4 !== 0)
+            return;
+        stagedGiB = value;
+    }
+    function stagePolicy(value) {
+        if (page !== "POL" || !sample || MemoryOperation.busy
+                || !Number.isInteger(value) || value < 0 || value > 200)
+            return;
+        stagedSwappiness = value;
+    }
+    onSampleChanged: {
+        adoptActual();
+        if (sample && stagedSwappiness < 0)
+            stagedSwappiness = sample.swappiness;
+    }
     function gib(kib) { return (kib / 1048576).toFixed(2) + " GiB"; }
     function refresh() {
         if (probe.running || (status === "READING" && (received || exited))) return;
@@ -180,8 +196,7 @@ Item {
             }
             Repeater {
                 model: !root.sample ? []
-                    : root.page === "POL" ? ["SWAPPINESS // " + root.sample.swappiness]
-                    : root.page === "CAP" || root.page === "DIAG" ? [
+                    : root.page === "DIAG" ? [
                     "PHYSICAL // " + root.gib(root.sample.total),
                     "AVAILABLE // " + root.gib(root.sample.available),
                     "SWAP USED // " + root.gib(root.sample.swap - root.sample.free)
@@ -199,7 +214,7 @@ Item {
                 }
             }
             Repeater {
-                model: root.sample && (root.page === "CAP" || root.page === "DIAG")
+                model: root.sample && root.page === "DIAG"
                     ? root.sample.rows : []
                 delegate: GohuText {
                     required property var modelData
@@ -218,6 +233,56 @@ Item {
                 spacing: 10
                 visible: root.page === "CAP"
                 enabled: visible
+                GohuText {
+                    width: parent.width
+                    text: "PHYSICAL RAM // KERNEL USABLE"
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: root.sample ? "AVAILABLE // " + root.gib(root.sample.available)
+                          + " / " + root.gib(root.sample.total) : "AVAILABLE // UNAVAILABLE"
+                    color: Colors.cyan
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: Math.max(0, parent.width - 10)
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    height: 24
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+                    clip: true
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        color: Colors.cyan
+                        opacity: root.sample ? 0.22 : 0
+                    }
+                    Rectangle {
+                        x: 3; y: 3
+                        height: Math.max(0, parent.height - 6)
+                        width: root.sample && root.sample.total > 0
+                            ? Math.max(0, parent.width - 6) * root.sample.available / root.sample.total : 0
+                        color: Colors.cyan
+                        opacity: 0.85
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    text: "BRIGHT = ESTIMATED AVAILABLE RAM"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    wrapMode: Text.WordWrap
+                }
+                CpuPlusSwapComposition {
+                    width: parent.width
+                    sample: root.sample
+                    capacity: root.capacity
+                }
                 Rectangle { width: parent.width; height: 1; color: Colors.cyan }
                 GohuText {
                     text: "MANAGED DISK SWAP // CAPACITY"
@@ -226,62 +291,74 @@ Item {
                     color: Colors.magenta
                     font.pixelSize: 12
                 }
-                GohuText {
-                    text: "TARGET CAPACITY // " + root.stagedGiB + " GiB"
+                Row {
+                    id: capacityRow
                     width: parent.width
-                    wrapMode: Text.WordWrap
-                    color: Colors.yellow
-                    font.pixelSize: 12
-                }
-                GohuText {
-                    width: parent.width
-                    text: root.capacity ? "ACTUAL ACTIVE // " + root.gib(root.capacity.actualKiB) : "ACTUAL ACTIVE // UNAVAILABLE"
-                    color: Colors.cyan
-                    font.pixelSize: 11
-                    wrapMode: Text.WordWrap
-                }
-                Controls.Slider {
-                    width: parent.width
-                    enabled: root.capacity !== null && !MemoryOperation.busy
-                    from: 0
-                    to: 64
-                    stepSize: 4
-                    snapMode: Controls.Slider.SnapAlways
-                    value: root.stagedGiB
-                    onMoved: root.stagedGiB = Math.round(value)
-                }
-                GohuText {
-                    width: parent.width
-                    text: root.capacity ? "PROJECTED TOTAL SWAP // "
-                          + root.gib(root.capacity.projectedKiB)
-                          : "PROJECTED TOTAL SWAP // UNAVAILABLE"
-                    color: Colors.cyan
-                    wrapMode: Text.WordWrap
-                    font.pixelSize: 10
-                }
-                GohuText {
-                    width: parent.width
-                    text: !root.capacity ? "WAITING FOR LIVE CAPACITY"
-                        : root.capacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
-                        : root.capacity.direction === "expand" && root.capacity.baseActive && !root.capacity.extensionActive
-                            ? "EXPANSION // ADD SEPARATE TEMPORARY SWAP"
-                        : root.capacity.active ? "PREVIEW ONLY // RESIZE NOT AVAILABLE YET"
-                        : "Would reserve " + root.stagedGiB + " GiB of storage. Not physical RAM."
-                    color: Colors.white
-                    wrapMode: Text.WordWrap
-                    font.pixelSize: 10
-                }
-                ActionButton {
-                    visible: root.capacity !== null && root.capacity.active && root.capacity.direction !== "unchanged"
-                    width: parent.width
-                    height: 30
-                    label: "RESET TARGET TO ACTIVE"
-                    onLeftClicked: root.stagedGiB = Math.max(4, Math.min(64, Math.round(root.capacity.actualGiB / 4) * 4))
-                }
-                CpuPlusSwapComposition {
-                    width: parent.width
-                    sample: root.sample
-                    capacity: root.capacity
+                    spacing: 10
+                    SelectorSlider {
+                        id: capacitySelector
+                        objectName: "cpuplusCapacitySelector"
+                        width: 44
+                        height: Math.max(180, targetDetails.implicitHeight)
+                        selectorProfile: "step"
+                        minimumValue: 0
+                        maximumValue: 64
+                        valueStep: 4
+                        valueDecimals: 0
+                        valueSuffix: "GiB"
+                        currentValue: root.stagedGiB
+                        enabledSlider: root.page === "CAP" && root.capacity !== null && !MemoryOperation.busy
+                        enabled: enabledSlider
+                        sideLabel: "GiB"
+                        onValueRequested: function(value) { root.stageCapacity(value); }
+                    }
+                    Column {
+                        id: targetDetails
+                        width: Math.max(0, capacityRow.width - capacitySelector.width - capacityRow.spacing)
+                        spacing: 8
+                        GohuText {
+                            text: "TARGET // " + root.stagedGiB + " GiB"
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            color: Colors.yellow
+                            font.pixelSize: 12
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: root.capacity ? "ACTUAL ACTIVE // " + root.gib(root.capacity.actualKiB) : "ACTUAL ACTIVE // UNAVAILABLE"
+                            color: Colors.cyan
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: root.capacity ? "PROJECTED TOTAL SWAP // " + root.gib(root.capacity.projectedKiB)
+                                : "PROJECTED TOTAL SWAP // UNAVAILABLE"
+                            color: Colors.yellow
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                        }
+                        GohuText {
+                            width: parent.width
+                            text: !root.capacity ? "WAITING FOR LIVE CAPACITY"
+                                : root.capacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
+                                : root.capacity.direction === "expand" && root.capacity.baseActive && !root.capacity.extensionActive
+                                    ? "EXPANSION // ADD SEPARATE TEMPORARY SWAP"
+                                : root.capacity.active ? "PREVIEW ONLY // RESIZE NOT AVAILABLE YET"
+                                : "Would reserve " + root.stagedGiB + " GiB of storage. Not physical RAM."
+                            color: Colors.white
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 10
+                        }
+                        ActionButton {
+                            visible: root.capacity !== null && root.capacity.active && root.capacity.direction !== "unchanged"
+                            width: parent.width
+                            height: 30
+                            label: "RESET TARGET"
+                            available: !MemoryOperation.busy
+                            onLeftClicked: root.stageCapacity(Math.max(4, Math.min(64, Math.round(root.capacity.actualGiB / 4) * 4)))
+                        }
+                    }
                 }
                 CpuPlusMemoryAddControl {
                     id: addControl
@@ -290,11 +367,79 @@ Item {
                     sample: root.sample
                 }
             }
+            Loader {
+                width: parent.width
+                height: active && item ? item.implicitHeight : 0
+                visible: active
+                active: root.page === "POL"
+                sourceComponent: Column {
+                    spacing: 8
+                    GohuText {
+                        width: parent.width
+                        text: "SWAPPINESS // 0–200"
+                        color: Colors.magenta
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: root.sample ? "ACTUAL // " + root.sample.swappiness : "ACTUAL // UNAVAILABLE"
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: root.stagedSwappiness < 0 ? "TARGET // UNAVAILABLE" : "TARGET // " + root.stagedSwappiness
+                        color: Colors.yellow
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    SelectorDial {
+                        objectName: "cpuplusSwappinessDial"
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        labelText: "SWAP"
+                        selectorMode: "continuous"
+                        minimumValue: 0
+                        maximumValue: 200
+                        currentValue: Math.max(0, root.stagedSwappiness)
+                        valueStep: 1
+                        valueDecimals: 0
+                        snapContinuousToStep: true
+                        options: ["0", "50", "100", "150", "200"]
+                        numericReferenceValues: [0, 50, 100, 150, 200]
+                        interactive: root.page === "POL" && root.sample !== null
+                                     && root.stagedSwappiness >= 0 && !MemoryOperation.busy
+                        enabled: interactive
+                        onValueRequested: function(value) { root.stagePolicy(Math.round(value)); }
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 30
+                        label: "RESET TARGET TO ACTUAL"
+                        available: root.sample !== null && !MemoryOperation.busy
+                        onLeftClicked: root.stagePolicy(root.sample.swappiness)
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Relative cost of reclaiming anonymous memory through swap versus reclaiming filesystem cache. Not a RAM usage percentage."
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "PREVIEW ONLY // APPLY NOT CONNECTED"
+                        color: Colors.orange
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
             GohuText {
                 width: parent.width
-                visible: root.page !== "CAP"
-                text: root.page === "POL" ? "READ ONLY // POLICY ADJUSTMENTS NOT CONNECTED"
-                    : root.page === "PROC" ? "PROCESS CONTROLS // NOT CONNECTED"
+                visible: root.page !== "CAP" && root.page !== "POL"
+                text: root.page === "PROC" ? "PROCESS CONTROLS // NOT CONNECTED"
                     : root.page === "AUTO" ? "DEFERRED REQUESTS // NOT CONNECTED"
                     : root.page === "DIAG" ? "LIVE SNAPSHOT // EXTENDED DIAGNOSTICS NOT CONNECTED"
                     : "PROFILE CONTROLS // NOT CONNECTED"

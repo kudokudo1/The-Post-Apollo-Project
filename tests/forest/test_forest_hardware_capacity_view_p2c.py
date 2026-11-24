@@ -70,6 +70,87 @@ class ForestHardwareViewP2CTests(unittest.TestCase):
         self.assertNotIn("chatHostTrusted: true", view)
         self.assertNotIn("voiceHostTrusted: true", view)
 
+    def test_memory_placement_does_not_claim_compute_placement(self):
+        ui=(ROOT/"widgets/ForestHardwareCapacityView.qml").read_text()
+        self.assertIn("memoryPlacement: currentModelObservation",ui)
+        self.assertIn("capacity.data.model.placement",ui)
+        self.assertIn("MODEL MEMORY // REPORTED VRAM SHARE",ui)
+        self.assertIn("CPU/GPU EXECUTION SHARE // UNKNOWN",ui)
+        self.assertIn("NOT GPU UTILIZATION OR HOST RAM SHARE",ui)
+        self.assertIn("visible: hardware.memoryPlacement.share !== null",ui)
+        self.assertIn("capacity.status === \"OBSERVED\"",ui)
+        self.assertIn("capacity.requestedModel === selectedModelName",ui)
+        self.assertEqual(ui.count("ForestCapacityAdapter {"),1)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
+    def test_actual_p2c_producer_memory_relationship(self):
+        import json
+        import test_performance_capacity_p2c as fixture
+        cls=fixture.CapacityP2CTests
+        cls.setUpClass()
+        case=cls("test_selected_resident_reports_used_not_free_vram")
+        reports=[]
+        try:
+            case.setUp()
+            for total,vram in [(1000,0),(1000,250),(1000,1000),(1000,None),
+                               (1000,1001),(0,0),(10000,1),(10000,9999)]:
+                row={"name":fixture.MODEL,"size":total,"context_length":2048}
+                if vram is not None:
+                    row["size_vram"]=vram
+                fixture.Handler.resident=[row]
+                reports.append(case.inspect(model=fixture.MODEL))
+            fixture.Handler.resident=[]
+            reports.append(case.inspect(model=fixture.MODEL))
+            reports.append(case.inspect())
+            self.assertEqual(fixture.Handler.post_count,0)
+            self.assertEqual(len(fixture.Handler.calls),30)
+        finally:
+            case.doCleanups()
+            cls.tearDownClass()
+        js=r"""
+const fs=require("fs"),vm=require("vm"),assert=require("assert");
+const p=vm.createContext({});
+vm.runInContext(fs.readFileSync(process.argv[1],"utf8"),p);
+const reports=JSON.parse(process.argv[2]),model=process.argv[3];
+const expected=[
+ ["ZERO_VRAM_REPORTED",0,"0%"],
+ ["PARTIAL_REPORTED_SHARE",0.25,"25.0%"],
+ ["EQUAL_COUNTERS",1,"100%"],
+ ["UNKNOWN",null,"?"],
+ ["UNKNOWN",null,"?"],
+ ["UNKNOWN",null,"?"],
+ ["PARTIAL_REPORTED_SHARE",0.0001,"<0.1%"],
+ ["PARTIAL_REPORTED_SHARE",0.9999,">99.9%"],
+ ["NOT_RESIDENT",null,"?"],
+ ["UNKNOWN",null,"?"]
+];
+for(let i=0;i<reports.length;i++){
+ const observed=p.parseSnapshot(JSON.stringify(reports[i]),i===9?"":model);
+ assert.strictEqual(observed.valid,true,i);
+ assert.strictEqual(observed.authority,false);
+ const m=observed.data.model.placement;
+ assert.strictEqual(m.state,expected[i][0],i);
+ assert.strictEqual(m.share,expected[i][1],i);
+ assert.strictEqual(m.label,expected[i][2],i);
+}
+const wrong=p.parseSnapshot(JSON.stringify(reports[1]),"other:model");
+assert.strictEqual(wrong.valid,false);
+assert.strictEqual(wrong.data.model.placement.share,null);
+assert.strictEqual(p.beginScan(model).data.model.placement.share,null);
+const raw=JSON.stringify(reports[1]);
+let scan=p.beginScan(model);
+scan=p.captureStdout(scan,raw);
+assert.strictEqual(scan.data.model.placement.share,null);
+scan=p.captureStderr(scan,"");
+assert.strictEqual(scan.data.model.placement.share,null);
+scan=p.captureExit(scan,0,0);
+assert.strictEqual(scan.data.model.placement.share,0.25);
+"""
+        proc=subprocess.run(["node","-e",js,str(ROOT/"services/forest/ForestCapacityPolicy.js"),
+                             json.dumps(reports),fixture.MODEL],
+                            capture_output=True,text=True,check=False)
+        self.assertEqual(proc.returncode,0,proc.stderr)
+
     @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
     def test_p2c_validation_and_exit_barrier(self):
         js = textwrap.dedent(r"""

@@ -22,4 +22,6 @@ assert.match(agent, /MemoryOperation\.agentReady\(\)/);
 assert.match(agent, /flow\.submit\(responseField\.text\);\s*clearSecret\(\)/);
 assert.match(time, /if \(externalSystemAuthBusy \|\| !resyncConfirmRequired/);
 assert.match(time, /if \(externalSystemAuthBusy \|\| !timezoneConfirmRequired/);
-console.log("16 native auth source assertions PASS");
+assert.match(owner, /args.push\("persist-authorized"\)/);
+assert.match(pane, /MemoryOperation.request\("persist", 0\)/);
+console.log("18 native auth source assertions PASS");

@@ -7,6 +7,7 @@ QtObject {
     required property var telemetry
     required property var hunterPresentation
     property var taskRows: []
+    readonly property var miniTaskLookup: buildMiniTaskLookup(taskRows)
 
     signal prepareCpuMemAppend()
     signal prepareCombiAppend()
@@ -288,6 +289,28 @@ QtObject {
         return persistentIdentity(entry);
     }
 
+    // One derived lookup per taskRows publication, shared by all graph readers.
+    // The snapshot is replaced (not mutated) by applyTaskSnapshot. Keep first
+    // PID match and first highest-CPU identity match, just like the old scans.
+    function buildMiniTaskLookup(rows) {
+        const byPid = Object.create(null);
+        const byIdentity = Object.create(null);
+        const sourceRows = Array.isArray(rows) ? rows : [];
+        for (let i = 0; i < sourceRows.length; i++) {
+            const candidate = sourceRows[i];
+            const pid = Number(candidate && candidate.pid || 0);
+            if (pid > 1 && byPid[String(pid)] === undefined)
+                byPid[String(pid)] = candidate;
+            const identity = persistentIdentity(candidate);
+            if (!identity || pid <= 0)
+                continue;
+            const best = byIdentity[identity];
+            if (!best || Number(candidate.cpu || 0) > Number(best.cpu || 0))
+                byIdentity[identity] = candidate;
+        }
+        return { byPid: byPid, byIdentity: byIdentity };
+    }
+
     function liveTaskForMiniGraph(entry) {
         const source = sourceItem(entry) || entry;
         if (!source || !source._taskRecord)
@@ -295,32 +318,16 @@ QtObject {
 
         const sourcePid = Number(source.pid || 0);
         if (sourcePid > 1) {
-            for (let i = 0; i < taskRows.length; i++) {
-                const exact = taskRows[i];
-                if (Number(exact && exact.pid || 0) === sourcePid)
-                    return exact;
-            }
-
+            const exact = miniTaskLookup.byPid[String(sourcePid)];
+            if (exact !== undefined)
+                return exact;
             if (!entry._favoriteRecord)
                 return source;
         }
 
         const identity = identityForEntry(entry);
         if (identity) {
-            let best = null;
-
-            for (let i = 0; i < taskRows.length; i++) {
-                const candidate = taskRows[i];
-                if (persistentIdentity(candidate) !== identity)
-                    continue;
-                if (Number(candidate.pid || 0) <= 0)
-                    continue;
-                if (!best
-                        || Number(candidate.cpu || 0)
-                           > Number(best.cpu || 0))
-                    best = candidate;
-            }
-
+            const best = miniTaskLookup.byIdentity[identity];
             if (best)
                 return best;
         }

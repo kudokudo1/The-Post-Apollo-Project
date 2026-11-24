@@ -429,6 +429,9 @@ Item {
                     }
                 }
             }
+            ForestResourceFitExample {
+                width: parent.width
+            }
             GohuText {
                 width: parent.width
                 text: "NO VERIFIED OLLAMA GPU MAPPING OR C5 PERMIT"

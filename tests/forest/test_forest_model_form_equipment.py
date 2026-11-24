@@ -64,9 +64,15 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         self.assertNotIn("selectedTreeReasoningSteps", rail)
         self.assertNotIn("scanResidency(", rail)
         self.assertNotIn("scanModels(", rail)
-        # Ensure a usable vertical track with the shared thumb and ruler.
-        self.assertIn("topMargin: 38", slider)
-        self.assertIn("bottomMargin: 26", slider)
+        # Horizontal STEP is opt-in. Forest's INDEX rail must retain the
+        # original vertical ruler insets and usable thumb travel.
+        self.assertIn('selectorProfile: "index"', rail)
+        self.assertNotIn("horizontalStepPresentation: true", rail)
+        self.assertIn("property bool horizontalStepPresentation: false", slider)
+        self.assertIn("readonly property bool horizontalStep: stepMode && horizontalStepPresentation", slider)
+        scale = slider.split("id: scaleArea", 1)[1].split("Repeater {", 1)[0]
+        self.assertIn("topMargin: slider.horizontalStep ? 8 : 38", scale)
+        self.assertIn("bottomMargin: slider.horizontalStep ? 8 : 26", scale)
         self.assertIn("height: 52", slider)
         for height in (320, 340, 360):
             rail_height = height - 33 - 19 - 62 - 2 - 2 - 17 - 4 - 3

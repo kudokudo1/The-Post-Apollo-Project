@@ -264,5 +264,72 @@ class ForestC5B4eRecoveryInteropTests(unittest.TestCase):
         self.assert_denied(self.compare())
 
 
+
+    def test_21_recovery_dict_keys_checked_before_equality(self):
+        class HostileKey(str):
+            armed = False
+            __hash__ = str.__hash__
+
+            def __eq__(self, other):
+                if self.armed:
+                    raise AssertionError("unexpected key comparison")
+                return super().__eq__(other)
+
+        for source in ("local", "signed"):
+            with self.subTest(source=source):
+                local = self.report()
+                signed, wire = self.signed()
+                obj = local if source == "local" else signed
+                key = HostileKey("schema")
+                obj[key] = obj.pop("schema")
+                key.armed = True
+                self.hold(source.upper() + "_EXACT_FIELDS_REQUIRED",
+                          local=local, signed=signed, intent=wire)
+                local = self.report()
+                signed, wire = self.signed()
+                obj = local if source == "local" else signed
+                obj.update({f"extra{i}": None for i in range(2048)})
+                self.hold(source.upper() + "_EXACT_FIELDS_REQUIRED",
+                          local=local, signed=signed, intent=wire)
+
+    def test_22_recovery_scalar_types_precede_comparison(self):
+        class HostileValue:
+            def __eq__(self, other):
+                raise AssertionError("unexpected value equality")
+
+            def __ne__(self, other):
+                raise AssertionError("unexpected value inequality")
+
+        for field in ("schema", "c5Settlement", "attemptId",
+                      "sessionId", "forestWriteState"):
+            with self.subTest(local=field):
+                self.hold("LOCAL_SCHEMA_OR_STATE_UNTRUSTED",
+                          local=dict(self.report(), **{field: HostileValue()}))
+        for field in ("schema", "status", "claimedTerminalOutcomeUntrusted",
+                      "claimedSessionIdUntrusted", "claimedIntentSha256Untrusted",
+                      "claimedReceiptSha256Untrusted", "claimedWriterJournalCounterUntrusted"):
+            with self.subTest(signed=field):
+                signed, wire = self.signed()
+                signed[field] = HostileValue()
+                expected = ("SIGNED_NOT_UNTRUSTED_DIAGNOSTIC"
+                            if field in ("schema", "status")
+                            else "SIGNED_DIAGNOSTIC_INVALID")
+                self.hold(expected, signed=signed, intent=wire)
+        self.assert_denied(self.compare())
+
+    def test_23_malformed_original_intent_refusal_does_not_chain(self):
+        signed, _ = self.signed()
+        for wire in (b'{"private":"SYNTHETIC_PRIVATE',
+                     b'{"private":"SYNTHETIC_PRIVATE\xff"}'):
+            with self.subTest(size=len(wire)):
+                with self.assertRaises(C.RecoveryComparisonHold) as caught:
+                    self.compare(signed=signed, intent=wire)
+                self.assertEqual(str(caught.exception),
+                                 "FOREST_C5_RECOVERY_UNKNOWN_HOLD // "
+                                 "INTENT_V1_UNTRUSTED_OR_MALFORMED")
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+
+
 if __name__ == "__main__":
     unittest.main()

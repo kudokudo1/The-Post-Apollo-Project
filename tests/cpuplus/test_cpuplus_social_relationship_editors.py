@@ -72,8 +72,21 @@ class CpuPlusSocialRelationshipEditors(unittest.TestCase):
         # One task binding in middle navigation, three in the same three bays.
         self.assertEqual(CPU.count("task: cpuPlusWindow.idManagementTask"), 4)
         self.assertEqual(CPU.count("CpuPlusLocalManagementPane {"), 3)
-        self.assertIn("implicitWidth: 1000", CPU)
-        self.assertIn("implicitHeight: 834", CPU)
+        # The established default remains 1000 x 834, now selected by the
+        # shared chassis resize policy and bounded by the available display.
+        # Verify the actual default selection and both dimension bindings,
+        # rather than requiring the obsolete fixed implicit dimensions.
+        import re
+        level = re.search(r"property int resizeLevel:\s*(\d+)", CPU)
+        steps = re.search(r"readonly property var resizeSteps:\s*\[([\s\S]*?)\]", CPU)
+        self.assertIsNotNone(level)
+        self.assertIsNotNone(steps)
+        sizes = re.findall(r"\{\s*width:\s*(\d+)\s*,\s*height:\s*(\d+)\s*\}", steps.group(1))
+        index = int(level.group(1))
+        self.assertLess(index, len(sizes))
+        self.assertEqual(tuple(map(int, sizes[index])), (1000, 834))
+        self.assertRegex(CPU, r"implicitWidth:\s*Math\.min\(\s*resizeSteps\[resizeLevel\]\.width,")
+        self.assertRegex(CPU, r"implicitHeight:\s*Math\.min\(\s*resizeSteps\[resizeLevel\]\.height,")
         self.assertIn("id: sharedInstrumentPane", CPU)
         self.assertIn("width: 390", CPU)
         self.assertIn("id: targetPane", CPU)

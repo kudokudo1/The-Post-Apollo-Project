@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Polkit
 import qs.services.time
+import qs.services.memory
 import "../components"
 
 // Temporary, native Polkit UI used only while Clock/CPU++ resync is pending.
@@ -73,11 +74,12 @@ PanelWindow {
             if (isRegistered) {
                 TimeSettings.launchResyncAfterAgentReady(true);
                 TimeSettings.launchTimezoneAfterAgentReady(true);
+                MemoryOperation.agentReady();
             }
         }
         onFlowChanged: {
             authWindow.clearSecret();
-            if (flow) {
+            if (flow && TimeSettings.authSessionActive) {
                 TimeSettings.authFlowStage = "POLKIT REQUEST RECEIVED";
                 TimeSettings.authActionId = String(flow.actionId || "");
             } else if (TimeSettings.authSessionActive) {
@@ -89,7 +91,16 @@ PanelWindow {
             if (isRegistered) {
                 TimeSettings.launchResyncAfterAgentReady(true);
                 TimeSettings.launchTimezoneAfterAgentReady(true);
+                MemoryOperation.agentReady();
             }
+        }
+    }
+
+    Connections {
+        target: MemoryOperation
+        function onWaitingChanged() {
+            if (MemoryOperation.waiting && authAgent.isRegistered)
+                MemoryOperation.agentReady();
         }
     }
 
@@ -98,21 +109,21 @@ PanelWindow {
         ignoreUnknownSignals: true
         function onIsResponseRequiredChanged() {
             authWindow.clearSecret();
-            if (authAgent.flow && authAgent.flow.isResponseRequired)
+            if (TimeSettings.authSessionActive && authAgent.flow && authAgent.flow.isResponseRequired)
                 TimeSettings.authFlowStage = "PASSWORD RESPONSE REQUIRED";
             authWindow.focusPrompt();
         }
         function onAuthenticationFailed() {
-            TimeSettings.authFlowStage = "AUTHENTICATION FAILED // RETRY AVAILABLE";
+            if (TimeSettings.authSessionActive) TimeSettings.authFlowStage = "AUTHENTICATION FAILED // RETRY AVAILABLE";
             authWindow.clearSecret();
             authWindow.focusPrompt();
         }
         function onAuthenticationSucceeded() {
-            TimeSettings.authFlowStage = "AUTHENTICATION ACCEPTED";
+            if (TimeSettings.authSessionActive) TimeSettings.authFlowStage = "AUTHENTICATION ACCEPTED";
             authWindow.clearSecret();
         }
         function onAuthenticationRequestCancelled() {
-            TimeSettings.authFlowStage = "AUTHENTICATION REQUEST CANCELLED";
+            if (TimeSettings.authSessionActive) TimeSettings.authFlowStage = "AUTHENTICATION REQUEST CANCELLED";
             authWindow.clearSecret();
         }
     }
@@ -130,7 +141,7 @@ PanelWindow {
 
             GohuText {
                 width: parent.width
-                text: "TIME // AUTHORIZATION"
+                text: "SYSTEM // AUTHORIZATION"
                 color: Colors.magenta
                 font.pixelSize: 15
             }

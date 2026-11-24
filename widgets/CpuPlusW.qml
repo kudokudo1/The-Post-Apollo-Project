@@ -1884,11 +1884,11 @@ PanelWindow {
                        && (cpuPlusWindow.settingsSubMode === "TIME"
                            || cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                            || cpuPlusWindow.settingsSubMode === "LOCATION"))
-                     && cpuPlusWindow.selectedModeIndex !== 3
                      && cpuPlusWindow.selectedModeIndex !== 5
                      && cpuPlusWindow.selectedModeIndex !== 4
                      && !(cpuPlusWindow.selectedModeIndex === 6
                           && cpuPlusWindow.settingsInputPreviewSelected)
+                     && cpuPlusWindow.selectedModeIndex !== 3
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedStateHeader.bottom

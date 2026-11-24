@@ -175,7 +175,7 @@ def status():
             "expansionVersion": 1, "extension": extension, "extensionExists": extension_exists,
             "expansionCandidate": fs == "btrfs" and base is not None and base["priority"] == 10
                 and extension is None and not extension_exists,
-            "candidate": fs == "btrfs" and not existing,
+            "candidate": fs == "btrfs" and not existing and not extension_exists and extension is None,
             "path": str(SWAPFILE)}
 
 def validate_request(size, observed):
@@ -212,6 +212,8 @@ def allocate(size, *, interactive=True):
     print("VERIFIED ACTIVE:", json.dumps(observed), flush=True)
 
 def expansion_delta(target, observed):
+    if not isinstance(target, int) or not 4 <= target <= 64 or target % 4:
+        raise ValueError("Invalid target capacity")
     if not observed.get("expansionCandidate"):
         raise RuntimeError("Existing extension or missing managed base; inspect before recovery")
     base = observed["active"]["sizeKiB"]

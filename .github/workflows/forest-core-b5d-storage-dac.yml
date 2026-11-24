@@ -1,0 +1,32 @@
+name: Forest Core B5d Native Storage DAC CI
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/native_ci/test_storage_dac_b5d.py'
+      - 'scripts/forest/STORAGE_DAC_B5D.md'
+      - 'scripts/forest/session_journal_v0.py'
+      - '.github/workflows/forest-core-b5d-storage-dac.yml'
+permissions:
+  contents: read
+jobs:
+  disposable-linux-storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Native UID-separated synthetic SQLite storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --cap-drop ALL \
+            --cap-add CHOWN --cap-add SETUID --cap-add SETGID --cap-add DAC_OVERRIDE \
+            -e GITHUB_ACTIONS=true \
+            -v "$PWD/tests/forest/native_ci/test_storage_dac_b5d.py:/ci/test_storage_dac_b5d.py:ro" \
+            -v "$PWD/scripts/forest/session_journal_v0.py:/b1/session_journal_v0.py:ro" \
+            python:3.13-slim python3 -I -B /ci/test_storage_dac_b5d.py
+      - name: B1 journal regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_session_journal_v0.py' -v
+      - name: B5a storage fixture regression
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_host_boundary_fixture_b5a.py' -v

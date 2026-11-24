@@ -79,6 +79,9 @@ PanelWindow {
     onBenchmarkReportsOpenChanged: if (benchmarkReportsOpen) autoPreviewOpen = false
     // Independent in-widget diagnostic menu; opening it does not scan.
     property bool diagnosticsOpen: false
+    property bool workshopOpen: false
+    onDiagnosticsOpenChanged: if (diagnosticsOpen) workshopOpen = false
+    onWorkshopOpenChanged: if (workshopOpen) diagnosticsOpen = false
     property string pendingModelScan: ""
     property string lastScannedModel: ""
     property string lastModelScanResult: ""
@@ -165,6 +168,7 @@ PanelWindow {
         if (!menuOpen) {
             modelPopupOpen = false;
             diagnosticsOpen = false;
+            workshopOpen = false;
             reasoningRailExpanded = false;
             // Local-only drafts never outlive the displayed Forest session.
             if (forestPromptInput)
@@ -349,6 +353,8 @@ PanelWindow {
                 root.modelPopupOpen = false;
             else if (root.diagnosticsOpen)
                 root.diagnosticsOpen = false;
+            else if (root.workshopOpen)
+                root.workshopOpen = false;
             else
                 root.menuOpen = false;
             event.accepted = true;
@@ -366,13 +372,36 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.right: forestDiagnosticsButton.left
+                anchors.right: workshopButton.left
                 anchors.rightMargin: 8
                 text: "FOREST // AI WORKSPACE"
                 font.pixelSize: 16
                 font.bold: true
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+            Rectangle {
+                id: workshopButton
+                anchors.right: forestDiagnosticsButton.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                width: 54
+                height: 32
+                color: root.workshopOpen ? Colors.yellow : Colors.black
+                border.width: 1
+                border.color: root.workshopOpen ? Colors.magenta : Colors.cyan
+                Accessible.name: "Open Forest Workshop capability reference"
+                GohuText {
+                    anchors.centerIn: parent
+                    text: "WORK"
+                    font.pixelSize: 10
+                    color: root.workshopOpen ? Colors.magenta : Colors.cyan
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.workshopOpen = !root.workshopOpen
+                }
             }
             DiagnosticsDockButton {
                 id: forestDiagnosticsButton
@@ -2186,6 +2215,63 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 7
+            }
+        }
+
+        Rectangle {
+            id: forestWorkshopPopup
+            visible: root.workshopOpen
+            z: 40
+            anchors.top: header.bottom
+            anchors.topMargin: 7
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.bottom: footer.top
+            anchors.bottomMargin: 7
+            width: Math.max(0, Math.min(390, chatPane.x + modelPopup.x - 20))
+            color: "#110319"
+            border.width: 1
+            border.color: Colors.magenta
+            clip: true
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                onPressed: function(mouse) { mouse.accepted = true; }
+                onWheel: function(wheel) { wheel.accepted = true; }
+            }
+            Item {
+                id: workshopHeader
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 7
+                height: 34
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.right: workshopClose.left
+                    anchors.rightMargin: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "FOREST // WORKSHOPS"
+                    font.pixelSize: 12
+                    color: Colors.magenta
+                    elide: Text.ElideRight
+                }
+                CloseButton {
+                    id: workshopClose
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 28
+                    Accessible.name: "Close Forest Workshops"
+                    onCloseRequested: root.workshopOpen = false
+                }
+            }
+            ForestWorkshopReferenceView {
+                anchors.top: workshopHeader.bottom
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 7
+                profileSupported: root.activeTree.sessionKey === "BRISTLECONE_PINE"
             }
         }
 

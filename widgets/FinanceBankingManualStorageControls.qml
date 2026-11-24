@@ -20,6 +20,7 @@ Item {
     readonly property bool dirty: ready && manualSession.mode==="manual"
         && JSON.stringify(manualSession)!==JSON.stringify(localStore.savedSession)
     readonly property bool localSaved: ready && localStore.savedOnDisk
+        && localStore.savedSession.mode==="manual"
     readonly property int savedRevision: localStore.revision
     signal sessionRestored(var session)
     implicitHeight: contents.implicitHeight

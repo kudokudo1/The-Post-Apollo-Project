@@ -23,6 +23,8 @@ mkdir "$tmp/pxe" "$tmp/seed"
 xorriso -osirrox on -indev "$tmp/$iso" -extract /images/pxeboot/vmlinuz "$tmp/pxe/vmlinuz" -extract /images/pxeboot/initrd.img "$tmp/pxe/initrd.img" >"$tmp/extract.log" 2>&1
 [[ -s "$tmp/pxe/vmlinuz" && -s "$tmp/pxe/initrd.img" ]]
 payload="$(base64 -w0 "$repo/tests/cpuplus_memory_native/guest-cycle.sh")"
+fault_payload="$(base64 -w0 "$repo/tests/cpuplus_memory_native_faults/guest-recovery.py")"
+phase_payload="$(base64 -w0 "$repo/tests/cpuplus_memory_native_faults/guest-phase.sh")"
 helper_payload="$(base64 -w0 "$helper")"
 helper_sha="$(sha256sum "$helper" | cut -d' ' -f1)"
 cat >"$tmp/seed/ks.cfg" <<EOF
@@ -46,23 +48,31 @@ ostreesetup --osname=fedora --remote=fedora --url=file:///ostree/repo --ref=fedo
 install -d -m 0755 /usr/local/libexec /etc/systemd/system
 printf '%s\n' DISPOSABLE_CPU_MEMORY_NATIVE_V1 > /etc/postapollo-memory-ci-only
 chmod 0600 /etc/postapollo-memory-ci-only
+printf '%s\n' DISPOSABLE_CPU_MEMORY_FAULT_V1 > /etc/postapollo-memory-native-fault-ci-only
+chmod 0600 /etc/postapollo-memory-native-fault-ci-only
 base64 -d >/usr/local/libexec/postapollo-memory-ci-helper <<'CPU_MEMORY_HELPER'
 $helper_payload
 CPU_MEMORY_HELPER
 base64 -d >/usr/local/libexec/postapollo-memory-ci-cycle.sh <<'CPU_MEMORY_GUEST'
 $payload
 CPU_MEMORY_GUEST
-chmod 0700 /usr/local/libexec/postapollo-memory-ci-helper /usr/local/libexec/postapollo-memory-ci-cycle.sh
+base64 -d >/usr/local/libexec/postapollo-memory-ci-fault.py <<'CPU_MEMORY_FAULT'
+$fault_payload
+CPU_MEMORY_FAULT
+base64 -d >/usr/local/libexec/postapollo-memory-ci-phase.sh <<'CPU_MEMORY_PHASE'
+$phase_payload
+CPU_MEMORY_PHASE
+chmod 0700 /usr/local/libexec/postapollo-memory-ci-helper /usr/local/libexec/postapollo-memory-ci-cycle.sh /usr/local/libexec/postapollo-memory-ci-fault.py /usr/local/libexec/postapollo-memory-ci-phase.sh
 printf '%s  %s\n' "$helper_sha" postapollo-memory-ci-helper >/usr/local/libexec/postapollo-memory-ci-helper.sha256
 chmod 0600 /usr/local/libexec/postapollo-memory-ci-helper.sha256
 cat > /etc/systemd/system/postapollo-memory-ci-cycle.service <<'CPU_MEMORY_UNIT'
 [Unit]
-Description=Disposable CPU++ memory native smoke fixture
+Description=Disposable CPU++ memory native cycle and reboot fixture
 After=local-fs.target swap.target
 ConditionPathExists=/etc/postapollo-memory-ci-only
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/bash -c 'exec /usr/bin/bash /usr/local/libexec/postapollo-memory-ci-cycle.sh >/dev/ttyS0 2>&1'
+ExecStart=/usr/bin/bash -c 'exec /usr/bin/bash /usr/local/libexec/postapollo-memory-ci-phase.sh >/dev/ttyS0 2>&1'
 TimeoutStartSec=900
 [Install]
 WantedBy=multi-user.target
@@ -100,25 +110,67 @@ grep -aFq CPU_MEM_NATIVE_INSTALLER_STAGED "$tmp/install-serial.log" || {
     tail -n 40 "$tmp/install-serial.log" || true
     exit 2
 }
-qemu-system-x86_64 -machine accel=kvm -m 6144 -smp 3 -display none -monitor none \
-  -serial "file:$tmp/guest-serial.log" \
-  -drive "file=$tmp/guest.qcow2,if=virtio,format=qcow2" \
-  -nic none -no-reboot >"$tmp/guest-qemu.log" 2>&1 &
-pid="$!"
-for ((n=0;n<600;n++)); do
-    if grep -aFq 'CPU_MEM_NATIVE_PASS // TWO_REAL_CYCLES_HISTORY_RETAINED' "$tmp/guest-serial.log" 2>/dev/null; then break; fi
-    if grep -aFq 'CPU_MEM_NATIVE_FAIL //' "$tmp/guest-serial.log" 2>/dev/null; then break; fi
-    if ! kill -0 "$pid" 2>/dev/null; then break; fi
-    sleep 2
-done
-grep -aE 'CPU_MEM_NATIVE_(PASS|FAIL|BLOCKED) //|VERIFIED (ACTIVE|PERSISTENCE|EXPANSION|REDUCTION|REACTIVATION|CYCLE ARCHIVE):|RECOVERY INSPECTION:|REDUCTION (BLOCKED|RECOVERY):|REFUSED/FAILED:' "$tmp/guest-serial.log" | tail -n 80 || true
-for marker in SILVERBLUE_BTRFS_ENFORCING_GUEST BASE_PERSISTENCE_AND_EXTENSION_ACTIVE CYCLE_1_VERIFIED CYCLE_2_VERIFIED TWO_REAL_CYCLES_HISTORY_RETAINED; do
-    [[ "$(grep -aFc "CPU_MEM_NATIVE_PASS // $marker" "$tmp/guest-serial.log")" == 1 ]] || {
-        echo "CPU_MEM_NATIVE_BLOCKED // REQUIRED_GUEST_EVIDENCE_MISSING"
-        tail -n 60 "$tmp/guest-serial.log" || true
-        exit 2
+# Run the same installed guest twice. Never treat process termination or a
+# guest-authored marker alone as success: each phase must exit normally, and
+# phase two independently checks the kernel boot ID and preserved state.
+run_phase() {
+    local stage="$1" log="$tmp/guest-$1-serial.log"
+    qemu-system-x86_64 -machine accel=kvm -m 6144 -smp 3 -display none -monitor none \
+      -serial "file:$log" \
+      -drive "file=$tmp/guest.qcow2,if=virtio,format=qcow2" \
+      -nic none -no-reboot >"$tmp/guest-$stage-qemu.log" 2>&1 &
+    pid="$!"
+    for ((n=0;n<600;n++)); do
+        if grep -aEq 'CPU_MEM_(NATIVE|FAULT)_FAIL //' "$log" 2>/dev/null; then
+            tail -n 80 "$log" || true
+            echo "CPU_MEM_NATIVE_BLOCKED // GUEST_FAILURE phase=$stage"
+            return 2
+        fi
+        if ! kill -0 "$pid" 2>/dev/null; then break; fi
+        if (( n % 30 == 0 )); then
+            echo "CPU_MEM_NATIVE_STAGE // phase=$stage poll=$n"
+            grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|STAGE) //' "$log" 2>/dev/null | tail -n 10 || true
+        fi
+        sleep 2
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "CPU_MEM_NATIVE_BLOCKED // GUEST_SHUTDOWN_TIMEOUT phase=$stage"
+        tail -n 80 "$log" || true
+        return 2
+    fi
+    if ! wait "$pid"; then
+        pid=
+        echo "CPU_MEM_NATIVE_BLOCKED // GUEST_EXIT_FAILED phase=$stage"
+        tail -n 80 "$log" || true
+        return 2
+    fi
+    pid=
+    grep -aE 'CPU_MEM_(NATIVE|FAULT)_(PASS|FAIL|BLOCKED|STAGE) //|VERIFIED (ACTIVE|PERSISTENCE|EXPANSION|REDUCTION|REACTIVATION|CYCLE ARCHIVE):|RECOVERY INSPECTION:|REDUCTION (BLOCKED|RECOVERY):|REFUSED/FAILED:' "$log" | tail -n 100 || true
+    ! grep -aEq 'CPU_MEM_(NATIVE|FAULT)_FAIL //' "$log"
+}
+require_marker() {
+    local stage="$1" marker="$2"
+    [[ "$(grep -aFc "$marker" "$tmp/guest-$stage-serial.log")" == 1 ]] || {
+        echo "CPU_MEM_NATIVE_BLOCKED // REQUIRED_GUEST_EVIDENCE_MISSING phase=$stage marker=$marker"
+        tail -n 60 "$tmp/guest-$stage-serial.log" || true
+        return 2
     }
+}
+run_phase initial
+for marker in SILVERBLUE_BTRFS_ENFORCING_GUEST BASE_PERSISTENCE_AND_EXTENSION_ACTIVE CYCLE_1_VERIFIED CYCLE_2_VERIFIED TWO_REAL_CYCLES_HISTORY_RETAINED; do
+    require_marker initial "CPU_MEM_NATIVE_PASS // $marker"
 done
-! grep -aFq 'CPU_MEM_NATIVE_FAIL //' "$tmp/guest-serial.log"
-echo "CPU_MEM_NATIVE_PASS // OFFLINE_GUEST_NORMAL_PATH_ONLY"
-echo "CPU_MEM_NATIVE_LIMITATION // NO_REBOOT_OR_KERNEL_INTERRUPTION_OR_PRESSURE_INJECTION_ACCEPTANCE"
+for marker in REAL_SIGKILL_PARTIAL_RETIREMENT_FENCED EXPLICIT_ARCHIVE_RESUME_HISTORY_INTACT REBOOT_WITNESS_DURABLE; do
+    require_marker initial "CPU_MEM_FAULT_PASS // $marker"
+done
+require_marker initial "CPU_MEM_FAULT_STAGE // REQUEST_GUEST_POWEROFF_INITIAL"
+! grep -aFq 'CPU_MEM_FAULT_PASS // REAL_REBOOT_BASE_ACTIVE_EXTENSION_INACTIVE' "$tmp/guest-initial-serial.log"
+echo "CPU_MEM_NATIVE_PASS // FIRST_GUEST_SHUTDOWN_VERIFIED"
+run_phase reboot
+require_marker reboot "CPU_MEM_FAULT_PASS // REAL_REBOOT_BASE_ACTIVE_EXTENSION_INACTIVE"
+require_marker reboot "CPU_MEM_FAULT_PASS // JOURNALS_AND_HISTORY_PRESERVED_NO_REPLAY"
+require_marker reboot "CPU_MEM_FAULT_STAGE // REQUEST_GUEST_POWEROFF_REBOOT"
+! grep -aFq 'CPU_MEM_NATIVE_PASS // CYCLE_1_VERIFIED' "$tmp/guest-reboot-serial.log"
+! grep -aFq 'CPU_MEM_FAULT_PASS // REBOOT_WITNESS_DURABLE' "$tmp/guest-reboot-serial.log"
+echo "CPU_MEM_NATIVE_PASS // OFFLINE_GUEST_ARCHIVE_SIGKILL_AND_CLEAN_REBOOT"
+echo "CPU_MEM_NATIVE_LIMITATION // NO_UTIL_LINUX_INTERRUPTION_PRESSURE_OR_HARD_POWER_LOSS_ACCEPTANCE"

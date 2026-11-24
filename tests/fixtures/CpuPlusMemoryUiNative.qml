@@ -68,7 +68,20 @@ ShellRoot {
                     pane.stagedGiB = 16;
                     pane.stagedSwappiness = 60;
                     if (!smoke.check(rail.columns === 6 && slider.enabledSlider, "wide CAP geometry/availability")) return;
-                    slider.valueRequested(24);
+                    const shared = smoke.find(slider, "cpuplusSharedHorizontalSelector");
+                    if (!smoke.check(shared && shared.horizontalStep && shared.rotation === 90
+                            && shared.stepDetentCount === 17 && shared.handleTravel() > 0,
+                            "shared horizontal STEP geometry")) return;
+                    const left = shared.mapToItem(slider, shared.width / 2, shared.height);
+                    const right = shared.mapToItem(slider, shared.width / 2, 0);
+                    if (!smoke.check(left.x < right.x && Math.abs(left.y - right.y) < 1,
+                            "horizontal low-to-high transform")) return;
+                    shared.beginStepPreview(shared.handleYForValue(24));
+                    if (!smoke.check(shared.pendingStepValue === 24 && pane.stagedGiB === 16,
+                            "preview must not stage owner")) return;
+                    shared.cancelStepPreview();
+                    shared.requestStepDelta(1);
+                    shared.requestStepDelta(1);
                     if (!smoke.check(pane.stagedGiB === 24 && pane.capacity.actualKiB === 16777212, "target versus actual")) return;
                     pane.selectCapSection(1);
                     if (!smoke.check(!slider.visible && scroll.visible, "actions section")) return;

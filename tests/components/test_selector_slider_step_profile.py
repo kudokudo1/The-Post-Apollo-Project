@@ -14,6 +14,12 @@ value_demo = (ROOT / "tests/fixtures/SelectorSliderValueDemo.qml").read_text(enc
 step_demo = (ROOT / "tests/fixtures/SelectorSliderStepDemo.qml").read_text(encoding="utf-8")
 step_shell = (ROOT / "SelectorStepTest.qml").read_text(encoding="utf-8")
 
+assert 'property bool horizontalStepPresentation: false' in slider
+assert 'readonly property bool horizontalStep: stepMode && horizontalStepPresentation' in slider
+assert 'topMargin: slider.horizontalStep ? 8 : 38' in slider
+assert 'bottomMargin: slider.horizontalStep ? 8 : 26' in slider
+assert 'preventStealing: slider.horizontalStep' in slider
+assert 'if (!horizontalStep) { event.accepted = false; return; }' in slider
 assert 'property string selectorProfile: "index"' in slider
 assert 'readonly property bool stepMode: selectorProfile === "step"' in slider
 assert 'readonly property bool numericMode: valueMode || stepMode' in slider

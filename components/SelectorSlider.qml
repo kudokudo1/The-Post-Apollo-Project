@@ -22,6 +22,11 @@ Rectangle {
     // Existing Git/Hospital sliders keep their numeric readouts.
     property bool showIndexReadout: true
     property string sideLabel: ""
+    // Opt-in presentation for a host rotating the actual STEP instrument +90°.
+    // The host provides upright external reference labels/readout. All existing
+    // vertical INDEX/VALUE/STEP/RANGE consumers retain their defaults.
+    property bool horizontalStepPresentation: false
+    readonly property bool horizontalStep: stepMode && horizontalStepPresentation
     // F2 VALUE is opt-in. Existing INDEX users retain the exact default.
     property string selectorProfile: "index" // "index" | "value" | "step" | "range"
     readonly property bool valueMode: selectorProfile === "value"
@@ -181,6 +186,14 @@ Rectangle {
             valueRequested(next);
     }
 
+    onEnabledSliderChanged: {
+        if (horizontalStep && !enabledSlider && stepGestureActive)
+            cancelStepPreview();
+    }
+    onHeightChanged: {
+        if (horizontalStep && stepGestureActive)
+            cancelStepPreview();
+    }
     onSelectorProfileChanged: {
         if (!valueMode) {
             valueDragActive = false;
@@ -279,6 +292,16 @@ Rectangle {
         event.accepted = true;
     }
 
+    Keys.onLeftPressed: function(event) {
+        if (!horizontalStep) { event.accepted = false; return; }
+        requestStepDelta(-1);
+        event.accepted = true;
+    }
+    Keys.onRightPressed: function(event) {
+        if (!horizontalStep) { event.accepted = false; return; }
+        requestStepDelta(1);
+        event.accepted = true;
+    }
     Keys.onUpPressed: function(event) {
         if (stepMode) {
             requestStepDelta(1);
@@ -379,6 +402,7 @@ Rectangle {
             topMargin: 13
         }
 
+        visible: !slider.horizontalStep
         rotation: -90
         transformOrigin: Item.Center
         text: slider.sideLabel
@@ -396,8 +420,8 @@ Rectangle {
             bottom: parent.bottom
             left: parent.left
             right: parent.right
-            topMargin: 38
-            bottomMargin: 26
+            topMargin: slider.horizontalStep ? 8 : 38
+            bottomMargin: slider.horizontalStep ? 8 : 26
             leftMargin: 4
             rightMargin: 4
         }
@@ -466,6 +490,7 @@ Rectangle {
                 }
 
                 GohuText {
+                    visible: !slider.horizontalStep
                     x: 10
                     anchors.verticalCenter: parent.verticalCenter
                     text: slider.valueText(parent.tickValue)
@@ -794,8 +819,9 @@ Rectangle {
                         && (!slider.indexPilot || slider.enabledSlider)
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
+                preventStealing: slider.horizontalStep
                 cursorShape: slider.enabledSlider
-                             ? Qt.SizeVerCursor
+                             ? (slider.horizontalStep ? Qt.SizeHorCursor : Qt.SizeVerCursor)
                              : Qt.ArrowCursor
 
                 property real dragOffset: 0
@@ -1060,7 +1086,7 @@ Rectangle {
     }
 
     GohuText {
-        visible: !slider.rangeMode
+        visible: !slider.rangeMode && !slider.horizontalStep
             && (slider.numericMode || slider.showIndexReadout)
         anchors {
             horizontalCenter: parent.horizontalCenter

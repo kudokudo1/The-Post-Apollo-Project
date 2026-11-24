@@ -320,7 +320,8 @@ def run(directory: Path, command):
         previous = read_doc(directory)
         if previous["revision"] != command["expectedRevision"]:
             fail("STALE_REVISION")
-        if action == "clear" and previous["revision"] == 0:
+        if action == "clear" and (previous["revision"] == 0
+                                   or previous["session"]["mode"] != "manual"):
             fail("NOTHING_SAVED")
         if previous["revision"] >= MAX_REVISION - 1:
             fail("REVISION_LIMIT")

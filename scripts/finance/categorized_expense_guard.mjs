@@ -43,7 +43,9 @@ function expenseCategory(budget,id) {
   }
   if(matches.length!==1)refuse("category-unavailable");
   const {cat,group}=matches[0];
-  if(group.hidden===true || cat.hidden===true)refuse("hidden-category");
+  // Both visibility flags MUST be explicitly known and false. Unknown,
+  // missing or malformed values are not authority to create an expense.
+  if(group.hidden!==false || cat.hidden!==false)refuse("hidden-category");
   if(typeof cat.name!=="string" || !cat.name.trim()
       || !isCents(cat.budgeted) || !isCents(cat.balance)
       || !isCents(cat.spent))refuse("invalid-category");

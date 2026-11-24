@@ -160,9 +160,13 @@ def block_provisional_delta(
     reference is NOT a production release/cancellation implementation.
     """
     _candidate(candidate_wire, original_v1_intent_wire, now_ms)
-    if (type(event) is not dict or set(event) !=
-            {"event", "text", "provisional"} or
-            event["event"] != "DELTA" or event["provisional"] is not True or
+    # Bound the existing drop-only shape before comparing untrusted keys or
+    # event tags. No custom Python equality is needed to refuse an event.
+    if (type(event) is not dict or len(event) != 3 or
+            any(type(key) is not str for key in event) or
+            set(event) != {"event", "text", "provisional"} or
+            type(event["event"]) is not str or event["event"] != "DELTA" or
+            event["provisional"] is not True or
             type(event["text"]) is not str or not event["text"]):
         _hold("ONLY_UNTRUSTED_PROVISIONAL_DELTA_IS_INSPECTABLE")
     # Every valid UTF-8 code point occupies at least one byte. Reject

@@ -1,0 +1,25 @@
+name: Forest Heart H4b DRM client CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/heart_drm_client_h4b.py'
+      - 'scripts/forest/HEART_DRM_CLIENT_H4B.md'
+      - 'scripts/forest/cgroup_observation_i5.py'
+      - 'scripts/forest/runtime_membership_i6.py'
+      - 'scripts/forest/process_observation_i4.py'
+      - 'tests/forest/test_heart_drm_client_h4b.py'
+      - '.github/workflows/forest-heart-h4b-drm-client.yml'
+permissions:
+  contents: read
+jobs:
+  drm-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_heart_drm_client_h4b.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_runtime_membership_i6.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_cgroup_observation_i5.py' -v
+      - run: python3 -m py_compile scripts/forest/heart_drm_client_h4b.py tests/forest/test_heart_drm_client_h4b.py

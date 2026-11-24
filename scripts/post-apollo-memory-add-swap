@@ -179,7 +179,7 @@ def status():
     base = active_swap()
     extension = active_swap(EXT_FILE)
     extension_exists = os.path.lexists(EXT_DIRECTORY)
-    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "recoveryInspectionVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": base,
@@ -296,7 +296,7 @@ def check_recovery_fence():
         raise ReductionRecovery("RECOVERY_REQUIRED")
 
 @contextmanager
-def mutation_lock():
+def mutation_lock(*, inspection=False):
     # Shared by all helper mutations; this does not serialize external root tools.
     global _mutation_fd
     if _mutation_fd is not None:
@@ -318,7 +318,8 @@ def mutation_lock():
             raise ReductionBlocked("OPERATION_BUSY") from error
         _mutation_fd = fd
         try:
-            check_recovery_fence()
+            if not inspection:
+                check_recovery_fence()
             yield
         finally:
             _mutation_fd = None
@@ -505,6 +506,136 @@ def withdraw_authorized(target):
     print("VERIFIED REDUCTION:", json.dumps(result), flush=True)
 
 
+
+def read_protected_record(path):
+    """Bounded, no-follow read; absence is distinct from corruption."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0
+                or info.st_mode & 0o077 or info.st_nlink != 1
+                or not 0 < info.st_size <= 16384):
+            raise ValueError("Untrusted or oversized record")
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            raw = stream.read(16385)
+        if len(raw) != info.st_size or len(raw) > 16384:
+            raise ValueError("Record changed while reading")
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("Duplicate record key")
+                result[key] = value
+            return result
+        record = json.loads(raw, object_pairs_hook=unique)
+        if not isinstance(record, dict):
+            raise ValueError("Invalid record")
+        return record
+    finally:
+        os.close(fd)
+
+def classify_recovery(intent, result, identity, snapshot):
+    """Describe recorded evidence, never authorize clearing or replay."""
+    rows = snapshot["rows"]
+    base, extra = rows.get(str(SWAPFILE)), rows.get(str(EXT_FILE))
+    response = {"version": 1, "state": "RECOVERY_REQUIRED",
+                "code": "UNKNOWN", "baseActive": base is not None,
+                "extensionActive": extra is not None,
+                "baseSizeKiB": base["sizeKiB"] if base else None,
+                "extensionSizeKiB": extra["sizeKiB"] if extra else None,
+                "extensionUsedKiB": extra["usedKiB"] if extra else None,
+                "mutationAllowed": False, "recordCleared": False}
+    def report(code):
+        return dict(response, code=code)
+    if intent is None:
+        return report("ORPHAN_RESULT" if result is not None else "RETAINED_UNJOURNALED")
+    if (type(intent.get("version")) is not int or intent["version"] != REDUCTION_VERSION
+            or intent.get("state") != "PREPARED"
+            or type(intent.get("targetGiB")) is not int
+            or type(intent.get("timeNs")) is not int or intent["timeNs"] <= 0
+            or not isinstance(intent.get("evidence"), dict)):
+        return report("INVALID_INTENT")
+    if intent.get("identity") != [list(row) for row in identity]:
+        return report("FILE_IDENTITY_MISMATCH")
+    evidence = intent["evidence"]
+    base_size, extra_size = evidence.get("baseSizeKiB"), evidence.get("extensionSizeKiB")
+    if (type(base_size) is not int or type(extra_size) is not int
+            or evidence.get("targetGiB") != intent["targetGiB"]
+            or type(evidence.get("extensionUsedKiB")) is not int or evidence["extensionUsedKiB"] != 0):
+        return report("INVALID_INTENT")
+    try:
+        nominal_base = nominal_capacity({"sizeKiB": base_size})
+        nominal_extra = nominal_capacity({"sizeKiB": extra_size})
+    except ReductionBlocked:
+        return report("INVALID_INTENT")
+    if (nominal_base != intent["targetGiB"] or nominal_base + nominal_extra > 64
+            or len(identity) != 4
+            or identity[1][2] != nominal_base * GIB
+            or identity[3][2] != nominal_extra * GIB):
+        return report("INVALID_INTENT")
+    if not base or base["kind"] != "file" or base["priority"] != 10 or base["sizeKiB"] != base_size:
+        return report("BASE_MISMATCH")
+    if extra and (extra["kind"] != "file" or extra["priority"] != 9 or extra["sizeKiB"] != extra_size):
+        return report("EXTENSION_MISMATCH")
+    if result is None:
+        return report("INTENT_ONLY_ACTIVE" if extra else "INTENT_ONLY_INACTIVE")
+    if result.get("state") == "NOT_STARTED":
+        allowed_codes = {"FILE_IDENTITY_CHANGED", "CAPACITY_CHANGED",
+                         "BASE_OR_EXTENSION_INACTIVE", "UNEXPECTED_SWAP_IDENTITY",
+                         "UNEXPECTED_CAPACITY", "UNSUPPORTED_TARGET", "EXTENSION_OCCUPIED",
+                         "RAM_HEADROOM", "BASE_HEADROOM", "MEMORY_PRESSURE",
+                         "UNTRUSTED_FILE", "UNSUPPORTED_FILESYSTEM"}
+        if result.get("code") not in allowed_codes:
+            return report("INVALID_RESULT")
+        return report("NOT_STARTED_ACTIVE" if extra else "RESULT_CONTRADICTS_KERNEL")
+    if (result.get("state") != "VERIFIED" or type(result.get("version")) is not int
+            or result["version"] != REDUCTION_VERSION
+            or type(result.get("targetGiB")) is not int or result["targetGiB"] != nominal_base
+            or type(result.get("sizeKiB")) is not int or result["sizeKiB"] != base_size
+            or type(result.get("basePriority")) is not int or result["basePriority"] != 10
+            or result.get("extensionActive") is not False or result.get("fileRetained") is not True
+            or type(result.get("timeNs")) is not int or result["timeNs"] < intent["timeNs"]):
+        return report("INVALID_RESULT")
+    return report("RESULT_CONTRADICTS_KERNEL" if extra else "RECORDED_VERIFIED_INACTIVE")
+
+def inspect_recovery_authorized():
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    # Lock excludes cooperating helper mutations. A free lock is NOT evidence
+    # that an external actor or old child has finished. Never clear the fence.
+    with mutation_lock(inspection=True):
+        try:
+            secure_parent()
+            if not os.path.lexists(EXT_DIRECTORY):
+                code = "EXTENSION_PATH_ABSENT"
+                result = {"version":1, "state":"OBSERVED", "code":code,
+                          "mutationAllowed":False, "recordCleared":False}
+            else:
+                identity = extension_identity()
+                intent = read_protected_record(WITHDRAW_MARKER)
+                outcome = read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json"))
+                check_extension_boot_policy()
+                first = read_reduction_snapshot()
+                second = read_reduction_snapshot()
+                # Compare only stable swap identity/capacity, not used pages.
+                def signature(s):
+                    return [(s["rows"].get(str(path), {}) or {}).get(key)
+                            for path in (SWAPFILE, EXT_FILE)
+                            for key in ("kind", "sizeKiB", "priority")]
+                if (extension_identity() != identity or signature(first) != signature(second)
+                        or read_protected_record(WITHDRAW_MARKER) != intent
+                        or read_protected_record(WITHDRAW_MARKER.with_name("withdrawal-result.json")) != outcome):
+                    raise ValueError("Recovery observations changed")
+                result = classify_recovery(intent, outcome, identity, second)
+        except (OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.SubprocessError):
+            result = {"version":1, "state":"RECOVERY_REQUIRED", "code":"INSPECTION_UNVERIFIED",
+                      "mutationAllowed":False, "recordCleared":False}
+        print("RECOVERY INSPECTION:", json.dumps(result), flush=True)
+
+
 def verify_authorized():
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
@@ -535,11 +666,13 @@ def main(args):
                 expand_authorized(parse_size(args[1]))
         elif len(args) == 2 and args[0] == "reduction-preflight":
             print(json.dumps(reduction_preflight(parse_size(args[1]))))
+        elif args == ["inspect-recovery-authorized"]:
+            inspect_recovery_authorized()
         elif len(args) == 2 and args[0] == "withdraw-authorized":
             with mutation_lock():
                 withdraw_authorized(parse_size(args[1]))
         else:
-            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB")
+            raise ValueError("Usage: status | add GIB | add-authorized GIB | verify-authorized | persist-authorized | expand-authorized GIB | reduction-preflight GIB | withdraw-authorized GIB | inspect-recovery-authorized")
         return 0
     except ReductionRecovery as error:
         print("REDUCTION RECOVERY:", json.dumps({"version": REDUCTION_VERSION, "state": "RECOVERY_REQUIRED", "code": str(error)}), flush=True)

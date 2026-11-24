@@ -228,7 +228,17 @@ def after_reboot():
             and not os.path.lexists(PENDING), "unexpected recovery journal")
     fence()
     observed = success("inspect-recovery-authorized", prefix="RECOVERY INSPECTION: ")
-    expected = ("RECORDED_VERIFIED_INACTIVE" if current == witness["identity"]
+    # The helper journals include both directories, not only the swap files.
+    # Btrfs device numbers may change independently for each subvolume.
+    recorded = json.loads(protected_bytes(EXT / RECORD_NAMES[0]))["identity"]
+    actual = []
+    for path in (BASE.parent, BASE, EXT, EXTRA):
+        info = path.lstat()
+        actual.append([info.st_dev, info.st_ino,
+                       info.st_size if stat.S_ISREG(info.st_mode) else 0])
+    require([row[1:] for row in actual] == [row[1:] for row in recorded],
+            "managed directory or file inode/size changed across boot")
+    expected = ("RECORDED_VERIFIED_INACTIVE" if actual == recorded
                 else "FILE_IDENTITY_MISMATCH")
     require(observed["code"] == expected and observed["mutationAllowed"] is False
             and observed["recordCleared"] is False, "postboot recovery observation not fail-closed")

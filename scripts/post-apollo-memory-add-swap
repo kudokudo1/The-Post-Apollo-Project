@@ -20,11 +20,16 @@ EXT_FILE = EXT_DIRECTORY / "swapfile"
 LOCK = Path("/run/post-apollo-memory.lock")
 WITHDRAW_MARKER = EXT_DIRECTORY / "withdrawal.json"
 REDUCTION_VERSION = 1
+# Single-threaded helper; ownership remains with the open file description.
+_mutation_fd = None
 ENV = {"PATH": "/usr/sbin:/usr/bin", "LC_ALL": "C"}
 
 def run(*argv):
+    # Inherit the same flock description across exec. Closing the parent fd
+    # must not unlock a still-running direct child. Never call LOCK_UN explicitly.
+    inherited = () if _mutation_fd is None else (_mutation_fd,)
     return subprocess.run(argv, check=True, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, env=ENV, cwd="/").stdout
+                          stderr=subprocess.PIPE, env=ENV, cwd="/", pass_fds=inherited).stdout
 
 def parse_size(value):
     if not re.fullmatch(r"[1-9][0-9]?", value):
@@ -174,7 +179,7 @@ def status():
     base = active_swap()
     extension = active_swap(EXT_FILE)
     extension_exists = os.path.lexists(EXT_DIRECTORY)
-    return {"reductionVersion": REDUCTION_VERSION, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": base,
@@ -272,9 +277,30 @@ class ReductionBlocked(RuntimeError):
         self.code = code
         self.evidence = evidence or {}
 
+def check_recovery_fence():
+    """All mutations fail closed until the retained journal is reconciled."""
+    secure_parent()
+    try:
+        info = EXT_DIRECTORY.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+        raise ReductionRecovery("UNTRUSTED_EXTENSION_DIRECTORY")
+    # Existence alone is sufficient, including partial/corrupt records and
+    # orphan result files. Do not parse or clear them on the mutation path.
+    for path in (WITHDRAW_MARKER, WITHDRAW_MARKER.with_name("withdrawal-result.json")):
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            continue
+        raise ReductionRecovery("RECOVERY_REQUIRED")
+
 @contextmanager
 def mutation_lock():
     # Shared by all helper mutations; this does not serialize external root tools.
+    global _mutation_fd
+    if _mutation_fd is not None:
+        raise ReductionBlocked("OPERATION_BUSY")
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
     info = LOCK.parent.lstat()
@@ -290,7 +316,12 @@ def mutation_lock():
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise ReductionBlocked("OPERATION_BUSY") from error
-        yield
+        _mutation_fd = fd
+        try:
+            check_recovery_fence()
+            yield
+        finally:
+            _mutation_fd = None
     finally:
         os.close(fd)
 

@@ -524,3 +524,24 @@ function crossStockNormalizedChart(comparison) {
         readOnly:true,noProviderCalls:true
     };
 }
+
+// M38: inspect a matched-date observation; never reconstruct an unmatched
+// date or compare independently selected dates. Revalidate the M36 result.
+function inspectCrossStockDate(comparison, step) {
+    const chart=crossStockNormalizedChart(comparison);
+    if (!chart || !Number.isInteger(step) || step < 0 || step > chart.maxSteps)
+        return null;
+    const row=comparison.pairs[step], a=chart.first[step], b=chart.second[step];
+    const referencePct=a.value-100, currentPct=b.value-100;
+    const gap=b.value-a.value;
+    if (![referencePct,currentPct,gap].every(Number.isFinite)) return null;
+    return {
+        step:step,date:row.date,priceBasis:chart.priceBasis,
+        reference:{symbol:chart.referenceSymbol,date:row.date,step:step,
+            price:row.referencePrice,value:a.value,changePct:referencePct},
+        current:{symbol:chart.currentSymbol,date:row.date,step:step,
+            price:row.currentPrice,value:b.value,changePct:currentPct},
+        gapPoints:gap,from:chart.from,
+        source:chart.source,readOnly:true,noProviderCalls:true
+    };
+}

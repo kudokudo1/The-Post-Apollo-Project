@@ -100,6 +100,12 @@ Item {
         : null
     // M37: chart is derived only from the ready M36 matched-date result.
     readonly property var crossStockChart: RangeAnalysisPolicy.crossStockNormalizedChart(crossStockComparison)
+    // M38: selection belongs to the exact current cross-stock comparison.
+    property int crossStockSelectedStep: -1
+    readonly property var crossStockDateDetail: crossStockChart !== null
+        ? RangeAnalysisPolicy.inspectCrossStockDate(crossStockComparison,
+            crossStockSelectedStep) : null
+    onCrossStockChartChanged: crossStockSelectedStep = -1
     function saveStockReference() {
         if (rangeAnalysis === null || !stockFeed) return;
         const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
@@ -613,6 +619,8 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 9
                     property var plot: stocks.crossStockChart
+                    property var dateDetail: stocks.crossStockDateDetail
+                    onDateDetailChanged: requestPaint()
                     onPlotChanged: requestPaint()
                     onWidthChanged: requestPaint()
                     onHeightChanged: requestPaint()
@@ -653,6 +661,43 @@ Item {
                         }
                         draw(chart.first,"#55CFCA");
                         draw(chart.second,"#C74EC7");
+                        const selected=dateDetail;
+                        if (selected) {
+                            const pos=pointAt(selected.reference);
+                            if (!pos) return;
+                            ctx.beginPath();
+                            ctx.moveTo(pos.x,0);
+                            ctx.lineTo(pos.x,height-1);
+                            ctx.strokeStyle="#F2D24D";
+                            ctx.lineWidth=1;
+                            ctx.stroke();
+                            function mark(observation,color) {
+                                const p=pointAt(observation);
+                                if (!p) return;
+                                ctx.beginPath();
+                                ctx.arc(p.x,p.y,4,0,Math.PI*2);
+                                ctx.fillStyle=color;
+                                ctx.fill();
+                                ctx.strokeStyle="#F2D24D";
+                                ctx.lineWidth=1.5;
+                                ctx.stroke();
+                            }
+                            mark(selected.reference,"#55CFCA");
+                            mark(selected.current,"#C74EC7");
+                        }
+                    }
+                    MouseArea {
+                        objectName: "marketCrossStockDatePicker"
+                        anchors.fill: parent
+                        enabled: stocks.crossStockChart !== null
+                        acceptedButtons: Qt.LeftButton
+                        onClicked: function(mouse) {
+                            const step=RangeAnalysisPolicy.normalizedStepAtX(
+                                crossStockCanvas.plot, crossStockCanvas.width,
+                                Math.min(mouse.x,crossStockCanvas.width-1));
+                            stocks.crossStockSelectedStep =
+                                step === stocks.crossStockSelectedStep ? -1 : step;
+                        }
                     }
                 }
             }
@@ -676,6 +721,31 @@ Item {
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
                 color: Colors.orange
+            }
+            GohuText {
+                objectName: "marketCrossStockDateDetail"
+                width: parent.width
+                visible: stocks.crossStockChart !== null
+                text: {
+                    const d=stocks.crossStockDateDetail;
+                    if (!d) return "CLICK CROSS-STOCK CHART TO INSPECT A COMMON CLOSE DATE";
+                    function describe(p) {
+                        return p.symbol + " // $" + p.price.toFixed(2)
+                            + " // INDEX " + p.value.toPrecision(6)
+                            + " // " + p.changePct.toFixed(4) + "% FROM START";
+                    }
+                    return "COMMON CLOSE DATE " + d.date + " // " + d.priceBasis
+                        + "\n" + describe(d.reference)
+                        + "\n" + describe(d.current)
+                        + "\nCURRENT MINUS REF // " + d.gapPoints.toFixed(4)
+                        + " PERCENTAGE POINTS"
+                        + "\nBASE DATE " + d.from
+                        + " // LOADED CLOSES ONLY // CLICK AGAIN TO CLEAR";
+                }
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.pixelSize: 11
+                color: Colors.white
             }
             Rectangle {
                 objectName: "marketRangeAnalysisPanel"

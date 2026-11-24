@@ -299,7 +299,7 @@ class CrashFenceTests(unittest.TestCase):
     def test_fence_refuses_partial_or_orphan_record(self):
         directory = SimpleNamespace(st_mode=0o40700, st_uid=0)
         for marker in (m.WITHDRAW_MARKER, m.WITHDRAW_MARKER.with_name("withdrawal-result.json"),
-                       m.REACTIVATE_MARKER, m.REACTIVATE_RESULT):
+                       m.REACTIVATE_MARKER, m.REACTIVATE_RESULT, m.ARCHIVE_PENDING):
             def lstat(path):
                 if path == m.EXT_DIRECTORY:
                     return directory
@@ -444,7 +444,7 @@ class RecoveryInspectionTests(unittest.TestCase):
 
     def test_inspect_never_mutates_and_detects_changed_record(self):
         identity,intent,outcome,before,after = self.fixture()
-        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()) as lock,patch.object(m,"secure_parent"),patch.object(m.os.path,"lexists",return_value=True),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"read_reduction_snapshot",return_value=after),patch.object(m,"read_protected_record",side_effect=[intent,outcome,intent,None]),patch.object(m,"durable_withdrawal_record") as write,patch("builtins.print") as output:
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()) as lock,patch.object(m,"secure_parent"),patch.object(m.os.path,"lexists",return_value=True),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"read_reduction_snapshot",return_value=after),patch.object(m,"read_protected_record",side_effect=[None,intent,outcome,intent,None]),patch.object(m,"durable_withdrawal_record") as write,patch("builtins.print") as output:
             m.inspect_recovery_authorized()
             lock.assert_called_once_with(inspection=True)
             write.assert_not_called()
@@ -578,6 +578,97 @@ class ReactivationTests(unittest.TestCase):
             reactivate.assert_called_once_with(24)
             self.assertEqual(m.main(["reactivate-authorized","0"]),1)
             reactivate.assert_called_once()
+
+
+class CycleArchiveTests(unittest.TestCase):
+    def fixture(self):
+        identity,intent,outcome,before,after = RecoveryInspectionTests().fixture()
+        prepared = dict(m.reactivation_plan(24,intent,outcome,identity,after),timeNs=102)
+        receipt = dict(prepared,state="VERIFIED",timeNs=103,sizeKiB=25165816,
+                       basePriority=10,extensionPriority=9,extensionActive=True,fileRetained=True,temporary=True)
+        return identity,[intent,outcome,prepared,receipt],before,after
+
+    def test_archive_plan_requires_verified_active_cycle(self):
+        identity,records,before,after = self.fixture()
+        bundle = m.cycle_archive_plan(records,identity,before)
+        self.assertEqual(bundle["state"],"VERIFIED_ACTIVE_CYCLE")
+        self.assertEqual(bundle["digest"],m.cycle_digest(records))
+        for r,s in ((records,after),(records[:2],before),
+                    ([*records[:3],None],before),([*records[:3],dict(records[3],sizeKiB=1)],before)):
+            with self.assertRaises(m.ReductionRecovery):
+                m.cycle_archive_plan(r,identity,s)
+
+    def test_archive_id_path_is_bounded(self):
+        for value in ("../../etc/passwd","A"*64,"a"*63,None):
+            with self.assertRaises(m.ReductionRecovery):
+                m.archive_path(value)
+
+    def test_nonroot_refusal(self):
+        with patch.object(m.os,"geteuid",return_value=1000),patch.object(m,"mutation_lock") as lock:
+            with self.assertRaises(PermissionError):
+                m.archive_cycle_authorized()
+            lock.assert_not_called()
+
+    def test_durable_archive_before_retirement_and_resume(self):
+        identity,records,before,after = self.fixture()
+        paths = m.cycle_paths()
+        bundle = m.cycle_archive_plan(records,identity,before)
+        destination = m.archive_path(bundle["digest"])
+        storage = dict(zip(paths,records))
+        events = []
+        def read(path,**kwargs):
+            return storage.get(path)
+        def write(path,data):
+            self.assertNotIn(path,storage)
+            storage[path]=data
+            events.append(("write",path))
+        failed = False
+        def unlink(path):
+            nonlocal failed
+            self.assertEqual(storage[destination],bundle)
+            self.assertIn(m.ARCHIVE_PENDING,storage)
+            if path==paths[1] and not failed:
+                failed=True
+                raise OSError("fixture interruption")
+            del storage[path]
+            events.append(("unlink",path))
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"read_reduction_snapshot",return_value=before),patch.object(m,"read_protected_record",side_effect=read),patch.object(m,"write_protected_record",side_effect=write),patch.object(m,"archive_directory"),patch.object(m,"sync_archive",side_effect=lambda path:events.append(("fsync",path))),patch.object(m,"sync_directory"),patch.object(Path,"unlink",unlink),patch.object(m,"run") as run:
+            with self.assertRaises(m.ReductionRecovery):
+                m.archive_cycle_authorized()
+            self.assertIn(m.ARCHIVE_PENDING,storage)
+            self.assertNotIn(paths[0],storage)
+            self.assertEqual(events[:3],[("write",destination),("fsync",destination),("write",m.ARCHIVE_PENDING)])
+            m.archive_cycle_authorized()
+            self.assertEqual(storage,{destination:bundle})
+            run.assert_not_called()
+
+    def test_resume_refuses_mismatched_remaining_record(self):
+        identity,records,before,after = self.fixture()
+        bundle = m.cycle_archive_plan(records,identity,before)
+        storage = dict(zip(m.cycle_paths(),records))
+        storage[m.cycle_paths()[1]] = dict(records[1],timeNs=999)
+        storage[m.archive_path(bundle["digest"])]=bundle
+        storage[m.ARCHIVE_PENDING]={"version":1,"state":"ARCHIVE_PENDING","digest":bundle["digest"]}
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"mutation_lock",return_value=nullcontext()),patch.object(m,"extension_identity",return_value=identity),patch.object(m,"check_extension_boot_policy"),patch.object(m,"read_reduction_snapshot",return_value=before),patch.object(m,"read_protected_record",side_effect=lambda path,**kwargs:storage.get(path)),patch.object(m,"archive_directory"),patch.object(m,"sync_archive"),patch.object(Path,"unlink") as unlink,patch.object(m,"run") as run:
+            with self.assertRaises(m.ReductionRecovery):
+                m.archive_cycle_authorized()
+            unlink.assert_not_called()
+            run.assert_not_called()
+
+    def test_bad_archive_digest_refuses(self):
+        identity,records,before,after = self.fixture()
+        bundle = m.cycle_archive_plan(records,identity,before)
+        with patch.object(m,"read_protected_record",return_value=bundle):
+            with self.assertRaises(m.ReductionRecovery):
+                m.read_cycle_archive("a"*64,identity,before)
+
+    def test_command_grammar(self):
+        with patch.object(m,"archive_cycle_authorized") as archive:
+            self.assertEqual(m.main(["archive-cycle-authorized"]),0)
+            archive.assert_called_once_with()
+            self.assertEqual(m.main(["archive-cycle-authorized","extra"]),1)
+            archive.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

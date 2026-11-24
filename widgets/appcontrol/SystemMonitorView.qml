@@ -9,7 +9,13 @@ import "../../components"
 required property var controller
 
             width: parent.width
-            spacing: 12
+            spacing: pinnedInstrument ? 5 : 12
+            // CPU++ owns a finite viewport; legacy hosts retain full-height flow.
+            property bool pinnedInstrument: false
+            readonly property string contributorSourceId: String(safeComponent.id || "")
+            onContributorSourceIdChanged: resetContributorScroll()
+            onVisibleChanged: if (!visible) resetContributorScroll()
+            function resetContributorScroll() { contributorScroll.contentY = 0; }
 
             visible:
                 controller.selectedResultIsSystemComponent()
@@ -29,282 +35,862 @@ required property var controller
             readonly property bool categoryTextAccent:
                 categoryName === "NETWORK" || categoryName === "STORAGE"
 
-            Row {
-                width: parent.width
-                height: 78
-                spacing: 2
-                clip: false
-
-                Item {
-                    width: (parent.width - parent.spacing) * 0.42
-                    height: parent.height
+            Column {
+                id: fixedInstrument
+                objectName: "systemMonitorFixedInstrument"
+                width: systemMonitorBody.width
+                spacing: systemMonitorBody.spacing
+                Row {
+                    width: parent.width
+                    height: systemMonitorBody.pinnedInstrument ? 62 : 78
+                    spacing: 2
                     clip: false
 
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 7
-                        color: Colors.black
-                        border.width:
-                            controller.savedSystemWatchSourceId ===
-                                String(systemMonitorBody.safeComponent.id || "")
-                            && controller.savedSystemWatchBoxId === "utilization" ? 3 : 1
-                        border.color:
-                            controller.savedSystemWatchSourceId ===
-                                String(systemMonitorBody.safeComponent.id || "")
-                            && controller.savedSystemWatchBoxId === "utilization"
-                            ? Colors.magenta : systemMonitorBody.accent
+                    Item {
+                        width: (parent.width - parent.spacing) * 0.42
+                        height: parent.height
+                        clip: false
 
-                        RectangularShadow {
+                        Rectangle {
                             anchors.fill: parent
-                            spread: 3
-                            z: -1
-                            opacity: 0.28
-                            color: systemMonitorBody.accent
-                        }
+                            anchors.margins: systemMonitorBody.pinnedInstrument ? 4 : 7
+                            color: Colors.black
+                            border.width:
+                                controller.savedSystemWatchSourceId ===
+                                    String(systemMonitorBody.safeComponent.id || "")
+                                && controller.savedSystemWatchBoxId === "utilization" ? 3 : 1
+                            border.color:
+                                controller.savedSystemWatchSourceId ===
+                                    String(systemMonitorBody.safeComponent.id || "")
+                                && controller.savedSystemWatchBoxId === "utilization"
+                                ? Colors.magenta : systemMonitorBody.accent
 
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 4
-
-                            GohuText {
-                                text: "UTILIZATION"
-                                font.pixelSize: 10
-                                color: systemMonitorBody.accent
-
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    radius: 6
-                                    samples: 5
-                                    opacity: 0.46
-                                    color: systemMonitorBody.accent
-                                    transparentBorder: true
-                                }
-                            }
-
-                            GohuText {
-                                text:
-                                    systemMonitorBody.currentComponent
-                                    && Number(
-                                           systemMonitorBody.safeComponent.usage
-                                       ) >= 0
-                                    ? Number(
-                                          systemMonitorBody.safeComponent.usage
-                                      ).toFixed(1)
-                                      + "%"
-                                    : "LIVE I/O"
-                                font.pixelSize: 18
-                                color: systemMonitorBody.accent
-
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    radius: 7
-                                    samples: 5
-                                    opacity: 0.58
-                                    color: systemMonitorBody.accent
-                                    transparentBorder: true
-                                }
-                            }
-                        }
-
-                        Item {
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            width: 20
-                            height: 20
-                            z: 20
-
-                            readonly property bool favorite:
-                                controller.isMonitorBoxFavorite(
-                                    systemMonitorBody.currentComponent,
-                                    "utilization"
-                                )
-
-                            GohuText {
-                                anchors.centerIn: parent
-                                text: parent.favorite ? "✦" : "✧"
-                                font.pixelSize: 13
-                                color: systemMonitorBody.accent
-
-                                layer.enabled: parent.favorite
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 5
-                                    opacity: 0.42
-                                    color: systemMonitorBody.accent
-                                    transparentBorder: true
-                                }
-                            }
-
-                            MouseArea {
+                            RectangularShadow {
                                 anchors.fill: parent
-                                onClicked: {
-                                    controller.toggleMonitorBoxFavorite(
+                                spread: 3
+                                z: -1
+                                opacity: 0.28
+                                color: systemMonitorBody.accent
+                            }
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: systemMonitorBody.pinnedInstrument ? 5 : 8
+                                spacing: 4
+
+                                GohuText {
+                                    text: "UTILIZATION"
+                                    font.pixelSize: 10
+                                    color: systemMonitorBody.accent
+
+                                    layer.enabled: true
+                                    layer.effect: DropShadow {
+                                        radius: 6
+                                        samples: 5
+                                        opacity: 0.46
+                                        color: systemMonitorBody.accent
+                                        transparentBorder: true
+                                    }
+                                }
+
+                                GohuText {
+                                    text:
+                                        systemMonitorBody.currentComponent
+                                        && Number(
+                                               systemMonitorBody.safeComponent.usage
+                                           ) >= 0
+                                        ? Number(
+                                              systemMonitorBody.safeComponent.usage
+                                          ).toFixed(1)
+                                          + "%"
+                                        : "LIVE I/O"
+                                    font.pixelSize: 18
+                                    color: systemMonitorBody.accent
+
+                                    layer.enabled: true
+                                    layer.effect: DropShadow {
+                                        radius: 7
+                                        samples: 5
+                                        opacity: 0.58
+                                        color: systemMonitorBody.accent
+                                        transparentBorder: true
+                                    }
+                                }
+                            }
+
+                            Item {
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                width: 20
+                                height: 20
+                                z: 20
+
+                                readonly property bool favorite:
+                                    controller.isMonitorBoxFavorite(
                                         systemMonitorBody.currentComponent,
                                         "utilization"
-                                    );
+                                    )
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: parent.favorite ? "✦" : "✧"
+                                    font.pixelSize: 13
+                                    color: systemMonitorBody.accent
+
+                                    layer.enabled: parent.favorite
+                                    layer.effect: DropShadow {
+                                        radius: 5
+                                        samples: 5
+                                        opacity: 0.42
+                                        color: systemMonitorBody.accent
+                                        transparentBorder: true
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        controller.toggleMonitorBoxFavorite(
+                                            systemMonitorBody.currentComponent,
+                                            "utilization"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Item {
+                        width:
+                            parent.width
+                            - ((parent.width - parent.spacing) * 0.42)
+                            - parent.spacing
+                        height: parent.height
+                        clip: false
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: systemMonitorBody.pinnedInstrument ? 4 : 7
+                            color: Colors.black
+                            border.width:
+                                controller.savedSystemWatchSourceId ===
+                                    String(systemMonitorBody.safeComponent.id || "")
+                                && controller.savedSystemWatchBoxId === "metric" ? 3 : 1
+                            border.color:
+                                controller.savedSystemWatchSourceId ===
+                                    String(systemMonitorBody.safeComponent.id || "")
+                                && controller.savedSystemWatchBoxId === "metric"
+                                ? Colors.magenta : systemMonitorBody.accent
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 3
+                                z: -1
+                                opacity: 0.28
+                                color: systemMonitorBody.accent
+                            }
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: systemMonitorBody.pinnedInstrument ? 5 : 8
+                                spacing: 4
+
+                                GohuText {
+                                    text:
+                                        systemMonitorBody.currentComponent
+                                        ? String(
+                                              systemMonitorBody.safeComponent.category
+                                              || "SYSTEM"
+                                          )
+                                        : "SYSTEM"
+                                    font.pixelSize: 10
+                                    color: systemMonitorBody.accent
+
+                                    layer.enabled: true
+                                    layer.effect: DropShadow {
+                                        radius: 6
+                                        samples: 5
+                                        opacity: 0.46
+                                        color: systemMonitorBody.accent
+                                        transparentBorder: true
+                                    }
+                                }
+
+                                Item {
+                                    width: parent.width - 16
+                                    height: 20
+
+                                    GohuText {
+                                        anchors.fill: parent
+                                        visible:
+                                            systemMonitorBody.categoryName !== "NETWORK"
+                                        text:
+                                            systemMonitorBody.currentComponent
+                                            ? String(
+                                                  systemMonitorBody.safeComponent.metric
+                                                  || ""
+                                              )
+                                            : ""
+                                        font.pixelSize: 14
+                                        fontSizeMode: Text.HorizontalFit
+                                        minimumPixelSize: 8
+                                        color:
+                                            systemMonitorBody.categoryTextAccent
+                                            ? systemMonitorBody.accent
+                                            : Colors.white
+                                        elide: Text.ElideRight
+
+                                        layer.enabled: true
+                                        layer.effect: DropShadow {
+                                            radius: 6
+                                            samples: 5
+                                            opacity: 0.48
+                                            color: systemMonitorBody.accent
+                                            transparentBorder: true
+                                        }
+                                    }
+
+                                    Row {
+                                        id: systemNetworkMetricRow
+                                        anchors.fill: parent
+                                        visible:
+                                            systemMonitorBody.categoryName === "NETWORK"
+                                        spacing: 4
+
+                                        Repeater {
+                                            model:
+                                                controller.systemRateMetricParts(
+                                                    systemMonitorBody.currentComponent
+                                                )
+
+                                            delegate: Row {
+                                                required property var modelData
+                                                width:
+                                                    (systemNetworkMetricRow.width
+                                                     - systemNetworkMetricRow.spacing
+                                                       * Math.max(0,
+                                                           controller.systemRateMetricParts(
+                                                               systemMonitorBody.currentComponent
+                                                           ).length - 1))
+                                                    / Math.max(
+                                                        1,
+                                                        controller.systemRateMetricParts(
+                                                            systemMonitorBody.currentComponent
+                                                        ).length
+                                                    )
+                                                height: systemNetworkMetricRow.height
+                                                spacing: 2
+
+                                                GohuText {
+                                                    id: networkMetricValue
+                                                    width:
+                                                        Math.max(
+                                                            0,
+                                                            parent.width
+                                                            - networkMetricUnit.implicitWidth
+                                                            - parent.spacing
+                                                        )
+                                                    height: parent.height
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    text: String(modelData.value || "")
+                                                    font.pixelSize: 12
+                                                    fontSizeMode: Text.HorizontalFit
+                                                    minimumPixelSize: 7
+                                                    color: Colors.cyan
+                                                    layer.enabled: true
+                                                    layer.effect: DropShadow {
+                                                        radius: 5
+                                                        samples: 5
+                                                        opacity: 0.42
+                                                        color: Colors.cyan
+                                                        transparentBorder: true
+                                                    }
+                                                }
+
+                                                GohuText {
+                                                    id: networkMetricUnit
+                                                    height: parent.height
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    text: String(modelData.unit || "")
+                                                    font.pixelSize: 8
+                                                    color: Colors.cyan
+                                                    opacity: 0.82
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Item {
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                width: 20
+                                height: 20
+                                z: 20
+
+                                readonly property bool favorite:
+                                    controller.isMonitorBoxFavorite(
+                                        systemMonitorBody.currentComponent,
+                                        "metric"
+                                    )
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: parent.favorite ? "✦" : "✧"
+                                    font.pixelSize: 13
+                                    color: systemMonitorBody.accent
+
+                                    layer.enabled: parent.favorite
+                                    layer.effect: DropShadow {
+                                        radius: 5
+                                        samples: 5
+                                        opacity: 0.42
+                                        color: systemMonitorBody.accent
+                                        transparentBorder: true
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        controller.toggleMonitorBoxFavorite(
+                                            systemMonitorBody.currentComponent,
+                                            "metric"
+                                        );
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                Item {
-                    width:
-                        parent.width
-                        - ((parent.width - parent.spacing) * 0.42)
-                        - parent.spacing
-                    height: parent.height
-                    clip: false
+                Rectangle {
+                    visible:
+                        systemMonitorBody.currentComponent
+                        && Number(
+                               systemMonitorBody.safeComponent.usage
+                           ) >= 0
+
+                    width: parent.width - 10
+                    height: 24
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    color: Colors.black
+                    border.width: 1
+                    border.color: systemMonitorBody.accent
 
                     Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 3
+
+                        width:
+                            Math.max(
+                                0,
+                                (parent.width - 6)
+                                * Math.min(
+                                    1.0,
+                                    Number(
+                                        systemMonitorBody.currentComponent
+                                        ? systemMonitorBody.safeComponent.usage
+                                        : 0
+                                    ) / 100.0
+                                )
+                            )
+
+                        color: systemMonitorBody.accent
+                        opacity: 0.58
+                    }
+
+                    RectangularShadow {
                         anchors.fill: parent
-                        anchors.margins: 7
-                        color: Colors.black
-                        border.width:
-                            controller.savedSystemWatchSourceId ===
-                                String(systemMonitorBody.safeComponent.id || "")
-                            && controller.savedSystemWatchBoxId === "metric" ? 3 : 1
-                        border.color:
-                            controller.savedSystemWatchSourceId ===
-                                String(systemMonitorBody.safeComponent.id || "")
-                            && controller.savedSystemWatchBoxId === "metric"
-                            ? Colors.magenta : systemMonitorBody.accent
+                        spread: 2
+                        z: -1
+                        opacity: 0.26
+                        color: systemMonitorBody.accent
+                    }
+                }
 
-                        RectangularShadow {
-                            anchors.fill: parent
-                            spread: 3
-                            z: -1
-                            opacity: 0.28
+                Row {
+                    // CPU++ identity rail already presents the role and icon.
+                    visible: !systemMonitorBody.pinnedInstrument
+                    width: parent.width - 14
+                    height: 34
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 7
+                    transform: Translate { y: -6 }
+
+                    GohuText {
+                        id: systemRoleIcon
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        text:
+                            controller.systemIconFor(
+                                systemMonitorBody.currentComponent
+                            )
+                        font.pixelSize:
+                            systemMonitorBody.categoryName === "NETWORK"
+                            ? 24 : 32
+                        color: systemMonitorBody.accent
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 6
+                            samples: 5
+                            opacity: 0.44
                             color: systemMonitorBody.accent
+                            transparentBorder: true
                         }
+                    }
 
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 4
+                    GohuText {
+                        id: systemRoleText
+                        width:
+                            Math.max(
+                                0,
+                                parent.width
+                                - systemRoleIcon.implicitWidth
+                                - parent.spacing
+                            )
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        text:
+                            systemMonitorBody.currentComponent
+                            ? String(systemMonitorBody.safeComponent.role || "")
+                            : ""
+                        font.pixelSize: 12
+                        color: systemMonitorBody.accent
+                        wrapMode: Text.Wrap
 
-                            GohuText {
-                                text:
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 5
+                            opacity: 0.36
+                            color: systemMonitorBody.accent
+                            transparentBorder: true
+                        }
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        systemMonitorBody.currentComponent
+                        ? String(
+                              systemMonitorBody.safeComponent.secondary
+                              || ""
+                          )
+                        : ""
+                    font.pixelSize: 12
+                    color:
+                        systemMonitorBody.categoryTextAccent
+                        ? systemMonitorBody.accent : Colors.white
+                    wrapMode: Text.Wrap
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        systemMonitorBody.currentComponent
+                        ? String(
+                              systemMonitorBody.safeComponent.detail
+                              || ""
+                          )
+                        : ""
+                    font.pixelSize: 10
+                    color:
+                        systemMonitorBody.categoryTextAccent
+                        ? systemMonitorBody.accent : Colors.white
+                    opacity:
+                        systemMonitorBody.categoryTextAccent ? 0.88 : 0.64
+                    wrapMode: Text.Wrap
+                }
+
+                GohuText {
+                    visible: systemMonitorBody.pinnedInstrument
+                    width: parent.width
+                    text: "SYSTEM STATE"
+                    color: Colors.cyan
+                    font.pixelSize: 13
+                }
+                Rectangle {
+                    visible: systemMonitorBody.pinnedInstrument
+                    width: parent.width
+                    height: 1
+                    color: Colors.cyan
+                }
+                Item {
+                    width: systemMonitorBody.pinnedInstrument ? parent.width :
+                        systemControlHeader.implicitWidth
+                        + systemControlWarning.implicitWidth
+                        + 44
+                    height: systemMonitorBody.pinnedInstrument
+                        ? Math.max(systemControlHeader.implicitHeight, systemControlWarning.implicitHeight) + 8
+                        : systemControlHeader.implicitHeight + 16
+
+                    GohuText {
+                        id: systemControlHeader
+                        anchors.left: parent.left
+                        anchors.leftMargin: systemMonitorBody.pinnedInstrument ? 0 : 16
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        text: "SYSTEM CONTROL"
+                        font.pixelSize: 13
+                        color: Colors.red
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 5
+                            opacity: 0.34
+                            color: Colors.red
+                            transparentBorder: true
+                        }
+                    }
+
+                    GohuText {
+                        id: systemControlWarning
+                        anchors.left: systemControlHeader.right
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: systemMonitorBody.pinnedInstrument
+                            ? Math.max(0, parent.width - systemControlHeader.width - 10)
+                            : implicitWidth
+                        wrapMode: systemMonitorBody.pinnedInstrument ? Text.Wrap : Text.NoWrap
+
+                        text:
+                            controller.systemComponentWarning(
+                                systemMonitorBody.currentComponent
+                            )
+
+                        font.pixelSize: 9
+                        color: Colors.yellow
+
+                        layer.enabled: text.length > 0
+                        layer.effect: DropShadow {
+                            radius: 4
+                            samples: 5
+                            opacity: 0.32
+                            color: Colors.yellow
+                            transparentBorder: true
+                        }
+                    }
+                }
+
+                Row {
+                    objectName: "systemMonitorFixedActions"
+                    width: parent.width
+                    spacing: 6
+
+                    Repeater {
+                        model: [
+                            {
+                                label: "DISCONNECT",
+                                action: "disconnect",
+                                accent: Colors.red,
+                                available:
                                     systemMonitorBody.currentComponent
-                                    ? String(
-                                          systemMonitorBody.safeComponent.category
-                                          || "SYSTEM"
-                                      )
-                                    : "SYSTEM"
-                                font.pixelSize: 10
-                                color: systemMonitorBody.accent
+                                    && systemMonitorBody.safeComponent.canDisconnect
+                            },
+                            {
+                                label: "RECONNECT",
+                                action: "reconnect",
+                                accent: Colors.omnitrix,
+                                available:
+                                    systemMonitorBody.currentComponent
+                                    && systemMonitorBody.safeComponent.canReconnect
+                            },
+                            {
+                                label:
+                                    controller.systemRebootArmed
+                                    ? "CONFIRM REBOOT"
+                                    : "REBOOT PC",
+                                action: "reboot",
+                                accent: Colors.orange,
+                                available:
+                                    systemMonitorBody.currentComponent
+                                    && systemMonitorBody.safeComponent.canReboot
+                            }
+                        ]
 
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    radius: 6
-                                    samples: 5
-                                    opacity: 0.46
-                                    color: systemMonitorBody.accent
-                                    transparentBorder: true
-                                }
+                        ActionButton {
+                            id: systemControlActionButton
+
+                            required property var modelData
+
+                            width: (systemMonitorBody.width - 12) / 3
+                            height: 34
+
+                            property bool canRun:
+                                !!modelData.available
+                            property bool isRebootAction:
+                                modelData.action === "reboot"
+
+                            available: canRun
+                            label: modelData.label
+                            labelPixelSize: 9
+                            unavailableOpacity: 0.32
+                            unavailableContentOpacity: 0.42
+
+                            idleFillColor: Colors.black
+                            hoverFillColor:
+                                isRebootAction ? Colors.red : Colors.yellow
+                            pressedFillColor: Colors.magenta
+
+                            idleForegroundColor:
+                                available ? modelData.accent : Colors.white
+                            hoverForegroundColor:
+                                isRebootAction ? Colors.black : Colors.orange
+                            pressedForegroundColor: Colors.black
+
+                            idleBorderColor:
+                                available ? modelData.accent : Colors.white
+                            hoverBorderColor:
+                                available ? modelData.accent : Colors.white
+                            pressedBorderColor:
+                                available ? modelData.accent : Colors.white
+
+                            contentGlowEnabled: available
+                            idleContentGlowColor: modelData.accent
+                            hoverContentGlowColor:
+                                isRebootAction ? Colors.red : modelData.accent
+                            pressedContentGlowColor:
+                                isRebootAction ? Colors.red : modelData.accent
+                            contentGlowIdleOpacity: 0.34
+                            contentGlowHoverOpacity: 0.34
+                            contentGlowPressedOpacity: 0.34
+                            contentGlowRadius: 5
+                            contentGlowSamples: 5
+
+                            softGlowEnabled: true
+                            softGlowSpread: 2
+                            idleSoftGlowColor: Colors.red
+                            hoverSoftGlowColor: Colors.red
+                            pressedSoftGlowColor: Colors.red
+                            softGlowIdleOpacity: 0.0
+                            softGlowHoverOpacity:
+                                isRebootAction ? 0.46 : 0.0
+                            softGlowPressedOpacity:
+                                isRebootAction ? 0.46 : 0.0
+                            wideGlowEnabled: false
+
+                            onTriggered: {
+                                controller.runSystemComponentAction(
+                                    systemMonitorBody.currentComponent,
+                                    modelData.action
+                                );
                             }
 
-                            Item {
-                                width: parent.width - 16
-                                height: 20
 
-                                GohuText {
-                                    anchors.fill: parent
-                                    visible:
-                                        systemMonitorBody.categoryName !== "NETWORK"
-                                    text:
-                                        systemMonitorBody.currentComponent
-                                        ? String(
-                                              systemMonitorBody.safeComponent.metric
-                                              || ""
-                                          )
-                                        : ""
-                                    font.pixelSize: 14
-                                    fontSizeMode: Text.HorizontalFit
-                                    minimumPixelSize: 8
-                                    color:
-                                        systemMonitorBody.categoryTextAccent
-                                        ? systemMonitorBody.accent
-                                        : Colors.white
-                                    elide: Text.ElideRight
 
-                                    layer.enabled: true
-                                    layer.effect: DropShadow {
-                                        radius: 6
-                                        samples: 5
-                                        opacity: 0.48
-                                        color: systemMonitorBody.accent
-                                        transparentBorder: true
-                                    }
-                                }
+
+
+
+                        }
+                    }
+                }
+
+                Item {
+                    width: systemMonitorBody.pinnedInstrument ? parent.width : systemContributorHeader.implicitWidth + 32
+                    height: systemContributorHeader.implicitHeight + (systemMonitorBody.pinnedInstrument ? 8 : 16)
+
+                    GohuText {
+                        id: systemContributorHeader
+                        anchors.left: parent.left
+                        anchors.leftMargin: systemMonitorBody.pinnedInstrument ? 0 : 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "PROCESS / APP CONTRIBUTORS"
+                        font.pixelSize: 13
+                        color: systemMonitorBody.accent
+                    }
+
+                    DropShadow {
+                        anchors.fill: systemContributorHeader
+                        source: systemContributorHeader
+                        radius: 5
+                        samples: 5
+                        opacity: 0.34
+                        color: systemMonitorBody.accent
+                        transparentBorder: true
+                    }
+                }
+
+            }
+            Item {
+                width: systemMonitorBody.width
+                height: systemMonitorBody.pinnedInstrument
+                    ? Math.max(0, systemMonitorBody.height - fixedInstrument.height - systemMonitorBody.spacing)
+                    : contributorBody.implicitHeight
+                Flickable {
+                    id: contributorScroll
+                    objectName: "systemMonitorContributorScroll"
+                    anchors.fill: parent
+                    clip: systemMonitorBody.pinnedInstrument
+                    interactive: systemMonitorBody.pinnedInstrument && contentHeight > height
+                    boundsBehavior: Flickable.StopAtBounds
+                    contentWidth: width
+                    contentHeight: contributorBody.implicitHeight
+                    flickableDirection: Flickable.VerticalFlick
+                    Column {
+                        id: contributorBody
+                        width: Math.max(0, contributorScroll.width - (systemMonitorBody.pinnedInstrument ? 14 : 0))
+                        spacing: systemMonitorBody.spacing
+                        GohuText {
+                            width: parent.width
+                            text:
+                                systemMonitorBody.currentComponent
+                                ? String(
+                                      systemMonitorBody.safeComponent.contributorNote
+                                      || ""
+                                  )
+                                : ""
+                            font.pixelSize: 9
+                            color: Colors.white
+                            opacity: 0.58
+                            wrapMode: Text.Wrap
+                        }
+
+                        Repeater {
+                            model:
+                                controller.contributorRows(
+                                    systemMonitorBody.currentComponent
+                                )
+
+                            Rectangle {
+                                required property var modelData
+
+                                width: Math.max(0, parent.width - 8)
+                                height: 38
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                color: Colors.black
+                                border.width: 1
+                                border.color: systemMonitorBody.accent
 
                                 Row {
-                                    id: systemNetworkMetricRow
                                     anchors.fill: parent
-                                    visible:
-                                        systemMonitorBody.categoryName === "NETWORK"
-                                    spacing: 4
+                                    anchors.leftMargin: 7
+                                    anchors.rightMargin: 7
+                                    spacing: 6
 
-                                    Repeater {
-                                        model:
-                                            controller.systemRateMetricParts(
-                                                systemMonitorBody.currentComponent
-                                            )
+                                    GohuText {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "⚙"
+                                        font.pixelSize: 12
+                                        color: systemMonitorBody.accent
 
-                                        delegate: Row {
-                                            required property var modelData
-                                            width:
-                                                (systemNetworkMetricRow.width
-                                                 - systemNetworkMetricRow.spacing
-                                                   * Math.max(0,
-                                                       controller.systemRateMetricParts(
-                                                           systemMonitorBody.currentComponent
-                                                       ).length - 1))
-                                                / Math.max(
-                                                    1,
-                                                    controller.systemRateMetricParts(
-                                                        systemMonitorBody.currentComponent
-                                                    ).length
-                                                )
-                                            height: systemNetworkMetricRow.height
-                                            spacing: 2
+                                        layer.enabled: true
+                                        layer.effect: DropShadow {
+                                            radius: 4
+                                            samples: 5
+                                            opacity: 0.34
+                                            color: systemMonitorBody.accent
+                                            transparentBorder: true
+                                        }
+                                    }
 
-                                            GohuText {
-                                                id: networkMetricValue
-                                                width:
-                                                    Math.max(
-                                                        0,
-                                                        parent.width
-                                                        - networkMetricUnit.implicitWidth
-                                                        - parent.spacing
-                                                    )
-                                                height: parent.height
-                                                verticalAlignment: Text.AlignVCenter
-                                                horizontalAlignment: Text.AlignHCenter
-                                                text: String(modelData.value || "")
-                                                font.pixelSize: 12
-                                                fontSizeMode: Text.HorizontalFit
-                                                minimumPixelSize: 7
-                                                color: Colors.cyan
-                                                layer.enabled: true
-                                                layer.effect: DropShadow {
-                                                    radius: 5
-                                                    samples: 5
-                                                    opacity: 0.42
-                                                    color: Colors.cyan
-                                                    transparentBorder: true
-                                                }
+                                    GohuText {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width * 0.40
+                                        text:
+                                            String(modelData.name || "PROCESS")
+                                            + "  ["
+                                            + String(modelData.pid || "?")
+                                            + "]"
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                        elide: Text.ElideRight
+                                    }
+
+                                    GohuText {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width * 0.28
+                                        text: String(modelData.valueText || "")
+                                        font.pixelSize: 10
+                                        color: systemMonitorBody.accent
+                                        horizontalAlignment: Text.AlignRight
+                                        elide: Text.ElideRight
+
+                                        layer.enabled: true
+                                        layer.effect: DropShadow {
+                                            radius: 4
+                                            samples: 5
+                                            opacity: 0.32
+                                            color: systemMonitorBody.accent
+                                            transparentBorder: true
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 58
+                                        height: 26
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        property bool canKill:
+                                            !!modelData.killable
+                                            && Number(modelData.pid || 0) > 1
+
+                                        color:
+                                            contributorKillMouse.pressed
+                                            ? Colors.red
+                                            : contributorKillMouse.containsMouse
+                                              && canKill
+                                            ? Colors.yellow
+                                            : Colors.black
+
+                                        opacity: canKill ? 1.0 : 0.30
+                                        border.width: 1
+                                        border.color:
+                                            !canKill ? Colors.white
+                                            : contributorKillMouse.pressed ? Colors.black
+                                            : Colors.red
+
+                                        GohuText {
+                                            anchors.centerIn: parent
+
+                                            text: "TERM"
+                                            font.pixelSize: 9
+                                            color:
+                                                contributorKillMouse.pressed
+                                                ? Colors.black
+                                                : parent.canKill
+                                                ? Colors.red
+                                                : Colors.white
+
+                                            layer.enabled: parent.canKill
+                                            layer.effect: DropShadow {
+                                                radius: 4
+                                                samples: 5
+                                                opacity: 0.34
+                                                color: Colors.red
+                                                transparentBorder: true
                                             }
+                                        }
 
-                                            GohuText {
-                                                id: networkMetricUnit
-                                                height: parent.height
-                                                verticalAlignment: Text.AlignVCenter
-                                                text: String(modelData.unit || "")
-                                                font.pixelSize: 8
-                                                color: Colors.cyan
-                                                opacity: 0.82
+
+                                        RectangularShadow {
+                                            anchors.fill: parent
+                                            anchors.margins: -3
+                                            spread: 3
+                                            z: -1
+                                            opacity: contributorKillMouse.pressed ? 0.94
+                                                     : contributorKillMouse.containsMouse ? 0.78 : 0.22
+                                            color: Colors.red
+                                        }
+
+
+                                        MouseArea {
+                                            id: contributorKillMouse
+                                            anchors.fill: parent
+                                            enabled: parent.canKill
+                                            hoverEnabled: true
+
+                                            onClicked: {
+                                                controller.terminateSystemContributor(
+                                                    modelData
+                                                );
                                             }
                                         }
                                     }
@@ -312,556 +898,31 @@ required property var controller
                             }
                         }
 
-                        Item {
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            width: 20
-                            height: 20
-                            z: 20
-
-                            readonly property bool favorite:
-                                controller.isMonitorBoxFavorite(
-                                    systemMonitorBody.currentComponent,
-                                    "metric"
-                                )
-
-                            GohuText {
-                                anchors.centerIn: parent
-                                text: parent.favorite ? "✦" : "✧"
-                                font.pixelSize: 13
-                                color: systemMonitorBody.accent
-
-                                layer.enabled: parent.favorite
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 5
-                                    opacity: 0.42
-                                    color: systemMonitorBody.accent
-                                    transparentBorder: true
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    controller.toggleMonitorBoxFavorite(
-                                        systemMonitorBody.currentComponent,
-                                        "metric"
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                visible:
-                    systemMonitorBody.currentComponent
-                    && Number(
-                           systemMonitorBody.safeComponent.usage
-                       ) >= 0
-
-                width: parent.width - 10
-                height: 24
-                anchors.horizontalCenter: parent.horizontalCenter
-                color: Colors.black
-                border.width: 1
-                border.color: systemMonitorBody.accent
-
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 3
-
-                    width:
-                        Math.max(
-                            0,
-                            (parent.width - 6)
-                            * Math.min(
-                                1.0,
-                                Number(
+                        GohuText {
+                            visible:
+                                controller.contributorRows(
                                     systemMonitorBody.currentComponent
-                                    ? systemMonitorBody.safeComponent.usage
-                                    : 0
-                                ) / 100.0
-                            )
-                        )
+                                ).length === 0
 
-                    color: systemMonitorBody.accent
-                    opacity: 0.58
-                }
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 2
-                    z: -1
-                    opacity: 0.26
-                    color: systemMonitorBody.accent
-                }
-            }
-
-            Row {
-                width: parent.width - 14
-                height: 34
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 7
-                transform: Translate { y: -6 }
-
-                GohuText {
-                    id: systemRoleIcon
-                    height: parent.height
-                    verticalAlignment: Text.AlignVCenter
-                    text:
-                        controller.systemIconFor(
-                            systemMonitorBody.currentComponent
-                        )
-                    font.pixelSize:
-                        systemMonitorBody.categoryName === "NETWORK"
-                        ? 24 : 32
-                    color: systemMonitorBody.accent
-
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        radius: 6
-                        samples: 5
-                        opacity: 0.44
-                        color: systemMonitorBody.accent
-                        transparentBorder: true
-                    }
-                }
-
-                GohuText {
-                    id: systemRoleText
-                    width:
-                        Math.max(
-                            0,
-                            parent.width
-                            - systemRoleIcon.implicitWidth
-                            - parent.spacing
-                        )
-                    height: parent.height
-                    verticalAlignment: Text.AlignVCenter
-                    text:
-                        systemMonitorBody.currentComponent
-                        ? String(systemMonitorBody.safeComponent.role || "")
-                        : ""
-                    font.pixelSize: 12
-                    color: systemMonitorBody.accent
-                    wrapMode: Text.Wrap
-
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        radius: 5
-                        samples: 5
-                        opacity: 0.36
-                        color: systemMonitorBody.accent
-                        transparentBorder: true
-                    }
-                }
-            }
-
-            GohuText {
-                width: parent.width
-                text:
-                    systemMonitorBody.currentComponent
-                    ? String(
-                          systemMonitorBody.safeComponent.secondary
-                          || ""
-                      )
-                    : ""
-                font.pixelSize: 12
-                color:
-                    systemMonitorBody.categoryTextAccent
-                    ? systemMonitorBody.accent : Colors.white
-                wrapMode: Text.Wrap
-            }
-
-            GohuText {
-                width: parent.width
-                text:
-                    systemMonitorBody.currentComponent
-                    ? String(
-                          systemMonitorBody.safeComponent.detail
-                          || ""
-                      )
-                    : ""
-                font.pixelSize: 10
-                color:
-                    systemMonitorBody.categoryTextAccent
-                    ? systemMonitorBody.accent : Colors.white
-                opacity:
-                    systemMonitorBody.categoryTextAccent ? 0.88 : 0.64
-                wrapMode: Text.Wrap
-            }
-
-            Item {
-                width:
-                    systemControlHeader.implicitWidth
-                    + systemControlWarning.implicitWidth
-                    + 44
-                height: systemControlHeader.implicitHeight + 16
-
-                GohuText {
-                    id: systemControlHeader
-                    anchors.left: parent.left
-                    anchors.leftMargin: 16
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text: "SYSTEM CONTROL"
-                    font.pixelSize: 13
-                    color: Colors.red
-
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        radius: 5
-                        samples: 5
-                        opacity: 0.34
-                        color: Colors.red
-                        transparentBorder: true
-                    }
-                }
-
-                GohuText {
-                    id: systemControlWarning
-                    anchors.left: systemControlHeader.right
-                    anchors.leftMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text:
-                        controller.systemComponentWarning(
-                            systemMonitorBody.currentComponent
-                        )
-
-                    font.pixelSize: 9
-                    color: Colors.yellow
-
-                    layer.enabled: text.length > 0
-                    layer.effect: DropShadow {
-                        radius: 4
-                        samples: 5
-                        opacity: 0.32
-                        color: Colors.yellow
-                        transparentBorder: true
-                    }
-                }
-            }
-
-            Row {
-                width: parent.width
-                spacing: 6
-
-                Repeater {
-                    model: [
-                        {
-                            label: "DISCONNECT",
-                            action: "disconnect",
-                            accent: Colors.red,
-                            available:
-                                systemMonitorBody.currentComponent
-                                && systemMonitorBody.safeComponent.canDisconnect
-                        },
-                        {
-                            label: "RECONNECT",
-                            action: "reconnect",
-                            accent: Colors.omnitrix,
-                            available:
-                                systemMonitorBody.currentComponent
-                                && systemMonitorBody.safeComponent.canReconnect
-                        },
-                        {
-                            label:
-                                controller.systemRebootArmed
-                                ? "CONFIRM REBOOT"
-                                : "REBOOT PC",
-                            action: "reboot",
-                            accent: Colors.orange,
-                            available:
-                                systemMonitorBody.currentComponent
-                                && systemMonitorBody.safeComponent.canReboot
-                        }
-                    ]
-
-                    ActionButton {
-                        id: systemControlActionButton
-
-                        required property var modelData
-
-                        width: (systemMonitorBody.width - 12) / 3
-                        height: 34
-
-                        property bool canRun:
-                            !!modelData.available
-                        property bool isRebootAction:
-                            modelData.action === "reboot"
-
-                        available: canRun
-                        label: modelData.label
-                        labelPixelSize: 9
-                        unavailableOpacity: 0.32
-                        unavailableContentOpacity: 0.42
-
-                        idleFillColor: Colors.black
-                        hoverFillColor:
-                            isRebootAction ? Colors.red : Colors.yellow
-                        pressedFillColor: Colors.magenta
-
-                        idleForegroundColor:
-                            available ? modelData.accent : Colors.white
-                        hoverForegroundColor:
-                            isRebootAction ? Colors.black : Colors.orange
-                        pressedForegroundColor: Colors.black
-
-                        idleBorderColor:
-                            available ? modelData.accent : Colors.white
-                        hoverBorderColor:
-                            available ? modelData.accent : Colors.white
-                        pressedBorderColor:
-                            available ? modelData.accent : Colors.white
-
-                        contentGlowEnabled: available
-                        idleContentGlowColor: modelData.accent
-                        hoverContentGlowColor:
-                            isRebootAction ? Colors.red : modelData.accent
-                        pressedContentGlowColor:
-                            isRebootAction ? Colors.red : modelData.accent
-                        contentGlowIdleOpacity: 0.34
-                        contentGlowHoverOpacity: 0.34
-                        contentGlowPressedOpacity: 0.34
-                        contentGlowRadius: 5
-                        contentGlowSamples: 5
-
-                        softGlowEnabled: true
-                        softGlowSpread: 2
-                        idleSoftGlowColor: Colors.red
-                        hoverSoftGlowColor: Colors.red
-                        pressedSoftGlowColor: Colors.red
-                        softGlowIdleOpacity: 0.0
-                        softGlowHoverOpacity:
-                            isRebootAction ? 0.46 : 0.0
-                        softGlowPressedOpacity:
-                            isRebootAction ? 0.46 : 0.0
-                        wideGlowEnabled: false
-
-                        onTriggered: {
-                            controller.runSystemComponentAction(
-                                systemMonitorBody.currentComponent,
-                                modelData.action
-                            );
-                        }
-
-
-
-
-
-
-                    }
-                }
-            }
-
-            Item {
-                width: systemContributorHeader.implicitWidth + 32
-                height: systemContributorHeader.implicitHeight + 16
-
-                GohuText {
-                    id: systemContributorHeader
-                    anchors.left: parent.left
-                    anchors.leftMargin: 16
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "PROCESS / APP CONTRIBUTORS"
-                    font.pixelSize: 13
-                    color: systemMonitorBody.accent
-                }
-
-                DropShadow {
-                    anchors.fill: systemContributorHeader
-                    source: systemContributorHeader
-                    radius: 5
-                    samples: 5
-                    opacity: 0.34
-                    color: systemMonitorBody.accent
-                    transparentBorder: true
-                }
-            }
-
-            GohuText {
-                width: parent.width
-                text:
-                    systemMonitorBody.currentComponent
-                    ? String(
-                          systemMonitorBody.safeComponent.contributorNote
-                          || ""
-                      )
-                    : ""
-                font.pixelSize: 9
-                color: Colors.white
-                opacity: 0.58
-                wrapMode: Text.Wrap
-            }
-
-            Repeater {
-                model:
-                    controller.contributorRows(
-                        systemMonitorBody.currentComponent
-                    )
-
-                Rectangle {
-                    required property var modelData
-
-                    width: systemMonitorBody.width - 8
-                    height: 38
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    color: Colors.black
-                    border.width: 1
-                    border.color: systemMonitorBody.accent
-
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: 7
-                        anchors.rightMargin: 7
-                        spacing: 6
-
-                        GohuText {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "⚙"
-                            font.pixelSize: 12
-                            color: systemMonitorBody.accent
-
-                            layer.enabled: true
-                            layer.effect: DropShadow {
-                                radius: 4
-                                samples: 5
-                                opacity: 0.34
-                                color: systemMonitorBody.accent
-                                transparentBorder: true
-                            }
-                        }
-
-                        GohuText {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width * 0.40
+                            width: parent.width
                             text:
-                                String(modelData.name || "PROCESS")
-                                + "  ["
-                                + String(modelData.pid || "?")
-                                + "]"
+                                systemMonitorBody.currentComponent
+                                ? String(
+                                      systemMonitorBody.safeComponent.contributorNote
+                                      || "NO PER-PROCESS ATTRIBUTION AVAILABLE"
+                                  )
+                                : ""
                             font.pixelSize: 10
                             color: Colors.white
-                            elide: Text.ElideRight
-                        }
-
-                        GohuText {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width * 0.28
-                            text: String(modelData.valueText || "")
-                            font.pixelSize: 10
-                            color: systemMonitorBody.accent
-                            horizontalAlignment: Text.AlignRight
-                            elide: Text.ElideRight
-
-                            layer.enabled: true
-                            layer.effect: DropShadow {
-                                radius: 4
-                                samples: 5
-                                opacity: 0.32
-                                color: systemMonitorBody.accent
-                                transparentBorder: true
-                            }
-                        }
-
-                        Rectangle {
-                            width: 58
-                            height: 26
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            property bool canKill:
-                                !!modelData.killable
-                                && Number(modelData.pid || 0) > 1
-
-                            color:
-                                contributorKillMouse.pressed
-                                ? Colors.red
-                                : contributorKillMouse.containsMouse
-                                  && canKill
-                                ? Colors.yellow
-                                : Colors.black
-
-                            opacity: canKill ? 1.0 : 0.30
-                            border.width: 1
-                            border.color:
-                                !canKill ? Colors.white
-                                : contributorKillMouse.pressed ? Colors.black
-                                : Colors.red
-
-                            GohuText {
-                                anchors.centerIn: parent
-
-                                text: "TERM"
-                                font.pixelSize: 9
-                                color:
-                                    contributorKillMouse.pressed
-                                    ? Colors.black
-                                    : parent.canKill
-                                    ? Colors.red
-                                    : Colors.white
-
-                                layer.enabled: parent.canKill
-                                layer.effect: DropShadow {
-                                    radius: 4
-                                    samples: 5
-                                    opacity: 0.34
-                                    color: Colors.red
-                                    transparentBorder: true
-                                }
-                            }
-
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                anchors.margins: -3
-                                spread: 3
-                                z: -1
-                                opacity: contributorKillMouse.pressed ? 0.94
-                                         : contributorKillMouse.containsMouse ? 0.78 : 0.22
-                                color: Colors.red
-                            }
-
-
-                            MouseArea {
-                                id: contributorKillMouse
-                                anchors.fill: parent
-                                enabled: parent.canKill
-                                hoverEnabled: true
-
-                                onClicked: {
-                                    controller.terminateSystemContributor(
-                                        modelData
-                                    );
-                                }
-                            }
+                            opacity: 0.58
+                            wrapMode: Text.Wrap
                         }
                     }
                 }
-            }
-
-            GohuText {
-                visible:
-                    controller.contributorRows(
-                        systemMonitorBody.currentComponent
-                    ).length === 0
-
-                width: parent.width
-                text:
-                    systemMonitorBody.currentComponent
-                    ? String(
-                          systemMonitorBody.safeComponent.contributorNote
-                          || "NO PER-PROCESS ATTRIBUTION AVAILABLE"
-                      )
-                    : ""
-                font.pixelSize: 10
-                color: Colors.white
-                opacity: 0.58
-                wrapMode: Text.Wrap
+                NeonScrollBar {
+                    flickable: contributorScroll
+                    geometryMode: "viewport"
+                    visible: systemMonitorBody.pinnedInstrument && systemMonitorBody.visible && scrollable
+                }
             }
         }

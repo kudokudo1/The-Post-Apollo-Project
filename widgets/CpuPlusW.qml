@@ -587,6 +587,7 @@ PanelWindow {
         systemSelectedIndex = 0;
         monitorSelectorScroll.contentY = 0;
         sharedInstrumentScroll.contentY = 0;
+        systemMonitorBody.resetContributorScroll();
         refreshSharedMonitors();
     }
 
@@ -1532,7 +1533,7 @@ PanelWindow {
                  || cpuPlusWindow.selectedModeIndex === 3)
                 && entry !== null
 
-            height: visible ? 122 : 0
+            height: visible ? (showingSystem ? 74 : 122) : 0
 
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1734,6 +1735,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
+                visible: !selectedMonitorIdentity.showingSystem
 
                 text:
                     cpuPlusWindow.monitorIdentityDetail(
@@ -1790,7 +1792,8 @@ PanelWindow {
             anchors.rightMargin: 8
             anchors.topMargin: 8
 
-            height: 30
+            visible: cpuPlusWindow.selectedModeIndex !== 3
+            height: visible ? 30 : 0
 
             GohuText {
                 anchors.left: parent.left
@@ -1877,7 +1880,8 @@ PanelWindow {
 
             // SETTINGS/TIME owns this left slot with the shared Clock basic
             // control pane, not the inert instrument placeholder.
-            visible: !(cpuPlusWindow.selectedModeIndex === 6
+            visible: cpuPlusWindow.selectedModeIndex !== 3
+                     && !(cpuPlusWindow.selectedModeIndex === 6
                        && (cpuPlusWindow.settingsSubMode === "TIME"
                            || cpuPlusWindow.settingsSubMode === "CONNECTIONS"
                            || cpuPlusWindow.settingsSubMode === "LOCATION"))
@@ -1903,11 +1907,6 @@ PanelWindow {
                       height,
                       thermalMonitorBody.implicitHeight
                   )
-                : cpuPlusWindow.selectedModeIndex === 3
-                ? Math.max(
-                      height,
-                      systemMonitorBody.implicitHeight
-                  )
                 : height
 
             Item {
@@ -1920,13 +1919,6 @@ PanelWindow {
                     width: parent.width
                     controller: monitorHost
                     thermalController: thermalController
-                }
-
-                SystemMonitorView {
-                    id: systemMonitorBody
-
-                    width: parent.width
-                    controller: monitorHost
                 }
 
                 GohuText {
@@ -1952,6 +1944,22 @@ PanelWindow {
         NeonScrollBar {
             flickable: sharedInstrumentScroll
             visible: sharedInstrumentScroll.visible && scrollable
+        }
+
+        // SYSTEM uses a fixed upper instrument with an independently
+        // scrolling contributor viewport. Other modes retain their old host.
+        SystemMonitorView {
+            id: systemMonitorBody
+            pinnedInstrument: true
+            controller: monitorHost
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: selectedMonitorIdentity.bottom
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 5
+            anchors.bottomMargin: 8
         }
 
         // SETTINGS // LOCATION uses all three existing CPU++ bays.

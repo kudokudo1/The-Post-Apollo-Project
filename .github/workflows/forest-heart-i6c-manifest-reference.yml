@@ -1,0 +1,24 @@
+name: Forest Heart I6c manifest reference CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/manifest_reference_i6c.py'
+      - 'scripts/forest/MANIFEST_REFERENCE_I6C.md'
+      - 'scripts/forest/performance_snapshot_p0.py'
+      - 'tests/forest/test_manifest_reference_i6c.py'
+      - '.github/workflows/forest-heart-i6c-manifest-reference.yml'
+permissions:
+  contents: read
+jobs:
+  manifest-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_manifest_reference_i6c.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_performance_snapshot_p0.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_runtime_membership_i6.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_model_binding_i2.py' -v
+      - run: python3 -m py_compile scripts/forest/manifest_reference_i6c.py tests/forest/test_manifest_reference_i6c.py

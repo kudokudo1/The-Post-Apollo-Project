@@ -1,0 +1,107 @@
+#!/usr/bin/python3 -I
+"""One-time, add-only Btrfs swap allocation. No persistence."""
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+
+GIB = 1024 ** 3
+PARENT = Path("/var/lib")
+DIRECTORY = PARENT / "post-apollo-memory-swap"
+SWAPFILE = DIRECTORY / "swapfile"
+ENV = {"PATH": "/usr/sbin:/usr/bin", "LC_ALL": "C"}
+
+def run(*argv):
+    return subprocess.run(argv, check=True, text=True, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, env=ENV, cwd="/").stdout
+
+def parse_size(value):
+    if not re.fullmatch(r"[1-9][0-9]?", value):
+        raise ValueError("Choose 4–64 GiB in 4 GiB steps")
+    size = int(value)
+    if size < 4 or size > 64 or size % 4:
+        raise ValueError("Choose 4–64 GiB in 4 GiB steps")
+    return size
+
+def secure_parent():
+    for path in (Path("/"), Path("/var"), PARENT):
+        info = path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise RuntimeError("Unsafe or unsupported storage parent: " + str(path))
+
+def active_swap():
+    with open("/proc/swaps", encoding="ascii") as stream:
+        next(stream)
+        for line in stream:
+            fields = line.split()
+            if len(fields) == 5 and fields[0] == str(SWAPFILE):
+                return {"sizeKiB": int(fields[2]), "priority": int(fields[4])}
+    return None
+
+def status():
+    secure_parent()
+    fs = run("/usr/bin/findmnt", "-n", "-o", "FSTYPE", "-T", str(PARENT)).strip()
+    usage = os.statvfs(PARENT)
+    available = usage.f_bavail * usage.f_frsize
+    reserve = max(32 * GIB, (usage.f_blocks * usage.f_frsize + 9) // 10)
+    existing = os.path.lexists(DIRECTORY)
+    return {"filesystem": fs, "availableGiB": available // GIB,
+            "reserveGiB": (reserve + GIB - 1) // GIB,
+            "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
+            "existing": existing, "active": active_swap(),
+            "candidate": fs == "btrfs" and not existing,
+            "path": str(SWAPFILE)}
+
+def validate_request(size, observed):
+    if not observed["candidate"] or size > observed["maximumGiB"]:
+        raise RuntimeError("Unsupported filesystem, existing allocation, or insufficient reserved space")
+
+def allocate(size):
+    if os.geteuid() != 0:
+        raise PermissionError("Administrator authentication required")
+    if not sys.stdin.isatty():
+        raise RuntimeError("Interactive terminal confirmation required")
+    validate_request(size, status())
+    print(f"Reserve {size} GiB in {SWAPFILE} (Btrfs /var/lib).", flush=True)
+    print("Temporary swap, priority 10. No existing swap will be removed.", flush=True)
+    if input(f"Type ADD {size} to confirm: ") != f"ADD {size}":
+        raise RuntimeError("Cancelled; no allocation attempted")
+    validate_request(size, status())
+    devices = run("/usr/bin/btrfs", "filesystem", "show", "--raw", str(PARENT))
+    if not re.search(r"\bTotal devices\s+1\b", devices):
+        raise RuntimeError("Only single-device Btrfs is supported")
+    os.umask(0o077)
+    # Atomic refusal if another request has already reserved this path.
+    run("/usr/bin/btrfs", "subvolume", "create", str(DIRECTORY))
+    DIRECTORY.chmod(0o700)
+    run("/usr/bin/btrfs", "filesystem", "mkswapfile", "--size", f"{size}G", str(SWAPFILE))
+    SWAPFILE.chmod(0o600)
+    run("/usr/bin/btrfs", "inspect-internal", "map-swapfile", str(SWAPFILE))
+    run("/usr/sbin/swapon", "--priority", "10", "--", str(SWAPFILE))
+    observed = active_swap()
+    if not observed or observed["priority"] != 10 or not (
+            size * GIB // 1024 - 1024 <= observed["sizeKiB"] <= size * GIB // 1024):
+        raise RuntimeError("Activation not verified; inspect swapon --show before recovery")
+    print("VERIFIED ACTIVE:", json.dumps(observed), flush=True)
+
+def main(args):
+    try:
+        if args == ["status"]:
+            print(json.dumps(status()))
+        elif len(args) == 2 and args[0] == "add":
+            allocate(parse_size(args[1]))
+        else:
+            raise ValueError("Usage: status | add GIB")
+        return 0
+    except (OSError, ValueError, RuntimeError, EOFError, subprocess.SubprocessError) as error:
+        print("REFUSED/FAILED:", error, file=sys.stderr)
+        if isinstance(error, subprocess.CalledProcessError) and error.stderr:
+            print(error.stderr.strip(), file=sys.stderr)
+        print("No automatic cleanup or retry. Inspect existing state before recovery.", file=sys.stderr)
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -2,6 +2,8 @@ import importlib.machinery
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
+from unittest.mock import mock_open
 from unittest.mock import patch
 
 path = Path(__file__).resolve().parents[1] / "scripts/post-apollo-memory-add-swap"
@@ -72,6 +74,28 @@ class SwapAddTests(unittest.TestCase):
         self.assertIn("Priority=10\n", m.UNIT_CONTENT)
         self.assertIn("WantedBy=swap.target\n", m.UNIT_CONTENT)
         self.assertIn("What=" + str(m.SWAPFILE), m.UNIT_CONTENT)
+
+    def test_persist_publishes_only_boot_policy(self):
+        observed = {"sizeKiB": 16777212, "priority": 10}
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            unit = directory / m.UNIT_NAME
+            def command(*argv):
+                if argv[0] == "/usr/bin/systemd-escape":
+                    return m.UNIT_NAME
+                return ""
+            with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "trusted_unit_directory"), patch.object(m, "trusted_swap_file"), patch.object(m, "active_swap", return_value=observed), patch.object(m, "mount_info", return_value=("/var", "btrfs")), patch.object(m, "persistence_state", side_effect=["off", "enabled"]), patch.object(m, "UNIT_DIR", directory), patch.object(m, "UNIT_PATH", unit), patch.object(m, "run", side_effect=command) as run, patch("builtins.open", mock_open(read_data="# empty\\n")):
+                m.persist_authorized()
+            self.assertEqual(unit.read_text(), m.UNIT_CONTENT)
+            self.assertEqual(run.call_args_list[-1].args, ("/usr/bin/systemctl", "enable", m.UNIT_NAME))
+            self.assertEqual(run.call_count, 3)
+            self.assertEqual(unit.stat().st_mode & 0o777, 0o644)
+
+    def test_persist_existing_fstab_refuses(self):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "secure_parent"), patch.object(m, "trusted_unit_directory"), patch.object(m, "trusted_swap_file"), patch.object(m, "active_swap", return_value={"sizeKiB": 16777212, "priority": 10}), patch.object(m, "mount_info", return_value=("/var", "btrfs")), patch.object(m, "run", return_value=m.UNIT_NAME) as run, patch("builtins.open", mock_open(read_data=str(m.SWAPFILE) + " none swap defaults 0 0")):
+            with self.assertRaises(RuntimeError):
+                m.persist_authorized()
+            self.assertEqual(run.call_count, 1)
 
     def test_size_choices(self):
         for size in range(4, 65, 4):

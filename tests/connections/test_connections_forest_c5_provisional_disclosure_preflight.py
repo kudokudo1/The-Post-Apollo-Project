@@ -2,7 +2,12 @@
 """DOC3 // separate provisional disclosure candidate is NEVER an issuer grant."""
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import json
+import socket
+import threading
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 import sqlite3
 import sys
@@ -19,6 +24,10 @@ from services.connections.forest import ForestC5ExactSessionV1Preflight as V
 import session_journal_v0 as b1
 import turn_bridge_b3 as b3
 import local_terminal_outbox_b4f as b4f
+import ollama_chat_transport as chat
+import native_host_candidate_b5b as native
+sys.path.insert(0, str(ROOT / "tests/forest"))
+from test_ollama_chat_transport import FakeOllama, packet
 
 SECRET = "SYNTHETIC_SECRET_PROVISIONAL_1234"
 
@@ -409,6 +418,129 @@ class ProvisionalCandidateNegativeTests(unittest.TestCase):
                         {"event": tag, "text": SECRET, "provisional": True},
                         now_ms=1000)
         self.no_grant(self.block())
+
+
+
+    def _exercise_existing_transport_and_hold_sender(self, *, cancel):
+        """Join existing B2/B3/C5/B5b in a disposable test, not a host path."""
+        class PublicFixture(FakeOllama):
+            # Deliberately isolated public synthetic provider data.
+            lines = [packet(SECRET, done=True)]
+            observed = []
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), PublicFixture)
+        serving = threading.Thread(target=server.serve_forever, daemon=True)
+        serving.start()
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+        stop = threading.Event()
+        try:
+            with tempfile.TemporaryDirectory(prefix="doc3-first-tree-") as root:
+                with contextlib.closing(sqlite3.connect(
+                        str(Path(root) / "public-fixture.sqlite"))) as db:
+                    b1.bootstrap_synthetic(db)
+                    b3.bootstrap_attempts_synthetic(db)
+                    b4f.bootstrap_local_terminal_outbox_synthetic(db)
+                    journal = b1.ForestSessionJournal(db)
+                    sid = journal.create_session(
+                        "fixture_owner", "CHERRY", "Public fixture", now_ms=100)["session_id"]
+                    uid = journal.append_turn(
+                        "fixture_owner", sid, expected_revision=0, role="user",
+                        body="Public synthetic question", now_ms=101)["turn_id"]
+                    # Test-only injection through the already existing B3
+                    # streamer seam; production B3 does not forward STOP yet.
+                    def local_transport(**kwargs):
+                        return chat.stream_chat(**kwargs, cancel_event=stop)
+
+                    bridge = b3.ForestTurnBridge(
+                        journal, clock_ms=lambda: 200, streamer=local_transport,
+                        synthetic_terminal_outbox=True)
+                    with contextlib.closing(bridge.exchange(
+                        owner="fixture_owner", session_id=sid,
+                        expected_revision=1, model="qwen3:1.7b",
+                        endpoint=endpoint, pre_commit=lambda: True
+                    )) as stream:
+                        res = next(stream)
+                        self.assertEqual(res["event"], "RESERVED")
+                        started = next(stream)
+                        self.assertEqual(started["event"], "STARTED")
+                        delta = next(stream)
+                        self.assertEqual(delta["text"], SECRET)
+                        self.assertIs(delta["provisional"], True)
+                        orig = dict(self.base, principal="fixture_owner",
+                                    tree="CHERRY", sessionId=sid, userTurn=uid,
+                                    attempt=res["attempt_id"], revision=1,
+                                    issuedAtMs=100, expiresAtMs=300)
+                        iw = S.canonical_bytes(orig)
+                        cw = S.canonical_bytes(dict(
+                            self.mk_candidate(orig, iw),
+                            issuedAtMs=150, expiresAtMs=250))
+                        result = D.block_provisional_delta(cw, iw, delta, now_ms=200)
+                        self.no_grant(result)
+                        self.assertIsNone(result["emitEvent"])
+                        self.assertEqual(result["emittedBytes"], 0)
+                        if cancel:
+                            stop.set()
+                            with self.assertRaisesRegex(b3.BridgeRefusal, "OLLAMA_CANCELLED"):
+                                next(stream)
+                        else:
+                            terminal = next(stream)
+                            self.assertEqual(terminal["event"], "COMMITTED")
+                            self.assertEqual(terminal["text"], SECRET)
+                            self.assertEqual(terminal["revision"], 2)
+                            # A durable local reply is itself text-bearing;
+                            # never reinterpret it as permission to release.
+                            with self.assertRaisesRegex(
+                                D.DisclosureHold,
+                                "ONLY_UNTRUSTED_PROVISIONAL_DELTA_IS_INSPECTABLE"
+                            ) as caught:
+                                D.block_provisional_delta(cw, iw, terminal, now_ms=200)
+                            self.assertNotIn(SECRET, str(caught.exception))
+                            with self.assertRaises(StopIteration):
+                                next(stream)
+                        # The existing native candidate can submit only its
+                        # immutable public HOLD. Explicit test invocation,
+                        # not an installed B3-to-Bark adapter.
+                        sender, receiver = socket.socketpair(
+                            socket.AF_UNIX, socket.SOCK_SEQPACKET)
+                        with sender, receiver:
+                            sender.settimeout(1)
+                            receiver.settimeout(1)
+                            self.assertTrue(native._submit_public_hold_once(sender))
+                            wire = receiver.recv(2048)
+                            self.assertEqual(wire, native._PUBLIC_HOLD)
+                            self.assertEqual(len(wire), len(native._PUBLIC_HOLD))
+                            for marker in (SECRET, sid, uid, res["attempt_id"],
+                                           "fixture_owner"):
+                                self.assertNotIn(marker.encode("utf-8"), wire)
+                            status = json.loads(wire)
+                            self.assertEqual(status["status"], "UNKNOWN_HOLD")
+                            self.assertEqual(status["privateBytesSubmitted"], 0)
+                            self.assertIs(status["revocationFencedAck"], False)
+                            self.assertIs(status["permissionGranted"], False)
+                            self.assertEqual(status["safeActions"], [])
+                        attempt = db.execute(
+                            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?",
+                            (res["attempt_id"],)).fetchone()[0]
+                        self.assertEqual(attempt, "ABORTED" if cancel else "COMMITTED")
+                        report = b4f.ForestLocalTerminalOutboxInspector(journal).inspect(
+                            owner="fixture_owner", session_id=sid,
+                            attempt_id=res["attempt_id"])
+                        self.assertEqual(report["c5Settlement"], "UNKNOWN_HOLD")
+                        self.assertIs(report["safeToRetryInference"], False)
+                        self.assertIs(report["safeToReleaseRevocation"], False)
+                        self.assertEqual(len(journal.turns("fixture_owner", sid)),
+                                         1 if cancel else 2)
+                        self.assertEqual(len(PublicFixture.observed), 1)
+        finally:
+            server.shutdown()
+            server.server_close()
+            serving.join(timeout=2)
+
+    def test_33_existing_b2_b3_commit_does_not_release_reply(self):
+        self._exercise_existing_transport_and_hold_sender(cancel=False)
+
+    def test_34_existing_b2_cancel_does_not_release_or_ack_revoke(self):
+        self._exercise_existing_transport_and_hold_sender(cancel=True)
 
 
 if __name__ == "__main__":

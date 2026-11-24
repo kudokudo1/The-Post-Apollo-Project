@@ -19,6 +19,16 @@ Item {
         status = sample ? "OBSERVED" : "UNAVAILABLE";
     }
     property int stagedGiB: 16
+    property bool initializedTarget: false
+    readonly property var capacity: Snapshot.capacityPlan(sample, stagedGiB)
+    function adoptActual() {
+        if (!sample || initializedTarget) return;
+        const plan = Snapshot.capacityPlan(sample, stagedGiB);
+        if (!plan) return;
+        if (plan.active) stagedGiB = Math.max(4, Math.min(64, Math.round(plan.actualGiB / 4) * 4));
+        initializedTarget = true;
+    }
+    onSampleChanged: adoptActual()
     function gib(kib) { return (kib / 1048576).toFixed(2) + " GiB"; }
     function refresh() {
         if (probe.running || (status === "READING" && (received || exited))) return;
@@ -122,21 +132,29 @@ Item {
             }
             Rectangle { width: parent.width; height: 1; color: Colors.cyan }
             GohuText {
-                text: "MEMORY EXPANSION // ADD"
+                text: "MANAGED DISK SWAP // CAPACITY"
                 width: parent.width
                 wrapMode: Text.WordWrap
                 color: Colors.magenta
                 font.pixelSize: 12
             }
             GohuText {
-                text: "ADDITIONAL DISK SWAP // " + root.stagedGiB + " GiB"
+                text: "TARGET CAPACITY // " + root.stagedGiB + " GiB"
                 width: parent.width
                 wrapMode: Text.WordWrap
                 color: Colors.yellow
                 font.pixelSize: 12
             }
+            GohuText {
+                width: parent.width
+                text: root.capacity ? "ACTUAL ACTIVE // " + root.gib(root.capacity.actualKiB) : "ACTUAL ACTIVE // UNAVAILABLE"
+                color: Colors.cyan
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
             Controls.Slider {
                 width: parent.width
+                enabled: root.capacity !== null
                 from: 0
                 to: 64
                 stepSize: 4
@@ -146,8 +164,8 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: root.sample ? "PROJECTED TOTAL SWAP // "
-                      + root.gib(root.sample.swap + root.stagedGiB * 1048576)
+                text: root.capacity ? "PROJECTED TOTAL SWAP // "
+                      + root.gib(root.capacity.projectedKiB)
                       : "PROJECTED TOTAL SWAP // UNAVAILABLE"
                 color: Colors.cyan
                 wrapMode: Text.WordWrap
@@ -155,11 +173,20 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "Would reserve " + root.stagedGiB
-                      + " GiB of disk storage. Not physical RAM. Check the host below before requesting allocation."
+                text: !root.capacity ? "WAITING FOR LIVE CAPACITY"
+                    : root.capacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
+                    : root.capacity.active ? "PREVIEW ONLY // RESIZE NOT AVAILABLE YET"
+                    : "Would reserve " + root.stagedGiB + " GiB of storage. Not physical RAM."
                 color: Colors.white
                 wrapMode: Text.WordWrap
                 font.pixelSize: 10
+            }
+            ActionButton {
+                visible: root.capacity !== null && root.capacity.active && root.capacity.direction !== "unchanged"
+                width: parent.width
+                height: 30
+                label: "RESET TARGET TO ACTIVE"
+                onLeftClicked: root.stagedGiB = Math.max(4, Math.min(64, Math.round(root.capacity.actualGiB / 4) * 4))
             }
             CpuPlusMemoryAddControl {
                 width: parent.width

@@ -305,5 +305,84 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
                     C.NO_AUTHORITY[name] = True
 
 
+
+    def test_27_malformed_intent_does_not_chain_private_parser_objects(self):
+        marker = b"SYNTHETIC_PRIVATE_METADATA"
+        for wire in (
+            b'{"title":"' + marker,
+            b'{"title":"' + marker + b'\xff"}',
+            b'[' * 1500 + b']' * 1500,
+            b'{"title":"' + marker + b'","title":"second"}',
+        ):
+            with self.subTest(length=len(wire)):
+                with self.assertRaises(C.ForestC5Hold) as caught:
+                    self.ref(wire=wire)
+                error = caught.exception
+                self.assertEqual(str(error),
+                                 "FOREST_C5_AUTHORITY_HOLD // UNTRUSTED_INTENT_INVALID")
+                self.assertIsNone(error.__cause__)
+                self.assertIsNone(error.__context__)
+                self.assertNotIn(marker.decode("ascii"), str(error))
+
+    def test_28_binding_key_type_and_cardinality_checked_before_equality(self):
+        class HostileKey(str):
+            armed = False
+            __hash__ = str.__hash__
+
+            def __eq__(self, other):
+                if self.armed:
+                    raise AssertionError("caller equality must not run")
+                return super().__eq__(other)
+
+        key = HostileKey("owner_key")
+        binding = {k: v for k, v in self.binding.items() if k != "owner_key"}
+        binding[key] = self.binding["owner_key"]
+        key.armed = True
+        self.hold("EXACT_FOREST_BINDING_FIELDS_REQUIRED", binding=binding)
+        oversized = dict(self.binding)
+        oversized.update({f"extra{i}": None for i in range(2048)})
+        self.hold("EXACT_FOREST_BINDING_FIELDS_REQUIRED", binding=oversized)
+        self.assert_denied(self.ref())
+
+    def test_29_real_b6_reference_and_workshop_selection_never_grant(self):
+        sys.path.insert(0, str(ROOT / "scripts/forest"))
+        try:
+            from shared_context_b6r1 import (
+                TaskContext, BarkAttachment, BarkListRequest,
+                ListOperationReference, compare_list_reference,
+            )
+            from capability_registry_b6r2 import (
+                bristlecone_reference_profile, plan_selection,
+            )
+        finally:
+            sys.path.pop(0)
+        context = TaskContext("alice", "bristlecone", "cloneA",
+                              "taskA", "contextA", 1, "INTERACTIVE")
+        bark = BarkAttachment(context, "barkA", "requesterA", "releaseA",
+                              "seatA", "recipientA", "bristlecone", 2)
+        request = BarkListRequest("r_0123456789abcdef", "bristlecone", 2)
+        original = ListOperationReference(bark, request, "operationA")
+        match = compare_list_reference(original, request, bark, context)
+        plan = plan_selection(bristlecone_reference_profile(context),
+                              context, "design", general=("session",))
+        self.assertEqual(match.status, "UNKNOWN_HOLD")
+        self.assertIn("session", plan.selected)
+        self.assertFalse(plan.permission_granted)
+        for authority in (self.local, self.protected):
+            for method in ("authorize_list_sessions",
+                           "authorize_disclose_session_titles",
+                           "authorize_read_session", "authorize_tool_execution",
+                           "prepare_generate", "acquire_commit_permit"):
+                with self.subTest(method=method):
+                    with self.assertRaises(C.ForestC5Hold):
+                        getattr(authority, method)(
+                            original, match, plan, permissionGranted=True)
+            self.assert_denied(authority.status())
+        self.hold("EXACT_FOREST_BINDING_FIELDS_REQUIRED", binding=context)
+        with self.assertRaisesRegex(C.ForestC5Hold,
+                                    "PROTECTED_MODE_REFUSES_UNTRUSTED"):
+            self.protected.inspect_reference_binding(self.intentwire, original)
+
+
 if __name__ == "__main__":
     unittest.main()

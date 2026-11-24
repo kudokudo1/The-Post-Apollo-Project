@@ -73,7 +73,7 @@ def _constant(_value):
 
 def inspect_public_hold_ci_only(packet: bytes, *,
                                 controller_expected_source_sha256: str):
-    """Validate exact public bytes and return immutable false authority.
+    """Validate exact public bytes and return a fresh false-authority diagnostic.
 
     The SHA is provided by the CI controller, not protected enrollment. Even
     correct package/file correspondence does NOT authenticate Forest custody.
@@ -88,12 +88,20 @@ def inspect_public_hold_ci_only(packet: bytes, *,
         raise UnknownHold("C3E_FOREST_INSTALLED_NO_ACK_UNKNOWN_HOLD_NO_RETRY")
     if len(packet) > MAX_FRAME:
         _deny("C3E_FOREST_INSTALLED_OVERSIZE_PACKET_REFUSED")
+    # Decoder exceptions can retain the complete rejected bytes or text.
+    # Keep only fixed codes from our own hooks; raise outside the handler
+    # so the public refusal does not retain the decoder's exception chain.
+    parse_refusal = None
     try:
         reply = json.loads(packet.decode("utf-8"),
                            object_pairs_hook=_unique_pairs,
                            parse_constant=_constant)
-    except (UnicodeError, json.JSONDecodeError) as exc:
-        raise Refused("C3E_FOREST_INSTALLED_INVALID_UTF8_JSON_REFUSED") from exc
+    except Refused as exc:
+        parse_refusal = str(exc)
+    except (UnicodeError, json.JSONDecodeError, RecursionError):
+        parse_refusal = "C3E_FOREST_INSTALLED_INVALID_UTF8_JSON_REFUSED"
+    if parse_refusal is not None:
+        _deny(parse_refusal)
     if type(reply) is not dict or set(reply) != PUBLIC_FIELDS:
         _deny("C3E_FOREST_INSTALLED_UNEXPECTED_FIELDS_OR_PRIVATE_BYTES")
     if (reply["schema"] != SOURCE_SCHEMA or reply["status"] != "UNKNOWN_HOLD"

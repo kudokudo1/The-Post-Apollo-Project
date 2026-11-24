@@ -11,6 +11,7 @@ import socket
 import stat
 import subprocess
 import sys
+import traceback
 import unittest
 from unittest import mock
 
@@ -162,6 +163,43 @@ class StrictPublicHoldNotForestCustody(unittest.TestCase):
                 self.inspect()
 
     def test_20_no_production_authorization_entrypoint(self):
+        self.deny_flags(self.inspect())
+        with self.assertRaisesRegex(M.Refused, "NOT_PROTECTED_OR_ENROLLED"):
+            M.protected_forest_admission()
+
+    def test_25_malformed_utf8_json_and_deep_input_have_no_decoder_chain(self):
+        marker = b"PRIVATE_FIXTURE_NOT_FOR_DIAGNOSTICS"
+        for raw in (b'{"title":"' + marker,
+                    b'{"title":"' + marker + b'\xff"}',
+                    b"[" * M.MAX_FRAME):
+            with self.subTest(length=len(raw)):
+                with self.assertRaisesRegex(M.Refused, "INVALID_UTF8_JSON") as caught:
+                    self.inspect(raw)
+                error = caught.exception
+                self.assertIsNone(error.__cause__)
+                self.assertIsNone(error.__context__)
+                self.assertNotIn(marker.decode("ascii"),
+                                 "".join(traceback.format_exception(error)))
+
+    def test_26_hook_refusals_keep_fixed_codes_without_chains(self):
+        marker = b"PRIVATE_FIXTURE_NOT_FOR_DIAGNOSTICS"
+        for raw, code in (
+            (b'{"' + marker + b'":0,"' + marker + b'":1}', "DUPLICATE_JSON_KEY"),
+            (b'{"' + marker + b'":NaN}', "NONFINITE_JSON"),
+        ):
+            with self.subTest(code=code):
+                with self.assertRaisesRegex(M.Refused, code) as caught:
+                    self.inspect(raw)
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+                self.assertNotIn(marker.decode("ascii"),
+                                 "".join(traceback.format_exception(caught.exception)))
+
+    def test_27_valid_result_mutation_does_not_change_next_refusal_diagnostic(self):
+        result = self.inspect()
+        result["productionSignInAllowed"] = True
+        result["safeToRetry"] = True
+        result["safeActions"].append("LIST_SESSIONS")
         self.deny_flags(self.inspect())
         with self.assertRaisesRegex(M.Refused, "NOT_PROTECTED_OR_ENROLLED"):
             M.protected_forest_admission()

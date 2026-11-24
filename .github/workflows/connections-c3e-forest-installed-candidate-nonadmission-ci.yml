@@ -51,7 +51,7 @@ jobs:
           assert "readonly property bool credentialActionsEnabled: false" in app
           print("C3E_FOREST_INSTALLED_CI // NO_ISSUER_OR_PRIVATE_DATA")
           PY
-      - name: 20 strict public packet tests, 4 installed-specific tests skipped
+      - name: 23 strict public packet tests, 4 installed-specific tests skipped
         shell: bash
         run: |
           set -euo pipefail

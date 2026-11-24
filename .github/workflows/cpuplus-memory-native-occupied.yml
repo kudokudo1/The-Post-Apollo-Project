@@ -1,0 +1,58 @@
+name: CPU++ memory disposable occupied extension refusal (production HOLD)
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_occupied_ci/**'
+      - '.github/workflows/cpuplus-memory-native-occupied.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-occupied:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ed3003d407798898d59bf8ab5ce5511f39a7560e
+          path: reviewed-memory-source
+          persist-credentials: false
+      - name: Source guards and isolated runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test -c /dev/kvm || { echo "CPU_MEM_OCCUPIED_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          test "$(git hash-object reviewed-memory-source/scripts/post-apollo-memory-add-swap)" = eec7a83cc9068303c3fbc6f4ae9c98e78f7b67ad
+          test "$(df -B1 --output=avail / | tail -n 1)" -ge 24000000000
+          test "$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)" -ge 7000000
+          bash -n tests/cpuplus_memory_occupied_ci/run-silverblue-occupied.sh
+          python3 -B -m py_compile tests/cpuplus_memory_occupied_ci/guest-occupied.py
+          python3 -B tests/cpuplus_memory_occupied_ci/test_occupied_evidence.py
+          set +e
+          output="$(python3 -I -B tests/cpuplus_memory_occupied_ci/guest-occupied.py 2>&1)"
+          rc="$?"
+          set -e
+          test "$rc" = 2
+          grep -Fq 'CPU_MEM_OCCUPIED_FAIL // RuntimeError: not a root Silverblue guest' <<<"$output"
+      - name: Fresh offline KVM guest only
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 4500s docker run --rm --device=/dev/kvm \
+            --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted \
+            --env GITHUB_ACTOR="$GITHUB_ACTOR" --env POST_APOLLO_MEMORY_NATIVE_CI_ONLY=1 \
+            --env POST_APOLLO_MEMORY_OCCUPIED_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            fedora:44 /usr/bin/bash -c '
+              set -euo pipefail
+              dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install curl qemu-system-x86 qemu-img xorriso genisoimage
+              /usr/bin/bash /src/tests/cpuplus_memory_occupied_ci/run-silverblue-occupied.sh /src/reviewed-memory-source/scripts/post-apollo-memory-add-swap
+            '

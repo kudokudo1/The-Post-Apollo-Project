@@ -1,0 +1,23 @@
+name: Forest UI2.3a Public History Display
+on:
+  pull_request:
+    paths:
+      - 'widgets/forest/ui2/PublicHistoryDisplay.js'
+      - 'scripts/forest/history_public_fixture_m4.py'
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/context_first_tree_m2.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'tests/forest/ui2_m4_public_fixture.py'
+      - 'tests/forest/test_ui23a_public_history.js'
+      - '.github/workflows/forest-ui2-public-history.yml'
+permissions:
+  contents: read
+jobs:
+  history-display:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node tests/forest/test_ui23a_public_history.js

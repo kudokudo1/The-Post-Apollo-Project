@@ -34,10 +34,10 @@ class ForestAutoPreviewTests(unittest.TestCase):
         self.assertIn("!busy || !stdoutSeen || !stderrSeen || !exitSeen",preview)
         self.assertIn("if (!discard && visible)",preview)
         self.assertIn("if (busy) discard = true;",preview)
-        self.assertIn("AutoPreview.parse(output,submitted)",preview)
+        self.assertIn("AutoPreview.parseBinding(output,submitted)",preview)
         self.assertEqual(preview.count("Process {"),1)
         self.assertNotIn("function preview(",policy)
-        self.assertIn("result = recommend(RoutingInput(",HELPER.read_text())
+        self.assertIn("return recommend(RoutingInput(",HELPER.read_text())
         for forbidden in ("Timer {","XMLHttpRequest","forestPromptInput",
                           "equipLocalModel(", "chooseModelForm(", "saveModelPreferences(",
                           "scanModels(", "scanResidency(", "chatHostTrusted"):

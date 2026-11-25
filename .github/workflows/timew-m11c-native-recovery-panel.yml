@@ -1,4 +1,4 @@
-name: TimeW M11c disposable native Quickshell recovery panel
+name: TimeW M11d native recovery panel cancellation and launch failure
 on:
   pull_request:
     paths:
@@ -8,6 +8,8 @@ on:
       - 'services/time/MachineV3LocalSaveRecoveryUiRead.py'
       - 'services/time/MachineV3LocalSaveRecoveryPolicy.js'
       - 'docs/timew-m11c-native-recovery-panel.md'
+      - 'docs/timew-m11d-recovery-read-custody.md'
+      - 'tests/timew/test_machine_v11b_recovery_panel.cjs'
       - '.github/workflows/timew-m11c-native-recovery-panel.yml'
   workflow_dispatch:
 permissions:
@@ -33,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Real panel, real Process and 45s deadline in disposable X11
+      - name: Real panel, hung-child cancellation and missing executable in disposable X11
         run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 -B tests/timew/native_recovery_panel_m11c.py
   existing-boundaries:
     runs-on: ubuntu-24.04

@@ -19,6 +19,8 @@ Column {
     property int selectedIndex: 0
     property var displayResult: null
     property string statusText: "NOT INSPECTED // READ ONLY"
+    property var activeRead: null
+    property var activeWatchdog: null
     property bool streamDone: false
     property bool exitDone: false
     property bool exitOk: false
@@ -114,48 +116,105 @@ Column {
             mode, token];
         if (mode === "inspect")
             args.push(requestIdentity);
-        recoveryDeadline.restart();
-        recoveryProcess.exec(args);
+        // Each read has its own Process, collector and watchdog. A retired
+        // callback cannot become a response to a later explicit read.
+        let process = null;
+        let watchdog = null;
+        try {
+            process = recoveryProcessFactory.createObject(panel, { generation: requestSequence });
+            if (!process)
+                throw new Error("reader allocation");
+            activeRead = process;
+            watchdog = recoveryWatchdogFactory.createObject(panel,
+                { ownerProcess: process, generation: requestSequence });
+            if (!watchdog)
+                throw new Error("watchdog allocation");
+            activeWatchdog = watchdog;
+            watchdog.start();
+            process.exec(args);
+        } catch (error) {
+            // Creation/exec failure is never a completed read. Retire only
+            // when the owned Process has no running child.
+            if (process && activeRead === process) {
+                deadlineReached(process, process.generation);
+            } else {
+                requestToken = "";
+                displayResult = RecoveryPolicy.unavailable();
+                statusText = displayResult.status;
+                busy = false;
+            }
+        }
     }
 
-    function deadlineReached() {
-        if (!busy)
+    function isCurrent(process, generation) {
+        return busy && !!process && activeRead === process
+            && generation === requestSequence;
+    }
+
+    function deadlineReached(process, generation) {
+        if (!isCurrent(process, generation))
             return;
         timedOut = true;
         invalidate(false);
         statusText = "RECOVERY READ TIMED OUT // HOLD";
-        // Do not reuse the Process until both original completion signals.
+        // Cancel only our own read-only child. No PID from a response, no
+        // external kill command, no Save/Restore process is ever targeted.
+        if (process.running) {
+            process.signal(9);
+        }
+        // A failed start may emit neither streamFinished nor exited.
+        // Never release on a timer alone while the owned child is running.
+        finishIfReady(process, generation);
     }
 
-    function streamFinished(text) {
-        if (!busy)
+    function streamFinished(process, generation, text) {
+        if (!isCurrent(process, generation))
             return;
         responseText = typeof text === "string" && text.length <= 8193 ? text : "";
         streamDone = true;
-        finishIfReady();
+        finishIfReady(process, generation);
     }
 
-    function processExited(exitCode, exitStatus) {
-        if (!busy)
+    function processExited(process, generation, exitCode, exitStatus) {
+        if (!isCurrent(process, generation))
             return;
         exitOk = exitCode === 0 && exitStatus === 0;
         exitDone = true;
-        finishIfReady();
+        finishIfReady(process, generation);
     }
 
-    function finishIfReady() {
-        if (!busy || !streamDone || !exitDone)
+    function processStateChanged(process, generation) {
+        if (!isCurrent(process, generation))
             return;
-        recoveryDeadline.stop();
+        finishIfReady(process, generation);
+    }
+
+    function finishIfReady(process, generation) {
+        if (!isCurrent(process, generation))
+            return;
+        if (timedOut) {
+            if (process.running || (process.processId !== null && process.processId !== undefined))
+                return; // unconfirmed termination stays HOLD; no overlap.
+        } else if (!streamDone || !exitDone) {
+            return;
+        }
         const token = requestToken;
         const mode = requestMode;
         const identity = requestIdentity;
         const raw = responseText;
         const ok = exitOk;
-        const current = contextActive && expanded && !blocked && token !== ""
+        const current = !timedOut && contextActive && expanded && !blocked && token !== ""
             && (mode === "list" || (mode === "inspect" && identity === selectedIdentity));
+
+        // Revoke old ownership before retiring Qt objects; their queued
+        // signals carry the original object and generation.
+        const watchdog = activeWatchdog;
+        activeRead = null;
+        activeWatchdog = null;
         requestToken = "";
         responseText = "";
+        if (watchdog)
+            watchdog.stop();
         if (current) {
             let result = RecoveryPolicy.unavailable();
             if (ok && raw.length > 0) {
@@ -178,26 +237,44 @@ Column {
         streamDone = false;
         exitDone = false;
         exitOk = false;
-        timedOut = false;
         busy = false;
+        Qt.callLater(function() {
+            if (watchdog)
+                watchdog.destroy();
+            process.destroy();
+        });
     }
 
-    Timer {
-        id: recoveryDeadline
-        interval: 45000
-        repeat: false
-        running: false
-        onTriggered: panel.deadlineReached()
-    }
-
-    Process {
-        id: recoveryProcess
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: panel.streamFinished(this.text)
+    Component {
+        id: recoveryWatchdogFactory
+        Timer {
+            id: deadline
+            property var ownerProcess: null
+            property double generation: 0
+            interval: 45000
+            repeat: false
+            running: false
+            onTriggered: {
+                if (panel.activeWatchdog === deadline)
+                    panel.deadlineReached(ownerProcess, generation);
+            }
         }
-        onExited: function(exitCode, exitStatus) {
-            panel.processExited(exitCode, exitStatus);
+    }
+
+    Component {
+        id: recoveryProcessFactory
+        Process {
+            id: reader
+            property double generation: 0
+            running: false
+            stdout: StdioCollector {
+                onStreamFinished: panel.streamFinished(reader, reader.generation, this.text)
+            }
+            onExited: function(exitCode, exitStatus) {
+                panel.processExited(reader, reader.generation, exitCode, exitStatus);
+            }
+            onRunningChanged: panel.processStateChanged(reader, reader.generation)
+            onProcessIdChanged: panel.processStateChanged(reader, reader.generation)
         }
     }
 

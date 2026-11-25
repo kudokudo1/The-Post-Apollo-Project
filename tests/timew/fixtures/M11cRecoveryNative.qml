@@ -8,6 +8,7 @@ ShellRoot {
     id: smoke
     readonly property bool armed:
         Quickshell.env("POST_APOLLO_TIMEW_M11C") === "CI_DISPOSABLE_ONLY"
+    readonly property bool missingExecutable: Quickshell.env("TIMEW_M11D_MISSING_EXEC") === "1"
     property bool activeContext: true
     property bool blockedContext: false
     property int stage: 0
@@ -51,6 +52,24 @@ ShellRoot {
         running: smoke.armed
         onTriggered: {
             smoke.ticks += 1;
+            if (smoke.missingExecutable) {
+                if (smoke.stage === 0) {
+                    recovery.toggle();
+                    recovery.begin("list");
+                    smoke.advance();
+                    return;
+                }
+                if (recovery.busy)
+                    return;
+                if (!smoke.require(recovery.timedOut && recovery.activeRead === null
+                        && recovery.displayResult === null && recovery.requestSequence === 1
+                        && recovery.statusText === "RECOVERY READ TIMED OUT // HOLD",
+                        "failed exec retired without false success"))
+                    return;
+                console.log("M11D_NATIVE_MISSING_EXEC_PASS");
+                Qt.quit();
+                return;
+            }
             switch (smoke.stage) {
             case 0:
                 if (!smoke.require(!recovery.busy && !recovery.expanded
@@ -129,7 +148,7 @@ ShellRoot {
                 if (recovery.busy) return;
                 if (!smoke.require(recovery.intentIds.length === 2, "fresh list"))
                     return;
-                recovery.begin("inspect"); // actual 45s deadline, wrapper delays 47s
+                recovery.begin("inspect"); // actual 45s deadline, permanently hung fixture child
                 smoke.advance();
                 return;
             case 7:
@@ -138,20 +157,23 @@ ShellRoot {
                         return;
                     return;
                 }
-                if (!smoke.require(recovery.busy && recovery.requestToken === ""
+                if (!smoke.require(recovery.requestToken === ""
                         && recovery.displayResult === null
                         && recovery.statusText === "RECOVERY READ TIMED OUT // HOLD",
                         "real timer fail closed"))
                     return;
-                recovery.begin("inspect");
-                if (!smoke.require(recovery.requestSequence === 6, "timeout no overlapping read"))
-                    return;
+                if (recovery.busy) {
+                    recovery.begin("inspect");
+                    if (!smoke.require(recovery.requestSequence === 6, "timeout no overlapping read"))
+                        return;
+                }
                 console.log("M11C_NATIVE_DEADLINE_PASS");
                 smoke.advance();
                 return;
             case 8:
                 if (recovery.busy) return;
-                if (!smoke.require(recovery.displayResult === null, "timeout late data ignored"))
+                if (!smoke.require(recovery.displayResult === null && recovery.activeRead === null,
+                                   "timeout retired child and discarded data"))
                     return;
                 recovery.begin("list"); // wrapper #7 exits nonzero
                 smoke.advance();

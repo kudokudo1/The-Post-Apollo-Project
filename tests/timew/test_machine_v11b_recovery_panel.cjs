@@ -36,14 +36,26 @@ const ctx=vm.createContext({
     intentIds:[],selectedIndex:0,displayResult:null,statusText:"NOT INSPECTED // READ ONLY",
     streamDone:false,exitDone:false,exitOk:false,timedOut:false,responseText:"",
     RecoveryPolicy:pctx,Quickshell:{shellPath:p=>p},
-    recoveryProcess:{exec:args=>launched.push(Array.from(args))},
-    recoveryDeadline:{restart:()=>restarts++,stop:()=>stops++}
+    activeRead:null,activeWatchdog:null,
+    Qt:{callLater:fn=>fn()},
+    recoveryProcessFactory:{createObject:(_parent, props)=>({
+        ...props, running:false, processId:null, kills:0,
+        exec(args){this.running=true;this.processId=123;launched.push(Array.from(args));},
+        signal(n){assert(n===9);this.kills++;},
+        destroy(){this.destroyed=true;}
+    })},
+    recoveryWatchdogFactory:{createObject:(_parent,props)=>({
+        ...props,start(){restarts++;},stop(){stops++;},destroy(){this.destroyed=true;}
+    })},
+    panel:{}
 });
 Object.defineProperty(ctx,"selectedIdentity",{get(){return ctx.intentIds[ctx.selectedIndex]||"";}});
 for(const [name,args] of [
     ["invalidate","clearList"],["toggle",""],["step","delta"],["nextToken",""],
-    ["begin","mode"],["deadlineReached",""],["streamFinished","text"],
-    ["processExited","exitCode, exitStatus"],["finishIfReady",""]
+    ["begin","mode"],["isCurrent","process, generation"],
+    ["deadlineReached","process, generation"],["streamFinished","process, generation, text"],
+    ["processExited","process, generation, exitCode, exitStatus"],
+    ["processStateChanged","process, generation"],["finishIfReady","process, generation"]
 ]) vm.runInContext("function "+name+"("+args+")"+body("function "+name+"(" + args + ")"),ctx);
 function handler(name){vm.runInContext(body(name+":"),ctx);}
 function packet(mode, token=ctx.requestToken, identity=ctx.selectedIdentity) {
@@ -58,14 +70,15 @@ function packet(mode, token=ctx.requestToken, identity=ctx.selectedIdentity) {
     return JSON.stringify(data);
 }
 function complete(raw, reverse=false, code=0, status=0){
+    const p=ctx.activeRead,g=p.generation; p.running=false;p.processId=null;
     if(reverse){
-        ctx.processExited(code,status);
+        ctx.processExited(p,g,code,status);
         check(ctx.busy,"exit alone cannot release");
-        ctx.streamFinished(raw);
+        ctx.streamFinished(p,g,raw);
     }else{
-        ctx.streamFinished(raw);
+        ctx.streamFinished(p,g,raw);
         check(ctx.busy,"stream alone cannot release");
-        ctx.processExited(code,status);
+        ctx.processExited(p,g,code,status);
     }
     check(!ctx.busy,"both signals release");
 }
@@ -127,11 +140,29 @@ ctx.blocked=true;handler("onBlockedChanged");
 ctx.blocked=false;complete(old);
 check(ctx.displayResult===null&&ctx.intentIds.length===0,"other operation invalidates");
 ctx.begin("list");old=packet("list");
-ctx.deadlineReached();
+const retired=ctx.activeRead, retiredGeneration=retired.generation;
+ctx.deadlineReached(retired,retiredGeneration);
 check(ctx.timedOut&&ctx.busy&&ctx.requestToken===""&&ctx.statusText.includes("TIMED OUT"),"deadline fail closed");
+check(retired.kills===1,"only owned child cancelled");
 ctx.begin("list");check(ctx.busy,"no unsafe Process reuse");
-complete(old,true);
+ctx.streamFinished(retired,retiredGeneration,old);
+check(ctx.busy,"stdout closure is not termination");
+retired.running=false;retired.processId=null;
+ctx.processStateChanged(retired,retiredGeneration);
+check(!ctx.busy&&retired.destroyed,"stopped child retired without exit signal");
 check(ctx.displayResult===null&&ctx.intentIds.length===0,"late timeout data ignored");
+ctx.begin("list");
+const fresh=ctx.activeRead;
+ctx.streamFinished(retired,retiredGeneration,old);
+ctx.processExited(retired,retiredGeneration,0,0);
+ctx.deadlineReached(retired,retiredGeneration);
+check(ctx.activeRead===fresh&&ctx.busy&&!ctx.streamDone&&!ctx.exitDone&&fresh.kills===0,"old callbacks cannot mutate or kill current child");
+complete(packet("list"));
+ctx.begin("list");
+const failed=ctx.activeRead;
+failed.running=false;failed.processId=null;
+ctx.deadlineReached(failed,failed.generation);
+check(!ctx.busy&&failed.kills===0&&failed.destroyed&&ctx.displayResult===null,"missing launch / no signals releases only when no child");
 ctx.begin("list");complete(packet("list"));
 ctx.begin("inspect");old=packet("inspect");
 ctx.selectedIndex=1;handler("onSelectedIdentityChanged");
@@ -141,10 +172,10 @@ check(restarts===stops,"one deadline per completed request");
 for(const marker of ['MachineSaveRecoveryPanel {','contextActive: timew.menuOpen && timew.selectedMode === "machine"',
     '&& !timew.machineStoredViewOpen','blocked: timew.machineSaveBridgeBusy || timew.machineStoreBusy'])
     check(widget.includes(marker),"real widget mount "+marker);
-check((panel.match(/recoveryProcess\.exec\(/g)||[]).length===1,"only one launch site");
+check((panel.match(/process\.exec\(/g)||[]).length===1,"only one launch site");
 check(!/save_once|dispatch_once|admit_checkpoint|MachineSaveBridgeV2|MachineRestoreCheckpoint|startDetached|Component\.onCompleted/.test(panel),"no write/auto start/restore");
 for(const marker of ['onLeftClicked: panel.begin("list")','onLeftClicked: panel.begin("inspect")',
-    'onStreamFinished: panel.streamFinished(this.text)','panel.processExited(exitCode, exitStatus)',
-    'repeat: false','running: false','onTriggered: panel.deadlineReached()'])
+    'onStreamFinished: panel.streamFinished(reader, reader.generation, this.text)','panel.processExited(reader, reader.generation, exitCode, exitStatus)',
+    'repeat: false','running: false','panel.deadlineReached(ownerProcess, generation)'])
     check(panel.includes(marker),"explicit actual source "+marker);
 console.log("TIMEW M11B RECOVERY PANEL // "+checks+" lifecycle and source checks PASS");

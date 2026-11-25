@@ -966,13 +966,15 @@ Item {
                 height: active && item ? item.implicitHeight : 0
                 active: root.page === "AUTO"
                 visible: active
-                sourceComponent: CpuPlusQueuePane {
+                sourceComponent: CpuPlusAutoWorkspace {
                     headerTarget: workHeader
                     footerTarget: workFooter
                     observedDiskKiB: root.capacity ? root.capacity.actualKiB : null
                     capacityTargetGiB: root.stagedGiB
-                    runtimeProjection: null
-                    actionContext: null
+                    // Production launch/lifecycle remains HOLD. No session
+                    // owner is constructed inside the demand-loaded widget.
+                    hostState: null
+                    onSectionChangedByUser: scroll.contentY = 0
                 }
             }
             Loader {

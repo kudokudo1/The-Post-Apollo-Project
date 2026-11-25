@@ -130,7 +130,7 @@ assert.equal(queueCtx.project({...packet,status:{...packet.status,state:"VERIFIE
 assert.equal(queueCtx.project({...packet,status:{...packet.status,original_actual_kib:null}}).state,"INVALID STATUS");
 assert.equal(queueCtx.project({...packet,notification_error:"EVENT_STAGE_UNAVAILABLE"}).notificationIssue,true);
 assert.equal(queueCtx.project({...packet,status:{...packet.status,code:"UNKNOWN_FUTURE"}}).state,"INVALID STATUS");
-assert.match(pane,/active: root.page === "AUTO"[\s\S]*?sourceComponent: CpuPlusQueuePane[\s\S]*?runtimeProjection: null/);
+assert.match(pane,/active: root.page === "AUTO"[\s\S]*?sourceComponent: CpuPlusAutoWorkspace[\s\S]*?hostState: null/);
 const queuePane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueuePane.qml"),"utf8");
 assert.doesNotMatch(queuePane,/\b(?:Process|Timer|MemoryOperation|pkexec|sudo|execDetached)\b/);
 assert.match(queuePane,/Consumer.prepare\(current,kind/);
@@ -139,7 +139,7 @@ assert.match(queuePane,/current.sequence > submitted.statusSequence/);
 assert.match(queuePane,/if \(!visible \|\| submitted \|\| !usableContext\(context\)\) return null/);
 assert.match(queuePane,/intentConfirmed\(Object.assign\(\{\},frozen\)\)/);
 assert.match(queuePane,/onVisibleChanged: if \(!visible\) preparation = null/);
-assert.match(pane,/sourceComponent: CpuPlusQueuePane[\s\S]*?actionContext: null/);
+assert.match(pane,/sourceComponent: CpuPlusAutoWorkspace[\s\S]*?hostState: null/);
 assert.doesNotMatch(queuePane,/Consumer.submit\s*\(|onCompleted\s*:/);
 const expiryCtx=vm.createContext({});
 vm.runInContext(queuePane.slice(queuePane.indexOf("    function expirySeconds("),queuePane.indexOf("    function candidate(")),expiryCtx);
@@ -202,3 +202,16 @@ const profilePane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlu
 assert.doesNotMatch(profilePane,/\b(?:Process|Timer|MemoryOperation|execDetached)\b/);
 assert.match(profilePane,/parent: root.footerTarget \|\| root/);
 console.log("CPU++ profile preview contract PASS");
+
+const autoWorkspace=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusAutoWorkspace.qml"),"utf8");
+assert.match(autoWorkspace,/import "..\/..\/services\/memory\/MemoryQueueSessionHost.js" as Host/);
+assert.doesNotMatch(autoWorkspace,/CpuPlusQueueSession\.js|\b(?:Process|Timer|execDetached|MemoryOperation)\b|Host\.(?:start|stop|feed|confirm|readHistory|readRecovery)\s*\(/);
+assert.match(autoWorkspace,/model: \["REQUESTS","HISTORY","RECOVERY"\]/);
+assert.match(autoWorkspace,/hostState \? Host.context\(hostState\) : null/);
+assert.match(autoWorkspace,/hostState \? Host.recoveryContext\(hostState\) : null/);
+assert.match(autoWorkspace,/startupLocked===false/);
+assert.match(autoWorkspace,/!hostState.session.unresolved/);
+assert.match(autoWorkspace,/hostMode: true/);
+assert.match(autoWorkspace,/atomicMode: true/);
+assert.match(autoWorkspace,/parent: root.footerTarget \|\| root/);
+console.log("CPU++ AUTO workspace source contract PASS");

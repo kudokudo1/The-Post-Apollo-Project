@@ -17,12 +17,13 @@ with tempfile.TemporaryDirectory(prefix="cpu-memory-ui-") as tmp:
     (config / "widgets/cpuplus").mkdir(parents=True)
     for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js", "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js", "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js", "CpuPlusDiagnosticsPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
-    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js"):
+    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js", "CpuPlusAutoWorkspace.qml", "CpuPlusQueueHistoryPane.qml", "CpuPlusQueueHistory.js", "CpuPlusQueueRecoveryPane.qml", "CpuPlusQueueRecovery.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
     shutil.copy2(ROOT / "tests/fixtures/CpuPlusMemoryUiNative.qml", config / "smoke.qml")
     shutil.copytree(ROOT / "services/diagnostics", config / "services/diagnostics")
     service = config / "services/memory"
     service.mkdir(parents=True)
+    shutil.copy2(ROOT / "services/memory/MemoryQueueSessionHost.js", service / "MemoryQueueSessionHost.js")
     (service / "qmldir").write_text("module qs.services.memory\n\nsingleton MemoryOperation 1.0 MemoryOperation.qml\n")
     (service / "MemoryOperation.qml").write_text("""pragma Singleton
 import QtQuick

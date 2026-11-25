@@ -14552,6 +14552,8 @@ PanelWindow {
                         readonly property var sourceItem: {
                             // Make the revision an explicit dependency so this
                             // binding re-resolves the live row on every snapshot.
+                            if (sourceMode !== appControlWindow.killModeIndex)
+                                return appControlWindow.favoriteSourceItem(rowItem) || rowItem;
                             const revision = appControlWindow.taskMiniHistoryRevision;
                             return taskGraphController.liveTaskForMiniGraph(rowItem)
                                    || appControlWindow.favoriteSourceItem(rowItem)
@@ -14600,13 +14602,19 @@ PanelWindow {
                             // Every completed task snapshot explicitly replaces this
                             // array, which guarantees the segment bindings see a change.
                             property int historyRevision:
-                                appControlWindow.taskMiniDisplayRevision
-                            property int graphEpoch: 0
-                            property var historyValues: []
+                                killMiniGraphBox.showingTask
+                                ? appControlWindow.taskMiniDisplayRevision : -1
                             readonly property var emptyCombiHistories: ({
                                 cpu: [], mem: [], io: [], age: []
                             })
-                            property var combiHistories: emptyCombiHistories
+                            // Publish a fresh, isolated value once per refresh.
+                            // Geometry follows the array notification, including
+                            // equal-length histories; no second epoch broadcast.
+                            property var historyFrame: ({
+                                values: [], combi: emptyCombiHistories
+                            })
+                            readonly property var historyValues: historyFrame.values
+                            readonly property var combiHistories: historyFrame.combi
                             property bool graphReady: false
                             property real graphScrollOffset: 0
 
@@ -14671,6 +14679,18 @@ PanelWindow {
                             }
 
                             function refreshHistory(animateScroll) {
+                                if (!graphReady)
+                                    return;
+                                // APP/RUN/other non-task delegates share this
+                                // component but never display a task trace.
+                                if (!killMiniGraphBox.showingTask) {
+                                    if (historyValues.length > 0
+                                            || combiHistories !== emptyCombiHistories) {
+                                        stopGraphScroll();
+                                        historyFrame = {values: [], combi: emptyCombiHistories};
+                                    }
+                                    return;
+                                }
                                 const live =
                                     taskGraphController.liveTaskForMiniGraph(
                                         killMiniGraphBox.rowItem
@@ -14700,12 +14720,10 @@ PanelWindow {
                                 else
                                     stopGraphScroll();
 
-                                historyValues = Array.isArray(next)
-                                                ? next.slice()
-                                                : [];
-                                if (combiHistories !== nextCombi)
-                                    combiHistories = nextCombi;
-                                graphEpoch += 1;
+                                historyFrame = {
+                                    values: Array.isArray(next) ? next.slice() : [],
+                                    combi: nextCombi
+                                };
                             }
 
                             onHistoryRevisionChanged: refreshHistory(true)
@@ -14717,6 +14735,9 @@ PanelWindow {
                             // FAVORITES row can display the previous row's frozen graph.
                             Connections {
                                 target: killMiniGraphBox
+                                function onShowingTaskChanged() {
+                                    killMiniCpuCanvas.refreshHistory(false);
+                                }
                                 function onTaskIdentityChanged() {
                                     killMiniCpuCanvas.refreshHistory(false);
                                 }
@@ -14765,7 +14786,6 @@ PanelWindow {
                             }
 
                             readonly property var graphPoints: {
-                                const epoch = graphEpoch;
                                 const values = historyValues;
 
                                 // Always render against the final 48-sample timeline.
@@ -14827,7 +14847,6 @@ PanelWindow {
                                         z: 5
 
                                         readonly property var metricHistory: {
-                                            const epoch = killMiniCpuCanvas.graphEpoch;
                                             // The controller has already aligned and
                                             // isolated all four local series.
                                             const values = killMiniCpuCanvas.combiHistories[modelData.metric];
@@ -15001,17 +15020,12 @@ PanelWindow {
                                     delegate: Item {
                                         anchors.fill: parent
 
-                                        // graphEpoch is deliberately referenced here as well.
-                                        // It forces already-created delegates to refresh their
-                                        // coordinates even when the Repeater count is unchanged.
-                                        readonly property point p1: {
-                                            const epoch = killMiniCpuCanvas.graphEpoch;
-                                            return killMiniCpuCanvas.graphPoints[index];
-                                        }
-                                        readonly property point p2: {
-                                            const epoch = killMiniCpuCanvas.graphEpoch;
-                                            return killMiniCpuCanvas.graphPoints[index + 1];
-                                        }
+                                        // Fresh graphPoints also notify existing
+                                        // segments when the point count is unchanged.
+                                        readonly property point p1:
+                                            killMiniCpuCanvas.graphPoints[index]
+                                        readonly property point p2:
+                                            killMiniCpuCanvas.graphPoints[index + 1]
                                         readonly property real dx: p2.x - p1.x
                                         readonly property real dy: p2.y - p1.y
                                         readonly property real segmentLength:
@@ -15741,6 +15755,8 @@ PanelWindow {
                             // Force this binding to re-resolve on every task
                             // snapshot. FAVORITES wrappers do not themselves
                             // own live CPU/MEM/PID fields.
+                            if (sourceMode !== appControlWindow.killModeIndex)
+                                return sourceItem;
                             const revision = appControlWindow.taskMiniHistoryRevision;
                             return taskGraphController.liveTaskForMiniGraph(modelData)
                                    || sourceItem;

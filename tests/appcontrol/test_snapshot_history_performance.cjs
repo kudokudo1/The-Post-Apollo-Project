@@ -406,7 +406,7 @@ test('mini COMBI histories align once on demand and preserve snapshot isolation'
     }
     const refresh = app.slice(end, app.indexOf('// Keep the same three-quarter grid', end));
     assert.match(refresh, /const nextCombi = snapshotCombiHistory\(live\);/);
-    assert.match(refresh, /if \(combiHistories !== nextCombi\)\s+combiHistories = nextCombi;/);
+    assert.match(refresh, /historyFrame = \{\s*values: Array.isArray\(next\) \? next.slice\(\) : \[\],\s*combi: nextCombi\s*\};/);
     assert.match(refresh, /onCombiViewChanged:\s*\{\s*if \(graphReady\)\s*refreshHistory\(false\);/);
     assert.match(refresh, /Component\.onCompleted:\s*\{\s*graphReady = true;\s*refreshHistory\(false\);/);
     assert.match(refresh, /onHistoryRevisionChanged: refreshHistory\(true\)/);
@@ -670,4 +670,49 @@ test('opening substages and runtime KILL work remain opt-in and keep existing op
     assert.match(app,/traceKillWork\("snapshot-selection", selectionStart\)/);
     const mini=app.slice(app.indexOf('    function applyTaskMiniProbeRows('),app.indexOf('    Timer {',app.indexOf('    function applyTaskMiniProbeRows(')));
     assert.match(mini,/updateTaskMiniCpuHistories\(samples\);[\s\S]*?traceKillWork\("mini-cpu-history"[\s\S]*?updateTaskMiniHunterMetricHistories\(samples\);[\s\S]*?traceKillWork\("mini-hunter-history"[\s\S]*?taskMiniDisplayRevision \+= 1;[\s\S]*?traceKillWork\("mini-history-revisions"/);
+});
+
+
+test('mini graph publishes isolated equal-length frames and skips non-task refreshes', () => {
+    const start=app.indexOf('                            function refreshHistory(animateScroll) {');
+    const end=app.indexOf('                            onHistoryRevisionChanged:',start);
+    assert.ok(start>=0&&end>start);
+    // Execute the actual refresh function with QML-like owned properties.
+    const body=app.slice(start,end);
+    const create=new Function('state',
+        'let graphReady=true; const killMiniGraphBox=state.box; const emptyCombiHistories=state.empty;'+
+        'let historyFrame={values:[],combi:emptyCombiHistories}; let historyValues=historyFrame.values,combiHistories=historyFrame.combi;'+
+        'const appControlWindow={selectedModeIndex:1,killModeIndex:7,killViewMode:0,killViewHunter:1};'+
+        'const taskGraphController={liveTaskForMiniGraph(){state.lookups++;return state.box.rowItem;},miniCpuHistoryByIdentity(){return state.values;},miniHunterHistoryForEntry(){return state.values;}};'+
+        'function snapshotCombiHistory(){return emptyCombiHistories;} function startGraphScroll(){state.starts++;} function stopGraphScroll(){state.stops++;}'+body+
+        '\nreturn {run(animate){refreshHistory(animate);historyValues=historyFrame.values;combiHistories=historyFrame.combi;return historyFrame;},ready(v){graphReady=v;}};');
+    const state={box:{showingTask:false,rowItem:{pid:10},taskIdentity:'task'},empty:{cpu:[],mem:[],io:[],age:[]},values:[1,2],lookups:0,starts:0,stops:0};
+    const graph=create(state);
+    const empty=graph.run(true);
+    assert.equal(graph.run(true),empty);
+    assert.equal(state.lookups,0);
+    graph.ready(false);state.box.showingTask=true;assert.equal(graph.run(true),empty);
+    graph.ready(true);
+    const first=graph.run(false);
+    assert.deepStrictEqual(first.values,[1,2]);
+    assert.notEqual(first.values,state.values);
+    state.values=[2,3];
+    const second=graph.run(true);
+    assert.deepStrictEqual(second.values,[2,3]);
+    assert.notEqual(second,first);
+    assert.deepStrictEqual(first.values,[1,2]);
+    assert.equal(state.starts,1);
+    state.box.showingTask=false;
+    const cleared=graph.run(true);
+    assert.deepStrictEqual(cleared.values,[]);
+    assert.equal(graph.run(true),cleared);
+    assert.equal(state.lookups,2);
+    state.box.showingTask=true;
+    assert.deepStrictEqual(graph.run(false).values,[2,3]);
+    const mini=app.slice(app.indexOf('id: killMiniCpuCanvas'),app.indexOf('id: selectorAppIconBox',app.indexOf('id: killMiniCpuCanvas')));
+    assert.doesNotMatch(mini,/graphEpoch/);
+    assert.match(mini,/property int historyRevision:\s*killMiniGraphBox.showingTask\s*\? appControlWindow.taskMiniDisplayRevision : -1/);
+    assert.match(mini,/onShowingTaskChanged\(\)/);
+    assert.match(mini,/readonly property point p1:\s*killMiniCpuCanvas.graphPoints\[index\]/);
+    assert.match(mini,/readonly property point p2:\s*killMiniCpuCanvas.graphPoints\[index \+ 1\]/);
 });

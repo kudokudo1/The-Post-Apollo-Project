@@ -23,6 +23,12 @@ Item {
     property int jobsStarted: 0
     property string observedHead: ""
     property string activeRepo: ""
+    property string activeDirectory: ""
+    property alias searchQuery: searchInput.text
+    property string searchStatus: ""
+    property var searchRequest: null
+    property int searchEpoch: 0
+    property var lastMatch: null
     property var pendingResult: null
     property string pendingRepo: ""
     property string statusText: "AVAILABLE HISTORY // 48 COMMITS MAX"
@@ -45,6 +51,10 @@ Item {
     onRepoRootChanged: {
         repoEpoch += 1;
         activeRepo = "";
+        activeDirectory = "";
+        searchRequest=null;
+        lastMatch=null;
+        searchStatus="";
         pendingResult = null;
         pendingRepo = "";
         statusText = "AVAILABLE HISTORY // REPOSITORY CHANGED";
@@ -56,6 +66,7 @@ Item {
     }
 
     onOperatorActiveChanged: {
+        if (!operatorActive) searchEpoch++;
         if (operatorActive) {
             if (!pendingResult && !busy && !buildQueued) lookupQueued = true;
             schedule();
@@ -131,6 +142,55 @@ Item {
                      "locate",pendingResult.directory,pendingResult.manifest.snapshot,anchor.sha]);
         return true;
     }
+    function searchHistory(next) {
+        const query=searchInput.text.trim();
+        const s=candidate.mapState;
+        if (!canRequest || pendingResult || !fullVisible || !s || !activeDirectory
+                || !query || query.length>128 || /[\x00-\x1f\x7f]/.test(query)) return false;
+        const start=next && lastMatch && lastMatch.query===query
+            && lastMatch.snapshot===s.snapshot ? lastMatch.ordinal+1 : 0;
+        if (start>s.total) return false;
+        searchRequest={query:query,start:start,snapshot:s.snapshot,repoId:s.repoId,total:s.total,epoch:searchEpoch};
+        job="search";
+        jobRepo=repoRoot;
+        jobEpoch=repoEpoch;
+        received=false; exited=false; exitOk=false; output="";
+        searchStatus="SEARCHING";
+        watchdog.restart();
+        worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",
+            Quickshell.shellPath("scripts/git_map_history_index.py"),
+            "search",activeDirectory,s.snapshot,"--",query,String(start)]);
+        return true;
+    }
+    function finishSearch(result) {
+        const req=searchRequest;
+        searchRequest=null;
+        const s=candidate.mapState;
+        if (!req || req.epoch!==searchEpoch || !operatorActive || !fullVisible || !s
+                || req.query!==searchInput.text.trim() || req.snapshot!==s.snapshot
+                || req.repoId!==s.repoId || req.total!==s.total) {
+            searchStatus="SEARCH DISCARDED";
+            return;
+        }
+        if (!Policy.identity(result) || result.snapshot!==req.snapshot
+                || result.repoId!==req.repoId || result.query!==req.query
+                || result.start!==req.start) {
+            searchStatus="SEARCH UNAVAILABLE";
+            return;
+        }
+        if (result.match===null) {
+            searchStatus="NO FURTHER MATCH // SEARCH TO RESTART";
+            return;
+        }
+        const m=result.match;
+        if (!m || !Policy.sha(m.sha) || !Policy.integer(m.ordinal,req.start,s.total-1)) {
+            searchStatus="SEARCH UNAVAILABLE";
+            return;
+        }
+        lastMatch={query:req.query,snapshot:req.snapshot,ordinal:m.ordinal,sha:m.sha};
+        candidate.scrollTo(m.ordinal*candidate.rowHeight);
+        searchStatus="MATCH "+(m.ordinal+1)+" / "+s.total+" // "+m.sha.slice(0,10);
+    }
     function validReceipt(value) {
         return value && value.schema === "post-apollo-git-map-cache-v1"
             && typeof value.repoId === "string" && /^[0-9a-f]{64}$/.test(value.repoId)
@@ -153,6 +213,7 @@ Item {
         }
         output = "";
         if (repo !== repoRoot || jobEpoch !== repoEpoch) { schedule(); return; }
+        if (action==="search") { finishSearch(result); schedule(); return; }
         if (action==="locate") {
             const anchor=locateAnchor;
             locateAnchor=null;
@@ -218,6 +279,9 @@ Item {
             return false;
         }
         activeRepo=pendingRepo;
+        activeDirectory=result.directory;
+        lastMatch=null;
+        searchStatus="";
         pendingResult=null;
         pendingRepo="";
         allocated=true;
@@ -237,6 +301,8 @@ Item {
             root.jobRepo = "";
             root.output = "";
             root.pendingResult=null;
+            root.searchRequest=null;
+            root.searchStatus="SEARCH / INDEX WORKER FAULT";
             root.pendingRepo="";
             root.buildQueued=false;
             root.lookupQueued=false;
@@ -275,9 +341,73 @@ Item {
         text: root.statusText
         elide: Text.ElideRight
     }
+    Row {
+        id: searchRow
+        anchors.top: status.bottom
+        width: parent.width
+        height: 28
+        spacing: 4
+        Rectangle {
+            width: Math.max(0,parent.width-112)
+            height: parent.height
+            color: Colors.dark
+            border.color: Colors.cyan
+            border.width: 1
+            radius: 0
+            TextInput {
+                id: searchInput
+                anchors.fill: parent
+                anchors.margins: 5
+                maximumLength: 128
+                enabled: root.operatorActive && root.fullVisible
+                selectByMouse: true
+                clip: true
+                font.pixelSize: 11
+                color: Colors.white
+                selectionColor: Colors.magenta
+                selectedTextColor: Colors.white
+                verticalAlignment: TextInput.AlignVCenter
+                onTextChanged: { root.searchEpoch++; root.lastMatch=null; root.searchStatus=""; }
+                onAccepted: root.searchHistory(false)
+            }
+            GohuText {
+                anchors.fill: searchInput
+                visible: !searchInput.text.length && !searchInput.activeFocus
+                text: "SHA / AUTHOR / SUBJECT"
+                color: Colors.cyan
+                font.pixelSize: 9
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
+        }
+        ActionButton {
+            width: 60; height: parent.height
+            label: "FIND"
+            available: root.canRequest && root.fullVisible && !root.pendingResult && !!searchInput.text.trim()
+            onLeftClicked: root.searchHistory(false)
+        }
+        ActionButton {
+            width: 44; height: parent.height
+            label: "NEXT"
+            available: root.canRequest && root.fullVisible && !root.pendingResult && !!root.lastMatch
+            onLeftClicked: root.searchHistory(true)
+        }
+    }
+    GohuText {
+        id: searchFeedback
+        anchors.top: searchRow.bottom
+        width: parent.width
+        height: root.searchStatus.length ? 16 : 0
+        visible: height>0
+        text: root.searchStatus
+        color: Colors.orange
+        font.pixelSize: 9
+        textFormat: Text.PlainText
+        elide: Text.ElideRight
+    }
     GitMapVirtualViewport {
         id: candidate
-        anchors.top: status.bottom
+        anchors.top: searchFeedback.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

@@ -44,6 +44,23 @@ class HistoryIndexTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 index.page(conn,"d"*32,0)
 
+    def test_literal_search_bounded_and_snapshot_bound(self):
+        with make_index(chain(1000)) as conn:
+            first=index.search(conn,"a"*32,"COMMIT 12",0)
+            self.assertEqual(first["match"],{"ordinal":12,"sha":sha(12)})
+            self.assertEqual(index.search(conn,"a"*32,"commit 12",13)["match"]["ordinal"],120)
+            self.assertEqual(index.search(conn,"a"*32,sha(999),0)["match"]["ordinal"],999)
+            self.assertEqual(index.search(conn,"a"*32,"fixture",999)["match"]["ordinal"],999)
+            for query in ("%", "_", "' OR 1=1 --", "not present"):
+                self.assertIsNone(index.search(conn,"a"*32,query,0)["match"])
+            self.assertIsNone(index.search(conn,"a"*32,"fixture",1000)["match"])
+            for query,start in [("",0),(" ",0),("a"*129,0),("x\n",0),("x",-1),("x",1001),("x",True)]:
+                with self.assertRaises(ValueError):
+                    index.search(conn,"a"*32,query,start)
+            with self.assertRaises(ValueError):
+                index.search(conn,"d"*32,"fixture",0)
+            self.assertEqual(index.manifest_for(conn)["total"],1000)
+
     def test_merge_frontier_across_page_boundary(self):
         def graph():
             for i in range(132):

@@ -30,6 +30,7 @@ on:
       - 'tests/cpuplus_memory_navigation_test.js'
       - 'tests/cpuplus_memory_ui_native.py'
       - 'tests/fixtures/CpuPlusMemoryUiNative.qml'
+      - 'tests/fixtures/CpuPlusProfileApplicationNative.qml'
       - 'components/SelectorSlider.qml'
       - 'components/SelectorDial.qml'
       - '.github/workflows/cpuplus-memory-navigation.yml'

@@ -122,6 +122,7 @@ ShellRoot {
                 if (!root.check(map.scrollPosition===0 && map.mapState.repoId===root.manifestB.repoId,"switch position/identity")) return;
                 if (!map.rowAt(0)) return;
                 if (!root.check(map.rowAt(0).sha===root.sha(200000),"old repo response contaminated B")) return;
+                if (!root.check(map.nodeGlyph(map.rowAt(0))==="✧","legacy ordinary commit glyph")) return;
                 if (!root.check(map.renderedRows<=24 && map.graphSurfaceHeight<480,"renderer bound after switch")) return;
                 map.scrollTo(124*24+5);
                 root.expectedY=map.scrollPosition;

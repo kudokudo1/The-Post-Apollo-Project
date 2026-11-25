@@ -109,10 +109,19 @@ def after_reboot(guard):
     witness=json.loads(guard.protected_bytes(WITNESS))
     require(guard.boot_id()!=witness["boot"],"new kernel boot not observed")
     guard.verify_swap(False)
-    require([guard.identity(guard.BASE)[1:],guard.identity(guard.EXTRA)[1:]]
-            == [row[1:] for row in witness["identity"]]
-            and fence_identity()[1]==witness["fence"][1]
-            and signature(guard)==witness["swap"],"reboot identity or swap state mismatch")
+    actual = {"identity":[guard.identity(guard.BASE)[1:],guard.identity(guard.EXTRA)[1:]],
+              "fence_inode":fence_identity()[1],"swap":signature(guard)}
+    expected = {"identity":[row[1:] for row in witness["identity"]],
+                "fence_inode":witness["fence"][1],"swap":witness["swap"]}
+    # Dedicated offline guest only. Report fixed fixture metadata, not swap
+    # contents. Do not drop unrelated swap rows or accept changed identities.
+    for key in ("identity","fence_inode","swap"):
+        if actual[key]!=expected[key]:
+            print("CPU_MEM_EXTFENCE_DIAG // "+json.dumps(
+                  {"field":key,"expected":expected[key],"actual":actual[key]},sort_keys=True),flush=True)
+    require(actual["identity"]==expected["identity"],"managed file inode or size changed after reboot")
+    require(actual["fence_inode"]==expected["fence_inode"],"external fence inode changed after reboot")
+    require(actual["swap"]==expected["swap"],"active swap composition changed after reboot")
     verify_refusal(guard)
     require(guard.history()==witness["history"]
             and [guard.digest_file(guard.EXT / name) for name in guard.RECORD_NAMES[:2]]

@@ -18,6 +18,10 @@ for trial in ("NORMAL","BLOCK","DND"):
         (scene/"services").mkdir()
         shutil.copytree(ROOT/"services/notifications",scene/"services/notifications")
         shutil.copytree(ROOT/"services/memory",scene/"services/memory")
+        # Preserve real QML dependencies: MemoryOperation uses TimeSettings;
+        # Hub alarm actions use AlarmManagerService, which imports sounds.
+        for module in ("time", "sounds"):
+            shutil.copytree(ROOT/"services"/module,scene/"services"/module)
         shutil.copytree(ROOT/"services/memory",scene/"memory")
         widgets=scene/"widgets/cpuplus"
         widgets.mkdir(parents=True)

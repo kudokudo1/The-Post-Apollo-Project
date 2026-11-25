@@ -8,6 +8,8 @@ import "GitMapViewportPolicy.js" as Policy
 Scope {
     id: root
     property var state: null
+    property bool requestsEnabled: true
+    onRequestsEnabledChanged: if (requestsEnabled) schedule()
     property string directory: ""
     property var activeRequest: null
     property string activeDirectory: ""
@@ -49,7 +51,7 @@ Scope {
         Qt.callLater(pump);
     }
     function pump() {
-        if (!state || faulted || busy || worker.running) return;
+        if (!requestsEnabled || !state || faulted || busy || worker.running) return;
         const plan = Policy.requests(state);
         state = plan.state;
         const wanted = Policy.wantedPages(state);

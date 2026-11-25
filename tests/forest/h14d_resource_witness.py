@@ -271,7 +271,7 @@ def preflight(sample, *, selected, now_ns):
     return "RESOURCE_PREFLIGHT_REFERENCE"
 
 
-def evaluate(parent, samples, *, selected, launch_ns):
+def evaluate(parent, samples, *, selected, launch_ns, expected_leaf):
     """Evaluate exact bounded observations, not model demand or terminal proof.
 
     Runtime/Security must separately verify host, image, disk, namespace,
@@ -280,8 +280,11 @@ def evaluate(parent, samples, *, selected, launch_ns):
     preflight(parent, selected=selected, now_ns=launch_ns)
     require(type(samples) is tuple and 2 <= len(samples) <= MAX_SAMPLES,
             "SAMPLE_COUNT")
+    require(type(expected_leaf) is tuple and len(expected_leaf) == 2
+            and all(_number(v) and v > 0 for v in expected_leaf)
+            and expected_leaf not in tuple(l.identity for l in parent.levels),
+            "LEAF_IDENTITY_INVALID")
     previous = None
-    leaf_id = None
     max_charge = 0
     minimum_host = parent.host_available_mib
     expected_cpus = tuple((c, c) for c in selected)
@@ -291,8 +294,8 @@ def evaluate(parent, samples, *, selected, launch_ns):
         _validate(sample, leaf=True)
         require(launch_ns <= sample.start_ns < sample.end_ns <= launch_ns + MAX_NS,
                 "WITNESS_WINDOW")
-        require(sample.start_ns - (launch_ns if previous is None else previous.end_ns)
-                in range(0, MAX_GAP_NS + 1), "SAMPLE_GAP")
+        require(0 <= sample.start_ns - (launch_ns if previous is None else previous.end_ns)
+                <= MAX_GAP_NS, "SAMPLE_GAP")
         require(len(sample.levels) == len(parent.levels) + 1,
                 "ANCESTRY_MISMATCH")
         ancestor_pairs = zip(parent.levels, sample.levels[:-1])
@@ -303,9 +306,7 @@ def evaluate(parent, samples, *, selected, launch_ns):
                      original.cpus, original.pids_max, original.events),
                     "ANCESTOR_CHANGED")
         child = sample.levels[-1]
-        if leaf_id is None:
-            leaf_id = child.identity
-        require(child.identity == leaf_id, "LEAF_CHANGED")
+        require(child.identity == expected_leaf, "LEAF_CHANGED")
         require(child.hard == CAP and child.quota == QUOTA
                 and child.cpus == expected_cpus and child.pids_max == TASK_CAP
                 and sample.swap_max == 0, "LEAF_LIMIT_MISMATCH")

@@ -26,8 +26,20 @@ Item {
             bars:rows,first:rows[0],last:rows[1]};
         var copied = Policy.captureGlobalHistory(identity,listing,data);
         if (!copied) return false;
+        var summary = Policy.summarizeRange(copied);
+        var chart = Policy.normalizedIntervalChart(copied,0,1,0,1);
+        var avListing = {symbol:"ASML.AMS",region:"Netherlands",name:"ASML",currency:"EUR"};
+        data.source="alpha-vantage-daily-compact"; data.symbol="ASML.AMS";
+        data.currencySource="alpha-vantage-symbol-search"; data.compactMaxBars=100;
+        data.returnedBars=100; data.compactMayBeTruncated=true;
+        var av = Policy.captureGlobalHistory(identity,avListing,data);
+        var avStats = Policy.summarizeRange(av);
+        var avChart = Policy.normalizedIntervalChart(av,0,1,0,1);
         rows[0].price=1;
-        return copied.first.price===100 && copied.bars[0].price===100
+        return summary && summary.sessions===2 && chart && chart.first[0].value===100
+            && avStats && avStats.source==="loaded-alpha-vantage-range-only"
+            && avChart && Policy.inspectNormalizedStep(avChart,0).first.value===100
+            && copied.first.price===100 && copied.bars[0].price===100
             && copied.last.price===110 && copied.currency==="EUR";
     }
 }

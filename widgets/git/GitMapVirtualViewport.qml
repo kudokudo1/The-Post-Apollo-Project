@@ -285,7 +285,7 @@ Rectangle {
                         verticalAlignment: Text.AlignVCenter
                         color: Colors.orange
                         visible: rowItem.selected
-                        layer.enabled: visible
+                        layer.enabled: rowItem.selected
                         layer.effect: DropShadow {
                             radius: 15; samples: 25; opacity: 1.0
                             color: Colors.orange; transparentBorder: true
@@ -302,7 +302,7 @@ Rectangle {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         color: star.color
-                        layer.enabled: visible && parent.visible
+                        layer.enabled: !!rowItem.record && graph.laneX(rowItem.record.lane)<graph.width-14
                         layer.effect: DropShadow {
                             radius: 8
                             samples: 17

@@ -8,6 +8,7 @@ ShellRoot {
     property int phase: 0
     property bool failed: false
     property bool small: false
+    property bool compact: false
     property var parts: ({})
     function check(ok, reason) {
         if (!ok) {
@@ -65,6 +66,120 @@ ShellRoot {
             check(a.loader.item === null, "inactive fixture retained");
         }
     }
+    // Explicit test-only units, never an installed producer or permission.
+    readonly property var firstRef: ({requestId: "a".repeat(32), viewKey: "b".repeat(32), generation: 1})
+    readonly property var secondRef: ({requestId: "c".repeat(32), viewKey: "d".repeat(32), generation: 2})
+    readonly property var thirdRef: ({requestId: "e".repeat(32), viewKey: "f".repeat(32), generation: 3})
+    function unit(ref, seq, name) {
+        return {requestId: ref.requestId, viewKey: ref.viewKey, generation: ref.generation,
+            sequence: seq, kind: "STATUS", statusPacket: {
+                schema: "postapollo.forest.public-runtime-status.v1", status: name,
+                sourceAuthenticated: false, permissionGranted: false,
+                productionAuthority: false, modelExecutionPermitted: false, safeActions: []}};
+    }
+    function withdraw(ref, seq) {
+        return {requestId: ref.requestId, viewKey: ref.viewKey, generation: ref.generation,
+            sequence: seq, kind: "WITHDRAW", statusPacket: null};
+    }
+    function openRuntime(item, ref) {
+        // The test host supplies currentness independently of incoming units.
+        item.runtimeTreeKey = forest.activeTree.sessionKey;
+        item.runtimeCurrentCorrelation = ref;
+        item.runtimeViewOpen = true;
+        check(item.runtimeInitialized && item.runtimeEligible && item.openRuntimeLifetime(ref),
+            "explicit fixture lifetime");
+    }
+    function statusGeometry(expected) {
+        geometry(true);
+        if (failed) return false;
+        const item = parts.loader.item;
+        const status = find(item, "publicFixtureStatus");
+        const runtime = find(item, "publicFixtureRuntimeStatus");
+        const feed = find(item, "publicFixtureFeed");
+        const viewport = find(feed, "conversationViewport");
+        check(status && runtime && feed && viewport, "missing actual status/viewport");
+        if (failed) return false;
+        check(item.runtimeStatusText === expected && runtime.visible === (expected !== ""),
+            "actual operation label");
+        check(expected ? runtime.height > 0 : runtime.height === 0, "status collapse/height");
+        check(status.statusText === "HISTORY SNAPSHOT COMPLETE"
+            && status.executionText === "PUBLIC FIXTURE // SEND / STOP LOCKED"
+            && item.transcriptReady && feed.messages.length === 2
+            && feed.messages[0].body === "What is a Tree?"
+            && feed.messages[1].direction === "incoming", "history/transcript changed");
+        check(!runtime.sendEnabled && !runtime.stopEnabled && !runtime.sourceAuthenticated
+            && !runtime.permissionGranted && !runtime.productionAuthority
+            && !runtime.modelExecutionPermitted, "status authority changed");
+        check(runtime.y === status.height && runtime.width === item.width
+            && feed.y === status.height + runtime.height
+            && feed.height === item.height - feed.y && feed.height > 0
+            && viewport.y === 0 && viewport.height === feed.height, "actual status/feed geometry");
+        check(parts.pane.width >= 300 && parts.pane.height >= 160, "measured usable viewport");
+        console.info("FOREST_HOST_STATUS_GEOMETRY " + parts.pane.width + "x" + parts.pane.height
+            + " label=" + runtime.height + " feed=" + feed.height);
+        return !failed;
+    }
+    function runtimePhase(n) {
+        const item = parts.loader.item;
+        switch (n) {
+        case 0:
+            if (!statusGeometry("")) return;
+            check(item.runtimeCurrentCorrelation === null, "default correlation");
+            item.receiveRuntimeUnit(unit(firstRef, 1, "REQUEST_PENDING"));
+            check(item.runtimeState === "CLOSED", "incoming auto-open");
+            openRuntime(item, firstRef);
+            item.receiveRuntimeUnit(unit(firstRef, 1, "REQUEST_PENDING"));
+            item.receiveRuntimeUnit(unit(firstRef, 2, "PREPARING"));
+            item.receiveRuntimeUnit(unit(firstRef, 3, "GENERATING"));
+            item.receiveRuntimeUnit(unit(firstRef, 4, "LOCAL_COMMIT_RECORDED"));
+            break;
+        case 1:
+            if (!statusGeometry("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED")) return;
+            check(parts.input.text === "unsubmitted local draft", "active status changed draft");
+            forest.selectedTreeIndex = 1;
+            break;
+        case 2:
+            geometry(false);
+            check(!parts.preview.interactive, "non-CHERRY retained status lifetime");
+            forest.selectedTreeIndex = 0;
+            break;
+        case 3:
+            geometry(false);
+            check(parts.preview.interactive, "CHERRY gate unavailable");
+            parts.preview.leftClicked(null);
+            break;
+        case 4:
+            if (!statusGeometry("")) return;
+            check(item.runtimeCurrentCorrelation === null, "replacement Loader retained old correlation");
+            item.receiveRuntimeUnit(unit(firstRef, 4, "LOCAL_COMMIT_RECORDED"));
+            item.receiveRuntimeUnit(withdraw(firstRef, 5));
+            check(item.runtimeState === "CLOSED", "old callback reopened replacement");
+            openRuntime(item, secondRef);
+            item.receiveRuntimeUnit(unit(secondRef, 1, "REQUEST_PENDING"));
+            item.receiveRuntimeUnit(withdraw(firstRef, 5));
+            item.invalidateRuntimeLifetime(firstRef);
+            check(!item.openRuntimeLifetime(firstRef), "stale open accepted");
+            break;
+        case 5:
+            if (!statusGeometry("REQUEST PENDING")) return;
+            item.runtimeCurrentCorrelation = null;
+            check(item.runtimeState === "CLOSED", "independent currentness loss not cleared");
+            item.receiveRuntimeUnit(unit(secondRef, 2, "PREPARING"));
+            break;
+        case 6:
+            if (!statusGeometry("")) return;
+            openRuntime(item, thirdRef);
+            item.receiveRuntimeUnit(unit(thirdRef, 1, "REQUEST_PENDING"));
+            check(item.runtimeStatusText === "REQUEST PENDING", "fresh lifetime did not paint");
+            forest.menuOpen = false;
+            break;
+        case 7:
+            check(!parts.loader.active && parts.loader.item === null, "closed active host retained fixture");
+            check(parts.input.text === "", "closed host retained draft");
+            break;
+        default: check(false, "unexpected runtime phase");
+        }
+    }
     // Emit only after the actual assertions and changes in a phase complete.
     function completePhase(n) {
         if (failed) { timer.stop(); Qt.quit(); return; }
@@ -84,15 +199,25 @@ ShellRoot {
         onTriggered: {
             if (witness.failed) { stop(); Qt.quit(); return; }
             const n = witness.phase++;
+            const runtimeStart = witness.compact ? 2 : 10;
+            if (!witness.small && n >= runtimeStart) {
+                witness.runtimePhase(n - runtimeStart);
+                witness.completePhase(n);
+                if (n === runtimeStart + 7) witness.finish();
+                return;
+            }
             switch (n) {
             case 0:
                 if (!witness.capture()) return;
                 witness.check(forest.screen !== null, "native screen unavailable");
                 if (witness.failed) return;
                 witness.small = forest.screen.width < 600;
+                witness.compact = !witness.small && forest.screen.width < 930;
                 witness.check(witness.small
                     ? forest.screen.width === 420 && forest.screen.height === 340
-                    : forest.screen.width === 1366 && forest.screen.height === 900,
+                    : witness.compact
+                        ? forest.screen.width === 770 && forest.screen.height === 450
+                        : forest.screen.width === 1366 && forest.screen.height === 900,
                     "unexpected private output dimensions");
                 witness.check(!forest.menuOpen && !parts.loader.active, "default-off");
                 forest.menuOpen = true;
@@ -104,7 +229,9 @@ ShellRoot {
                     parts.preview.leftClicked(null); // direct signal, not a physical pointer event
                     break;
                 }
-                witness.check(forest.frameWidth === 930 && forest.frameHeight === 610, "default stage");
+                witness.check(witness.compact
+                    ? forest.frameWidth < 930 && forest.frameHeight < 610
+                    : forest.frameWidth === 930 && forest.frameHeight === 610, "default/clamped stage");
                 witness.check(parts.preview.interactive, "normal viewport ineligible");
                 parts.input.text = "unsubmitted local draft";
                 parts.preview.leftClicked(null);
@@ -155,9 +282,10 @@ ShellRoot {
             case 9:
                 witness.geometry(false);
                 witness.check(parts.preview.interactive, "preview unavailable after explicit reopen");
-                witness.completePhase(n);
-                witness.finish();
-                return;
+                forest.chassisLevel = 0;
+                parts.input.text = "unsubmitted local draft";
+                parts.preview.leftClicked(null);
+                break;
             default:
                 witness.check(false, "unexpected phase");
             }

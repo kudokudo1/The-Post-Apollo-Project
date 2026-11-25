@@ -9,6 +9,7 @@ on:
       - 'widgets/cpuplus/CpuPlusAdvancedPolicy.js'
       - 'widgets/cpuplus/CpuPlusQueuePane.qml'
       - 'widgets/cpuplus/CpuPlusQueuePresentation.js'
+      - 'widgets/cpuplus/CpuPlusQueueConsumer.js'
       - 'tests/cpuplus/test_diagnostic_continuity_native.py'
       - 'widgets/cpuplus/CpuPlusMemoryAddControl.qml'
       - 'tests/cpuplus_memory_navigation_test.js'

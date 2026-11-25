@@ -135,6 +135,27 @@ class VersionedTests(unittest.TestCase):
         self.install(fresh)
         self.assertEqual(self.lookup(fresh).entries,())
 
+    def test_newer_input_lookup_revocation_fences_without_install(self):
+        fresh=self.fresh(input_generation=2)
+        with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+            self.lookup(fresh,PublicUse(fresh,(),(self.u,)))
+        self.assertEqual(self.cache.counts(),(0,0))
+        with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+            self.install(self.fresh(input_generation=3))
+        allowed=self.fresh(input_generation=4,policy_generation=3)
+        self.install(allowed)
+        self.assertEqual(self.lookup(allowed).entries,())
+        self.remember(allowed,(self.user,self.op))
+        self.assertTrue(self.lookup(allowed).complete)
+
+    def test_newer_input_lookup_without_revocation_requires_install(self):
+        fresh=self.fresh(input_generation=2)
+        with self.assertRaisesRegex(ContextRefusal,"HOT_ROUTE_CHANGED"):
+            self.lookup(fresh)
+        self.assertEqual(self.cache.counts(),(1,1))
+        self.install(fresh)
+        self.assertEqual(self.lookup(fresh).entries,(self.user,self.op))
+
     def test_epoch_exhaustion(self):
         fresh=self.fresh(input_generation=2,policy_generation=MAX_GENERATION)
         self.install(fresh)

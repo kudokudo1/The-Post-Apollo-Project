@@ -3,7 +3,7 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 from h14d_resource_witness import (
-    CAP, GIB, QUOTA, Hold, Level, Sample, Reader, evaluate, preflight, preflight_outer, validate_prefix,
+    CAP, GIB, QUOTA, MIN_HOST_MIB, Hold, Level, Sample, Reader, evaluate, preflight, preflight_outer, validate_prefix,
 )
 
 
@@ -283,6 +283,57 @@ class ResourceWitnessTests(unittest.TestCase):
                    side_effect=Hold("PREFIX_REFUSED")):
             with self.assertRaisesRegex(Hold, "PREFIX_REFUSED"):
                 self.outer_check(b)
+
+
+    def test_full_host_floor_all_phases_both_scopes(self):
+        p = replace(self.parent, host_available_mib=MIN_HOST_MIB)
+        b = replace(self.outer_baseline(), host_available_mib=MIN_HOST_MIB)
+        f = replace(self.active, host_available_mib=MIN_HOST_MIB)
+        z = replace(self.final, host_available_mib=MIN_HOST_MIB)
+        mid = replace(f, start_ns=410, end_ns=450)
+        for scope, baseline in (("DIRECT", None), ("RETAINED_OUTER", b)):
+            with self.subTest(scope=scope):
+                args = dict(selected=(0,1), launch_ns=200, expected_leaf=(1,11),
+                            scope=scope, baseline=baseline)
+                self.assertEqual(validate_prefix(p, f, **args)["status"],
+                                 "RESOURCE_PREFIX_REFERENCE")
+                self.assertEqual(evaluate(p, (f, mid, z), **args)["host_available_mib_sampled_min"],
+                                 MIN_HOST_MIB)
+                low = MIN_HOST_MIB-1
+                for parent, first, expected in (
+                        (replace(p, host_available_mib=low), f, "HOST_HEADROOM"),
+                        (p, replace(f, host_available_mib=low), "HOST_MARGIN")):
+                    with self.assertRaisesRegex(Hold, expected):
+                        validate_prefix(parent, first, **args)
+                    with self.assertRaisesRegex(Hold, expected):
+                        evaluate(parent, (first, mid, z), **args)
+                for samples in ((f, replace(mid, host_available_mib=low), z),
+                                (f, mid, replace(z, host_available_mib=low))):
+                    with self.assertRaisesRegex(Hold, "HOST_MARGIN"):
+                        evaluate(p, samples, **args)
+                if baseline is not None:
+                    args["baseline"] = replace(baseline, host_available_mib=low)
+                    with self.assertRaisesRegex(Hold, "HOST_MARGIN"):
+                        validate_prefix(p, f, **args)
+                    with self.assertRaisesRegex(Hold, "HOST_MARGIN"):
+                        evaluate(p, (f, mid, z), **args)
+
+    def test_charged_bytes_never_discount_host_floor(self):
+        # 8GiB available and 2GiB charged passed the former host formula.
+        # The fixture does not establish whether that charge is reclaimable.
+        f = replace(self.active, host_available_mib=8192, peak=2*GIB,
+                    levels=(self.ancestor, replace(self.child, current=2*GIB)))
+        z = replace(f, start_ns=500, end_ns=600, populated=0,
+                    levels=(self.ancestor, replace(f.levels[-1], tasks=0)))
+        for scope, baseline in (("DIRECT", None),
+                                ("RETAINED_OUTER", self.outer_baseline())):
+            args = dict(selected=(0,1), launch_ns=200, expected_leaf=(1,11),
+                        scope=scope, baseline=baseline)
+            with self.subTest(scope=scope):
+                with self.assertRaisesRegex(Hold, "HOST_MARGIN"):
+                    validate_prefix(self.parent, f, **args)
+                with self.assertRaisesRegex(Hold, "HOST_MARGIN"):
+                    evaluate(self.parent, (f,z), **args)
 
 
 class ReaderPinTests(unittest.TestCase):

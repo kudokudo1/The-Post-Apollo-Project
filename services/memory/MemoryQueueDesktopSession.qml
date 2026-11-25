@@ -11,6 +11,7 @@ QtObject {
     id: root
     property string pythonPath: ""
     property string ownerPath: ""
+    property string custodyLauncherPath: ""
     property string helperPath: ""
     property string checkpointDirectory: ""
     readonly property string phase: ctl.phase
@@ -37,7 +38,7 @@ QtObject {
         catch (_) { fail("WRAPPER_TRANSITION_FAILED"); return false; }
         finally { ctl.entered=false; }
     }
-    function config() { return [pythonPath,ownerPath,helperPath,checkpointDirectory]; }
+    function config() { return [pythonPath,ownerPath,helperPath,checkpointDirectory,custodyLauncherPath]; }
     function checkConfig() {
         const c=config();
         return c.every(x=>x.startsWith("/") && !/[\x00-\x1f]/.test(x))
@@ -63,6 +64,7 @@ QtObject {
     }
     onPythonPathChanged: configurationChanged()
     onOwnerPathChanged: configurationChanged()
+    onCustodyLauncherPathChanged: configurationChanged()
     onHelperPathChanged: configurationChanged()
     onCheckpointDirectoryChanged: configurationChanged()
 
@@ -206,7 +208,7 @@ QtObject {
         const next=Host.start(restored,Consumer,epoch,"STAGED",true,true,true,true);
         if (next.phase!=="HELLO" || !next.startupLocked) { fail("HOST_START_REFUSED");return; }
         const process=childFactory.createObject(root,{epoch:epoch,
-            command:[ctl.paths[0],"-B",ctl.paths[1],String(epoch)]});
+            command:[ctl.paths[0],"-I","-B",ctl.paths[4],ctl.paths[1],String(epoch)]});
         if (!process) { fail("OWNER_CREATE_FAILED");return; }
         ctl.child=process;
         ctl.phase="ACTIVE";
@@ -247,8 +249,9 @@ QtObject {
             if (!ctl.advance || !hub.hostState.retentionPending || hub.hostState.phase!=="STOPPED") {
                 fail("RETENTION_EXIT_MISMATCH");return;
             }
-            // Exact Process object delivered its exit callback. No running
-            // flag, PID lookup or timeout alone can release this transition.
+            // Exact supervisor Process exit is successful only after its
+            // kernel pidfd child witness and wait status agree. No running
+            // flag, PID lookup or timeout alone releases this transition.
             ctl.phase="ADVANCING";
             Qt.callLater(()=>{if (ctl.phase==="ADVANCING" && ctl.epoch===epoch && !ctl.child)
                 guarded(()=>beginIo("GEN_ADVANCE",ctl.advance));});

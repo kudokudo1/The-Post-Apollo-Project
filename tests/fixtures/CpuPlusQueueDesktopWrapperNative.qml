@@ -14,6 +14,7 @@ ShellRoot {
         id: session
         pythonPath: "/usr/bin/python3"
         ownerPath: smoke.rootPath+"/child.py"
+        custodyLauncherPath: smoke.rootPath+"/services/memory/memory_queue_custody.py"
         helperPath: smoke.rootPath+"/helper.py"
         checkpointDirectory: smoke.rootPath+"/checkpoint"
     }

@@ -21,6 +21,7 @@ from pathlib import Path
 import socket
 import sys
 
+from TimeWC5CustodianBoundaryReference import _head_shape
 from TimeWC5DualRecoveryReturnReference import (
     Comparison, compare_untrusted_recovery_returns,
 )
@@ -108,6 +109,35 @@ def _snapshot_response(response):
     return copied
 
 
+def _snapshot_prior_heads(prior):
+    """Keep the original caller's two untrusted comparison baselines stable.
+
+    No claim of freshness, custody or atomic cross-source observation.
+    """
+    if prior is None:
+        return None
+    if type(prior) is not dict or len(prior) != 2:
+        raise ValueError("INVALID_LOCAL_PRIOR_HEAD")
+    outer = prior.copy()
+    if (len(outer) != 2 or any(type(k) is not str for k in outer)
+            or set(outer) != {"c5", "native"}):
+        raise ValueError("INVALID_LOCAL_PRIOR_HEAD")
+    result = {}
+    for role in ("c5", "native"):
+        entry = outer[role]
+        if entry is None:
+            result[role] = None
+            continue
+        if type(entry) is not dict or len(entry) != 2:
+            raise ValueError("INVALID_LOCAL_PRIOR_HEAD")
+        copied = entry.copy()
+        if (len(copied) != 2 or any(type(k) is not str for k in copied)
+                or not _head_shape(copied)):
+            raise ValueError("INVALID_LOCAL_PRIOR_HEAD")
+        result[role] = copied
+    return result
+
+
 def _receiver_identity(receiver):
     # Different Python socket objects (or dup() FDs) can name the same
     # kernel socket. Compare live Linux socket inode identities, not objects.
@@ -183,6 +213,10 @@ def inspect_dual_packet_returns_ci_only(*, c5_receiver, native_receiver,
     except OSError:
         return _hold("TWO_DISTINCT_CONNECTED_RECEIVERS_REQUIRED_HOLD")
     try:
+        prior_snapshot = _snapshot_prior_heads(last_seen)
+    except ValueError:
+        return _hold("INVALID_LOCAL_PRIOR_HEAD_UNKNOWN_HOLD")
+    try:
         # These private flat snapshots are the SAME values used for both
         # packet digest matching and the subsequent comparison. In particular,
         # a caller mutating its original dict during recvmsg cannot substitute
@@ -206,7 +240,7 @@ def inspect_dual_packet_returns_ci_only(*, c5_receiver, native_receiver,
             plan=original_recovery_plan,
             c5_return=c5_snapshot,
             native_return=native_snapshot,
-            last_seen=last_seen,
+            last_seen=prior_snapshot,
         )
     except (TypeError, ValueError):
         return _hold("COMPARATOR_REFUSED_UNKNOWN_HOLD")

@@ -43,12 +43,10 @@ def main(argv=None):
     try:
         if args.action=="hold" and not stat.S_ISFIFO(os.fstat(sys.stdin.fileno()).st_mode):
             raise ValueError("lifetime pipe required")
-        expected=None
-        if args.device is not None or args.inode is not None:
-            if not all(isinstance(x,str) and re.fullmatch(r"0|[1-9][0-9]{0,19}",x)
-                       for x in (args.device,args.inode)):
-                raise ValueError("invalid expected directory identity")
-            expected=(args.device,args.inode)
+        if not all(isinstance(x,str) and re.fullmatch(r"0|[1-9][0-9]{0,19}",x)
+                   for x in (args.device,args.inode)):
+            raise ValueError("expected directory identity required")
+        expected=(args.device,args.inode)
         evidence={}
         with v2.read(args.base,args.repo_id,args.key,args.snapshot,
                      expected_identity=expected,evidence=evidence) as (conn,m):
@@ -65,6 +63,11 @@ def main(argv=None):
             elif args.action=="page": result=index.page(conn,args.snapshot,args.start)
             elif args.action=="locate": result=index.locate(conn,args.snapshot,args.sha)
             else: result=index.search(conn,args.snapshot,args.query,args.start)
+            # Recheck the named directory while still holding the original
+            # inode. This is cooperative race detection, not a security boundary.
+            named=v2.generation_path(args.base,args.repo_id,args.key).stat()
+            if (str(named.st_dev),str(named.st_ino))!=expected:
+                raise ValueError("candidate directory changed during read")
             # Serialize and flush before relinquishing the finite shared lock.
             emit({"schema":SCHEMA,"status":"READY","repoId":args.repo_id,
                   "key":args.key,"snapshot":m["snapshot"],"reclamationAllowed":False,

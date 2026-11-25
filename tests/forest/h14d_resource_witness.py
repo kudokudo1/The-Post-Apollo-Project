@@ -301,10 +301,11 @@ def _scope_sample(parent, sample, selected, expected_leaf):
             and sample.swap == 0 and child.tasks <= TASK_CAP
             and child.events == (0,) * len(EVENT_KEYS), "LEAF_RESOURCE_EVENT")
     require(sample.host_pressure == parent.host_pressure, "HOST_PRESSURE_CHANGED")
-    # Conservative uncharged cap and margin, not physical release credit.
+    # MemAvailable includes estimated reclaimable pages, which can already
+    # be charged to the child. Do not subtract those charges from the host
+    # floor. Ancestor charge-domain headroom is a separate calculation.
+    require(sample.host_available_mib >= MIN_HOST_MIB, "HOST_MARGIN")
     remaining = CAP - child.current
-    require(sample.host_available_mib * 1024**2 >= 4 * GIB + remaining,
-            "HOST_MARGIN")
     for level in sample.levels[:-1]:
         _limits(level, selected, remaining + 4 * GIB, TASK_CAP - child.tasks)
     return child

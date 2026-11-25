@@ -34,7 +34,8 @@ descendant identity; empty group is not terminal proof.
 
 Conservative proposal: require parent effective cpuset >=4, ancestor
 hard/high headroom >=10 GiB at preflight, host >=10 GiB available,
-and maintain >=4 GiB plus uncharged part of cap at host and ancestors.
+and maintain >=10 GiB host available throughout; separately maintain
+>=4 GiB plus uncharged part of cap in the ancestor charge domain.
 Zero displayed host memory PSI and no observed PSI total change;
 any ancestor memory event change refuses. These intentionally strict
 conditions may block otherwise feasible runners. Review exact thresholds
@@ -115,3 +116,16 @@ isolation and any native invocation remain HOLD. No duplicate observer
 or launcher; no new OS adapter. Offline tests cover both modes, exact
 shared refusal reasons, retained baseline continuity, authority flags
 and final evaluator forwarding the original prefix objects.
+
+## Conservative host floor (Nurse #7177604459)
+
+The shared host check uses MIN_HOST_MIB = 10240 for preflight and
+all retained baseline, active and final samples. MemAvailable is a
+reclaimability-inclusive estimate: child.current may already count
+pages included in that estimate. Never deduct child charges from the
+host floor. The ancestor charged-domain remainder check is unchanged.
+Both DIRECT and RETAINED_OUTER use the same check before progression
+reference and in the final audit. The exact floor is inclusive; 10239
+MiB or 8192 MiB with 2 GiB charged refuses. This conservative threshold
+can refuse otherwise feasible hosts and does not establish physical
+availability, demand, reservation or safety. No native invocation.

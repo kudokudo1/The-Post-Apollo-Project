@@ -113,8 +113,17 @@ function load(dir) {
     const st = fs.fstatSync(fd);
     if (unsafeRegular(st) || st.dev !== expected.dev || st.ino !== expected.ino)
       refuse("UNSAFE_FILE");
-    const raw = fs.readFileSync(fd,{encoding:"utf8"});
-    if (Buffer.byteLength(raw,"utf8") > MAX_BYTES) refuse("STORE_LIMIT");
+    // The on-disk length may grow between fstat and read. Never allocate
+    // an unbounded read buffer for a raced or hostile file.
+    const buffer=Buffer.alloc(MAX_BYTES+1);
+    let total=0;
+    while (total < buffer.length) {
+      const n=fs.readSync(fd,buffer,total,buffer.length-total,null);
+      if (n===0) break;
+      total+=n;
+    }
+    if (total>MAX_BYTES) refuse("STORE_LIMIT");
+    const raw=buffer.subarray(0,total).toString("utf8");
     let doc;
     try { doc = JSON.parse(raw); } catch { refuse("CORRUPT_STORE"); }
     if (!validDocument(doc)) refuse("CORRUPT_STORE");

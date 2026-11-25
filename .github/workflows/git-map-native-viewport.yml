@@ -23,11 +23,21 @@ jobs:
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins \
+            git ca-certificates python3 nodejs coreutils xvfb xauth xdotool libxcb-cursor0 quickshell=0.3.2-1 qt6-qpa-plugins \
             qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
             qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
             qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
       - uses: actions/checkout@v4
-      - run: python3 -B tests/git/test_git_map_viewport_native.py
+      - name: Re-run history index and viewport contracts after Qt compatibility changes
+        run: |
+          python3 -B tests/git/test_git_map_history_index.py
+          node tests/git/test_git_map_viewport.cjs
+      - name: Offscreen asynchronous paging, boundary and merge continuity
+        run: python3 -B tests/git/test_git_map_viewport_native.py
         env:
           POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY
+      - name: Isolated X11 star drag and wheel input
+        run: xvfb-run -a -s "-screen 0 1280x720x24" python3 -B tests/git/test_git_map_viewport_native.py
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY
+          POST_APOLLO_GIT_MAP_INPUT: "1"

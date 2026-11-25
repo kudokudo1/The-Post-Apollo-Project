@@ -1,0 +1,43 @@
+name: FinanceW Simple M3d5b3 nonactivated bridge contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/simple_m3d5b3_bridge_contract.mjs"
+      - "tests/finance/test_simple_m3d5b3_bridge_contract.mjs"
+      - "tests/finance/test_simple_m3d5b3_source_hold.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5B3_BRIDGE_CONTRACT_README.md"
+      - ".github/workflows/financew-simple-m3d5b3-bridge-contract.yml"
+  push:
+    paths:
+      - "scripts/finance/simple_m3d5b3_bridge_contract.mjs"
+      - "tests/finance/test_simple_m3d5b3_bridge_contract.mjs"
+      - "tests/finance/test_simple_m3d5b3_source_hold.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5B3_BRIDGE_CONTRACT_README.md"
+      - ".github/workflows/financew-simple-m3d5b3-bridge-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protected-bridge-no-dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse and static financial-write hold
+        run: |
+          node --check scripts/finance/simple_m3d5b3_bridge_contract.mjs
+          node --check tests/finance/test_simple_m3d5b3_bridge_contract.mjs
+          python3 -B tests/finance/test_simple_m3d5b3_source_hold.py
+      - name: Read-only bridge and synthetic failure matrix
+        run: node --test tests/finance/test_simple_m3d5b3_bridge_contract.mjs
+      - name: Prior independent reviewed controllers and framing regression
+        run: |
+          node --test tests/finance/test_simple_m3d5b_protected_controller.mjs
+          node --test tests/finance/test_simple_m3d5b2_transport.mjs
+          node --test tests/finance/test_finance_simple_m3d2_offline_review.mjs

@@ -286,6 +286,7 @@ Column {
             ActionButton {
                 width: Math.max(0,(parent.width-parent.spacing)/2)
                 height: 28
+                objectName: "cpuplusRecoveryAckCancel"
                 label: "CANCEL"
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"

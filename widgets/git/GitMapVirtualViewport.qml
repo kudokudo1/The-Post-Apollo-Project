@@ -129,6 +129,8 @@ Rectangle {
 
     GitMap.GitMapPageBridge { id: bridge }
 
+    function currentAnchor() { return mapState ? Policy.anchorOf(mapState) : null; }
+
     function nodeGlyph(record) {
         const d=decoration(record);
         return d.isHead || d.refsText ? "★" : "✧";
@@ -141,7 +143,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.margins: 8
         height: 24
-        text: root.mapState ? root.titleText + " // " + root.mapState.total + (root.indexedActive ? " LOCAL COMMITS" : " AVAILABLE COMMITS") + (graph.laneX(root.mapState.maxLane) >= graph.width-10 ? " // LANES CLIPPED" : "") : root.titleText + " // NO INDEX"
+        text: root.mapState ? root.titleText + " // " + root.mapState.total + (root.indexedActive ? " LOCAL COMMITS" : " AVAILABLE COMMITS") + (graph.laneX(root.mapState.maxLane) >= graph.width-14 ? " // LANES CLIPPED" : "") : root.titleText + " // NO INDEX"
         color: Colors.magenta
         font.pixelSize: 12
         textFormat: Text.PlainText
@@ -214,7 +216,7 @@ Rectangle {
                             ctx.lineWidth=1.35;
                             ctx.lineJoin="miter";
                             ctx.lineCap="butt";
-                            ctx.globalAlpha=0.72;
+                            ctx.globalAlpha=0.90;
                             for (const key of Object.keys(frontier)) {
                                 const lane=frontier[key], x=laneX(lane);
                                 if (x>=width) continue;
@@ -264,8 +266,8 @@ Rectangle {
                 Item {
                     width: graph.width
                     height: parent.height
-                    clip: true
-                    visible: rowItem.record !== null && graph.laneX(rowItem.record.lane)<width-10
+                    // The outer viewport clips the graph, not each 24px halo.
+                    visible: rowItem.record !== null && graph.laneX(rowItem.record.lane)<width-14
                     Rectangle {
                         width: rowItem.decoration.isHead || rowItem.decoration.refsText ? 10 : 8
                         height: width
@@ -289,24 +291,40 @@ Rectangle {
                             color: Colors.orange; transparentBorder: true
                         }
                     }
+                    // Separate the halo from the full-opacity foreground. The
+                    // effect opacity must never dim the commit's actual glyph.
+                    NotoText {
+                        id: halo
+                        width: star.width; height: star.height
+                        x: star.x
+                        text: star.text
+                        font.pixelSize: star.font.pixelSize
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: star.color
+                        layer.enabled: visible && parent.visible
+                        layer.effect: DropShadow {
+                            radius: 8
+                            samples: 17
+                            spread: 0.28
+                            opacity: 0.9
+                            color: halo.color
+                            transparentBorder: true
+                        }
+                    }
                     NotoText {
                         id: star
                         objectName: "gitMapCommitStar"
+                        z: 3
                         width: 20; height: parent.height
                         x: graph.laneX(rowItem.record ? rowItem.record.lane : 0)-width/2
                         text: root.nodeGlyph(rowItem.record)
                         font.pixelSize: rowItem.decoration.isHead ? 15 : 13
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
-                        color: rowItem.decoration.isHead ? Colors.yellow : graph.laneColor(rowItem.record ? rowItem.record.lane : 0)
-                        layer.enabled: visible && parent.visible
-                        layer.effect: DropShadow {
-                            radius: rowItem.decoration.isHead ? 7 : 5
-                            samples: rowItem.decoration.isHead ? 9 : 7
-                            opacity: rowItem.decoration.isHead ? 0.78 : rowItem.decoration.refsText ? 0.48 : 0.38
-                            color: star.color
-                            transparentBorder: true
-                        }
+                        color: Qt.lighter(rowItem.decoration.isHead ? Colors.yellow : graph.laneColor(rowItem.record ? rowItem.record.lane : 0), 1.30)
+                        opacity: 1.0
+                        layer.enabled: false
                     }
                 }
                 Row {

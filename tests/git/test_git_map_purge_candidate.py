@@ -82,6 +82,19 @@ p.purge(Path(sys.argv[3]),Path(sys.argv[4]),*sys.argv[5:],confirmation="PURGE")
         self.assertFalse(self.retired.exists() or self.pending.exists() or self.live.exists())
         with self.assertRaises(ValueError): self.purge(recover=True)
         print("GIT_MAP_PURGE_EXPLICIT_PASS",flush=True)
+    def test_current_and_rebuilt_refusal(self):
+        old_head=self.git("rev-parse","HEAD~1").decode().strip()
+        self.git("reset","--hard",old_head)
+        try:
+            with self.assertRaises(ValueError): self.purge()
+            self.assertTrue((self.retired/v2.NAME).is_file())
+            rebuilt=v2.build(self.repo,self.cache)
+            self.assertEqual(rebuilt["key"],self.old["key"])
+        finally:
+            self.git("reset","--hard",self.head.decode().strip())
+        with self.assertRaises(ValueError): self.purge()
+        self.assertTrue((self.retired/v2.NAME).is_file())
+        self.assertTrue((self.live/v2.NAME).is_file())
     def test_kill_after_rename(self):
         self.interrupted("rename")
         self.assertTrue((self.pending/v2.NAME).is_file())

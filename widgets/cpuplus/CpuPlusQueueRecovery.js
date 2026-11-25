@@ -140,3 +140,35 @@ function reviewReceipt(r) {
     return v&&r.acknowledged_at_ms>=v.reviewedAt&&r.acknowledged_at_ms-v.reviewedAt<60000
         ?Object.assign({},v,{acknowledgedAt:r.acknowledged_at_ms}):null;
 }
+
+ // R6 recovery-only presentation. All eligibility is revalidated by the
+ // canonical wrapper; no receipt or UI state grants execution permission.
+function dismissalSelection(c,generation) {
+    if(!c || c.enabled!==true || c.canDismiss!==true) return null;
+    const v=reviewEvidence(c.review);
+    return v && v.action.state==="PREPARED"
+        ?reviewSelection(Object.assign({},c,{canAcknowledge:true}),generation):null;
+}
+function dispositionReceipt(r) {
+    if(!exact(r,["version","review","dismissed_at_ms","disposition","adjustment_outcome","can_execute","startup_unlock"])
+        ||r.version!==2||r.disposition!=="LOCAL_PREPARATION_DISMISSED"
+        ||r.adjustment_outcome!=="UNVERIFIED"||r.can_execute!==false||r.startup_unlock!==false
+        ||!count(r.dismissed_at_ms))return null;
+    const v=reviewEvidence(r.review);
+    return v&&v.action.state==="PREPARED"&&r.dismissed_at_ms>=v.reviewedAt&&r.dismissed_at_ms-v.reviewedAt<60000
+        ?Object.assign({},v,{dismissedAt:r.dismissed_at_ms}):null;
+}
+function retentionSelection(s,dismissed,acknowledged,generation,storageGeneration) {
+    if(!exact(s,["storageGeneration","actionId","reviewDigest","sequence"])
+        ||!count(s.storageGeneration)||s.storageGeneration!==storageGeneration
+        ||!count(s.sequence)||!s.sequence||!count(generation)||!generation
+        ||!uuid(s.actionId)||typeof s.reviewDigest!=="string"||!/^[a-f0-9]{64}$/.test(s.reviewDigest))return null;
+    const matches=v=>v&&v.action.actionId===s.actionId&&v.digest===s.reviewDigest;
+    const mode=matches(dismissed)?"DISMISSED":matches(acknowledged)&&acknowledged.action.state==="COMMITTED"?"COMMITTED":null;
+    return mode?Object.assign({},s,{generation,mode}):null;
+}
+function sameRetention(a,b) {
+    return !!(a&&exact(b,["storageGeneration","actionId","reviewDigest","sequence","generation","mode"])
+        &&a.storageGeneration===b.storageGeneration&&a.actionId===b.actionId&&a.reviewDigest===b.reviewDigest
+        &&a.sequence===b.sequence&&a.generation===b.generation&&a.mode===b.mode);
+}

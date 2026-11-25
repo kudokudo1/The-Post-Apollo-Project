@@ -62,17 +62,18 @@ function activate(previous,m,rowHeight,viewportHeight,anchor) {
     if(!manifest(m) || !validGeometry(rowHeight,viewportHeight)) return null;
     // Replacing a generation requires explicit top selection or a validated
     // exact-SHA locate response. Never silently jump when an anchor is absent.
-    if(previous && (!anchor || (!anchor.top &&
+    const prior = previous ? anchorOf(previous) : null;
+    if(previous && (!anchor || (anchor.top !== true &&
             (!identity(anchor) || anchor.snapshot!==m.snapshot || anchor.repoId!==m.repoId
              || !sha(anchor.sha) || !integer(anchor.ordinal,0,m.total-1)
-             || anchor.sha!==anchor.previousSha
-             || previous.repoId!==m.repoId
+             || !prior || !prior.sha || anchor.sha!==prior.sha
+             || anchor.offset!==prior.offset || previous.repoId!==m.repoId
              || !Number.isFinite(anchor.offset) || anchor.offset<0
              || anchor.offset>=rowHeight)))) return null;
     const s={schema:SCHEMA,snapshot:m.snapshot,repoId:m.repoId,total:m.total,
         shallow:m.shallow,maxLane:m.maxLane,rowHeight,viewportHeight,y:0,direction:1,
         epoch:previous?previous.epoch+1:1,sequence:0,cache:{},pending:{},errors:{}};
-    if(previous && !anchor.top) s.y=clamp(s,anchor.ordinal*rowHeight+anchor.offset);
+    if(previous && anchor.top !== true) s.y=clamp(s,anchor.ordinal*rowHeight+anchor.offset);
     return s;
 }
 function scroll(s,y) {
@@ -175,7 +176,7 @@ function rowState(s,ordinal) {
     const start=Math.floor(ordinal/PAGE)*PAGE;
     return rowAt(s,ordinal)?"READY":s.errors[start]?"UNAVAILABLE":"LOADING";
 }
-function anchor(s) {
+function anchorOf(s) {
     if(!s.total) return null;
     const ordinal=visibleRange(s).first,row=rowAt(s,ordinal);
     return {ordinal,offset:s.y-ordinal*s.rowHeight,sha:row?row.sha:null};

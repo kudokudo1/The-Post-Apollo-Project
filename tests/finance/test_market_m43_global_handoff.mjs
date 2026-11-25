@@ -34,9 +34,12 @@ assert.equal(capture(identity,avListing,{...av,priceBasis:"ADJUSTED CLOSE"}),nul
 assert.equal(capture(identity,avListing,{...av,returnedBars:1}),null);
 assert.equal(capture(identity,avListing,{...av,compactMayBeTruncated:"true"}),null);
 const f=qml.slice(qml.indexOf("function acceptGlobalHistory("),qml.indexOf("function openControls()"));
-const ctx={discoveryOpen:true,visible:true,dayDate:"",priceBars:[],globalHistoryActive:false,stockFeed:{monitoring:true},RangeAnalysisPolicy:{captureGlobalHistory:capture},
+const ctx={discoveryOpen:true,visible:true,dayDate:"",priceBars:[],globalHistoryActive:false,stocksSessionActive:true,RangeAnalysisPolicy:{captureGlobalHistory:capture},
     stockReference:null,globalHistory:null,globalHandoffMessage:"",controlsExpanded:true,researchView:"compare",scroll:{contentY:90}};
 vm.createContext(ctx);vm.runInContext(f,ctx);
+ctx.stocksSessionActive=false;
+assert.equal(ctx.acceptGlobalHistory(identity,listing,eod),false);
+ctx.stocksSessionActive=true;
 assert.equal(ctx.acceptGlobalHistory(identity,listing,eod),true);
 assert.equal(ctx.discoveryOpen,false);assert.equal(ctx.researchView,"price");assert.equal(ctx.controlsExpanded,false);
 assert.equal(ctx.scroll.contentY,0);assert.equal(ctx.globalHistory.bars[0].price,100);

@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceW.qml"
+      - "widgets/FinanceMarketPane.qml"
+      - "tests/finance/test_market_m46e1_legacy_mount_retirement.mjs"
       - "widgets/FinanceMarketDateControls.qml"
       - "widgets/FinanceStockModePolicy.js"
       - "services/finance/FinanceGlobalPriceService.qml"
@@ -53,6 +56,9 @@ on:
     branches: [main]
     paths:
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceW.qml"
+      - "widgets/FinanceMarketPane.qml"
+      - "tests/finance/test_market_m46e1_legacy_mount_retirement.mjs"
       - "widgets/FinanceMarketDateControls.qml"
       - "widgets/FinanceStockModePolicy.js"
       - "services/finance/FinanceGlobalPriceService.qml"

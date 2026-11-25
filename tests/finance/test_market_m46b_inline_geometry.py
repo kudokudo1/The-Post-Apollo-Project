@@ -50,7 +50,7 @@ Window {
     readonly property int requestCount: Quickshell.callCount
     width: 620; height: 480; visible: true
     QtObject { id: monitor; objectName: "stocksMonitor"; property bool monitoring: true }
-    FinanceStockHistoryPane { objectName: "stocksProbe"; anchors.fill: parent; stockFeed: monitor }
+    FinanceStockHistoryPane { objectName: "stocksProbe"; anchors.fill: parent; sessionEnabled: monitor.monitoring }
 }""")
     engine=QQmlEngine()
     engine.addImportPath(str(p))

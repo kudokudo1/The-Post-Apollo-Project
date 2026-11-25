@@ -13,7 +13,7 @@ market=(root/"widgets/FinanceMarketPane.qml").read_text()
 
 assert app.count("PanelWindow {")==1
 assert app.count("FinanceToolHost {")==1
-assert 'FinanceServices.FinanceStockHistoryReadService {' in app
+assert 'FinanceServices.FinanceStockHistoryReadService {' not in app
 assert 'FinanceServices.FinanceSecPriceReadService {' in app
 assert 'label: "POLYMARKET"' in market and 'label: "OSIRIS"' in market
 assert 'label: "STOCKS"' in market

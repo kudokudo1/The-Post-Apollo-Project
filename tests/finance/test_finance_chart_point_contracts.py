@@ -14,7 +14,7 @@ oldpolicy=(r/"widgets/FinanceStockModePolicy.js").read_text()
 
 assert app.count("PanelWindow {") == 1
 assert app.count("FinanceToolHost {") == 1
-assert app.count("FinanceServices.FinanceStockHistoryReadService {") == 1
+assert "FinanceServices.FinanceStockHistoryReadService {" not in app
 assert 'label: "POLYMARKET"' in market and 'label: "OSIRIS"' in market
 assert 'label: "STOCKS"' in market
 

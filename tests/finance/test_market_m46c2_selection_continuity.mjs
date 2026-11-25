@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=p=>readFileSync(new URL("../../"+p,import.meta.url),"utf8");
 const q=read("widgets/FinanceStockHistoryPane.qml"),d=read("widgets/FinanceStockDiscoveryPane.qml"),e=read("widgets/FinanceGlobalPricePane.qml"),a=read("widgets/FinanceAlphaVantageFreePane.qml"),dates=read("widgets/FinanceMarketDateControls.qml");
-assert.ok(q.includes("sessionActive: stocks.visible && !!stocks.stockFeed && stocks.stockFeed.monitoring"));
+assert.ok(q.includes("sessionActive: stocks.stocksSessionActive"));
 assert.ok(q.includes("active: stocks.discoveryOpen && sessionActive"));
+assert.ok(q.includes("readonly property bool stocksSessionActive: visible && sessionEnabled"));
 for(const [source,id] of [[d,"discovery"],[e,"priceView"],[a,"avPane"]]){
  assert.ok(source.includes("property bool sessionActive: active"));
  assert.ok(source.includes("monitoring: "+id+".sessionActive"));

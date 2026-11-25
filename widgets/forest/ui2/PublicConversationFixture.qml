@@ -16,6 +16,12 @@ Item {
     }, view, view)
     readonly property bool fixtureReady: sample.state === "STRUCTURALLY_VALID_PUBLIC_FIXTURE"
         && sample.sessions.length === 1
+    property bool _rootCompleted: false
+    property bool _populated: false
+    readonly property bool canPopulate: _rootCompleted && history.initialized
+    readonly property bool transcriptReady: fixtureReady && history.complete
+    readonly property string fixtureState: history.state
+    readonly property string fixtureReason: history.reason
 
     PublicHistoryViewState {
         id: history
@@ -27,8 +33,17 @@ Item {
     }
 
     // Instantiation is the opt-in fixture action. This local literal page
-    // is not an M4 database read or model execution. No queued callbacks.
-    Component.onCompleted: {
+    // is not an M4 database read or model execution. Child and parent
+    // completion order is unspecified; wait for both, with no queued work.
+    Component.onCompleted: _rootCompleted = true
+    onCanPopulateChanged: {
+        if (canPopulate)
+            populateFixture();
+    }
+    function populateFixture() {
+        if (!canPopulate || _populated)
+            return;
+        _populated = true;
         if (!fixtureReady)
             return;
         history.attached = true;
@@ -67,11 +82,11 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        conversation: root.fixtureReady && history.complete
+        conversation: root.transcriptReady
             ? ({id: root.sample.sessions[0].session_id,
                 displayNameInProfile: root.sample.sessions[0].title}) : null
         scopeId: "forest-ui2-public-fixture"
-        messages: root.fixtureReady && history.complete ? history.messages : []
+        messages: root.transcriptReady ? history.messages : []
         showHeader: false
         showComposer: false
         messageTextFormat: Text.PlainText

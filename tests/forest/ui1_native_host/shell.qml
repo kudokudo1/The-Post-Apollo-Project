@@ -284,12 +284,12 @@ ShellRoot {
         } else if (joinedLast==="STOP_OBSERVED")
             ok=item.runtimeStatusText==="STOP REQUESTED // OUTCOME PENDING"
                 && p.outcome!=="ABORTED_LOCAL" && feed.messages.length===0 && p.request("STEP");
-        else if (joinedLast==="ABORTED_LOCAL")
+        else if (joinedLast==="ABORTED_LOCAL") {
             ok=p.phase==="BLOCKED" && p.outcome==="ABORTED_LOCAL"
                 && item.runtimeStatusText==="LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED"
                 && feed.messages.length===0 && !p.request("NEXT") && waitForDb("ABORT");
             if (ok) console.info("FOREST_HOST_TYPED_ABORT_PASS");
-        else if (joinedLast==="CLOSED") return;
+        } else if (joinedLast==="CLOSED") return;
         check(ok,"joined action "+joinedLast);
         if (failed) p.hold("JOINED_HARNESS");
     }

@@ -143,3 +143,57 @@ recovering=h.stop(recovering,c,"RECOVERY_TIMEOUT",1);
 assert.equal(h.recoveryContext(recovering).inventory,null);
 assert.equal(h.recoveryContext(recovering).hostStatus.phase,"FAILED");
 console.log("R3e recovery read PASS: correlated inventory/lookup, no unlock, invalidation, timeout");
+
+// R3m: same controller, explicitly configured staged transport. No public
+// unlock; only fixture injects a reviewed startup result.
+function stagedStart() {
+ let s=h.start(h.initial(c),c,1,"STAGED");
+ s=feed(s,wire(control("HELLO"))+wire(control("INVALIDATE"))+wire(status(1,1)));
+ const i=c.prepare(s.session,"QUEUE",16,200).prepared;
+ assert.equal(h.confirm(s,i,X,c).frame,null);
+ return h.confirm({...s,startupLocked:false},i,X,c);
+}
+function stagedReceipt(s) {
+ return {version:1,kind:"PREPARED_ACTION",owner_id:A,sequence:2,next_action_sequence:2,can_execute:false,
+  record:{version:1,ordinal:1,message:s.session.pending,state:"PREPARED",prepared_at:100,
+   result_request_id:null,committed_at:null,adjustment_outcome:"UNVERIFIED",can_execute:false},challenge:B};
+}
+const prep=stagedStart(), receipt=stagedReceipt(prep.state);
+assert.equal(JSON.parse(prep.frame).kind,"PREPARE_ACTION");
+assert.equal(h.takeCommit(prep.state,1).frame,null);
+assert.equal(h.context(prep.state).actionStage,"WAIT_PREPARED");
+assert.equal(feed(prep.state,reply).phase,"FAILED");
+for(const bad of [{...receipt,owner_id:B},{...receipt,next_action_sequence:3},
+ {...receipt,challenge:"bad"},{...receipt,record:{...receipt.record,state:"COMMITTED"}},
+ {...receipt,record:{...receipt.record,message:{...receipt.record.message,target_gib:20}}}]) {
+ const f=feed(prep.state,bad);
+ assert.equal(f.phase,"FAILED");assert.ok(f.session.unresolved);
+ assert.equal(h.takeCommit(f,1).frame,null);
+}
+let staged=feed(prep.state,wire(receipt).slice(0,12));
+assert.equal(h.takeCommit(staged,1).frame,null);
+staged=feed(staged,wire(receipt).slice(12));
+assert.equal(h.context(staged).actionStage,"RECEIPT_READY");
+assert.ok(h.waiting(staged).includes("ACTION"));
+assert.equal(h.takeCommit(staged,2).frame,null);
+assert.equal(feed(staged,receipt).phase,"FAILED");
+assert.equal(h.takeCommit(feed(staged,"{"),1).frame,null);
+const commit=h.takeCommit(staged,1);
+assert.deepEqual(JSON.parse(commit.frame),{version:1,kind:"COMMIT_ACTION",
+ message:JSON.parse(prep.frame).message,prepared_sequence:2,challenge:B});
+assert.equal(h.context(commit.state).actionStage,"WAIT_COMMIT");
+assert.equal(h.takeCommit(commit.state,1).frame,null);
+assert.equal(h.readRecovery(commit.state,"INVENTORY",16).frame,null);
+let complete=feed(commit.state,wire({...reply,sequence:3})+wire(control("INVALIDATE"))+wire(status(4,2,R)));
+assert.equal(complete.session.status.requestId,R);assert.equal(complete.stage,null);
+assert.equal(complete.session.pending,null);
+for(const lost of [prep.state,staged,commit.state]) {
+ let stopped=h.stop(lost,c,"DISCONNECT",1);
+ assert.ok(stopped.session.unresolved);assert.equal(stopped.stage,null);
+ stopped=h.start(stopped,c,2,"STAGED");
+ stopped=feed(stopped,wire(control("HELLO",B))+wire(control("INVALIDATE",B))+wire(status(1,1,R,B)));
+ assert.ok(stopped.startupLocked && stopped.session.unresolved);
+ assert.equal(h.takeCommit(stopped,2).frame,null);
+ assert.equal(feed(stopped,receipt,1),stopped);
+}
+console.log("R3m staged host PASS: receipt validation, one-use commit, partial frame, loss and restart refusal");

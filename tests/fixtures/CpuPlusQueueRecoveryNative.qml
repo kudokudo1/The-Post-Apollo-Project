@@ -15,6 +15,8 @@ ShellRoot {
     id: smoke
     readonly property bool armed: Quickshell.env("POST_APOLLO_QUEUE_PIPE_SMOKE") === "CI_DISPOSABLE_ONLY"
     readonly property bool timeoutTrial: Quickshell.env("POST_APOLLO_QUEUE_WATCHDOG_TRIAL") === "1"
+    readonly property string stagedTrial: Quickshell.env("POST_APOLLO_QUEUE_STAGED_TRIAL")
+    property int commits: 0
     property int watchdogTrips: 0
     property var host: Host.initial(Consumer)
     readonly property var recovery: Host.recoveryContext(host)
@@ -38,16 +40,17 @@ ShellRoot {
         return ok;
     }
     function launch(generation) {
-        host = Host.start(host, Consumer, generation);
+        host = Host.start(host, Consumer, generation, stagedTrial ? "STAGED" : "LEGACY");
         exited = false;
         dropping = false;
+        child.stdinEnabled = true;
         child.running = true;
     }
     function receive(line) {
         if (done || dropping) return;
         let packet;
         try { packet = JSON.parse(line); } catch (_) { check(false,"parse"); return; }
-        if (phase === 2 && packet.kind === "ACTION") {
+        if (phase === 2 && packet.kind === "ACTION" && stagedTrial !== "ROUNDTRIP") {
             if (!check(!timeoutTrial,"delayed child replied before watchdog")) return;
             // Observe the reply only in the harness, never deliver to Host.
             if (!check(packet.disposition === "REPORTED" && packet.result.request.id
@@ -59,7 +62,22 @@ ShellRoot {
         }
         host = Host.feed(host,line+"\n",Consumer,Presentation.project,History.project,
             host.generation,Recovery.project,Recovery.row);
-        check(host.phase !== "FAILED","canonical host accepts " + packet.kind);
+        if (!check(host.phase !== "FAILED","canonical host accepts " + packet.kind)) return;
+        if (packet.kind === "PREPARED_ACTION") {
+            if (!check(!!stagedTrial && host.stage.phase === "RECEIPT_READY"
+                && host.session.pending && commits === 0,"validated live receipt")) return;
+            if (stagedTrial === "EOF") {
+                dropping = true;
+                child.stdinEnabled = false;
+                return;
+            }
+            const next = Host.takeCommit(host,host.generation);
+            if (!check(!!next.frame,"one commit frame")) return;
+            host = next.state;
+            ++commits;
+            if (!check(!Host.takeCommit(host,host.generation).frame,"commit consumed before write")) return;
+            child.write(next.frame);
+        }
     }
     function read(kind, value) {
         const request = Host.readRecovery(host,kind,value);
@@ -155,6 +173,17 @@ ShellRoot {
                 if (!smoke.check(!!pane.preparation,"fixture confirmation")) return;
                 pane.confirmIntent();
                 pane.confirmIntent();
+            } else if (smoke.phase === 2 && smoke.stagedTrial === "ROUNDTRIP" && smoke.host.session.status) {
+                if (!smoke.check(!!smoke.host.session.status.requestId && !smoke.host.session.pending
+                    && smoke.commits === 1 && smoke.writes === 1,"staged roundtrip committed once")) return;
+                smoke.dropping = true;
+                smoke.phase = 8;
+                child.stdinEnabled = false;
+            } else if (smoke.phase === 8 && smoke.exited) {
+                console.log("QUEUE_R3_STAGED_PASS // actual roundtrip");
+                console.log("QUEUE_R3_RECOVERY_PASS // staged roundtrip");
+                smoke.done = true;
+                Qt.quit();
             } else if (smoke.phase === 2 && smoke.exited) {
                 if (!smoke.check(smoke.host.session.unresolved && smoke.host.startupLocked
                     && smoke.recovery.inventory === null && smoke.writes === 1,"lost reply remains unresolved")) return;
@@ -162,8 +191,10 @@ ShellRoot {
                 smoke.launch(2);
             } else if (smoke.phase === 3 && smoke.host.session.status) {
                 if (!smoke.check(smoke.host.session.ownerId !== smoke.oldOwner
-                    && !!smoke.host.session.status.requestId
-                    && (smoke.timeoutTrial || smoke.host.session.status.requestId === smoke.resultId)
+                    && (smoke.stagedTrial === "EOF"
+                        ? smoke.host.session.status.requestId === null
+                        : !!smoke.host.session.status.requestId
+                            && (smoke.timeoutTrial || smoke.host.session.status.requestId === smoke.resultId))
                     && smoke.host.session.unresolved && smoke.host.startupLocked,"new owner same saved request")) return;
                 if(smoke.timeoutTrial)smoke.resultId=smoke.host.session.status.requestId;
                 if(!smoke.check(watchdog.activeCount===0,"reconnected idle deadlines"))return;
@@ -173,8 +204,9 @@ ShellRoot {
             } else if (smoke.phase === 4 && recoveryPane.view) {
                 const view = recoveryPane.view;
                 if (!smoke.check(view.recent.length === 1 && view.recent[0].actionId === smoke.actionId
-                    && view.recent[0].resultId === smoke.resultId && view.recent[0].state === "COMMITTED"
-                    && view.pendingId === smoke.resultId && view.outcome === "UNVERIFIED"
+                    && view.recent[0].resultId === (smoke.stagedTrial === "EOF" ? null : smoke.resultId)
+                    && view.recent[0].state === (smoke.stagedTrial === "EOF" ? "PREPARED" : "COMMITTED")
+                    && view.pendingId === (smoke.stagedTrial === "EOF" ? null : smoke.resultId) && view.outcome === "UNVERIFIED"
                     && !view.canExecute && smoke.recovery.hostStatus.unresolved,"actual recovery pane local commit")) return;
                 console.log("QUEUE_R3_RECOVERY_STEP // committed local intent rendered, startup locked");
                 smoke.phase = 5;
@@ -185,10 +217,10 @@ ShellRoot {
             } else if (smoke.phase === 5 && recoveryPane.localView) {
                 const local = smoke.recovery.localAction;
                 if (!smoke.check(recoveryPane.localView.record && !recoveryPane.localView.missing
-                    && recoveryPane.localView.record.resultId === smoke.resultId
+                    && recoveryPane.localView.record.resultId === (smoke.stagedTrial === "EOF" ? null : smoke.resultId)
                     && recoveryPane.view === null,"actual exact lookup display")) return;
-                if (!smoke.check(local.record.result_request_id === smoke.resultId
-                    && local.record.state === "COMMITTED" && !local.canExecute
+                if (!smoke.check(local.record.result_request_id === (smoke.stagedTrial === "EOF" ? null : smoke.resultId)
+                    && local.record.state === (smoke.stagedTrial === "EOF" ? "PREPARED" : "COMMITTED") && !local.canExecute
                     && smoke.host.startupLocked && smoke.host.session.unresolved && smoke.writes === 1,"exact action recovered without unlock")) return;
                 pane.prepareIntent("CANCEL");
                 if (!smoke.check(!pane.preparation,"no cancel before reconciliation")) return;
@@ -209,6 +241,10 @@ ShellRoot {
                     && smoke.host.startupLocked && smoke.host.session.unresolved && smoke.writes === 1,"EOF clears recovery")) return;
                 if(!smoke.check(smoke.watchdogTrips===(smoke.timeoutTrial?1:0)
                     && watchdog.activeCount===0,"exact deadline count and no idle timers"))return;
+                if(smoke.stagedTrial) {
+                    if (!smoke.check(smoke.commits === (smoke.stagedTrial === "EOF" ? 0 : 1),"staged commit count")) return;
+                    console.log("QUEUE_R3_STAGED_PASS // "+smoke.stagedTrial);
+                }
                 if(smoke.timeoutTrial)console.log("QUEUE_R3_WATCHDOG_PASS // delayed committed reply recovered, no replay");
                 console.log("QUEUE_R3_RECOVERY_PASS // actual canonical host, QML pane, durable lost QUEUE, inventory, lookup, EOF");
                 smoke.done = true;

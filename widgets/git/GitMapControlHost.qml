@@ -21,6 +21,7 @@ Item {
     property bool buildQueued: false
     property var locateAnchor: null
     property int jobsStarted: 0
+    property string observedHead: ""
     property string activeRepo: ""
     property var pendingResult: null
     property string pendingRepo: ""
@@ -50,6 +51,7 @@ Item {
         lookupQueued = true;
         buildQueued = false;
         locateAnchor = null;
+        observedHead = "";
         schedule();
     }
 
@@ -57,6 +59,23 @@ Item {
         if (operatorActive) {
             if (!pendingResult && !busy && !buildQueued) lookupQueued = true;
             schedule();
+        }
+    }
+    // A completed Git refresh after a pull/commit may expose a new HEAD.
+    // No polling, no repeated rebuild just because the status refreshes.
+    Connections {
+        target: root.topologyService
+        ignoreUnknownSignals: true
+        function onRefreshed() {
+            const service=root.topologyService;
+            if (!service || service.repoPath!==root.repoRoot || service.repoRoot!==root.repoRoot
+                    || !Policy.sha(String(service.headFull))) return;
+            const head=String(service.headFull);
+            if (root.observedHead && root.observedHead!==head && root.operatorActive) {
+                root.lookupQueued=true;
+                root.schedule();
+            }
+            root.observedHead=head;
         }
     }
     function schedule() { Qt.callLater(pump); }
@@ -170,6 +189,7 @@ Item {
         if (fullVisible && candidate.mapState
                 && candidate.mapState.snapshot === result.manifest.snapshot) {
             statusText = "INDEX CURRENT // POSITION RETAINED";
+            schedule();
             return;
         }
         pendingResult = result;
@@ -202,6 +222,7 @@ Item {
         pendingRepo="";
         allocated=true;
         statusText="INDEXED HISTORY // "+result.manifest.total+" COMMITS";
+        schedule();
         return true;
     }
 

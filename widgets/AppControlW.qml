@@ -563,6 +563,39 @@ PanelWindow {
     // NORMAL/HUNTER/filter change rebuilds the ranking while the model is blank.
     property var killTaskOrderIds: []
 
+    // Rebuild only when the stable order changes, not on every telemetry
+    // publication or search edit. Keep the final slot for duplicate IDs.
+    readonly property var killTaskOrderPositions: buildKillTaskOrderPositions(killTaskOrderIds)
+
+    function buildKillTaskOrderPositions(order) {
+        const positions = Object.create(null);
+        for (let i = 0; i < order.length; i++)
+            positions[String(order[i])] = i;
+        return positions;
+    }
+
+    function orderVisibleKillRows(rows, positions) {
+        // Compute identity and slot once per filtered row. Only fallback
+        // rows require PID conversion. Preserve stable ties and original
+        // objects: ScriptModel must still receive the same task identities.
+        const ranked = rows.map(function(entry) {
+            const id = String(entry.id || ("task:" + String(entry.pid || 0)));
+            const slot = positions[id];
+            return {entry: entry, slot: slot,
+                    pid: slot === undefined ? Number(entry.pid || 0) : 0};
+        });
+        ranked.sort(function(a, b) {
+            if (a.slot !== undefined && b.slot !== undefined)
+                return a.slot - b.slot;
+            if (a.slot !== undefined)
+                return -1;
+            if (b.slot !== undefined)
+                return 1;
+            return a.pid - b.pid;
+        });
+        return ranked.map(function(row) { return row.entry; });
+    }
+
     function killTaskVisibleForView(entry, viewMode) {
         if (!entry)
             return false;
@@ -8015,35 +8048,9 @@ PanelWindow {
                 }
             );
 
-            const order = appControlWindow.killTaskOrderIds;
-            const positions = ({});
-
-            for (let i = 0; i < order.length; i++)
-                positions[String(order[i])] = i;
-
-            rows.sort(function(a, b) {
-                const aId = String(
-                    a.id || ("task:" + String(a.pid || 0))
-                );
-                const bId = String(
-                    b.id || ("task:" + String(b.pid || 0))
-                );
-                const aKnown = positions[aId] !== undefined;
-                const bKnown = positions[bId] !== undefined;
-
-                if (aKnown && bKnown)
-                    return positions[aId] - positions[bId];
-                if (aKnown)
-                    return -1;
-                if (bKnown)
-                    return 1;
-
-                // Unknown rows are only possible for the tiny interval between
-                // telemetry publication and order extension.
-                return Number(a.pid || 0) - Number(b.pid || 0);
-            });
-
-            return rows;
+            return appControlWindow.orderVisibleKillRows(
+                rows, appControlWindow.killTaskOrderPositions
+            );
         }
     }
 

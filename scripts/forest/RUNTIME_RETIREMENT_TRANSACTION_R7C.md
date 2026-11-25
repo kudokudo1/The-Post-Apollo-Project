@@ -107,3 +107,117 @@ UI2: synthetic dormant selector remains independent; no actual catalog
 or plan until lifecycle and disclosure accepted. UI1 no mount or wire change.
 Nurse2F: exact R7c-a design and R7c-b scope review after owner agreement.
 No executable change, schema, writer, host mutation or production approval.
+
+
+## Revision 1 proposal // exact mapping and transaction owner intake
+
+Post-merge main b57277b1, R7b #2778 and R7c-a #2785 merged.
+Nurse #7169709860 design ACCEPT / R7c-b HOLD; Mind #7169647526
+REVISE; Security #7169646591 design ACCEPT. This resolves the questions
+for review, NOT authorization to create a schema, implement or execute.
+
+### Named ownership and minimal candidate record
+
+Runtime proposes ownership of one canonical task lifecycle mapping
+inside the existing B1/B3 SQLite transaction domain, with Mind owning
+the existing session/turn lineage and transaction compatibility.
+This is a proposed extension to the owner-controlled journal, not a
+separate DB, task service, event log or second active-slot authority.
+No existing canonical durable mapping was found in the inspected Forest
+B1/B3/R3/R5 sources. B1 remains the only conversation truth. Actual
+production store/custodian is not established; first candidate is a
+disposable journal only. Security owns effect authorization/receipt
+semantics, not a Runtime-minted grant.
+
+Proposed record semantics for the first scope (names illustrative):
+- immutable task identity: principal, Tree, task, execution context,
+  generation, origin, base-Tree (Clone absent); independently resolved,
+  not user-provided alias. Exact B1 session identity links continuity.
+  Require a unique task identity and unique session association for the
+  limited one-task fixture; no assumption all future Tasks use one
+  session. Never use session title or conversation revision as task ID.
+- separate positive lifecycle revision and lifecycle state
+  ACTIVE / RETIREMENT_PENDING / WINTER. For the first one-slot fixture
+  the active claim is derived from ACTIVE or RETIREMENT_PENDING in the
+  same record (pending retains claim); WINTER releases it. No second
+  mutable active flag or active-slot row that can contradict this state.
+  Explicit original slot scope and exclusivity constraint required.
+- pinned continuity session revision and exact last B3 attempt/turn/
+  operation + retained H11 binding/settings identity; independent
+  currentness and effect identity checked on every transition.
+- one immutable original retirement effect ID, original lifecycle
+  revision and disposition retained through pending and WINTER. The
+  same owner transaction records its committed outcome; lost ACK reads
+  that exact outcome, no new effect or rewrite. A future Spring claim
+  must preserve this receipt rather than overwrite it; not in scope.
+  No raw metadata/digest publication or actual authenticated receipt
+  inferred from fixture values.
+
+No storage format, DDL, migration, production path or positive
+permission frozen here. Ask Mind/Security/Heart to agree record and
+transaction semantics and the exact first fixture boundary below.
+
+### Writer inventory and proposed ordering
+
+B1 d1533f15: create_session, append_turn, set_state, _write. B3
+c5dbbc29: _reserve, _commit, _abort, _commit_fenced, exchange;
+M2 1085bc56: snapshot_in_transaction. R5 7dba584a owns fixture
+connection, create_session, append_turn, advance and reopen; R6 wraps
+R5 and is fixed public. B4a 5948497e generate calls bridge.exchange;
+B5b 1b21eb72 is a disposable FD HOLD candidate, not a lifecycle writer.
+These are existing entry points, not an exhaustive proof of installed
+writer exclusion. Actual create/append/reserve/resume/activation and
+provider dispatch must all use the same authoritative lifecycle fence
+before a real retirement can be accepted. Existing B1/B3 direct calls
+have no such fence and can bypass an outer wrapper; do not claim safety
+from one new retirement API. B1 PAUSED omitted per Mind.
+
+Pending intent must serialize against new work. Existing admitted
+attempt settlement remains allowed only for the exact retained attempt,
+not every RESERVED row; a reservation alone is not authorized dispatch.
+If send status is ambiguous, preserve pending HOLD. Do not let a
+previously reserved but unadmitted request start after freeze. Terminal
+writer must not be blocked merely by pending state, nor permit
+replacement context. Currentness/fence check in actual write domain,
+not a stale pre-read. For a writer transaction, recheck exact metadata
+and B4d lineage in that transaction; do not call R7b by disabling
+query_only or nesting its caller-held read transaction. A shared
+metadata predicate refactor would need explicit review.
+
+### Proposed smallest R7c-b executable scope for Nurse decision
+
+One fixed-public base-CHERRY task and one already committed B3
+attempt, no active model or provider; existing disposable B1/B3
+connection and owner-selected fixture-only mapping/record. No actual
+freeze of running inference, restoration, protected authority, R6 wire
+or installed writer change. Use explicit owner-approved synthetic
+record extension on the same database ONLY if all owners agree.
+Transaction witness must prove compare-and-set against original
+lifecycle revision, exact session/revision and last committed attempt,
+pending effect identity, five separate fixture references and no
+competing RESERVED. Freeze candidate (pending) and terminal dormant
+commit are separate explicit effects; final dormant transition and
+active claim release/outcome atomic, no mutation of B1/B3 rows.
+Unknown stays pending and fenced within the witness.
+
+Because current direct B1/B3 writers lack a lifecycle fence, either
+agree separately scoped integration of their actual checks first or
+limit this witness to the owner-exclusive disposable transaction
+domain and explicitly demonstrate that the current unrestricted
+direct paths remain an integration blocker. No claim that the
+witness enforces actual append/reserve/resume globally. Do not
+silently substitute wrapper-only checks for real enforcement.
+Two candidate retirement intents must serialize against one original
+lifecycle revision; fail before write/rollback and lost ACK after
+commit/reopen must preserve exactly one outcome and original turns.
+No automatic retry/activate. Use metadata-only checks, SQL authorizer
+or equivalent audit of no body/title access during retirement, exact
+unchanged conversation rows and independent read-only recovery.
+All actual authority/action/release flags remain false.
+
+Request Mind/Security/Heart ACCEPT or REVISE this exact proposed
+ownership, record, writer-path limitation and scope, followed by
+Nurse exact R7c-b decision. If no mapping owner or exclusive fixture
+transaction custody can be agreed, HOLD. Real writer integration,
+actual live freeze/settlement, protected producer and dormant
+publication remain separate later scope.

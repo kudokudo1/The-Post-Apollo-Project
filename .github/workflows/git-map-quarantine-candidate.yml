@@ -1,0 +1,21 @@
+name: Git map V2 reversible quarantine
+on:
+  pull_request:
+    paths:
+      - "scripts/git_map_quarantine_candidate.py"
+      - "scripts/git_map_isolated_candidate.py"
+      - "tests/git/test_git_map_quarantine_candidate.py"
+      - ".github/workflows/git-map-quarantine-candidate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quarantine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disposable V2 quarantine qualification
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/git/test_git_map_quarantine_candidate.py

@@ -33,13 +33,13 @@ def _body(value):
         raise ContextRefusal("INVALID_HOT_TEXT")
     if any(ord(c) < 32 and c not in "\n\t" or 0x7f <= ord(c) <= 0x9f
            or 0x202a <= ord(c) <= 0x202e or 0x2066 <= ord(c) <= 0x2069
+           or 0xd800 <= ord(c) <= 0xdfff
            for c in value):
         raise ContextRefusal("INVALID_HOT_TEXT")
-    try:
-        if len(value.encode("utf-8")) > MAX_RECORD_BYTES:
-            raise ContextRefusal("INVALID_HOT_TEXT")
-    except UnicodeError as exc:
-        raise ContextRefusal("INVALID_HOT_TEXT") from exc
+    # Surrogates are rejected above, before encoding. Never attach a
+    # UnicodeEncodeError containing the rejected body to a refusal.
+    if len(value.encode("utf-8")) > MAX_RECORD_BYTES:
+        raise ContextRefusal("INVALID_HOT_TEXT")
 
 
 @dataclass(frozen=True, slots=True)

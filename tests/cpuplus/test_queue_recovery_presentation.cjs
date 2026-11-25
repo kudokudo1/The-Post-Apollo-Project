@@ -25,6 +25,37 @@ assert.match(c.gate({...host,unresolved:true}),/OUTCOME UNKNOWN/);
 assert.match(c.gate(null),/LOCKED/);
 assert.match(c.gate({...host,phase:"FAILED"}),/FAILED/);
 const ui=fs.readFileSync(path.join(dir,"CpuPlusQueueRecoveryPane.qml"),"utf8");
-assert.doesNotMatch(ui,/\b(?:Process|Timer|ActionButton|MemoryOperation|execDetached)\b/);
+assert.doesNotMatch(ui,/\b(?:Process|Timer|MemoryOperation|execDetached)\b/);
 assert.match(ui,/ADJUSTMENT OUTCOME \/\/ UNVERIFIED/);
 console.log("CPU++ recovery presentation contract PASS");
+
+const ctx={hostStatus:host,inventory:packet,localAction:null,recoveryPending:false};
+assert.equal(c.context(ctx).inventory.recent.length,2);
+assert.equal(c.canRead(ctx,true),true); // reads while startup locked
+assert.equal(c.canRead(ctx,false),false);
+const unknown={...host,unresolved:true};
+const local={actionId:A,record:committed,outcome:"UNVERIFIED",canExecute:false};
+const lookup={hostStatus:unknown,inventory:null,localAction:local,recoveryPending:false};
+assert.equal(c.context(lookup).localAction.record.resultId,R);
+assert.equal(c.canRead(lookup,true),true);
+assert.equal(c.context({...lookup,localAction:{...local,record:null}}).localAction.missing,true);
+for(const bad of [
+    {...lookup,inventory:packet},
+    {...lookup,localAction:{...local,actionId:B}},
+    {...lookup,localAction:{...local,canExecute:true}},
+    {...lookup,hostStatus:{...unknown,phase:"FAILED"}},
+    {...lookup,hostStatus:{...unknown,actionPending:true}},
+    {...lookup,recoveryPending:true}
+]) assert.equal(c.context(bad),null);
+const pending={hostStatus:{...unknown,historyPending:true},inventory:null,localAction:null,recoveryPending:true};
+assert.equal(c.context(pending).readPending,true);
+assert.equal(c.canRead(pending,true),false);
+assert.equal(c.context({...pending,inventory:packet}),null);
+const stopped={hostStatus:{...unknown,phase:"STOPPED"},inventory:null,localAction:null,recoveryPending:false};
+assert.equal(c.context(stopped).localAction,null);
+assert.equal(c.canRead(stopped,true),false);
+assert.equal(c.context(null),null);
+assert.match(ui,/atomicMode \? \(snapshot \? snapshot.inventory : null\) : Recovery.project\(inventory\)/);
+assert.match(ui,/recoveryReadRequested\(kind,value\)/);
+assert.match(ui,/NO RECORD REPORTED \/\/ NOT PROOF OF NONCOMMIT/);
+console.log("CPU++ canonical recovery context presentation PASS");

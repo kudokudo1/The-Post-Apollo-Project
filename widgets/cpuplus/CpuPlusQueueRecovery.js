@@ -70,3 +70,39 @@ function gate(host) {
     if(host.historyPending)return "HISTORY READ PENDING";
     return "HOST REPORTED // SEPARATE REQUEST VALIDATION REQUIRED";
 }
+
+// Canonical host #2621 publishes these four fields as one immutable snapshot.
+// Correlation, owner identity and sequence are enforced by the host, not here.
+function context(value) {
+    if(!exact(value,["hostStatus","inventory","localAction","recoveryPending"])
+        ||typeof value.recoveryPending!=="boolean")return null;
+    const host=value.hostStatus;
+    if(!exact(host,["phase","startupLocked","historyPending","actionPending","unresolved"])
+        ||!["STOPPED","HELLO","CONNECTED","FAILED"].includes(host.phase)
+        ||!["startupLocked","historyPending","actionPending","unresolved"].every(k=>typeof host[k]==="boolean"))
+        return null;
+    if(value.recoveryPending&&!host.historyPending)return null;
+    const busy=host.historyPending||host.actionPending||value.recoveryPending;
+    if(host.phase!=="CONNECTED"||busy) {
+        if(value.inventory!==null||value.localAction!==null)return null;
+        return {host,inventory:null,localAction:null,readPending:value.recoveryPending};
+    }
+    if(value.inventory!==null&&value.localAction!==null)return null;
+    const inventory=value.inventory===null?null:project(value.inventory);
+    if(value.inventory!==null&&!inventory)return null;
+    let localAction=null;
+    if(value.localAction!==null) {
+        const raw=value.localAction;
+        if(!exact(raw,["actionId","record","outcome","canExecute"])||!uuid(raw.actionId)
+            ||raw.outcome!=="UNVERIFIED"||raw.canExecute!==false)return null;
+        const record=raw.record===null?null:row(raw.record);
+        if(raw.record!==null&&(!record||record.actionId!==raw.actionId))return null;
+        localAction={actionId:raw.actionId,record,missing:record===null};
+    }
+    return {host,inventory,localAction,readPending:false};
+}
+function canRead(value,hostAvailable) {
+    const v=context(value);
+    return !!(hostAvailable===true&&v&&v.host.phase==="CONNECTED"
+        &&!v.host.historyPending&&!v.host.actionPending&&!v.readPending);
+}

@@ -69,6 +69,21 @@ with tempfile.TemporaryDirectory(prefix="financew-m3c-view-") as temp:
         assert plan["savesToActual"] is False
         assert plan["estimatedAvailableAfterCents"]==6250
 
+        # New M3d5a UI review must match the offline financial fields but
+        # may NEVER emit a Save request, permit, action or request ID.
+        invoke(pane,"reviewForSave")
+        review=value(pane,"saveReview")
+        assert review["ok"] is True,review
+        assert review["canSave"] is False
+        assert review["writeAllowed"] is False
+        fields=review["previewFields"]
+        assert fields["categoryId"]=="groceries"
+        assert fields["expectedCategoryAvailableCents"]==7500
+        assert fields["amountCents"]==-1250
+        assert "requestId" not in fields
+        assert "action" not in fields
+        assert value(root,"savedCount")==0
+
         # Calling existing CONFIRM SAVE directly must not bypass the UI.
         setprop(draft,"reviewed",True)
         invoke(draft,"requestCommit")

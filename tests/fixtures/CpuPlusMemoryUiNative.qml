@@ -167,7 +167,21 @@ ShellRoot {
                     console.log("CPU_M11D_INSTRUMENT_PASS // inset gauge and info popup");
                     const savedSample=pane.sample;
                     const originalCard=card;
-                    pane.setScanMode("STOPPED");
+                    pane.scanDiagnosticsOpen=true;
+                    const transport=smoke.find(pane,"cpuplusScanPlayPause");
+                    const stop=smoke.find(pane,"cpuplusScanStop");
+                    const freq=smoke.find(pane,"cpuplusScanFrequencySlider");
+                    if(!smoke.check(transport&&stop&&freq&&transport.width===28&&stop.width===28
+                        &&freq.horizontalStep&&String(freq.valueFillColor).toLowerCase()==="#00f782"
+                        &&String(freq.handleGlowColor).toLowerCase()===String(freq.handleColor).toLowerCase(),
+                        "compact transport and white/green frequency slider"))return;
+                    transport.leftClicked(null);
+                    if(!smoke.check(pane.scanMode==="PAUSED"&&pane.scanBadge==="PAUSED","transport pauses"))return;
+                    stop.leftClicked(null);
+                    if(!smoke.check(stop.selected&&String(stop.fillColor).toLowerCase()===String(stop.pressedFillColor).toLowerCase()
+                        &&String(stop.foregroundColor).toLowerCase()===String(stop.pressedForegroundColor).toLowerCase(),
+                        "manual stop retains pressed state"))return;
+                    pane.scanDiagnosticsOpen=false;
                     if(!smoke.check(pane.sample===null&&pane.displaySample===savedSample&&pane.scanBadge==="MANUAL"
                         &&smoke.find(ramView,"cpuplusRamMetricCard")===originalCard,"stop preserves display, invalidates operation input"))return;
                     pane.setScanInterval(15);

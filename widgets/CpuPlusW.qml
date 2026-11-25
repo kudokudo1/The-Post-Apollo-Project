@@ -547,7 +547,9 @@ PanelWindow {
         : modes[selectedModeIndex].name
     readonly property bool showCpuObservation: selectedModeIndex<=3
     readonly property color cpuHeaderColor: !showCpuObservation ? internetStatusColor : (cpuHeaderStatus==="OBSERVED" || cpuHeaderStatus.startsWith("LIVE")) ? Colors.omnitrix
-        : cpuHeaderStatus==="UNAVAILABLE" ? Colors.orange : Colors.cyan
+        : cpuHeaderStatus==="PAUSED" ? Colors.yellow
+        : cpuHeaderStatus==="MANUAL" ? Colors.red
+        : cpuHeaderStatus==="UNAVAILABLE" || cpuHeaderStatus.startsWith("STALE") ? Colors.orange : Colors.cyan
     function refreshCpuMenu() {
         refreshSharedMonitors();
         if(activeMemoryPane) activeMemoryPane.refresh();

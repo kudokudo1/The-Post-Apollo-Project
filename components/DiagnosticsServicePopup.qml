@@ -17,6 +17,10 @@ Rectangle {
     property string reasonHeading: "REASON // CURRENT ROUTING"
     property string footnote: "READ ONLY // NO EXTRA FETCHES FROM THIS PANEL."
     property string ageHeading: "LAST PROVIDER SUCCESS // "
+    // Opt-in host accessory under the canonical pinned title/close row.
+    property Component headerAccessory: null
+    property color liveReadyColor: Colors.cyan
+    property color manualStateColor: Colors.cyan
 
     // A deferred gutter update avoids a binding cycle:
     // column width -> wrapped height -> scrollbar visibility -> column width.
@@ -74,11 +78,13 @@ Rectangle {
 
     function statusColor(state) {
         const value = String(state || "").toUpperCase();
-        if (value === "LIVE" || value === "READY") return Colors.cyan;
+        if (value === "LIVE" || value === "READY") return diagnosticsPane.liveReadyColor;
+        if (value === "PAUSED") return Colors.yellow;
+        if (value === "MANUAL") return diagnosticsPane.manualStateColor;
         if (value === "READING") return Colors.orange;
         if (value === "CACHE" || value === "FALLBACK") return Colors.yellow;
         if (value === "CACHE STALE" || value === "FALLBACK STALE") return Colors.orange;
-        if (value === "SNAPSHOT" || value === "MANUAL" || value === "LOCAL")
+        if (value === "SNAPSHOT" || value === "LOCAL")
             return Colors.cyan;
         if (value === "IDLE" || value === "WAITING"
                 || value === "NO SELECTED PLACE" || value === "NO FEED")
@@ -97,7 +103,7 @@ Rectangle {
         anchors.topMargin: 8
         anchors.leftMargin: 12
         anchors.rightMargin: 12
-        height: 49
+        height: 49 + (accessoryLoader.active ? accessoryLoader.height + 6 : 0)
 
         Row {
             id: diagnosticsHeaderRow
@@ -123,9 +129,19 @@ Rectangle {
             }
         }
 
+        Loader {
+            id: accessoryLoader
+            anchors.top: diagnosticsHeaderRow.bottom
+            anchors.topMargin: active ? 6 : 0
+            width: parent.width
+            active: diagnosticsPane.headerAccessory !== null
+            sourceComponent: diagnosticsPane.headerAccessory
+            height: active && item ? item.implicitHeight : 0
+        }
+
         Rectangle {
             id: diagnosticsPinnedDivider
-            anchors.top: diagnosticsHeaderRow.bottom
+            anchors.top: accessoryLoader.bottom
             anchors.topMargin: 8
             anchors.left: parent.left
             anchors.right: parent.right

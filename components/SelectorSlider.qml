@@ -8,6 +8,8 @@ Rectangle {
     property int count: 0
     property int currentIndex: -1
     property color accentColor: Colors.cyan
+    // Optional numeric fill ink; existing controls inherit their original accent.
+    property color valueFillColor: accentColor
     property color handleColor: Colors.white
     // Opt-in palette only: Git/Hospital and every existing consumer keep
     // their white hardware thumb and current interaction behavior.
@@ -571,7 +573,7 @@ Rectangle {
                     thumb.y + thumb.height / 2))
                 height: Math.max(0, slot.height - y)
                 radius: 2
-                color: slider.accentColor
+                color: slider.valueFillColor
                 opacity: slider.enabledSlider ? 0.72 : 0.20
             }
 

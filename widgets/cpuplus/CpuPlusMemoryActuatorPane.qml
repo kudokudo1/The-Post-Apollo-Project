@@ -1424,95 +1424,150 @@ Item {
         color: "#110319"
         border.color: Colors.magenta
         MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
-        Column {
-            id: scanControls
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: 5
-            spacing: 3
-            Row {
-                width: parent.width
-                height: 30
-                spacing: 5
-                ActionButton {
-                    objectName: "cpuplusScanPlayPause"
-                    width: 42
-                    height: parent.height
-                    label: root.scanLive?"Ⅱ":"▶"
-                    accentColor: Colors.white
-                    selected: root.scanLive
-                    Accessible.name: root.scanLive?"Pause automatic scans":"Play automatic scans"
-                    acceptedButtons: Qt.LeftButton
-                    onLeftClicked: root.setScanMode(root.scanLive?"PAUSED":"LIVE")
-                }
-                ActionButton {
-                    objectName: "cpuplusScanStop"
-                    width: 42
-                    height: parent.height
-                    label: "■"
-                    accentColor: Colors.red
-                    selected: root.scanMode==="STOPPED"
-                    idleForegroundColor: Colors.red
-                    selectedForegroundColor: Colors.red
-                    selectedBorderColor: Colors.red
-                    selectedContentGlowColor: Colors.red
-                    selectedFillColor: Colors.black
-                    Accessible.name: "Stop automatic scans; reload manually"
-                    acceptedButtons: Qt.LeftButton
-                    onLeftClicked: root.setScanMode("STOPPED")
-                }
-                CpuPlusMemoryReadout {
-                    width: Math.max(0,parent.width-94)
-                    height: parent.height
-                    text: root.scanBadge
-                    color: root.scanLive?Colors.white:Colors.orange
-                    font.pixelSize: 11
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
-            CpuPlusMemoryReadout {
-                width: parent.width
-                text: "SCAN INTERVAL // "+root.scanIntervalSeconds+" s"
-                color: Colors.white
-                font.pixelSize: 11
-            }
-            Item {
-                width: parent.width
-                height: 46
-                SelectorSlider {
-                    objectName: "cpuplusScanFrequencySlider"
-                    anchors.centerIn: parent
-                    width: 44
-                    height: parent.width
-                    rotation: 90
-                    horizontalStepPresentation: true
-                    selectorProfile: "step"
-                    minimumValue: 5
-                    maximumValue: 60
-                    valueStep: 5
-                    valueDecimals: 0
-                    valueSuffix: "s"
-                    currentValue: root.scanIntervalSeconds
-                    enabledSlider: true
-                    accentColor: Colors.white
-                    handleColor: Colors.white
-                    handleGradientBaseColor: Colors.white
-                    handleGradientAccentColor: Colors.white
-                    handleGlowColor: Colors.white
-                    activityGlowColor: Colors.white
-                    onValueRequested: value=>root.setScanInterval(value)
-                }
-            }
-        }
         DiagnosticsServicePopup {
-            anchors.top: scanControls.bottom
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
+            id: scanReportPopup
+            anchors.fill: parent
             anchors.margins: 4
             heading: "MEMORY // SCAN DIAGNOSTICS"
-            displayedState: root.status==="READING"?"READING":!root.scanLive?(root.scanMode==="STOPPED"?"MANUAL":"IDLE"):root.status==="OBSERVED"?"LIVE":root.lastGoodSample?"CACHE STALE":"WAITING"
+            liveReadyColor: Colors.omnitrix
+            manualStateColor: Colors.red
+            headerAccessory: Component {
+                Column {
+                    id: scanControls
+                    objectName: "cpuplusScanControls"
+                    spacing: 3
+                    CpuPlusMemoryReadout {
+                        width: parent.width
+                        text: "SCAN INTERVAL // "+root.scanIntervalSeconds+" s"
+                        color: Colors.white
+                        font.pixelSize: 11
+                    }
+                    Row {
+                        width: parent.width
+                        height: 36
+                        spacing: 5
+                        ActionButton {
+                            objectName: "cpuplusScanPlayPause"
+                            width: 28
+                            height: 28
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: root.scanLive?"Ⅱ":"▶"
+                            labelPixelSize: 21
+                            contentPadding: 1
+                            accentColor: Colors.omnitrix
+                            selected: root.scanLive
+                            idleForegroundColor: Colors.omnitrix
+                            hoverForegroundColor: Colors.omnitrix
+                            pressedForegroundColor: Colors.black
+                            selectedForegroundColor: Colors.black
+                            idleBorderColor: Colors.omnitrix
+                            hoverBorderColor: Colors.omnitrix
+                            pressedBorderColor: Colors.black
+                            selectedBorderColor: Colors.black
+                            hoverFillColor: Colors.yellow
+                            pressedFillColor: Colors.omnitrix
+                            selectedFillColor: Colors.omnitrix
+                            idleContentGlowColor: Colors.omnitrix
+                            hoverContentGlowColor: Colors.omnitrix
+                            pressedContentGlowColor: Colors.omnitrix
+                            selectedContentGlowColor: Colors.omnitrix
+                            idleSoftGlowColor: Colors.omnitrix
+                            hoverSoftGlowColor: Colors.omnitrix
+                            pressedSoftGlowColor: Colors.omnitrix
+                            selectedSoftGlowColor: Colors.omnitrix
+                            contentGlowIdleOpacity: 0.72
+                            contentGlowSelectedOpacity: 1.0
+                            softGlowIdleOpacity: 0.48
+                            softGlowSelectedOpacity: 1.0
+                            wideGlowEnabled: true
+                            idleWideGlowColor: Colors.omnitrix
+                            hoverWideGlowColor: Colors.omnitrix
+                            pressedWideGlowColor: Colors.omnitrix
+                            selectedWideGlowColor: Colors.omnitrix
+                            Accessible.name: root.scanLive?"Pause automatic scans":"Play automatic scans"
+                            acceptedButtons: Qt.LeftButton
+                            keyboardActivationSignal: "leftClicked"
+                            onLeftClicked: root.setScanMode(root.scanLive?"PAUSED":"LIVE")
+                        }
+                        ActionButton {
+                            objectName: "cpuplusScanStop"
+                            width: 28
+                            height: 28
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: "■"
+                            labelPixelSize: 22
+                            contentPadding: 1
+                            accentColor: Colors.red
+                            selected: root.scanMode==="STOPPED"
+                            idleForegroundColor: Colors.red
+                            hoverForegroundColor: Colors.red
+                            pressedForegroundColor: Colors.black
+                            selectedForegroundColor: Colors.black
+                            idleBorderColor: Colors.red
+                            hoverBorderColor: Colors.red
+                            pressedBorderColor: Colors.black
+                            selectedBorderColor: Colors.black
+                            hoverFillColor: Colors.yellow
+                            pressedFillColor: Colors.red
+                            selectedFillColor: Colors.red
+                            idleContentGlowColor: Colors.red
+                            hoverContentGlowColor: Colors.red
+                            pressedContentGlowColor: Colors.red
+                            selectedContentGlowColor: Colors.red
+                            idleSoftGlowColor: Colors.red
+                            hoverSoftGlowColor: Colors.red
+                            pressedSoftGlowColor: Colors.red
+                            selectedSoftGlowColor: Colors.red
+                            contentGlowIdleOpacity: 0.72
+                            contentGlowPressedOpacity: 1.0
+                            contentGlowSelectedOpacity: 1.0
+                            softGlowIdleOpacity: 0.48
+                            softGlowPressedOpacity: 1.0
+                            softGlowSelectedOpacity: 1.0
+                            wideGlowEnabled: true
+                            idleWideGlowColor: Colors.red
+                            hoverWideGlowColor: Colors.red
+                            pressedWideGlowColor: Colors.red
+                            selectedWideGlowColor: Colors.red
+                            wideGlowPressedOpacity: 1.0
+                            wideGlowSelectedOpacity: 1.0
+                            Accessible.name: "Stop automatic scans; reload manually"
+                            acceptedButtons: Qt.LeftButton
+                            keyboardActivationSignal: "leftClicked"
+                            onLeftClicked: root.setScanMode("STOPPED")
+                        }
+                        Item {
+                            width: Math.max(0,parent.width-66)
+                            height: parent.height
+                            SelectorSlider {
+                                objectName: "cpuplusScanFrequencySlider"
+                                anchors.centerIn: parent
+                                width: 32
+                                height: parent.width
+                                rotation: 90
+                                horizontalStepPresentation: true
+                                selectorProfile: "step"
+                                minimumValue: 5
+                                maximumValue: 60
+                                valueStep: 5
+                                valueDecimals: 0
+                                valueSuffix: "s"
+                                currentValue: root.scanIntervalSeconds
+                                enabledSlider: true
+                                accentColor: Colors.white
+                                valueFillColor: Colors.omnitrix
+                                handleColor: Colors.white
+                                handleGradientBaseColor: Colors.white
+                                handleGradientAccentColor: Colors.white
+                                handleGlowColor: Colors.white
+                                activityGlowColor: Colors.white
+                                onValueRequested: value=>root.setScanInterval(value)
+                            }
+                        }
+                    }
+                }
+            }
+            displayedState: root.status==="READING"?"READING":!root.scanLive?(root.scanMode==="STOPPED"?"MANUAL":"PAUSED"):root.status==="OBSERVED"?"LIVE":root.lastGoodSample?"CACHE STALE":"WAITING"
             providerLabel: "LOCAL LINUX // PROCFS"
             currentAge: root.scanLastSuccessMs ? Math.max(0,Math.floor((root.scanClockMs-root.scanLastSuccessMs)/1000))+"s" : "--"
             showLocation: false

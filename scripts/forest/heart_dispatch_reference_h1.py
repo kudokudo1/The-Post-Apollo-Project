@@ -90,9 +90,10 @@ class DispatchSnapshot:
             raise DispatchRefusal("REQUIREMENT_REQUEST_MISMATCH")
 
 
-def _evaluate(s):
+def _validate_binding_settings(b, settings):
+    if type(b) is not BindingResult or type(settings) is not TransportSettings:
+        raise DispatchRefusal("INVALID_BINDING_REFERENCE")
     try:
-        b = s.binding
         preserve_binding(b, b.recommendation, b.registry,
                          required_features=b.required_features, evidence=b.evidence)
     except (BindingRefusal, AttributeError, TypeError):
@@ -107,15 +108,43 @@ def _evaluate(s):
         raise DispatchRefusal("EXPLICIT_FORM_REQUIRED")
     if "chat" not in b.required_features:
         raise DispatchRefusal("CHAT_CAPABILITY_REQUIRED")
-    if (s.settings.model != b.binding.identity.model_name
-            or s.settings.num_ctx != b.binding.context_tokens
-            or s.settings.max_predict != b.binding.output_tokens
-            or s.settings.config_digest != b.binding.config_digest):
+    if (settings.model != b.binding.identity.model_name
+            or settings.num_ctx != b.binding.context_tokens
+            or settings.max_predict != b.binding.output_tokens
+            or settings.config_digest != b.binding.config_digest):
         raise DispatchRefusal("TRANSPORT_BINDING_MISMATCH")
-    if (s.request.task_id, s.request.execution_context_id,
-        s.request.model_form, s.request.reasoning_mode) != (
-            context.task_id, context.execution_context_id,
-            b.binding.form, b.recommendation.original.reasoning.mode):
+    return context
+
+
+def prepare_resource_request(binding, settings, *, priority, source,
+                             reasons=(), may_defer=True):
+    """Recover frozen-turn preparation using existing I2/I1/B6 and P1.
+
+    Caller supplies policy; no model selection, IO or grant. Use the exact
+    returned object for its ResourceRequirement and retain binding/settings
+    in DispatchSnapshot. A P1 request alone does not identify a turn.
+    """
+    context = _validate_binding_settings(binding, settings)
+    try:
+        return ResourceRequest(
+            task_id=context.task_id,
+            execution_context_id=context.execution_context_id,
+            model_form=binding.binding.form,
+            reasoning_mode=binding.recommendation.original.reasoning.mode,
+            priority=priority, source=source, reasons=reasons,
+            may_defer=may_defer,
+        )
+    except ResourcePolicyRefusal:
+        raise DispatchRefusal("INVALID_RESOURCE_REFERENCE") from None
+
+
+def _evaluate(s):
+    expected = prepare_resource_request(
+        s.binding, s.settings, priority=s.request.priority,
+        source=s.request.source, reasons=s.request.reasons,
+        may_defer=s.request.may_defer,
+    )
+    if expected != s.request:
         raise DispatchRefusal("RESOURCE_SCOPE_MISMATCH")
     # P1 allows unset ceilings and incremental zero. The first-Tree
     # candidate deliberately requires explicit ceilings and positive

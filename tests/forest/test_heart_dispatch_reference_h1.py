@@ -157,3 +157,75 @@ class DispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(H.DispatchRefusal, "REQUIREMENT_REQUEST_MISMATCH"):
             replace(s, requirement=replace(s.requirement, request=replace(s.request)))
         self.assertEqual(H.compare_dispatch({}, s, now_ns=300)["reason"], "INVALID_SNAPSHOT")
+
+
+class RecoveredPreparationTests(unittest.TestCase):
+    def test_frozen_scope_and_explicit_policy(self):
+        for form in ("small", "big"):
+            s = fixture(form=form)
+            request = H.prepare_resource_request(
+                s.binding, s.settings, priority="background", source="operator-policy",
+                reasons=("bounded example",), may_defer=False)
+            self.assertEqual((request.task_id, request.execution_context_id,
+                              request.model_form, request.reasoning_mode),
+                             ("task", "execution", form, "normal"))
+            self.assertEqual((request.priority, request.source, request.reasons,
+                              request.may_defer),
+                             ("background", "operator-policy", ("bounded example",), False))
+            prepared = replace(s, request=request,
+                               requirement=replace(s.requirement, request=request))
+            result = H.compare_dispatch(prepared, replace(prepared, captured_ns=200), now_ns=300)
+            self.assertEqual(result["reason"], "REFERENCE_MATCH_AUTHORITY_HOLD")
+            self.assertFalse(result["safe_to_start_inference"])
+
+    def test_reasoning_and_task_derived_not_inferred(self):
+        s = fixture()
+        scope = R.TurnScope(replace(s.binding.recommendation.original.scope.context,
+                                    task_id="different-task", execution_context_id="different-execution"),
+                            "another-turn")
+        rec = R.recommend(R.RoutingInput(scope, "small", R.ReasoningReference(scope, "deep", "explicit")))
+        evidence = replace(s.binding.evidence, scope=scope)
+        b = B.resolve_reference(rec, s.binding.registry, required_features=("chat",), evidence=evidence)
+        req = H.prepare_resource_request(b, s.settings, priority="standard", source="heart")
+        self.assertEqual((req.task_id, req.execution_context_id, req.reasoning_mode),
+                         ("different-task", "different-execution", "deep"))
+
+    def test_unresolved_forged_and_unsupported_references(self):
+        s = fixture()
+        unresolved = B.resolve_reference(s.binding.recommendation, s.binding.registry,
+                                          required_features=("chat",))
+        for b, reason in (
+            (unresolved, "MODEL_BINDING_UNRESOLVED"),
+            (replace(s.binding, reason="FORGED"), "INVALID_BINDING_REFERENCE"),
+            (fixture(form="auto").binding, "EXPLICIT_FORM_REQUIRED"),
+            (fixture(clone="clone").binding, "FIRST_TREE_SCOPE_UNSUPPORTED"),
+            (fixture(origin="BACKGROUND").binding, "FIRST_TREE_SCOPE_UNSUPPORTED"),
+            (fixture(features=()).binding, "CHAT_CAPABILITY_REQUIRED"),
+            ({}, "INVALID_BINDING_REFERENCE"),
+        ):
+            with self.subTest(reason=reason), self.assertRaisesRegex(H.DispatchRefusal, reason):
+                H.prepare_resource_request(b, s.settings, priority="interactive", source="heart")
+
+    def test_changed_transport_rejected(self):
+        s = fixture()
+        for settings in (replace(s.settings, model="other:latest"),
+                         replace(s.settings, num_ctx=4096),
+                         replace(s.settings, max_predict=256)):
+            with self.assertRaisesRegex(H.DispatchRefusal, "TRANSPORT_BINDING_MISMATCH"):
+                H.prepare_resource_request(s.binding, settings, priority="interactive", source="heart")
+
+    def test_explicit_policy_validation(self):
+        s = fixture()
+        for changes in ({"priority": "urgent"}, {"source": ""}, {"may_defer": 1},
+                        {"reasons": ["not immutable"]}):
+            kwargs = {"priority": "standard", "source": "heart", **changes}
+            with self.assertRaisesRegex(H.DispatchRefusal, "INVALID_RESOURCE_REFERENCE"):
+                H.prepare_resource_request(s.binding, s.settings, **kwargs)
+
+    def test_requirement_must_use_same_prepared_object(self):
+        s = fixture()
+        req = H.prepare_resource_request(s.binding, s.settings, priority="interactive", source="heart")
+        self.assertEqual(req, s.request)
+        self.assertIsNot(req, s.request)
+        with self.assertRaisesRegex(H.DispatchRefusal, "REQUIREMENT_REQUEST_MISMATCH"):
+            replace(s, request=req)

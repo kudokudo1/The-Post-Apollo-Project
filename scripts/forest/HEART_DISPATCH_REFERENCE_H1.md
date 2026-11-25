@@ -53,3 +53,27 @@ independently review. Actual host-owned current resource observation,
 safe conservative limits, one-in-flight custody, dispatch fence and
 terminal resource-release evidence remain necessary. No new issuer, DB,
 or substitute trust authority. No production or private access.
+
+
+## H7 // Original Forest recovery: frozen resource request preparation
+
+Recover the mechanism in original Bristlecone
+[resources/request_preparation.py](https://github.com/kudokudo1/The-Post-Apollo-Forest-Project/blob/28895aafdddb07cf402f1e75574eea1ee79a516d/raw-import/2026-09-22-transfer/The-Forest/bristlecone/resources/request_preparation.py)
+(blob 3e7d3f46293b428046249da6d1306c5c3e0218c3). Its frozen form,
+reasoning and context are now the already-integrated I2/I1/B6 references.
+H7 adds `prepare_resource_request(binding, settings, *, priority, source,
+reasons=(), may_defer=True)` inside H1, not a second resource governor.
+It derives task, execution context, form and reasoning from the validated
+binding, preserving exact settings and all existing first-Tree refusals.
+H1 compares the derived request to its supplied request on evaluation.
+The caller uses the exact returned request object to construct P1
+ResourceRequirement, and retains the binding/settings in the snapshot.
+P1 request equality alone is not proof of turn identity, source
+authenticity, freshness or resource reservation. No priority inference.
+No native execution, automatic model selection, provider callbacks or
+reused historical resource measurements. R6 remains untouched.
+
+Next: separately review workload-specific residency-aware requirements;
+do not subtract generic resident bytes from available RAM or import
+historical CPU-only calibration. Mind owns context selection, Runtime
+owns actual execution. See issue #2161 comments 7160677299 and 7160733041.

@@ -489,12 +489,59 @@ def sync_directory(path):
     finally:
         os.close(fd)
 
+def canonical_boot_id(value):
+    return (type(value) is str
+            and re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", value) is not None
+            and value != "00000000-0000-0000-0000-000000000000")
+
+
+def current_boot_id():
+    with open("/proc/sys/kernel/random/boot_id", encoding="ascii") as stream:
+        raw = stream.read(38)
+    if len(raw) != 37 or not raw.endswith("\n") or not canonical_boot_id(raw[:-1]):
+        raise ValueError("Kernel boot identity unverified")
+    return raw[:-1]
+
+
+def require_same_boot(expected):
+    if current_boot_id() != expected:
+        raise RuntimeError("Kernel boot identity changed")
+
+
+def intent_digest(intent):
+    return hashlib.sha256(json.dumps(intent, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=True, allow_nan=False).encode("ascii")).hexdigest()
+
+
+def valid_intent_boot_binding(binding):
+    return (type(binding) is dict and set(binding) == {"version", "bootId"}
+            and type(binding["version"]) is int and binding["version"] == 1
+            and canonical_boot_id(binding["bootId"]))
+
+
+def valid_outcome_boot_binding(intent, outcome):
+    if "bootBinding" not in intent:
+        return "bootBinding" not in outcome
+    binding = intent["bootBinding"]
+    receipt = outcome.get("bootBinding")
+    if (not valid_intent_boot_binding(binding)
+            or type(receipt) is not dict or set(receipt) != {"version", "bootId", "intentDigest"}
+            or type(receipt["version"]) is not int or receipt["version"] != 1
+            or receipt["bootId"] != binding["bootId"]):
+        return False
+    try:
+        return receipt["intentDigest"] == intent_digest(intent)
+    except (ValueError, TypeError, OverflowError):
+        return False
+
+
 def withdraw_authorized(target):
     if os.geteuid() != 0:
         raise PermissionError("Administrator authentication required")
     identity = extension_identity()
     if os.path.lexists(WITHDRAW_MARKER) or os.path.lexists(WITHDRAW_MARKER.with_name("withdrawal-result.json")):
         raise ReductionRecovery("RECOVERY_REQUIRED")
+    boot = current_boot_id()
     check_extension_boot_policy()
     first = reduction_plan(target, read_reduction_snapshot())
     time.sleep(2)
@@ -506,7 +553,9 @@ def withdraw_authorized(target):
         if first[key] != second[key]:
             raise ReductionBlocked("CAPACITY_CHANGED")
     record = {"version": REDUCTION_VERSION, "state": "PREPARED", "targetGiB": target,
-              "identity": identity, "timeNs": time.time_ns(), "evidence": second}
+              "identity": identity, "timeNs": time.time_ns(), "evidence": second,
+              "bootBinding": {"version": 1, "bootId": boot}}
+    require_same_boot(boot)
     try:
         durable_withdrawal_record(record, initial=True)
     except (OSError, ValueError) as error:
@@ -519,6 +568,7 @@ def withdraw_authorized(target):
         final = reduction_plan(target, read_reduction_snapshot())
         if any(final[key] != second[key] for key in ("baseSizeKiB", "extensionSizeKiB")):
             raise ReductionBlocked("CAPACITY_CHANGED")
+        require_same_boot(boot)
     except ReductionBlocked as error:
         try:
             durable_withdrawal_record({"state": "NOT_STARTED", "code": error.code})
@@ -538,7 +588,11 @@ def withdraw_authorized(target):
         result = {"version": REDUCTION_VERSION, "state": "VERIFIED", "targetGiB": target,
                   "sizeKiB": base["sizeKiB"], "basePriority": 10,
                   "extensionActive": False, "fileRetained": True, "timeNs": time.time_ns()}
-        durable_withdrawal_record(result)
+        require_same_boot(boot)
+        # Public stdout receipt stays unchanged; durable records bind boot
+        # and the complete original intent under existing protected custody.
+        durable_withdrawal_record(dict(result, bootBinding={
+            "version": 1, "bootId": boot, "intentDigest": intent_digest(record)}))
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         raise ReductionRecovery("WITHDRAWAL_OUTCOME_UNKNOWN") from error
     print("VERIFIED REDUCTION:", json.dumps(result), flush=True)
@@ -596,6 +650,8 @@ def classify_recovery(intent, result, identity, snapshot):
             or type(intent.get("timeNs")) is not int or intent["timeNs"] <= 0
             or not isinstance(intent.get("evidence"), dict)):
         return report("INVALID_INTENT")
+    if "bootBinding" in intent and not valid_intent_boot_binding(intent["bootBinding"]):
+        return report("INVALID_INTENT")
     if intent.get("identity") != [list(row) for row in identity]:
         return report("FILE_IDENTITY_MISMATCH")
     evidence = intent["evidence"]
@@ -626,7 +682,7 @@ def classify_recovery(intent, result, identity, snapshot):
                          "UNEXPECTED_CAPACITY", "UNSUPPORTED_TARGET", "EXTENSION_OCCUPIED",
                          "RAM_HEADROOM", "BASE_HEADROOM", "MEMORY_PRESSURE",
                          "UNTRUSTED_FILE", "UNSUPPORTED_FILESYSTEM"}
-        if result.get("code") not in allowed_codes:
+        if result.get("code") not in allowed_codes or "bootBinding" in result:
             return report("INVALID_RESULT")
         return report("NOT_STARTED_ACTIVE" if extra else "RESULT_CONTRADICTS_KERNEL")
     if (result.get("state") != "VERIFIED" or type(result.get("version")) is not int
@@ -637,7 +693,31 @@ def classify_recovery(intent, result, identity, snapshot):
             or result.get("extensionActive") is not False or result.get("fileRetained") is not True
             or type(result.get("timeNs")) is not int or result["timeNs"] < intent["timeNs"]):
         return report("INVALID_RESULT")
+    if not valid_outcome_boot_binding(intent, result):
+        return report("INVALID_RESULT")
     return report("RESULT_CONTRADICTS_KERNEL" if extra else "RECORDED_VERIFIED_INACTIVE")
+
+
+def withdrawal_boot_witness(intent, outcome, identity, snapshot, observed_boot):
+    """Pure proposed witness, not authority. Caller must establish actual
+    protected records, fresh kernel boot/identity and common lock separately.
+    No CLI route or reclamation executor consumes this function.
+    """
+    if type(intent) is not dict or type(outcome) is not dict:
+        return None
+    if not canonical_boot_id(observed_boot) or "bootBinding" not in intent:
+        return None
+    if not valid_outcome_boot_binding(intent, outcome):
+        return None
+    if intent["bootBinding"]["bootId"] != observed_boot:
+        return None
+    try:
+        if classify_recovery(intent, outcome, identity, snapshot)["code"] != "RECORDED_VERIFIED_INACTIVE":
+            return None
+        return {"version": 1, "boot_id": observed_boot,
+                "withdrawal_digest": withdrawal_digest(intent, outcome)}
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        return None
 
 
 def withdrawal_digest(intent, outcome):

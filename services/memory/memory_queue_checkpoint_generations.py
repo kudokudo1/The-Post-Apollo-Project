@@ -11,7 +11,8 @@ import json
 import os
 
 from memory_adjustment_queue import QueueError
-from memory_queue_host_checkpoint import HostCheckpoint, SLOTS, MAX_BYTES, _json
+from memory_queue_host_checkpoint import HostCheckpoint, SLOTS, MAX_BYTES, _json, validate_record
+from memory_queue_local_actions import MAX_SAFE
 
 # Bounded development policy, not an installed retention setting.
 MAX_GENERATIONS = 32
@@ -49,12 +50,13 @@ class CheckpointGenerations:
                                     "disposition", "adjustment_outcome",
                                     "can_execute", "startup_unlock"}
                 or type(receipt["version"]) is not int or receipt["version"] != 2
-                or receipt["review"] != dismissal["review"]
+                or _json(receipt["review"]) != _json(dismissal["review"])
                 or receipt["disposition"] != "LOCAL_PREPARATION_DISMISSED"
                 or receipt["adjustment_outcome"] != "UNVERIFIED"
                 or receipt["can_execute"] is not False
                 or receipt["startup_unlock"] is not False
                 or type(receipt["dismissed_at_ms"]) is not int
+                or not 0 <= receipt["dismissed_at_ms"] <= MAX_SAFE
                 or not 0 <= receipt["dismissed_at_ms"] - dismissal["review"]["reviewed_at_ms"] < 60000):
             raise QueueError("CHECKPOINT_EXACT_DISMISSAL_REQUIRED")
         data = _json({"version": 1, "receipt": receipt,
@@ -133,7 +135,11 @@ class CheckpointGenerations:
 
     def save(self, generation, record):
         with self._locked() as fd:
+            validate_record(record)
             entries, seen = self._scan(fd)
+            # A prior mkdir may have survived a failed root fsync. Make its
+            # directory entry durable before allowing a new checkpoint save.
+            os.fsync(fd)
             snapshot, receipt = entries[-1]
             if type(generation) is not int or generation != len(entries)-1 or receipt is not None:
                 raise QueueError("CHECKPOINT_GENERATION_NOT_WRITABLE")

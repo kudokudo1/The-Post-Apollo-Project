@@ -124,8 +124,7 @@ class RecoveryReview:
             if dismiss:
                 if not hasattr(self.journal,"dismiss_in_transaction"):
                     raise QueueError("LOCAL_DISPOSITION_MODE_REQUIRED")
-                wall_ms=admit()
-                return self.journal.dismiss_in_transaction(db,review,wall_ms)
+                return self.journal.dismiss_in_transaction(db,review,admit)
             _schema(db,create=True)
             wall_ms=admit()
             receipt={"version":1,"review":review,"acknowledged_at_ms":wall_ms,

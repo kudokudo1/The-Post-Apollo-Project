@@ -99,7 +99,7 @@ class LocalActionsV2(LocalActions):
         except (TypeError,ValueError,KeyError,AttributeError,RecursionError) as exc:
             raise QueueError("INVALID_LOCAL_DISPOSITION") from exc
 
-    def dismiss_in_transaction(self,db,review,wall_ms):
+    def dismiss_in_transaction(self,db,review,admission_clock):
         """Only RecoveryReview's explicit live dismissal path may call this.
 
         Caller already holds the owner and SQLite writer lock, revalidated
@@ -113,13 +113,16 @@ class LocalActionsV2(LocalActions):
         record=self._decode(db,row)
         if record["state"]!="PREPARED" or record!=review["snapshot"]["record"]:
             raise QueueError("LOCAL_DISPOSITION_REQUIRES_PREPARED")
-        receipt={"version":2,"review":review,"dismissed_at_ms":wall_ms,
+        # Recheck after scanning retained evidence, not before that work.
+        receipt={"version":2,"review":review,"dismissed_at_ms":admission_clock(),
                  "disposition":"LOCAL_PREPARATION_DISMISSED","adjustment_outcome":"UNVERIFIED",
                  "can_execute":False,"startup_unlock":False}
         payload=canonical(receipt)
         # Validate the complete retained evidence before updating. No
         # original row fields or request rows are modified.
         self._decode_disposition(db,tuple(row)+(payload,))
+        receipt["dismissed_at_ms"]=admission_clock()
+        payload=canonical(receipt)
         count=db.execute("UPDATE "+self.TABLE+" SET dismissal=? WHERE action_id=? AND state='PREPARED' AND dismissal IS NULL",
                          (payload,action_id)).rowcount
         if count!=1:

@@ -325,14 +325,20 @@ def preflight_outer(parent, baseline, *, selected, now_ns, expected_leaf):
     return "OUTER_RESOURCE_PREFLIGHT_REFERENCE"
 
 
-def evaluate(parent, samples, *, selected, launch_ns, expected_leaf,
-             scope="DIRECT", baseline=None):
-    """Evaluate explicit accounting scope, not model demand or terminal proof.
+def _continuity(previous, sample):
+    if previous is not None:
+        require(sample.peak >= previous.peak and sample.cpu_usec >= previous.cpu_usec
+                and sample.levels[-1].high == previous.levels[-1].high,
+                "COUNTER_REGRESSION")
 
-    DIRECT preserves original child behavior. RETAINED_OUTER is selected
-    before launch and requires original empty baseline from same pinned
-    Reader. Runtime must bind scope/timing to original launch; no fallback.
-    Inner effective limits, original terminal and confinement are separate.
+
+def validate_prefix(parent, first, *, selected, launch_ns, expected_leaf,
+                    scope="DIRECT", baseline=None):
+    """Shared preventive *reference* check; no permission to progress.
+
+    Runtime must independently pin original identity, bind the exact same
+    immutable samples and verify inner limits/isolation before progression.
+    This function observes no OS state and cannot establish that provenance.
     """
     require(type(scope) is str and scope in ("DIRECT", "RETAINED_OUTER"),
             "ACCOUNTING_SCOPE_INVALID")
@@ -343,24 +349,55 @@ def evaluate(parent, samples, *, selected, launch_ns, expected_leaf,
     else:
         preflight_outer(parent, baseline, selected=selected, now_ns=launch_ns,
                         expected_leaf=expected_leaf)
+    child = _scope_sample(parent, first, selected, expected_leaf)
+    require(launch_ns <= first.start_ns < first.end_ns <= launch_ns + MAX_NS,
+            "WITNESS_WINDOW")
+    require(0 <= first.start_ns - launch_ns <= MAX_GAP_NS, "SAMPLE_GAP")
+    require(first.end_ns - launch_ns <= MAX_SAMPLE_NS, "FIRST_OBSERVATION_LATE")
+    _continuity(baseline, first)
+    require(first.populated == 1 and child.tasks > 0, "FIRST_NOT_ACTIVE")
+    return {
+        "status": "RESOURCE_PREFIX_REFERENCE",
+        "accounting_scope": scope,
+        "progression_authorized": False,
+        "terminal_verified": False,
+        "device_isolation_verified": False,
+        "measurement_coverage_complete": False,
+        "resource_requirements_established": False,
+        "resource_reserved": False,
+        "safe_to_start_inference": False,
+        "permission_granted": False,
+        "production_authority": False,
+        "safe_actions": [],
+    }
+
+
+def evaluate(parent, samples, *, selected, launch_ns, expected_leaf,
+             scope="DIRECT", baseline=None):
+    """Evaluate explicit accounting scope, not model demand or terminal proof.
+
+    DIRECT preserves original child behavior. RETAINED_OUTER is selected
+    before launch and requires original empty baseline from same pinned
+    Reader. Runtime must bind scope/timing to original launch; no fallback.
+    Inner effective limits, original terminal and confinement are separate.
+    """
     require(type(samples) is tuple and 2 <= len(samples) <= MAX_SAMPLES,
             "SAMPLE_COUNT")
-    previous = baseline
-    max_charge = baseline.levels[-1].current if baseline is not None else 0
-    minimum_host = min(parent.host_available_mib, baseline.host_available_mib) \
-        if baseline is not None else parent.host_available_mib
-    for index, sample in enumerate(samples):
+    first = samples[0]
+    validate_prefix(parent, first, selected=selected, launch_ns=launch_ns,
+                    expected_leaf=expected_leaf, scope=scope, baseline=baseline)
+    previous = first
+    max_charge = first.levels[-1].current
+    minimum_host = min(parent.host_available_mib, first.host_available_mib)
+    if baseline is not None:
+        max_charge = max(max_charge, baseline.levels[-1].current)
+        minimum_host = min(minimum_host, baseline.host_available_mib)
+    for sample in samples[1:]:
         child = _scope_sample(parent, sample, selected, expected_leaf)
         require(launch_ns <= sample.start_ns < sample.end_ns <= launch_ns + MAX_NS,
                 "WITNESS_WINDOW")
-        require(0 <= sample.start_ns - (launch_ns if index == 0 else previous.end_ns)
-                <= MAX_GAP_NS, "SAMPLE_GAP")
-        if index == 0:
-            require(sample.end_ns - launch_ns <= MAX_SAMPLE_NS,
-                    "FIRST_OBSERVATION_LATE")
-        if previous is not None:
-            require(sample.peak >= previous.peak and sample.cpu_usec >= previous.cpu_usec
-                    and child.high == previous.levels[-1].high, "COUNTER_REGRESSION")
+        require(0 <= sample.start_ns - previous.end_ns <= MAX_GAP_NS, "SAMPLE_GAP")
+        _continuity(previous, sample)
         max_charge = max(max_charge, child.current)
         minimum_host = min(minimum_host, sample.host_available_mib)
         previous = sample

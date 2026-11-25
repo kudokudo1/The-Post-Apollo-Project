@@ -11,6 +11,8 @@ on:
       - 'tests/forest/test_task_sticky_context_m7b.py'
       - 'scripts/forest/MIND_ORIGINAL_RECOVERY_M7.md'
       - 'tests/forest/test_layered_hot_context_m7a.py'
+      - 'tests/forest/test_mind_version_resolution_m7d.py'
+      - 'scripts/forest/MIND_RETRIEVAL_M7D_CONTRACT.md'
       - 'scripts/forest/HISTORY_PUBLIC_FIXTURE_M4.md'
       - 'scripts/forest/context_first_tree_m2.py'
       - 'scripts/forest/session_journal_v0.py'
@@ -57,3 +59,6 @@ jobs:
 
       - name: M7c selective derived shedding
         run: python3 -B -m unittest discover -s tests/forest -p 'test_task_sticky_context_m7c.py' -v
+
+      - name: M7d-b fixed public exact-version resolution
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_mind_version_resolution_m7d.py' -v

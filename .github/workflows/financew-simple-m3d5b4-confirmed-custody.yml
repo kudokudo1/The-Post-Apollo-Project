@@ -1,0 +1,49 @@
+name: FinanceW Simple M3d5b4 disposable confirmed ID custody HOLD
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/simple_m3d5b4_disposable_confirmation.mjs"
+      - "tests/finance/fixtures/simple_m3d5b4_payload.mjs"
+      - "tests/finance/fixtures/simple_m3d5b4_child.mjs"
+      - "tests/finance/test_simple_m3d5b4_disposable_confirmation.mjs"
+      - "tests/finance/test_simple_m3d5b4_source_hold.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5B4_CUSTODY_README.md"
+      - ".github/workflows/financew-simple-m3d5b4-confirmed-custody.yml"
+  push:
+    paths:
+      - "scripts/finance/simple_m3d5b4_disposable_confirmation.mjs"
+      - "tests/finance/fixtures/simple_m3d5b4_payload.mjs"
+      - "tests/finance/fixtures/simple_m3d5b4_child.mjs"
+      - "tests/finance/test_simple_m3d5b4_disposable_confirmation.mjs"
+      - "tests/finance/test_simple_m3d5b4_source_hold.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5B4_CUSTODY_README.md"
+      - ".github/workflows/financew-simple-m3d5b4-confirmed-custody.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  confirmed-identity-disposable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Source HOLD and syntax checks
+        run: |
+          node --check scripts/finance/simple_m3d5b4_disposable_confirmation.mjs
+          node --check tests/finance/test_simple_m3d5b4_disposable_confirmation.mjs
+          node --check tests/finance/fixtures/simple_m3d5b4_child.mjs
+          node --check tests/finance/fixtures/simple_m3d5b4_payload.mjs
+          python3 -B tests/finance/test_simple_m3d5b4_source_hold.py
+      - name: Sealed one-use ID custody across real process restarts
+        run: node --test tests/finance/test_simple_m3d5b4_disposable_confirmation.mjs
+      - name: Existing nonactivated bridge and parser regressions
+        run: |
+          node --test tests/finance/test_simple_m3d5b3_bridge_contract.mjs
+          node --test tests/finance/test_simple_m3d5b2_transport.mjs
+          node --test tests/finance/test_simple_m3d5b_protected_controller.mjs

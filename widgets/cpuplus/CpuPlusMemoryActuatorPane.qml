@@ -4,6 +4,7 @@ import qs.services.memory
 import qs.services.diagnostics
 import "../../components"
 import "CpuPlusMemorySnapshot.js" as Snapshot
+import "CpuPlusProfilePreview.js" as Profiles
 
 // Demand-loaded by SYSTEM memory/swap selection. No privileged operations.
 Item {
@@ -18,6 +19,22 @@ Item {
         if (!received || !exited) return;
         sample = exitOk ? pendingSample : null;
         status = sample ? "OBSERVED" : "UNAVAILABLE";
+    }
+    // Draft belongs to this memory pane, not the demand-loaded PROF subpage.
+    property string selectedProfile: ""
+    property var customProfileDraft: Profiles.empty()
+    function chooseProfile(name) {
+        if (page === "PROF" && Profiles.names().includes(name)) selectedProfile = name;
+    }
+    function captureProfileTarget(key) {
+        if (page !== "PROF" || selectedProfile !== "CUSTOM" || !sample || status !== "OBSERVED" || MemoryOperation.busy) return;
+        if (key === "capacityGiB" && !capacity) return;
+        if (key === "swappiness" && !Profiles.policy(sample.swappiness)) return;
+        const next = Profiles.capture(customProfileDraft,key,key === "capacityGiB" ? stagedGiB : stagedSwappiness);
+        if (next) customProfileDraft = next;
+    }
+    function clearProfileDraft() {
+        if (page === "PROF" && selectedProfile === "CUSTOM") customProfileDraft = Profiles.empty();
     }
     property int stagedGiB: 16
     property bool initializedTarget: false
@@ -215,7 +232,7 @@ Item {
             }
         }
     }
-    readonly property bool fixedWorkPage: ["PROC","AUTO","DIAG"].includes(root.page)
+    readonly property bool fixedWorkPage: ["PROC","AUTO","DIAG","PROF"].includes(root.page)
     Column {
         id: workHeader
         objectName: "cpuplusWorkHeader"
@@ -958,13 +975,26 @@ Item {
                     actionContext: null
                 }
             }
-            GohuText {
+            Loader {
                 width: parent.width
-                visible: root.page === "PROF"
-                text: "PROFILE CONTROLS // NOT CONNECTED"
-                color: Colors.orange
-                font.pixelSize: 11
-                wrapMode: Text.WordWrap
+                height: active && item ? item.implicitHeight : 0
+                active: root.page === "PROF"
+                visible: active
+                sourceComponent: CpuPlusProfilePane {
+                    headerTarget: workHeader
+                    footerTarget: workFooter
+                    selectedProfile: root.selectedProfile
+                    customDraft: root.customProfileDraft
+                    actualKiB: root.capacity ? root.capacity.actualKiB : null
+                    actualSwappiness: root.sample ? root.sample.swappiness : null
+                    capacityTarget: root.stagedGiB
+                    policyTarget: root.stagedSwappiness
+                    observationReady: root.status === "OBSERVED"
+                    operationBusy: MemoryOperation.busy
+                    onProfileSelected: name => root.chooseProfile(name)
+                    onDraftCapture: key => root.captureProfileTarget(key)
+                    onDraftCleared: root.clearProfileDraft()
+                }
             }
         }
     }

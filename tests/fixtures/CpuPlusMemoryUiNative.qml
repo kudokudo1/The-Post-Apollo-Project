@@ -308,6 +308,22 @@ ShellRoot {
                         queue.cancelIntent();
                         queue.actionContext = null;
                     }
+                    if (smoke.phase === 5) {
+                        const prof=smoke.find(pane,"cpuplusProfilePane");
+                        const bottom=smoke.find(pane,"cpuplusProfileBottomControls");
+                        if (!prof || !bottom) return;
+                        if (!smoke.check(prof.view && !prof.view.canApply && prof.view.capacity.target===null
+                            && bottom.parent===smoke.find(pane,"cpuplusWorkFooter"),"blank profile and stapled footer")) return;
+                        pane.chooseProfile("CUSTOM");
+                        pane.captureProfileTarget("capacityGiB");
+                        pane.captureProfileTarget("swappiness");
+                        if (!smoke.check(prof.view.capacity.target===24 && prof.view.swappiness.target===150
+                            && MemoryOperation.requests===0,"explicit CUSTOM copy")) return;
+                        pane.chooseProfile("GAMING");
+                        if (!smoke.check(prof.view.capacity.target===null && pane.customProfileDraft.capacityGiB===24,
+                            "unconfigured preset cannot alter custom draft")) return;
+                        pane.chooseProfile("CUSTOM");
+                    }
                     if (smoke.phase < 5) pane.selectMenu(smoke.phase + 1);
                     else pane.selectMenu(0);
                     smoke.phase++;
@@ -315,6 +331,7 @@ ShellRoot {
                 }
                 if (!smoke.check(pane.page === "CAP" && slider.visible
                         && pane.stagedGiB === 24 && pane.stagedSwappiness === 150
+                        && pane.customProfileDraft.capacityGiB===24 && pane.customProfileDraft.swappiness===150
                         && MemoryOperation.requests === 0, "navigation continuity or unexpected dispatch")) return;
                 console.log("CPU_MEMORY_UI_NATIVE_PASS");
                 smoke.done = true;

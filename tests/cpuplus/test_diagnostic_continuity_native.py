@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-diag-native-") as temporary:
                  "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js",
                  "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, destination / name)
-    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js"):
+    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, destination / name)
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/DiagnosticContinuityNative.qml", config / "smoke.qml")
     memory = config / "services/memory"

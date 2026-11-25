@@ -82,10 +82,11 @@ Item {
         ? ChartPointPolicy.selectedBar(priceBars, selectedPointIndex) : null
     // M26: recompute locally only from the current, loaded RANGE snapshot.
     // No QML service, provider request, local file, timer or persistent state.
-    readonly property var rangeAnalysis: !globalHistoryActive && !dayMode && snapshot
-        && stockFeed && snapshot.cik === stockFeed.selectedCik
-        && snapshot.from === stockFeed.startDate
-        && snapshot.to === stockFeed.endDate
+    readonly property var rangeAnalysis: !dayMode && snapshot
+        && (globalHistoryActive ? RangeAnalysisPolicy.retainedGlobalRange(snapshot)
+            : stockFeed && snapshot.cik === stockFeed.selectedCik
+                && snapshot.from === stockFeed.startDate
+                && snapshot.to === stockFeed.endDate)
         ? RangeAnalysisPolicy.summarizeRange(snapshot) : null
     readonly property var averageOverlay: !dayMode && showAverages
         && priceBars.length >= 5 && rangeAnalysis !== null
@@ -139,7 +140,7 @@ Item {
     // same-snapshot pins. Survives issuer changes, never persists to disk.
     property var stockReference: null
     readonly property var crossStockComparison: stockReference !== null
-        && rangeAnalysis !== null && stockFeed
+        && !globalHistoryActive && rangeAnalysis !== null && stockFeed
         ? RangeAnalysisPolicy.compareStockReferences(stockReference, snapshot,
             stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik))
         : null
@@ -159,7 +160,7 @@ Item {
     readonly property var crossStockGap: crossStockChart !== null
         ? RangeAnalysisPolicy.crossStockGapChart(crossStockComparison) : null
     function saveStockReference() {
-        if (rangeAnalysis === null || !stockFeed) return;
+        if (globalHistoryActive || rangeAnalysis === null || !stockFeed) return;
         const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
             stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik));
         if (captured) stockReference=captured;
@@ -578,7 +579,7 @@ Item {
                         + "\nUSER-CHOSEN LISTING // FIGI MATCH NOT VERIFIED"
                         + (stocks.globalHistory.compactMayBeTruncated
                             ? "\nWARNING // COMPACT HISTORY MAY OMIT EARLIER DATES" : "")
-                        + "\nSEARCH TO LOAD ANOTHER RANGE // ADVANCED TOOLS PENDING")
+                        + "\nSEARCH TO LOAD ANOTHER RANGE // CROSS-STOCK PENDING")
                     : stocks.stockFeed ? stocks.stockFeed.message
                     : "STOCK HISTORY SOURCE UNAVAILABLE")
                 textFormat: Text.PlainText
@@ -1095,9 +1096,9 @@ Item {
                         anchors.rightMargin: 10
                         text: stocks.rangeAnalysis
                             ? ("RANGE MOVEMENT // LOADED " + stocks.rangeAnalysis.priceBasis
-                                + "\nHIGH $" + stocks.rangeAnalysis.high.price.toFixed(2)
+                                + "\nHIGH " + stocks.priceUnit + stocks.rangeAnalysis.high.price.toFixed(2)
                                 + " // " + stocks.rangeAnalysis.high.date
-                                + "\nLOW $" + stocks.rangeAnalysis.low.price.toFixed(2)
+                                + "\nLOW " + stocks.priceUnit + stocks.rangeAnalysis.low.price.toFixed(2)
                                 + " // " + stocks.rangeAnalysis.low.date
                                 + "\nMAX PEAK-TO-TROUGH DROP "
                                 + stocks.rangeAnalysis.maxDrawdownPct.toFixed(2) + "%"
@@ -1287,12 +1288,12 @@ Item {
                     text: stocks.averageOverlay
                         ? ("TRAILING SESSION AVERAGES // "
                             + stocks.averageOverlay.priceBasis
-                            + "\nORANGE SMA 5 // $"
+                            + "\nORANGE SMA 5 // " + stocks.priceUnit
                             + stocks.averageOverlay.latest5.toFixed(2)
                             + "\nLILAC SMA 20 // "
                             + (stocks.averageOverlay.latest20 === null
                                 ? "N/A // NEED 20 LOADED SESSIONS"
-                                : "$" + stocks.averageOverlay.latest20.toFixed(2))
+                                : stocks.priceUnit + stocks.averageOverlay.latest20.toFixed(2))
                             + "\nLOADED SESSIONS ONLY // NO NEW REQUEST"
                             + "\nNOT A LIVE QUOTE OR TRADE SIGNAL")
                         : ""
@@ -1316,7 +1317,7 @@ Item {
                                 + " // SMA 5 " + stocks.averageRelationship.latestSide
                                 + " SMA 20"
                                 + "\nSPREAD SMA 5 MINUS SMA 20 "
-                                + (stocks.averageRelationship.spreadPrice < 0 ? "-$" : "+$")
+                                + (stocks.averageRelationship.spreadPrice < 0 ? "-" : "+") + stocks.priceUnit
                                 + Math.abs(stocks.averageRelationship.spreadPrice).toFixed(2)
                                 + " // " + (stocks.averageRelationship.spreadPct > 0 ? "+" : "")
                                 + stocks.averageRelationship.spreadPct.toFixed(2) + "%"
@@ -1340,9 +1341,7 @@ Item {
                 GohuText {
                     width: parent.width
                     visible: !stocks.dayMode && stocks.priceBars.length >= 2
-                    text: stocks.globalHistoryActive
-                        ? "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED"
-                        : "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
+                    text: "CYAN = DAILY CLOSES // CLICK A DATA POINT TO INSPECT // ORANGE DOT = SELECTED B // YELLOW = PINNED A"
                     textFormat: Text.PlainText
                     wrapMode: Text.WordWrap
                     font.pixelSize: 9
@@ -1383,11 +1382,11 @@ Item {
                             ? ("SELECTED VS LAST LOADED CLOSE // "
                                 + stocks.selectedCloseComparison.priceBasis
                                 + "\nSELECTED " + stocks.selectedCloseComparison.selected.date
-                                + " // $" + stocks.selectedCloseComparison.selected.price.toFixed(2)
+                                + " // " + stocks.priceUnit + stocks.selectedCloseComparison.selected.price.toFixed(2)
                                 + "\nLAST " + stocks.selectedCloseComparison.last.date
-                                + " // $" + stocks.selectedCloseComparison.last.price.toFixed(2)
+                                + " // " + stocks.priceUnit + stocks.selectedCloseComparison.last.price.toFixed(2)
                                 + "\nCHANGE " + (stocks.selectedCloseComparison.deltaPrice > 0 ? "+" : "")
-                                + "$" + stocks.selectedCloseComparison.deltaPrice.toFixed(2)
+                                + stocks.priceUnit + stocks.selectedCloseComparison.deltaPrice.toFixed(2)
                                 + " // " + (stocks.selectedCloseComparison.deltaPct > 0 ? "+" : "")
                                 + stocks.selectedCloseComparison.deltaPct.toFixed(2) + "%"
                                 + "\nOBSERVED SESSION STEPS "
@@ -1436,7 +1435,7 @@ Item {
                     width: parent.width
                     visible: stocks.pinValid
                     text: stocks.pinnedPoint
-                        ? ("PINNED A // " + stocks.pinnedPoint.date + " // $"
+                        ? ("PINNED A // " + stocks.pinnedPoint.date + " // " + stocks.priceUnit
                             + stocks.pinnedPoint.price.toFixed(2)
                             + "\nCLICK ANOTHER CHART CLOSE TO CHOOSE B. "
                             + "YELLOW = PINNED A // ORANGE = SELECTED B.")
@@ -1467,11 +1466,11 @@ Item {
                             ? ("PINNED A VS SELECTED B // "
                                 + stocks.pinnedPairComparison.priceBasis
                                 + "\nA " + stocks.pinnedPairComparison.start.date
-                                + " // $" + stocks.pinnedPairComparison.start.price.toFixed(2)
+                                + " // " + stocks.priceUnit + stocks.pinnedPairComparison.start.price.toFixed(2)
                                 + "\nB " + stocks.pinnedPairComparison.end.date
-                                + " // $" + stocks.pinnedPairComparison.end.price.toFixed(2)
+                                + " // " + stocks.priceUnit + stocks.pinnedPairComparison.end.price.toFixed(2)
                                 + "\nB MINUS A // "
-                                + (stocks.pinnedPairComparison.deltaPrice < 0 ? "-$" : "+$")
+                                + (stocks.pinnedPairComparison.deltaPrice < 0 ? "-" : "+") + stocks.priceUnit
                                 + Math.abs(stocks.pinnedPairComparison.deltaPrice).toFixed(2)
                                 + " // "
                                 + (stocks.pinnedPairComparison.deltaPct > 0 ? "+" : "")
@@ -1510,10 +1509,10 @@ Item {
                                 + " TO " + stocks.pinnedInterval.to.date
                                 + " // " + stocks.pinnedInterval.sessions
                                 + " OBSERVED SESSIONS"
-                                + "\nHIGHEST CLOSE $"
+                                + "\nHIGHEST CLOSE " + stocks.priceUnit
                                 + stocks.pinnedInterval.high.price.toFixed(2)
                                 + " // " + stocks.pinnedInterval.high.date
-                                + "\nLOWEST CLOSE $"
+                                + "\nLOWEST CLOSE " + stocks.priceUnit
                                 + stocks.pinnedInterval.low.price.toFixed(2)
                                 + " // " + stocks.pinnedInterval.low.date
                                 + "\nMAX PEAK-TO-TROUGH CLOSE DECLINE "
@@ -1781,7 +1780,7 @@ Item {
             }
             GohuText {
                 width: parent.width
-                text: "Historical closes are not live quotes or a price-reaction study. Adjusted prices can be recomputed after dividends and splits. EODHD demo/key limits still apply."
+                text: "Historical closes are not live quotes or a price-reaction study. Adjusted prices can be recomputed after dividends and splits. Provider plan limits apply."
                 textFormat: Text.PlainText
                 wrapMode: Text.WordWrap
                 font.pixelSize: 9

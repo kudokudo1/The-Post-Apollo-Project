@@ -5507,7 +5507,7 @@ PanelWindow {
                         FullHistoryMap.GitMapControlHost {
                             width: parent.width
                             height: gitControlCamera.branchMapHeight
-                            repoRoot: gitService.available ? gitService.repoRoot : ""
+                            repoRoot: gitService.repoIsLocal ? gitService.repoPath : ""
                             operatorActive: root.menuOpen && root.activePage === "git" && root.gitView === "control"
 
                             topologyService: gitService

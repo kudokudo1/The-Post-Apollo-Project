@@ -210,3 +210,20 @@ occupied/corrupt refusal and fresh restore. Actual QML process adapter,
 bounded native raw reads and full-shell SIGKILL remain next. No production
 path, timeout policy, startup unlock or repeated-use retention selected.
 No DOC 2 source changes.
+
+## R3s // native checkpoint IO adapter candidate
+
+Direct main baseline 8e2b759d (all R3l-R3r dependencies merged; final
+combined CI not returned). Unmounted MemoryQueueCheckpointAdapter.qml
+launches one fixed Python LOAD/SAVE at a time, explicit trusted absolute
+paths and timeout, bounded retained parsed reply, exact operation/ticket/
+generation/exit correlation, terminal cancel or failure; no queue frame
+write in adapter. Canonical host still owns all state and frame release.
+Native fixture PASS loads empty locked checkpoint, test-only initial
+confirmation, saves PREPARE and ACK before frame release; FAIL uses corrupt
+slot and proves no local preparation or evidence overwrite. Prior eight
+native scenarios retained. SplitParser does not bound upstream raw
+allocation; trusted fixed helper only, no arbitrary provider/command.
+Full shell kill, startup restore from nonempty storage, repeated-use
+retention, production launch paths and provider still unqualified.
+No startup unlock API or DOC 2 source edits. CI pending.

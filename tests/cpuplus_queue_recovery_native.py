@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
         shutil.copy2(source,backend/source.name)
     watchdog=config/"watchdog"
     watchdog.mkdir()
-    for name in ("MemoryQueueSessionWatchdog.qml","MemoryQueueSessionHost.js"):
+    for name in ("MemoryQueueSessionWatchdog.qml","MemoryQueueSessionHost.js","MemoryQueueCheckpointAdapter.qml"):
         shutil.copy2(memory/name,watchdog/name)
         if (watchdog/name).read_bytes()!=(memory/name).read_bytes():
             raise SystemExit("Watchdog fixture source mismatch")
@@ -46,6 +46,16 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
         env[key]=str(d)
     env.update(QT_QPA_PLATFORM="offscreen",QT_QUICK_BACKEND="software",LIBGL_ALWAYS_SOFTWARE="1",
                QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",DISPLAY="",POST_APOLLO_QUEUE_PIPE_CHILD=str(child))
+    gate=env.get("POST_APOLLO_QUEUE_GATE_TRIAL")
+    checkpoint_dir=config/"checkpoint"
+    checkpoint_dir.mkdir(mode=0o700)
+    env.update(POST_APOLLO_QUEUE_CHECKPOINT_HELPER=str(backend/"memory_queue_checkpoint_io.py"),
+               POST_APOLLO_QUEUE_CHECKPOINT_DIR=str(checkpoint_dir))
+    if gate=="FAIL":
+        # Bypass initial load solely to exercise actual SAVE failure.
+        slot=checkpoint_dir/"action-v1.json"
+        slot.write_bytes(b"{")
+        slot.chmod(0o600)
     proc=subprocess.run(["qs","-p",str(config/"smoke.qml"),"--no-color"],cwd=config,env=env,
                         text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=25,check=False)
     print(proc.stdout)
@@ -54,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     if env.get("POST_APOLLO_QUEUE_WATCHDOG_TRIAL")=="1" and "QUEUE_R3_WATCHDOG_PASS" not in proc.stdout:
         raise SystemExit("Native watchdog fixture failed")
     trial=env.get("POST_APOLLO_QUEUE_STAGED_TRIAL")
-    if trial and "QUEUE_R3_STAGED_PASS //" not in proc.stdout:
+    if trial and gate!="FAIL" and "QUEUE_R3_STAGED_PASS //" not in proc.stdout:
         raise SystemExit("Native staged transport fixture failed")
     ack_trial=env.get("POST_APOLLO_QUEUE_ACK_TRIAL")
     if ack_trial:
@@ -72,3 +82,20 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
             if count!=(0 if ack_trial=="EOF" else 1):
                 raise SystemExit("Unexpected durable acknowledgment count")
         print("QUEUE_R3_ACK_DB_PASS // "+ack_trial+" exact persistent counts",flush=True)
+    if gate:
+        if "QUEUE_R3_GATE_PASS // "+gate not in proc.stdout:
+            raise SystemExit("Native checkpoint gate fixture failed")
+        if gate=="FAIL":
+            with sqlite3.connect((config/"private"/"queue.db").as_uri()+"?mode=ro",uri=True) as db:
+                if db.execute("SELECT count(*) FROM memory_queue_local_actions_v1").fetchone()[0]!=0:
+                    raise SystemExit("Failed SAVE allowed preparation")
+            if (checkpoint_dir/"action-v1.json").read_bytes()!=b"{":
+                raise SystemExit("Failed SAVE overwrote evidence")
+        else:
+            import sys
+            sys.path.insert(0,str(backend))
+            from memory_queue_host_checkpoint import HostCheckpoint
+            snapshot=HostCheckpoint(checkpoint_dir).load()
+            if snapshot["action"] is None or snapshot["acknowledgment"] is None:
+                raise SystemExit("Native checkpoints missing")
+        print("QUEUE_R3_GATE_DB_PASS // "+gate,flush=True)

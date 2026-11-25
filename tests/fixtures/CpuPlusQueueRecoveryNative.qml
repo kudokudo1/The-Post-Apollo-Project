@@ -18,6 +18,10 @@ ShellRoot {
     readonly property string stagedTrial: (Quickshell.env("POST_APOLLO_QUEUE_STAGED_TRIAL") || "")
     readonly property string ackTrial: (Quickshell.env("POST_APOLLO_QUEUE_ACK_TRIAL") || "")
     readonly property var reviewView: Host.reviewContext(host)
+    readonly property string gateTrial: (Quickshell.env("POST_APOLLO_QUEUE_GATE_TRIAL") || "")
+    property int gateTicket: 0
+    property int durableSaves: 0
+    property bool gateLoadDone: false
     property int reviewWrites: 0
     property int ackWrites: 0
     property int receiptReads: 0
@@ -48,7 +52,7 @@ ShellRoot {
         return ok;
     }
     function launch(generation) {
-        host = Host.start(host, Consumer, generation, stagedTrial ? "STAGED" : "LEGACY", !!ackTrial);
+        host = Host.start(host, Consumer, generation, stagedTrial ? "STAGED" : "LEGACY", !!ackTrial, !!gateTrial);
         exited = false;
         dropping = false;
         child.stdinEnabled = true;
@@ -105,17 +109,61 @@ ShellRoot {
         ++reads;
         child.write(request.frame);
     }
+    function transmit(sent) {
+        host=sent.state;
+        if (sent.checkpoint) {
+            if (!check(!sent.frame && !!gateTrial && !checkpoint.busy,"checkpoint withheld frame")) return;
+            gateTicket=checkpoint.begin("SAVE",host.generation,sent.checkpoint);
+            check(gateTicket>0,"checkpoint save started");
+        } else if (sent.frame) child.write(sent.frame);
+    }
     function submit(intent) {
         const sent = Host.confirm(host,intent,actionId,Consumer);
-        if (!check(!!sent.frame && sent.state.session.pending && writes === 0,"single confirmed write")) return;
-        host = sent.state;
+        if (!check((gateTrial ? !!sent.checkpoint && !sent.frame : !!sent.frame)
+            && sent.state.session.pending && writes === 0,"single confirmed write")) return;
         ++writes;
-        child.write(sent.frame);
+        transmit(sent);
+    }
+    Memory.MemoryQueueCheckpointAdapter {
+        id: checkpoint
+        pythonPath: "/usr/bin/python3"
+        helperPath: Quickshell.env("POST_APOLLO_QUEUE_CHECKPOINT_HELPER") || ""
+        directory: Quickshell.env("POST_APOLLO_QUEUE_CHECKPOINT_DIR") || ""
+        timeoutMs: 2000
+        onCompleted: (generation,ticket,operation,result) => {
+            if (smoke.done) return;
+            if (!smoke.check(ticket===smoke.gateTicket,"exact helper ticket")) return;
+            if (operation==="LOAD") {
+                if (!smoke.check(generation===1 && !!result,"startup load succeeded")) return;
+                const restored=Host.restoreCheckpoint(Consumer,result.snapshot,Recovery.row);
+                if (!smoke.check(!!restored && restored.startupLocked && !restored.session.unresolved,"empty locked startup")) return;
+                smoke.host=restored;
+                smoke.gateLoadDone=true;
+                smoke.launch(1);
+                return;
+            }
+            const sent=Host.finishCheckpoint(smoke.host,result,generation,Consumer,Recovery.row);
+            smoke.host=sent.state;
+            if (smoke.gateTrial==="FAIL") {
+                if (!smoke.check(!result && !sent.frame && smoke.host.phase==="FAILED"
+                    && smoke.host.startupLocked && smoke.host.session.unresolved && smoke.durableSaves===0,
+                    "failed checkpoint blocks frame")) return;
+                smoke.dropping=true;
+                smoke.phase=15;
+                child.stdinEnabled=false;
+                return;
+            }
+            if (!smoke.check(!!result && !!sent.frame && !smoke.host.checkpointWait,"durable result releases one frame")) return;
+            ++smoke.durableSaves;
+            if (!smoke.check(!Host.finishCheckpoint(smoke.host,result,generation,Consumer,Recovery.row).frame,
+                "duplicate completion refused")) return;
+            child.write(sent.frame);
+        }
     }
     Memory.MemoryQueueSessionWatchdog {
         id: watchdog
         hostState: smoke.host
-        timeouts: ({HELLO:5000,PUBLICATION:5000,ACTION:1200,HISTORY:3000,RECOVERY:3000,PARTIAL_FRAME:2000})
+        timeouts: ({HELLO:5000,PUBLICATION:5000,ACTION:smoke.gateTrial?5000:1200,HISTORY:3000,RECOVERY:smoke.gateTrial?5000:3000,PARTIAL_FRAME:2000})
         onPolicyRejected: generation => smoke.check(false,"watchdog policy rejected")
         onDeadlineExpired: (generation,category,ticket) => {
             if (!smoke.check(smoke.timeoutTrial && smoke.phase===2 && category==="ACTION"
@@ -283,13 +331,13 @@ ShellRoot {
                     child.stdinEnabled = false;
                 } else {
                     // Fixture simulates explicit operator confirmation.
-                    const next = Host.acknowledgeReview(smoke.host,selection,smoke.host.generation);
-                    if (!smoke.check(!!next.frame,"explicit ack frame")) return;
-                    smoke.host = next.state;
+                    const next = Host.acknowledgeReview(smoke.host,selection,smoke.host.generation,Recovery.row);
+                    if (!smoke.check(smoke.gateTrial ? !!next.checkpoint && !next.frame : !!next.frame,"explicit ack frame or checkpoint")) return;
                     ++smoke.ackWrites;
-                    if (!smoke.check(!Host.acknowledgeReview(smoke.host,selection,smoke.host.generation).frame,
+                    smoke.transmit(next);
+                    const duplicate=Host.acknowledgeReview(smoke.host,selection,smoke.host.generation,Recovery.row);
+                    if (!smoke.check(!duplicate.frame && !duplicate.checkpoint,
                         "duplicate ack refused before write")) return;
-                    child.write(next.frame);
                 }
             } else if (smoke.phase === 10 && smoke.ackTrial === "ACK" && smoke.reviewView.receipt && !smoke.dropping) {
                 const receipt = smoke.reviewView.receipt;
@@ -343,10 +391,21 @@ ShellRoot {
                 if (!smoke.check(watchdog.activeCount === 0 && smoke.host.startupLocked
                     && smoke.host.session.unresolved && smoke.reviewView.receipt === null,
                     "final disconnect clears live review view")) return;
+                if (smoke.gateTrial) {
+                    if (!smoke.check(smoke.gateLoadDone && smoke.durableSaves===2 && !checkpoint.busy,"both native save gates")) return;
+                    console.log("QUEUE_R3_GATE_PASS // "+smoke.gateTrial);
+                }
                 console.log("QUEUE_R3_ACK_PASS // "+smoke.ackTrial);
                 console.log("QUEUE_R3_STAGED_PASS // EOF");
                 console.log("QUEUE_R3_RECOVERY_PASS // native explicit acknowledgment trial");
                 smoke.done = true;
+                Qt.quit();
+            } else if (smoke.phase === 15 && smoke.exited) {
+                if (!smoke.check(smoke.commits===0 && smoke.durableSaves===0 && smoke.host.startupLocked
+                    && watchdog.activeCount===0,"failed save no commit")) return;
+                console.log("QUEUE_R3_GATE_PASS // FAIL");
+                console.log("QUEUE_R3_RECOVERY_PASS // failed checkpoint withheld transmission");
+                smoke.done=true;
                 Qt.quit();
             } else if (smoke.phase === 7 && smoke.exited) {
                 recoveryPane.requestRead("INVENTORY",16);
@@ -369,6 +428,9 @@ ShellRoot {
     }
     Component.onCompleted: {
         if (!armed) Qt.quit();
-        else launch(1);
+        else if (gateTrial==="PASS") {
+            gateTicket=checkpoint.begin("LOAD",1,null);
+            check(gateTicket>0,"initial load started");
+        } else launch(1);
     }
 }

@@ -9,6 +9,7 @@ on:
       - 'services/memory/memory_adjustment_queue.py'
       - 'services/memory/MemoryQueueSessionHost.js'
       - 'services/memory/MemoryQueueSessionWatchdog.qml'
+      - 'services/memory/MemoryQueueCheckpointAdapter.qml'
       - 'widgets/cpuplus/CpuPlusQueue*.js'
       - 'widgets/cpuplus/CpuPlusQueue*.qml'
       - '.github/workflows/cpuplus-queue-r3-recovery-native.yml'
@@ -61,3 +62,11 @@ jobs:
           for trial in ACK LOST EOF; do
             POST_APOLLO_QUEUE_ACK_TRIAL="$trial" python3 -B tests/cpuplus_queue_recovery_native.py
           done
+      - name: Native checkpoint process gate
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+          POST_APOLLO_QUEUE_STAGED_TRIAL: "EOF"
+        run: |
+          set -eu
+          POST_APOLLO_QUEUE_GATE_TRIAL=PASS POST_APOLLO_QUEUE_ACK_TRIAL=ACK python3 -B tests/cpuplus_queue_recovery_native.py
+          POST_APOLLO_QUEUE_GATE_TRIAL=FAIL python3 -B tests/cpuplus_queue_recovery_native.py

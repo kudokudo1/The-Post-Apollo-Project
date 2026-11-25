@@ -21,6 +21,51 @@ Column {
     property bool reviewAvailable: false
     property string receiptLookup: ""
     property var confirmation: null
+    property var recoverySession: null
+    property bool sessionActive: false
+    property var dismissalConfirmation: null
+    property var retentionConfirmation: null
+    readonly property var dispositionContext: recoverySession ? recoverySession.dispositionContext : null
+    readonly property var dismissedReceipt: dispositionContext ? Recovery.dispositionReceipt(dispositionContext.receipt) : null
+    readonly property string unknownActionId: dispositionContext && Recovery.uuid(dispositionContext.unknownActionId) ? dispositionContext.unknownActionId : ""
+    readonly property string dispositionLookupId: unknownActionId || lookupText
+    readonly property var dismissalSelection: sessionActive ? Recovery.dismissalSelection(dispositionContext,reviewGeneration) : null
+    readonly property var retainSelection: sessionActive && recoverySession
+        ? Recovery.retentionSelection(recoverySession.retentionSelection,dismissedReceipt,reviewReceipt,
+            reviewGeneration,recoverySession.storageGeneration) : null
+    function clearConfirmations() {
+        confirmation=null; dismissalConfirmation=null; retentionConfirmation=null;
+    }
+    function prepareDismissal() {
+        if(visible && atomicMode && sessionActive && dismissalSelection && !confirmation && !retentionConfirmation && !dismissalConfirmation)
+            dismissalConfirmation=Object.assign({},dismissalSelection);
+    }
+    function confirmDismissal() {
+        const frozen=dismissalConfirmation;
+        dismissalConfirmation=null;
+        if(visible && atomicMode && sessionActive && recoverySession && Recovery.sameSelection(dismissalSelection,frozen))
+            recoverySession.dismiss({reviewId:frozen.reviewId,digest:frozen.digest,sequence:frozen.sequence});
+    }
+    function lookupDisposition() {
+        if(visible && atomicMode && sessionActive && recoverySession && reviewAvailable
+            && Recovery.uuid(dispositionLookupId) && !unknownReviewId)
+            recoverySession.readDisposition(dispositionLookupId);
+    }
+    function prepareRetention() {
+        if(visible && atomicMode && sessionActive && retainSelection && !confirmation && !dismissalConfirmation && !retentionConfirmation)
+            retentionConfirmation=Object.assign({},retainSelection);
+    }
+    function confirmRetention() {
+        const frozen=retentionConfirmation;
+        retentionConfirmation=null;
+        if(visible && atomicMode && sessionActive && recoverySession && Recovery.sameRetention(retainSelection,frozen))
+            recoverySession.advance({storageGeneration:frozen.storageGeneration,actionId:frozen.actionId,
+                reviewDigest:frozen.reviewDigest,sequence:frozen.sequence});
+    }
+    onDismissalSelectionChanged: if(!Recovery.sameSelection(dismissalSelection,dismissalConfirmation)) dismissalConfirmation=null
+    onRetainSelectionChanged: if(!Recovery.sameRetention(retainSelection,retentionConfirmation)) retentionConfirmation=null
+    onRecoverySessionChanged: clearConfirmations()
+    onSessionActiveChanged: if(!sessionActive) clearConfirmations()
     signal reviewRequested(string actionId)
     signal acknowledgmentRequested(var selection, var generation)
     signal reviewReceiptRequested(string reviewId)
@@ -30,11 +75,11 @@ Column {
     readonly property string unknownReviewId: reviewContext && Recovery.uuid(reviewContext.unknownReviewId) ? reviewContext.unknownReviewId : ""
     readonly property string effectiveReceiptId: unknownReviewId || receiptLookup
     function beginReview() {
-        if(visible && atomicMode && reviewAvailable && !unknownReviewId && Recovery.uuid(lookupText))
+        if(visible && atomicMode && reviewAvailable && !unknownReviewId && !unknownActionId && Recovery.uuid(lookupText))
             reviewRequested(lookupText);
     }
     function prepareAcknowledgment() {
-        if(visible && atomicMode && currentSelection && !confirmation)
+        if(visible && atomicMode && currentSelection && !confirmation && !dismissalConfirmation && !retentionConfirmation)
             confirmation=Object.assign({},currentSelection);
     }
     function confirmAcknowledgment() {
@@ -48,17 +93,28 @@ Column {
             reviewReceiptRequested(effectiveReceiptId);
     }
     onCurrentSelectionChanged: if(!Recovery.sameSelection(currentSelection,confirmation)) confirmation=null
-    onVisibleChanged: if(!visible) confirmation=null
-    onAtomicModeChanged: if(!atomicMode) confirmation=null
+    onVisibleChanged: if(!visible) clearConfirmations()
+    onAtomicModeChanged: if(!atomicMode) clearConfirmations()
+    onLookupTextChanged: clearConfirmations()
 
     readonly property var snapshot: atomicMode ? Recovery.context(recoveryContext) : null
     readonly property var effectiveHost: atomicMode ? (snapshot ? snapshot.host : null) : hostStatus
-    readonly property var view: atomicMode ? (snapshot ? snapshot.inventory : null) : Recovery.project(inventory)
+    readonly property var view: recoverySession
+        ? (sessionActive && snapshot && !snapshot.host.historyPending && !snapshot.host.actionPending
+            && !snapshot.localAction && dispositionContext && dispositionContext.enabled===true
+            ? Recovery.dispositionInventory(dispositionContext.inventory) : null)
+        : atomicMode ? (snapshot ? snapshot.inventory : null) : Recovery.project(inventory)
+    readonly property int inventoryLimit: recoverySession ? 4 : 16
+    function selectRecord(actionId) {
+        if(!visible || !atomicMode || !Recovery.uuid(actionId))return;
+        const rows=localView ? (localView.record?[localView.record]:[]) : view ? view.recent : [];
+        if(rows.some(item=>item.actionId===actionId))lookupText=actionId;
+    }
     readonly property var localView: snapshot ? snapshot.localAction : null
     readonly property bool canRead: atomicMode && Recovery.canRead(recoveryContext,readAvailable)
     function requestRead(kind,value) {
         if (!visible || !atomicMode || !Recovery.canRead(recoveryContext,readAvailable)) return;
-        if (kind==="INVENTORY" && value===16) recoveryReadRequested(kind,value);
+        if (kind==="INVENTORY" && value===inventoryLimit) recoveryReadRequested(kind,value);
         else if (kind==="LOCAL_ACTION" && Recovery.uuid(value)) recoveryReadRequested(kind,value);
     }
     spacing: 5
@@ -118,7 +174,7 @@ Column {
             height: body.implicitHeight + 8
             color: Colors.black
             border.width: 1
-            border.color: Colors.cyan
+            border.color: root.lookupText===modelData.actionId ? Colors.yellow : Colors.cyan
             Column {
                 id: body
                 anchors.left: parent.left
@@ -128,8 +184,8 @@ Column {
                 spacing: 2
                 GohuText {
                     width: parent.width
-                    text: modelData.kind + " // " + (modelData.state==="COMMITTED"
-                        ? "LOCAL INTENT COMMITTED" : "PREPARED // UNRESOLVED")
+                    text: modelData.kind + " // " + (modelData.dismissed===true ? "LOCAL PREPARATION DISMISSED" : modelData.state==="COMMITTED"
+                        ? "LOCAL INTENT COMMITTED" : root.recoverySession && root.localView ? "PREPARED RECORD // DISPOSITION NOT SHOWN" : "PREPARED // UNRESOLVED")
                     color: Colors.orange
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
@@ -143,10 +199,22 @@ Column {
                             + "\nEXPIRY // "+Recovery.utc(modelData.expiry))
                         + "\nPREPARED // "+Recovery.utc(modelData.preparedAt)
                         + (modelData.committedAt===null?"":"\nCOMMITTED // "+Recovery.utc(modelData.committedAt))
+                        + (modelData.dismissed===true?"\nDISPOSITION REVIEW // "+modelData.dispositionReviewId:"")
                     textFormat: Text.PlainText
                     color: Colors.white
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
+                }
+                ActionButton {
+                    objectName: "cpuplusRecoverySelectRecord"
+                    width: parent.width
+                    height: 26
+                    label: "SELECT"
+                    selected: root.lookupText===modelData.actionId
+                    available: root.atomicMode
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectRecord(modelData.actionId)
                 }
             }
         }
@@ -193,7 +261,7 @@ Column {
                 available: root.canRead
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"
-                onLeftClicked: root.requestRead("INVENTORY",16)
+                onLeftClicked: root.requestRead("INVENTORY",root.inventoryLimit)
             }
             ActionButton {
                 objectName: "cpuplusRecoveryActionRead"
@@ -226,7 +294,7 @@ Column {
             width: parent.width
             height: 28
             label: "REVIEW ACTION UUID"
-            available: root.reviewAvailable && !root.unknownReviewId && Recovery.uuid(root.lookupText)
+            available: root.reviewAvailable && !root.unknownReviewId && !root.unknownActionId && Recovery.uuid(root.lookupText)
             acceptedButtons: Qt.LeftButton
             keyboardActivationSignal: "leftClicked"
             onLeftClicked: root.beginReview()
@@ -256,7 +324,7 @@ Column {
             height: 28
             label: "ACKNOWLEDGE REVIEW"
             visible: root.confirmation===null
-            available: root.currentSelection!==null
+            available: root.currentSelection!==null && !root.dismissalConfirmation && !root.retentionConfirmation
             acceptedButtons: Qt.LeftButton
             keyboardActivationSignal: "leftClicked"
             onLeftClicked: root.prepareAcknowledgment()
@@ -291,6 +359,136 @@ Column {
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"
                 onLeftClicked: root.confirmation=null
+            }
+        }
+        Column {
+            width: parent.width
+            spacing: 3
+            visible: root.recoverySession!==null
+            GohuText {
+                width: parent.width
+                text: "LOCAL DISPOSITION // "+(root.dispositionContext ? root.dispositionContext.phase : "UNAVAILABLE")
+                    +(root.unknownActionId?"\nOUTCOME UNKNOWN // "+root.unknownActionId+"\nLOOK UP; NEVER REPEAT DISMISSAL":"")
+                color: Colors.orange
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.WrapAnywhere
+            }
+            ActionButton {
+                objectName: "cpuplusRecoveryDismissPrepare"
+                width: parent.width
+                height: 28
+                label: "DISMISS LOCAL PREPARATION"
+                available: !!root.dismissalSelection && !root.confirmation && !root.retentionConfirmation && !root.dismissalConfirmation
+                visible: !root.dismissalConfirmation
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: root.prepareDismissal()
+            }
+            GohuText {
+                width: parent.width
+                visible: !!root.dismissalConfirmation
+                text: "CONFIRM LOCAL DISMISSAL ONLY // ORIGINAL EVIDENCE RETAINED; NO MEMORY CHANGE OR STARTUP UNLOCK"
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
+            Row {
+                width: parent.width
+                spacing: 3
+                visible: !!root.dismissalConfirmation
+                ActionButton {
+                    objectName: "cpuplusRecoveryDismissConfirm"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 28
+                    label: "CONFIRM"
+                    available: Recovery.sameSelection(root.dismissalSelection,root.dismissalConfirmation)
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.confirmDismissal()
+                }
+                ActionButton {
+                    objectName: "cpuplusRecoveryDismissCancel"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 28
+                    label: "CANCEL"
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.dismissalConfirmation=null
+                }
+            }
+            ActionButton {
+                objectName: "cpuplusRecoveryDispositionLookup"
+                width: parent.width
+                height: 28
+                label: "LOOK UP DISMISSAL"
+                available: root.sessionActive && root.reviewAvailable && !root.unknownReviewId && Recovery.uuid(root.dispositionLookupId)
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: root.lookupDisposition()
+            }
+            GohuText {
+                width: parent.width
+                text: root.dismissedReceipt ? "LOCAL PREPARATION DISMISSED // "+root.dismissedReceipt.action.actionId
+                    +"\nADJUSTMENT UNVERIFIED" : "NO DISMISSAL RECEIPT DISPLAYED"
+                color: Colors.orange
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.WrapAnywhere
+            }
+            GohuText {
+                width: parent.width
+                text: "RETENTION // GENERATION "+(root.recoverySession && root.recoverySession.storageGeneration>=0
+                    ? root.recoverySession.storageGeneration : "UNAVAILABLE")
+                    +(root.retainSelection ? "\n"+root.retainSelection.mode+" // "+root.retainSelection.actionId
+                        : "\nFRESH HISTORICAL RECEIPT REQUIRED; CLOSE AND RECONNECT AFTER SAVE")
+                color: Colors.cyan
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.WrapAnywhere
+            }
+            ActionButton {
+                objectName: "cpuplusRecoveryRetainPrepare"
+                width: parent.width
+                height: 28
+                label: "RETAIN & ADVANCE"
+                available: !!root.retainSelection && !root.confirmation && !root.dismissalConfirmation && !root.retentionConfirmation
+                visible: !root.retentionConfirmation
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: root.prepareRetention()
+            }
+            GohuText {
+                width: parent.width
+                visible: !!root.retentionConfirmation
+                text: "CONFIRM GENERATION RETENTION // ORIGINAL RECORDS KEPT; SESSION RETIRES; NO EXECUTION UNLOCK"
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
+            Row {
+                width: parent.width
+                spacing: 3
+                visible: !!root.retentionConfirmation
+                ActionButton {
+                    objectName: "cpuplusRecoveryRetainConfirm"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 28
+                    label: "CONFIRM"
+                    available: Recovery.sameRetention(root.retainSelection,root.retentionConfirmation)
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.confirmRetention()
+                }
+                ActionButton {
+                    objectName: "cpuplusRecoveryRetainCancel"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 28
+                    label: "CANCEL"
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.retentionConfirmation=null
+                }
             }
         }
         GohuText {

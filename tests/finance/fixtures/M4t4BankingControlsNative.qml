@@ -69,6 +69,22 @@ ShellRoot {
         onTriggered: {
             const secret=root.input(1025), file=root.input(53);
             if(!root.check(secret!==null&&file!==null,"native input fields"))return;
+            if(Quickshell.env("BANKING_M4T5_TIMEOUT_FIXTURE")==="1"){
+                if(root.stage===0){
+                    backup.reviewEnabled=true;portable.reviewEnabled=true;
+                    secret.text=root.password;
+                    if(!root.click(backup,"REFRESH BACKUPS")
+                        ||!root.click(portable,"EXPORT SAVED MANUAL LEDGER")
+                        ||!root.click(portable,"CONFIRM EXPORT"))return;
+                    root.stage=1;return;
+                }
+                if(!backup.requestRetired||!portable.requestRetired
+                    ||!backup.requestDrained||!portable.requestDrained)return;
+                if(!root.check(backup.requestBusy&&portable.requestBusy&&!backup.rowsLoaded
+                    &&portable.receipt===null&&secret.text===""&&!backup.refresh()
+                    &&!portable.confirm("export"),"timeout retired and drained both children"))return;
+                console.log("M4T5_TIMEOUT_PASS");Qt.quit();return;
+            }
             switch(root.stage){
             case 0:
                 if(!root.check(!backup.available&&!portable.available&&!backup.refresh()&&!portable.confirm("export"),"default disabled"))return;
@@ -145,6 +161,33 @@ ShellRoot {
                 secret.text=root.password;
                 portable.active=false;
                 if(!root.check(secret.text===""&&portable.receipt===null&&portable.armed===null,"context clears sensitive input"))return;
+                portable.active=true;
+                if(!root.click(backup,"REFRESH BACKUPS"))return;
+                backup.active=false;backup.active=true;
+                if(!root.check(backup.requestBusy&&!backup.refresh(),"no overlapping refresh after reopen"))return;
+                root.stage++;return;
+            case 9:
+                if(backup.requestBusy)return;
+                if(!root.check(!backup.rowsLoaded&&backup.rows.length===0,"old context result discarded"))return;
+                if(!root.click(backup,"REFRESH BACKUPS"))return;
+                root.stage++;return;
+            case 10:
+                if(!backup.rowsLoaded)return;
+                secret.text=root.password;
+                if(!root.click(portable,"AUTHENTICATE / PREVIEW SEALED FILE")||!root.click(portable,"CONFIRM PREVIEW"))return;
+                portable.savedRevision=2;portable.savedRevision=1;
+                if(!root.check(portable.requestBusy&&portable.receipt===null&&secret.text==="","revision roundtrip invalidates pending preview"))return;
+                root.stage++;return;
+            case 11:
+                if(portable.requestBusy)return;
+                if(!root.check(portable.receipt===null&&portable.notice==="RESULT NOT CONFIRMED // INSPECT FILES BEFORE RETRY","old revision receipt discarded"))return;
+                secret.text=root.password;
+                if(!root.click(portable,"AUTHENTICATE / PREVIEW SEALED FILE")||!root.click(portable,"CONFIRM PREVIEW"))return;
+                root.stage++;return;
+            case 12:
+                if(portable.requestBusy)return;
+                if(!root.check(portable.receipt!==null&&portable.receipt.action==="preview","fresh explicit preview"))return;
+                console.log("M4T5_CONTEXT_PASS");
                 console.log("M4T4_NATIVE_PASS");Qt.quit();return;
             }
         }

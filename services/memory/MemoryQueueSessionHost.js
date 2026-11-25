@@ -94,11 +94,11 @@ function initial(consumer) {
         mode:"LEGACY",stage:null,reviewEnabled:false,reviewFlow:null,reviewReceipt:null,reviewLost:null,
         checkpointRequired:false,checkpointWait:null,notificationEnabled:false,lastNoticeSequence:0,
         dispositionEnabled:false,dispositionConnectPending:false,dispositionInventory:null,
-        dispositionLost:null,dispositionReceipt:null,
+        dispositionLost:null,dispositionReceipt:null,retentionProof:null,retentionPending:false,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
 function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false,checkpointRequired=false,notificationEnabled=false,dispositionEnabled=false) {
-    if ((state.phase!=="STOPPED" && state.phase!=="FAILED")
+    if (state.retentionPending || (state.phase!=="STOPPED" && state.phase!=="FAILED")
         || !positive(generation) || generation<=state.generation
         || !["LEGACY","STAGED"].includes(mode) || typeof reviewEnabled!=="boolean"
         || typeof checkpointRequired!=="boolean" || typeof notificationEnabled!=="boolean"
@@ -183,6 +183,8 @@ function takeDispositionConnect(state,generation) {
 function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow,offerNotice) {
     const fail=reason=>stop(state,consumer,reason,state.generation);
     if (!p || typeof p!=="object" || Array.isArray(p) || !safe(p) || p.version!==1 || p.can_execute!==false) return fail("INVALID_PACKET");
+    // A retention proof is one fresh history response, not a cached UI receipt.
+    if (state.retentionProof) state=Object.assign({},state,{retentionProof:null});
     if (state.phase==="HELLO") {
         if (!exact(p,["version","kind","owner_id","can_execute"]) || p.kind!==(state.dispositionEnabled?"HELLO_DISPOSITION":"HELLO") || !uuid(p.owner_id)
             || p.owner_id===state.session.previousOwnerId)
@@ -273,7 +275,10 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         if (state.reviewLost && p.receipt!==null && !equal(p.receipt.review,state.reviewLost))
             return fail("REVIEW_HISTORY_MISMATCH");
         return Object.assign({},state,advanced,{reviewFlow:null,reviewReceipt:p.receipt,
-            reviewLost:p.receipt!==null ? null:state.reviewLost});
+            reviewLost:p.receipt!==null ? null:state.reviewLost,
+            retentionProof:p.receipt?.review?.snapshot?.record?.state==="COMMITTED"
+                ? {generation:state.generation,ownerId:p.owner_id,sequence:p.sequence,
+                    receipt:JSON.parse(JSON.stringify(p.receipt))} : null});
     }
     if (p.kind==="LOCAL_DISPOSITION" || p.kind==="LOCAL_DISPOSITION_HISTORY") {
         const f=state.reviewFlow;
@@ -297,7 +302,9 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         if (state.dispositionLost && p.receipt!==null && !equal(p.receipt.review,state.dispositionLost))
             return fail("DISPOSITION_HISTORY_MISMATCH");
         return Object.assign({},state,advanced,{reviewFlow:null,dispositionReceipt:p.receipt,
-            dispositionLost:p.receipt!==null?null:state.dispositionLost});
+            dispositionLost:p.receipt!==null?null:state.dispositionLost,
+            retentionProof:p.receipt===null?null:{generation:state.generation,ownerId:p.owner_id,
+                sequence:p.sequence,receipt:JSON.parse(JSON.stringify(p.receipt))}});
     }
     if (p.kind==="PREPARED_ACTION") {
         const pending=state.session.pending;
@@ -498,7 +505,7 @@ function readReviewReceipt(state,reviewId) {
     const no={state,frame:null};
     if (!reviewAvailable(state) || !uuid(reviewId)
         || (state.reviewLost && state.reviewLost.review_id!==reviewId)) return no;
-    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null}),
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null,retentionProof:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW_HISTORY",owner_id:state.session.ownerId,review_id:reviewId})+"\n"};
 }
 function canDismiss(state) {
@@ -530,8 +537,48 @@ function readDispositionReceipt(state,actionId) {
     const no={state,frame:null};
     if (!state.dispositionEnabled || !reviewAvailable(state) || !uuid(actionId)
         || (state.dispositionLost && state.dispositionLost.action_id!==actionId)) return no;
-    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_DISPOSITION",actionId},dispositionReceipt:null}),
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_DISPOSITION",actionId},dispositionReceipt:null,retentionProof:null}),
         frame:JSON.stringify({version:1,kind:"DISPOSITION_HISTORY",owner_id:state.session.ownerId,action_id:actionId})+"\n"};
+}
+// R6e: consume only a fresh history proof accepted by the canonical owner
+// feed. Trusted wrapper owns the LOAD result and explicit selection, must
+// publish stopped state, terminate its exact child and await exit before IO.
+// No queue frame, unlock, replay, or caller-supplied receipt argument.
+function takeRetentionAdvance(state,selection,loaded,generation,consumer,recoveryRow) {
+    const no={state,request:null,frame:null};
+    const proof=state.retentionProof;
+    const committed=proof?.receipt?.version===1;
+    if (generation!==state.generation || !reviewAvailable(state) || !state.dispositionEnabled
+        || !state.checkpointRequired || state.reviewLost || state.dispositionLost
+        || state.checkpointWait || !proof || proof.generation!==generation
+        || proof.ownerId!==state.session.ownerId || proof.sequence!==state.sequence
+        || (committed ? (!equal(proof.receipt,state.reviewReceipt) || !receiptValue(proof.receipt,recoveryRow)
+            || proof.receipt.review.snapshot.record.state!=="COMMITTED")
+            : (!equal(proof.receipt,state.dispositionReceipt) || !dispositionValue(proof.receipt,recoveryRow)))
+        || !safe(selection) || !exact(selection,["storageGeneration","actionId","reviewDigest","sequence"])
+        || selection.sequence!==proof.sequence || selection.actionId!==proof.receipt.review.action_id
+        || selection.reviewDigest!==proof.receipt.review.review_digest
+        || !safe(loaded) || !exact(loaded,["version","kind","snapshot","can_execute"])
+        || loaded.version!==1 || loaded.kind!=="CHECKPOINT_GENERATION_LOADED" || loaded.can_execute!==false)
+        return no;
+    const snapshot=loaded.snapshot;
+    if (!exact(snapshot,["generation","checkpoint","sealed","receipt","startup_unlock","can_execute"])
+        || !Number.isSafeInteger(snapshot.generation) || snapshot.generation<0
+        || snapshot.generation!==selection.storageGeneration || snapshot.startup_unlock!==false
+        || snapshot.can_execute!==false || typeof snapshot.sealed!=="boolean"
+        || (snapshot.sealed?!equal(snapshot.receipt,proof.receipt):snapshot.receipt!==null))
+        return no;
+    const restored=restoreCheckpoint(consumer,snapshot.checkpoint,recoveryRow);
+    if (!restored || (committed ? (!!restored.dispositionLost || !restored.reviewLost
+            || !equal(restored.reviewLost,proof.receipt.review))
+            : (!restored.dispositionLost || !equal(restored.dispositionLost,proof.receipt.review)))
+        || !equal(restored.session.unresolved,state.session.unresolved)) return no;
+    const request={version:1,generation:snapshot.generation,receipt:JSON.parse(JSON.stringify(proof.receipt))};
+    // Retire this controller instance before storage. Only a fresh verified
+    // LOAD may construct another locked state; the wrapper owns monotonic
+    // process generation across that reconstruction.
+    return {state:Object.assign({},stop(state,consumer,null,generation),{retentionPending:true}),
+        request,frame:null};
 }
 // R3q: bounded durable checkpoint contract. The actual storage adapter
 // must save the exact returned record before emitting the associated frame.

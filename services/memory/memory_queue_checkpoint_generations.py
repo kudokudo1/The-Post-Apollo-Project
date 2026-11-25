@@ -13,10 +13,13 @@ import os
 from memory_adjustment_queue import QueueError
 from memory_queue_host_checkpoint import HostCheckpoint, SLOTS, MAX_BYTES, _json, validate_record
 from memory_queue_local_actions import MAX_SAFE
+from memory_queue_pipe import _receipt_wire
 
 # Bounded development policy, not an installed retention setting.
 MAX_GENERATIONS = 32
 SEAL = "dismissed-v2.json"
+COMMITTED_SEAL = "committed-v1.json"
+SEALS = {SEAL, COMMITTED_SEAL}
 
 
 class CheckpointGenerations:
@@ -43,7 +46,21 @@ class CheckpointGenerations:
         return None
 
     @staticmethod
+    def _seal_name(receipt):
+        return COMMITTED_SEAL if type(receipt) is dict and receipt.get("version") == 1 else SEAL
+
+    @staticmethod
     def _seal_bytes(snapshot, receipt):
+        if CheckpointGenerations._seal_name(receipt) == COMMITTED_SEAL:
+            ack = snapshot.get("acknowledgment")
+            if (ack is None or snapshot.get("dismissal") is not None
+                    or ack["review"]["snapshot"]["record"]["state"] != "COMMITTED"):
+                raise QueueError("CHECKPOINT_EXACT_COMMITTED_REVIEW_REQUIRED")
+            _receipt_wire(receipt)
+            if (_json(receipt["review"]) != _json(ack["review"])
+                    or not 0 <= receipt["acknowledged_at_ms"] - ack["review"]["reviewed_at_ms"] < 60000):
+                raise QueueError("CHECKPOINT_EXACT_COMMITTED_REVIEW_REQUIRED")
+            return CheckpointGenerations._encode_seal(snapshot, receipt)
         dismissal = snapshot.get("dismissal")
         if (dismissal is None or type(receipt) is not dict
                 or set(receipt) != {"version", "review", "dismissed_at_ms",
@@ -59,6 +76,10 @@ class CheckpointGenerations:
                 or not 0 <= receipt["dismissed_at_ms"] <= MAX_SAFE
                 or not 0 <= receipt["dismissed_at_ms"] - dismissal["review"]["reviewed_at_ms"] < 60000):
             raise QueueError("CHECKPOINT_EXACT_DISMISSAL_REQUIRED")
+        return CheckpointGenerations._encode_seal(snapshot, receipt)
+
+    @staticmethod
+    def _encode_seal(snapshot, receipt):
         data = _json({"version": 1, "receipt": receipt,
                       "snapshot_sha256": hashlib.sha256(_json(snapshot)).hexdigest()}) + b"\n"
         if len(data) > MAX_BYTES:
@@ -66,11 +87,14 @@ class CheckpointGenerations:
         return data
 
     def _read_seal(self, fd, snapshot):
-        try:
-            handle = os.open(SEAL, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
-                             dir_fd=fd)
-        except FileNotFoundError:
+        present = SEALS.intersection(os.listdir(fd))
+        if not present:
             return None
+        if len(present) != 1:
+            raise QueueError("INVALID_CHECKPOINT_GENERATION_SEAL")
+        name = next(iter(present))
+        handle = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                         dir_fd=fd)
         try:
             before = os.fstat(handle)
             HostCheckpoint._private(before)
@@ -81,7 +105,7 @@ class CheckpointGenerations:
                     break
                 data.extend(part)
             after = os.fstat(handle)
-            current = os.stat(SEAL, dir_fd=fd, follow_symlinks=False)
+            current = os.stat(name, dir_fd=fd, follow_symlinks=False)
             for info in (after, current):
                 HostCheckpoint._private(info)
             stamp = lambda i: (i.st_dev, i.st_ino, i.st_size, i.st_mtime_ns, i.st_ctime_ns)
@@ -92,7 +116,7 @@ class CheckpointGenerations:
                     raise ValueError("oversize seal")
                 value = json.loads(data.decode("ascii"))
                 receipt = value["receipt"]
-                if self._seal_bytes(snapshot, receipt) != data:
+                if self._seal_name(receipt) != name or self._seal_bytes(snapshot, receipt) != data:
                     raise ValueError("noncanonical seal")
                 return receipt
             except (ValueError, KeyError, TypeError, RecursionError) as exc:
@@ -101,7 +125,7 @@ class CheckpointGenerations:
             os.close(handle)
 
     def _scan(self, root_fd):
-        allowed = set(SLOTS.values()) | {SEAL}
+        allowed = set(SLOTS.values()) | SEALS
         names = set(os.listdir(root_fd)) - allowed
         expected = {"generation-%04d" % i for i in range(1, len(names) + 1)}
         if len(names) >= MAX_GENERATIONS or names != expected:
@@ -161,10 +185,11 @@ class CheckpointGenerations:
                 raise QueueError("CHECKPOINT_GENERATION_LIMIT")
             snapshot, previous = entries[-1]
             data = self._seal_bytes(snapshot, receipt)
+            seal_name = self._seal_name(receipt)
             store = self._store(generation)
             with store._directory() as fd:
                 if previous is None:
-                    handle = os.open(SEAL, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                    handle = os.open(seal_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                                      os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=fd)
                     try:
                         remaining = memoryview(data)
@@ -182,7 +207,7 @@ class CheckpointGenerations:
                 # it before advancing; never replace a partial/corrupt seal.
                 if self._read_seal(fd, snapshot) != receipt:
                     raise QueueError("INVALID_CHECKPOINT_GENERATION_SEAL")
-                handle = os.open(SEAL, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
+                handle = os.open(seal_name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
                 try:
                     os.fsync(handle)
                 finally:

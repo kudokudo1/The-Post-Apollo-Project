@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from cpuplus_memory_queue_host_checkpoint_test import ACTION, acknowledgment, QueueError
-from memory_queue_checkpoint_generations import CheckpointGenerations, SEAL
+from memory_queue_checkpoint_generations import CheckpointGenerations, SEAL, COMMITTED_SEAL
 from memory_queue_host_checkpoint import SLOTS
 
 
@@ -124,6 +124,43 @@ class Tests(unittest.TestCase):
         (self.path/"generation-0001").symlink_to(self.path)
         with self.assertRaises(QueueError):
             self.store.load()
+
+    def test_committed_ack_seal_distinct_and_exact(self):
+        ack=acknowledgment()
+        row=ack["review"]["snapshot"]["record"]
+        row.update(state="COMMITTED",result_request_id="c23683a9-b2ab-4a2c-87ce-31bdf27a3019",committed_at=101)
+        ack["review"]["review_digest"]=hashlib.sha256(json.dumps(
+            ack["review"]["snapshot"],sort_keys=True,separators=(",",":")).encode("ascii")).hexdigest()
+        self.store.save(0,ACTION)
+        self.store.save(0,ack)
+        proof={"version":1,"review":ack["review"],"acknowledged_at_ms":100001,
+               "disposition":"REVIEW_ACKNOWLEDGED_ONLY","adjustment_outcome":"UNVERIFIED",
+               "can_execute":False,"startup_unlock":False}
+        before={p.name:p.read_bytes() for p in self.path.iterdir()}
+        for wrong in (dict(proof,can_execute=True),dict(proof,acknowledged_at_ms=160000),
+                      dict(proof,review=dict(proof["review"],review_digest="0"*64))):
+            with self.assertRaises(QueueError):
+                self.store.advance(0,wrong)
+        self.assertEqual(self.store.advance(0,proof),1)
+        self.assertTrue((self.path/COMMITTED_SEAL).is_file())
+        self.assertFalse((self.path/SEAL).exists())
+        self.assertEqual(self.store.load()["generation"],1)
+        for name,data in before.items(): self.assertEqual((self.path/name).read_bytes(),data)
+        with self.assertRaisesRegex(QueueError,"CHECKPOINT_ACTION_ALREADY_RETAINED"):
+            self.store.save(1,ACTION)
+        (self.path/SEAL).write_bytes((self.path/COMMITTED_SEAL).read_bytes())
+        with self.assertRaises(QueueError): self.store.load()
+
+    def test_prepared_ack_never_seals(self):
+        ack=acknowledgment()
+        self.store.save(0,ACTION)
+        self.store.save(0,ack)
+        proof={"version":1,"review":ack["review"],"acknowledged_at_ms":100001,
+               "disposition":"REVIEW_ACKNOWLEDGED_ONLY","adjustment_outcome":"UNVERIFIED",
+               "can_execute":False,"startup_unlock":False}
+        with self.assertRaisesRegex(QueueError,"CHECKPOINT_EXACT_COMMITTED_REVIEW_REQUIRED"):
+            self.store.advance(0,proof)
+        self.assertEqual(self.store.load()["generation"],0)
 
     def test_bound_refuses_without_erasure(self):
         self.prepare()

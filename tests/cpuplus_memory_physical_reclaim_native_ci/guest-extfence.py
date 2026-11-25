@@ -336,16 +336,29 @@ def physical_trial(guard):
     custody = [guard.digest_file(ARCHIVE),guard.digest_file(PREPARED)]
     fence = fence_identity(guard,witness["prepared"].encode("ascii"))
     parent = trial.parent
+    module = load_candidate(guard)
+    mount, fs = module.mount_info()
+    require(fs == "btrfs" and mount in ("/", "/var", "/var/lib"),
+            "trusted Btrfs mount unavailable")
+    require(os.stat(mount).st_dev == parent.stat().st_dev,
+            "trial parent differs from filesystem mount")
     btrfs = "/usr/bin/btrfs"
     def command(*args):
-        return guard.command(btrfs,*map(str,args)).strip()
+        import subprocess
+        try:
+            return guard.command(btrfs,*map(str,args)).strip()
+        except subprocess.CalledProcessError as exc:
+            print("CPU_MEM_EXTFENCE_DIAG // " + json.dumps({
+                "command":list(exc.cmd),"returncode":exc.returncode,
+                "stderr":str(exc.stderr)[:1000]},sort_keys=True),flush=True)
+            raise RuntimeError("fixture Btrfs command failed") from exc
     def rootid(target):
         value = command("inspect-internal","rootid",target)
         require(re.fullmatch(r"[1-9][0-9]*",value) is not None,"root ID unverified")
         return int(value)
     def usage():
-        command("filesystem","sync",parent)
-        output = command("filesystem","usage","--raw",parent)
+        command("filesystem","sync",mount)
+        output = command("filesystem","usage","--raw",mount)
         totals = re.findall(r"(?m)^\s*Used:\s*(\d+)\s*$",output)
         require(len(totals)==1,"Btrfs used bytes unavailable")
         v=os.statvfs(parent)
@@ -363,9 +376,10 @@ def physical_trial(guard):
             if kind=="file":
                 s=os.stat(name)
                 require((s.st_dev,s.st_ino)!=identity,"active swap alias")
-    require(re.findall(r"Total devices\s+(\d+)\b",command("filesystem","show","--raw",parent))==["1"],
+    require(re.findall(r"Total devices\s+(\d+)\b",command("filesystem","show","--raw",mount))==["1"],
             "not single-device Btrfs")
     baseline=usage()
+    print("CPU_MEM_EXTFENCE_DIAG // "+json.dumps({"mount":mount,"baseline":baseline},sort_keys=True),flush=True)
     command("subvolume","create",trial)
     trial.chmod(0o700)
     command("filesystem","mkswapfile","--size","1G",path)
@@ -385,6 +399,7 @@ def physical_trial(guard):
                 and s.st_blocks*512>=guard.GIB//2
                 and set(os.listdir(fd))=={"swapfile"},"trial allocation unverified")
         allocated=usage()
+        print("CPU_MEM_EXTFENCE_DIAG // "+json.dumps({"allocated":allocated},sort_keys=True),flush=True)
         require(allocated["used"]-baseline["used"]>=guard.GIB//2
                 and baseline["available"]-allocated["available"]>=guard.GIB//2,
                 "physical allocation accounting insufficient")
@@ -415,8 +430,9 @@ def physical_trial(guard):
     require((trial.lstat().st_dev,trial.lstat().st_ino)==(d.st_dev,d.st_ino)
             and rootid(trial)==root and not list(trial.iterdir()),"empty trial replaced")
     command("subvolume","delete","--commit-after",trial)
-    command("subvolume","sync",parent,root)
+    command("subvolume","sync",mount,root)
     released=usage()
+    print("CPU_MEM_EXTFENCE_DIAG // "+json.dumps({"released":released},sort_keys=True),flush=True)
     require(not os.path.lexists(trial),"trial directory retained")
     require(allocated["used"]-released["used"]>=guard.GIB//2
             and released["available"]-allocated["available"]>=guard.GIB//2,

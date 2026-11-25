@@ -13,6 +13,8 @@ ShellRoot {
     readonly property var manifestB: JSON.parse(Quickshell.env("MAP_FIXTURE_B"))
     readonly property string dirA: Quickshell.env("MAP_FIXTURE_DIR_A")
     readonly property string dirB: Quickshell.env("MAP_FIXTURE_DIR_B")
+    readonly property var manifestC: JSON.parse(Quickshell.env("MAP_FIXTURE_C"))
+    readonly property string dirC: Quickshell.env("MAP_FIXTURE_DIR_C")
     property real expectedY: 0
     property string chosen: ""
     readonly property bool inputTest: Quickshell.env("MAP_FIXTURE_INPUT")==="1"
@@ -35,6 +37,10 @@ ShellRoot {
         const viewport=map.scrollViewport;
         const point=viewport.mapToGlobal(viewport.width/2,viewport.height/2);
         runInput(move(point).concat(["click","--repeat","4",String(button)]));
+    }
+    function dense() {
+        if (!check(map.activate(dirC,manifestC,{top:true}),"activate wide merge")) return;
+        phase=13;
     }
     function pass() {
         console.log("GIT_MAP_NATIVE_PASS");
@@ -145,7 +151,7 @@ ShellRoot {
             if (root.phase===7) {
                 map.visible=true;
                 if (!root.check(map.scrollPosition===root.expectedY,"hidden candidate lost position")) return;
-                if (!root.inputTest) {root.pass();return;}
+                if (!root.inputTest) {root.dense();return;}
                 root.dragRail(true);
                 root.phase=8;
                 return;
@@ -183,6 +189,39 @@ ShellRoot {
             if (root.phase===12) {
                 if (!root.inputDone) return;
                 if (!root.check(Math.abs(map.scrollPosition)<0.5,"wheel at top wrapped")) return;
+                root.dense();
+                return;
+            }
+            if (root.phase===13) {
+                if (!map.rowAt(32)) return;
+                if (!root.check(map.mapState.maxLane>=31 && map.graphSurfaceWidth>190 && map.laneMaxOffset>0,"responsive wide graph and pan")) return;
+                if (!root.check(map.graphLaneVisible(0) && !map.graphLaneVisible(31),"initial lane window")) return;
+                map.scrollTo(32*24);
+                root.expectedY=map.scrollPosition;
+                if (!root.check(map.choose(32) && map.graphLaneVisible(map.rowAt(32).lane),"select high-lane commit reveals exact star")) return;
+                if (!root.check(map.scrollPosition===root.expectedY && map.renderedRows<=24 && map.graphSurfaceHeight<480,"horizontal navigation preserves bounded vertical viewport")) return;
+                map.setLaneOffset(99999);
+                if (!root.check(map.laneOffset===map.laneMaxOffset && map.graphLaneVisible(map.mapState.maxLane),"last lane reachable")) return;
+                map.setLaneOffset(-99);
+                if (!root.check(map.laneOffset===0 && map.graphLaneVisible(0),"first lane reachable")) return;
+                console.log("GIT_MAP_DENSE_LANES_PASS");
+                map.scrollTo(99999999);
+                root.expectedY=map.scrollPosition;
+                root.phase=14;
+                return;
+            }
+            if (root.phase===14) {
+                if (!map.rowAt(63)) return;
+                if (!root.check(map.visibleLaneCount===1 && map.graphSurfaceWidth===2*map.laneMargin && map.laneOffset===map.laneMinOffset,"graph contracts in narrow tail")) return;
+                if (!root.check(map.scrollPosition===root.expectedY,"contraction preserves vertical position")) return;
+                map.scrollTo(0);
+                root.phase=15;
+                return;
+            }
+            if (root.phase===15) {
+                if (!map.rowAt(0)) return;
+                if (!root.check(map.visibleLaneCount>=32 && map.graphSurfaceWidth>190 && map.laneMaxOffset>map.laneMinOffset && map.scrollPosition===0,"graph re-expands on wide ancestry")) return;
+                console.log("GIT_MAP_REACTIVE_LANES_PASS");
                 root.pass();
             }
         }

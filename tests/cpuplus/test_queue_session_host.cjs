@@ -486,5 +486,38 @@ console.log("R3q checkpoint host PASS: pre-send correlation, fresh-shell lookup 
     assert.equal(h.takeCommit(recovered,1).frame,null);
     assert.equal(h.dismissReview(recovered,select,1,recovery.row).frame,null);
     console.log("R6b disposition host PASS: handshake, durable dismissal, exact receipt and lost reply, no unlock");
+    // R6e: actual retained storage IO; synthetic wire responses in this
+    // Node suite are not evidence of real backend provenance.
+    const genLoad=result(io("GEN_LOAD",null));
+    assert.equal(genLoad.kind,"CHECKPOINT_GENERATION_LOADED");
+    assert.equal(genLoad.snapshot.generation,0);
+    const retain={storageGeneration:0,actionId:X,reviewDigest:live.review_digest,sequence:3};
+    const advance=(s,sel=retain,load=genLoad,g=1)=>h.takeRetentionAdvance(s,sel,load,g,c,recovery.row);
+    assert.equal(advance(done).request,null); // live reply alone insufficient
+    assert.equal(advance(missing).request,null);
+    assert.equal(advance(recovered,{...retain,actionId:R}).request,null);
+    assert.equal(advance(recovered,{...retain,sequence:2}).request,null);
+    assert.equal(advance(recovered,{...retain,storageGeneration:1}).request,null);
+    assert.equal(advance(recovered,retain,genLoad,2).request,null);
+    assert.equal(advance(recovered,retain,{...genLoad,snapshot:{...genLoad.snapshot,checkpoint:loaded.snapshot.action}}).request,null);
+    assert.equal(advance(feed(recovered,control("INVALIDATE",R))).request,null);
+    const chosen=advance(recovered);
+    assert.ok(chosen.request); assert.equal(chosen.frame,null);
+    assert.equal(chosen.state.phase,"STOPPED"); assert.equal(chosen.state.startupLocked,true);
+    assert.equal(advance(chosen.state).request,null);
+    assert.equal(h.start(chosen.state,c,2,"STAGED",true,true,false,true).phase,"STOPPED");
+    const reply=result(io("GEN_ADVANCE",chosen.request));
+    assert.equal(reply.kind,"CHECKPOINT_GENERATION_ADVANCED");
+    assert.equal(reply.generation,1); assert.equal(reply.action_id,X);
+    assert.equal(reply.startup_unlock,false); assert.equal(reply.can_execute,false);
+    assert.notEqual(io("GEN_ADVANCE",chosen.request).status,0);
+    assert.notEqual(io("LOAD",null).status,0);
+    assert.notEqual(io("SAVE",actionCheckpoint).status,0);
+    const next=result(io("GEN_LOAD",null));
+    assert.equal(next.snapshot.generation,1);
+    const locked=h.restoreCheckpoint(c,next.snapshot.checkpoint,recovery.row);
+    assert.ok(locked.startupLocked && !locked.session.pending && !locked.session.unresolved);
+    assert.notEqual(io("GEN_SAVE",{version:1,generation:1,record:actionCheckpoint}).status,0);
+    console.log("R6e retention host PASS: fresh history gate, exact storage IO, old writer refusal, no unlock");
  } finally {fs.rmSync(folder,{recursive:true,force:true});}
 }

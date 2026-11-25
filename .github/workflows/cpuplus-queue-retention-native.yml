@@ -1,0 +1,35 @@
+name: CPU++ R6f native trusted retention
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_queue_retention_native.py'
+      - 'tests/fixtures/CpuPlusQueueRetentionNative.qml'
+      - 'tests/fixtures/cpuplus_queue_retention_child.py'
+      - 'tests/fixtures/cpuplus_queue_retention_helper.py'
+      - 'services/memory/MemoryQueueSessionHost.js'
+      - 'services/memory/MemoryQueueCheckpointAdapter.qml'
+      - 'services/memory/memory_queue_*.py'
+      - '.github/workflows/cpuplus-queue-retention-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtqml
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Native real owner and exact child-exit retention qualification
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/cpuplus_queue_retention_native.py

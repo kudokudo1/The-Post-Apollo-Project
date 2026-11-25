@@ -18,24 +18,56 @@ const sample = JSON.parse(execFileSync("python3", ["-B", "-c", [
     "from pathlib import Path",
     "sys.path[:0] = ['scripts', 'tests/cpuplus']",
     "import cpuplus_quickshell_memory_observer as observer",
-    "from test_quickshell_memory_observer import stat, rollup",
+    "from test_quickshell_memory_observer import stat, rollup, host_info",
     "with tempfile.TemporaryDirectory() as tmp:",
     "    p = Path(tmp) / '123'",
     "    p.mkdir()",
     "    (p / 'stat').write_text(stat())",
     "    (p / 'smaps_rollup').write_text(rollup())",
+    "    (p.parent / 'meminfo').write_text(host_info())",
     "    print(json.dumps(observer.observe(p, os.getuid(), 100)))"
 ].join("\n")], {cwd:root, encoding:"utf8"}));
 assert.equal(sample.privateResidentKiB, 110);
+assert.equal(sample.hostObservation.beforeKiB.MemAvailable, 6000);
+assert.equal(sample.hostObservation.afterKiB.MemAvailable, 6000);
 const current = {...sample, cpuPct:null, sampleIntervalMs:null};
 const legacy = JSON.parse(JSON.stringify(current));
 delete legacy.memoryKiB.Private_Clean;
 delete legacy.privateResidentKiB;
+delete legacy.hostObservation;
 const terminal = {event:"complete",pid:sample.pid,startTicks:sample.startTicks};
 // Explicit map callback avoids Array.map passing an index as JSON replacer.
 const jsonl = row => [row, terminal].map(x => JSON.stringify(x)).join("\n");
 const oldText = jsonl(legacy), newText = jsonl(current);
-assert.equal(policy.summarize("memory", oldText), policy.summarize("memory", newText));
+const oldSummary=policy.summarize("memory", oldText), newSummary=policy.summarize("memory", newText);
+assert.ok(newSummary.startsWith(oldSummary+"\nHOST CONTEXT // 1/1 paired samples"));
+assert.match(newSummary,/HOST AVAILABLE MIN \x28OBSERVED\x29 \/\/ 5\.9 MiB/);
+assert.match(newSummary,/CORRELATION ONLY \/\/ CAUSE NOT ESTABLISHED/);
+assert.doesNotMatch(oldSummary,/HOST CONTEXT/);
+const after={...current,tsMs:current.tsMs+10000,cpuTicks:current.cpuTicks+10,cpuPct:1,sampleIntervalMs:10000,
+    memoryKiB:{...current.memoryKiB,Rss:200+1024,Pss:150+1024,Pss_Anon:100+1024},
+    pssPlusSwapPssKiB:180+1024,
+    hostObservation:{...current.hostObservation,afterKiB:{...current.hostObservation.afterKiB,MemAvailable:3952}}};
+const summaryFor=(rows)=>policy.summarize("memory",[...rows,terminal].map(x=>JSON.stringify(x)).join("\n"));
+let summary=summaryFor([current,after]);
+assert.match(summary,/HOST CONTEXT \/\/ 2\/2 paired samples/);
+assert.match(summary,/HOST AVAILABLE CHANGE \/\/ -2\.0 MiB/);
+assert.match(summary,/QS PSS CHANGE \/\/ \+1\.0 MiB/);
+for(const unavailable of [null,{...after.hostObservation,afterKiB:null},
+    {...after.hostObservation,afterKiB:{...after.hostObservation.afterKiB,MemAvailable:999999}},
+    {...after.hostObservation,spanMs:-1}]){
+    summary=summaryFor([current,{...after,hostObservation:unavailable}]);
+    assert.match(summary,/HOST CONTEXT \/\/ 1\/2 paired samples/);
+    assert.match(summary,/HOST TREND \/\/ INCOMPLETE/);
+    assert.doesNotMatch(summary,/HOST AVAILABLE CHANGE|QS PSS CHANGE/);
+}
+summary=summaryFor([{...current,hostObservation:null}]);
+assert.match(summary,/HOST CONTEXT \/\/ 0\/1 paired samples \/\/ UNAVAILABLE/);
+summary=summaryFor([current,{...after,hostObservation:{...after.hostObservation,
+    beforeKiB:{...after.hostObservation.beforeKiB,MemTotal:64000},
+    afterKiB:{...after.hostObservation.afterKiB,MemTotal:64000}}}]);
+assert.match(summary,/HOST TREND \/\/ INCOMPLETE OR CHANGED CAPACITY/);
+assert.doesNotMatch(summary,/HOST AVAILABLE CHANGE/);
 const details = text => breakdown.memoryBreakdown("memory", {status:"COMPLETE",text});
 assert.ok(details(oldText));
 assert.deepEqual(JSON.parse(JSON.stringify(details(oldText))),

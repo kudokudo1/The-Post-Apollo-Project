@@ -57,7 +57,7 @@ for(const token of ["property bool reviewEnabled: false","TextInput.Password","Q
     assert.ok(panel.includes(token),token);
 for(const token of ["property bool allowed: false","Policy.frame(intent,password)",
     "pending=JSON.parse(JSON.stringify(intent))","banking_manual_portable.py",
-    "worker.write(service.discarded ?","service.frame=\"\"","Policy.accept(service.output,code,service.pending)"])
+    "worker.write(service.discarded ?","service.frame=\"\"","Policy.accept(service.output,code,service.pending)","discarded=true","retired=true","interval: 35000"])
     assert.ok(service.includes(token),token);
 assert.ok(!service.includes("Component.onCompleted"));
 assert.ok(!service.includes("banking_manual_archive.py"));

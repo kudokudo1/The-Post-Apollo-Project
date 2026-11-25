@@ -1,0 +1,38 @@
+name: CPU++ R6h desktop recovery wrapper
+on:
+  pull_request:
+    paths:
+      - 'services/memory/MemoryQueue*.qml'
+      - 'services/memory/MemoryQueueSessionHost.js'
+      - 'services/memory/memory_queue_*.py'
+      - 'tests/cpuplus_queue_wrapper_native.py'
+      - 'tests/cpuplus_queue_custody_test.py'
+      - 'tests/fixtures/CpuPlusQueueDesktopWrapperNative.qml'
+      - 'tests/fixtures/cpuplus_queue_wrapper_child.py'
+      - 'tests/fixtures/cpuplus_queue_retention_helper.py'
+      - '.github/workflows/cpuplus-queue-wrapper-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Native disposable runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 dbus-daemon quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtqml qml6-module-qtqml-models
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Actual unmounted desktop recovery wrapper
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+        run: |
+          python3 -B tests/cpuplus_queue_custody_test.py
+          python3 -B tests/cpuplus_queue_wrapper_native.py

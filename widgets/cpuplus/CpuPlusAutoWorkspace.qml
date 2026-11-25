@@ -15,6 +15,17 @@ Column {
     required property var observedDiskKiB
     required property int capacityTargetGiB
     property var hostState: null
+    // Externally owned, preconfigured recovery-only session. Never create
+    // a process or select launch paths in this demand-loaded view.
+    property var recoverySession: null
+    readonly property bool sessionActive: !!recoverySession && recoverySession.phase==="ACTIVE"
+        && recoverySession.active() && recoverySession.startupLocked===true && recoverySession.canExecute===false
+    readonly property bool sessionReadAvailable: sessionActive && Recovery.canRead(recoverySession.recoveryContext,true)
+    function sessionAction(kind) {
+        if (!visible || section!=="RECOVERY" || !recoverySession) return;
+        if (kind==="OPEN" && recoverySession.phase==="IDLE") recoverySession.open();
+        else if (kind==="CLOSE" && sessionActive) recoverySession.close();
+    }
     property string section: "REQUESTS"
     signal sectionChangedByUser()
     signal intentConfirmed(var intent)
@@ -23,27 +34,45 @@ Column {
     signal reviewRequested(string actionId)
     signal acknowledgmentRequested(var selection, var generation)
     signal reviewReceiptRequested(string reviewId)
-    readonly property var reviewContext: hostState ? Host.reviewContext(hostState) : null
-    readonly property bool reviewAvailable: !!hostState && Host.reviewAvailable(hostState) && !hostState.checkpointWait
-    readonly property var reviewGeneration: hostState ? hostState.generation : null
+    readonly property var reviewContext: recoverySession ? (sessionActive ? recoverySession.reviewContext : null) : hostState ? Host.reviewContext(hostState) : null
+    readonly property bool reviewAvailable: recoverySession ? sessionReadAvailable && !!reviewContext && ["IDLE","ACK_UNKNOWN"].includes(reviewContext.phase) : !!hostState && Host.reviewAvailable(hostState) && !hostState.checkpointWait
+    readonly property var reviewGeneration: recoverySession ? recoverySession.generation : hostState ? hostState.generation : null
     function forwardReview(actionId) {
+        if (recoverySession) {
+            if (visible && section==="RECOVERY" && reviewAvailable && !reviewContext.unknownReviewId
+                && !recoverySession.dispositionContext.unknownActionId && Recovery.uuid(actionId)) recoverySession.beginReview(actionId);
+            return;
+        }
         if (visible && section==="RECOVERY" && reviewAvailable && !hostState.reviewLost && Recovery.uuid(actionId))
             reviewRequested(actionId);
     }
     function forwardAcknowledgment(selection,generation) {
+        if (recoverySession) {
+            const current=Recovery.reviewSelection(reviewContext,reviewGeneration);
+            if (visible && section==="RECOVERY" && sessionActive && generation===reviewGeneration
+                && Recovery.sameSelection(current,selection))
+                recoverySession.acknowledge({reviewId:current.reviewId,digest:current.digest,sequence:current.sequence});
+            return;
+        }
         if (!visible || section!=="RECOVERY" || !hostState || generation!==hostState.generation || hostState.checkpointWait) return;
         const current=Recovery.reviewSelection(Host.reviewContext(hostState),generation);
         if (current && Recovery.sameSelection(current,selection))
             acknowledgmentRequested({reviewId:current.reviewId,digest:current.digest,sequence:current.sequence},generation);
     }
     function forwardReceipt(reviewId) {
+        if (recoverySession) {
+            if (visible && section==="RECOVERY" && reviewAvailable && Recovery.uuid(reviewId)
+                && (!reviewContext.unknownReviewId || reviewContext.unknownReviewId===reviewId))
+                recoverySession.readAcknowledgment(reviewId);
+            return;
+        }
         if (visible && section==="RECOVERY" && reviewAvailable && Recovery.uuid(reviewId)
             && (!hostState.reviewLost || hostState.reviewLost.review_id===reviewId))
             reviewReceiptRequested(reviewId);
     }
-    readonly property var actionContext: hostState ? Host.context(hostState) : null
-    readonly property var recoveryContext: hostState ? Host.recoveryContext(hostState) : null
-    readonly property bool readAvailable: canRead(hostState)
+    readonly property var actionContext: !recoverySession && hostState ? Host.context(hostState) : null
+    readonly property var recoveryContext: recoverySession ? recoverySession.recoveryContext : hostState ? Host.recoveryContext(hostState) : null
+    readonly property bool readAvailable: recoverySession ? sessionReadAvailable : canRead(hostState)
     function canRead(s) {
         return !!(s && s.phase==="CONNECTED" && s.session && s.session.status
             && !s.session.pending && !s.historyRead && !s.recoveryRead
@@ -57,16 +86,22 @@ Column {
     // Read controls may operate while startup is locked or an outcome is
     // unresolved. Only the canonical host can accept the read or mutation.
     function forwardHistory(requestId) {
-        if (visible && section==="HISTORY" && canRead(hostState) && History.uuid(requestId))
+        if (!recoverySession && visible && section==="HISTORY" && canRead(hostState) && History.uuid(requestId))
             historyReadRequested(requestId);
     }
     function forwardRecovery(kind,value) {
+        if (recoverySession) {
+            if (!visible || section!=="RECOVERY" || !sessionReadAvailable) return;
+            if (kind==="INVENTORY" && value===4) recoverySession.readInventory(value);
+            else if (kind==="LOCAL_ACTION" && Recovery.uuid(value)) recoverySession.readAction(value);
+            return;
+        }
         if (!visible || section!=="RECOVERY" || !canRead(hostState)) return;
         if ((kind==="INVENTORY"&&value===16)||(kind==="LOCAL_ACTION"&&Recovery.uuid(value)))
             recoveryReadRequested(kind,value);
     }
     function forwardIntent(intent) {
-        if (visible && section==="REQUESTS" && canRead(hostState)
+        if (!recoverySession && visible && section==="REQUESTS" && canRead(hostState)
             && hostState.startupLocked===false && !hostState.session.unresolved)
             intentConfirmed(intent);
     }
@@ -106,10 +141,47 @@ Column {
             }
         }
     }
+    Row {
+        parent: root.headerTarget || root
+        objectName: "cpuplusRecoverySessionControls"
+        visible: root.section==="RECOVERY"
+        width: parent.width
+        spacing: 3
+        GohuText {
+            width: Math.max(0,parent.width-120-2*parent.spacing)
+            text: root.recoverySession ? "SESSION // "+root.recoverySession.phase : "SESSION // NOT MOUNTED"
+            color: Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        ActionButton {
+            objectName: "cpuplusRecoverySessionOpen"
+            width: 64
+            height: 26
+            label: "CONNECT"
+            contentPadding: 2
+            available: !!root.recoverySession && root.recoverySession.phase==="IDLE"
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            onLeftClicked: root.sessionAction("OPEN")
+        }
+        ActionButton {
+            objectName: "cpuplusRecoverySessionClose"
+            width: 56
+            height: 26
+            label: "CLOSE"
+            contentPadding: 2
+            available: root.sessionActive
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            onLeftClicked: root.sessionAction("CLOSE")
+        }
+    }
     GohuText {
         parent: root.headerTarget || root
         width: parent.width
-        text: root.hostState ? Recovery.gate(root.recoveryContext ? root.recoveryContext.hostStatus : null)
+        text: root.recoverySession ? Recovery.gate(root.recoveryContext ? root.recoveryContext.hostStatus : null)
+            : root.hostState ? Recovery.gate(root.recoveryContext ? root.recoveryContext.hostStatus : null)
             : "AUTO // TRANSPORT NOT CONNECTED"
         color: Colors.orange
         font.pixelSize: 10
@@ -139,8 +211,8 @@ Column {
             hostMode: true
             footerTarget: sectionFooter
             hostHistory: root.hostState ? root.hostState.history : null
-            historyAvailable: root.readAvailable && hostHistory!==null
-            readAvailable: root.readAvailable
+            historyAvailable: !root.recoverySession && root.readAvailable && hostHistory!==null
+            readAvailable: !root.recoverySession && root.readAvailable
             readPending: !!(root.hostState && root.hostState.historyRead)
             onHistoryReadRequested: requestId => root.forwardHistory(requestId)
         }
@@ -156,6 +228,8 @@ Column {
             recoveryContext: root.recoveryContext
             readAvailable: root.readAvailable
             onRecoveryReadRequested: (kind,value) => root.forwardRecovery(kind,value)
+            recoverySession: root.recoverySession
+            sessionActive: root.sessionActive
             reviewContext: root.reviewContext
             reviewGeneration: root.reviewGeneration
             reviewAvailable: root.reviewAvailable

@@ -340,3 +340,47 @@ assert.equal(reviewCtx.reviewReceipt({...ackReceipt,acknowledged_at_ms:160000}),
 assert.equal(reviewCtx.reviewReceipt({...ackReceipt,startup_unlock:true}),null);
 assert.doesNotMatch(autoWorkspace,/Host\.(?:beginReview|acknowledgeReview|readReviewReceipt)\s*\(/);
 console.log("CPU++ M7a recovery selection and receipt presentation PASS");
+
+const dismissalContext={...reviewContext,enabled:true,canDismiss:true,unknownActionId:null};
+const dismissalSelection=reviewCtx.dismissalSelection(dismissalContext,12);
+assert.equal(dismissalSelection.reviewId,reviewId);
+for(const change of [{canDismiss:false},{enabled:false},{phase:"WAIT_CHECKPOINT"},{canExecute:true},{startupLocked:false}])
+    assert.equal(reviewCtx.dismissalSelection({...dismissalContext,...change},12),null);
+const dismissalReceipt={version:2,review:reviewValue,dismissed_at_ms:100001,disposition:"LOCAL_PREPARATION_DISMISSED",adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false};
+const dismissed=reviewCtx.dispositionReceipt(dismissalReceipt);
+assert.equal(dismissed.action.actionId,reviewAction);
+assert.equal(reviewCtx.dispositionReceipt({...dismissalReceipt,startup_unlock:true}),null);
+assert.equal(reviewCtx.dispositionReceipt({...dismissalReceipt,dismissed_at_ms:160000}),null);
+const proof={storageGeneration:0,actionId:reviewAction,reviewDigest:reviewValue.review_digest,sequence:23};
+const retained=reviewCtx.retentionSelection(proof,dismissed,null,12,0);
+assert.equal(retained.mode,"DISMISSED");
+assert.equal(reviewCtx.retentionSelection(proof,null,reviewCtx.reviewReceipt(ackReceipt),12,0),null);
+assert.equal(reviewCtx.retentionSelection({...proof,actionId:reviewId},dismissed,null,12,0),null);
+assert.equal(reviewCtx.retentionSelection(proof,dismissed,null,12,1),null);
+for(const key of Object.keys(retained))assert.equal(reviewCtx.sameRetention(retained,{...retained,[key]:null}),false);
+const committedReview={...reviewValue,snapshot:{...reviewValue.snapshot,record:{...reviewRecord,state:"COMMITTED",result_request_id:reviewId,committed_at:101}}};
+const committedAck=reviewCtx.reviewReceipt({...ackReceipt,review:committedReview});
+assert.equal(reviewCtx.retentionSelection(proof,null,committedAck,12,0).mode,"COMMITTED");
+assert.equal(reviewCtx.dismissalSelection({...dismissalContext,review:committedReview},12),null);
+assert.match(autoWorkspace,/property var recoverySession: null/);
+assert.match(autoWorkspace,/objectName: "cpuplusRecoverySessionControls"/);
+assert.doesNotMatch(autoWorkspace,/MemoryQueueDesktopSession\s*\{|Host\.(?:dismissReview|takeRetentionAdvance)\s*\(/);
+console.log("CPU++ M8 dismissal and retention presentation PASS");
+
+const v2Inventory={version:2,recent:[{record:reviewRecord,disposition:dismissalReceipt}],truncated:false,prepared:null,pending_request_id:null,startup_unlock:false,adjustment_outcome:"UNVERIFIED",can_execute:false};
+const dismissedInventory=reviewCtx.dispositionInventory(v2Inventory);
+assert.equal(dismissedInventory.recent[0].dismissed,true);
+assert.equal(dismissedInventory.recent[0].dispositionReviewId,reviewId);
+assert.equal(dismissedInventory.prepared,null);
+const openInventory={...v2Inventory,recent:[{record:reviewRecord,disposition:null}],prepared:reviewRecord};
+assert.equal(reviewCtx.dispositionInventory(openInventory).prepared.actionId,reviewAction);
+assert.equal(reviewCtx.dispositionInventory({...openInventory,prepared:null}),null);
+assert.equal(reviewCtx.dispositionInventory({...v2Inventory,prepared:reviewRecord}),null);
+assert.equal(reviewCtx.dispositionInventory({...v2Inventory,recent:[{record:{...reviewRecord,message:{...reviewRecord.message,owner_id:reviewId}},disposition:dismissalReceipt}]}),null);
+for(const change of [{version:1},{startup_unlock:true},{can_execute:true},{truncated:true},{recent:Array(5).fill(v2Inventory.recent[0])},{recent:[...v2Inventory.recent,...v2Inventory.recent]}])
+    assert.equal(reviewCtx.dispositionInventory({...v2Inventory,...change}),null);
+assert.match(autoWorkspace,/kind==="INVENTORY" && value===4\) recoverySession.readInventory/);
+const recoveryPaneM8c=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueueRecoveryPane.qml"),"utf8");
+assert.match(recoveryPaneM8c,/inventoryLimit: recoverySession \? 4 : 16/);
+assert.match(recoveryPaneM8c,/objectName: "cpuplusRecoverySelectRecord"/);
+console.log("CPU++ M8c V2 inventory and disposition distinction PASS");

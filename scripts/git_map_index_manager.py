@@ -18,7 +18,11 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import git_map_history_index as index
 
 SCHEMA="post-apollo-git-map-cache-v1"
+# V2 retains its original conservative qualification bound. V1 has no
+# safe reclamation authority; bounded append-only headroom restores history
+# for active repositories without modifying or removing existing generations.
 MAX_GENERATIONS=8
+V1_MAX_GENERATIONS=64
 MAX_INVENTORY_ENTRIES=64
 CANDIDATE=re.compile(r"\.candidate-[0-9a-f]{32}")
 HEX=re.compile(r"[0-9a-f]{64}")
@@ -121,7 +125,7 @@ def build(repo,root):
                 if item.name==".build.lock":
                     continue
                 count+=1
-                if count>=MAX_GENERATIONS:
+                if count>=V1_MAX_GENERATIONS:
                     return receipt(target,ident,"CACHE LIMIT")
         stage=folder/(".candidate-"+uuid.uuid4().hex)
         m=index.build(repo,stage)
@@ -150,7 +154,7 @@ def inventory(repo,root):
     repo_id,roots_digest,shallow,key=ident
     folder=root/repo_id
     result={"schema":"post-apollo-git-map-inventory-v1","repoId":repo_id,
-            "currentKey":key,"generationLimit":MAX_GENERATIONS,
+            "currentKey":key,"generationLimit":V1_MAX_GENERATIONS,
             "entries":[],"observedSlots":0,"truncated":False,
             "observedDatabaseBytes":0,"readerProtection":"NOT ESTABLISHED",
             "reclamationAllowed":False}

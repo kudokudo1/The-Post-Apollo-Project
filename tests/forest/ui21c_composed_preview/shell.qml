@@ -804,6 +804,17 @@ ShellRoot {
                 check(item.selectTask(a,rows[1].taskAlias)&&item.reviewState==="CLOSED"
                     && item.reviewRows.length===0,"selection retires review");
                 check(!item.receivePlan(a,next,fixedReviewRows()),"retired review packet");
+                const replacement=catalogPlan(4,rows[1].taskAlias);
+                item.ownerPlanScope=replacement;
+                check(item.openReview(a,replacement)&&item.receivePlan(a,replacement,fixedReviewRows()),
+                    "plan owner loss setup");
+                item.ownerPlanScope=null;
+                check(item.reviewState==="CLOSED"&&item.reviewRows.length===0
+                    && item.catalogRows.length===3,"plan owner loss retires only review");
+                check(!item.dismissPlan(a,replacement)&&!item.receivePlan(a,replacement,fixedReviewRows()),
+                    "retired plan owner callbacks");
+                item.ownerPlanScope=replacement;
+                check(!item.openReview(a,replacement),"lost plan owner replay");
                 break;
             }
             case 53: {

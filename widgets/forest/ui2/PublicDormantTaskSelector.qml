@@ -21,7 +21,6 @@ Item {
     property var _usedPlans: ({})
     property int _listCount: 0
     property int _planCount: 0
-    property bool _openingReview: false
     readonly property int lifetimeMs: 120000
     readonly property string catalogState: eligible && sameScope(_scope,ownerScope) ? _state : "CLOSED"
     readonly property var catalogRows: catalogState === "DISPLAYING" && !_plan ? _rows : []
@@ -170,11 +169,9 @@ Item {
         _usedPlans[plan.viewKey]=true;
         ++_planCount;
         releaseListFocus();
-        _openingReview=true;
         _plan={treeKey:plan.treeKey,taskAlias:plan.taskAlias,viewKey:plan.viewKey,
             planRevision:plan.planRevision};
         const ok=review.openReview(_plan);
-        _openingReview=false;
         if (!ok || !current(ref) || !samePlan(_plan,ownerPlanScope)) {
             retireReview();
             return false;
@@ -335,10 +332,13 @@ Item {
         visible: root.eligible && root._plan!==null
         syntheticOwner: root.syntheticOwner
         ownerScope: root._plan ? root.ownerPlanScope : null
-        onReviewStateChanged: {
-            if (!root._openingReview && root._plan && reviewState==="CLOSED")
-                root.retireReview(root.eligible && root.sameScope(root._scope,root.ownerScope)
-                    && root.samePlan(root._plan,root.ownerPlanScope));
+        // Never change _plan from a derived reviewState binding: doing so
+        // changes this item's visibility/ownerScope while Qt is evaluating
+        // that very binding. Only the explicit, original dismissal returns focus.
+        onReviewDismissed: ref => {
+            if (root.current(root._scope) && root.samePlan(ref,root._plan)
+                    && root.samePlan(ref,root.ownerPlanScope))
+                root.retireReview(true);
         }
     }
 }

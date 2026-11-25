@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os
+import hashlib
+import json
 import fcntl
 import time
 from pathlib import Path
@@ -8,6 +10,7 @@ import subprocess
 import tempfile
 
 ROOT=Path(__file__).resolve().parents[2]
+compact=os.environ.get("MAP_V2_COMPACT_NATIVE")=="yes"
 if os.environ.get("POST_APOLLO_GIT_MAP_SMOKE")!="CI_DISPOSABLE_ONLY":
     raise SystemExit("Disposable CI only")
 with tempfile.TemporaryDirectory(prefix="git-map-v2-native-") as tmp:
@@ -24,6 +27,16 @@ with tempfile.TemporaryDirectory(prefix="git-map-v2-native-") as tmp:
         dest.mkdir(parents=True)
         for name in names:
             shutil.copy2(ROOT/folder/name,dest/name)
+    if compact:
+        stage=scene/"scripts"
+        command=["/usr/bin/python3","-I","-B",str(ROOT/"scripts/git_map_stage_compact_holder.py"),str(stage)]
+        staged=json.loads(subprocess.check_output(command,text=True))
+        binary=stage/"git_map_compact_holder"
+        assert staged["status"]=="STAGED" and staged["productionActivation"] is False
+        assert staged["sha256"]==hashlib.sha256(binary.read_bytes()).hexdigest()
+        refused=subprocess.run(command,capture_output=True,text=True)
+        assert refused.returncode!=0 and not refused.stdout and hashlib.sha256(binary.read_bytes()).hexdigest()==staged["sha256"]
+        print("GIT_MAP_COMPACT_STAGING_PASS",flush=True)
     shutil.copy2(ROOT/"tests/git/fixtures/GitMapSharedCustodyNative.qml",scene/"smoke.qml")
     shutil.copy2(ROOT/"tests/git/fixtures/git_map_shared_custody_probe.py",scene/"probe.py")
     # Use actual source components. Only the disposable fixture selects V2.
@@ -31,12 +44,20 @@ with tempfile.TemporaryDirectory(prefix="git-map-v2-native-") as tmp:
     source=fixture.read_text()
     anchor="GitMapCustodyController { id: pool }"
     assert source.count(anchor)==1
-    fixture.write_text(source.replace(anchor,'GitMapCustodyController { id: pool; v2Mode: true; v2Base: Quickshell.env("XDG_CACHE_HOME") }'))
+    fixture.write_text(source.replace(anchor,'GitMapCustodyController { id: pool; v2Mode: true; v2Base: Quickshell.env("XDG_CACHE_HOME"); compactHold: ' + ("true" if compact else "false") + ' }'))
     probe=scene/"probe.py"
     source=probe.read_text()
     anchor='b"/scripts/git_map_reader_candidate.py"'
     assert source.count(anchor)==1
-    probe.write_text(source.replace(anchor,'b"/scripts/git_map_v2_reader_candidate.py"'))
+    if compact:
+        source=source.replace('assert any(x.endswith(b"/scripts/git_map_reader_candidate.py") for x in args)',
+            'assert (proc/"exe").resolve()==Path(__file__).resolve().parent/"scripts/git_map_compact_holder"')
+        source=source.replace('assert snapshot.encode() in args and Path(directory).name.encode() in args',
+            'import json\nreceipt=json.loads(args[3])\nassert receipt["snapshot"]==snapshot and receipt["key"]==Path(directory).name\nassert args[2].decode()==directory')
+        assert 'receipt=json.loads(args[3])' in source and 'proc/"exe"' in source
+        probe.write_text(source)
+    else:
+        probe.write_text(source.replace(anchor,'b"/scripts/git_map_v2_reader_candidate.py"'))
     # Test-only delay inside the real CLI search, after v2.read acquired
     # its shared lock. An external witness controls release, not a guessed delay.
     control=base/"inflight"

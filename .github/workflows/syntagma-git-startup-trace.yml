@@ -33,5 +33,5 @@ jobs:
         run: |
           python3 tests/components/test_syntagma_git_startup_trace.py
           python3 tests/git/test_refresh_stage_trace_contracts.py
-          python3 tests/git/test_refresh_merged_ref_prefilter_contracts.py
+          python3 tests/git/test_refresh_merged_ref_prefilter_contracts.py --benchmark
           python3 tests/git/test_refresh_remote_branch_index_contracts.py

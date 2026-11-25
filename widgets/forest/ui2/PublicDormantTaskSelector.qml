@@ -72,7 +72,7 @@ Item {
         if (returnFocus && eligible && catalogState==="DISPLAYING" && reviewButton.visible)
             reviewButton.forceActiveFocus();
     }
-    function clear() {
+    function releaseListFocus() {
         // Retire focused local controls before hiding them.
         for (let i=0;choices && i<choices.count;i++) {
             const item=choices.itemAt(i);
@@ -80,6 +80,9 @@ Item {
         }
         if (reviewButton) reviewButton.releaseFocus();
         if (closeButton) closeButton.releaseFocus();
+    }
+    function clear() {
+        releaseListFocus();
         if (expiry) expiry.stop();
         retireReview();
         _selection="";
@@ -124,10 +127,12 @@ Item {
     }
     function refuseCatalog(ref) {
         if (!current(ref)) return false;
+        releaseListFocus();
         retireReview();
         _selection="";
         _rows=[];
         _state="UNAVAILABLE";
+        if (closeButton) closeButton.syncFocus();
         return true;
     }
     function receiveCatalog(ref,rows) {
@@ -164,6 +169,7 @@ Item {
                 || _usedPlans[plan.viewKey] || _planCount>=64) return false;
         _usedPlans[plan.viewKey]=true;
         ++_planCount;
+        releaseListFocus();
         _openingReview=true;
         _plan={treeKey:plan.treeKey,taskAlias:plan.taskAlias,viewKey:plan.viewKey,
             planRevision:plan.planRevision};
@@ -313,7 +319,7 @@ Item {
             label: "OPEN CLEANING REVIEW"
             usable: listBody.visible && !!root.selectedAlias && root.validPlan(root.ownerPlanScope)
                 && root.ownerPlanScope.taskAlias===root.selectedAlias
-            intent: {scope:root._scope,plan:root.ownerPlanScope}
+            intent: ({scope:root._scope,plan:root.ownerPlanScope})
             onInvoked: pin=>root.openReview(pin.scope,pin.plan)
         }
         Text {

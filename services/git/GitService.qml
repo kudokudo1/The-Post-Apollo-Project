@@ -192,6 +192,77 @@ Scope {
     }
     property bool refreshing: false
     property bool refreshPending: false
+    // The read owns its staging buffers until the child has exited and
+    // terminal publication has finished. A warning does not release custody.
+    property bool refreshFinalizing: false
+    property bool refreshDoneSeen: false
+    property bool refreshDuplicateDone: false
+    property bool refreshExitSeen: false
+    property int refreshExitCode: -1
+    property int refreshExitStatus: -1
+    property int refreshRepoEpoch: 0
+    property int repoSelectionEpoch: 0
+    readonly property bool refreshReadBusy: refreshing || refreshFinalizing || refreshProcess.running
+    onRepoPathChanged: repoSelectionEpoch++
+    function refreshContextChanged() {
+        return refreshRepoPath !== repoPath || refreshRepoEpoch !== repoSelectionEpoch;
+    }
+    function refreshSoftDeadline() {
+        if (!refreshing || refreshExitSeen) return;
+        if (!refreshProcess.running) {
+            // Failed-to-start does not necessarily emit exited.
+            finishRefreshRead();
+            return;
+        }
+        refreshDiagTimedOut=true;
+        refreshDiagOutcome="READING // SLOW";
+        // Do not write lastError, invalidate models, or release refreshing.
+    }
+    function noteRefreshExit(code, status) {
+        if (!refreshing || refreshExitSeen) return;
+        refreshExitSeen=true;
+        refreshExitCode=code;
+        refreshExitStatus=status;
+        Qt.callLater(finishRefreshRead);
+    }
+    function finishRefreshRead() {
+        if (!refreshing || refreshFinalizing || refreshProcess.running) return;
+        refreshFinalizing=true;
+        refreshWatchdog.stop();
+        const stale=refreshContextChanged();
+        let failure="";
+        if (stale) failure="STALE REPOSITORY RESULT";
+        else if (!refreshExitSeen) failure="CHILD DID NOT START";
+        else if (refreshExitCode===124 || refreshExitCode===137) failure="GIT READ TIMEOUT";
+        else if (refreshExitCode!==0 || refreshExitStatus!==0) failure="CHILD NONZERO EXIT";
+        else if (!refreshDoneSeen || refreshDuplicateDone) failure="INVALID COMPLETION MARKER";
+        else if (lastError) failure=refreshDiagOutcome==="REPOSITORY CHECK ERROR"
+            ? "REPOSITORY CHECK ERROR" : "READ ERROR";
+        if (!failure) {
+            publishCompletedRefresh();
+        } else {
+            // Preserve previously published rows; do not advertise them as live.
+            available=false;
+            if (!lastError || stale) lastError=failure;
+            if (failure==="GIT READ TIMEOUT") rememberRefreshFailure("GIT READ TIMEOUT");
+            else rememberRefreshFailure(failure);
+            refreshing=false;
+            topologyRevision++;
+            // This is view timing, not an operation or journal acknowledgement.
+            syncAfterRefreshStartedMs=0;
+            if (stale || refreshPending) {
+                refreshPending=false;
+                Qt.callLater(function() { refresh(); });
+            }
+        }
+        refreshFinalizing=false;
+    }
+    // A terminal callback can arrive before runningChanged; never open a
+    // second read until the existing Process is actually idle.
+    function refreshRunningChanged() {
+        if (refreshExitSeen && !refreshProcess.running && refreshing)
+            Qt.callLater(finishRefreshRead);
+    }
     property string refreshRepoPath: ""
     property bool discoveringRepos: false
     property bool actionBusy: false
@@ -772,7 +843,7 @@ Scope {
         selectedLocalUpstream = "";
         selectedLocalIndex = -1;
 
-        if (refreshing) {
+        if (refreshReadBusy) {
             refreshPending = true;
             if (syntagmaStartupTraceEnabled) {
                 console.warn(
@@ -1356,8 +1427,10 @@ Scope {
             );
         }
 
-        if (refreshing)
+        if (refreshReadBusy) {
+            if (refreshContextChanged()) refreshPending=true;
             return;
+        }
 
         if (syntagmaStartupTraceEnabled) {
             traceRefreshStartedMs = Date.now();
@@ -1411,6 +1484,13 @@ Scope {
         }
 
         beginRefreshDiagnostic();
+        refreshDoneSeen=false;
+        refreshDuplicateDone=false;
+        refreshExitSeen=false;
+        refreshExitCode=-1;
+        refreshExitStatus=-1;
+        refreshRepoEpoch=repoSelectionEpoch;
+        refreshPending=false;
         refreshing = true;
         refreshRepoPath = repoPath;
         lastError = "";
@@ -1433,6 +1513,11 @@ Scope {
             "bash",
             "-lc",
             [
+                // Preserve the existing Bash command contract while bounding
+                // the read-only child process group. No timeout on Git actions.
+                'if [ "${3:-}" != "bounded" ]; then',
+                '  exec /usr/bin/timeout --kill-after=2s 45s bash -c "$BASH_EXECUTION_STRING" "$0" "$1" "${2:-0}" bounded',
+                'fi',
                 'repo="$1"',
                 'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
                 // Bash EPOCHREALTIME is built in: no extra date subprocesses.
@@ -1586,10 +1671,16 @@ Scope {
     }
 
     function consumeRefreshLine(line) {
+        if (!refreshing || refreshFinalizing) return;
         const raw = String(line || "");
         const parts = raw.split("\t");
         const key = parts.length > 0 ? parts[0] : "";
 
+        if (refreshDoneSeen) {
+            if (key==="DONE") refreshDuplicateDone=true;
+            else refreshDuplicateDone=true; // no protocol data is legal after DONE
+            return;
+        }
         if (key === "DIAGTIME") {
             const stage=parts.length===3 ? parts[1] : "";
             const rawMs=parts.length===3 ? parts[2] : "";
@@ -1689,149 +1780,154 @@ Scope {
             if (refreshDiagTimedOut) refreshDiagLateDone++;
             if (!refreshDiagOverlap && refreshDiagLastFailure && refreshDiagLastFailure.attempt===refreshDiagAttempt)
                 refreshDiagLastFailure=Object.assign({},refreshDiagLastFailure,{doneMs:refreshDiagDoneMs,marks:refreshDiagMarks.slice()});
-            // Measure the individual synchronous stages of the DONE callback
-            // only in the operator's opt-in diagnostic. Keep the ordering and
-            // operations exactly the same in normal and traced modes.
-            const trace = syntagmaStartupTraceEnabled;
-            let started = trace ? Date.now() : 0;
-            let publishMs = 0;
-            let publishParts = null;
-            let localSelectionMs = 0;
-            let remoteSelectionMs = 0;
-            let revisionMs = 0;
-            let availableMs = 0;
-            let refreshedSignalMs = 0;
+            refreshDoneSeen=true;
+            // Publication waits for normal process exit; DONE alone is not success.
+        }
+    }
 
-            const staleRead = refreshRepoPath !== repoPath;
-            const pendingAtDone = trace ? refreshPending : false;
+    function publishCompletedRefresh() {
+        // Measure the individual synchronous stages of the DONE callback
+        // only in the operator's opt-in diagnostic. Keep the ordering and
+        // operations exactly the same in normal and traced modes.
+        const trace = syntagmaStartupTraceEnabled;
+        let started = trace ? Date.now() : 0;
+        let publishMs = 0;
+        let publishParts = null;
+        let localSelectionMs = 0;
+        let remoteSelectionMs = 0;
+        let revisionMs = 0;
+        let availableMs = 0;
+        let refreshedSignalMs = 0;
 
-            refreshing = false;
-            refreshWatchdog.stop();
-            const pipelineRefreshStartedMs = syncAfterRefreshStartedMs;
-            if (syncAfterRefreshStartedMs > 0) {
-                const refreshElapsed =
-                    Math.max(0, Date.now() - syncAfterRefreshStartedMs);
-                syncAfterRefreshStartedMs = 0;
-                // Expose the exact existing REFRESHED measurement to the
-                // header without changing or discarding the raw log line.
-                syncTimingRepoViewMs = refreshElapsed;
-                actionOutput += (actionOutput.length ? "\n" : "")
-                    + "REFRESHED // repository view "
-                    + refreshElapsed + " ms";
-            }
-            const stateMs = trace ? Date.now() - started : 0;
+        const staleRead = refreshContextChanged();
+        const pendingAtDone = trace ? refreshPending : false;
 
-            if (!staleRead && !lastError) {
-                if (trace) started = Date.now();
-                traceSubprocessLag("refresh:publish:begin", pendingTopology.length);
-                publishParts = publishPendingModels();
-                traceSubprocessLag("refresh:publish:end", pendingTopology.length);
-                if (trace) {
-                    publishMs = Date.now() - started;
-                    started = Date.now();
-                }
-                ensureLocalSelection();
-                if (trace) {
-                    localSelectionMs = Date.now() - started;
-                    started = Date.now();
-                }
-                ensureRemoteSelection();
-                if (trace) {
-                    remoteSelectionMs = Date.now() - started;
-                    started = Date.now();
-                }
-                topologyRevision += 1;
-                if (trace) {
-                    revisionMs = Date.now() - started;
-                    started = Date.now();
-                }
-                available = true;
-                refreshDiagOutcome="PUBLISHED";
-                refreshDiagLastSuccess=Date.now();
-                if (trace) {
-                    availableMs = Date.now() - started;
-                    started = Date.now();
-                }
-                traceSubprocessLag("refresh:refreshed:begin", pendingTopology.length);
-                refreshed();
-                traceSubprocessLag("refresh:refreshed:end", pendingTopology.length);
-                if (trace)
-                    refreshedSignalMs = Date.now() - started;
-            }
+        refreshing = false;
+        refreshWatchdog.stop();
+        const pipelineRefreshStartedMs = syncAfterRefreshStartedMs;
+        if (syncAfterRefreshStartedMs > 0) {
+            const refreshElapsed =
+                Math.max(0, Date.now() - syncAfterRefreshStartedMs);
+            syncAfterRefreshStartedMs = 0;
+            // Expose the exact existing REFRESHED measurement to the
+            // header without changing or discarding the raw log line.
+            syncTimingRepoViewMs = refreshElapsed;
+            actionOutput += (actionOutput.length ? "\n" : "")
+                + "REFRESHED // repository view "
+                + refreshElapsed + " ms";
+        }
+        const stateMs = trace ? Date.now() - started : 0;
 
-            if (staleRead) rememberRefreshFailure("STALE REPOSITORY RESULT");
-            else if (lastError && !refreshDiagTimedOut && refreshDiagOutcome!=="REPOSITORY CHECK ERROR")
-                rememberRefreshFailure("READ ERROR");
-
-            // End-to-end timing is emitted only after refreshing the UI
-            // models; unlike the legacy REFRESHED line it includes their
-            // synchronous publication. Never uses the timing to unlock or
-            // report a Git result, which remains journal-acknowledged above.
-            if (pipelineRefreshStartedMs > 0
-                    && syncCommandStartedMs >= syncStartedMs
-                    && syncCommandFinishedMs >= syncCommandStartedMs
-                    && pipelineRefreshStartedMs >= syncCommandFinishedMs) {
-                const end = Date.now();
-                const prepareMs = syncCommandStartedMs - syncStartedMs;
-                const gitMs = syncCommandFinishedMs - syncCommandStartedMs;
-                const finalizeMs = pipelineRefreshStartedMs - syncCommandFinishedMs;
-                const refreshMs = end - pipelineRefreshStartedMs;
-                // Publish into the existing output header, not a duplicate
-                // log line. The journal's BEGIN/COMPLETE profiles remain in
-                // the scrollable log because they measure different work.
-                syncTimingPrepareMs = prepareMs;
-                syncTimingGitMs = gitMs;
-                syncTimingFinalizeMs = finalizeMs;
-                syncTimingRefreshMs = refreshMs;
-                syncTimingTotalMs = end - syncStartedMs;
-                syncCommandStartedMs = 0;
-                syncCommandFinishedMs = 0;
-            }
-
+        if (!staleRead && !lastError) {
             if (trace) started = Date.now();
-            if (refreshPending || staleRead) {
-                refreshPending = false;
-                Qt.callLater(function() {
-                    refresh();
-                });
-            }
-
+            traceSubprocessLag("refresh:publish:begin", pendingTopology.length);
+            publishParts = publishPendingModels();
+            traceSubprocessLag("refresh:publish:end", pendingTopology.length);
             if (trace) {
-                const followupMs = Date.now() - started;
+                publishMs = Date.now() - started;
+                started = Date.now();
+            }
+            ensureLocalSelection();
+            if (trace) {
+                localSelectionMs = Date.now() - started;
+                started = Date.now();
+            }
+            ensureRemoteSelection();
+            if (trace) {
+                remoteSelectionMs = Date.now() - started;
+                started = Date.now();
+            }
+            topologyRevision += 1;
+            if (trace) {
+                revisionMs = Date.now() - started;
+                started = Date.now();
+            }
+            available = true;
+            refreshDiagOutcome="PUBLISHED";
+            refreshDiagLastSuccess=Date.now();
+            if (trace) {
+                availableMs = Date.now() - started;
+                started = Date.now();
+            }
+            traceSubprocessLag("refresh:refreshed:begin", pendingTopology.length);
+            refreshed();
+            traceSubprocessLag("refresh:refreshed:end", pendingTopology.length);
+            if (trace)
+                refreshedSignalMs = Date.now() - started;
+        }
+
+        if (staleRead) rememberRefreshFailure("STALE REPOSITORY RESULT");
+        else if (lastError && !refreshDiagTimedOut && refreshDiagOutcome!=="REPOSITORY CHECK ERROR")
+            rememberRefreshFailure("READ ERROR");
+
+        // End-to-end timing is emitted only after refreshing the UI
+        // models; unlike the legacy REFRESHED line it includes their
+        // synchronous publication. Never uses the timing to unlock or
+        // report a Git result, which remains journal-acknowledged above.
+        if (pipelineRefreshStartedMs > 0
+                && syncCommandStartedMs >= syncStartedMs
+                && syncCommandFinishedMs >= syncCommandStartedMs
+                && pipelineRefreshStartedMs >= syncCommandFinishedMs) {
+            const end = Date.now();
+            const prepareMs = syncCommandStartedMs - syncStartedMs;
+            const gitMs = syncCommandFinishedMs - syncCommandStartedMs;
+            const finalizeMs = pipelineRefreshStartedMs - syncCommandFinishedMs;
+            const refreshMs = end - pipelineRefreshStartedMs;
+            // Publish into the existing output header, not a duplicate
+            // log line. The journal's BEGIN/COMPLETE profiles remain in
+            // the scrollable log because they measure different work.
+            syncTimingPrepareMs = prepareMs;
+            syncTimingGitMs = gitMs;
+            syncTimingFinalizeMs = finalizeMs;
+            syncTimingRefreshMs = refreshMs;
+            syncTimingTotalMs = end - syncStartedMs;
+            syncCommandStartedMs = 0;
+            syncCommandFinishedMs = 0;
+        }
+
+        if (trace) started = Date.now();
+        if (refreshPending || staleRead) {
+            refreshPending = false;
+            Qt.callLater(function() {
+                refresh();
+            });
+        }
+
+        if (trace) {
+            const followupMs = Date.now() - started;
+            console.warn(
+                "SYNTAGMA_STARTUP_TRACE // git DONE phases // "
+                + syntagmaTraceLabel()
+                + " // state=" + stateMs + "ms"
+                + " publish=" + publishMs + "ms"
+                + " localSelection=" + localSelectionMs + "ms"
+                + " remoteSelection=" + remoteSelectionMs + "ms"
+                + " revision=" + revisionMs + "ms"
+                + " available=" + availableMs + "ms"
+                + " refreshedSignal=" + refreshedSignalMs + "ms"
+                + " followup=" + followupMs + "ms"
+                + " // localRows=" + pendingLocalBranches.length
+                + " remoteRows=" + pendingRemoteBranches.length
+                + " topologyRows=" + pendingTopology.length
+                + " stale=" + staleRead
+                + " pendingAtDone=" + pendingAtDone
+                + " followupQueued=" + (pendingAtDone || staleRead)
+            );
+            if (publishParts) {
                 console.warn(
-                    "SYNTAGMA_STARTUP_TRACE // git DONE phases // "
+                    "SYNTAGMA_STARTUP_TRACE // git publish phases // "
                     + syntagmaTraceLabel()
-                    + " // state=" + stateMs + "ms"
-                    + " publish=" + publishMs + "ms"
-                    + " localSelection=" + localSelectionMs + "ms"
-                    + " remoteSelection=" + remoteSelectionMs + "ms"
-                    + " revision=" + revisionMs + "ms"
-                    + " available=" + availableMs + "ms"
-                    + " refreshedSignal=" + refreshedSignalMs + "ms"
-                    + " followup=" + followupMs + "ms"
+                    + " // metadata=" + publishParts.metadataMs + "ms"
+                    + " clears=" + publishParts.clearsMs + "ms"
+                    + " local=" + publishParts.localMs + "ms"
+                    + " remote=" + publishParts.remoteMs + "ms"
+                    + " topology=" + publishParts.topologyMs + "ms"
+                    + " topologyDelta=" + JSON.stringify(publishParts.topologyDelta)
+                    + " total=" + publishMs + "ms"
                     + " // localRows=" + pendingLocalBranches.length
                     + " remoteRows=" + pendingRemoteBranches.length
                     + " topologyRows=" + pendingTopology.length
-                    + " stale=" + staleRead
-                    + " pendingAtDone=" + pendingAtDone
-                    + " followupQueued=" + (pendingAtDone || staleRead)
                 );
-                if (publishParts) {
-                    console.warn(
-                        "SYNTAGMA_STARTUP_TRACE // git publish phases // "
-                        + syntagmaTraceLabel()
-                        + " // metadata=" + publishParts.metadataMs + "ms"
-                        + " clears=" + publishParts.clearsMs + "ms"
-                        + " local=" + publishParts.localMs + "ms"
-                        + " remote=" + publishParts.remoteMs + "ms"
-                        + " topology=" + publishParts.topologyMs + "ms"
-                        + " topologyDelta=" + JSON.stringify(publishParts.topologyDelta)
-                        + " total=" + publishMs + "ms"
-                        + " // localRows=" + pendingLocalBranches.length
-                        + " remoteRows=" + pendingRemoteBranches.length
-                        + " topologyRows=" + pendingTopology.length
-                    );
-                }
             }
         }
     }
@@ -2957,11 +3053,9 @@ Scope {
     Process {
         id: refreshProcess
         onExited: function(code, exitStatus) {
-            // Exit and stdout ordering are not proof of missing DONE.
-            // Preserve this advisory observation without changing refresh state.
-            if (gitService.refreshing && code!==0)
-                gitService.rememberRefreshFailure("CHILD NONZERO EXIT");
+            gitService.noteRefreshExit(code, exitStatus);
         }
+        onRunningChanged: gitService.refreshRunningChanged()
 
         stdout: SplitParser {
             onRead: function(line) {
@@ -3017,7 +3111,7 @@ Scope {
             onRead: function(line) {
                 const splitReadTrace = gitService.beginSplitRead("refresh-stderr", line);
                 const message = String(line || "").trim();
-                if (message.length > 0) {
+                if (message.length > 0 && gitService.refreshing && !gitService.refreshFinalizing) {
                     gitService.refreshDiagStderr++;
                     gitService.lastError = message;
                 }
@@ -3067,12 +3161,7 @@ Scope {
         repeat: false
 
         onTriggered: {
-            gitService.refreshDiagTimedOut=true;
-            gitService.rememberRefreshFailure("GIT READ TIMEOUT");
-            gitService.refreshing = false;
-            gitService.available = false;
-            gitService.lastError = "GIT READ TIMEOUT";
-            gitService.topologyRevision += 1;
+            gitService.refreshSoftDeadline();
         }
     }
 

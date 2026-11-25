@@ -3,6 +3,8 @@ import QtQuick.Window
 import Quickshell
 import qs.services.memory
 import "widgets/cpuplus"
+import "widgets/cpuplus/CpuPlusQueueConsumer.js" as Consumer
+import "widgets/cpuplus/CpuPlusQueuePresentation.js" as QueueView
 
 // Unmounted, isolated native test only. Runner copies the actual UI and uses
 // a recording operation singleton instead of any privileged backend.
@@ -12,6 +14,8 @@ ShellRoot {
     property int phase: 0
     property int ticks: 0
     property bool done: false
+    property int intentCount: 0
+    property var lastIntent: null
 
     function find(item, name) {
         if (item.objectName === name) return item;
@@ -207,9 +211,62 @@ ShellRoot {
                             && queue.display.outcome === "UNVERIFIED" && !queue.display.canExecute
                             && queue.display.originalActualKiB !== queue.observedDiskKiB,
                             "AUTO historical report not live capacity or authorization")) return;
+                        const report = queue.runtimeProjection;
                         queue.runtimeProjection = null;
                         if (!smoke.check(queue.display.requestId === null && queue.display.state === "NOT CONNECTED"
                             && MemoryOperation.requests === 0,"AUTO owner loss clears report")) return;
+                        queue.intentConfirmed.connect(intent => { smoke.intentCount++; smoke.lastIntent = intent; });
+                        queue.prepareIntent("CANCEL"); queue.confirmIntent();
+                        if (!smoke.check(smoke.intentCount === 0 && queue.preparation === null,
+                            "disconnected controls cannot submit")) return;
+                        const ownerId = "c23683a9-b2ab-4a2c-87ce-31bdf27a3013";
+                        const owner = Consumer.connect(Consumer.initial(),ownerId);
+                        const envelope = {version:1,owner_id:ownerId,sequence:1,next_action_sequence:1,
+                            kind:"STATUS",can_execute:false,projection:report};
+                        const state = Consumer.acceptStatus(owner,envelope,QueueView.project);
+                        queue.actionContext = {state:state,projection:report};
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.preparation && queue.preparation.expectedId === report.status.request_id
+                            && smoke.intentCount === 0,"explicit prepare does not send")) return;
+                        const newer = Consumer.acceptStatus(state,Object.assign({},envelope,{sequence:2}),QueueView.project);
+                        queue.actionContext = {state:newer,projection:report};
+                        queue.confirmIntent();
+                        if (!smoke.check(queue.preparation === null && smoke.intentCount === 0,
+                            "fresh status invalidates confirmation")) return;
+                        queue.prepareIntent("CANCEL");
+                        queue.visible = false;
+                        queue.confirmIntent();
+                        queue.visible = true;
+                        if (!smoke.check(queue.preparation === null && smoke.intentCount === 0,
+                            "hide invalidates confirmation")) return;
+                        queue.prepareIntent("CANCEL");
+                        queue.confirmIntent();
+                        queue.confirmIntent();
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(smoke.intentCount === 1 && smoke.lastIntent.kind === "CANCEL"
+                            && smoke.lastIntent.expectedId === report.status.request_id
+                            && smoke.lastIntent.statusSequence === 2 && queue.preparation === null
+                            && MemoryOperation.requests === 0,"only one explicit intent signal")) return;
+                        // Same revision echo must not release the latch.
+                        queue.actionContext = {state:newer,projection:report};
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.submitted && queue.preparation === null,
+                            "same revision cannot rearm")) return;
+                        // Host clears the context during pending/reply, then publishes
+                        // a newer status. The pane must not retain the old click latch.
+                        queue.actionContext = null;
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.preparation === null && queue.display.state === "NOT CONNECTED",
+                            "owner loss disables controls")) return;
+                        const after = Consumer.acceptStatus(newer,Object.assign({},envelope,{
+                            sequence:4,next_action_sequence:2}),QueueView.project);
+                        queue.actionContext = {state:after,projection:report};
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.submitted === null && queue.preparation
+                            && queue.preparation.statusSequence === 4 && queue.preparation.actionSequence === 2
+                            && smoke.intentCount === 1,"new host publication releases previous click latch")) return;
+                        queue.cancelIntent();
+                        queue.actionContext = null;
                     }
                     if (smoke.phase < 5) pane.selectMenu(smoke.phase + 1);
                     else pane.selectMenu(0);

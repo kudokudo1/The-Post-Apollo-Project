@@ -103,7 +103,7 @@ assert.match(pane,/active: root.page === "POL" && root.policySection === 3\s+vis
 assert.match(pane,/\(policyBottomRail.width - 12\) \/ 4/);
 const diagRunner=fs.readFileSync(path.join(__dirname,"cpuplus/test_diagnostic_continuity_native.py"),"utf8");
 const memoryRunner=fs.readFileSync(path.join(__dirname,"cpuplus_memory_ui_native.py"),"utf8");
-for (const name of ["CpuPlusZramPolicyPane.qml","CpuPlusZramPolicy.js","CpuPlusAdvancedPolicyPane.qml","CpuPlusAdvancedPolicy.js","CpuPlusQueuePane.qml","CpuPlusQueuePresentation.js"]) {
+for (const name of ["CpuPlusZramPolicyPane.qml","CpuPlusZramPolicy.js","CpuPlusAdvancedPolicyPane.qml","CpuPlusAdvancedPolicy.js","CpuPlusQueuePane.qml","CpuPlusQueuePresentation.js","CpuPlusQueueConsumer.js"]) {
     assert.ok(diagRunner.includes('"'+name+'"'),"diagnostic fixture missing "+name);
     assert.ok(memoryRunner.includes('"'+name+'"'),"memory fixture missing "+name);
 }
@@ -132,5 +132,17 @@ assert.equal(queueCtx.project({...packet,notification_error:"EVENT_STAGE_UNAVAIL
 assert.equal(queueCtx.project({...packet,status:{...packet.status,code:"UNKNOWN_FUTURE"}}).state,"INVALID STATUS");
 assert.match(pane,/active: root.page === "AUTO"[\s\S]*?sourceComponent: CpuPlusQueuePane[\s\S]*?runtimeProjection: null/);
 const queuePane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueuePane.qml"),"utf8");
-assert.doesNotMatch(queuePane,/\b(?:Process|Timer|ActionButton|MemoryOperation|pkexec|sudo|execDetached)\b/);
+assert.doesNotMatch(queuePane,/\b(?:Process|Timer|MemoryOperation|pkexec|sudo|execDetached)\b/);
+assert.match(queuePane,/Consumer.prepare\(current,kind/);
+assert.match(queuePane,/onActionContextChanged:[\s\S]*?const current = actionContext \? actionContext.state : null/);
+assert.match(queuePane,/current.sequence > submitted.statusSequence/);
+assert.match(queuePane,/if \(!visible \|\| submitted \|\| !usableContext\(context\)\) return null/);
+assert.match(queuePane,/intentConfirmed\(Object.assign\(\{\},frozen\)\)/);
+assert.match(queuePane,/onVisibleChanged: if \(!visible\) preparation = null/);
+assert.match(pane,/sourceComponent: CpuPlusQueuePane[\s\S]*?actionContext: null/);
+assert.doesNotMatch(queuePane,/Consumer.submit\s*\(|onCompleted\s*:/);
+const expiryCtx=vm.createContext({});
+vm.runInContext(queuePane.slice(queuePane.indexOf("    function expirySeconds("),queuePane.indexOf("    function candidate(")),expiryCtx);
+assert.equal(expiryCtx.expirySeconds("2026-11-25 12:30"),Date.parse("2026-11-25T12:30:00Z")/1000);
+for (const value of ["","2026-02-30 12:00","2026-11-25 25:00","2026-11-25T12:30","2026-11-25 12:30 UTC"]) assert.equal(expiryCtx.expirySeconds(value),null);
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

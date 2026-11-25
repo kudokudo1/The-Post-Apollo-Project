@@ -891,6 +891,7 @@ Item {
                     observedDiskKiB: root.capacity ? root.capacity.actualKiB : null
                     capacityTargetGiB: root.stagedGiB
                     runtimeProjection: null
+                    actionContext: null
                 }
             }
             GohuText {

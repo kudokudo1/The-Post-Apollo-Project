@@ -11,6 +11,7 @@ on:
       - "widgets/cpuplus/CpuPlusAdvancedPolicy.js"
       - "widgets/cpuplus/CpuPlusQueuePane.qml"
       - "widgets/cpuplus/CpuPlusQueuePresentation.js"
+      - "widgets/cpuplus/CpuPlusQueueConsumer.js"
       - "tests/cpuplus/test_diagnostic_controls.cjs"
       - "tests/cpuplus/test_diagnostic_comparison.cjs"
       - "tests/cpuplus/test_diagnostic_notifications.cjs"

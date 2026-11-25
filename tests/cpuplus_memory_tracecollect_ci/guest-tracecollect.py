@@ -176,8 +176,10 @@ def parse(raw,pid):
         else:
             raise RuntimeError("unexpected event in private trace")
         records.append((kind,stamp))
-    require([kind for kind,_ in records]==["SYSCALL_ENTER","UNUSE_ENTER","UNUSE_RETURN","SYSCALL_EXIT"],
-            "missing, repeated or misordered kernel boundaries")
+    kinds=[kind for kind,_ in records]
+    require(kinds==["SYSCALL_ENTER","UNUSE_ENTER","UNUSE_RETURN","SYSCALL_EXIT"],
+            "missing, repeated or misordered kernel boundaries; observed="+
+            json.dumps(kinds[:32])+" count="+str(len(kinds)))
     require(all(a[1]<b[1] for a,b in zip(records,records[1:])),"trace ordering ambiguous")
     return records
 
@@ -238,6 +240,18 @@ def run(guard):
         ready=guard.helper("reduction-preflight","4")
         require(ready.returncode==0 and json.loads(ready.stdout)["state"]=="READY_ADVISORY",
                 "ordinary withdrawal admission unavailable")
+        # Linux snapshots syscall_work before ptrace's entry stop.
+        # Enable syscall tracepoints BEFORE spawning the actor, while
+        # tracing_on stays zero. Installing the PID filters later is safe:
+        # the kernel's syscall tracepoint work bit is already established.
+        require(bounded(INSTANCE/"tracing_on",32).strip()=="0",
+                "capture unexpectedly enabled before actor discovery")
+        for event in EVENTS[:2]:
+            path=INSTANCE/"events"/event
+            write(path/"enable","1")
+            require(bounded(path/"enable",32).strip()=="1",
+                    "early syscall event not enabled")
+        stage("SYSCALL_EVENTS_ARMED_BEFORE_ACTOR")
         root,swap=custody.trace_to_entry(guard)
         intent_path,result_path=(guard.EXT/name for name in guard.RECORD_NAMES[:2])
         intent=guard.protected_bytes(intent_path)
@@ -263,11 +277,16 @@ def run(guard):
         custody.expect_busy(guard)
         for event in EVENTS:
             path=INSTANCE/"events"/event
+            if event in EVENTS[:2]:
+                require(bounded(path/"enable",32).strip()=="1",
+                        "early syscall event lost before actor filter")
             write(path/"filter","common_pid == "+str(swap))
             require(bounded(path/"filter",4096).strip()=="common_pid == "+str(swap),
                     "actor filter not installed")
-            write(path/"enable","1")
+            if event not in EVENTS[:2]:
+                write(path/"enable","1")
             require(bounded(path/"enable",32).strip()=="1","event not enabled")
+        stage("EXACT_ACTOR_FILTERS_INSTALLED")
         write(INSTANCE/"trace","")
         stats(INSTANCE)
         write(INSTANCE/"tracing_on","1")

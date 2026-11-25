@@ -29,6 +29,9 @@ class TraceParser(unittest.TestCase):
         for altered in (rows[:-1],rows+rows[:1],rows[:1]+rows[2:3]+rows[1:2]+rows[3:]):
             with self.assertRaises(RuntimeError):
                 m.parse("\n".join(altered),123)
+    def test_missing_enter_reports_only_normalized_kinds(self):
+        with self.assertRaisesRegex(RuntimeError, 'observed=\\["UNUSE_ENTER", "UNUSE_RETURN", "SYSCALL_EXIT"\\] count=3'):
+            m.parse("\n".join(fixture()[1:]),123)
     def test_same_clock(self):
         with self.assertRaises(RuntimeError):
             m.parse("\n".join(fixture()).replace("1.000003","1.000002"),123)

@@ -10,6 +10,7 @@ ShellRoot {
     property string lastText: ""
     property bool failed: false
     property int phase: 0
+    Component.onCompleted: console.info("FEED_TRANSCRIPT_FIXTURE_STARTED")
     function check(ok, why) {
         if (!ok) {
             failed = true;
@@ -72,7 +73,8 @@ ShellRoot {
                 check(false, "missing production items");
                 return;
             }
-            switch (witness.phase++) {
+            const currentPhase = witness.phase++;
+            switch (currentPhase) {
             case 0:
                 check(feed.showHeader && feed.showComposer, "default opt-ins changed");
                 geometry(true, true, 60, 230);
@@ -131,10 +133,22 @@ ShellRoot {
                 break;
             case 7:
                 geometry(true, true, 60, 110);
-                if (!witness.failed) console.log("FEED_TRANSCRIPT_NATIVE_PASS");
+                break;
+            default:
+                check(false, "unexpected test phase " + currentPhase);
+            }
+            // Emit a witness only AFTER this phase's assertions completed.
+            // No pass on early Qt.quit, exception or failed check.
+            if (witness.failed) {
                 stop();
                 Qt.quit();
-                break;
+                return;
+            }
+            console.info("FEED_TRANSCRIPT_PHASE_PASS " + currentPhase);
+            if (currentPhase === 7) {
+                console.info("FEED_TRANSCRIPT_NATIVE_PASS");
+                stop();
+                Qt.quit();
             }
         }
     }

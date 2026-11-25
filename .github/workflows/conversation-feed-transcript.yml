@@ -33,6 +33,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           LIBGL_ALWAYS_SOFTWARE: '1'
+          QT_LOGGING_RULES: 'qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true'
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
@@ -51,6 +52,24 @@ jobs:
           done
           grep -E '^(singleton Colors|ConversationFeed|NeonScrollBar|SafeDropShadow) ' "$GITHUB_WORKSPACE/components/qmldir" > "$scene/components/qmldir"
           test "$(wc -l < "$scene/components/qmldir")" -eq 4
-          timeout --signal=TERM --kill-after=3s 30s quickshell --path "$scene/shell.qml" --no-color 2>&1 | tee "$work/output"
-          if grep -q FEED_TRANSCRIPT_FAIL "$work/output"; then exit 1; fi
-          grep -q FEED_TRANSCRIPT_NATIVE_PASS "$work/output"
+          # Quickshell filters QML console output by default. Explicitly
+          # enable it, as the existing Weather M26-D native fixture does.
+          timeout --signal=TERM --kill-after=3s 30s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
+          if grep -q FEED_TRANSCRIPT_FAIL "$work/output"; then
+            echo "Native fixture reported an assertion failure" >&2
+            exit 1
+          fi
+          if ! grep -q FEED_TRANSCRIPT_FIXTURE_STARTED "$work/output"; then
+            echo "Missing native fixture startup witness" >&2
+            exit 1
+          fi
+          observed="$(grep -oE 'FEED_TRANSCRIPT_PHASE_PASS [0-7]' "$work/output" || true)"
+          expected="$(printf 'FEED_TRANSCRIPT_PHASE_PASS %s\n' 0 1 2 3 4 5 6 7)"
+          if [ "$observed" != "$expected" ]; then
+            printf 'Incomplete or out-of-order native phases:\n%s\n' "$observed" >&2
+            exit 1
+          fi
+          if ! grep -q FEED_TRANSCRIPT_NATIVE_PASS "$work/output"; then
+            echo "Missing final native completion witness" >&2
+            exit 1
+          fi

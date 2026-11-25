@@ -28,3 +28,23 @@ This is a same-process fixture host, not actual installed ForestW/Quickshell
 integration. UI1/UI2 own panel mounting and a separately approved actual
 process boundary; DOC3F placement/security and Nurse2F independent review
 required. No private/protected release or operator acceptance.
+
+## R5b joined lifecycle hardening
+
+Owner-only continuation now requires the first page's revision and exact
+independently observed PresentationCorrelation for after > 0. Missing or
+changed view/revision refuses before producing a page; every valid page has
+a fresh M4 request ID. The scoped metadata query does not read the title.
+This does not change the M4 wire schema or authorize a UI-selected session.
+
+Explicit reopen_journal is allowed only at a known committed idle boundary.
+Withdraw/clear the old status scope, close the existing SQLite connection,
+reopen the same host-created database in read/write-existing mode and check
+exact canonical session/revision and committed attempt/reply linkage. No new
+bootstrap, new path, replay, or new user row on reopen; failure blocks future
+turns. The next explicit turn has a new task/view and verifies old context via
+the existing fake provider. This is connection reopen within one disposable
+host lifetime, not process restart or recovery of a destroyed temp journal.
+Mind M6c already covers separate restart continuity; wider process recovery
+and a history-only fresh reattach without a new operation remain owner
+coordination items. Existing actual QML consumer reused; no UI edits.

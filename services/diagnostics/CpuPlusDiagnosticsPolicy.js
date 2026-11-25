@@ -130,7 +130,7 @@ function hostMemorySummary(rows) {
 }
 
 // Bounded numeric opening markers plus the existing external thread sampler.
-function combineAppControl(raw, modes, openings, overflow) {
+function combineAppControl(raw, modes, openings, overflow, killWork) {
     if (overflow || typeof raw !== "string" || raw.length > 65536) return null;
     try {
         const rows = raw.trim().split("\n").map(line => JSON.parse(line));
@@ -143,8 +143,9 @@ function combineAppControl(raw, modes, openings, overflow) {
             startMs:start.tsMs,endMs:end.tsMs,modes:modes,openings:openings,
             samples:rows.map(row=>({tsMs:row.tsMs,intervalMs:row.sampleIntervalMs,
                 total:row.totalCpuPct,main:row.main.cpuPct}))};
+        if (killWork !== undefined) doc.killWork = killWork;
         const text = JSON.stringify(doc);
-        return appControlMetrics(text) ? text : null;
+        return text.length <= 65536 && appControlMetrics(text) ? text : null;
     } catch (error) { return null; }
 }
 function appControlMetrics(text) {
@@ -153,6 +154,11 @@ function appControlMetrics(text) {
         const stamp = n => Number.isSafeInteger(n) && n >= 0;
         const stages = ["graph-invalidation","mode-restore","selection","probe-schedule",
             "refresh-dispatch","focus","handler-total"];
+        const selectionStages = ["selection-state","selection-row","selection-detail"];
+        const detailedStages = stages.slice(0,2).concat(selectionStages,stages.slice(2));
+        const workStages = ["cpu-history","hunter-history","history-revisions","task-order",
+            "task-rows","metric-alerts","snapshot-selection","mini-cpu-history",
+            "mini-hunter-history","mini-history-revisions"];
         if (!d || d.schema !== "post-apollo-appcontrol-diagnostic-v1"
                 || !Number.isSafeInteger(d.pid) || d.pid <= 1
                 || !stamp(d.startMs) || !stamp(d.endMs) || d.endMs < d.startMs
@@ -167,7 +173,7 @@ function appControlMetrics(text) {
                     || s.intervalMs<=0 || s.tsMs<d.startMs || s.tsMs>d.endMs
                     || (i>0 && s.tsMs<=d.samples[i-1].tsMs)
                     || !numeric(s.total) || !numeric(s.main) || s.main>s.total+0.1)
-                || d.openings.some(o=>!o || stages.indexOf(o.stage)<0
+                || d.openings.some(o=>!o || detailedStages.indexOf(o.stage)<0
                     || !Number.isSafeInteger(o.sequence) || o.sequence<1
                     || !stamp(o.tsMs) || !numeric(o.elapsedMs))) return null;
         const groups = {};
@@ -176,12 +182,32 @@ function appControlMetrics(text) {
             groups[o.sequence].push(o);
         }
         const totals = [];
+        const selection = {};
+        for (const stage of selectionStages) selection[stage]=[];
         for (const group of Object.values(groups)) {
-            if (group.length !== stages.length) continue;
-            if (group.some((o,i)=>o.stage!==stages[i] || (i && o.tsMs<group[i-1].tsMs))) return null;
+            const expected = group.some(o=>selectionStages.indexOf(o.stage)>=0) ? detailedStages : stages;
+            if (group.length>expected.length
+                    || group.some((o,i)=>o.stage!==expected[i] || (i && o.tsMs<group[i-1].tsMs))) return null;
+            if (group.length !== expected.length) continue;
             const total=group[group.length-1];
-            if (total.tsMs-total.elapsedMs>=d.startMs && total.tsMs<=d.endMs)
+            if (total.tsMs-total.elapsedMs>=d.startMs && total.tsMs<=d.endMs) {
                 totals.push(total.elapsedMs);
+                for (const o of group)
+                    if (selectionStages.indexOf(o.stage)>=0) selection[o.stage].push(o.elapsedMs);
+            }
+        }
+        const killWork = {};
+        if (d.killWork !== undefined) {
+            if (!Array.isArray(d.killWork) || d.killWork.length>512
+                    || d.killWork.some((o,i)=>!o || workStages.indexOf(o.stage)<0
+                        || !stamp(o.tsMs) || !numeric(o.elapsedMs)
+                        || (i>0 && o.tsMs<d.killWork[i-1].tsMs))) return null;
+            for (const o of d.killWork) {
+                if (o.tsMs-o.elapsedMs<d.startMs || o.tsMs>d.endMs) continue;
+                const v=killWork[o.stage] || {count:0,totalMs:0,maxMs:0};
+                v.count++; v.totalMs+=o.elapsedMs; v.maxMs=Math.max(v.maxMs,o.elapsedMs);
+                killWork[o.stage]=v;
+            }
         }
         const weighted = rows => {
             const ms=rows.reduce((n,s)=>n+s.intervalMs,0);
@@ -200,6 +226,7 @@ function appControlMetrics(text) {
         }
         return {pid:d.pid,durationMs:d.endMs-d.startMs,all:weighted(d.samples),
             app:weighted(buckets.app),kill:weighted(buckets.kill),
+            selection:selection,killWork:killWork,
             openings:totals.length,openingMean:totals.length?totals.reduce((a,b)=>a+b,0)/totals.length:null,
             openingMax:totals.length?Math.max(...totals):null};
     } catch (error) { return null; }
@@ -212,7 +239,9 @@ function summarize(kind, text) {
             const line=(name,x)=>name+" // "+(x.count?x.total.toFixed(1)+"% total / "+x.main.toFixed(1)+"% main ("+x.count+" samples)":"N/A");
             return "PID // "+d.pid+"\n"+line("MIXED / WHOLE CAPTURE",d.all)+"\n"+line("APP",d.app)+"\n"+line("KILL",d.kill)
                 +"\nOPENINGS // "+d.openings+(d.openings?" / mean "+d.openingMean.toFixed(1)+" ms / max "+d.openingMax+" ms":" / N/A")
-                +"\nStable-mode intervals only; whole capture includes closed/other. Synchronous openings, not first paint. 100% = one core.";
+                +Object.keys(d.selection).filter(k=>d.selection[k].length).map(k=>"\n"+k.toUpperCase()+" // mean "+(d.selection[k].reduce((a,b)=>a+b,0)/d.selection[k].length).toFixed(1)+" ms").join("")
+                +Object.keys(d.killWork).sort((a,b)=>d.killWork[b].totalMs-d.killWork[a].totalMs).map(k=>"\nKILL "+k.toUpperCase()+" // "+d.killWork[k].count+" calls / "+d.killWork[k].totalMs+" ms summed / "+d.killWork[k].maxMs+" ms max").join("")
+                +"\nStable-mode intervals only; whole capture includes closed/other. Stage timings are synchronous wall time, not CPU attribution or first paint. 100% = one core.";
         }
         if (kind === "inventory") {
             const data = JSON.parse(text);

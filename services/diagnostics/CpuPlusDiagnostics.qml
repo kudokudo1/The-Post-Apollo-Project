@@ -57,6 +57,7 @@ Scope {
     property string appControlMode: "unavailable"
     readonly property bool appControlCaptureActive: busy && kind === "appcontrol" && !cancelled && !exited
     property var openingRecords: []
+    property var killWorkRecords: []
     property var modeRecords: []
     property bool diagnosticOverflow: false
     onAppControlModeChanged: {
@@ -70,6 +71,12 @@ Scope {
         if (!appControlCaptureActive) return;
         if (openingRecords.length >= 140) { diagnosticOverflow = true; return; }
         openingRecords.push({stage:stage, sequence:sequence, elapsedMs:elapsedMs, tsMs:timestampMs});
+    }
+
+    function recordKillWork(stage, elapsedMs, timestampMs) {
+        if (!appControlCaptureActive) return;
+        if (killWorkRecords.length >= 512) { diagnosticOverflow = true; return; }
+        killWorkRecords.push({stage:stage, elapsedMs:elapsedMs, tsMs:timestampMs});
     }
 
     function request(job) {
@@ -87,6 +94,7 @@ Scope {
         cancelled = false;
         output = "";
         openingRecords = [];
+        killWorkRecords = [];
         modeRecords = [];
         diagnosticOverflow = false;
         busy = true;
@@ -136,7 +144,7 @@ Scope {
         if (!busy || !received || !exited) return;
         deadline.stop();
         if (kind === "appcontrol" && !cancelled && exitOk && output.length <= maximumReport)
-            output = Policy.combineAppControl(output, modeRecords, openingRecords, diagnosticOverflow) || "";
+            output = Policy.combineAppControl(output, modeRecords, openingRecords, diagnosticOverflow, killWorkRecords) || "";
         const summary = !cancelled && exitOk && output.length <= maximumReport
             ? Policy.summarize(kind, output) : null;
         publishResult(cancelled ? "CANCELLED" : summary ? "COMPLETE" : "NOT VERIFIED",

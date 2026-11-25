@@ -786,6 +786,9 @@ PanelWindow {
                 onDiagnosticOpeningStage: function(stage, sequence, elapsedMs, timestampMs) {
                     CpuPlusDiagnostics.recordOpening(stage, sequence, elapsedMs, timestampMs);
                 }
+                onDiagnosticKillWorkStage: function(stage, elapsedMs, timestampMs) {
+                    CpuPlusDiagnostics.recordKillWork(stage, elapsedMs, timestampMs);
+                }
 
                 systemTelemetry: sharedSystemTelemetry
                 fanControl: sharedFanControl

@@ -1693,7 +1693,9 @@ PanelWindow {
             return;
         const now = Date.now();
         const elapsedMs = now - startMs;
-        if (elapsedMs < 25 && sequence % 16 !== 1)
+        if (killDiagnosticActive())
+            diagnosticKillWorkStage(stage, elapsedMs, now);
+        if (!appControlSnapshotTraceEnabled || (elapsedMs < 25 && sequence % 16 !== 1))
             return;
         console.warn("SYNTAGMA_COMPLETION_PROBE // service=appcontrol"
                      + " stage=consumer:" + stage + ":end"
@@ -1706,6 +1708,18 @@ PanelWindow {
     property int appControlOpenTraceSequence: 0
     property bool diagnosticCaptureActive: false
     signal diagnosticOpeningStage(string stage, int sequence, double elapsedMs, double timestampMs)
+    signal diagnosticKillWorkStage(string stage, double elapsedMs, double timestampMs)
+
+    function killDiagnosticActive() {
+        return diagnosticCaptureActive && menuOpen && selectedModeIndex === killModeIndex;
+    }
+
+    function traceKillWork(stage, startMs) {
+        if (!startMs || !killDiagnosticActive())
+            return;
+        const now = Date.now();
+        diagnosticKillWorkStage(stage, now - startMs, now);
+    }
 
     function traceAppControlOpen(stage, sequence, startMs) {
         if (sequence <= 0)
@@ -1723,7 +1737,7 @@ PanelWindow {
 
     function applyTaskSnapshot(rows) {
         const snapshotRows = Array.isArray(rows) ? rows : [];
-        const traceSequence = appControlSnapshotTraceEnabled
+        const traceSequence = (appControlSnapshotTraceEnabled || killDiagnosticActive())
             ? ++appControlSnapshotTraceSequence : 0;
         const traceRowCount = snapshotRows.length;
 
@@ -1780,6 +1794,7 @@ PanelWindow {
                     || killViewSwitchPending)
                 return;
 
+            const selectionStart = killDiagnosticActive() ? Date.now() : 0;
             let targetIndex = 0;
 
             if (preservedPid > 0) {
@@ -1803,6 +1818,7 @@ PanelWindow {
 
             if (taskHistoryPid <= 0)
                 resetTaskHistoryForSelection();
+            traceKillWork("snapshot-selection", selectionStart);
         });
     }
 
@@ -2521,10 +2537,17 @@ PanelWindow {
         const samples = Array.isArray(rows) ? rows : [];
 
         if (samples.length > 0) {
+            const timed = killDiagnosticActive();
+            let stageStart = timed ? Date.now() : 0;
             updateTaskMiniCpuHistories(samples);
+            traceKillWork("mini-cpu-history", stageStart);
+            stageStart = timed ? Date.now() : 0;
             updateTaskMiniHunterMetricHistories(samples);
+            traceKillWork("mini-hunter-history", stageStart);
+            stageStart = timed ? Date.now() : 0;
             taskMiniHistoryRevision += 1;
             taskMiniDisplayRevision += 1;
+            traceKillWork("mini-history-revisions", stageStart);
         }
     }
 
@@ -29493,6 +29516,7 @@ PanelWindow {
                 fireKillRailOnce();
             restoreInputForMode(selectedModeIndex);
             openStage = traceAppControlOpen("mode-restore", openTrace, openStage);
+            const selectionStart = openStage;
 
             detailFocused = false;
             modeRailFocused = false;
@@ -29500,14 +29524,17 @@ PanelWindow {
             modeRailHoveredIndex = -1;
             keyboardActive = false;
             hoveredResultIndex = -1;
+            openStage = traceAppControlOpen("selection-state", openTrace, openStage);
 
             if (selectedModeIndex === appsModeIndex)
                 restoreRememberedAppSelection();
             else
                 resetResultSelection();
+            openStage = traceAppControlOpen("selection-row", openTrace, openStage);
 
             resetDetailActionSelection();
-            openStage = traceAppControlOpen("selection", openTrace, openStage);
+            traceAppControlOpen("selection-detail", openTrace, openStage);
+            openStage = traceAppControlOpen("selection", openTrace, selectionStart);
             scheduleRunKillProbe();
             scheduleWindowAudioProbe();
             scheduleAppAudioProbe();

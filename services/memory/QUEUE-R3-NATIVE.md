@@ -59,3 +59,20 @@ notification. Pin that exact revision and repeat the unchanged native
 scenario. No source changes to either candidate; no weakened checks.
 Production host, real provider, Hub delivery and native resource acceptance
 remain outstanding. New combined CI must pass before merge review.
+
+## R3f // actual-checkout durable recovery qualification
+
+Nurse 2 designates MemoryQueueSessionHost.js as canonical; keep separate
+reference coordinator unmounted. Add disposable native Quickshell fixture
+using actual checkout host, durable owner, pipe, DOC 2 AUTO and recovery
+panes. Initial empty inventory cannot unlock. Explicit fixture-only state
+injection allows one QUEUE confirmation; discard successful reply before
+host consumes it, stop child, explicitly restart with new generation and
+recover exact committed local intent via INVENTORY and LOCAL_ACTION.
+Display UNVERIFIED and preserve unresolved + startup lock; refuse CANCEL,
+clear recovery on EOF. No automatic replay or acknowledgment. Actual
+checkout, no pinned overlays in this new workflow. Earlier R3b fixture
+retained unchanged. Real Process pipes, test timer and synthetic source;
+no raw byte-bounded QML parser, real watchdog, full-shell crash, native
+resource acceptance, production launcher/provider or Hub. Test invokes
+pane methods rather than physical clicks. No production unlock method.

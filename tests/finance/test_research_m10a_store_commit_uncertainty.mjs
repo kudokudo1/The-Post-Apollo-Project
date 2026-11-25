@@ -92,6 +92,46 @@ try {
   assert.equal(run({action:"list"},swap).revision,1);
   console.log("M10A_CHECK // REPLACED_LOCK_NEVER_DELETED");
 
+  // Reject a symlinked parent BEFORE creating any data directories in
+  // the other location. The old recursive mkdir followed this symlink.
+  const outside=path.join(root,"outside");
+  fs.mkdirSync(outside,{mode:0o700});
+  const redirect=path.join(root,"redirect");
+  fs.symlinkSync(outside,redirect,"dir");
+  assert.throws(()=>run(cmd(0,"escape"),
+    path.join(redirect,"created","research")),when("UNSAFE_DIRECTORY"));
+  assert.equal(fs.existsSync(path.join(outside,"created")),false);
+  assert.throws(()=>run({action:"list"},
+    path.join(redirect,"created","research")),when("UNSAFE_DIRECTORY"));
+  console.log("M10A_CHECK // ANCESTOR_SYMLINK_CANNOT_CREATE_STORE");
+
+  // Refuse other private files hardlinked into Research storage, even if
+  // their owner and 0600 mode would otherwise look normal.
+  const hard=path.join(root,"hardlink");
+  fs.mkdirSync(hard,{mode:0o700});
+  const borrowed=path.join(root,"borrowed.json");
+  fs.writeFileSync(borrowed,'{"schemaVersion":1,"revision":0,"investigations":[]}\\n',
+    {mode:0o600});
+  fs.linkSync(borrowed,path.join(hard,"investigations.json"));
+  assert.throws(()=>run({action:"list"},hard),when("UNSAFE_FILE"));
+  assert.equal(fs.readFileSync(borrowed,"utf8"),
+    fs.readFileSync(path.join(hard,"investigations.json"),"utf8"));
+  console.log("M10A_CHECK // HARDLINK_STORE_REFUSED");
+
+  // Replacing the file after lstat but before O_NOFOLLOW open must not
+  // substitute a different private inode in a read-only snapshot.
+  const race=path.join(root,"inode-race");
+  run(cmd(0,"original"),race);
+  const file=path.join(race,"investigations.json");
+  const replacement=path.join(race,"replacement.json");
+  fs.copyFileSync(file,replacement);
+  assert.throws(()=>withPatched("openSync",(real,args)=>{
+    if(args[0]===file) fs.renameSync(replacement,file);
+    return real.apply(fs,args);
+  },()=>run({action:"list"},race)),when("UNSAFE_FILE"));
+  assert.equal(run({action:"list"},race).revision,1);
+  console.log("M10A_CHECK // PREOPEN_INODE_SWAP_REFUSED");
+
   // A child must finish on one newline-terminated frame even when its
   // parent leaves stdin open. Unlike old readFileSync(0), this does not
   // wait for Quickshell to close the transport.

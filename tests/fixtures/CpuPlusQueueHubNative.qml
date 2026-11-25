@@ -94,7 +94,10 @@ ShellRoot {
                 if (smoke.trial==="BLOCK") {
                     if (!smoke.check(smoke.hub.setBlocked("cpu-plus-memory-queue","cpu-plus-memory-queue","CPU++",true),"set isolated BLOCK"))return;
                 } else if (smoke.trial==="DND") {
-                    if (!smoke.check(smoke.hub.setDnd("cpu-plus-memory-queue","cpu-plus-memory-queue","CPU++",true),"set isolated DND"))return;
+                    // setDnd is a setter without a success return; verify the actual policy.
+                    smoke.hub.setDnd("cpu-plus-memory-queue","cpu-plus-memory-queue","CPU++",true);
+                    if (!smoke.check(smoke.hub.isDnd("cpu-plus-memory-queue")
+                        && !smoke.hub.isBlocked("cpu-plus-memory-queue"),"set isolated DND"))return;
                 }
                 if (!smoke.check(binding.publishState(Host.start(binding.hostState,Consumer,1,"LEGACY",false,false,true)),
                     "start explicit notify-only host"))return;

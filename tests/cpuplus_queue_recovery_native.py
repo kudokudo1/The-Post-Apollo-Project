@@ -3,10 +3,72 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+import signal
+import selectors
+import time
 import subprocess
 import tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
+
+
+def kill_at_boundary(command,config,env,trial):
+    # Binary reads avoid text-reader buffering hiding an already received
+    # marker. Bound total output and deadline; own process group only.
+    proc=subprocess.Popen(command,cwd=config,env=env,stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT,start_new_session=True)
+    output=bytearray()
+    owner_pid=None
+    try:
+        with selectors.DefaultSelector() as sel:
+            sel.register(proc.stdout,selectors.EVENT_READ)
+            until=time.monotonic()+20
+            marker=("QUEUE_R3_CRASH_POINT // "+trial).encode()
+            while marker not in output:
+                remaining=until-time.monotonic()
+                if remaining<=0 or not sel.select(remaining):
+                    raise AssertionError("Crash boundary timeout")
+                part=os.read(proc.stdout.fileno(),4096)
+                if not part:
+                    raise AssertionError("Shell exited before crash boundary")
+                output.extend(part)
+                if len(output)>1048576 or b"QUEUE_R3_RECOVERY_FAIL" in output:
+                    raise AssertionError("Unexpected crash fixture output")
+            import re
+            pids=re.findall(rb"QUEUE_R3_OWNER_PID // (\d+)",output)
+            if not pids:
+                raise AssertionError("Missing exact child owner identity")
+            owner_pid=int(pids[-1])
+            # Kill only the disposable shell, not a named process or user's
+            # desktop. The child must retire via parent pipe EOF.
+            proc.send_signal(signal.SIGKILL)
+            if proc.wait(timeout=5)!=-signal.SIGKILL:
+                raise AssertionError("Shell not terminated by SIGKILL")
+        # Check ownership released using the actual cooperative queue lock.
+        # This waits for retirement, not a new owner or operation retry.
+        import fcntl
+        with open(config/"private"/"queue.db","rb") as db:
+            until=time.monotonic()+5
+            while True:
+                try:
+                    fcntl.flock(db.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    fcntl.flock(db.fileno(),fcntl.LOCK_UN)
+                    break
+                except BlockingIOError:
+                    if time.monotonic()>=until:
+                        raise AssertionError("Old owner retained custody")
+                    time.sleep(0.02)
+        print("QUEUE_R3_SHELL_SIGKILL // "+trial+" old owner custody released",flush=True)
+    finally:
+        print(output.decode("utf-8",errors="replace"))
+        # Cleanup only processes inside this disposable process group.
+        try:
+            os.killpg(proc.pid,signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait(timeout=5)
+        proc.stdout.close()
+
 if os.environ.get("POST_APOLLO_QUEUE_PIPE_SMOKE")!="CI_DISPOSABLE_ONLY":
     raise SystemExit("Disposable CI only")
 with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
@@ -56,7 +118,48 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
         slot=checkpoint_dir/"action-v1.json"
         slot.write_bytes(b"{")
         slot.chmod(0o600)
-    proc=subprocess.run(["qs","-p",str(config/"smoke.qml"),"--no-color"],cwd=config,env=env,
+    command=["qs","-p",str(config/"smoke.qml"),"--no-color"]
+    crash=env.get("POST_APOLLO_QUEUE_CRASH_TRIAL")
+    if crash:
+        if crash not in {"BEFORE_PREPARE","PREPARED","COMMITTED","ACK_BEFORE","ACK_SAVED"}:
+            raise SystemExit("Unknown crash trial")
+        kill_at_boundary(command,config,env,crash)
+        # New process, same durable files. Never pass volatile action or
+        # review identities from supervisor to shell.
+        env["POST_APOLLO_QUEUE_CRASH_RESTORE"]="1"
+        proc=subprocess.run(command,cwd=config,env=env,text=True,stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,timeout=25,check=False)
+        print(proc.stdout)
+        if proc.returncode or "QUEUE_R3_CRASH_RESTORE_PASS // "+crash not in proc.stdout or "QUEUE_R3_RECOVERY_FAIL" in proc.stdout:
+            raise SystemExit("Fresh shell recovery failed")
+        import sys
+        sys.path.insert(0,str(backend))
+        from memory_queue_host_checkpoint import HostCheckpoint
+        snapshot=HostCheckpoint(checkpoint_dir).load()
+        action=snapshot["action"]["message"]
+        ack=snapshot["acknowledgment"]
+        with sqlite3.connect((config/"private"/"queue.db").as_uri()+"?mode=ro",uri=True) as db:
+            rows=db.execute("SELECT action_id,state,result_id FROM memory_queue_local_actions_v1").fetchall()
+            expected="COMMITTED" if crash=="COMMITTED" else "PREPARED"
+            if crash=="BEFORE_PREPARE":
+                if rows:
+                    raise SystemExit("Withheld PREPARE mutated queue")
+            elif len(rows)!=1 or rows[0][:2]!=(action["action_id"],expected) or (rows[0][2] is not None)!=(expected=="COMMITTED"):
+                raise SystemExit("Unexpected action recovery rows")
+            if db.execute("SELECT count(*) FROM requests").fetchone()[0]!=(1 if expected=="COMMITTED" else 0):
+                raise SystemExit("Unexpected request count")
+            table=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_queue_recovery_reviews_v1'").fetchone()
+            receipts=db.execute("SELECT review_id,action_id FROM memory_queue_recovery_reviews_v1").fetchall() if table else []
+            if crash=="ACK_SAVED":
+                if ack is None or receipts!=[(ack["review"]["review_id"],action["action_id"])]:
+                    raise SystemExit("Unexpected recovered receipt")
+            elif receipts:
+                raise SystemExit("Unexpected acknowledgment")
+            if (ack is not None)!=(crash in {"ACK_BEFORE","ACK_SAVED"}):
+                raise SystemExit("Unexpected checkpoint presence")
+        print("QUEUE_R3_CRASH_DB_PASS // "+crash,flush=True)
+        raise SystemExit(0)
+    proc=subprocess.run(command,cwd=config,env=env,
                         text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=25,check=False)
     print(proc.stdout)
     if proc.returncode or "QUEUE_R3_RECOVERY_PASS" not in proc.stdout or "QUEUE_R3_RECOVERY_FAIL" in proc.stdout:

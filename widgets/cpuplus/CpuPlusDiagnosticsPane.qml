@@ -22,8 +22,8 @@ Column {
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
     readonly property bool canChooseComparison: report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
     readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize) : null
-    readonly property var memoryDetails: memoryBreakdown(selectedReport, report)
-    function memoryBreakdown(selected, report) {
+    readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true)
+    function memoryBreakdown(selected, report, includePrivate = false) {
         // Presentation only: reuse the existing completed JSONL capture.
         if (selected !== "memory" || !report || report.status !== "COMPLETE"
                 || typeof report.text !== "string" || report.text.length > 65536) return null;
@@ -36,6 +36,8 @@ Column {
                     || !count(final.startTicks) || records.length < 1 || records.length > 361)
                 return null;
             let duration = 0;
+            let privateCoverage = 0;
+            const privateValues = [];
             for (let i=0; i<records.length; ++i) {
                 const row = records[i];
                 if (!row || row.event !== "memory" || row.pid !== final.pid
@@ -48,6 +50,20 @@ Column {
                         || row.memoryKiB.Private_Dirty > row.memoryKiB.Rss
                         || row.memoryKiB.SwapPss > row.memoryKiB.Swap)
                     return null;
+                if (includePrivate) {
+                    const clean = row.memoryKiB.Private_Clean;
+                    const resident = row.privateResidentKiB;
+                    const hasClean = Object.prototype.hasOwnProperty.call(row.memoryKiB,"Private_Clean");
+                    const hasResident = Object.prototype.hasOwnProperty.call(row,"privateResidentKiB");
+                    if (hasClean || hasResident) {
+                        if (!hasClean || !hasResident || !count(clean) || !count(resident)
+                                || !count(clean + row.memoryKiB.Private_Dirty)
+                                || resident !== clean + row.memoryKiB.Private_Dirty
+                                || resident > row.memoryKiB.Rss) return null;
+                        privateCoverage++;
+                        privateValues.push({clean:clean,resident:resident});
+                    }
+                }
                 if (i === 0) {
                     if (row.sampleIntervalMs !== null || row.cpuPct !== null) return null;
                 } else {
@@ -63,11 +79,26 @@ Column {
                 ["RSS","Rss"], ["PSS","Pss"], ["PRIVATE DIRTY","Private_Dirty"],
                 ["SWAP","Swap"], ["SWAP PSS","SwapPss"]
             ];
-            return {pid:final.pid, startTicks:final.startTicks, samples:records.length,
+            const details = {pid:final.pid, startTicks:final.startTicks, samples:records.length,
                 durationMs:duration, rows:labels.map(pair => ({label:pair[0],
                     first:first[pair[1]], peak:Math.max(...records.map(row=>row.memoryKiB[pair[1]])),
                     last:last[pair[1]], change:records.length > 1 ? last[pair[1]]-first[pair[1]] : null})),
                 anon:last.Pss_Anon, file:last.Pss_File, shmem:last.Pss_Shmem};
+            if (includePrivate) {
+                // A legacy capture has neither field. Never mix partially
+                // extended rows into a trend or substitute zero for absence.
+                if (privateCoverage !== 0 && privateCoverage !== records.length) return null;
+                details.privateResidentAvailable = privateCoverage === records.length;
+                if (details.privateResidentAvailable) {
+                    for (const pair of [["PRIVATE RESIDENT","resident"],["PRIVATE CLEAN","clean"]]) {
+                        const values = privateValues.map(row=>row[pair[1]]);
+                        const firstValue=values[0], lastValue=values[values.length-1];
+                        details.rows.push({label:pair[0],first:firstValue,peak:Math.max(...values),
+                            last:lastValue,change:values.length>1?lastValue-firstValue:null});
+                    }
+                }
+            }
+            return details;
         } catch (_) { return null; }
     }
 
@@ -223,6 +254,15 @@ Column {
                 + " / FILE " + (root.memoryDetails.file / 1048576).toFixed(3)
                 + " / SHMEM " + (root.memoryDetails.shmem / 1048576).toFixed(3) + " GiB" : ""
             color: Colors.white
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: root.memoryDetails && root.memoryDetails.privateResidentAvailable
+                ? "PRIVATE RESIDENT // CLEAN + DIRTY (EXCLUDES SEPARATELY ACCOUNTED HUGETLB)"
+                : "PRIVATE RESIDENT // UNAVAILABLE IN THIS CAPTURE"
+            color: Colors.orange
             font.pixelSize: 10
             wrapMode: Text.Wrap
         }

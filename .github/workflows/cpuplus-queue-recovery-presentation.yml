@@ -1,0 +1,17 @@
+name: CPU++ queue recovery presentation
+on:
+  pull_request:
+    paths:
+      - 'widgets/cpuplus/CpuPlusQueueRecovery.js'
+      - 'widgets/cpuplus/CpuPlusQueueRecoveryPane.qml'
+      - 'tests/cpuplus/test_queue_recovery_presentation.cjs'
+      - '.github/workflows/cpuplus-queue-recovery-presentation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_queue_recovery_presentation.cjs

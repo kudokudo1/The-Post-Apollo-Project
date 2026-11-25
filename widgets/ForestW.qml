@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../components"
+import "forest/ui2" as PublicPreview
 import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
@@ -733,6 +734,7 @@ PanelWindow {
 
         Item {
             id: chatPane
+            objectName: "forestChatPane"
             anchors.left: activeChatRail.right
             anchors.right: parent.right
             anchors.top: header.bottom
@@ -740,6 +742,7 @@ PanelWindow {
 
             Item {
                 id: chatHeadingRow
+                objectName: "forestChatHeading"
                 anchors.top: parent.top
                 anchors.topMargin: 9
                 anchors.left: parent.left
@@ -808,14 +811,29 @@ PanelWindow {
                     z: -1
                 }
             }
-            GohuText {
+            // Explicit local public preview, never a host/session request.
+            ActionButton {
+                id: publicPreviewButton
+                objectName: "forestPublicPreviewButton"
                 anchors.right: parent.right
                 anchors.rightMargin: 13
                 anchors.top: parent.top
-                anchors.topMargin: 18
-                text: "PREVIEW"
-                color: Colors.orange
-                font.pixelSize: 10
+                anchors.topMargin: 10
+                width: 66
+                height: 24
+                radius: 0
+                label: "PREVIEW"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                selected: publicPreviewGate.active
+                available: publicPreviewGate.eligible
+                interactive: publicPreviewGate.eligible
+                acceptedButtons: Qt.LeftButton
+                Accessible.name: publicPreviewGate.active
+                    ? "Close public conversation preview"
+                    : "Open public conversation preview"
+                Accessible.description: "Fixed public CHERRY example; no model or session execution."
+                onLeftClicked: publicPreviewGate.togglePreview()
             }
             Rectangle {
                 id: chatDivider
@@ -839,6 +857,7 @@ PanelWindow {
 
             Rectangle {
                 id: modelPopup
+                objectName: "forestModelPopup"
                 visible: root.modelPopupOpen
                 z: 30
                 anchors.right: promptRow.right
@@ -1523,6 +1542,7 @@ PanelWindow {
             // The selector lives in its own overlay and cannot cover the prompt.
             Item {
                 id: sessionPreview
+                objectName: "forestSessionPreview"
                 anchors.top: chatDivider.bottom
                 anchors.topMargin: 12
                 anchors.bottom: promptRow.top
@@ -1534,7 +1554,40 @@ PanelWindow {
                 anchors.rightMargin: 8
                 clip: true
 
+                // Measured viewport, not chassis size or a claimed host grant.
+                PublicPreview.PublicPreviewGate {
+                    id: publicPreviewGate
+                    menuOpen: root.menuOpen && root.visible
+                    treeKey: root.activeTree ? root.activeTree.sessionKey : ""
+                    chatHostTrusted: root.chatHostTrusted
+                    activeSessionCount: Array.isArray(root.activeChatSessions)
+                        ? root.activeChatSessions.length : -1
+                    viewportUsable: sessionPreview.width >= 300
+                        && sessionPreview.height >= 160
+                }
+
+                Loader {
+                    id: publicPreviewLoader
+                    objectName: "forestPublicPreviewLoader"
+                    anchors.fill: parent
+                    active: publicPreviewGate.active
+                    visible: active && status === Loader.Ready
+                    enabled: visible
+                    sourceComponent: publicPreviewComponent
+                    onStatusChanged: {
+                        if (status === Loader.Error)
+                            publicPreviewGate.dismissPreview();
+                    }
+                }
+
+                Component {
+                    id: publicPreviewComponent
+                    PublicPreview.PublicConversationFixture {}
+                }
+
                 Column {
+                    objectName: "forestEmptySessionPlaceholder"
+                    visible: !publicPreviewLoader.visible
                     anchors.centerIn: parent
                     width: Math.max(120, parent.width - 30)
                     spacing: root.frameHeight >= 540 ? 8 : 4
@@ -1574,6 +1627,7 @@ PanelWindow {
             // not a separate button floating above the bar.
             Item {
                 id: reasoningRailHost
+                objectName: "forestReasoningRail"
                 z: 12
                 enabled: root.menuOpen
                 anchors.top: chatDivider.bottom
@@ -1585,6 +1639,7 @@ PanelWindow {
 
                 ActionButton {
                     id: reasoningCoffeeButton
+                    objectName: "forestReasoningCoffee"
                     // Inset the red close state INSIDE the slider's own
                     // 40px frame/38px top cap. The surround is part of the
                     // existing SelectorSlider, not another floating row.
@@ -1917,6 +1972,7 @@ PanelWindow {
 
             Item {
                 id: promptRow
+                objectName: "forestPromptRow"
                 z: 40
                 anchors.left: parent.left
                 anchors.leftMargin: 12
@@ -1953,6 +2009,7 @@ PanelWindow {
 
                     TextInput {
                         id: forestPromptInput
+                        objectName: "forestPromptInput"
                         anchors.left: parent.left
                         anchors.leftMargin: 11
                         anchors.right: voiceToTextButton.left
@@ -2003,6 +2060,7 @@ PanelWindow {
                     // supplies recorder custody, consent and stop behavior.
                     VoiceToTextButton {
                         id: voiceToTextButton
+                        objectName: "forestVoiceButton"
                         anchors.right: modelPickerButton.left
                         anchors.rightMargin: 4
                         anchors.top: parent.top
@@ -2115,6 +2173,7 @@ PanelWindow {
                 // in Forest. It owns presentation, never provider calls.
                 AskSendButton {
                     id: forestAskSendButton
+                    objectName: "forestSendButton"
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom

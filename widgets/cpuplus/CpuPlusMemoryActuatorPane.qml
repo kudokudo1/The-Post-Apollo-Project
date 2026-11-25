@@ -742,24 +742,28 @@ Item {
                             required property var modelData
                             width: parent.width
                             spacing: 2
-                            GohuText {
-                                id: ramMetricText
-                                objectName: "cpuplusRamMetricText"
+                            Item {
                                 width: parent.width
-                                text: root.ramDetailText(modelData)
-                                textFormat: Text.RichText
-                                color: Colors.white
-                                font.pixelSize: 11
-                                wrapMode: Text.Wrap
-                            }
-                            // One existing safe sampled effect per visible dataset,
-                            // not one effect per punctuation mark or number token.
-                            TextHashGlow {
-                                objectName: "cpuplusRamMetricGlow"
-                                safeSource: ramMetricText.visible ? ramMetricText : null
-                                requestedVisible: ramMetricText.visible
-                                foregroundColor: Colors.white
-                                preferredGlowColor: root.ramDatasetGlow(modelData.label)
+                                height: ramMetricText.implicitHeight
+                                GohuText {
+                                    id: ramMetricText
+                                    objectName: "cpuplusRamMetricText"
+                                    width: parent.width
+                                    text: root.ramDetailText(modelData)
+                                    textFormat: Text.RichText
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    wrapMode: Text.Wrap
+                                }
+                                // One existing safe sampled effect per visible dataset,
+                                // not one effect per punctuation mark or number token.
+                                TextHashGlow {
+                                    objectName: "cpuplusRamMetricGlow"
+                                    safeSource: ramMetricText.visible ? ramMetricText : null
+                                    requestedVisible: ramMetricText.visible
+                                    foregroundColor: Colors.white
+                                    preferredGlowColor: root.ramDatasetGlow(modelData.label)
+                                }
                             }
                             Rectangle {
                                 width: parent.width

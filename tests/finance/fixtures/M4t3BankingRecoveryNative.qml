@@ -16,8 +16,8 @@ ShellRoot {
             {id:"acct-1",providerId:"chime",productId:"chime-checking",nickname:"Fictional checking",openingCents:10000,origin:"manual"},
             {id:"acct-2",providerId:"cashapp",productId:"cashapp-balance",nickname:"Fictional wallet",openingCents:5000,origin:"manual"}
         ], entries:[
-            {id:"entry-3",accountId:"acct-1",amountCents:-1200,date:"2026-01-01",description:"Fictional transfer",origin:"manual",transferId:"transfer-5"},
-            {id:"entry-4",accountId:"acct-2",amountCents:1200,date:"2026-01-01",description:"Fictional transfer",origin:"manual",transferId:"transfer-5"}
+            {id:"entry-3",accountId:"acct-1",amountCents:-1200,date:"2026-01-01",description:"Fictional transfer",origin:"manual",transferId:"transfer-5",transferSide:"out"},
+            {id:"entry-4",accountId:"acct-2",amountCents:1200,date:"2026-01-01",description:"Fictional transfer",origin:"manual",transferId:"transfer-5",transferSide:"in"}
         ], nextId:6
     })
     Finance.FinanceBankingRevisionBridgeCandidate { id: a; reviewEnabled: true }

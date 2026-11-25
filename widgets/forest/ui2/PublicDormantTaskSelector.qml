@@ -74,13 +74,13 @@ Item {
     }
     function clear() {
         // Retire focused local controls before hiding them.
-        for (let i=0;i<choices.count;i++) {
+        for (let i=0;choices && i<choices.count;i++) {
             const item=choices.itemAt(i);
             if (item) item.releaseFocus();
         }
-        reviewButton.releaseFocus();
-        closeButton.releaseFocus();
-        expiry.stop();
+        if (reviewButton) reviewButton.releaseFocus();
+        if (closeButton) closeButton.releaseFocus();
+        if (expiry) expiry.stop();
         retireReview();
         _selection="";
         _rows=[];
@@ -105,8 +105,9 @@ Item {
         return true;
     }
     function current(ref) {
-        if (_scope && clock.elapsedMs()>=lifetimeMs) clear();
-        return eligible && sameScope(ref,_scope) && sameScope(ref,ownerScope);
+        if (!eligible || !sameScope(ref,_scope) || !sameScope(ref,ownerScope)) return false;
+        if (clock.elapsedMs()>=lifetimeMs) { clear(); return false; }
+        return true;
     }
     function openCatalog(ref) {
         if (!eligible || !sameScope(ref,ownerScope) || _usedLists[ref.viewKey]

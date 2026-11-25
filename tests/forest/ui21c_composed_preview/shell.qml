@@ -218,6 +218,15 @@ ShellRoot {
                 "missing synthetic/locked labels");
         }
     }
+    function descendant(item,name) {
+        if (!item) return null;
+        if (item.objectName===name) return item;
+        for (const c of item.children) {
+            const match=descendant(c,name);
+            if (match) return match;
+        }
+        return null;
+    }
     function catalogScope(n) {
         return {treeKey:"CHERRY",viewKey:n.toString(16).padStart(32,"0"),catalogRevision:n};
     }
@@ -768,8 +777,12 @@ ShellRoot {
                 check(item.selectTask(a,rows[0].taskAlias) && item.reviewState==="CLOSED",
                     "selection is not review");
                 check(!item.openReview(a,catalogPlan(2,rows[0].taskAlias)),"wrong plan");
+                const opener=descendant(item,"dormantOpenReview");
+                check(opener && opener.activeFocusOnTab,"review opener eligible");
+                if (opener) opener.forceActiveFocus();
                 check(item.openReview(a,plan) && item.reviewState==="PENDING"
                     && item.catalogRows.length===0,"exclusive review");
+                check(opener && !opener.focus && !opener.activeFocusOnTab,"list focus retired");
                 check(item.receivePlan(a,plan,fixedReviewRows())
                     && item.reviewRows.length===5,"explicit plan");
                 check(!item.receivePlan(a,catalogPlan(2,rows[0].taskAlias),fixedReviewRows()),
@@ -782,6 +795,8 @@ ShellRoot {
                 check(item.dismissPlan(a,plan) && item.reviewState==="CLOSED"
                     && item.catalogRows.length===3 && item.selectedAlias===rows[0].taskAlias,
                     "review dismiss returns to list");
+                const opener=descendant(item,"dormantOpenReview");
+                check(opener && opener.focus && opener.activeFocusOnTab,"local opener focus returned");
                 check(!item.openReview(a,plan),"review view reused");
                 const next=catalogPlan(2,rows[0].taskAlias);
                 item.ownerPlanScope=next;
@@ -870,6 +885,51 @@ ShellRoot {
             case 60:
                 check(selector.item===null&&review.item===null&&preview.item===null,"selector unload");
                 break;
+            case 61:
+                selector.active=true;
+                break;
+            case 62: {
+                const item=selector.item,a=catalogScope(1),rows=catalogRows();
+                item.syntheticOwner=true;
+                item.ownerScope=a;
+                check(item.openCatalog(a)&&item.receiveCatalog(a,rows)
+                    &&item.selectTask(a,rows[0].taskAlias),"cap setup");
+                for(let i=1;i<=64;i++) {
+                    const plan=catalogPlan(i,rows[0].taskAlias);
+                    item.ownerPlanScope=plan;
+                    check(item.openReview(a,plan)&&item.receivePlan(a,plan,fixedReviewRows())
+                        &&item.dismissPlan(a,plan),"review cap "+i);
+                }
+                const over=catalogPlan(65,rows[0].taskAlias);
+                item.ownerPlanScope=over;
+                check(!item.openReview(a,over)&&item.catalogState==="DISPLAYING",
+                    "review cap exhausted");
+                const b=catalogScope(2);
+                item.ownerScope=b;
+                check(item.openCatalog(b)&&item.receiveCatalog(b,rows)
+                    &&item.selectTask(b,rows[0].taskAlias)&&!item.openReview(b,over),
+                    "review cap survives list refresh");
+                break;
+            }
+            case 63: {
+                const item=selector.item;
+                for(let i=3;i<=64;i++) {
+                    const ref=catalogScope(i);
+                    item.ownerScope=ref;
+                    check(item.openCatalog(ref)&&item.receiveCatalog(ref,[])
+                        &&item.dismissCatalog(ref),"catalog cap "+i);
+                }
+                const over=catalogScope(65);
+                item.ownerScope=over;
+                check(!item.openCatalog(over)&&item.catalogState==="CLOSED",
+                    "catalog cap exhausted");
+                check(!item.openCatalog(catalogScope(64)),"old cap reuse");
+                selector.active=false;
+                break;
+            }
+            case 64:
+                check(selector.item===null,"cap fixture unloaded");
+                break;
             default:
                 check(false, "unexpected phase");
             }
@@ -877,7 +937,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 60) {
+            if (p === 64) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

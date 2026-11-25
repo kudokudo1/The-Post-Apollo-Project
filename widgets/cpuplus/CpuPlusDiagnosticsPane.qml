@@ -8,6 +8,8 @@ import "../../components"
 Column {
     id: root
     objectName: "cpuplusDiagnosticControls"
+    property Item headerTarget: null
+    property Item footerTarget: null
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
@@ -111,48 +113,65 @@ Column {
             + (unit ? " " + (delta && unit === "%" ? "pp" : unit) : "");
     }
 
-    GohuText {
+    Column {
+        parent: root.headerTarget || root
+        objectName: "cpuplusDiagTopControls"
         width: parent.width
-        text: "TROUBLESHOOT // ON DEMAND"
-        color: Colors.magenta
-        font.pixelSize: 12
-    }
-    GohuText {
-        width: parent.width
-        text: CpuPlusDiagnostics.feedback
-        color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
-        font.pixelSize: 10
-        wrapMode: Text.WordWrap
-    }
-    Repeater {
-        model: [
-            {kind: "memory", label: "MEMORY OBSERVE // 120s"},
-            {kind: "inventory", label: "SOURCE WORKLOAD SCAN"},
-            {kind: "threads", label: "THREAD SAMPLE // 30s"},
-            {kind: "census", label: "PROCESS CENSUS // 30s"},
-            {kind: "storage", label: "STORAGE OBSERVE // 30s"}
-        ]
-        delegate: ActionButton {
-            required property var modelData
-            width: root.width
-            height: 30
-            label: modelData.label
-            labelPixelSize: 10
-            available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.faulted && !CpuPlusDiagnostics.archiveBusy
-            onLeftClicked: {
-                if (CpuPlusDiagnostics.request(modelData.kind)) {
-                    root.showReport = false;
+        spacing: 3
+        GohuText {
+            width: parent.width
+            text: "TROUBLESHOOT // ON DEMAND"
+            color: Colors.magenta
+            font.pixelSize: 12
+        }
+        GohuText {
+            width: parent.width
+            text: CpuPlusDiagnostics.feedback
+            color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+        }
+        Grid {
+            id: captureGrid
+            width: parent.width
+            columns: 2
+            spacing: 3
+            Repeater {
+            model: [
+                {kind: "memory", label: "MEMORY OBSERVE // 120s"},
+                {kind: "inventory", label: "SOURCE WORKLOAD SCAN"},
+                {kind: "threads", label: "THREAD SAMPLE // 30s"},
+                {kind: "census", label: "PROCESS CENSUS // 30s"},
+                {kind: "storage", label: "STORAGE OBSERVE // 30s"}
+            ]
+            delegate: ActionButton {
+                required property var modelData
+                width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
+                height: 26
+                label: modelData.label
+                labelPixelSize: 10
+                labelFontSizeMode: Text.HorizontalFit
+                labelMinimumPixelSize: 8
+                contentPadding: 2
+                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.faulted && !CpuPlusDiagnostics.archiveBusy
+                onLeftClicked: {
+                    if (CpuPlusDiagnostics.request(modelData.kind)) {
+                        root.showReport = false;
+                    }
                 }
             }
         }
-    }
-    ActionButton {
-        width: parent.width
-        height: 30
-        visible: CpuPlusDiagnostics.busy
-        available: CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.cancelled
-        label: "STOP CAPTURE"
-        onLeftClicked: CpuPlusDiagnostics.cancel()
+        ActionButton {
+            objectName: "cpuplusDiagCancel"
+            width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
+            height: 26
+            accentColor: Colors.red
+            contentPadding: 2
+            available: CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.cancelled
+            label: CpuPlusDiagnostics.busy && CpuPlusDiagnostics.cancelled ? "STOPPING" : "CANCEL"
+            onLeftClicked: CpuPlusDiagnostics.cancel()
+        }
+        }
     }
     GohuText {
         width: parent.width
@@ -160,25 +179,6 @@ Column {
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
-    }
-    Row {
-        width: parent.width
-        spacing: 3
-        Repeater {
-            model: ["memory", "inventory", "threads", "census", "storage"]
-            delegate: ActionButton {
-                required property string modelData
-                width: Math.max(0, Math.floor((root.width - 12) / 5))
-                height: 27
-                label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : "STORE"
-                labelPixelSize: 9
-                selected: root.selectedReport === modelData
-                onLeftClicked: {
-                    CpuPlusDiagnostics.selectLatest(modelData);
-                    root.showReport = false;
-                }
-            }
-        }
     }
     GohuText {
         width: parent.width
@@ -274,24 +274,6 @@ Column {
             wrapMode: Text.Wrap
         }
     }
-    ActionButton {
-        width: parent.width
-        height: 28
-        visible: root.report !== null && root.report.text.length > 0
-        label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
-        onLeftClicked: root.showReport = !root.showReport
-    }
-    ActionButton {
-        width: parent.width
-        height: 28
-        visible: root.showReport && root.report !== null && root.report.text.length > 0
-        label: "COPY REPORT"
-        onLeftClicked: {
-            reportText.selectAll();
-            reportText.copy();
-            reportText.deselect();
-        }
-    }
     TextEdit {
         id: reportText
         width: parent.width
@@ -312,16 +294,6 @@ Column {
         color: CpuPlusDiagnostics.archiveStatus === "READY" ? Colors.cyan : Colors.orange
         font.pixelSize: 10
         wrapMode: Text.Wrap
-    }
-    ActionButton {
-        width: parent.width
-        height: 28
-        label: root.showHistory ? "HIDE HISTORY" : "LOAD HISTORY"
-        available: root.showHistory || (!CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
-        onLeftClicked: {
-            if (root.showHistory) root.showHistory = false;
-            else if (CpuPlusDiagnostics.loadHistory()) root.showHistory = true;
-        }
     }
     Repeater {
         model: root.showHistory ? CpuPlusDiagnostics.archiveRows : []
@@ -346,24 +318,6 @@ Column {
         font.pixelSize: 11
         wrapMode: Text.Wrap
     }
-    Row {
-        width: parent.width
-        spacing: 4
-        ActionButton {
-            width: Math.max(0, (root.width - 4) / 2)
-            height: 30
-            label: "SET BEFORE"
-            available: root.canChooseComparison
-            onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
-        }
-        ActionButton {
-            width: Math.max(0, (root.width - 4) / 2)
-            height: 30
-            label: "SET AFTER"
-            available: root.canChooseComparison
-            onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
-        }
-    }
     GohuText {
         width: parent.width
         text: "BEFORE // " + root.comparisonLabel(root.beforeRecord)
@@ -372,13 +326,6 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.Wrap
         textFormat: Text.PlainText
-    }
-    ActionButton {
-        width: parent.width
-        height: 30
-        label: root.showComparison ? "HIDE COMPARISON" : "COMPARE CAPTURES"
-        available: root.showComparison || (root.beforeRecord !== null && root.afterRecord !== null)
-        onLeftClicked: root.showComparison = !root.showComparison
     }
     GohuText {
         width: parent.width
@@ -418,6 +365,99 @@ Column {
         color: Colors.orange
         font.pixelSize: 10
         wrapMode: Text.Wrap
+    }
+    Column {
+        parent: root.footerTarget || root
+        objectName: "cpuplusDiagBottomControls"
+        width: parent.width
+        spacing: 3
+        Row {
+            id: reportRail
+            width: parent.width
+            spacing: 3
+            Repeater {
+                model: ["memory", "inventory", "threads", "census", "storage"]
+                delegate: ActionButton {
+                    required property string modelData
+                    width: Math.max(0, Math.floor((reportRail.width - 12) / 5))
+                    height: 27
+                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : "STORE"
+                    labelPixelSize: 9
+                    selected: root.selectedReport === modelData
+                    onLeftClicked: {
+                        CpuPlusDiagnostics.selectLatest(modelData);
+                        root.showReport = false;
+                    }
+                }
+            }
+        }
+        Row {
+            id: reportActions
+            width: parent.width
+            spacing: 3
+            ActionButton {
+                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                height: 26
+                available: root.report !== null && root.report.text.length > 0
+                label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
+                onLeftClicked: root.showReport = !root.showReport
+            }
+            ActionButton {
+                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                height: 26
+                available: root.showReport && root.report !== null && root.report.text.length > 0
+                label: "COPY REPORT"
+                onLeftClicked: {
+                    reportText.selectAll();
+                    reportText.copy();
+                    reportText.deselect();
+                }
+            }
+        }
+        Row {
+            id: historyActions
+            width: parent.width
+            spacing: 3
+            ActionButton {
+                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
+                height: 26
+                label: root.showHistory ? "HIDE HISTORY" : "LOAD HISTORY"
+                available: root.showHistory || (!CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
+                onLeftClicked: {
+                    if (root.showHistory) root.showHistory = false;
+                    else if (CpuPlusDiagnostics.loadHistory()) root.showHistory = true;
+                }
+            }
+            ActionButton {
+                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
+                height: 26
+                label: root.showComparison ? "HIDE COMPARISON" : "COMPARE CAPTURES"
+                labelFontSizeMode: Text.HorizontalFit
+                labelMinimumPixelSize: 8
+                contentPadding: 2
+                available: root.showComparison || (root.beforeRecord !== null && root.afterRecord !== null)
+                onLeftClicked: root.showComparison = !root.showComparison
+            }
+        }
+        Row {
+            id: compareRail
+            width: parent.width
+            spacing: 4
+            ActionButton {
+                width: Math.max(0, (compareRail.width - 4) / 2)
+                height: 26
+                label: "SET BEFORE"
+                available: root.canChooseComparison
+                onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
+            }
+            ActionButton {
+                width: Math.max(0, (compareRail.width - 4) / 2)
+                height: 26
+                label: "SET AFTER"
+                available: root.canChooseComparison
+                onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
+            }
+        }
     }
     GohuText {
         width: parent.width

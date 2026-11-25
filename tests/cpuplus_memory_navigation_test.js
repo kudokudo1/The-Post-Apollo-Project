@@ -6,7 +6,7 @@ assert.match(pane, /menus: \["CAP", "POL", "PROC", "AUTO", "DIAG", "PROF"\]/);
 assert.match(pane, /readonly property int menuIndex: CpuPlusDiagnostics\.memoryMenuIndex/);
 assert.match(pane, /onLeftClicked: root.selectMenu\(index\)/);
 assert.match(pane, /anchors.top: menuRail.bottom/);
-assert.match(pane, /anchors.top: root.page === "CAP" \? capInstrument.bottom : menuRail.bottom/);
+assert.match(pane, /anchors.top: root.page === "CAP" \? capInstrument.bottom : root.fixedWorkPage \? workHeader.bottom : menuRail.bottom/);
 assert.match(pane, /visible: root.page !== "CAP" \|\| root.capSection !== 0/);
 assert.match(pane, /anchors.bottom: footer.top/);
 assert.match(pane, /visible: root.page === "CAP" && root.capSection === 1\s+enabled: visible/);
@@ -174,3 +174,10 @@ assert.doesNotMatch(procPane,/\b(?:Process|Timer|MemoryOperation|execDetached)\s
 assert.match(procPane,/CpuPlusDiagnostics.request\("census"\)/);
 assert.match(procPane,/Object.assign\(\{kind:"census"\},report\)/);
 console.log("CPU++ process census presentation PASS");
+
+assert.match(pane,/objectName: "cpuplusWorkHeader"/);
+assert.match(pane,/objectName: "cpuplusWorkFooter"/);
+assert.match(procPane,/objectName: "cpuplusProcCancel"/);
+assert.match(procPane,/if \(censusRunning && !CpuPlusDiagnostics.cancelled\) CpuPlusDiagnostics.cancel\(\)/);
+assert.match(procPane,/parent: root.footerTarget \|\| root/);
+assert.match(queuePane,/objectName: "cpuplusAutoBottomControls"/);

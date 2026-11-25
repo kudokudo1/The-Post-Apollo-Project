@@ -8,6 +8,8 @@ import "CpuPlusQueueConsumer.js" as Consumer
 Column {
     id: root
     objectName: "cpuplusQueuePane"
+    property Item headerTarget: null
+    property Item footerTarget: null
     required property var observedDiskKiB
     required property int capacityTargetGiB
     property var runtimeProjection: null
@@ -92,12 +94,14 @@ Column {
     }
     spacing: 6
     GohuText {
+        parent: root.headerTarget || root
         width: parent.width
         text: "AUTO // DEFERRED ADJUSTMENTS"
         color: Colors.magenta
         font.pixelSize: 12
     }
     GohuText {
+        parent: root.headerTarget || root
         width: parent.width
         text: "NOTIFY ONLY // PROTECTED EXECUTION HOLD"
         color: Colors.orange
@@ -189,108 +193,116 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    GohuText {
-        width: parent.width
-        text: !root.actionContext ? "REQUEST CONTROLS // TRANSPORT NOT CONNECTED"
-            : root.session && root.session.unresolved ? "OUTCOME UNKNOWN // REVIEW HISTORY"
-            : root.session && root.session.pending ? "ACTION PENDING // WAIT FOR RESPONSE"
-            : root.submitted ? "ACTION SUBMITTED // WAIT FOR HOST"
-            : root.sessionUsable ? "REQUEST CONTROLS // EXPLICIT INTENT ONLY"
-            : "FRESH OWNER STATUS REQUIRED"
-        color: Colors.orange
-        font.pixelSize: 10
-        wrapMode: Text.WordWrap
-    }
-    GohuText {
-        width: parent.width
-        text: "EXPIRY // UTC (YYYY-MM-DD HH:MM)"
-        color: Colors.cyan
-        font.pixelSize: 10
-        wrapMode: Text.WordWrap
-    }
-    Rectangle {
-        width: parent.width
-        height: 30
-        color: Colors.black
-        border.width: 1
-        border.color: root.sessionUsable && !root.submitted ? Colors.cyan : Colors.orange
-        TextInput {
-            id: expiryEditor
-            objectName: "cpuplusQueueExpiry"
-            anchors.fill: parent
-            anchors.margins: 4
-            text: root.expiryText
-            readOnly: !root.sessionUsable || !!root.preparation || !!root.submitted
-            selectByMouse: true
-            maximumLength: 16
-            color: Colors.white
-            font.pixelSize: 11
-            verticalAlignment: TextInput.AlignVCenter
-            onTextEdited: root.expiryText = text
-        }
-    }
-    Grid {
-        width: parent.width
-        columns: 2
-        spacing: 4
-        Repeater {
-            model: ["QUEUE","REPLACE","CANCEL","RECHECK","EXPIRE"]
-            delegate: ActionButton {
-                required property string modelData
-                objectName: "cpuplusQueueAction" + modelData
-                width: Math.max(0,(root.width-4)/2)
-                height: 28
-                label: modelData
-                contentPadding: 2
-                available: !root.preparation && root.candidate(modelData) !== null
-                acceptedButtons: Qt.LeftButton
-                keyboardActivationSignal: "leftClicked"
-                onLeftClicked: root.prepareIntent(modelData)
-            }
-        }
-    }
     Column {
+        parent: root.footerTarget || root
+        objectName: "cpuplusAutoBottomControls"
         width: parent.width
-        spacing: 4
-        visible: root.preparation !== null
+        spacing: 3
         GohuText {
             width: parent.width
-            text: root.preparation ? "CONFIRM " + root.preparation.kind
-                + "\nREQUEST // " + (root.preparation.expectedId || "NEW REQUEST")
-                + (root.preparation.targetGiB === null ? "" : "\nTARGET // " + root.preparation.targetGiB
-                    + " GiB\nEXPIRY // " + QueueView.timestamp(root.preparation.expiresAt)) : ""
-            color: Colors.yellow
-            textFormat: Text.PlainText
-            font.pixelSize: 10
-            wrapMode: Text.Wrap
-        }
-        GohuText {
-            width: parent.width
-            text: "Changes queue intent only. Does not authorize or cancel a kernel operation."
-            color: Colors.white
+            text: !root.actionContext ? "REQUEST CONTROLS // TRANSPORT NOT CONNECTED"
+                : root.session && root.session.unresolved ? "OUTCOME UNKNOWN // REVIEW HISTORY"
+                : root.session && root.session.pending ? "ACTION PENDING // WAIT FOR RESPONSE"
+                : root.submitted ? "ACTION SUBMITTED // WAIT FOR HOST"
+                : root.sessionUsable ? "REQUEST CONTROLS // EXPLICIT INTENT ONLY"
+                : "FRESH OWNER STATUS REQUIRED"
+            color: Colors.orange
             font.pixelSize: 10
             wrapMode: Text.WordWrap
         }
-        Row {
+        GohuText {
+            width: parent.width
+            text: "EXPIRY // UTC (YYYY-MM-DD HH:MM)"
+            color: Colors.cyan
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+        }
+        Rectangle {
+            width: parent.width
+            height: 30
+            color: Colors.black
+            border.width: 1
+            border.color: root.sessionUsable && !root.submitted ? Colors.cyan : Colors.orange
+            TextInput {
+                id: expiryEditor
+                objectName: "cpuplusQueueExpiry"
+                anchors.fill: parent
+                anchors.margins: 4
+                text: root.expiryText
+                readOnly: !root.sessionUsable || !!root.preparation || !!root.submitted
+                selectByMouse: true
+                maximumLength: 16
+                color: Colors.white
+                font.pixelSize: 11
+                verticalAlignment: TextInput.AlignVCenter
+                onTextEdited: root.expiryText = text
+            }
+        }
+        Grid {
+            id: actionGrid
+            visible: root.preparation === null
+            width: parent.width
+            columns: width >= 300 ? 3 : 2
+            spacing: 4
+            Repeater {
+                model: ["QUEUE","REPLACE","CANCEL","RECHECK","EXPIRE"]
+                delegate: ActionButton {
+                    required property string modelData
+                    objectName: "cpuplusQueueAction" + modelData
+                    width: Math.max(0,(actionGrid.width-(actionGrid.columns-1)*actionGrid.spacing)/actionGrid.columns)
+                    height: 28
+                    label: modelData
+                    contentPadding: 2
+                    available: !root.preparation && root.candidate(modelData) !== null
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.prepareIntent(modelData)
+                }
+            }
+        }
+        Column {
             width: parent.width
             spacing: 4
-            ActionButton {
-                width: Math.max(0,(root.width-4)/2)
-                height: 28
-                label: "CONFIRM"
-                objectName: "cpuplusQueueConfirm"
-                available: root.preparation !== null && root.sessionUsable && !root.submitted
-                acceptedButtons: Qt.LeftButton
-                keyboardActivationSignal: "leftClicked"
-                onLeftClicked: root.confirmIntent()
+            visible: root.preparation !== null
+            GohuText {
+                width: parent.width
+                text: root.preparation ? "CONFIRM " + root.preparation.kind
+                    + "\nREQUEST // " + (root.preparation.expectedId || "NEW REQUEST")
+                    + (root.preparation.targetGiB === null ? "" : "\nTARGET // " + root.preparation.targetGiB
+                        + " GiB\nEXPIRY // " + QueueView.timestamp(root.preparation.expiresAt)) : ""
+                color: Colors.yellow
+                textFormat: Text.PlainText
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
             }
-            ActionButton {
-                width: Math.max(0,(root.width-4)/2)
-                height: 28
-                label: "BACK"
-                acceptedButtons: Qt.LeftButton
-                keyboardActivationSignal: "leftClicked"
-                onLeftClicked: root.cancelIntent()
+            GohuText {
+                width: parent.width
+                text: "Changes queue intent only. Does not authorize or cancel a kernel operation."
+                color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+            Row {
+                width: parent.width
+                spacing: 4
+                ActionButton {
+                    width: Math.max(0,(parent.width-4)/2)
+                    height: 28
+                    label: "CONFIRM"
+                    objectName: "cpuplusQueueConfirm"
+                    available: root.preparation !== null && root.sessionUsable && !root.submitted
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.confirmIntent()
+                }
+                ActionButton {
+                    width: Math.max(0,(parent.width-4)/2)
+                    height: 28
+                    label: "BACK"
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.cancelIntent()
+                }
             }
         }
     }

@@ -172,6 +172,29 @@ ShellRoot {
                 const breakdown = root.findItem(pane.item,"cpuplusMemoryBreakdown");
                 if (!root.check(ui && breakdown && !breakdown.visible && ui.memoryDetails === null,
                     "no stale memory presentation after report change")) return;
+                pane.item.selectMenu(2);
+                root.phase = 9;
+                return;
+            }
+            if (root.phase === 9 && pane.item) {
+                if (CpuPlusDiagnostics.archiveBusy) return;
+                const start = root.findItem(pane.item,"cpuplusProcStart");
+                const cancel = root.findItem(pane.item,"cpuplusProcCancel");
+                if (!start || !cancel) return;
+                if (!root.check(start.available && !cancel.available,"idle PROC cancel unavailable")) return;
+                start.leftClicked();
+                if (!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="census"
+                    && cancel.available,"census started; cancel enabled")) return;
+                cancel.leftClicked();
+                root.phase=10;
+                return;
+            }
+            if (root.phase === 10 && pane.item) {
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.census;
+                const cancel=root.findItem(pane.item,"cpuplusProcCancel");
+                if (!root.check(report && report.status==="CANCELLED" && cancel && !cancel.available,
+                    "census cancellation terminal receipt")) return;
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

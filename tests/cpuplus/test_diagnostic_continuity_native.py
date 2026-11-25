@@ -48,6 +48,7 @@ Scope {
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')
+    (scripts / "cpuplus_process_census.py").write_text("import time\ntime.sleep(10)\n")
     env = os.environ.copy()
     for key in ("HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
                 "XDG_DATA_HOME", "XDG_RUNTIME_DIR"):

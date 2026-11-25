@@ -199,3 +199,127 @@ Nurse2F to review this exact evidence route, including the separate
 qualification-vs-admission distinction and whether a suitable host exists.
 No executable implementation, new collector, CI job, service, host change,
 model download or trial in this proposal. No numerical safety claim.
+
+## H14-C // Concrete external host candidate (proposal only)
+
+Nurse #2161 7170579213 and #2800 7170575185 independently accept
+H14-B design and request an exact feasible host/envelope plan. H14-B
+is merged (51f0a408); owner agreements 7170413011 / 7170407821.
+No execution, runner creation, model transfer or workflow is authorized.
+
+### Host selection and finite planning envelope
+
+Repository visibility verified PUBLIC. GitHub standard public hosted
+ubuntu-24.04 x64 runner is documented as a fresh VM with 4 CPUs,
+16 GB RAM and 14 GB SSD (GitHub-hosted runners reference:
+https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+Prefer this separate disposable job VM with an additional bounded
+container over nested KVM: avoids dependence on /dev/kvm, guest
+installation, and hypervisor memory overhead inside the job. Runtime
+and Security must agree this revised isolation route before execution.
+Published capacity is NOT observed available capacity or guaranteed
+allocation. Existing CPU++ KVM workflow is not modified.
+
+Candidate outer job preflight (proposed numbers, not measured model
+demand): independently verify GitHub-hosted fresh x64 VM and cgroup-v2
+controllers; at least 10 GiB MemAvailable, four visible CPUs, at least
+4 GiB reserve after 6 GiB workload cap, no competing qualification job
+in that VM, no unstable pressure, no inaccessible ancestor controller.
+Recheck after staged inputs and image preparation, immediately before
+launch. Effective ancestor limits and current usage must support this
+envelope; host safety cannot be inferred from nominal runner size.
+Disk preflight must account verified archive/extracted/model sizes,
+image layers, writable scratch and explicit reserve; 14 GB advertised
+alone is not sufficient. Refuse rather than clean unrelated files.
+No operator workstation or self-hosted runner as fallback.
+
+Candidate container (review specification, not a launch command):
+6 GiB memory.max; memory.swap.max=0; CPU quota 200000/100000
+(two CPU-equivalents, not a thread count), affinity to two independently
+selected allowed CPUs; pids.max 128; fresh non-root UID; no delegated
+cgroup writes, no privilege, no capability, no-new-privileges; read-only
+root/input mounts and bounded accounted tmpfs (256 MiB proposal).
+No host socket, credential, home, device or writable host mounts;
+network namespace without external interfaces, loopback only, no
+published ports; exact effective device allowlist excludes GPU
+render/card, KFD, NVIDIA and other accelerators, no /dev/kvm.
+Verify enforced cgroup and ancestor readback, namespaces, mount/device
+policy, UID and descendants before sending. Do not claim Docker flags
+alone prove containment or exclusive access. Fresh hosted VM and
+container scope must exclude unrelated clients and provider processes;
+one trusted fixed client and one private Ollama instance, no host
+Ollama access. Runtime owns exact reviewed launch implementation;
+Security owns privilege/credential/egress boundary. No root capability
+inside the workload. Docker infrastructure, host page cache and
+preparation outside workload charged separately to host margin.
+
+### Exact staged identity and execution proposal
+
+Upstream release API v0.32.14 reports linux-amd64.tar.zst,
+1421191399 bytes, SHA256
+c620917a71e146ab3a7f893084f066069c4c65d144ef8379a91c3cbe8b27de8f.
+This is a public release asset reference, not authenticated installed
+runtime or downloaded bytes. Pin and verify release, archive, extracted
+binary/runner/library hashes and immutable image digest independently.
+Do not pull/install now. Granite3.3:2b operator short ID 07bd1f170855
+is NOT a full manifest digest. Require full independently pinned
+manifest and all referenced blob digests/sizes, exact tokenizer/template
+and text-only/no adapters/projectors, verified staged model artifact
+matching the selected identity. No private operator file or credentials
+may be uploaded. Separate explicit approval needed for external public
+artifact acquisition; preparation egress separate from offline execution.
+Disk requirements and exact full model digest remain unestablished.
+
+Select separate external containment qualification, not integrated H11
+admission, and propose the existing P2B fixed public READY workload
+semantics (2048 context, 32 output, think=false, one request, no tools).
+Existing P2B does NOT enforce native options or isolation and its numeric
+acknowledgments are not a demand bound. Runtime must agree exact
+single request seam and manifest before code or execution; no reuse of
+H11 attempt and no false claim of P2B/H11 compatibility. Proposed
+native settings: num_gpu=0, num_thread=2, num_batch=128,
+num_parallel=1, max_loaded_models=1, explicit no-auto context,
+bounded residency policy (keep_alive=0 proposed), no adapters/projectors
+or speculative draft model, no automatic fallback/retry. Verify support
+and effective values; unknown/refusal remains HOLD. Exact rendered
+template/token count + output allowance before request; no truncation.
+Candidate deadline 180 seconds total from container launch including
+provider readiness, single POST and terminal observation; no retry
+or automatic second trial. A bounded normal isolated teardown is
+separate from a forced timeout; forced termination records failed/
+unknown outcome, not successful completion or demand proof.
+
+### Independent observation and terminal gates
+
+Host-side observer must not depend on workload self-report. Record
+original boot/cgroup/namespace/process lifetimes, limits/readback,
+memory.current and fresh-scope kernel memory.peak (including startup),
+memory.events, swap.current, cpu.stat, pids and host headroom/pressure;
+use I5/H3/H4 semantics where applicable, not repeated short snapshots
+as full peak coverage. Separate before-provider baseline, startup,
+pre-send, request, terminal and final teardown; bounded observation
+interval and deadline, account host-side staging/cache separately.
+Observe original provider/runner and exact one request and terminal
+outcome; prove no second load/retry, original descendant quiescence,
+empty workload scope before disposal, independent accounting and
+Security disposition. No proof from socket EOF/HTTP done or container
+exit alone. OOM/pressure/limit violation/observer loss/timeout/identity
+drift/refusal remains failed or unknown; no retry and no requirement
+credit. Capture only fixed public aggregate evidence; no raw environment,
+credentials, private logs or prompt data. Preserve original outcome
+before cleanup; no shared service or host cleanup.
+
+### Required decisions
+
+This candidate is a feasibility design, not an authorized job or
+measurement. Runtime: ACCEPT/REVISE exact outer VM + container
+isolation and existing P2B semantics/single effect seam; Security:
+ACCEPT/REVISE staged public inputs, credential/device/egress denial
+and independent terminal custody; Nurse: exact design review and
+separate scope for a no-model containment verification if needed.
+Operator must explicitly approve external staging/actual execution,
+exact identities, tested envelope and one workload before inference.
+No normal H9 admission, H1 zero-demand revision, guaranteed demand,
+GPU readiness or production release follows from a successful capped
+CPU experiment. No new CI job, runner script, source or host action
+in this amendment.

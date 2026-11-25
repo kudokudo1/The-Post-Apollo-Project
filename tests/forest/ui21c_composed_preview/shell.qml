@@ -45,6 +45,29 @@ ShellRoot {
         check(item.runtimeInitialized && item.runtimeEligible && item.openRuntimeLifetime(ref),
             "explicit runtime lifetime");
     }
+    readonly property var historyA: ({treeKey:"CHERRY", generation:1, sessionId:"1".repeat(32),
+        revision:2, viewKey:"2".repeat(32)})
+    readonly property var historyB: ({treeKey:"CHERRY", generation:2, sessionId:"1".repeat(32),
+        revision:2, viewKey:"3".repeat(32)})
+    readonly property string pageOne: "4".repeat(32)
+    readonly property string pageTwo: "5".repeat(32)
+    readonly property string pageThree: "6".repeat(32)
+    function historyPage(ref,rid,ordinal,complete) {
+        return {schema:"postapollo.forest.public-history-display.v1",requestId:rid,
+            treeKey:ref.treeKey,generation:ref.generation,sessionId:ref.sessionId,revision:ref.revision,
+            messages:[{turn_id:(ordinal===1?"7":"8").repeat(32),ordinal:ordinal,
+                role:ordinal===1?"user":"assistant",text:ordinal===1?"Public first question":"Public committed reply"}],
+            complete:complete};
+    }
+    function verifyConnected(count,state) {
+        const item=preview.item, feed=child(item,"publicFixtureFeed");
+        check(item && feed && item.connectedHistoryMode && feed.messages.length===count,
+            "connected history row count");
+        check(item.fixtureState===state, "connected history state "+item.fixtureState);
+        check(!feed.sendEnabled && !feed.showComposer && !feed.richMessageActions,
+            "connected execution gate");
+        check(!feed.messages.some(row=>row.body==="What is a Tree?"), "literal history leaked");
+    }
     function verifyLoaded(expectedLabel = "") {
         const item = preview.item;
         const status = child(item, "publicFixtureStatus");
@@ -170,6 +193,51 @@ ShellRoot {
                 break;
             case 8:
                 check(preview.item === null, "fixture survived unload");
+                preview.active=true;
+                break;
+            case 9:
+                verifyLoaded();
+                check(preview.item.beginConnectedHistory(), "explicit connected mode");
+                verifyConnected(0,"CLOSED");
+                preview.item.historyCurrentScope=historyA;
+                check(preview.item.attachHistoryScope(historyA), "attach accepted history");
+                verifyConnected(0,"CLOSED");
+                check(preview.item.openHistoryPage(historyA,pageOne,1), "first request");
+                check(preview.item.historyPendingRequest.after===0, "first cursor");
+                check(preview.item.receiveHistoryPage(historyA,historyPage(historyA,pageOne,1,false)), "partial page");
+                break;
+            case 10:
+                verifyConnected(1,"PARTIAL");
+                check(preview.item.historyNextAfter===1, "next cursor");
+                check(preview.item.nextHistoryPage(historyA,pageTwo,1), "next request");
+                check(preview.item.receiveHistoryPage(historyA,historyPage(historyA,pageTwo,2,true)), "complete page");
+                break;
+            case 11:
+                verifyConnected(2,"COMPLETE");
+                preview.item.historyCurrentScope=historyB;
+                verifyConnected(0,"CLOSED");
+                check(preview.item.attachHistoryScope(historyB), "new history scope");
+                check(preview.item.openHistoryPage(historyB,pageThree,1), "new request");
+                check(!preview.item.receiveHistoryPage(historyA,historyPage(historyA,pageTwo,2,true)), "old page");
+                preview.item.refuseHistoryScope(historyA);
+                check(!preview.item.attachHistoryScope(historyA), "old attachment");
+                verifyConnected(0,"PENDING");
+                check(preview.item.receiveHistoryPage(historyB,historyPage(historyB,pageThree,1,false)), "new partial");
+                break;
+            case 12:
+                verifyConnected(1,"PARTIAL");
+                preview.item.refuseHistoryScope(historyB);
+                verifyConnected(0,"UNAVAILABLE");
+                check(!preview.item.openHistoryPage(historyB,"9".repeat(32),1), "refused scope reopened");
+                preview.item.historyCurrentScope=null;
+                verifyConnected(0,"CLOSED");
+                preview.item.historyCurrentScope=historyB;
+                check(!preview.item.attachHistoryScope(historyB), "reused view accepted");
+                verifyConnected(0,"CLOSED");
+                preview.active=false;
+                break;
+            case 13:
+                check(preview.item===null, "connected fixture survived unload");
                 break;
             default:
                 check(false, "unexpected phase");
@@ -178,7 +246,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 8) {
+            if (p === 13) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

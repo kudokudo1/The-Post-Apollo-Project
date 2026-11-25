@@ -1,9 +1,10 @@
 import QtQuick
 import "../../../components" as Shared
 import "PublicSessionDisplay.js" as Display
+import "PublicHistoryDisplay.js" as History
 
-// Fixed literal transcript; the existing default-off Loader owns lifetime.
-// Optional public status seam only. No external history, sender or authority.
+// Default literal transcript; explicit connected public history mode is one-way
+// for this Loader lifetime. Presentation only, no sender or authority.
 // Owner must independently establish fixture provenance/currentness; no
 // status input opens the view or derives the current correlation.
 Item {
@@ -21,7 +22,109 @@ Item {
     property bool _rootCompleted: false
     property bool _populated: false
     readonly property bool canPopulate: _rootCompleted && history.initialized
-    readonly property bool transcriptReady: fixtureReady && history.complete
+    readonly property bool transcriptReady: !connectedHistoryMode && fixtureReady && history.complete
+
+    // Independently observed owner scope, never derived from a PAGE response.
+    // The owner must replace the whole object and fence its Process/Loader.
+    property var historyCurrentScope: null
+    property bool _connectedHistoryMode: false
+    readonly property bool connectedHistoryMode: _connectedHistoryMode
+    property var _acceptedHistoryScope: null
+    property var _usedHistoryViews: ({})
+    property int _historyViewCount: 0
+    readonly property bool historyInitialized: history.initialized
+    readonly property bool historyScopeActive: connectedHistoryMode && visible
+        && history.attached && sameHistoryScope(_acceptedHistoryScope, historyCurrentScope)
+    readonly property var historyPendingRequest: historyScopeActive ? history.pendingRequest : null
+    readonly property var historyNextAfter: historyScopeActive ? history.nextAfter : null
+
+    function publicToken(v) {
+        return typeof v === "string" && v.length === 32 && /^[0-9a-f]{32}$/.test(v);
+    }
+    function validHistoryScope(s) {
+        return History.exact(s, ["treeKey","generation","sessionId","revision","viewKey"])
+            && s.treeKey === "CHERRY" && History.integer(s.generation, 1)
+            && History.integer(s.revision, 0) && publicToken(s.sessionId)
+            && publicToken(s.viewKey) && s.sessionId !== s.viewKey;
+    }
+    function sameHistoryScope(a, b) {
+        return validHistoryScope(a) && validHistoryScope(b)
+            && a.treeKey === b.treeKey && a.generation === b.generation
+            && a.sessionId === b.sessionId && a.revision === b.revision && a.viewKey === b.viewKey;
+    }
+    function clearConnectedHistory() {
+        history.attached = false;
+        history.closeHistory();
+        _acceptedHistoryScope = null;
+    }
+    // Only an explicit owner action may leave the literal preview. No fallback
+    // on refusal, detach, or missing history. Recreate Loader for a new sample.
+    function beginConnectedHistory() {
+        if (!_rootCompleted || !history.initialized || !visible || connectedHistoryMode)
+            return false;
+        clearConnectedHistory();
+        _connectedHistoryMode = true;
+        return true;
+    }
+    function observeHistoryScope() {
+        if (connectedHistoryMode && (!visible
+                || !sameHistoryScope(_acceptedHistoryScope, historyCurrentScope)))
+            clearConnectedHistory();
+    }
+    onHistoryCurrentScopeChanged: observeHistoryScope()
+    onVisibleChanged: observeHistoryScope()
+
+    function attachHistoryScope(ref) {
+        if (!connectedHistoryMode || !visible || !history.initialized
+                || !sameHistoryScope(ref, historyCurrentScope))
+            return false;
+        // Never let a delayed open clear a different accepted scope.
+        if (_usedHistoryViews[ref.viewKey] || _historyViewCount >= 64)
+            return false;
+        clearConnectedHistory();
+        _usedHistoryViews[ref.viewKey] = true;
+        _historyViewCount++;
+        _acceptedHistoryScope = {treeKey: ref.treeKey, generation: ref.generation,
+            sessionId: ref.sessionId, revision: ref.revision, viewKey: ref.viewKey};
+        history.treeKey = ref.treeKey;
+        history.generation = ref.generation;
+        history.sessionId = ref.sessionId;
+        history.revision = ref.revision;
+        history.viewKey = ref.viewKey;
+        history.attached = true;
+        return historyScopeActive;
+    }
+    function openHistoryPage(ref, requestId, limit) {
+        if (!historyScopeActive || !sameHistoryScope(ref, _acceptedHistoryScope)
+                || !publicToken(requestId) || (limit !== 1 && limit !== 2)
+                || history.state !== "CLOSED")
+            return false;
+        return history.openPage(requestId, limit);
+    }
+    function nextHistoryPage(ref, requestId, limit) {
+        if (!historyScopeActive || !sameHistoryScope(ref, _acceptedHistoryScope)
+                || !publicToken(requestId) || (limit !== 1 && limit !== 2)
+                || history.state !== "PARTIAL")
+            return false;
+        return history.nextPage(requestId, limit);
+    }
+    function receiveHistoryPage(ref, frame) {
+        // Caller fences original child/action before invoking this method.
+        // Old view packets must not reach the fail-closed history controller.
+        if (!historyScopeActive || !sameHistoryScope(ref, _acceptedHistoryScope))
+            return false;
+        if (!frame || !Array.isArray(frame.messages) || frame.messages.length > 2
+                || frame.messages.some(row => !row || !publicToken(row.turn_id))) {
+            history.rejectPage();
+            return false;
+        }
+        return history.receivePublicPage(frame);
+    }
+    function refuseHistoryScope(ref) {
+        if (historyScopeActive && sameHistoryScope(ref, _acceptedHistoryScope))
+            history.rejectPage();
+    }
+
     readonly property string fixtureState: history.state
     readonly property string fixtureReason: history.reason
 
@@ -65,7 +168,7 @@ Item {
             populateFixture();
     }
     function populateFixture() {
-        if (!canPopulate || _populated)
+        if (!canPopulate || _populated || connectedHistoryMode)
             return;
         _populated = true;
         if (!fixtureReady)
@@ -95,7 +198,8 @@ Item {
         anchors.right: parent.right
         height: implicitHeight
         fixtureVisible: true
-        historyState: root.fixtureReady ? history.state : "UNAVAILABLE"
+        historyState: root.connectedHistoryMode ? (root.historyScopeActive ? history.state : "CLOSED")
+            : (root.fixtureReady ? history.state : "UNAVAILABLE")
         historyReason: history.reason
     }
 
@@ -107,7 +211,7 @@ Item {
         anchors.top: status.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        viewOpen: root.runtimeViewOpen && root.visible && root.transcriptReady
+        viewOpen: root.runtimeViewOpen && root.visible && (root.connectedHistoryMode || root.transcriptReady)
         treeKey: root.runtimeTreeKey
         currentCorrelation: root.runtimeCurrentCorrelation
     }
@@ -119,18 +223,21 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        conversation: root.transcriptReady
-            ? ({id: root.sample.sessions[0].session_id,
-                displayNameInProfile: root.sample.sessions[0].title}) : null
+        conversation: root.connectedHistoryMode
+            ? (root.historyScopeActive ? ({id: root._acceptedHistoryScope.sessionId,
+                displayNameInProfile: "Public conversation"}) : null)
+            : (root.transcriptReady ? ({id: root.sample.sessions[0].session_id,
+                displayNameInProfile: root.sample.sessions[0].title}) : null)
         scopeId: "forest-ui2-public-fixture"
-        messages: root.transcriptReady ? history.messages : []
+        messages: (root.connectedHistoryMode ? root.historyScopeActive : root.transcriptReady)
+            ? history.messages : []
         showHeader: false
         showComposer: false
         messageTextFormat: Text.PlainText
         richMessageActions: false
         sendEnabled: false
         sending: false
-        emptyConversationLabel: "FIXTURE UNAVAILABLE"
+        emptyConversationLabel: root.connectedHistoryMode ? "PUBLIC HISTORY NOT AVAILABLE" : "FIXTURE UNAVAILABLE"
         // No sendRequested handler, no transport, no STOP or authority claims.
     }
 }

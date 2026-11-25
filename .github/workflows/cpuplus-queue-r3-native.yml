@@ -1,0 +1,54 @@
+name: CPU++ queue R3 native candidate transport
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_queue_pipe_native.py'
+      - 'tests/fixtures/CpuPlusQueuePipeNative.qml'
+      - 'tests/fixtures/cpuplus_queue_pipe_child.py'
+      - 'services/memory/QUEUE-R3-NATIVE.md'
+      - '.github/workflows/cpuplus-queue-r3-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 7982ff18b04bdaf369f93f086d9d251640755b24
+          path: candidate-ui
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 659321a3d1d627e889841e9a74bec277aa50274a
+          path: candidate-pipe
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: d7b42622e6a96bdad6bc7e694408e6b4f6456fb5
+          path: candidate-expiry
+          persist-credentials: false
+      - name: Verify exact heads and run actual offscreen QML pipe fixture
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+        run: |
+          set -eu
+          test "$(git -C candidate-ui rev-parse HEAD)" = 7982ff18b04bdaf369f93f086d9d251640755b24
+          test "$(git -C candidate-pipe rev-parse HEAD)" = 659321a3d1d627e889841e9a74bec277aa50274a
+          test "$(git -C candidate-expiry rev-parse HEAD)" = d7b42622e6a96bdad6bc7e694408e6b4f6456fb5
+          python3 -B tests/cpuplus_queue_pipe_native.py

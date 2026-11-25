@@ -1,0 +1,42 @@
+name: FinanceW Simple M3d5b1 protected pre-dispatch controller
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/simple_m3d5b_protected_controller.mjs"
+      - "tests/finance/test_simple_m3d5b_protected_controller.mjs"
+      - "tests/finance/test_simple_m3d5b_source_hold.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5B1_CONTROLLER_README.md"
+      - ".github/workflows/financew-simple-m3d5b1-predispatch.yml"
+  push:
+    paths:
+      - "scripts/finance/simple_m3d5b_protected_controller.mjs"
+      - "tests/finance/test_simple_m3d5b_protected_controller.mjs"
+      - "tests/finance/test_simple_m3d5b_source_hold.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5B1_CONTROLLER_README.md"
+      - ".github/workflows/financew-simple-m3d5b1-predispatch.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controller-negative-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax and source-only production hold
+        run: |
+          node --check scripts/finance/simple_m3d5b_protected_controller.mjs
+          node --check tests/finance/test_simple_m3d5b_protected_controller.mjs
+          python3 -B tests/finance/test_simple_m3d5b_source_hold.py
+      - name: Protected source identity and one-use explicit confirmation
+        run: node --test tests/finance/test_simple_m3d5b_protected_controller.mjs
+      - name: Original M3d2 offline review remains read-only
+        run: |
+          node --test tests/finance/test_finance_simple_m3d2_offline_review.mjs
+          node --test tests/finance/test_finance_simple_m3d5_qml_review.mjs

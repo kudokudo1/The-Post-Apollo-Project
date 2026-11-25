@@ -22,6 +22,55 @@ Column {
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
     readonly property bool canChooseComparison: report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
     readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize) : null
+    readonly property var memoryDetails: memoryBreakdown(selectedReport, report)
+    function memoryBreakdown(selected, report) {
+        // Presentation only: reuse the existing completed JSONL capture.
+        if (selected !== "memory" || !report || report.status !== "COMPLETE"
+                || typeof report.text !== "string" || report.text.length > 65536) return null;
+        try {
+            const records = report.text.trim().split("\n").map(line => JSON.parse(line));
+            const final = records.pop();
+            const keys = ["Rss","Pss","Pss_Anon","Pss_File","Pss_Shmem","Private_Dirty","Swap","SwapPss"];
+            const count = value => Number.isSafeInteger(value) && value >= 0;
+            if (!final || final.event !== "complete" || !count(final.pid) || final.pid === 0
+                    || !count(final.startTicks) || records.length < 1 || records.length > 361)
+                return null;
+            let duration = 0;
+            for (let i=0; i<records.length; ++i) {
+                const row = records[i];
+                if (!row || row.event !== "memory" || row.pid !== final.pid
+                        || row.startTicks !== final.startTicks || !row.memoryKiB
+                        || !keys.every(key => count(row.memoryKiB[key]))
+                        || !count(row.tsMs) || !count(row.cpuTicks)
+                        || !count(row.pssPlusSwapPssKiB)
+                        || row.pssPlusSwapPssKiB !== row.memoryKiB.Pss + row.memoryKiB.SwapPss
+                        || row.memoryKiB.Pss > row.memoryKiB.Rss
+                        || row.memoryKiB.Private_Dirty > row.memoryKiB.Rss
+                        || row.memoryKiB.SwapPss > row.memoryKiB.Swap)
+                    return null;
+                if (i === 0) {
+                    if (row.sampleIntervalMs !== null || row.cpuPct !== null) return null;
+                } else {
+                    if (!count(row.sampleIntervalMs) || row.sampleIntervalMs === 0
+                            || typeof row.cpuPct !== "number" || !Number.isFinite(row.cpuPct) || row.cpuPct < 0
+                            || row.cpuTicks < records[i-1].cpuTicks) return null;
+                    duration += row.sampleIntervalMs;
+                    if (!count(duration)) return null;
+                }
+            }
+            const first = records[0].memoryKiB, last = records[records.length-1].memoryKiB;
+            const labels = [
+                ["RSS","Rss"], ["PSS","Pss"], ["PRIVATE DIRTY","Private_Dirty"],
+                ["SWAP","Swap"], ["SWAP PSS","SwapPss"]
+            ];
+            return {pid:final.pid, startTicks:final.startTicks, samples:records.length,
+                durationMs:duration, rows:labels.map(pair => ({label:pair[0],
+                    first:first[pair[1]], peak:Math.max(...records.map(row=>row.memoryKiB[pair[1]])),
+                    last:last[pair[1]], change:records.length > 1 ? last[pair[1]]-first[pair[1]] : null})),
+                anon:last.Pss_Anon, file:last.Pss_File, shmem:last.Pss_Shmem};
+        } catch (_) { return null; }
+    }
+
     function comparisonLabel(row) {
         return row ? row.kind.toUpperCase() + " // " + row.finishedAt.slice(0, 19).replace("T", " ") + " UTC" : "NOT SELECTED / NO LONGER RETAINED";
     }
@@ -108,6 +157,82 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.Wrap
         textFormat: Text.PlainText
+    }
+    Column {
+        id: memoryInstrument
+        objectName: "cpuplusMemoryBreakdown"
+        width: parent.width
+        spacing: 4
+        visible: root.selectedReport === "memory" && root.report !== null
+        GohuText {
+            width: parent.width
+            text: "QUICKSHELL // CAPTURE BREAKDOWN"
+            color: Colors.magenta
+            font.pixelSize: 11
+        }
+        GohuText {
+            width: parent.width
+            text: root.memoryDetails
+                ? "PID " + root.memoryDetails.pid + " // " + root.memoryDetails.samples
+                    + " SAMPLES // " + (root.memoryDetails.durationMs / 1000).toFixed(1) + " s"
+                : "COMPLETE MEMORY BREAKDOWN UNAVAILABLE"
+            color: root.memoryDetails ? Colors.cyan : Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+        }
+        Repeater {
+            model: root.memoryDetails ? root.memoryDetails.rows : []
+            delegate: Rectangle {
+                required property var modelData
+                width: memoryInstrument.width
+                height: detailBody.implicitHeight + 8
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.cyan
+                Column {
+                    id: detailBody
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 4
+                    spacing: 2
+                    GohuText {
+                        width: parent.width
+                        text: modelData.label + " // " + (modelData.last / 1048576).toFixed(3) + " GiB"
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "START " + (modelData.first / 1048576).toFixed(3)
+                            + " / PEAK " + (modelData.peak / 1048576).toFixed(3) + " GiB"
+                            + "\nCHANGE // " + (modelData.change === null ? "N/A"
+                                : (modelData.change > 0 ? "+" : "") + (modelData.change / 1024).toFixed(1) + " MiB")
+                        color: Colors.white
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                }
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: root.memoryDetails !== null
+            text: root.memoryDetails ? "FINAL PSS // ANON " + (root.memoryDetails.anon / 1048576).toFixed(3)
+                + " / FILE " + (root.memoryDetails.file / 1048576).toFixed(3)
+                + " / SHMEM " + (root.memoryDetails.shmem / 1048576).toFixed(3) + " GiB" : ""
+            color: Colors.white
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "HISTORICAL CAPTURE // NOT LIVE\nRSS includes shared pages; PSS apportions shared pages. Private dirty is not total private memory. GPU memory and component attribution are unavailable. Growth alone does not prove a leak."
+            color: Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
     }
     ActionButton {
         width: parent.width

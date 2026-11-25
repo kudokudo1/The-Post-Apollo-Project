@@ -101,3 +101,36 @@ const storageCompare=comparePolicy.compare(baseStorage,nextStorage,policy.summar
 assert.equal(storageCompare.error,"");
 assert.equal(storageCompare.rows.find(r=>r.label==="notifications.history CHANGED INTERVALS").delta,-2);
 assert.match(storageCompare.note,/not writes, transactions or writer identity/);
+
+const breakdown=vm.createContext({});
+vm.runInContext(ui.slice(ui.indexOf("    function memoryBreakdown("),ui.indexOf("    function comparisonLabel(")),breakdown);
+const memorySample={event:"memory",pid:12,startTicks:99,tsMs:1000,cpuTicks:100,cpuPct:null,sampleIntervalMs:null,
+    memoryKiB:{Rss:2097152,Pss:1048576,Pss_Anon:524288,Pss_File:262144,Pss_Shmem:262144,
+        Private_Dirty:524288,Swap:131072,SwapPss:65536},pssPlusSwapPssKiB:1114112};
+const memoryNext={...memorySample,tsMs:11000,cpuTicks:110,cpuPct:1,sampleIntervalMs:10000,
+    memoryKiB:{...memorySample.memoryKiB,Rss:3145728,Pss:1572864,Private_Dirty:1048576},pssPlusSwapPssKiB:1638400};
+const memoryReport={status:"COMPLETE",text:jsonl([memorySample,memoryNext,done])};
+const result=breakdown.memoryBreakdown("memory",memoryReport);
+assert.equal(result.pid,12);
+assert.equal(result.durationMs,10000);
+assert.equal(result.rows.length,5);
+assert.equal(result.rows.find(r=>r.label==="PSS").change,524288);
+assert.equal(result.rows.find(r=>r.label==="PRIVATE DIRTY").last,1048576);
+assert.equal(result.anon,524288);
+assert.equal(breakdown.memoryBreakdown("memory",{...memoryReport,text:jsonl([memorySample,done])}).rows[0].change,null);
+for(const invalid of [
+    {...memoryReport,status:"CANCELLED"},
+    {...memoryReport,text:jsonl([memorySample,memoryNext])},
+    {...memoryReport,text:jsonl([memorySample,{...memoryNext,pid:13},done])},
+    {...memoryReport,text:jsonl([memorySample,{...memoryNext,startTicks:100},done])},
+    {...memoryReport,text:jsonl([memorySample,{...memoryNext,memoryKiB:{Pss:1}},done])},
+    {...memoryReport,text:jsonl([memorySample,{...memoryNext,sampleIntervalMs:0},done])},
+    {...memoryReport,text:jsonl([memorySample,{...memoryNext,pssPlusSwapPssKiB:1},done])},
+    {...memoryReport,text:jsonl([memorySample,{event:"stopped"},done])},
+    {...memoryReport,text:"x".repeat(65537)}
+]) assert.equal(breakdown.memoryBreakdown("memory",invalid),null);
+assert.equal(breakdown.memoryBreakdown("inventory",memoryReport),null);
+assert.match(ui,/objectName: "cpuplusMemoryBreakdown"/);
+assert.match(ui,/HISTORICAL CAPTURE \/\/ NOT LIVE/);
+assert.match(ui,/Private dirty is not total private memory/);
+console.log("CPU++ completed memory capture presentation PASS");

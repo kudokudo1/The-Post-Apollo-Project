@@ -146,6 +146,7 @@ def trial(width, height, count):
                          "widgets/forest/ui2/PublicPreviewGate.qml",
                          "widgets/forest/ui2/PublicRestorationReview.qml",
                          "widgets/forest/ui2/PublicDormantTaskSelector.qml",
+                         "widgets/forest/ui2/PublicSeasonIndicator.qml",
                          "widgets/forest/ui2/PublicRuntimeStatusView.qml",
                          "widgets/forest/ui2/PublicRuntimeStatusDisplay.js",
                          "components/ConversationFeed.qml", helper):
@@ -200,7 +201,11 @@ def trial(width, height, count):
                       for line in output.splitlines() if "FOREST_HOST_REVIEW_PHASE_PASS " in line]
             dormant = [line.split("FOREST_HOST_DORMANT_PHASE_PASS ", 1)[1].strip()
                        for line in output.splitlines() if "FOREST_HOST_DORMANT_PHASE_PASS " in line]
-            if (dormant != ([str(i) for i in range(14)] if width >= 770 else []) or
+            season = [line.split("FOREST_HOST_SEASON_PHASE_PASS ", 1)[1].strip()
+                      for line in output.splitlines() if "FOREST_HOST_SEASON_PHASE_PASS " in line]
+            if (season != ([str(i) for i in range(9)] if width >= 770 else []) or
+                    output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
+                    dormant != ([str(i) for i in range(14)] if width >= 770 else []) or
                     output.count("FOREST_HOST_DORMANT_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
                     review != ([str(i) for i in range(11)] if width >= 770 else []) or
                     output.count("FOREST_HOST_REVIEW_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

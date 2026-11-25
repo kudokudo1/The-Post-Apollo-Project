@@ -2,8 +2,10 @@ import QtQuick
 import "../../../components" as Shared
 import "PublicSessionDisplay.js" as Display
 
-// Fixed public fixture only. A future explicit, default-off Loader owns
-// lifetime; no external transcript, runtime status, session or sender input.
+// Fixed literal transcript; the existing default-off Loader owns lifetime.
+// Optional public status seam only. No external history, sender or authority.
+// Owner must independently establish fixture provenance/currentness; no
+// status input opens the view or derives the current correlation.
 Item {
     id: root
     clip: true
@@ -22,6 +24,28 @@ Item {
     readonly property bool transcriptReady: fixtureReady && history.complete
     readonly property string fixtureState: history.state
     readonly property string fixtureReason: history.reason
+
+    // Host-owned, independent inputs. Replace the whole correlation; never
+    // populate these fields from a received unit. Defaults are disconnected.
+    property bool runtimeViewOpen: false
+    property string runtimeTreeKey: ""
+    property var runtimeCurrentCorrelation: null
+    readonly property bool runtimeInitialized: operationStatus.initialized
+    readonly property string runtimeState: operationStatus.state
+    readonly property string runtimeStatusText: operationStatus.statusText
+    readonly property bool runtimeEligible: operationStatus.eligible
+
+    function openRuntimeLifetime(ref) {
+        return operationStatus.openLifetime(ref);
+    }
+    function receiveRuntimeUnit(unit) {
+        operationStatus.receiveUnit(unit);
+    }
+    function invalidateRuntimeLifetime(ref) {
+        operationStatus.invalidateLifetime(ref);
+    }
+    // Only the owner of the current lifecycle may close it by changing
+    // runtimeViewOpen/currentCorrelation. No unscoped delayed-close method.
 
     PublicHistoryViewState {
         id: history
@@ -75,10 +99,23 @@ Item {
         historyReason: history.reason
     }
 
+    // One operation label below the independent history snapshot label.
+    // No label reserves space or changes the transcript when disconnected.
+    PublicRuntimeStatusView {
+        id: operationStatus
+        objectName: "publicFixtureRuntimeStatus"
+        anchors.top: status.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        viewOpen: root.runtimeViewOpen && root.visible && root.transcriptReady
+        treeKey: root.runtimeTreeKey
+        currentCorrelation: root.runtimeCurrentCorrelation
+    }
+
     Shared.ConversationFeed {
         id: feed
         objectName: "publicFixtureFeed"
-        anchors.top: status.bottom
+        anchors.top: operationStatus.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

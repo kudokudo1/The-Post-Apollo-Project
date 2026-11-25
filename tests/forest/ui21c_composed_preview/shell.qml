@@ -23,12 +23,42 @@ ShellRoot {
                 return item.children[i];
         return null;
     }
-    function verifyLoaded() {
+    // Explicit public test input, not a producer/transport or live execution.
+    readonly property var firstRef: ({requestId: "a".repeat(32), viewKey: "b".repeat(32), generation: 1})
+    readonly property var secondRef: ({requestId: "c".repeat(32), viewKey: "d".repeat(32), generation: 2})
+    function unit(ref, seq, name) {
+        return {requestId: ref.requestId, viewKey: ref.viewKey, generation: ref.generation,
+            sequence: seq, kind: "STATUS", statusPacket: {
+                schema: "postapollo.forest.public-runtime-status.v1", status: name,
+                sourceAuthenticated: false, permissionGranted: false,
+                productionAuthority: false, modelExecutionPermitted: false, safeActions: []}};
+    }
+    function withdraw(ref, seq) {
+        return {requestId: ref.requestId, viewKey: ref.viewKey, generation: ref.generation,
+            sequence: seq, kind: "WITHDRAW", statusPacket: null};
+    }
+    function openRuntime(ref) {
+        const item = preview.item;
+        item.runtimeTreeKey = "CHERRY";
+        item.runtimeCurrentCorrelation = ref;
+        item.runtimeViewOpen = true;
+        check(item.runtimeInitialized && item.runtimeEligible && item.openRuntimeLifetime(ref),
+            "explicit runtime lifetime");
+    }
+    function verifyLoaded(expectedLabel = "") {
         const item = preview.item;
         const status = child(item, "publicFixtureStatus");
         const feed = child(item, "publicFixtureFeed");
-        check(item && status && feed, "missing composed production objects");
-        if (!item || !status || !feed) return;
+        const runtime = child(item, "publicFixtureRuntimeStatus");
+        check(item && status && feed && runtime, "missing composed production objects");
+        if (!item || !status || !feed || !runtime) return;
+        check(item.runtimeStatusText === expectedLabel && runtime.visible === (expectedLabel !== ""),
+            "unexpected operation label");
+        check(!runtime.sendEnabled && !runtime.stopEnabled && !runtime.sourceAuthenticated
+            && !runtime.permissionGranted && !runtime.productionAuthority && !runtime.modelExecutionPermitted,
+            "operation authority changed");
+        check(expectedLabel ? runtime.height > 0 : runtime.height === 0, "status height");
+        check(runtime.y === status.height && runtime.width === item.width, "operation label geometry");
         check(item.fixtureReady, "fixed session validation failed");
         check(item.transcriptReady && status.statusText === "HISTORY SNAPSHOT COMPLETE",
             "history status " + item.fixtureState + "/" + item.fixtureReason + "/" + status.statusText);
@@ -49,8 +79,8 @@ ShellRoot {
         if (!header || !composer || !viewport || !list) return;
         check(!header.visible && !composer.visible && list.visible && list.count === 2,
             "duplicate controls or missing messages");
-        check(status.height > 0 && feed.y === status.height
-            && feed.height === item.height - status.height && feed.height > 0
+        check(status.height > 0 && feed.y === status.height + runtime.height
+            && feed.height === item.height - status.height - runtime.height && feed.height > 0
             && viewport.y === 0 && viewport.height === feed.height,
             "composed geometry");
         const input = child(composer, "conversationInput");
@@ -93,22 +123,52 @@ ShellRoot {
                 break;
             case 1:
                 verifyLoaded();
+                // No event may auto-open the disconnected fixture.
+                preview.item.receiveRuntimeUnit(unit(firstRef, 1, "REQUEST_PENDING"));
+                check(preview.item.runtimeState === "CLOSED", "incoming auto-open");
+                openRuntime(firstRef);
+                preview.item.receiveRuntimeUnit(unit(firstRef, 1, "REQUEST_PENDING"));
                 scene.width = 300;
                 scene.height = 160;
                 break;
             case 2:
+                verifyLoaded("REQUEST PENDING");
+                preview.item.receiveRuntimeUnit(unit(firstRef, 2, "PREPARING"));
+                preview.item.receiveRuntimeUnit(unit(firstRef, 3, "GENERATING"));
+                preview.item.receiveRuntimeUnit(unit(firstRef, 4, "LOCAL_COMMIT_RECORDED"));
+                break;
+            case 3:
+                verifyLoaded("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                openRuntime(secondRef);
+                preview.item.receiveRuntimeUnit(unit(secondRef, 1, "REQUEST_PENDING"));
+                preview.item.receiveRuntimeUnit(withdraw(firstRef, 5));
+                preview.item.invalidateRuntimeLifetime(firstRef);
+                check(!preview.item.openRuntimeLifetime(firstRef), "stale open accepted");
+                break;
+            case 4:
+                verifyLoaded("REQUEST PENDING");
+                preview.item.runtimeTreeKey = "MAPLE";
+                check(preview.item.runtimeState === "CLOSED", "Tree loss not cleared");
+                preview.item.runtimeTreeKey = "CHERRY";
+                preview.item.receiveRuntimeUnit(unit(secondRef, 2, "PREPARING"));
+                break;
+            case 5:
                 verifyLoaded();
                 preview.active = false;
                 break;
-            case 3:
+            case 6:
                 check(preview.item === null, "fixture not destroyed");
                 preview.active = true;
                 break;
-            case 4:
+            case 7:
+                verifyLoaded();
+                check(preview.item.runtimeCurrentCorrelation === null, "old lifetime retained");
+                preview.item.receiveRuntimeUnit(unit(secondRef, 2, "PREPARING"));
+                preview.item.receiveRuntimeUnit(withdraw(secondRef, 2));
                 verifyLoaded();
                 preview.active = false;
                 break;
-            case 5:
+            case 8:
                 check(preview.item === null, "fixture survived unload");
                 break;
             default:
@@ -118,7 +178,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 5) {
+            if (p === 8) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

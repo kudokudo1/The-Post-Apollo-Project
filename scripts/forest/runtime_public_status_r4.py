@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 from enum import Enum
+from dataclasses import dataclass
 
 from runtime_events_r3 import InternalEvent, OperationRef
 from shared_context_b6r1 import BarkAttachment, _KEY
@@ -20,6 +21,33 @@ class Observation(Enum):
     # Internal sentinel, deliberately not JSON serializable. None means
     # withdrawal; NO_UPDATE means retain display without sending anything.
     NO_UPDATE = 0
+
+
+@dataclass(frozen=True, slots=True)
+class FixtureTreeBinding:
+    """Host-resolved first-Tree pair, not an alias registry or proof of trust.
+
+    The fixture host must select this independently of Bark inputs. Only
+    the explicitly coordinated first-Tree pair is supported. Other Trees
+    require an agreed mapping rather than normalization or guesswork.
+    """
+    canonical_tree: str
+    presentation_tree: str
+
+    def __post_init__(self):
+        if (type(self.canonical_tree) is not str
+                or type(self.presentation_tree) is not str
+                or (self.canonical_tree, self.presentation_tree)
+                != ("cherry", "CHERRY")):
+            raise ValueError("UNAPPROVED_FIXTURE_TREE_PAIR")
+
+    def matches(self, operation, attachment):
+        return (type(operation) is OperationRef
+                and type(attachment) is BarkAttachment
+                and operation.context_ref.context.clone_key is None
+                and operation.context_ref.context.tree_key == self.canonical_tree
+                and attachment.context == operation.context_ref.context
+                and attachment.requested_tree == self.presentation_tree)
 
 
 def _packet(status):
@@ -38,15 +66,17 @@ class PublicRuntimeStatus:
     follows from a valid projection. Actual send requires owner review.
     """
 
-    def __init__(self, operation: OperationRef, attachment: BarkAttachment):
+    def __init__(self, operation: OperationRef, attachment: BarkAttachment, *,
+                 tree_binding: FixtureTreeBinding):
         if (type(operation) is not OperationRef
                 or type(attachment) is not BarkAttachment
                 or not attachment.attached
-                or attachment.context != operation.context_ref.context
-                or attachment.requested_tree != attachment.context.tree_key):
+                or type(tree_binding) is not FixtureTreeBinding
+                or not tree_binding.matches(operation, attachment)):
             raise ValueError("INVALID_FIXTURE_BINDING")
         self._operation = operation
         self._attachment = attachment
+        self._tree_binding = tree_binding
         self._ordinal = 0
         self._attempt = None
         self._phase = "INITIAL"
@@ -55,13 +85,16 @@ class PublicRuntimeStatus:
         self._terminal = False
         self._stop = False
 
-    def _current(self, operation, attachment):
+    def _current(self, operation, attachment, tree_binding):
         if (self._withdrawn
                 or type(operation) is not OperationRef
                 or operation != self._operation
                 or type(attachment) is not BarkAttachment
                 or not attachment.attached
-                or attachment != self._attachment):
+                or attachment != self._attachment
+                or type(tree_binding) is not FixtureTreeBinding
+                or tree_binding != self._tree_binding
+                or not tree_binding.matches(operation, attachment)):
             self._withdrawn = True
             return False
         return True
@@ -70,8 +103,8 @@ class PublicRuntimeStatus:
         """Local view withdrawal; neither STOP nor permission revocation."""
         self._withdrawn = True
 
-    def snapshot(self, *, current_operation, current_attachment):
-        if not self._current(current_operation, current_attachment):
+    def snapshot(self, *, current_operation, current_attachment, current_tree_binding):
+        if not self._current(current_operation, current_attachment, current_tree_binding):
             return None
         return _packet(self._status)
 
@@ -85,8 +118,8 @@ class PublicRuntimeStatus:
         self._status = "UNKNOWN_HOLD"
         return self._change(previous)
 
-    def observe(self, event, *, current_operation, current_attachment):
-        if not self._current(current_operation, current_attachment):
+    def observe(self, event, *, current_operation, current_attachment, current_tree_binding):
+        if not self._current(current_operation, current_attachment, current_tree_binding):
             return None
         if self._terminal:
             # Duplicate/postterminal events cannot revive or promote a view.
@@ -138,13 +171,13 @@ class PublicRuntimeStatus:
         return self._change(previous)
 
     def observe_stop_ack(self, disposition, attempt_id, *,
-                         current_operation, current_attachment):
+                         current_operation, current_attachment, current_tree_binding):
         """Owner reports actual R2 STOP disposition; does not dispatch STOP.
 
         Never accept this observation directly from Bark. A latched STOP
         is not terminal cancellation. An entry-won/closed ACK adds no claim.
         """
-        if not self._current(current_operation, current_attachment):
+        if not self._current(current_operation, current_attachment, current_tree_binding):
             return None
         if self._terminal:
             return Observation.NO_UPDATE
@@ -160,8 +193,8 @@ class PublicRuntimeStatus:
             self._status = "STOP_REQUESTED"
         return self._change(previous)
 
-    def finish(self, *, current_operation, current_attachment):
+    def finish(self, *, current_operation, current_attachment, current_tree_binding):
         """Missing terminal evidence is HOLD, never inferred success."""
-        if not self._current(current_operation, current_attachment):
+        if not self._current(current_operation, current_attachment, current_tree_binding):
             return None
         return Observation.NO_UPDATE if self._terminal else self._hold()

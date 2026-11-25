@@ -5,6 +5,7 @@ on:
       - 'scripts/forest/runtime_public_status_r4.py'
       - 'scripts/forest/runtime_events_r3.py'
       - 'scripts/forest/shared_context_b6r1.py'
+      - 'scripts/forest/history_public_fixture_m4.py'
       - 'tests/forest/test_runtime_public_status_r4.py'
       - 'tests/forest/test_runtime_events_r3.py'
       - 'scripts/forest/RUNTIME_PUBLIC_STATUS_R4.md'

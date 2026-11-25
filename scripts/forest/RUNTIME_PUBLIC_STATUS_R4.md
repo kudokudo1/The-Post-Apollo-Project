@@ -48,3 +48,25 @@ operation, attempt or attachment identity. A host must invalidate pending
 updates and clear on detach or changed request/view before display; no
 automatic reattachment, retry or retarget. Actual adapter/send placement
 requires UI2/DOC3F agreement. No wire schema is frozen here.
+
+## R4a canonical Tree compatibility
+
+B6 separates canonical Tree identity from the selected presentation hint.
+M4 assigns independent binding to its fixture host; no trusted universal
+alias registry exists. The only supported R4a disposable pair is exactly
+FixtureTreeBinding("cherry", "CHERRY"), as used by M6b. Uppercase-equal
+legacy R4 test data is replaced; no other Tree, Clone, case conversion,
+registry, persistent migration or authentication is implied. The host
+selects the original pair independently of the UI, and provides a freshly
+resolved current_tree_binding together with current_operation and
+current_attachment at every observation, snapshot, STOP ACK and finish.
+Missing or changed evidence permanently withdraws the existing view.
+Matching pair alone cannot authenticate a host or establish public scope.
+The currentness sample is not an atomic final-send fence. Actual sender
+and local request/attachment delivery correlation remain pending owner
+agreement. The seven-field packet and tri-state update contract are unchanged.
+
+Integration test uses a real R3/B3 disposable canonical journal, then an
+explicit fresh M4 history request on the exact same attachment at the new
+revision. No R4 packet becomes a history row, no implicit refresh or raw
+runtime text forwarding. No protected data, native inference or UI hook.

@@ -1,0 +1,36 @@
+name: CPU++ queue native Notification Hub binding
+on:
+  pull_request:
+    paths:
+      - 'services/memory/MemoryQueueHubBinding.qml'
+      - 'services/memory/MemoryQueueSessionHost.js'
+      - 'services/memory/MemoryQueueNotificationAdapter.js'
+      - 'services/memory/memory_queue_*.py'
+      - 'services/notifications/**'
+      - 'tests/fixtures/cpuplus_queue_recovery_child.py'
+      - 'tests/fixtures/CpuPlusQueueHubNative.qml'
+      - 'tests/cpuplus_queue_hub_native.py'
+      - '.github/workflows/cpuplus-queue-hub-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Native disposable runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 dbus-daemon quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtqml qml6-module-qtqml-models
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Real pipe and existing Notification Hub singleton
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/cpuplus_queue_hub_native.py

@@ -23,13 +23,15 @@ Item {
     property string statusText: "RECENT // 48 COMMITS MAX"
     property string job: ""
     property string jobRepo: ""
+    property int repoEpoch: 0
+    property int jobEpoch: -1
     property bool received: false
     property bool exited: false
     property bool exitOk: false
     property string output: ""
     property bool faulted: false
     readonly property bool busy: job !== ""
-    readonly property bool canRequest: operatorActive && !busy && !faulted
+    readonly property bool canRequest: operatorActive && !busy && !faulted && !worker.running
         && repoRoot.startsWith("/") && repoRoot.length > 1
     readonly property bool fullVisible: fullWanted && activeRepo === repoRoot
         && activeRepo !== "" && candidate.item !== null
@@ -37,6 +39,7 @@ Item {
         && pendingRepo === repoRoot && !busy && !faulted
 
     onRepoRootChanged: {
+        repoEpoch += 1;
         fullWanted = false;
         activeRepo = "";
         pendingResult = null;
@@ -61,6 +64,7 @@ Item {
         if (!canRequest || (action !== "lookup" && action !== "build")) return false;
         job = action;
         jobRepo = repoRoot;
+        jobEpoch = repoEpoch;
         pendingResult = null;
         pendingRepo = "";
         received = false;
@@ -96,7 +100,7 @@ Item {
             try { result = JSON.parse(output); } catch (error) {}
         }
         output = "";
-        if (repo !== repoRoot) return; // no old-repository receipt can activate
+        if (repo !== repoRoot || jobEpoch !== repoEpoch) return; // no old-repository receipt can activate
         if (!validReceipt(result)) {
             statusText = "INDEX UNAVAILABLE // RECENT MAP SAFE";
             return;
@@ -124,9 +128,11 @@ Item {
     }
     function openPending() {
         if (!canAdopt) return false;
-        allocated = true;
-        if (!candidate.item) return true;
-        return adoptPending();
+        if (!allocated) {
+            allocated = true;
+            return true; // onLoaded owns first adoption
+        }
+        return candidate.item ? adoptPending() : true;
     }
     function adoptPending() {
         if (!canAdopt || !candidate.item) return false;

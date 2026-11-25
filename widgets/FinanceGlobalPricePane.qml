@@ -146,8 +146,28 @@ Item {
                 available: priceView.active && priceFeed.identity!==null
                     && !priceFeed.loading
                 onLeftClicked: {
-                    if (priceFeed.lookup()) viewport.contentY=0;
+                    if (priceView.active) priceFeed.lookup();
                 }
+            }
+            ActionButton {
+                width: body.width
+                height: visible ? 30 : 0
+                visible: priceFeed.demoEligible
+                label: "USE DOCUMENTED DEMO LISTING"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                available: priceView.active && !priceFeed.loading && priceFeed.demoEligible
+                selected: !!priceFeed.selectedListing && priceFeed.selectedListing.demo===true
+                onLeftClicked: { if (priceView.active) priceFeed.chooseDemoListing(); }
+            }
+            GohuText {
+                width: body.width
+                visible: priceFeed.demoEligible
+                height: visible ? implicitHeight : 0
+                text: "DEMO // NO KEY REQUIRED // MANUAL LOAD // SAME LOCAL REQUEST CAP"
+                color: Colors.orange
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
             }
             GohuText {
                 width: body.width
@@ -239,7 +259,7 @@ Item {
                 width: body.width
                 visible: priceFeed.selectedListing!==null
                 text: priceFeed.selectedListing
-                    ? "YOUR EODHD CHOICE // "+priceFeed.selectedListing.symbol
+                    ? (priceFeed.selectedListing.demo===true ? "DOCUMENTED DEMO CHOICE // " : "YOUR EODHD CHOICE // ")+priceFeed.selectedListing.symbol
                         +"\n"+priceFeed.selectedListing.name
                         +" // "+priceFeed.selectedListing.country
                         +" // "+priceFeed.selectedListing.currency
@@ -306,7 +326,7 @@ Item {
                 text: priceFeed.ready
                     ? (priceFeed.snapshot.symbol+" // "+priceFeed.snapshot.currency
                         +" // "+priceFeed.snapshot.priceBasis
-                        +"\nSOURCE EODHD EOD // "+priceFeed.snapshot.from
+                        +"\nSOURCE EODHD EOD"+(priceFeed.snapshot.currencySource==="eodhd-demo-catalog"?" // DEMO":"")+" // "+priceFeed.snapshot.from
                         +" TO "+priceFeed.snapshot.to
                         +"\nSESSIONS "+priceFeed.snapshot.bars.length
                         +" // FETCHED "+priceFeed.snapshot.retrievedAt
@@ -377,7 +397,7 @@ Item {
             }
             GohuText {
                 width: body.width
-                text: "HISTORICAL CLOSES ONLY // CURRENCY FROM EODHD SEARCH, NOT PRICE API"
+                text: "HISTORICAL CLOSES ONLY // CURRENCY FROM "+(priceFeed.selectedListing && priceFeed.selectedListing.demo===true ? "DOCUMENTED DEMO LISTING" : "EODHD SEARCH")+", NOT PRICE API"
                 textFormat: Text.PlainText
                 color: Colors.orange
                 font.pixelSize: 9

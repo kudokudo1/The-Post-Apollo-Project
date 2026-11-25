@@ -81,7 +81,7 @@ Item {
     function returnToRange() { dayDate=""; }
     readonly property string priceUnit: globalHistoryActive ? globalHistory.currency+" " : ""
     readonly property string historySource: globalHistoryActive
-        ? (globalHistory.source === "eodhd-eod" ? "EODHD" : "ALPHA VANTAGE")
+        ? (globalHistory.source === "eodhd-eod" ? (globalHistory.currencySource==="eodhd-demo-catalog"?"EODHD DEMO":"EODHD") : "ALPHA VANTAGE")
         : ""
     readonly property var priceBars: snapshot && Array.isArray(snapshot.bars)
         ? snapshot.bars : []

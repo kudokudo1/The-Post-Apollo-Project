@@ -24,7 +24,7 @@ function retainedGlobalRange(snapshot) {
         return false;
     const l=snapshot.listing;
     const listing={symbol:l.symbol,name:l.name,currency:l.currency,
-        code:l.code,exchange:l.exchange,region:l.region};
+        code:l.code,exchange:l.exchange,region:l.region,demo:l.demo===true};
     return captureGlobalHistory(snapshot.identity,listing,snapshot)!==null
         && l.venue === (snapshot.source==="eodhd-eod"?l.exchange:l.region);
 }
@@ -478,7 +478,7 @@ function captureGlobalStockReference(snapshot) {
     const l=snapshot.listing;
     return captureGlobalHistory(snapshot.identity,
         {symbol:l.symbol,name:l.name,currency:l.currency,code:l.code,
-            exchange:l.exchange,region:l.region},snapshot);
+            exchange:l.exchange,region:l.region,demo:l.demo===true},snapshot);
 }
 function compareGlobalStockReferences(reference,current) {
     const a=captureGlobalStockReference(reference),b=captureGlobalStockReference(current);
@@ -486,7 +486,7 @@ function compareGlobalStockReferences(reference,current) {
     if (a.identity.figi===b.identity.figi
             || (a.source===b.source && a.symbol===b.symbol))
         return {state:"same-stock"};
-    if (a.source!==b.source) return {state:"provider-mismatch"};
+    if (a.source!==b.source || a.currencySource!==b.currencySource) return {state:"provider-mismatch"};
     if (a.currency!==b.currency) return {state:"currency-mismatch"};
     const compared=compareValidatedStockRanges(a,b);
     if (compared.state==="ready") {
@@ -711,7 +711,11 @@ function captureGlobalHistory(identity, listing, data) {
             || !Array.isArray(data.bars))
         return null;
     const eod=data.source==="eodhd-eod", alpha=data.source==="alpha-vantage-daily-compact";
-    if ((!eod && !alpha) || (eod && (data.currencySource!=="eodhd-search"
+    const demo=eod && data.currencySource==="eodhd-demo-catalog";
+    if ((listing.demo===true)!==demo || (demo && (identity.exchCode!=="US"
+            || !["AAPL.US","TSLA.US"].includes(data.symbol) || data.currency!=="USD")))
+        return null;
+    if ((!eod && !alpha) || (eod && ((!demo && data.currencySource!=="eodhd-search")
             || !["CLOSE","ADJUSTED CLOSE"].includes(data.priceBasis)
             || typeof listing.exchange!=="string" || !listing.exchange
             || listing.symbol!==listing.code+"."+listing.exchange || listing.code!==identity.ticker))
@@ -743,7 +747,7 @@ function captureGlobalHistory(identity, listing, data) {
         listing:{symbol:listing.symbol,name:listing.name,currency:listing.currency,
             venue:eod?listing.exchange:listing.region,
             code:eod?listing.code:null,exchange:eod?listing.exchange:null,
-            region:alpha?listing.region:null},
+            region:alpha?listing.region:null,demo:demo},
         compactMaxBars:alpha?data.compactMaxBars:null,
         returnedBars:alpha?data.returnedBars:null,
         compactMayBeTruncated:alpha && data.compactMayBeTruncated,

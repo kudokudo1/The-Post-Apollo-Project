@@ -85,6 +85,21 @@ Scope {
         message="OPENFIGI IDENTITY CHOSEN // FIND EODHD LISTINGS MANUALLY.";
         return true;
     }
+    // Local, documented sample metadata. No provider search result is invented.
+    readonly property bool demoEligible: !!identity && identity.exchCode==="US"
+        && ["AAPL","TSLA"].includes(identity.ticker)
+    function chooseDemoListing() {
+        if (!monitoring || loading || reader.running || !demoEligible) return false;
+        const ticker=identity.ticker;
+        selectedListing={symbol:ticker+".US",code:ticker,exchange:"US",
+            name:ticker==="AAPL"?"Apple Inc.":"Tesla, Inc.",
+            type:"Common Stock",country:"USA",currency:"USD",isin:null,demo:true};
+        snapshot=null;
+        sharedQuota=null;
+        state="selected";
+        message="DOCUMENTED DEMO LISTING // VERIFY IDENTITY // MANUAL LOAD";
+        return true;
+    }
     function lookup() {
         if (!monitoring || loading || reader.running || !identity
                 || !/^[A-Z0-9][A-Z0-9_.-]{0,29}$/.test(identity.ticker))
@@ -169,7 +184,8 @@ Scope {
         requestsThisRuntime++;
         reader.exec(["/usr/bin/env","node",
             Quickshell.shellPath("scripts/finance/read_global_eodhd_history.mjs"),
-            "history",requestedSymbol,requestedCurrency,requestedFrom,requestedTo]);
+            selectedListing.demo===true ? "demo-history" : "history",
+            requestedSymbol,requestedCurrency,requestedFrom,requestedTo]);
         return true;
     }
     function validDate(day) {
@@ -196,6 +212,8 @@ Scope {
                     ? "LOCAL QUOTA STORAGE UNSAFE OR UNAVAILABLE // REQUEST BLOCKED"
                     : code==="provider-key-required"
                     ? "FREE EODHD ACCOUNT KEY REQUIRED // PAID PLAN NOT REQUIRED"
+                    : code==="demo-not-authorized" || code==="demo-listing-not-supported"
+                    ? "DEMO LISTING UNAVAILABLE // NO KEY FALLBACK"
                     : code==="provider-not-entitled"
                     ? "EODHD DOES NOT PROVIDE THIS LISTING ON CURRENT PLAN"
                     : code==="rate-limited"
@@ -248,7 +266,10 @@ Scope {
                             || data.symbol!==selectedListing.symbol
                             || data.currency!==selectedListing.currency
                             || data.from!==requestedFrom || data.to!==requestedTo
-                            || data.currencySource!=="eodhd-search"
+                            || data.currencySource!==(selectedListing.demo===true
+                                ? "eodhd-demo-catalog" : "eodhd-search")
+                            || (selectedListing.demo===true && (!demoEligible
+                                || data.symbol!==identity.ticker+".US" || data.currency!=="USD"))
                             || data.identityVerified!==false
                             || !["CLOSE","ADJUSTED CLOSE"].includes(data.priceBasis)
                             || !Array.isArray(data.bars) || data.bars.length>132

@@ -41,6 +41,13 @@ Item {
         var other=Policy.captureGlobalHistory(otherIdentity,otherListing,data);
         var compared=Policy.compareGlobalStockReferences(Policy.captureGlobalStockReference(av),other);
         var detail=Policy.inspectCrossStockDate(compared,1);
+        var demoIdentity={figi:"BBG000000003",ticker:"AAPL",name:"Apple",exchCode:"US"};
+        var demoListing={symbol:"AAPL.US",name:"Apple",code:"AAPL",exchange:"US",currency:"USD",demo:true};
+        data.source="eodhd-eod"; data.symbol="AAPL.US"; data.currency="USD"; data.currencySource="eodhd-demo-catalog";
+        var demo=Policy.captureGlobalHistory(demoIdentity,demoListing,data);
+        if (!demo || !Policy.summarizeRange(demo) || !Policy.captureGlobalStockReference(demo)) return false;
+        demoListing.demo=false;
+        if (Policy.captureGlobalHistory(demoIdentity,demoListing,data)!==null) return false;
         rows[0].price=1;
         return compared.state==="ready" && detail && detail.current.currency==="EUR"
             && Policy.crossStockGapChart(compared).points[1].value===0

@@ -124,7 +124,6 @@ Rectangle {
                         const visible = row.ordinal>=range.first;
                         const y = row.ordinal*root.rowHeight-flick.contentY;
                         const middle = y+root.rowHeight/2;
-                        const incoming = frontier[row.sha] !== undefined;
                         if (visible) {
                             ctx.lineWidth=1.3;
                             for (const key of Object.keys(frontier)) {
@@ -180,9 +179,24 @@ Rectangle {
                         : rowItem.status==="UNAVAILABLE" ? "UNAVAILABLE // TAP TO RETRY" : "LOADING COMMIT "+(rowItem.ordinal+1)
                 }
                 TapHandler {
+                    property int pressedOrdinal: -1
+                    property string pressedSha: ""
+                    property string pressedSnapshot: ""
+                    property int pressedEpoch: -1
+                    onPressedChanged: if (pressed) {
+                        pressedOrdinal = rowItem.ordinal;
+                        pressedSha = rowItem.record ? rowItem.record.sha : "";
+                        pressedSnapshot = root.state ? root.state.snapshot : "";
+                        pressedEpoch = root.state ? root.state.epoch : -1;
+                    }
                     onTapped: {
-                        if (rowItem.record) root.choose(rowItem.ordinal);
-                        else if (rowItem.status==="UNAVAILABLE") root.retry(rowItem.ordinal);
+                        if (!root.state || pressedSnapshot !== root.state.snapshot
+                                || pressedEpoch !== root.state.epoch
+                                || pressedOrdinal !== rowItem.ordinal) return;
+                        if (rowItem.record && pressedSha === rowItem.record.sha)
+                            root.choose(rowItem.ordinal);
+                        else if (!pressedSha && rowItem.status==="UNAVAILABLE")
+                            root.retry(rowItem.ordinal);
                     }
                 }
             }
@@ -203,7 +217,7 @@ Rectangle {
         anchors.margins: 8
         height: 24
         text: root.bridgeFaulted ? "PAGE READER UNAVAILABLE // REOPEN REQUIRED" :
-            root.state ? (Policy.visibleRange(root.state).first+1)+" / "+root.state.total+" // "+root.bottomStatus : "NO INDEX"
+            root.state ? (root.state.total ? Policy.visibleRange(root.state).first+1 : 0)+" / "+root.state.total+" // "+root.bottomStatus : "NO INDEX"
         textFormat: Text.PlainText
         color: Colors.orange
         font.pixelSize: 10

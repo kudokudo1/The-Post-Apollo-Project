@@ -135,7 +135,12 @@ print("Optional profiling and bounded always-on timing markers: PASS")
 # Existing shared diagnostics presentation, fixed-size failure evidence.
 widget = (root / "widgets/GitW.qml").read_text()
 assert "SharedComponents.DiagnosticsDockButton" in widget
-assert "SharedComponents.DiagnosticsServicePopup" in widget
+assert "FullHistoryMap.GitDiagnosticsDashboard" in widget
+assert "active: root.menuOpen && root.activePage" in widget
+dash = (root / "widgets/git/GitDiagnosticsDashboard.qml").read_text()
+for token in ("SHELL TOTAL", "DONE RECEIVED", "SLOWEST COMPLETED", "LAST FAILURE", "EXECUTION STAGES", "refreshDiagnosticText()", "NeonScrollBar"):
+    assert token in dash
+assert "Process {" not in dash and "Timer {" not in dash
 assert 'rememberRefreshFailure("GIT READ TIMEOUT")' in service
 assert "refreshDiagOverlap=refreshProcess.running" in service
 assert "refreshDiagLastFailure={" in service

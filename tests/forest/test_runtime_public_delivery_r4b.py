@@ -200,6 +200,23 @@ class LocalDeliveryTests(unittest.TestCase):
         self.assertEqual(self.units, [])
         self.assertIs(d.observe(f), DeliveryResult.CALLBACK_RETURNED)
 
+    def test_sequence_exhaustion_invalidates_without_wrap_or_callback(self):
+        # Exercise the boundary directly; no billions of fixture units.
+        frames = self.frames()
+        d = self.delivery()
+        d._sequence = 2**53 - 2
+        self.assertIs(d.observe(frames[0]), DeliveryResult.CALLBACK_RETURNED)
+        self.assertEqual(self.units[-1]["sequence"], 2**53 - 1)
+        self.assertIs(d.observe(frames[1]), DeliveryResult.INVALIDATED)
+        self.assertEqual(len(self.units), 1)
+        self.assertIs(d.withdraw(), DeliveryResult.CLOSED)
+
+    def test_generation_rejects_bool_and_unsafe_integer(self):
+        for generation in (True, 0, -1, 2**53, 1.0):
+            with self.subTest(generation=generation):
+                with self.assertRaises(ValueError):
+                    PresentationCorrelation.fresh(generation)
+
     def test_invalid_correlation_or_generation_refuses(self):
         with self.assertRaises(ValueError):
             PresentationCorrelation("operation", "view", 1)

@@ -49,3 +49,9 @@ returned coroutine is closed without execution. Re-entry during explicit
 withdrawal also invalidates. These checks cannot prove a host callback
 has not independently queued work; actual placement review must establish
 that no asynchronous queue is used.
+
+The presentation sequence is limited to positive JavaScript-safe integers
+(1 through 2**53-1). Exhaustion invalidates the local lifetime without a
+callback, wrap, reuse or retry. Generation uses the existing B6 strict
+integer validator. The boundary tests directly place the fixture counter
+near exhaustion, not a claim that an actual operation emits that many units.

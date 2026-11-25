@@ -173,6 +173,10 @@ class LocalFixtureDelivery:
             # No atomic protected fence or asynchronous queue is claimed.
             if self._current() is None or self._closed:
                 return self._invalidate()
+            # Presentation consumers use JS safe integers. Never wrap,
+            # coerce, reuse, or dispatch a sequence outside that range.
+            if type(self._sequence) is not int or not 0 <= self._sequence < 2**53 - 1:
+                return self._invalidate()
             corr = self.correlation
             self._sequence += 1
             unit = {"requestId": corr.request_id, "viewKey": corr.view_key,

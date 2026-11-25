@@ -29,6 +29,10 @@ Item {
     property bool custodyLost: false
     property var pendingLease: null
     readonly property bool custodyEnabled: custodyController!==null
+    readonly property bool custodyV2: custodyEnabled && custodyController.v2Mode
+    readonly property string custodyBase: custodyV2 ? custodyController.v2Base : ""
+    function sameCustody(a,b) { return a && b && a.directory===b.directory && a.repoId===b.repoId && a.key===b.key && a.manifest.snapshot===b.manifest.snapshot && a.device===b.device && a.inode===b.inode; }
+    function v2Reply(reply,g,lease) { return reply && g && lease && lease.held && sameCustody(lease.generation,g) && reply.schema==="post-apollo-git-map-reader-v2-candidate" && reply.status==="READY" && reply.repoId===g.repoId && reply.key===g.key && reply.snapshot===g.manifest.snapshot && reply.device===g.device && reply.inode===g.inode && reply.reclamationAllowed===false ? reply.result : null; }
     readonly property bool pendingCustodyReady: !custodyEnabled || (pendingLease!==null && pendingLease.held)
     property alias searchQuery: searchInput.text
     property string searchStatus: ""
@@ -74,6 +78,12 @@ Item {
         // Do not release the lease from inside its held binding evaluation.
         // fullVisible/canRequest/canAdopt already fail closed immediately.
         function onHeldChanged() { Qt.callLater(root.handleCustodyLoss); }
+    }
+    function invalidateCustodyV2() {
+        custodyLost=true; repoEpoch++; searchEpoch++; activeRepo=""; activeDirectory=""; searchRequest=null; lastMatch=null;
+        searchStatus="SEARCH DISCARDED // CUSTODY LOST"; lookupQueued=false; buildQueued=false; clearPending();
+        const lost=activeLease; activeLease=null; if (lost && custodyController) custodyController.release(lost);
+        statusText="CUSTODY LOST // REOPEN TO RECHECK";
     }
     function handleCustodyLoss() {
         const lost=activeLease;
@@ -172,7 +182,8 @@ Item {
         output = "";
         statusText = action === "build" ? "INDEXING // CURRENT MAP RETAINED" : "CHECKING HISTORY";
         watchdog.restart();
-        worker.exec(["/usr/bin/timeout","--kill-after=2s",action === "build" ? "120s" : "20s",
+        if (custodyV2) worker.exec(["/usr/bin/timeout","--kill-after=2s",action === "build" ? "120s" : "20s","/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_manager_candidate.py"),"--base",custodyBase,action,jobRepo]);
+        else worker.exec(["/usr/bin/timeout","--kill-after=2s",action === "build" ? "120s" : "20s",
                      "/usr/bin/python3","-I","-B",
                      Quickshell.shellPath("scripts/git_map_index_manager.py"),
                      action,jobRepo]);
@@ -191,7 +202,8 @@ Item {
         jobsStarted++;
         received=false; exited=false; exitOk=false; output="";
         watchdog.restart();
-        worker.exec(["/usr/bin/timeout","--kill-after=2s","20s","/usr/bin/python3","-I","-B",
+        if (custodyV2) worker.exec(["/usr/bin/timeout","--kill-after=2s","20s","/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),"--base",custodyBase,"--device",pendingResult.device,"--inode",pendingResult.inode,"locate",pendingResult.repoId,pendingResult.key,pendingResult.manifest.snapshot,anchor.sha]);
+        else worker.exec(["/usr/bin/timeout","--kill-after=2s","20s","/usr/bin/python3","-I","-B",
                      Quickshell.shellPath("scripts/git_map_history_index.py"),
                      "locate",pendingResult.directory,pendingResult.manifest.snapshot,anchor.sha]);
         return true;
@@ -211,7 +223,8 @@ Item {
         received=false; exited=false; exitOk=false; output="";
         searchStatus="SEARCHING";
         watchdog.restart();
-        worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",
+        if (custodyV2) worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),"--base",custodyBase,"--device",activeLease.generation.device,"--inode",activeLease.generation.inode,"search",s.repoId,activeLease.generation.key,s.snapshot,"--",query,String(start)]);
+        else worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",
             Quickshell.shellPath("scripts/git_map_history_index.py"),
             "search",activeDirectory,s.snapshot,"--",query,String(start)]);
         return true;
@@ -246,6 +259,7 @@ Item {
         searchStatus="MATCH "+(m.ordinal+1)+" / "+s.total+" // "+m.sha.slice(0,10);
     }
     function validReceipt(value) {
+        if (custodyV2) return value && value.schema==="post-apollo-git-map-custody-v2" && value.reclamationAllowed===false && typeof value.repoId==="string" && /^[0-9a-f]{64}$/.test(value.repoId) && typeof value.key==="string" && /^[0-9a-f]{64}$/.test(value.key) && ["READY","MISSING","CACHE LIMIT"].includes(value.status) && (value.status!=="READY" || (Policy.manifest(value.manifest) && value.manifest.repoId===value.repoId && !value.manifest.shallow && value.directory===custodyBase+"/post-apollo-git-map-custody-v2/"+value.repoId+"/"+value.key && typeof value.device==="string" && typeof value.inode==="string" && /^(0|[1-9][0-9]{0,19})$/.test(value.device) && /^(0|[1-9][0-9]{0,19})$/.test(value.inode)));
         return value && value.schema === "post-apollo-git-map-cache-v1"
             && typeof value.repoId === "string" && /^[0-9a-f]{64}$/.test(value.repoId)
             && typeof value.key === "string" && /^[0-9a-f]{64}$/.test(value.key)
@@ -267,6 +281,11 @@ Item {
         }
         output = "";
         if (repo !== repoRoot || jobEpoch !== repoEpoch) { schedule(); return; }
+        if (custodyV2 && (action==="search" || action==="locate")) {
+            const lease=action==="locate" ? pendingLease : activeLease;
+            result=v2Reply(result,action==="locate" ? pendingResult : (lease ? lease.generation : null),lease);
+            if (!result) { invalidateCustodyV2(); return; }
+        }
         if (action==="search") { finishSearch(result); schedule(); return; }
         if (action==="locate") {
             const anchor=locateAnchor;
@@ -300,8 +319,11 @@ Item {
             statusText = "CACHE LIMIT // EXISTING HISTORY PRESERVED";
             return;
         }
+        if (custodyV2 && activeLease && activeLease.generation.directory===result.directory && !sameCustody(activeLease.generation,result)) {
+            invalidateCustodyV2(); return;
+        }
         if (fullVisible && candidate.mapState
-                && candidate.mapState.snapshot === result.manifest.snapshot) {
+                && candidate.mapState.snapshot === result.manifest.snapshot && (!custodyV2 || (activeLease && sameCustody(activeLease.generation,result)))) {
             statusText = "INDEX CURRENT // POSITION RETAINED";
             schedule();
             return;
@@ -333,7 +355,7 @@ Item {
     function adopt(anchor) {
         if (!canAdopt) return false;
         const result=pendingResult;
-        if (!candidate.activate(result.directory,result.manifest,anchor)) {
+        if (!candidate.activate(result.directory,result.manifest,anchor,custodyV2 ? result : null)) {
             statusText="INDEX OPEN FAILED // CURRENT MAP SAFE";
             clearPending();
             return false;
@@ -482,6 +504,9 @@ Item {
         recentRepo: root.repoRoot
         titleText: root.titleText
         requestsEnabled: root.operatorActive && root.fullVisible
+        custodyBase: root.custodyBase
+        custodyLease: root.custodyV2 ? root.activeLease : null
+        onCustodyFault: function(g) { Qt.callLater(()=>{ if (root.custodyV2 && root.activeLease && root.sameCustody(root.activeLease.generation,g)) root.invalidateCustodyV2(); }); }
         onReaderBusyChanged: if (!readerBusy && root.pendingResult) root.schedule()
         onScrollPositionChanged: if (root.pendingResult && scrollPosition===0) root.schedule()
         onCommitSelected: function(sha) {

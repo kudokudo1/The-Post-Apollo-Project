@@ -156,5 +156,27 @@ for (const row of [
 ]) assert.equal(breakdown.memoryBreakdown("memory",{...memoryReport,text:jsonl([extendedFirst,row,done])},true),null);
 assert.equal(breakdown.memoryBreakdown("memory",{...memoryReport,text:jsonl([extendedFirst,done])},true)
     .rows.find(r=>r.label==="PRIVATE RESIDENT").change,null);
-assert.match(ui,/memoryBreakdown\(selectedReport, report, true\)/);
+assert.match(ui,/memoryBreakdown\(selectedReport, report, true, true\)/);
 console.log("CPU++ private resident capture presentation PASS");
+
+const hostA={MemTotal:33554432,MemAvailable:8388608,MemFree:1024,AnonPages:1024,Cached:1024,Shmem:0,SReclaimable:0,SUnreclaim:0,SwapTotal:1024,SwapFree:1024};
+const hostB={...hostA,MemAvailable:6291456};
+const pairedFirst={...memorySample,hostObservation:{beforeKiB:hostA,afterKiB:hostA,spanMs:2}};
+const pairedNext={...memoryNext,hostObservation:{beforeKiB:hostA,afterKiB:hostB,spanMs:3}};
+const hostView=rows=>breakdown.memoryBreakdown("memory",{status:"COMPLETE",text:jsonl([...rows,done])},true,true);
+const h=hostView([pairedFirst,pairedNext]).hostContext;
+assert.equal(h.paired,2);assert.equal(h.minimum,6291456);assert.equal(h.maxSpan,3);
+assert.equal(h.total,33554432);assert.equal(h.start,8388608);assert.equal(h.final,6291456);
+assert.equal(h.delta,-2097152);assert.equal(h.pssDelta,524288);
+for(const value of [null,{...pairedNext.hostObservation,spanMs:-1},{...pairedNext.hostObservation,afterKiB:{...hostB,MemAvailable:999999999}}]){
+    const v=hostView([pairedFirst,{...pairedNext,hostObservation:value}]);
+    assert.equal(v.rows.length,5);assert.equal(v.hostContext.paired,1);
+    assert.equal(v.hostContext.delta,null);assert.equal(v.hostContext.pssDelta,null);
+}
+const changed=hostView([pairedFirst,{...pairedNext,hostObservation:{beforeKiB:{...hostA,MemTotal:67108864},afterKiB:{...hostB,MemTotal:67108864},spanMs:3}}]).hostContext;
+assert.equal(changed.paired,2);assert.equal(changed.complete,false);assert.equal(changed.total,null);
+assert.equal(hostView([memorySample,memoryNext]).hostContext.minimum,null);
+assert.equal(hostView([pairedFirst]).hostContext.delta,null);
+assert.match(ui,/objectName: "cpuplusDiagHostInstrument"/);
+assert.match(ui,/OBSERVED SAMPLES ONLY \/\/ CORRELATION, NOT CAUSE/);
+console.log("CPU++ M10 host RAM instrument projection PASS");

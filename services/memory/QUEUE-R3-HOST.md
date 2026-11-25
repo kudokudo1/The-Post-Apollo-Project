@@ -62,3 +62,42 @@ history/recovery parsers now tested without candidate overlays. #2594
 was also merged despite prior HOLD recommendation; no duplicate mount,
 cleanup remains Nurse 2 disposition. Native wrapper, client watchdog and
 full-shell durable pre-send/acknowledgment remain pending.
+
+## R3g // native one-shot watchdog (unmounted)
+
+MemoryQueueSessionWatchdog.qml accepts immutable canonical host state and an
+explicit six-category duration policy, creates only one-shot timers for
+active waits, retains deadlines across partial bytes and intermediate
+packets, destroys timers when waits resolve, fences callbacks by generation
+and unique ticket, latches first failure. No default production durations,
+no timer when idle, no launch, automatic retry or unlock. Wrapper must
+publish Host.stop for the exact generation before stopping the child;
+policy rejection also requires fail-closed handling. Coalesced same-kind
+waits conservatively keep earlier deadline. QML event-loop starvation is
+not bounded by these timers; native raw parser and actual installed
+wrapper still outstanding. Fixture-only values are not production policy.
+
+Merged #2621/#2631 native PASS at dd2a89e8 (raw job 139044396578).
+Remove candidate overlay and run actual checkout. Two disposable native
+trials: original lost response and actual delayed reply after local commit
+(test-only Runtime subclass sleeps 8s; ACTION watchdog 1.2s). Verify exact
+host invalidation before stop, one trip, explicit reconnect, durable local
+commit recovery, no replay, no idle deadlines. Does not prove full shell
+crash recovery, protected kernel action or physical durability. No DOC 2
+source edits. Startup reconciliation and Hub delivery still outstanding.
+
+## R3g revision 2 // isolate actual watchdog module
+
+Initial baba39bf: 4/5 workflows passed. Native job 139047832100 stopped
+before either acceptance scenario could execute: importing the production
+memory directory loaded its qmldir MemoryOperation singleton, whose
+qs.services.time dependency is intentionally absent in the isolated scene.
+Follow Nurse 2's REVISE/HOLD disposition. Copy actual Python sources only
+into the backend directory and byte-identical MemoryQueueSessionWatchdog.qml
+plus MemoryQueueSessionHost.js into a separate narrow QML directory; no
+production qmldir, singleton, fake time service, or dependency stub. Both
+fixture host and watchdog resolve the same actual JS copy. No changes to
+watchdog or host source, timeout durations, trial steps, or acceptance
+assertions. Both native trials must pass at the revised exact head before
+independent review. DOC 2 #2635 workspace qualification is separate;
+no shared fixture or presentation modifications.

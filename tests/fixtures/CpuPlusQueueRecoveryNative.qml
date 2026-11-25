@@ -7,12 +7,15 @@ import "widgets/cpuplus/CpuPlusQueueConsumer.js" as Consumer
 import "widgets/cpuplus/CpuPlusQueuePresentation.js" as Presentation
 import "widgets/cpuplus/CpuPlusQueueHistory.js" as History
 import "widgets/cpuplus/CpuPlusQueueRecovery.js" as Recovery
-import "memory/MemoryQueueSessionHost.js" as Host
+import "watchdog/MemoryQueueSessionHost.js" as Host
+import "watchdog" as Memory
 
 // Disposable CI only. One canonical controller; no production unlock.
 ShellRoot {
     id: smoke
     readonly property bool armed: Quickshell.env("POST_APOLLO_QUEUE_PIPE_SMOKE") === "CI_DISPOSABLE_ONLY"
+    readonly property bool timeoutTrial: Quickshell.env("POST_APOLLO_QUEUE_WATCHDOG_TRIAL") === "1"
+    property int watchdogTrips: 0
     property var host: Host.initial(Consumer)
     readonly property var recovery: Host.recoveryContext(host)
     readonly property string actionId: "c23683a9-b2ab-4a2c-87ce-000000000001"
@@ -45,6 +48,7 @@ ShellRoot {
         let packet;
         try { packet = JSON.parse(line); } catch (_) { check(false,"parse"); return; }
         if (phase === 2 && packet.kind === "ACTION") {
+            if (!check(!timeoutTrial,"delayed child replied before watchdog")) return;
             // Observe the reply only in the harness, never deliver to Host.
             if (!check(packet.disposition === "REPORTED" && packet.result.request.id
                 && !line.includes("inode"),"committed reply")) return;
@@ -70,6 +74,23 @@ ShellRoot {
         host = sent.state;
         ++writes;
         child.write(sent.frame);
+    }
+    Memory.MemoryQueueSessionWatchdog {
+        id: watchdog
+        hostState: smoke.host
+        timeouts: ({HELLO:5000,PUBLICATION:5000,ACTION:1200,HISTORY:3000,RECOVERY:3000,PARTIAL_FRAME:2000})
+        onPolicyRejected: generation => smoke.check(false,"watchdog policy rejected")
+        onDeadlineExpired: (generation,category,ticket) => {
+            if (!smoke.check(smoke.timeoutTrial && smoke.phase===2 && category==="ACTION"
+                && generation===smoke.host.generation && smoke.watchdogTrips===0,"exact action watchdog")) return;
+            ++smoke.watchdogTrips;
+            smoke.host=Host.stop(smoke.host,Consumer,"ACTION_TIMEOUT",generation);
+            if (!smoke.check(smoke.host.session.unresolved && smoke.host.startupLocked
+                && watchdog.activeCount===0,"timeout invalidates before child stop")) return;
+            smoke.dropping=true;
+            child.running=false;
+            console.log("QUEUE_R3_WATCHDOG_STEP // exact action timeout, owner invalidated before stop");
+        }
     }
     Process {
         id: child
@@ -115,6 +136,7 @@ ShellRoot {
             if (++smoke.ticks > 280) { smoke.check(false,"timeout " + smoke.phase); return; }
             if (smoke.phase === 0 && smoke.host.session.status) {
                 if (!smoke.check(smoke.host.startupLocked && smoke.host.session.status.state === "IDLE REPORTED","initial locked")) return;
+                if (!smoke.check(watchdog.activeCount===0,"idle no active deadlines")) return;
                 smoke.oldOwner = smoke.host.session.ownerId;
                 pane.expiryText = "2099-01-01 00:00";
                 pane.prepareIntent("QUEUE");
@@ -140,8 +162,11 @@ ShellRoot {
                 smoke.launch(2);
             } else if (smoke.phase === 3 && smoke.host.session.status) {
                 if (!smoke.check(smoke.host.session.ownerId !== smoke.oldOwner
-                    && smoke.host.session.status.requestId === smoke.resultId
+                    && !!smoke.host.session.status.requestId
+                    && (smoke.timeoutTrial || smoke.host.session.status.requestId === smoke.resultId)
                     && smoke.host.session.unresolved && smoke.host.startupLocked,"new owner same saved request")) return;
+                if(smoke.timeoutTrial)smoke.resultId=smoke.host.session.status.requestId;
+                if(!smoke.check(watchdog.activeCount===0,"reconnected idle deadlines"))return;
                 smoke.phase = 4;
                 recoveryPane.requestRead("INVENTORY",16);
                 if (!smoke.check(smoke.reads === 2,"new epoch inventory signal")) return;
@@ -182,6 +207,9 @@ ShellRoot {
                     && recoveryPane.localView === null,"EOF refuses reads and clears pane")) return;
                 if (!smoke.check(smoke.recovery.inventory === null && smoke.recovery.localAction === null
                     && smoke.host.startupLocked && smoke.host.session.unresolved && smoke.writes === 1,"EOF clears recovery")) return;
+                if(!smoke.check(smoke.watchdogTrips===(smoke.timeoutTrial?1:0)
+                    && watchdog.activeCount===0,"exact deadline count and no idle timers"))return;
+                if(smoke.timeoutTrial)console.log("QUEUE_R3_WATCHDOG_PASS // delayed committed reply recovered, no replay");
                 console.log("QUEUE_R3_RECOVERY_PASS // actual canonical host, QML pane, durable lost QUEUE, inventory, lookup, EOF");
                 smoke.done = true;
                 Qt.quit();

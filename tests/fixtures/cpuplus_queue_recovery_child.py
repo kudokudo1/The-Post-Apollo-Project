@@ -3,6 +3,7 @@ import copy
 import os
 from pathlib import Path
 import sys
+import time
 
 if os.environ.get("POST_APOLLO_QUEUE_PIPE_SMOKE") != "CI_DISPOSABLE_ONLY":
     raise SystemExit("Disposable fixture only")
@@ -29,8 +30,18 @@ def observe(record, observer):
     return None
 
 
+class DelayedReplyRuntime(Runtime):
+    def local_action(self, message):
+        result=super().local_action(message)
+        # Test-only delay after the durable transaction, before reply.
+        if os.environ.get("POST_APOLLO_QUEUE_WATCHDOG_TRIAL")=="1":
+            print("QUEUE_R3_CHILD // committed before delayed reply",file=sys.stderr,flush=True)
+            time.sleep(8)
+        return result
+
+
 def factory(queue):
-    return Runtime(queue, capture, observe, interval_ms=10000,
+    return DelayedReplyRuntime(queue, capture, observe, interval_ms=10000,
                    max_age_ms=20000, max_gap_ms=20000, stable_ms=20000)
 
 

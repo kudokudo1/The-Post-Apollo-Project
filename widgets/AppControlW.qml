@@ -1701,6 +1701,21 @@ PanelWindow {
                      + " elapsedMs=" + elapsedMs + " tsMs=" + now);
     }
 
+    // Opening traces share the existing opt-in completion probe.
+    // These wall-clock markers describe synchronous handler stages, not paint.
+    property int appControlOpenTraceSequence: 0
+
+    function traceAppControlOpen(stage, sequence, startMs) {
+        if (sequence <= 0)
+            return 0;
+        const now = Date.now();
+        console.warn("SYNTAGMA_COMPLETION_PROBE // service=appcontrol"
+                     + " stage=open:" + stage + ":end"
+                     + " seq=" + sequence
+                     + " elapsedMs=" + (now - startMs) + " tsMs=" + now);
+        return now;
+    }
+
     function applyTaskSnapshot(rows) {
         const snapshotRows = Array.isArray(rows) ? rows : [];
         const traceSequence = appControlSnapshotTraceEnabled
@@ -29385,6 +29400,10 @@ PanelWindow {
     onMenuOpenChanged: {
         if(!menuOpen) clearFavoriteNavigation();
         if (menuOpen) {
+            const openTrace = appControlSnapshotTraceEnabled
+                ? ++appControlOpenTraceSequence : 0;
+            const openStart = openTrace ? Date.now() : 0;
+            let openStage = openStart;
             appControlWindow.favoritesFaceClickPulse = false;
             appControlWindow.favoritesFaceBlinking = false;
             appControlWindow.favoritesFaceDoubleBlinkPending = false;
@@ -29417,6 +29436,8 @@ PanelWindow {
             if (taskManagerBody.memCanvas)
                 taskManagerBody.memCanvas.requestPaint();
 
+            openStage = traceAppControlOpen("graph-invalidation", openTrace, openStage);
+
             appControlWindow.scheduleFavoritesFaceBlink();
             appControlWindow.scheduleKittyFaceBlink();
             appControlWindow.scheduleHiddenFaceBlink();
@@ -29440,6 +29461,7 @@ PanelWindow {
             if (selectedModeIndex === killModeIndex)
                 fireKillRailOnce();
             restoreInputForMode(selectedModeIndex);
+            openStage = traceAppControlOpen("mode-restore", openTrace, openStage);
 
             detailFocused = false;
             modeRailFocused = false;
@@ -29454,11 +29476,13 @@ PanelWindow {
                 resetResultSelection();
 
             resetDetailActionSelection();
+            openStage = traceAppControlOpen("selection", openTrace, openStage);
             scheduleRunKillProbe();
             scheduleWindowAudioProbe();
             scheduleAppAudioProbe();
             scheduleTabAudioProbe();
 
+            openStage = traceAppControlOpen("probe-schedule", openTrace, openStage);
             refreshWindowState();
 
             if (selectedModeIndex === thermalModeIndex
@@ -29478,7 +29502,10 @@ PanelWindow {
             if (appControlWindow.bottleNames.length === 0)
                 refreshBottleList();
 
+            openStage = traceAppControlOpen("refresh-dispatch", openTrace, openStage);
             searchInput.forceActiveFocus();
+            traceAppControlOpen("focus", openTrace, openStage);
+            traceAppControlOpen("handler-total", openTrace, openStart);
         } else {
             recentModeIndex = selectedModeIndex;
             lastMenuCloseMs = Date.now();

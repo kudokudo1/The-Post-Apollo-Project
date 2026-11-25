@@ -555,3 +555,50 @@ test('visible Kill model resolves each stable slot once without changing display
     assert.match(model,/hunterTaskActive\(entry\)\s*&& appControlWindow.hunterTaskClassVisible\(entry\)/);
     assert.match(model,/if \(appControlWindow.killTaskModelBlank\)/);
 });
+
+
+test('opt-in AppControl opening markers preserve synchronous operation order', () => {
+    const begin = app.indexOf('    function traceAppControlOpen(');
+    const end = app.indexOf('    function applyTaskSnapshot(', begin);
+    assert.ok(begin >= 0 && end > begin);
+    let clockReads = 0;
+    const messages = [];
+    const trace = new Function('Date', 'console', app.slice(begin, end)
+        + '\nreturn traceAppControlOpen;')(
+        {now: () => { clockReads++; return 150; }},
+        {warn: message => messages.push(message)});
+    assert.equal(trace('selection', 0, 100), 0);
+    assert.equal(clockReads, 0);
+    assert.equal(messages.length, 0);
+    assert.equal(trace('selection', 7, 100), 150);
+    assert.equal(clockReads, 1);
+    assert.deepEqual(messages, [
+        'SYNTAGMA_COMPLETION_PROBE // service=appcontrol stage=open:selection:end seq=7 elapsedMs=50 tsMs=150'
+    ]);
+    const opening = app.slice(app.indexOf('    onMenuOpenChanged: {'),
+        app.indexOf('        } else {\n            recentModeIndex', app.indexOf('    onMenuOpenChanged: {')));
+    assert.match(opening, /const openTrace = appControlSnapshotTraceEnabled\s*\? \+\+appControlOpenTraceSequence : 0/);
+    assert.match(opening, /const openStart = openTrace \? Date\.now\(\) : 0/);
+    let prev = -1;
+    for (const marker of [
+        'taskMiniHistoryRevision += 1',
+        'traceAppControlOpen("graph-invalidation"',
+        'restoreInputForMode(selectedModeIndex)',
+        'traceAppControlOpen("mode-restore"',
+        'resetDetailActionSelection()',
+        'traceAppControlOpen("selection"',
+        'scheduleTabAudioProbe()',
+        'traceAppControlOpen("probe-schedule"',
+        'refreshWindowState()',
+        'refreshTaskManager()',
+        'refreshBottleList()',
+        'traceAppControlOpen("refresh-dispatch"',
+        'searchInput.forceActiveFocus()',
+        'traceAppControlOpen("focus"',
+        'traceAppControlOpen("handler-total"'
+    ]) {
+        const ix = opening.indexOf(marker);
+        assert.ok(ix > prev, 'ordered marker: ' + marker);
+        prev = ix;
+    }
+});

@@ -79,6 +79,7 @@ function activate(previous,m,rowHeight,viewportHeight,anchor) {
 function scroll(s,y) {
     if(!Number.isFinite(y)) return s;
     const next=clamp(s,y);
+    if(next===s.y) return s;
     return retain(Object.assign({},s,{y:next,direction:next===s.y?s.direction:next>s.y?1:-1}));
 }
 function resize(s,viewportHeight) {
@@ -97,7 +98,7 @@ function requests(s) {
         next.pending[start]=request;
         list.push(request);
     }
-    return {state:next,requests:list};
+    return {state:list.length ? next : s,requests:list};
 }
 function sameRequest(s,r) {
     if(!identity(r) || r.snapshot!==s.snapshot || r.repoId!==s.repoId

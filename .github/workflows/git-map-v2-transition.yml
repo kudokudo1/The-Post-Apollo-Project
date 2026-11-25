@@ -1,0 +1,36 @@
+name: Git map V2 native interruption and repository transition
+on:
+  pull_request:
+    paths:
+      - "tests/git/test_git_map_v2_transition_native.py"
+      - "tests/git/test_git_map_v2_native.py"
+      - "tests/git/fixtures/GitMapTransitionNative.qml"
+      - "tests/git/fixtures/git_map_transition_probe.py"
+      - "scripts/git_map_v2_reader_candidate.py"
+      - "scripts/git_map_isolated_candidate.py"
+      - ".github/workflows/git-map-v2-transition.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Compile check V2 transition fixture
+        run: python3 -B -m py_compile tests/git/test_git_map_v2_transition_native.py
+      - name: Delayed locked V2 page and locate across repository transition
+        run: python3 -B tests/git/test_git_map_v2_transition_native.py
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY

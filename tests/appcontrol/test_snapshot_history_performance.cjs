@@ -602,3 +602,59 @@ test('opt-in AppControl opening markers preserve synchronous operation order', (
         prev = ix;
     }
 });
+
+
+test('preferred detail selection reuses action snapshots without changing favorite identity or first match', () => {
+    const section=(source,a,b)=>source.slice(source.indexOf('    function '+a+'('),
+        source.indexOf('    function '+b+'(',source.indexOf('    function '+a+'(')));
+    const code=section(app,'detailFavoriteContextKey','detailActionAvailable')
+        +section(app,'favoriteDetailActionIndex','toggleDetailActionFavorite');
+    const stubs= [
+        "function selectedResult(){return state.entry;}",
+        "function favoriteSourceItem(e){return e&&e._favoriteRecord?e._sourceItem:e;}",
+        "function selectedResultIsApplication(){return state.mode==='app';}",
+        "function selectedResultIsRun(){return state.mode==='run';}",
+        "function appEntryKey(e){return String(e.id||e.name||'');}",
+        "const runModeIndex=3;",
+        "function favoriteKeyFor(e){return e.id;}",
+        "function appDesktopActions(e){counts.actions++;return e._hiddenCommand?[]:e.actions.slice();}",
+        "function detailActionCount(){counts.count++;if(!state.entry)return 0;const e=favoriteSourceItem(state.entry);return state.mode==='app'?(e._hiddenCommand?7:6+appDesktopActions(e).length):state.mode==='run'?6:3;}"
+    ].join('\n');
+    const make=new Function('state','counts','favoriteStore',stubs+'\n'+code+
+        '\nreturn {pick:favoriteDetailActionIndex,key:detailFavoriteKeyFor,legacy:function(){const n=detailActionCount();for(let i=0;i<n;i++)if(isDetailActionFavorite(i))return i;return -1;}};');
+    const cases=[
+        {mode:'app',entry:{id:'browser|a',actions:[{name:'New window'},{name:'New window'},{_appControlBuiltin:'history'},{}]}},
+        {mode:'app',entry:{_favoriteRecord:true,_sourceItem:{id:'wrapped',actions:[{name:'é'}]}}},
+        {mode:'app',entry:{id:'hidden',_hiddenCommand:true,actions:[]}},
+        {mode:'run',entry:{id:'run|sample'}},
+        {mode:'other',entry:{id:'task'}},
+        {mode:'app',entry:null}
+    ];
+    for(const state of cases){
+        const counts={actions:0,count:0}, store={favoriteDetailActionKeys:[]};
+        const model=make(state,counts,store);
+        const ids=Array.from({length:16},(_,i)=>model.key(i)).filter(Boolean);
+        for(const keys of [[],['app|unrelated|launch'],ids.slice().reverse(),ids.slice(-1),ids.slice(1,3),['bad|key',...ids]]){
+            store.favoriteDetailActionKeys=keys;
+            const expected=model.legacy();
+            counts.actions=0;counts.count=0;
+            assert.equal(model.pick(),expected);
+            assert.ok(counts.actions<=2,'one count snapshot and one action snapshot');
+            if(!keys.length||keys[0]==='app|unrelated|launch')assert.equal(counts.actions,0);
+        }
+        if(state.mode==='app'&&state.entry&&!state.entry._favoriteRecord&&state.entry.id==='browser|a'){
+            assert.equal(model.key(1),'app|browser%7Ca|desktop|New%20window');
+            assert.equal(model.key(2),model.key(1));
+            assert.equal(model.key(3),'app|browser%7Ca|builtin|history');
+            assert.equal(model.key(4),'app|browser%7Ca|desktop|3');
+            assert.equal(model.key(8),'app|browser%7Ca|freeze-app');
+            store.favoriteDetailActionKeys=[model.key(2)];
+            counts.actions=0;counts.count=0;
+            assert.equal(model.pick(10),1);
+            assert.equal(counts.actions,1);
+            assert.equal(counts.count,0);
+        }
+    }
+    assert.match(app,/function resetDetailActionSelection\(\) \{[\s\S]*?favoriteDetailActionIndex\(count\)[\s\S]*?detailActionAvailable\(favoriteIndex\)/);
+    assert.match(app,/function activateFavoriteDetailActionFromSelector\(\) \{[\s\S]*?favoriteIndex < 0[\s\S]*?!detailActionAvailable\(favoriteIndex\)/);
+});

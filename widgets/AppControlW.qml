@@ -9107,7 +9107,7 @@ PanelWindow {
         return "";
     }
 
-    function detailActionStableId(actionIndex) {
+    function detailActionStableId(actionIndex, desktopActions) {
         const entry = selectedResult();
 
         if (!entry || actionIndex < 0)
@@ -9134,7 +9134,9 @@ PanelWindow {
             return "";
 
         const appEntry = favoriteSourceItem(entry) || entry;
-        const desktopCount = appDesktopActions(appEntry).length;
+        const actions = desktopActions === undefined
+            ? appDesktopActions(appEntry) : desktopActions;
+        const desktopCount = actions.length;
 
         if (actionIndex === 0)
             return "launch";
@@ -9169,7 +9171,7 @@ PanelWindow {
         if (desktopIndex < 0 || desktopIndex >= desktopCount)
             return "";
 
-        const action = appDesktopActions(appEntry)[desktopIndex];
+        const action = actions[desktopIndex];
 
         if (action && action._appControlBuiltin)
             return "builtin|" + String(action._appControlBuiltin);
@@ -9325,11 +9327,35 @@ PanelWindow {
                && desktopIndex < desktopCount;
     }
 
-    function favoriteDetailActionIndex() {
-        const count = detailActionCount();
+    function favoriteDetailActionIndex(knownCount) {
+        // Resolve the selected context once. Most rows have no preferred
+        // action; do not rebuild desktop actions to discover that fact.
+        const context = detailFavoriteContextKey();
+        if (!context)
+            return -1;
 
+        const keys = favoriteStore.favoriteDetailActionKeys;
+        const prefix = context + "|";
+        let relevant = false;
+        for (let i = 0; i < keys.length; i++) {
+            if (String(keys[i]).indexOf(prefix) === 0) {
+                relevant = true;
+                break;
+            }
+        }
+        if (!relevant)
+            return -1;
+
+        const count = knownCount === undefined ? detailActionCount() : knownCount;
+        const entry = selectedResult();
+        const actions = selectedResultIsApplication()
+            ? appDesktopActions(favoriteSourceItem(entry) || entry) : undefined;
+
+        // Preserve first matching action-index order, including duplicate
+        // desktop action IDs. Availability is still checked by the caller.
         for (let i = 0; i < count; i++) {
-            if (isDetailActionFavorite(i))
+            const id = detailActionStableId(i, actions);
+            if (id && keys.indexOf(prefix + id) !== -1)
                 return i;
         }
 
@@ -9583,7 +9609,7 @@ PanelWindow {
 
     function resetDetailActionSelection() {
         const count = detailActionCount();
-        const favoriteIndex = favoriteDetailActionIndex();
+        const favoriteIndex = favoriteDetailActionIndex(count);
 
         selectedDetailActionIndex =
             favoriteIndex >= 0

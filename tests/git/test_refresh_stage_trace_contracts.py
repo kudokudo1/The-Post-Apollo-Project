@@ -101,14 +101,26 @@ with tempfile.TemporaryDirectory(prefix="pa-git-refresh-stage-") as td:
 
     # Every ordinary stdout byte is preserved, including COMMIT protocol,
     # error wording, branch identities, and exactly one DONE sentinel.
-    stripped = b"".join(line for line in profiled.splitlines(keepends=True)
-                        if not line.startswith(b"PROFILE\t"))
-    assert baseline == stripped, (
+    def ordinary(data):
+        return b"".join(line for line in data.splitlines(keepends=True)
+                        if not line.startswith((b"PROFILE\t", b"DIAGTIME\t")))
+    stripped = ordinary(profiled)
+    assert ordinary(baseline) == stripped, (
         "diagnostic mode must not change the refresh data protocol\n"
         + repr(baseline[-700:]) + "\n" + repr(stripped[-700:])
     )
     stages = [line.decode().strip().split("\t")[1] for line in baseline.splitlines() if line.startswith(b"DIAGSTAGE\t")]
     assert stages == ["repo_check", "metadata", "status", "upstream", "merged_refs", "cherry", "local_branches", "remote_branches", "history"], stages
+    for data in (baseline, profiled):
+        timings = [line.decode().split("\t")[1:] for line in data.splitlines()
+                   if line.startswith(b"DIAGTIME\t")]
+        assert [stage for stage, _ in timings] == stages + ["finished"], timings
+        elapsed = [int(ms) for _, ms in timings]
+        assert elapsed == sorted(elapsed) and elapsed[0] >= 0, elapsed
+        assert data.index(b"DIAGTIME\tfinished\t") < data.index(b"DONE\t")
+    invalid = execute(actual_command(str(temp / "not-a-repo"), False))
+    assert b"DIAGTIME\trepo_check\t" in invalid and b"DIAGTIME\tfinished\t" in invalid
+    assert b"ERROR\tNOT A GIT REPOSITORY" in invalid
     assert baseline.count(b"DONE\t") == 1
     assert b"REMOTEBRANCH\torigin/feature" in baseline
     assert b"LOCALBRANCH\tmain" in baseline
@@ -118,7 +130,7 @@ with tempfile.TemporaryDirectory(prefix="pa-git-refresh-stage-") as td:
     print("Actual Git refresh Bash: off/on exact protocol parity PASS")
     print("Nine stage durations, synthetic origin branches/history: PASS")
 
-print("Git refresh stage diagnostics dormant by default: PASS")
+print("Optional profiling and bounded always-on timing markers: PASS")
 
 # Existing shared diagnostics presentation, fixed-size failure evidence.
 widget = (root / "widgets/GitW.qml").read_text()

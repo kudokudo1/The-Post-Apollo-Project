@@ -4120,8 +4120,8 @@ PanelWindow {
             z: 110
             visible: root.menuOpen && root.activePage === "git" && root.gitDiagnosticsOpen
             enabled: visible
-            width: Math.max(0,Math.min(520,parent.width-36))
-            height: Math.max(0,Math.min(460,parent.height-100))
+            width: Math.max(0,Math.min(760,parent.width-36))
+            height: Math.max(0,parent.height-100)
             anchors.right: parent.right
             anchors.rightMargin: 18
             anchors.top: parent.top
@@ -4132,15 +4132,10 @@ PanelWindow {
             currentAge: gitService.refreshDiagLastSuccess ? new Date(gitService.refreshDiagLastSuccess).toLocaleTimeString() : "--"
             showLocation: false
             ageHeading: "DETAIL // "
-            serviceRows: [
-                {label:"LOCAL REFRESH",state:gitService.refreshing?"READING":gitService.available?"LIVE":"OFFLINE",age:gitService.refreshDiagOutcome},
-                {label:"REFRESH CHILD",state:gitService.refreshDiagChildRunning?"READING":"IDLE",age:gitService.refreshDiagChildRunning?"RUNNING":"NOT RUNNING"},
-                {label:"LAST FAILURE",state:gitService.refreshDiagLastFailure?"ERROR":"WAITING",age:gitService.refreshDiagLastFailure?gitService.refreshDiagLastFailure.code:"NONE RECORDED"},
-                {label:"GITHUB // SEPARATE SERVICE",state:githubService.refreshing?"READING":githubService.available?"LIVE":"OFFLINE",age:"INDEPENDENT FROM LOCAL GIT"}
-            ]
-            reasonHeading: "REFRESH EVIDENCE // CURRENT SESSION"
+            serviceRows: []
+            reasonHeading: "FAILURE EXPLANATION // STAGE TIMINGS"
             reason: gitService.refreshDiagnosticText()
-            footnote: "READ ONLY // NO EXTRA FETCH. STAGE IS LAST RECEIVED, NOT PROOF OF ROOT CAUSE. FAILURE RETAINED ACROSS RELOAD; LOST ON SHELL RESTART. NO RAW STDERR OR REPO CONTENT."
+            footnote: "READ ONLY // SHELL TIMES ARE WALL CLOCK ESTIMATES, RECEIVED TIMES INCLUDE QML DELIVERY. TIMINGS ARE SUPPRESSED IF AN OVERLAPPING CHILD IS DETECTED. NO RAW STDERR OR REPO CONTENT. SESSION ONLY."
             onCloseRequested: root.gitDiagnosticsOpen=false
         }
 

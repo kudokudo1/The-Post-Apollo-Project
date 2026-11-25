@@ -1,0 +1,20 @@
+name: Git read terminal custody
+on:
+  pull_request:
+    paths:
+      - "services/git/GitService.qml"
+      - "tests/git/test_refresh_terminal_custody.cjs"
+      - ".github/workflows/git-refresh-terminal-custody.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute real QML custody functions and existing Bash protocol
+        run: |
+          node tests/git/test_refresh_terminal_custody.cjs
+          python3 -B tests/git/test_refresh_stage_trace_contracts.py

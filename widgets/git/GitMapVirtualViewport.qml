@@ -12,6 +12,7 @@ Rectangle {
     border.color: Colors.cyan
     border.width: 1
     readonly property int rowHeight: 24
+    property alias requestsEnabled: bridge.requestsEnabled
     readonly property var mapState: bridge.state
     readonly property real scrollPosition: flick.contentY
     readonly property real scrollExtent: flick.contentHeight

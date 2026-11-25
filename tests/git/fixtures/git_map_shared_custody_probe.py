@@ -4,7 +4,14 @@ import fcntl
 import os
 from pathlib import Path
 import signal
+import select
+import time
 import sys
+
+control=Path(os.environ["MAP_SHARED_INFLIGHT_DIR"])
+if sys.argv[1:]==["release"]:
+    (control/"release").touch()
+    sys.exit(0)
 
 mode,directory,pid,snapshot,old=sys.argv[1:]
 assert mode in ("held","overlap","kill")
@@ -32,10 +39,19 @@ for line in (proc/"smaps_rollup").read_text().splitlines():
 assert set(values)=={"Rss","Pss","SwapPss"}
 print("SHARED_CUSTODY_KERNEL_MEMORY",mode,values,flush=True)
 if mode=="kill":
+    deadline=time.monotonic()+2
+    while not (control/"started").exists():
+        assert time.monotonic()<deadline,"finite search never acquired lock"
+        time.sleep(.01)
     # pidfd binds the signal to this disposable helper rather than a reused PID.
     with_fd=os.pidfd_open(pid)
     try:
         assert (proc/"cmdline").read_bytes().split(b"\0")==args
         signal.pidfd_send_signal(with_fd,signal.SIGKILL)
+        poller=select.poll()
+        poller.register(with_fd,select.POLLIN)
+        assert poller.poll(1000),"continuous helper did not exit"
+        assert locked(directory),"finite search lost its independent lock"
+        print("SHARED_CUSTODY_INFLIGHT_LOCK_PASS",flush=True)
     finally: os.close(with_fd)
 print("SHARED_CUSTODY_KERNEL_WITNESS_PASS",mode,flush=True)

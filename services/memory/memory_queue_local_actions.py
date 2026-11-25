@@ -160,6 +160,10 @@ class LocalActions:
         self._fresh = canonical(m)
         return result
 
+    def discard_continuation(self):
+        """Forget only process-local continuation; leave durable PREPARED."""
+        self._fresh = None
+
     def commit(self, message, *, now, source=None, admission_clock=None):
         """Explicit continuation, never recovery.
 

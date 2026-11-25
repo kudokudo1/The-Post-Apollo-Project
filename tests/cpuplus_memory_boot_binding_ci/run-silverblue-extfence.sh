@@ -55,6 +55,16 @@ printf '%s\n' DISPOSABLE_CPU_MEMORY_EXTFENCE_V1 > /etc/postapollo-memory-native-
 chmod 0600 /etc/postapollo-memory-native-extfence-ci-only
 printf '%s\n' DISPOSABLE_CPU_MEMORY_BOOT_BINDING_V1 > /etc/postapollo-memory-native-boot-binding-ci-only
 chmod 0600 /etc/postapollo-memory-native-boot-binding-ci-only
+# Set only the disposable guest's generator configuration before first boot.
+# Fedora's RAM-derived default varied by one MiB between the prior boots.
+# Keep the complete exact swap signature comparison, including ZRAM.
+install -d -m 0755 /etc/systemd/zram-generator.conf.d
+cat > /etc/systemd/zram-generator.conf.d/99-postapollo-boot-binding-ci.conf <<'CPU_MEMORY_ZRAM'
+[zram0]
+zram-size = 4096
+swap-priority = 100
+CPU_MEMORY_ZRAM
+chmod 0600 /etc/systemd/zram-generator.conf.d/99-postapollo-boot-binding-ci.conf
 base64 -d >/usr/local/libexec/postapollo-memory-ci-helper <<'CPU_MEMORY_HELPER'
 $helper_payload
 CPU_MEMORY_HELPER
@@ -174,6 +184,7 @@ for marker in SILVERBLUE_BTRFS_ENFORCING_GUEST BASE_PERSISTENCE_AND_EXTENSION_AC
     require_marker initial "CPU_MEM_NATIVE_PASS // $marker"
 done
 require_marker initial "CPU_MEM_EXTFENCE_STAGE // EXACT_CANDIDATE 8082bac43e3d8a0f506348e0ecee2e063d34935b"
+require_marker initial "CPU_MEM_EXTFENCE_PASS // FIXED_GUEST_ZRAM_4GIB"
 require_marker initial "CPU_MEM_EXTFENCE_PASS // ABSENT_EXTENSION_ALL_ENTRYPOINTS_BLOCKED"
 require_marker initial "CPU_MEM_EXTFENCE_PASS // BOUND_ARCHIVED_CYCLES_ACTIVE_REFUSED"
 require_marker initial "CPU_MEM_EXTFENCE_PASS // SAME_BOOT_INACTIVE_WITNESS_AND_PUBLIC_RECEIPT"
@@ -183,6 +194,7 @@ require_marker initial "CPU_MEM_EXTFENCE_STAGE // REQUEST_GUEST_POWEROFF_INITIAL
 [[ "$(grep -aFc 'CPU_MEM_EXTFENCE_STAGE // EIGHT_PROTECTED_ENTRYPOINTS_REFUSED' "$tmp/guest-initial-serial.log")" == 2 ]]
 run_phase reboot
 require_marker reboot "CPU_MEM_EXTFENCE_STAGE // EXACT_CANDIDATE 8082bac43e3d8a0f506348e0ecee2e063d34935b"
+require_marker reboot "CPU_MEM_EXTFENCE_PASS // FIXED_GUEST_ZRAM_4GIB"
 require_marker reboot "CPU_MEM_EXTFENCE_STAGE // EIGHT_PROTECTED_ENTRYPOINTS_REFUSED"
 require_marker reboot "CPU_MEM_EXTFENCE_PASS // PRIOR_BOOT_WITNESS_REFUSED"
 require_marker reboot "CPU_MEM_EXTFENCE_PASS // NEW_BOOT_EXTERNAL_FENCE_AND_RECORDS_RETAINED_NO_REPLAY"

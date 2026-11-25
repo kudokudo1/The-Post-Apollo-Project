@@ -35,6 +35,17 @@ def guarded():
             b"DISPOSABLE_CPU_MEMORY_BOOT_BINDING_V1", "boot binding fixture marker absent")
     guard.PIN = PIN
     guard.guard()
+    # Pin only the disposable guest's boot-generated ZRAM capacity. Do not
+    # normalize away changes in the complete /proc/swaps signature.
+    config = Path("/etc/systemd/zram-generator.conf.d/99-postapollo-boot-binding-ci.conf")
+    require(guard.protected_bytes(config) == b"[zram0]\nzram-size = 4096\nswap-priority = 100\n",
+            "fixture ZRAM configuration mismatch")
+    require(int(Path("/sys/block/zram0/disksize").read_text()) == 4 * guard.GIB,
+            "fixture ZRAM disk capacity mismatch")
+    row = guard.rows().get("/dev/zram0")
+    require(row is not None and row[0] == "partition" and row[3] == 100
+            and row[1] == 4 * guard.GIB // 1024 - os.sysconf("SC_PAGE_SIZE") // 1024,
+            "fixture ZRAM swap capacity or priority mismatch")
     return guard
 
 def sync_parent():
@@ -213,6 +224,7 @@ def main():
     require(len(sys.argv)==2,"phase required")
     if sys.argv[1]=="guard":
         print("CPU_MEM_EXTFENCE_STAGE // EXACT_CANDIDATE "+PIN,flush=True)
+        print("CPU_MEM_EXTFENCE_PASS // FIXED_GUEST_ZRAM_4GIB", flush=True)
     elif sys.argv[1]=="fresh":
         fresh(guard)
     elif sys.argv[1]=="prepare":

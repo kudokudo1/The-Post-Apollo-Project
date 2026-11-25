@@ -297,3 +297,22 @@ deletion or retention expiry. A future versioned migration must make old
 readers fail closed and permit bounded repeat use only after disposition;
 current one-shot checkpoints and PREPARED fence intentionally remain.
 No production unlock, protected consent or host mutation in this slice.
+
+## R6b // explicit host disposition and durable pre-send evidence
+
+Independent main baseline dcf22ace; R6a #2767 exact d5075517 8/8
+workflows and ten disposition tests PASS; pending separate merge/review.
+Canonical host explicit v2 selection requires staged review and checkpoint
+mode; accepts distinct HELLO_DISPOSITION and emits one CONNECT_DISPOSITION
+only after wrapper publishes transition. V2 inventory strictly validated
+and separate from DOC2 v1 projection. Explicit dismissReview requires exact
+live selected PREPARED review, saves REVIEW_DISMISS in a third write-once
+slot before releasing frame; ACK remains distinct. Exact v2 receipt and
+fresh publication required; lost outcome recovered only by explicit exact
+DISPOSITION_HISTORY read. Null preserves unknown. Fresh LOAD restores
+correlation, never a live command or unlock. Original checkpoint slots
+and all evidence retained, v1 LOAD shape unchanged without dismissal.
+New host + actual helper regression and three storage tests. No DOC2 UI
+source edits, launcher, repeat-use rotation, startup release, actual Hub
+binding or protected execution here. These are still required for final
+integration. No production activation. CI pending.

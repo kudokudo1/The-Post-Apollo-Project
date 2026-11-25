@@ -52,22 +52,63 @@ function receiptValue(r,recoveryRow) {
         && r.disposition==="REVIEW_ACKNOWLEDGED_ONLY" && r.adjustment_outcome==="UNVERIFIED"
         && r.can_execute===false && r.startup_unlock===false;
 }
+function dispositionValue(r,recoveryRow) {
+    return exact(r,["version","review","dismissed_at_ms","disposition","adjustment_outcome","can_execute","startup_unlock"])
+        && r.version===2 && reviewValue(r.review,recoveryRow)
+        && r.review.snapshot.record.state==="PREPARED"
+        && Number.isSafeInteger(r.dismissed_at_ms) && r.dismissed_at_ms>=r.review.reviewed_at_ms
+        && r.dismissed_at_ms-r.review.reviewed_at_ms<60000
+        && r.disposition==="LOCAL_PREPARATION_DISMISSED" && r.adjustment_outcome==="UNVERIFIED"
+        && r.can_execute===false && r.startup_unlock===false;
+}
+function dispositionInventoryValue(v,recoveryRow,limit) {
+    if (!exact(v,["version","recent","truncated","prepared","pending_request_id","startup_unlock","adjustment_outcome","can_execute"])
+        || v.version!==2 || v.startup_unlock!==false || v.adjustment_outcome!=="UNVERIFIED" || v.can_execute!==false
+        || typeof v.truncated!=="boolean" || !Array.isArray(v.recent) || v.recent.length>limit
+        || (v.truncated && v.recent.length!==limit)
+        || (v.pending_request_id!==null && !uuid(v.pending_request_id))) return false;
+    let last=Infinity,open=null;
+    const ids=new Set();
+    for (const entry of v.recent) {
+        if (!exact(entry,["record","disposition"])) return false;
+        const view=recoveryRow(entry.record);
+        if (!view || view.ordinal>=last || ids.has(view.actionId)) return false;
+        last=view.ordinal;ids.add(view.actionId);
+        if (entry.disposition!==null) {
+            if (!dispositionValue(entry.disposition,recoveryRow)
+                || !equal(entry.record,entry.disposition.review.snapshot.record)) return false;
+        } else if (view.state==="PREPARED") {
+            if (open) return false;
+            open=entry.record;
+        }
+    }
+    const unresolved=v.prepared===null?null:recoveryRow(v.prepared);
+    if (v.prepared!==null && (!unresolved || unresolved.state!=="PREPARED")) return false;
+    if (open) return equal(open,v.prepared);
+    return !unresolved || (v.truncated && unresolved.ordinal<last && !ids.has(unresolved.actionId));
+}
 function initial(consumer) {
     return {session:consumer.initial(),projection:null,history:null,historyRead:null,
         recoveryRead:null,inventory:null,localAction:null,
         buffer:"",phase:"STOPPED",sequence:0,generation:0,startupLocked:true,
         mode:"LEGACY",stage:null,reviewEnabled:false,reviewFlow:null,reviewReceipt:null,reviewLost:null,
         checkpointRequired:false,checkpointWait:null,notificationEnabled:false,lastNoticeSequence:0,
+        dispositionEnabled:false,dispositionConnectPending:false,dispositionInventory:null,
+        dispositionLost:null,dispositionReceipt:null,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
-function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false,checkpointRequired=false,notificationEnabled=false) {
+function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false,checkpointRequired=false,notificationEnabled=false,dispositionEnabled=false) {
     if ((state.phase!=="STOPPED" && state.phase!=="FAILED")
         || !positive(generation) || generation<=state.generation
         || !["LEGACY","STAGED"].includes(mode) || typeof reviewEnabled!=="boolean"
         || typeof checkpointRequired!=="boolean" || typeof notificationEnabled!=="boolean"
+        || typeof dispositionEnabled!=="boolean"
+        || (dispositionEnabled && (!reviewEnabled || !checkpointRequired))
+        || (state.dispositionLost && !dispositionEnabled)
         || ((reviewEnabled || checkpointRequired) && mode!=="STAGED")) return state;
     return Object.assign({},initial(consumer),{
         generation,mode,reviewEnabled,checkpointRequired,notificationEnabled,reviewLost:state.reviewLost,
+        dispositionEnabled,dispositionLost:state.dispositionLost,
         session:consumer.disconnect(state.session),phase:"HELLO"});
 }
 function stop(state,consumer,reason,generation) {
@@ -75,6 +116,7 @@ function stop(state,consumer,reason,generation) {
     return Object.assign({},initial(consumer),{
         generation,reviewLost:state.reviewFlow?.phase==="WAIT_ACK"
             ? state.reviewFlow.review : state.reviewLost,
+        dispositionLost:state.reviewFlow?.phase==="WAIT_DISMISS" ? state.reviewFlow.review : state.dispositionLost,
         session:consumer.disconnect(state.session),phase:reason?"FAILED":"STOPPED",
         failure:reason||null});
 }
@@ -131,16 +173,24 @@ function canAck(state) {
         && !!status && (status.requestId!==null || status.state==="IDLE REPORTED")
         && status.requestId===f.review.snapshot.pending_request_id;
 }
+function takeDispositionConnect(state,generation) {
+    const no={state,frame:null};
+    if (generation!==state.generation || state.phase!=="CONNECTED" || !state.dispositionEnabled
+        || !state.dispositionConnectPending || state.buffer || !state.publicationRequired) return no;
+    return {state:Object.assign({},state,{dispositionConnectPending:false}),
+        frame:JSON.stringify({version:1,kind:"CONNECT_DISPOSITION",owner_id:state.session.ownerId})+"\n"};
+}
 function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow,offerNotice) {
     const fail=reason=>stop(state,consumer,reason,state.generation);
     if (!p || typeof p!=="object" || Array.isArray(p) || !safe(p) || p.version!==1 || p.can_execute!==false) return fail("INVALID_PACKET");
     if (state.phase==="HELLO") {
-        if (!exact(p,["version","kind","owner_id","can_execute"]) || p.kind!=="HELLO" || !uuid(p.owner_id)
+        if (!exact(p,["version","kind","owner_id","can_execute"]) || p.kind!==(state.dispositionEnabled?"HELLO_DISPOSITION":"HELLO") || !uuid(p.owner_id)
             || p.owner_id===state.session.previousOwnerId)
             return fail("INVALID_HELLO");
         return Object.assign({},state,{phase:"CONNECTED",session:consumer.connect(state.session,p.owner_id),
-            publicationRequired:true});
+            publicationRequired:true,dispositionConnectPending:state.dispositionEnabled});
     }
+    if (state.dispositionConnectPending) return fail("DISPOSITION_CONNECT_REQUIRED");
     if (state.phase!=="CONNECTED" || p.owner_id!==state.session.ownerId) return fail("OWNER_MISMATCH");
     // After a preparation receipt the server is waiting for our exact
     // continuation, not sending any additional frame until COMMIT.
@@ -151,7 +201,7 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         // Pending action may have been sent just before an owner timer fired.
         // Preserve pending until its correlated reply or explicit timeout.
         return Object.assign({},state,{session:consumer.invalidate(state.session,"FRESH STATUS REQUIRED"),
-            projection:null,history:null,inventory:null,localAction:null,
+            projection:null,history:null,inventory:null,localAction:null,dispositionInventory:null,
             awaitingStatus:true,publicationRequired:true});
     }
     if (p.kind==="NOTIFICATION") {
@@ -225,6 +275,30 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         return Object.assign({},state,advanced,{reviewFlow:null,reviewReceipt:p.receipt,
             reviewLost:p.receipt!==null ? null:state.reviewLost});
     }
+    if (p.kind==="LOCAL_DISPOSITION" || p.kind==="LOCAL_DISPOSITION_HISTORY") {
+        const f=state.reviewFlow;
+        const fields=["version","kind","owner_id","sequence","next_action_sequence","can_execute"];
+        if (!state.dispositionEnabled || !state.startupLocked || !f || state.session.pending
+            || state.awaitingStatus || state.publicationRequired || !state.session.status
+            || p.next_action_sequence!==state.session.nextActionSequence)
+            return fail("UNEXPECTED_DISPOSITION");
+        const advanced={sequence:p.sequence,session:Object.assign({},state.session,{sequence:p.sequence,prepared:null})};
+        if (p.kind==="LOCAL_DISPOSITION") {
+            if (f.phase!=="WAIT_DISMISS" || !exact(p,fields.concat(["receipt"]))
+                || !dispositionValue(p.receipt,recoveryRow) || !equal(p.receipt.review,f.review))
+                return fail("INVALID_DISPOSITION_RECEIPT");
+            return Object.assign({},state,advanced,{reviewFlow:null,dispositionReceipt:p.receipt,
+                projection:null,inventory:null,dispositionInventory:null,localAction:null,publicationRequired:true});
+        }
+        if (f.phase!=="WAIT_DISPOSITION" || !exact(p,fields.concat(["action_id","receipt"]))
+            || p.action_id!==f.actionId || (p.receipt!==null &&
+                (!dispositionValue(p.receipt,recoveryRow) || p.receipt.review.action_id!==f.actionId)))
+            return fail("INVALID_DISPOSITION_HISTORY");
+        if (state.dispositionLost && p.receipt!==null && !equal(p.receipt.review,state.dispositionLost))
+            return fail("DISPOSITION_HISTORY_MISMATCH");
+        return Object.assign({},state,advanced,{reviewFlow:null,dispositionReceipt:p.receipt,
+            dispositionLost:p.receipt!==null?null:state.dispositionLost});
+    }
     if (p.kind==="PREPARED_ACTION") {
         const pending=state.session.pending;
         const fields=["version","kind","owner_id","sequence","next_action_sequence","can_execute","record","challenge"];
@@ -271,11 +345,20 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
             || state.awaitingStatus || state.publicationRequired || !state.session.status
             || p.next_action_sequence!==state.session.nextActionSequence)
             return fail("UNEXPECTED_RECOVERY");
-        let inventory=null, localAction=null;
+        let inventory=null, localAction=null, dispositionInventory=null;
         try {
             if (p.kind==="INVENTORY") {
                 if (!exact(p,fields.concat(["inventory"])) || typeof recoveryProject!=="function")
                     return fail("INVALID_INVENTORY");
+                if (state.dispositionEnabled) {
+                    if (!dispositionInventoryValue(p.inventory,recoveryRow,read.limit))
+                        return fail("INVALID_DISPOSITION_INVENTORY");
+                    const observed=state.session.status;
+                    if ((observed.requestId!==null || observed.state==="IDLE REPORTED")
+                        && observed.requestId!==p.inventory.pending_request_id)
+                        return fail("INVENTORY_STATUS_MISMATCH");
+                    dispositionInventory=p.inventory;
+                } else {
                 const view=recoveryProject(p.inventory);
                 if (!view || view.canExecute!==false || view.startupLocked!==true
                     || view.outcome!=="UNVERIFIED" || view.recent.length>read.limit
@@ -288,6 +371,7 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
                     && observed.requestId!==view.pendingId)
                     return fail("INVENTORY_STATUS_MISMATCH");
                 inventory=p.inventory;
+                }
             } else {
                 if (!exact(p,fields.concat(["action_id","record"])) || p.action_id!==read.actionId
                     || typeof recoveryRow!=="function") return fail("INVALID_LOCAL_ACTION");
@@ -299,7 +383,7 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
                     outcome:"UNVERIFIED",canExecute:false};
             }
         } catch (_) { return fail("INVALID_RECOVERY"); }
-        return Object.assign({},state,{sequence:p.sequence,recoveryRead:null,inventory,localAction,
+        return Object.assign({},state,{sequence:p.sequence,recoveryRead:null,inventory,localAction,dispositionInventory,
             session:Object.assign({},state.session,{sequence:p.sequence,prepared:null})});
     }
     return fail("INVALID_KIND");
@@ -338,7 +422,7 @@ function feed(state,chunk,consumer,project,historyProject,generation,recoveryPro
 function confirm(state,intent,actionId,consumer) {
     const no={state:state,frame:null};
     if (state.phase!=="CONNECTED" || state.startupLocked || state.historyRead || state.recoveryRead
-        || state.reviewFlow || state.reviewLost || state.checkpointWait
+        || state.reviewFlow || state.reviewLost || state.dispositionLost || state.checkpointWait
         || (state.checkpointRequired && state.buffer)
         || state.awaitingStatus || state.publicationRequired || !state.projection || !uuid(actionId)
         || !exact(intent,["ownerId","statusSequence","actionSequence","kind","expectedId","targetGiB","expiresAt"])) return no;
@@ -378,13 +462,13 @@ function readRecovery(state,kind,value) {
         || state.session.pending || state.awaitingStatus || state.publicationRequired
         || !state.session.status) return no;
     let request;
-    if (kind==="INVENTORY" && positive(value) && value<=16) request={kind,limit:value};
+    if (kind==="INVENTORY" && positive(value) && value<=(state.dispositionEnabled?4:16)) request={kind,limit:value};
     else if (kind==="LOCAL_ACTION" && uuid(value)) request={kind,actionId:value};
     else return no;
     const message={version:1,kind,owner_id:state.session.ownerId};
     if (kind==="INVENTORY") message.limit=value;
     else message.action_id=value;
-    return {state:Object.assign({},state,{recoveryRead:request,inventory:null,localAction:null,history:null,
+    return {state:Object.assign({},state,{recoveryRead:request,inventory:null,localAction:null,dispositionInventory:null,history:null,
         session:Object.assign({},state.session,{prepared:null})}),frame:JSON.stringify(message)+"\n"};
 }
 function reviewAvailable(state) {
@@ -395,7 +479,7 @@ function reviewAvailable(state) {
 }
 function beginReview(state,actionId) {
     const no={state,frame:null};
-    if (!reviewAvailable(state) || state.reviewLost || !uuid(actionId)) return no;
+    if (!reviewAvailable(state) || state.reviewLost || state.dispositionLost || !uuid(actionId)) return no;
     return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_REVIEW",actionId},reviewReceipt:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW",owner_id:state.session.ownerId,action_id:actionId})+"\n"};
 }
@@ -416,6 +500,38 @@ function readReviewReceipt(state,reviewId) {
         || (state.reviewLost && state.reviewLost.review_id!==reviewId)) return no;
     return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW_HISTORY",owner_id:state.session.ownerId,review_id:reviewId})+"\n"};
+}
+function canDismiss(state) {
+    return state.dispositionEnabled && state.checkpointRequired && !state.reviewLost && !state.dispositionLost
+        && canAck(state) && state.reviewFlow.review.snapshot.record.state==="PREPARED";
+}
+function dispositionContext(state) {
+    const f=state.reviewFlow;
+    return {enabled:state.dispositionEnabled,phase:state.checkpointWait?.record.kind==="REVIEW_DISMISS"?"WAIT_CHECKPOINT":
+        f?f.phase:state.dispositionLost?"DISMISS_UNKNOWN":"IDLE",
+        review:f?.phase==="REVIEW_READY" && !state.awaitingStatus && !state.publicationRequired?f.review:null,
+        reviewSequence:f?.phase==="REVIEW_READY"?f.sequence:null,
+        inventory:state.dispositionInventory,receipt:state.dispositionReceipt,
+        unknownActionId:state.dispositionLost?.action_id||null,canDismiss:canDismiss(state),
+        startupLocked:state.startupLocked,canExecute:false};
+}
+function dismissReview(state,selection,generation,recoveryRow) {
+    const no={state,frame:null};
+    if (generation!==state.generation || !canDismiss(state)
+        || !exact(selection,["reviewId","digest","sequence"])) return no;
+    const f=state.reviewFlow,r=f.review;
+    if (selection.reviewId!==r.review_id || selection.digest!==r.review_digest || selection.sequence!==f.sequence) return no;
+    const transition={state:Object.assign({},state,{reviewFlow:{phase:"WAIT_DISMISS",review:r,sequence:f.sequence},dispositionReceipt:null}),
+        frame:JSON.stringify({version:1,kind:"RECOVERY_DISMISS",owner_id:state.session.ownerId,
+            review_id:r.review_id,review_digest:r.review_digest,review_sequence:f.sequence})+"\n"};
+    return holdCheckpoint(state,transition,recoveryRow);
+}
+function readDispositionReceipt(state,actionId) {
+    const no={state,frame:null};
+    if (!state.dispositionEnabled || !reviewAvailable(state) || !uuid(actionId)
+        || (state.dispositionLost && state.dispositionLost.action_id!==actionId)) return no;
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_DISPOSITION",actionId},dispositionReceipt:null}),
+        frame:JSON.stringify({version:1,kind:"DISPOSITION_HISTORY",owner_id:state.session.ownerId,action_id:actionId})+"\n"};
 }
 // R3q: bounded durable checkpoint contract. The actual storage adapter
 // must save the exact returned record before emitting the associated frame.
@@ -442,13 +558,14 @@ function checkpointForFrame(transition,recoveryRow) {
         && exact(p,["version","kind","message"]) && checkpointMessage(p.message)
         && equal(p.message,s.session.pending))
         return {version:1,kind:"ACTION",message:JSON.parse(JSON.stringify(p.message))};
-    if (p.kind==="RECOVERY_ACK" && s.reviewFlow?.phase==="WAIT_ACK"
+    if (((p.kind==="RECOVERY_ACK" && s.reviewFlow?.phase==="WAIT_ACK")
+        || (p.kind==="RECOVERY_DISMISS" && s.dispositionEnabled && s.reviewFlow?.phase==="WAIT_DISMISS"))
         && exact(p,["version","kind","owner_id","review_id","review_digest","review_sequence"])) {
         const r=s.reviewFlow.review;
         if (reviewValue(r,recoveryRow) && p.owner_id===s.session.ownerId
             && r.owner_id===p.owner_id && r.review_id===p.review_id && r.review_digest===p.review_digest
             && positive(p.review_sequence) && p.review_sequence===s.reviewFlow.sequence)
-            return {version:1,kind:"REVIEW_ACK",review:JSON.parse(JSON.stringify(r))};
+            return {version:1,kind:p.kind==="RECOVERY_DISMISS"?"REVIEW_DISMISS":"REVIEW_ACK",review:JSON.parse(JSON.stringify(r))};
     }
     return null;
 }
@@ -481,19 +598,26 @@ function finishCheckpoint(state,result,generation,consumer,recoveryRow) {
 function restoreCheckpoint(consumer,snapshot,recoveryRow) {
     // Only for a fresh shell before start(). Corrupt or mismatched evidence
     // returns null; caller must refuse startup. Empty evidence stays locked.
-    if (!safe(snapshot) || !exact(snapshot,["version","action","acknowledgment","startup_unlock","can_execute"])
-        || snapshot.version!==1 || snapshot.startup_unlock!==false || snapshot.can_execute!==false) return null;
-    const a=snapshot.action,b=snapshot.acknowledgment;
+    if (!safe(snapshot) || ![1,2].includes(snapshot?.version)
+        || !exact(snapshot,["version","action","acknowledgment","startup_unlock","can_execute"].concat(snapshot.version===2?["dismissal"]:[]))
+        || snapshot.startup_unlock!==false || snapshot.can_execute!==false) return null;
+    const a=snapshot.action,b=snapshot.acknowledgment,z=snapshot.version===2?snapshot.dismissal:null;
+    if (snapshot.version===2 && (!exact(z,["version","kind","review"]) || z.version!==1
+        || z.kind!=="REVIEW_DISMISS" || !reviewValue(z.review,recoveryRow)
+        || z.review.snapshot.record.state!=="PREPARED")) return null;
     if (a!==null && (!exact(a,["version","kind","message"]) || a.version!==1
         || a.kind!=="ACTION" || !checkpointMessage(a.message))) return null;
     if (b!==null && (!exact(b,["version","kind","review"]) || b.version!==1
         || b.kind!=="REVIEW_ACK" || !reviewValue(b.review,recoveryRow))) return null;
     const old=b!==null?b.review.snapshot.record.message:null;
+    const dismissed=z!==null?z.review.snapshot.record.message:null;
     if (a!==null && old!==null && !equal(a.message,old)) return null;
-    const s=initial(consumer),m=a!==null?a.message:old;
+    const s=initial(consumer),m=a!==null?a.message:old!==null?old:dismissed;
+    if (dismissed!==null && !equal(dismissed,m)) return null;
     return Object.assign({},s,{reviewLost:b!==null?JSON.parse(JSON.stringify(b.review)):null,
+        dispositionLost:z!==null?JSON.parse(JSON.stringify(z.review)):null,
         session:Object.assign({},s.session,{unresolved:m?JSON.parse(JSON.stringify(m)):null,
-            previousOwnerId:b!==null?b.review.owner_id:m?m.owner_id:null,
+            previousOwnerId:z!==null?z.review.owner_id:b!==null?b.review.owner_id:m?m.owner_id:null,
             feedback:m?"OUTCOME UNKNOWN // RECONCILE":"NOT CONNECTED"})});
 }
 // Deliberately no public startup unlock or action-reconciliation release.

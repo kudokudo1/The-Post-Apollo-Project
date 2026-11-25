@@ -1,6 +1,6 @@
 """R3q host pre-send recovery evidence, not an operation journal or authority.
 
-Explicit caller-owned private directory. Two write-once slots, no removal or
+Explicit caller-owned private directory. Write-once action/ack/dismiss slots, no removal or
 overwrite. Before sending a PREPARE or ACK the future host wrapper must
 persist the corresponding exact checkpoint and wait for successful fsync.
 A crash leaving a partial file blocks recovery; absence is not proof of
@@ -18,7 +18,8 @@ from memory_queue_local_actions import validate
 from memory_queue_pipe import _review_wire
 
 MAX_BYTES = 8192
-SLOTS = {"ACTION": "action-v1.json", "REVIEW_ACK": "review-ack-v1.json"}
+SLOTS = {"ACTION": "action-v1.json", "REVIEW_ACK": "review-ack-v1.json",
+         "REVIEW_DISMISS": "review-dismiss-v1.json"}
 
 
 def _json(value):
@@ -33,8 +34,10 @@ def validate_record(record):
     kind = record["kind"]
     if kind == "ACTION" and set(record) == {"version","kind","message"}:
         validate(record["message"])
-    elif kind == "REVIEW_ACK" and set(record) == {"version","kind","review"}:
+    elif kind in {"REVIEW_ACK","REVIEW_DISMISS"} and set(record) == {"version","kind","review"}:
         review = _review_wire(record["review"])
+        if kind=="REVIEW_DISMISS" and review["snapshot"]["record"]["state"]!="PREPARED":
+            raise QueueError("INVALID_HOST_CHECKPOINT")
         if hashlib.sha256(_json(review["snapshot"])).hexdigest() != review["review_digest"]:
             raise QueueError("INVALID_HOST_CHECKPOINT_DIGEST")
     else:
@@ -133,13 +136,25 @@ class HostCheckpoint:
                 and action["message"] != acknowledgment["review"]["snapshot"]["record"]["message"]):
             raise QueueError("HOST_CHECKPOINT_ACTION_MISMATCH")
 
+    @classmethod
+    def _linked_all(cls,action,acknowledgment,dismissal):
+        cls._linked(action,acknowledgment)
+        cls._linked(action,dismissal)
+        if acknowledgment is not None and dismissal is not None:
+            if acknowledgment["review"]["snapshot"]["record"]["message"] != dismissal["review"]["snapshot"]["record"]["message"]:
+                raise QueueError("HOST_CHECKPOINT_ACTION_MISMATCH")
+
     def load(self):
         with self._directory() as fd:
             action = self._read(fd,"ACTION")
             acknowledgment = self._read(fd,"REVIEW_ACK")
-            self._linked(action,acknowledgment)
-            return {"version":1,"action":action,"acknowledgment":acknowledgment,
+            dismissal = self._read(fd,"REVIEW_DISMISS")
+            self._linked_all(action,acknowledgment,dismissal)
+            result={"version":1,"action":action,"acknowledgment":acknowledgment,
                     "startup_unlock":False,"can_execute":False}
+            if dismissal is not None:
+                result.update(version=2,dismissal=dismissal)
+            return result
 
     def save(self, record):
         data = _encode(record)
@@ -149,14 +164,19 @@ class HostCheckpoint:
             # acknowledgment. No replacement, cleanup or reset API.
             action = self._read(directory_fd,"ACTION")
             acknowledgment = self._read(directory_fd,"REVIEW_ACK")
+            dismissal = self._read(directory_fd,"REVIEW_DISMISS")
+            self._linked_all(action,acknowledgment,dismissal)
             if kind == "ACTION":
-                if action is not None or acknowledgment is not None:
+                if action is not None or acknowledgment is not None or dismissal is not None:
                     raise QueueError("HOST_CHECKPOINT_OCCUPIED")
-                self._linked(record,acknowledgment)
+            elif kind == "REVIEW_ACK":
+                if acknowledgment is not None or dismissal is not None:
+                    raise QueueError("HOST_CHECKPOINT_OCCUPIED")
+                self._linked_all(action,record,dismissal)
             else:
-                if acknowledgment is not None:
+                if dismissal is not None:
                     raise QueueError("HOST_CHECKPOINT_OCCUPIED")
-                self._linked(action,record)
+                self._linked_all(action,acknowledgment,record)
             try:
                 fd = os.open(SLOTS[kind],os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_CLOEXEC,
                              0o600,dir_fd=directory_fd)
@@ -178,7 +198,8 @@ class HostCheckpoint:
             self._check_dir(directory_fd)
             if self._read(directory_fd,kind) != record:
                 raise QueueError("HOST_CHECKPOINT_CHANGED")
-            self._linked(self._read(directory_fd,"ACTION"),self._read(directory_fd,"REVIEW_ACK"))
+            self._linked_all(self._read(directory_fd,"ACTION"),self._read(directory_fd,"REVIEW_ACK"),
+                             self._read(directory_fd,"REVIEW_DISMISS"))
         # Return only after data and directory entry have been synced.
         # Any failure leaves evidence in place; caller MUST NOT send.
         return record

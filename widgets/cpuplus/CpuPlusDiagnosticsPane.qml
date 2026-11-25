@@ -102,7 +102,11 @@ Column {
                     }
                 }
             }
-            if (includeHost) details.hostContext = hostBreakdown(records);
+            if (includeHost) {
+                // Optional host presentation must never invalidate process evidence.
+                try { details.hostContext = hostBreakdown(records); }
+                catch (_) { details.hostContext = null; }
+            }
             return details;
         } catch (_) { return null; }
     }
@@ -124,12 +128,20 @@ Column {
         const result={paired:observed.length,samples:records.length,minimum:null,maxSpan:null,
             complete:false,total:null,start:null,final:null,delta:null,pssDelta:null};
         if (!observed.length) return result;
-        const samples=observed.flatMap(h=>[h.beforeKiB,h.afterKiB]);
-        result.minimum=Math.min(...samples.map(v=>v.MemAvailable));
-        result.maxSpan=Math.max(...observed.map(h=>h.spanMs));
-        result.complete=observed.length===records.length&&samples.every(v=>v.MemTotal===samples[0].MemTotal);
+        // Use bounded iteration rather than Array.flatMap, which is not
+        // guaranteed in the deployed QML JavaScript runtime.
+        const total=observed[0].beforeKiB.MemTotal;
+        let minimum=Infinity, maxSpan=0, sameCapacity=true;
+        for (const h of observed) {
+            minimum=Math.min(minimum,h.beforeKiB.MemAvailable,h.afterKiB.MemAvailable);
+            maxSpan=Math.max(maxSpan,h.spanMs);
+            if(h.beforeKiB.MemTotal!==total||h.afterKiB.MemTotal!==total)sameCapacity=false;
+        }
+        result.minimum=minimum;
+        result.maxSpan=maxSpan;
+        result.complete=observed.length===records.length&&sameCapacity;
         if (result.complete) {
-            result.total=samples[0].MemTotal;
+            result.total=total;
             result.start=pairs[0].beforeKiB.MemAvailable;
             result.final=pairs[pairs.length-1].afterKiB.MemAvailable;
             if(records.length>1){

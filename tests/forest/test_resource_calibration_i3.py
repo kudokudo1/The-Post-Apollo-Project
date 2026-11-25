@@ -167,5 +167,105 @@ class CalibrationTests(unittest.TestCase):
             s.host_peak_bytes = 1
 
 
+class ResidencyBudgetTests(unittest.TestCase):
+    def setUp(self):
+        fixture = CalibrationTests()
+        fixture.setUp()
+        self.result, self.warm_profile = fixture.result, fixture.profile
+        self.cold_profile = replace(self.warm_profile, residency="cold",
+                                    baseline_state_digest=digest("1"))
+        self.warm_trial = replace(fixture.trial, host=MemoryObservation(2048*1048576, 2304*1048576),
+                                  accelerator=MemoryObservation(512*1048576, 640*1048576))
+        self.cold_trial = replace(fixture.trial, profile=self.cold_profile, trial_id="cold-trial",
+                                  host=MemoryObservation(0, 2304*1048576),
+                                  accelerator=MemoryObservation(0, 640*1048576))
+        self.cold = summarize(self.cold_profile, (self.cold_trial,))
+        self.warm = summarize(self.warm_profile, (self.warm_trial,))
+
+    def evaluate(self, profile=None, **changes):
+        from resource_calibration_i3 import residency_budget_reference
+        args = {"cold": self.cold, "warm": self.warm, **changes}
+        return residency_budget_reference(self.result, profile or self.warm_profile, **args)
+
+    def test_select_same_baseline_only_no_credit(self):
+        for profile, host, gpu in ((self.warm_profile, 256, 128),
+                                   (self.cold_profile, 2304, 640)):
+            out = self.evaluate(profile)
+            self.assertTrue(out["matchingCampaignReference"])
+            self.assertEqual(out["selectedHostObservedIncrementalMiB"], host)
+            self.assertEqual(out["selectedAcceleratorObservedIncrementalMiB"], gpu)
+            self.assertEqual(out["coldHostObservedIncrementalMiB"], 2304)
+            self.assertEqual(out["warmHostObservedIncrementalMiB"], 256)
+            for key in ("hostRequirementMiB", "acceleratorRequirementMiB", "cpuRequirementThreads"):
+                self.assertIsNone(out[key])
+            for key in ("actualResidencyVerified", "freshnessVerified", "sourceAuthenticated",
+                        "requirementsEstablished", "availabilityEstablished", "resourceReserved",
+                        "safeToStartInference", "permissionGranted", "productionAuthority"):
+                self.assertIs(out[key], False)
+            self.assertEqual(out["safeActions"], [])
+            self.assertEqual(out["status"], "UNKNOWN_HOLD")
+            self.assertNotIn("fixture:big", str(out))
+
+    def test_no_fallback_to_other_residency_or_old_baseline(self):
+        for profile, overrides, reason in (
+            (self.warm_profile, {"warm": None}, "MATCHING_CAMPAIGN_MISSING"),
+            (self.cold_profile, {"cold": None}, "MATCHING_CAMPAIGN_MISSING"),
+            (replace(self.warm_profile, baseline_state_digest=digest("2")), {},
+             "BASELINE_REFERENCE_CHANGED"),
+        ):
+            out = self.evaluate(profile, **overrides)
+            self.assertEqual(out["reason"], reason)
+            self.assertFalse(out["matchingCampaignReference"])
+            self.assertIsNone(out["selectedHostObservedIncrementalMiB"])
+
+    def test_cold_only_allowed_without_fake_warm(self):
+        out = self.evaluate(self.cold_profile, warm=None)
+        self.assertEqual(out["selectedHostObservedIncrementalMiB"], 2304)
+        self.assertIsNone(out["warmHostObservedIncrementalMiB"])
+
+    def test_mixed_config_workload_and_hardware_refused(self):
+        for change in ({"machine_id": "other"}, {"boot_id": "other"},
+                       {"hardware_digest": digest("1")}, {"measurement_scope_id": "different"},
+                       {"accelerator_id": "different"}, {"workload_digest": digest("1")},
+                       {"prompt_tokens": 1025}, {"cpu_thread_limit": 5},
+                       {"binding": replace(self.warm_profile.binding, config_digest=digest("1"))}):
+            profile = replace(self.warm_profile, **change)
+            bad = summarize(profile, (replace(self.warm_trial, profile=profile),))
+            with self.assertRaisesRegex(CalibrationRefusal, "WORKLOAD_REFERENCE_MISMATCH"):
+                self.evaluate(warm=bad)
+
+    def test_forged_label_duplicate_and_baseline_refused(self):
+        with self.assertRaisesRegex(CalibrationRefusal, "INVALID_SUMMARY"):
+            self.evaluate(warm=replace(self.warm, host_incremental_bytes=1))
+        with self.assertRaisesRegex(CalibrationRefusal, "RESIDENCY_LABEL_MISMATCH"):
+            self.evaluate(warm=self.cold)
+        duplicate = summarize(self.warm_profile, (replace(self.warm_trial,
+                                                           trial_id=self.cold_trial.trial_id),))
+        with self.assertRaisesRegex(CalibrationRefusal, "DUPLICATE_TRIAL"):
+            self.evaluate(warm=duplicate)
+        same = replace(self.cold_profile, baseline_state_digest=self.warm_profile.baseline_state_digest)
+        with self.assertRaisesRegex(CalibrationRefusal, "BASELINE_REFERENCE_NOT_DISTINCT"):
+            self.evaluate(cold=summarize(same, (replace(self.cold_trial, profile=same),)))
+
+    def test_unknown_incomplete_zero_and_warm_higher(self):
+        incomplete = summarize(self.warm_profile, (replace(self.warm_trial, coverage_complete=False),))
+        out = self.evaluate(warm=incomplete)
+        self.assertEqual(out["reason"], "INCOMPLETE_CAMPAIGN")
+        self.assertIsNone(out["selectedHostObservedIncrementalMiB"])
+        unknown = summarize(self.warm_profile, (replace(self.warm_trial, host=MemoryObservation(None, 42),
+                                                         accelerator=MemoryObservation(10, 10)),))
+        out = self.evaluate(warm=unknown)
+        self.assertIsNone(out["selectedHostObservedIncrementalMiB"])
+        self.assertEqual(out["selectedAcceleratorObservedIncrementalMiB"], 0)
+        self.assertIsNone(out["acceleratorRequirementMiB"])
+        higher = summarize(self.warm_profile, (replace(self.warm_trial,
+                                                       host=MemoryObservation(0, 3000*1048576)),))
+        self.assertEqual(self.evaluate(warm=higher)["selectedHostObservedIncrementalMiB"], 3000)
+
+    def test_mismatched_current_binding_refused(self):
+        with self.assertRaisesRegex(CalibrationRefusal, "CURRENT_BINDING_MISMATCH"):
+            self.evaluate(replace(self.warm_profile, reasoning_mode="light"))
+
+
 if __name__ == "__main__":
     unittest.main()

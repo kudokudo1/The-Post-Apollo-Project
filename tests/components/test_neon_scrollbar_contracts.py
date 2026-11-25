@@ -173,3 +173,16 @@ for path, needles in MIGRATED.items():
     source = (ROOT / path).read_text(encoding="utf-8")
     for needle in needles:
         require(source, needle, f"preserve migrated scrollbar values in {path}")
+
+# Forest Workshop must use the existing viewport and a stationary sibling rail.
+workshop = (ROOT / "widgets/ForestWorkshopReferenceView.qml").read_text(encoding="utf-8")
+assert len(re.findall(r"\\bFlickable\\s*\\{", workshop)) == 1
+assert len(re.findall(r"\\bNeonScrollBar\\s*\\{", workshop)) == 1
+for needle in ("id: scroll", "id: body", "width: scroll.width",
+               "contentHeight: body.implicitHeight", "boundsBehavior: Flickable.StopAtBounds",
+               "anchors.rightMargin: Math.min(pane.width,", "workshopScrollBar.reservedExtent",
+               "\\n    NeonScrollBar {", "id: workshopScrollBar", "flickable: scroll",
+               "geometryHost: pane", "reserveGlowSpace: true",
+               "rightInset: effectiveGlowPadding + 2", "visible: pane.visible && scrollable"):
+    require(workshop, needle.replace("\\n", "\n"), "Workshop scrollbar binding")
+print("Forest Workshop scrollbar contract: PASS")

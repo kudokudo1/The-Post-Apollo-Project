@@ -83,40 +83,55 @@ Item {
         worker.running = true;
         return true;
     }
-    function clearHistory() {
-        if (joined && originalOwner && historyScope
-            && originalOwner.sameHistoryScope(historyScope,originalOwner.historyCurrentScope))
-            originalOwner.historyCurrentScope = null;
+    function clearHistory(touchView = true) {
+        // Retire local custody first. QML item destruction can invalidate a
+        // wrapper before it compares equal to null.
+        const scope = historyScope;
         historyConfirmed = false;
         historyScope = null;
         pageRequest = null;
         historyDisplay = historyController ? historyController.close() : null;
-    }
-    function clearOriginal() {
-        clearHistory();
-        // This object cannot mutate another owner's view; no callbacks to a
-        // replacement. Clear only its own retained reference and status.
-        if (joined && originalOwner && ref
-            && Status.same(Status.correlation(ref),Status.correlation(originalOwner.runtimeCurrentCorrelation))) {
-            originalOwner.runtimeViewOpen = false;
-            originalOwner.runtimeCurrentCorrelation = null;
+        if (touchView && joined && current && scope) {
+            const view = originalOwner;
+            const observed = view.historyCurrentScope;
+            if (observed && Object.keys(scope).every(k=>scope[k]===observed[k])
+                && current && originalOwner===view)
+                view.historyCurrentScope = null;
         }
+    }
+    function clearOriginal(touchView = true) {
+        const oldRef = ref;
         ref = null;
         sequence = 0;
         status = "";
+        clearHistory(touchView);
+        if (touchView && joined && current && oldRef) {
+            const view = originalOwner;
+            if (Status.same(Status.correlation(oldRef),Status.correlation(view.runtimeCurrentCorrelation))
+                && current && originalOwner===view) {
+                view.runtimeViewOpen = false;
+                if (current && originalOwner===view)
+                    view.runtimeCurrentCorrelation = null;
+            }
+        }
     }
     function hold(reason) {
         if (reaped || cleanupStarted) return;
         failure = reason; // fixed local labels only
         outcome = possibleEffect ? "UNKNOWN_HOLD" : "REFUSED";
-        clearOriginal();
-        if (wire) wire.stop();
-        pending = "";
-        phase = "HOLD";
+        // Fence reentrant callbacks and arm process cleanup independently
+        // of the visual item. Never dereference a lost Loader item.
         cleanupStarted = true;
         cleanupClock.restartMs();
-        if (worker.running && (!startedSeen || worker.processId === originalPid))
-            worker.signal(15);
+        pending = "";
+        phase = "HOLD";
+        if (wire) wire.stop();
+        try {
+            clearOriginal(reason !== "OWNER_LOST" && current);
+        } finally {
+            if (worker.running && (!startedSeen || worker.processId === originalPid))
+                worker.signal(15);
+        }
     }
     onCurrentChanged: {
         if (!current && phase !== "NEW" && !reaped)
@@ -272,7 +287,7 @@ Item {
                     historyGeneration = v.generation;
                     sessionAlias = v.sessionId;
                     used = used.concat([v.viewKey]);
-                } else clearHistory();
+                } else clearHistory(current);
             }
             if (!live()) return false;
             if (!send("HISTORY_ACK",{scope:v,accepted:accepted})) return false;
@@ -391,9 +406,13 @@ Item {
                 outcome = possibleEffect ? "UNKNOWN_HOLD" : "REFUSED";
             }
         }
-        clearOriginal();
-        phase = "EXIT_SEEN";
-        settle.restart();
+        // Exit/reap must not depend on the destroyed view.
+        try {
+            clearOriginal(!cleanupStarted && current);
+        } finally {
+            phase = "EXIT_SEEN";
+            settle.restart();
+        }
     }
 
     Process {

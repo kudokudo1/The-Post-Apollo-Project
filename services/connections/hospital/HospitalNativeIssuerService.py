@@ -457,8 +457,8 @@ def _send_committed_client_receipt_or_unknown(client, response):
     A successful send is only kernel transport success, NOT client ACK.
     """
     try:
-        wire = C.canonical(response)
-        if client.send(wire) != len(wire):
+        answer = C.canonical(response)
+        if client.send(answer) != len(answer):
             raise OSError("partial committed client receipt")
     except (C.Refused, OSError, TimeoutError, TypeError, ValueError,
             UnicodeError, OverflowError) as exc:

@@ -40,6 +40,7 @@ ShellRoot {
     Timer {
         interval: 100
         repeat: true
+        running: root.phase!==4
         onTriggered: {
             if (++root.ticks>150 && root.phase!==4) {
                 console.error("GIT_MAP_FOOTPRINT_FAIL timeout phase "+root.phase+" "+first.statusText+" / "+second.statusText);
@@ -71,7 +72,6 @@ ShellRoot {
             } else if (root.phase===3 && root.ready(first) && root.ready(second)) {
                 console.log("GIT_MAP_FOOTPRINT_READY "+first.viewport.mapState.snapshot);
                 root.phase=4;
-                stop();
             }
         }
     }

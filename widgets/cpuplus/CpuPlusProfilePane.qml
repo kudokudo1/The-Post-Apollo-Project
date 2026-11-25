@@ -59,6 +59,9 @@ Column {
     onVisibleChanged: if(!visible)confirmation=null
     onCatalogChanged: { confirmation=null; if(!catalog || !catalog.profiles.some(x=>x.name===selectedSaved)) selectedSaved=""; }
     readonly property var view: Catalog.validDraft(customDraft) ? Profile.preview(selectedProfile,{capacityGiB:customDraft.capacityGiB,swappiness:customDraft.swappiness},actualKiB,actualSwappiness) : null
+    readonly property var applicationPlan: Profile.applicationPreview(selectedProfile,customDraft,actualKiB,actualSwappiness,observationReady,operationBusy,Catalog.validDraft)
+    property bool applicationExpanded: false
+    onApplicationPlanChanged: if(!applicationPlan || !applicationPlan.rows.length) applicationExpanded=false
     spacing: 6
     GohuText {
         parent: root.headerTarget || root
@@ -127,6 +130,50 @@ Column {
         observationReady: root.observationReady
         operationBusy: root.operationBusy
         controlsTarget: profileControls
+    }
+    ActionButton {
+        objectName: "cpuplusProfileApplicationPreview"
+        width: parent.width
+        height: 28
+        label: root.applicationExpanded ? "HIDE APPLICATION PREVIEW" : "APPLICATION PREVIEW"
+        available: root.applicationPlan!==null && root.applicationPlan.rows.length>0
+        selected: root.applicationExpanded
+        contentPadding: 2
+        acceptedButtons: Qt.LeftButton
+        keyboardActivationSignal: "leftClicked"
+        onLeftClicked: root.applicationExpanded=!root.applicationExpanded
+    }
+    Column {
+        width: parent.width
+        spacing: 4
+        visible: root.applicationExpanded && root.applicationPlan!==null
+        GohuText {
+            width: parent.width
+            text: root.applicationPlan ? root.applicationPlan.status+"\\nDESCRIPTIVE REQUIREMENTS ONLY // NO EXECUTION ORDER OR GRANT. OBSERVATIONS ARE NOT AUTHORITY." : ""
+            color: Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.applicationExpanded && root.applicationPlan ? root.applicationPlan.rows : []
+            delegate: GohuText {
+                required property var modelData
+                width: root.width
+                text: modelData.label+"\\nTARGET // "+modelData.target+"\\n"+modelData.assessment
+                    +"\\nPERMISSION // "+modelData.permission+"\\nRECOVERY // "+modelData.recovery
+                color: Colors.cyan
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+            }
+        }
+        ActionButton {
+            objectName: "cpuplusProfileApplyLocked"
+            width: parent.width
+            height: 28
+            label: "APPLY PROFILE // LOCKED"
+            available: false
+        }
     }
     GohuText {
         width: parent.width

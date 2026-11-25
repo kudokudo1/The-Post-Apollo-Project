@@ -15,6 +15,7 @@ Item {
     readonly property bool available: reviewEnabled&&active&&visible
     readonly property bool requestBusy: bridge.busy
     readonly property bool requestRetired: bridge.retired
+    readonly property bool requestDrained: bridge.drained
     property var armed: null
     property var receipt: null
     property string notice: "PORTABLE EXPORT / PREVIEW ONLY"
@@ -72,7 +73,7 @@ Item {
             panel.receipt=null;
             panel.armed=null;
             secret.text="";
-            panel.notice=bridge.retired?"REQUEST TIMED OUT // REOPEN CONTROLS AND INSPECT FILES // NO RETRY":
+            panel.notice=bridge.retired?"REQUEST TIMED OUT // RESTART BANKING SESSION AND INSPECT FILES // NO RETRY":
                 "RESULT NOT CONFIRMED // INSPECT FILES BEFORE RETRY";
         }
     }

@@ -1,0 +1,23 @@
+name: Forest Heart H14-D offline resource reference
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/h14d_resource_witness.py'
+      - 'tests/forest/test_h14d_resource_witness.py'
+      - 'scripts/forest/cgroup_observation_i5.py'
+      - 'scripts/forest/heart_memory_headroom_h3.py'
+      - 'scripts/forest/heart_cpu_constraints_h4.py'
+      - 'scripts/forest/performance_snapshot_p0.py'
+      - '.github/workflows/forest-heart-h14d-offline.yml'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pure offline unit checks (no containment or runtime invocation)
+        run: python3 -B tests/forest/test_h14d_resource_witness.py

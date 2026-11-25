@@ -113,6 +113,8 @@ Scope {
     property int refreshDiagStderr: 0
     property int refreshDiagLateDone: 0
     property double refreshDiagLastSuccess: 0
+    property var refreshDiagMarks: []
+    property double refreshDiagDoneMs: -1
     property var refreshDiagLastFailure: null
     readonly property bool refreshDiagChildRunning: refreshProcess.running
     readonly property int refreshDiagDeadlineMs: refreshWatchdog.interval
@@ -125,6 +127,8 @@ Scope {
         refreshDiagOverlap=refreshProcess.running;
         refreshDiagTimedOut=false;
         refreshDiagStderr=0;
+        refreshDiagMarks=[];
+        refreshDiagDoneMs=-1;
     }
     function rememberRefreshFailure(code) {
         refreshDiagOutcome=code;
@@ -132,24 +136,59 @@ Scope {
             attempt:refreshDiagAttempt, code:code, stage:refreshDiagStage,
             elapsedMs:Math.max(0,Date.now()-refreshDiagStarted),
             childRunning:refreshProcess.running, overlap:refreshDiagOverlap,
-            stderrCount:refreshDiagStderr, at:Date.now()
+            stderrCount:refreshDiagStderr, at:Date.now(),
+            marks:refreshDiagMarks.slice(), doneMs:refreshDiagDoneMs
         };
+    }
+    function diagnosticStageLabel(stage) {
+        const labels={repo_check:"Repository check",metadata:"Repository metadata",
+            status:"Working tree status",upstream:"Upstream comparison",
+            merged_refs:"Merged branch scan",cherry:"Patch comparison (git cherry)",
+            local_branches:"Local branch list",remote_branches:"Remote branch list",
+            history:"Recent commit history",finished:"Shell completion"};
+        return labels[stage] || stage;
+    }
+    function diagnosticTimingText(marks,doneMs) {
+        if (!marks.length) return "No timing markers received.";
+        let lines=[], slowest=null;
+        for (let i=0;i<marks.length;i++) {
+            const mark=marks[i], next=marks[i+1];
+            if (mark.stage==="finished") continue;
+            const duration=next ? next.shellMs-mark.shellMs : -1;
+            if (duration>=0 && (!slowest || duration>slowest.ms))
+                slowest={stage:mark.stage,ms:duration};
+            lines.push(diagnosticStageLabel(mark.stage)+" // "
+                +(duration>=0?duration+" ms":"not completed")+" | received +"+mark.arrivalMs+" ms");
+        }
+        const final=marks.find(m=>m.stage==="finished");
+        return (slowest?"SLOWEST COMPLETED STAGE // "+diagnosticStageLabel(slowest.stage)+" · "+slowest.ms+" ms\n":"")
+            +"SHELL TOTAL // "+(final?final.shellMs+" ms":"not received")
+            +"\nDONE RECEIVED // "+(doneMs>=0?doneMs+" ms":"not received")
+            +(final && doneMs>=0?"\nUNATTRIBUTED WALL TIME // "+(doneMs-final.shellMs)+" ms (launch, delivery, scheduling and clock differences)":"")
+            +"\n\n"+lines.join("\n");
     }
     function refreshDiagnosticText() {
         const f=refreshDiagLastFailure;
-        const elapsed=refreshDiagStarted ? Math.max(0,refreshDiagStageAt-refreshDiagStarted) : 0;
-        return "ATTEMPT // "+refreshDiagAttempt+" | LAST STAGE // "+refreshDiagStage
-            +" | STAGE ARRIVED AT // "+elapsed+" ms"
-            +" | OUTCOME // "+refreshDiagOutcome
-            +" | DEADLINE // "+refreshDiagDeadlineMs+" ms"
-            +" | STDERR LINES // "+refreshDiagStderr
-            +" | CHILD RUNNING AT START // "+(refreshDiagOverlap?"YES":"NO")
-            +" | DONE AFTER TIMEOUT // "+refreshDiagLateDone
-            +(f ? "\nLAST FAILURE // "+f.code+" | ATTEMPT "+f.attempt
-                +" | LAST STAGE "+f.stage+" | "+f.elapsedMs+" ms"
-                +" | CHILD RUNNING "+(f.childRunning?"YES":"NO")
-                +" | OVERLAP "+(f.overlap?"YES":"NO")
-                +" | STDERR LINES "+f.stderrCount : "\nLAST FAILURE // NONE RECORDED");
+        let text="CURRENT // "+refreshDiagOutcome+" · attempt "+refreshDiagAttempt
+            +"\nLAST STAGE // "+diagnosticStageLabel(refreshDiagStage)
+            +"\nREFRESH DEADLINE // "+refreshDiagDeadlineMs+" ms"
+            +"\nCHILD PROCESS // "+(refreshDiagChildRunning?"RUNNING":"IDLE")
+            +" | STDERR // "+refreshDiagStderr
+            +"\nLATE DONE COUNT // "+refreshDiagLateDone;
+        if (f) {
+            text+="\n\nLAST FAILURE // "+f.code+" · attempt "+f.attempt
+                +"\n"+(f.code==="GIT READ TIMEOUT"
+                    ?"The UI deadline expired before the refresh completion marker arrived."
+                    :"The refresh did not publish a successful local snapshot.")
+                +"\nDeadline observed at "+f.elapsedMs+" ms; last stage "+diagnosticStageLabel(f.stage)+"."
+                +"\nChild running at failure: "+(f.childRunning?"YES":"NO")
+                +"; overlapping child at start: "+(f.overlap?"YES":"NO")+"; stderr lines: "+f.stderrCount+"."
+                +(f.doneMs>=0?"\nCompletion arrived at "+f.doneMs+" ms after attempt start.":"");
+            text+="\n\nFAILED ATTEMPT TIMINGS\n"+diagnosticTimingText(f.marks || [],f.doneMs);
+        }
+        if (!f || f.attempt!==refreshDiagAttempt)
+            text+="\n\nCURRENT ATTEMPT TIMINGS\n"+diagnosticTimingText(refreshDiagMarks,refreshDiagDoneMs);
+        return text;
     }
     property bool refreshing: false
     property bool refreshPending: false
@@ -1399,6 +1438,12 @@ Scope {
                 // Bash EPOCHREALTIME is built in: no extra date subprocesses.
                 // Off by default; timings are wall durations, not CPU time.
                 'refresh_stage_trace="$2"',
+                'diag_started="${EPOCHREALTIME/./}"',
+                'diag_mark() {',
+                '  local now="${EPOCHREALTIME/./}"',
+                '  printf "DIAGTIME\\t%s\\t%s\\n" "$1" "$(( (now - diag_started) / 1000 ))"',
+                '  [ "$1" = "finished" ] || printf "DIAGSTAGE\\t%s\\n" "$1"',
+                '}',
                 'if [ "$refresh_stage_trace" = "1" ]; then',
                 '  refresh_stage_started="${EPOCHREALTIME/./}"',
                 '  refresh_stage_last="$refresh_stage_started"',
@@ -1406,7 +1451,6 @@ Scope {
                 'trace_refresh_stage() {',
                 '  [ "$refresh_stage_trace" = "1" ] || return 0',
                 '  local now="${EPOCHREALTIME/./}"',
-                '  [ "$1" = "history" ] && printf "\\n"',
                 '  printf "PROFILE\\t%s\\t%s\\n" "$1" "$(( (now - refresh_stage_last) / 1000 ))"',
                 '  refresh_stage_last="$now"',
                 '}',
@@ -1415,13 +1459,14 @@ Scope {
                 '  local now="${EPOCHREALTIME/./}"',
                 '  printf "PROFILE\\ttotal\\t%s\\n" "$(( (now - refresh_stage_started) / 1000 ))"',
                 '}',
-                'printf "DIAGSTAGE\\trepo_check\\n"',
+                'diag_mark repo_check',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '  diag_mark finished',
                 '  printf "ERROR\\tNOT A GIT REPOSITORY\\n"',
                 '  printf "DONE\\t\\n"',
                 '  exit 0',
                 'fi',
-                'printf "DIAGSTAGE\\tmetadata\\n"',
+                'diag_mark metadata',
                 'root="$(git -C "$repo" rev-parse --show-toplevel)"',
                 'name="$(basename "$root")"',
                 'branch="$(git -C "$root" branch --show-current)"',
@@ -1429,11 +1474,11 @@ Scope {
                 'head="$(git -C "$root" rev-parse --short=10 HEAD)"',
                 'head_full="$(git -C "$root" rev-parse HEAD)"',
                 'trace_refresh_stage "metadata"',
-                'printf "DIAGSTAGE\\tstatus\\n"',
+                'diag_mark status',
                 'count="$(git -C "$root" status --porcelain=v1 | wc -l | tr -d " ")"',
                 'if [ "$count" -eq 0 ]; then worktree="CLEAN"; else worktree="DIRTY • $count CHANGES"; fi',
                 'trace_refresh_stage "status"',
-                'printf "DIAGSTAGE\\tupstream\\n"',
+                'diag_mark upstream',
                 'origin="$(git -C "$root" remote get-url origin 2>/dev/null || true)"',
                 'if [ -z "$origin" ]; then origin="NO ORIGIN"; fi',
                 'upstream="$(git -C "$root" rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)"',
@@ -1458,14 +1503,14 @@ Scope {
                 // A ref already reachable from HEAD cannot produce a '+'
                 // from git cherry. Compute merged tips in one Git invocation
                 // and retain the original patch-equivalence check elsewhere.
-                'printf "DIAGSTAGE\\tmerged_refs\\n"',
+                'diag_mark merged_refs',
                 'merged_remote_refs="|"',
                 'while IFS= read -r ref; do',
                 '  [ -n "$ref" ] || continue',
                 '  merged_remote_refs="${merged_remote_refs}${ref}|"',
                 'done < <(git -C "$root" for-each-ref --merged=HEAD --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
                 'trace_refresh_stage "merged_refs"',
-                'printf "DIAGSTAGE\\tcherry\\n"',
+                'diag_mark cherry',
                 'pending_refs="|"',
                 'pending_count=0',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
@@ -1484,7 +1529,7 @@ Scope {
                 // Collect full local ref names while reading the existing
                 // for-each-ref rows. The nonempty "u" prefix prevents Bash
                 // tab IFS from swallowing an empty upstream column.
-                'printf "DIAGSTAGE\\tlocal_branches\\n"',
+                'diag_mark local_branches',
                 'declare -A local_branch_refs=()',
                 'while IFS="$(printf "\\t")" read -r ref ref_head encoded_upstream local_ref; do',
                 '  [ -z "$ref" ] && continue',
@@ -1501,7 +1546,7 @@ Scope {
                 '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09u%(upstream:short)%09%(refname:lstrip=2)" refs/heads 2>/dev/null)',
                 'trace_refresh_stage "local_branches"',
-                'printf "DIAGSTAGE\\tremote_branches\\n"',
+                'diag_mark remote_branches',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',
@@ -1520,8 +1565,10 @@ Scope {
                 '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
                 'trace_refresh_stage "remote_branches"',
-                'printf "DIAGSTAGE\\thistory\\n"',
+                'diag_mark history',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
+                'printf "\\n"',
+                'diag_mark finished',
                 'trace_refresh_stage "history"',
                 'trace_refresh_total',
                 // The opt-in PROFILE rows already terminate with a newline.
@@ -1529,7 +1576,7 @@ Scope {
                 'if [ "$refresh_stage_trace" = "1" ]; then',
                 '  printf "DONE\\t\\n"',
                 'else',
-                '  printf "\\nDONE\\t\\n"',
+                '  printf "DONE\\t\\n"',
                 'fi'
             ].join("\n"),
             "pa-git-refresh",
@@ -1543,6 +1590,24 @@ Scope {
         const parts = raw.split("\t");
         const key = parts.length > 0 ? parts[0] : "";
 
+        if (key === "DIAGTIME") {
+            const stage=parts.length===3 ? parts[1] : "";
+            const rawMs=parts.length===3 ? parts[2] : "";
+            const order=["repo_check","metadata","status","upstream","merged_refs","cherry","local_branches","remote_branches","history","finished"];
+            const last=refreshDiagMarks.length ? refreshDiagMarks[refreshDiagMarks.length-1] : null;
+            const position=order.indexOf(stage);
+            const ms=Number(rawMs);
+            if ((refreshing || refreshDiagTimedOut) && !refreshDiagOverlap
+                    && position>=0 && /^\d{1,9}$/.test(rawMs)
+                    && (!last ? position===0 : position>order.indexOf(last.stage) && ms>=last.shellMs)
+                    && refreshDiagMarks.length<10) {
+                refreshDiagMarks=refreshDiagMarks.concat([{stage:stage,shellMs:ms,
+                    arrivalMs:Math.max(0,Date.now()-refreshDiagStarted)}]);
+                if (refreshDiagLastFailure && refreshDiagLastFailure.attempt===refreshDiagAttempt)
+                    refreshDiagLastFailure=Object.assign({},refreshDiagLastFailure,{marks:refreshDiagMarks.slice()});
+            }
+            return;
+        }
         if (key === "DIAGSTAGE") {
             const stage=parts.length===2 ? parts[1] : "";
             if (refreshing && /^(repo_check|metadata|status|upstream|merged_refs|cherry|local_branches|remote_branches|history)$/.test(stage)) {
@@ -1620,7 +1685,10 @@ Scope {
             available = false;
             lastError = value;
         } else if (key === "DONE") {
+            refreshDiagDoneMs=Math.max(0,Date.now()-refreshDiagStarted);
             if (refreshDiagTimedOut) refreshDiagLateDone++;
+            if (!refreshDiagOverlap && refreshDiagLastFailure && refreshDiagLastFailure.attempt===refreshDiagAttempt)
+                refreshDiagLastFailure=Object.assign({},refreshDiagLastFailure,{doneMs:refreshDiagDoneMs,marks:refreshDiagMarks.slice()});
             // Measure the individual synchronous stages of the DONE callback
             // only in the operator's opt-in diagnostic. Keep the ordering and
             // operations exactly the same in normal and traced modes.

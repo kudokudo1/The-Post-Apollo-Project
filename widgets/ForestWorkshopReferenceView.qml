@@ -129,6 +129,29 @@ Item {
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap
             }
+            // Original Forest vocabulary, not a live lifecycle report.
+            // Runtime/Mind must supply reviewed, current evidence before any
+            // season is selected or Spirit action becomes available.
+            GohuText {
+                objectName: "forestSeasonReference"
+                width: parent.width
+                text: "SEASONS // STATE UNKNOWN (REFERENCE)\nSUMMER // GROWING\nFALL // SHEDDING\nWINTER // DORMANT\nSPRING // CLEANING"
+                textFormat: Text.PlainText
+                color: Colors.cyan
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
+                Accessible.name: text
+            }
+            GohuText {
+                objectName: "forestSpiritReference"
+                width: parent.width
+                text: "SPIRIT // DETERMINISTIC GUIDANCE AND CONTROLS\nTOOLS LOCKED // NO LIVE AUTHORITY"
+                textFormat: Text.PlainText
+                color: Colors.orange
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
+                Accessible.name: text
+            }
             ActionButton {
                 width: body.width
                 height: 27

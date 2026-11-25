@@ -70,6 +70,7 @@ class TaskStickyContext:
         self._user = {}
         self._operational = {}
         self._closed = False
+        self._shed_input_floor = None
 
     def _observe(self, current):
         if self._closed:
@@ -104,6 +105,9 @@ class TaskStickyContext:
                     or requested != current
                     or HotDependencies.from_route(current) != self._deps):
                 raise ContextRefusal("HOT_ROUTE_CHANGED")
+            if (self._shed_input_floor is not None
+                    and current.input_generation <= self._shed_input_floor):
+                raise ContextRefusal("STICKY_SHED_RESELECTION_REQUIRED")
             self._route = current
 
     def _require(self, requested, current, dependencies):
@@ -176,6 +180,26 @@ class TaskStickyContext:
             return assemble_hot_context(requested, current=current,
                 user_records=result.user_records,
                 operational_records=result.operational_records, max_bytes=max_bytes)
+
+    def shed(self, requested, *, current, dependencies,
+             drop_user=False, drop_operational=False):
+        """Discard selected derived domains, not durable knowledge or RAM custody.
+
+        Requires the exact currently installed route. A strictly newer
+        independently observed input is needed before any further selection.
+        Retained records are never implicitly selected or authorized.
+        """
+        with self._lock:
+            if (type(drop_user) is not bool or type(drop_operational) is not bool
+                    or not (drop_user or drop_operational)):
+                raise ContextRefusal("INVALID_STICKY_SHED")
+            self._require(requested, current, dependencies)
+            if drop_user:
+                self._user.clear()
+            if drop_operational:
+                self._operational.clear()
+            self._shed_input_floor = current.input_generation
+            self._route = None
 
     def counts(self):
         """Owner-local counts only; no record content or authority."""

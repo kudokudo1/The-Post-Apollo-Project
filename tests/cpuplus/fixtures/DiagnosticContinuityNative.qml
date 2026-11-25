@@ -163,6 +163,40 @@ ShellRoot {
                         && ui.memoryDetails.rows.length === 7
                         && ui.memoryDetails.rows.find(row=>row.label==="PRIVATE RESIDENT").change === 786432
                         && !CpuPlusDiagnostics.busy,"extended capture private resident breakdown")) return;
+                const report=CpuPlusDiagnostics.reports.memory;
+                const lines=report.text.split("\n").map(line=>JSON.parse(line));
+                const before={MemTotal:33554432,MemAvailable:8388608,MemFree:1024,AnonPages:1024,Cached:1024,Shmem:0,SReclaimable:0,SUnreclaim:0,SwapTotal:1024,SwapFree:1024};
+                lines[0].hostObservation={beforeKiB:before,afterKiB:before,spanMs:2};
+                lines[1].hostObservation={beforeKiB:before,afterKiB:Object.assign({},before,{MemAvailable:6291456}),spanMs:3};
+                CpuPlusDiagnostics.reports=Object.assign({},CpuPlusDiagnostics.reports,{memory:Object.assign({},report,{text:lines.map(row=>JSON.stringify(row)).join("\n")})});
+                root.phase=12;
+                return;
+            }
+            if(root.phase===12&&pane.item) {
+                const ui=root.findItem(pane.item,"cpuplusDiagnosticControls");
+                const host=root.findItem(pane.item,"cpuplusDiagHostInstrument");
+                const toggle=root.findItem(pane.item,"cpuplusDiagHostToggle");
+                if(!host||!toggle||!ui)return;
+                if(!root.check(host.visible&&toggle.available&&ui.hostDetails.complete
+                    &&ui.hostDetails.minimum===6291456&&ui.hostDetails.delta===-2097152
+                    &&ui.hostDetails.pssDelta===524288&&!CpuPlusDiagnostics.busy,"paired host instrument"))return;
+                toggle.leftClicked(null);
+                if(!root.check(!host.visible&&!ui.showHostDetails,"hide historical host instrument"))return;
+                toggle.leftClicked(null);
+                if(!root.check(host.visible&&ui.showHostDetails,"show historical host instrument"))return;
+                const report=CpuPlusDiagnostics.reports.memory;
+                const lines=report.text.split("\n").map(line=>JSON.parse(line));
+                lines[1].hostObservation=null;
+                CpuPlusDiagnostics.reports=Object.assign({},CpuPlusDiagnostics.reports,{memory:Object.assign({},report,{text:lines.map(row=>JSON.stringify(row)).join("\n")})});
+                root.phase=13;return;
+            }
+            if(root.phase===13&&pane.item) {
+                const ui=root.findItem(pane.item,"cpuplusDiagnosticControls");
+                if(!root.check(ui&&ui.hostDetails.paired===1&&!ui.hostDetails.complete
+                    &&ui.hostDetails.total===null&&ui.hostDetails.delta===null&&ui.hostDetails.pssDelta===null
+                    &&ui.memoryDetails.rows.length===7&&!CpuPlusDiagnostics.busy&&root.completions===1,
+                    "partial host context retains process evidence without comparative bars"))return;
+                console.log("CPU_M10_HOST_INSTRUMENT_PASS // actual hide/show, full and partial evidence, zero new captures");
                 CpuPlusDiagnostics.selectLatest("inventory");
                 root.phase = 7;
                 return;

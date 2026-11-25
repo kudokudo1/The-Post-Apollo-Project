@@ -129,3 +129,24 @@ Nurse2F: independent scope review, operator acceptance separate.
 
 R6b/c/d continues unchanged. This documentation PR is not approval of
 new protocol, UI source, installation, inference, or protected release.
+
+## R1 implementation scope approved
+
+Nurse2F #7162318447 accepts exact #2690 a5550565 and all four owner
+agreements (#7161256592, #7161314589, #7161359214, #7161019466).
+PublicRestorationReview.qml is an isolated, nonmounted synthetic view.
+Local test owner independently sets syntheticOwner and entire ownerScope
+(CHERRY, distinct opaque 32-hex taskAlias/viewKey, positive planRevision).
+Explicit openReview(ref) precedes receiveReview(ref, rows). The only allowed
+ordered rows are CONTINUITY=PRESERVED, CONTEXT=REVIEW, WORKSHOP=AVAILABLE,
+MODEL_FORM=DORMANT, REASONING=UNKNOWN; fixed local labels, never raw inputs.
+Refusal and malformed current plan clear rows; stale ref ignored; dismiss,
+visibility/viewport or scope loss clears. Fresh view required for every open;
+64-view local replay cap, not actual owner custody. No real grant, plan query,
+season, restored resources, decision/apply, history refresh or R6 action.
+Existing composed preview native witness expands 22 to 31 phases, then mounts
+only the isolated review at 480x240 and 300x160. Tests cover default-off,
+explicit open, exact rows, stale/replacement, malformed/duplicate plans,
+dismiss, independent owner and viewport loss, no fallback, unload.
+Actual keyboard/focus and panel placement remain UI1 joined review; local
+Dismiss is nonexecuting. No ForestW or shared controller change. CI pending.

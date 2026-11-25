@@ -25,13 +25,15 @@ function initial(consumer) {
     return {session:consumer.initial(),projection:null,history:null,historyRead:null,
         recoveryRead:null,inventory:null,localAction:null,
         buffer:"",phase:"STOPPED",sequence:0,generation:0,startupLocked:true,
+        mode:"LEGACY",stage:null,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
-function start(state,consumer,generation) {
+function start(state,consumer,generation,mode="LEGACY") {
     if ((state.phase!=="STOPPED" && state.phase!=="FAILED")
-        || !positive(generation) || generation<=state.generation) return state;
+        || !positive(generation) || generation<=state.generation
+        || !["LEGACY","STAGED"].includes(mode)) return state;
     return Object.assign({},initial(consumer),{
-        generation,session:consumer.disconnect(state.session),phase:"HELLO"});
+        generation,mode,session:consumer.disconnect(state.session),phase:"HELLO"});
 }
 function stop(state,consumer,reason,generation) {
     if (generation!==state.generation || !["HELLO","CONNECTED"].includes(state.phase)) return state;
@@ -62,7 +64,8 @@ function context(state) {
         : state.session;
     return {state:session,projection:state.projection,startupLocked:state.startupLocked,
         historyPending:!!state.historyRead,phase:state.phase,waiting:waiting(state),failure:state.failure,
-        recoveryPending:!!state.recoveryRead};
+        recoveryPending:!!state.recoveryRead,
+        actionStage:state.stage?state.stage.phase:null};
 }
 function recoveryContext(state) {
     // Atomic snapshot for DOC 2's read-only pane. This metadata is not
@@ -84,6 +87,9 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
             publicationRequired:true});
     }
     if (state.phase!=="CONNECTED" || p.owner_id!==state.session.ownerId) return fail("OWNER_MISMATCH");
+    // After a preparation receipt the server is waiting for our exact
+    // continuation, not sending any additional frame until COMMIT.
+    if (state.stage?.phase==="RECEIPT_READY") return fail("UNEXPECTED_STAGED_PACKET");
     if (p.kind==="INVALIDATE") {
         if (!exact(p,["version","kind","owner_id","can_execute"]) || state.awaitingStatus)
             return fail("INVALID_CONTROL");
@@ -107,14 +113,32 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         return Object.assign({},state,{session:next,sequence:p.sequence,
             projection:next.status?p.projection:null,awaitingStatus:false,publicationRequired:false,history:null});
     }
+    if (p.kind==="PREPARED_ACTION") {
+        const pending=state.session.pending;
+        const fields=["version","kind","owner_id","sequence","next_action_sequence","can_execute","record","challenge"];
+        if (state.mode!=="STAGED" || state.stage?.phase!=="WAIT_PREPARED" || !pending
+            || state.awaitingStatus || state.publicationRequired || !exact(p,fields)
+            || p.next_action_sequence!==pending.action_sequence+1 || !uuid(p.challenge)
+            || typeof recoveryRow!=="function") return fail("INVALID_PREPARED_RECEIPT");
+        let view;
+        try { view=recoveryRow(p.record); } catch (_) { view=null; }
+        if (!view || view.state!=="PREPARED" || !exact(p.record.message,Object.keys(pending))
+            || !Object.keys(pending).every(k=>p.record.message[k]===pending[k]))
+            return fail("INVALID_PREPARED_RECEIPT");
+        // Keep the original pending action; the receipt is not completion.
+        return Object.assign({},state,{sequence:p.sequence,
+            session:Object.assign({},state.session,{sequence:p.sequence,prepared:null}),
+            stage:{phase:"RECEIPT_READY",sequence:p.sequence,challenge:p.challenge}});
+    }
     if (p.kind==="ACTION") {
+        if (state.stage && state.stage.phase!=="WAIT_COMMIT") return fail("PREMATURE_ACTION");
         if (!state.session.pending || state.historyRead || state.recoveryRead || state.awaitingStatus) return fail("UNEXPECTED_ACTION");
         const next=consumer.acceptAction(state.session,p);
         if (next.sequence!==p.sequence || next.pending
             || next.feedback==="INVALID RESPONSE // RECONCILE"
             || next.feedback==="UNMATCHED RESPONSE // RECONCILE") return fail("INVALID_ACTION");
         return Object.assign({},state,{session:next,sequence:p.sequence,projection:null,
-            history:null,publicationRequired:true});
+            history:null,stage:null,publicationRequired:true});
     }
     if (p.kind==="DETAIL") {
         const read=state.historyRead;
@@ -203,8 +227,23 @@ function confirm(state,intent,actionId,consumer) {
     if (!prepared.prepared || !Object.keys(intent).every(k=>intent[k]===prepared.prepared[k])) return no;
     const submitted=consumer.submit(prepared,actionId);
     if (!submitted.message) return no;
+    const staged=state.mode==="STAGED" && submitted.message.kind!=="RECHECK";
     return {state:Object.assign({},state,{session:submitted.state,projection:null,history:null,inventory:null,localAction:null,
-        awaitingStatus:false}),frame:JSON.stringify({version:1,kind:"ACTION",message:submitted.message})+"\n"};
+        awaitingStatus:false,stage:staged?{phase:"WAIT_PREPARED"}:null}),
+        frame:JSON.stringify({version:1,kind:staged?"PREPARE_ACTION":"ACTION",message:submitted.message})+"\n"};
+}
+function takeCommit(state,generation) {
+    // Called by the transport only after feed has validated the complete
+    // receipt. Publish returned state BEFORE writing. Never retry a failed
+    // write or take a continuation from a recovered record.
+    const no={state,frame:null};
+    if (generation!==state.generation || state.phase!=="CONNECTED"
+        || state.mode!=="STAGED" || state.stage?.phase!=="RECEIPT_READY"
+        || state.startupLocked || !state.session.pending || state.session.unresolved
+        || state.buffer || state.awaitingStatus || state.publicationRequired) return no;
+    const frame=JSON.stringify({version:1,kind:"COMMIT_ACTION",message:state.session.pending,
+        prepared_sequence:state.stage.sequence,challenge:state.stage.challenge})+"\n";
+    return {state:Object.assign({},state,{stage:{phase:"WAIT_COMMIT"}}),frame};
 }
 function readHistory(state,requestId) {
     const no={state:state,frame:null};

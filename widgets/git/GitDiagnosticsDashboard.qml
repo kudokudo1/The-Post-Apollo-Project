@@ -19,6 +19,10 @@ Rectangle {
     readonly property real shellMs: finalMark ? finalMark.shellMs : -1
     readonly property real budget: Math.max(1,service.refreshDiagDeadlineMs)
     readonly property real scale: Math.max(budget,shellMs,doneMs)
+    readonly property bool selectedFailed: showingFailure || (!service.refreshing && !service.available
+        && !!failure && failure.attempt===service.refreshDiagAttempt)
+    readonly property bool selectedPublished: !showingFailure && service.refreshDiagOutcome==="PUBLISHED"
+    readonly property color completionInk: selectedFailed ? Colors.red : doneMs>budget ? Colors.orange : Colors.cyan
     function makeRows(input) {
         const stages=["repo_check","metadata","status","upstream","merged_refs","cherry","local_branches","remote_branches","history","finished"];
         return input.filter(m=>m.stage!=="finished").map(m=>{
@@ -105,7 +109,7 @@ Rectangle {
                 spacing: 8
                 GohuText {
                     width: parent.width
-                    text: (root.service.refreshing?"READING":root.service.available?"LOCAL LIVE":"OFFLINE")
+                    text: (root.service.refreshing?(root.service.refreshDiagTimedOut?"READING // SLOW":"READING"):root.service.available?"LOCAL LIVE":"OFFLINE")
                         +" // "+(root.showingFailure?"FAILED ATTEMPT "+root.failure.attempt:"CURRENT ATTEMPT "+root.service.refreshDiagAttempt)
                     font.pixelSize: 14
                     color: root.service.refreshing?Colors.orange:root.service.available?Colors.cyan:Colors.red
@@ -114,17 +118,17 @@ Rectangle {
                 Text {
                     width: parent.width
                     text: root.showingFailure && root.failure.code==="GIT READ TIMEOUT"
-                        ? "Local read exceeded the deadline. "+(root.doneMs>=0?"Completion marker arrived later.":"Completion not yet recorded.")
-                        : root.showingFailure ? root.failure.code : root.service.refreshDiagOutcome
+                        ? "Local read failed with a timeout. "+(root.doneMs>=0?"Completion marker arrived later.":"Completion not yet recorded.")
+                        : root.showingFailure ? root.failure.code : root.selectedPublished && root.doneMs>root.budget ? "PUBLISHED // ABOVE SOFT DEADLINE" : root.service.refreshDiagOutcome
                     color: Colors.white; font.pixelSize: 14; wrapMode: Text.Wrap
                     textFormat: Text.PlainText
                 }
                 Row {
                     width: parent.width; height: 58; spacing: 6
                     Repeater {
-                        model: [{label:"DEADLINE",value:root.budget,ink:Colors.orange},
+                        model: [{label:"SOFT DEADLINE",value:root.budget,ink:Colors.orange},
                             {label:"SHELL TOTAL",value:root.shellMs,ink:Colors.cyan},
-                            {label:"DONE RECEIVED",value:root.doneMs,ink:root.doneMs>root.budget?Colors.red:Colors.cyan}]
+                            {label:"DONE RECEIVED",value:root.doneMs,ink:root.completionInk}]
                         delegate: Rectangle {
                             required property var modelData
                             width: Math.max(0,(body.width-12)/3); height: 58
@@ -140,7 +144,7 @@ Rectangle {
                 // Deadline tick marks the scale, not a second progress estimate.
                 Rectangle {
                     width: parent.width; height: 13; color: Colors.dark; border.color: Colors.cyan
-                    Rectangle { height: parent.height-2; x: 1; y: 1; width: Math.max(0,(parent.width-2)*Math.max(0,root.doneMs)/root.scale); color: root.doneMs>root.budget?Colors.red:Colors.cyan; opacity: 0.65 }
+                    Rectangle { height: parent.height-2; x: 1; y: 1; width: Math.max(0,(parent.width-2)*Math.max(0,root.doneMs)/root.scale); color: root.completionInk; opacity: 0.65 }
                     Rectangle { x: Math.min(parent.width-2,(parent.width-2)*root.budget/root.scale); width: 2; height: parent.height; color: Colors.yellow }
                 }
                 GohuText {
@@ -174,7 +178,7 @@ Rectangle {
                     width: parent.width; font.pixelSize: 12; color: Colors.white; wrapMode: Text.Wrap
                     text: "Child at timeout: "+(root.showingFailure?(root.failure.childRunning?"RUNNING":"IDLE"):"N/A")
                         +" | STDERR: "+(root.showingFailure?root.failure.stderrCount:root.service.refreshDiagStderr)
-                        +" | Late DONE: "+root.service.refreshDiagLateDone
+                        +" | DONE after soft limit: "+root.service.refreshDiagLateDone
                         +"\nUnattributed wall time: "+(root.shellMs>=0 && root.doneMs>=0 ? (root.doneMs-root.shellMs)+" ms" : "N/A")
                         +" (launch, delivery, scheduling and clock differences)."
                 }

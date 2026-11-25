@@ -7,6 +7,7 @@ on:
       - 'tests/fixtures/cpuplus_queue_retention_child.py'
       - 'tests/fixtures/cpuplus_queue_retention_helper.py'
       - 'services/memory/MemoryQueueSessionHost.js'
+      - 'services/memory/MemoryQueueCheckpointAdapter.qml'
       - 'services/memory/memory_queue_*.py'
       - '.github/workflows/cpuplus-queue-retention-native.yml'
   workflow_dispatch:

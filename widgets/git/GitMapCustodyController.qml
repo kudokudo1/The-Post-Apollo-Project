@@ -6,6 +6,7 @@ Item {
     id: root
     visible: false
     property bool v2Mode: false
+    property bool compactHold: false
     property string v2Base: ""
     property var leases: []
     readonly property int leaseCount: leases.length
@@ -27,7 +28,7 @@ Item {
         }
         // Two active hosts and two replacement generations.
         if (leases.length>=4) return null;
-        const l=factory.createObject(root,{generation:g,owners:1,v2Mode:root.v2Mode,v2Base:root.v2Base});
+        const l=factory.createObject(root,{generation:g,owners:1,v2Mode:root.v2Mode,v2Base:root.v2Base,compactHold:root.compactHold});
         if (!l) return null;
         leases=leases.concat([l]);
         l.ended.connect(()=>collect(l));

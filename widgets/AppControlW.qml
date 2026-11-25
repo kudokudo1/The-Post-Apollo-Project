@@ -573,38 +573,53 @@ PanelWindow {
         return true;
     }
 
+    function killTaskRankKey(entry, viewMode) {
+        return {
+            entry: entry,
+            hunter: viewMode === killViewHunter
+                    ? hunterTaskMetricScore(entry) : 0,
+            cpu: Number(entry.cpu || 0),
+            mem: Number(entry.mem || 0),
+            pid: Number(entry.pid || 0)
+        };
+    }
+
     function killTaskRankCompare(a, b, viewMode) {
         if (viewMode === killViewHunter) {
-            const hunterDelta =
-                hunterTaskMetricScore(b) - hunterTaskMetricScore(a);
+            const hunterDelta = b.hunter - a.hunter;
             if (Math.abs(hunterDelta) > 0.001)
                 return hunterDelta;
         }
 
-        const cpuDelta = Number(b.cpu || 0) - Number(a.cpu || 0);
+        const cpuDelta = b.cpu - a.cpu;
         if (Math.abs(cpuDelta) > 0.001)
             return cpuDelta;
 
-        const memDelta = Number(b.mem || 0) - Number(a.mem || 0);
+        const memDelta = b.mem - a.mem;
         if (Math.abs(memDelta) > 0.001)
             return memDelta;
 
-        return Number(a.pid || 0) - Number(b.pid || 0);
+        return a.pid - b.pid;
     }
 
     function rebuildKillTaskOrderSnapshot(viewMode) {
         const mode =
             viewMode === killViewHunter ? killViewHunter : killViewNormal;
 
+        // Snapshot the ranking inputs once per eligible row. Sorting must not
+        // repeatedly scan its 48-sample CPU history for each comparison.
         const rows = taskRows.filter(function(entry) {
             return killTaskVisibleForView(entry, mode);
+        }).map(function(entry) {
+            return killTaskRankKey(entry, mode);
         });
 
         rows.sort(function(a, b) {
             return killTaskRankCompare(a, b, mode);
         });
 
-        killTaskOrderIds = rows.map(function(entry) {
+        killTaskOrderIds = rows.map(function(row) {
+            const entry = row.entry;
             return String(entry.id || ("task:" + String(entry.pid || 0)));
         });
     }
@@ -617,11 +632,12 @@ PanelWindow {
             known[String(killTaskOrderIds[i])] = true;
 
         const additions = source.filter(function(entry) {
-            if (!killTaskVisibleForView(entry, killViewMode))
+            // Existing identities retain their slots regardless of current
+            // eligibility. The displayed model still applies every filter.
+            if (!entry)
                 return false;
-
             const id = String(entry.id || ("task:" + String(entry.pid || 0)));
-            return !known[id];
+            return !known[id] && killTaskVisibleForView(entry, killViewMode);
         });
 
         if (additions.length === 0)

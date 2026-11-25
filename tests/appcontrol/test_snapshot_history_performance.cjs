@@ -356,3 +356,65 @@ test('mini graph scroll moves one trace layer, not every rectangle', () => {
     assert.match(app, /\? 600\s*:\s*appControlWindow.menuOpen/);
     assert.match(app, /id: taskMiniDisplayTimer[\s\S]*?interval: 1200/);
 });
+
+test('explicit Kill ranking snapshots score once per eligible task and retains legacy order', () => {
+    const start=app.indexOf('    function killTaskRankKey(');
+    const end=app.indexOf('    // HUNTER answers two separate questions',start);
+    assert.ok(start>=0 && end>start);
+    const create=new Function('initial','active','counter',app.slice(start,end)+`
+        const killViewNormal=0,killViewHunter=1;
+        let killViewMode=killViewHunter, taskRows=initial,killTaskOrderIds=[];
+        function killTaskVisibleForView(entry,mode) {
+            counter.visible++;
+            return !!entry && (mode===killViewNormal || active(entry));
+        }
+        function hunterTaskMetricScore(entry) {counter.score++; return entry.score;}
+        return {
+            rebuild(mode) {rebuildKillTaskOrderSnapshot(mode);return killTaskOrderIds.slice();},
+            append(rows) {appendNewKillTaskOrderIds(rows);return killTaskOrderIds.slice();},
+            mode(value) {killViewMode=value;}
+        };
+    `);
+    const id=e=>String(e.id || ('task:'+String(e.pid||0)));
+    const rows=Array.from({length:600},(_,i)=>({pid:i+2,
+        cpu:i%13,mem:i%7,score:(i*17)%41,active:i%3!==0,
+        ...(i%5===0?{id:'task:'+String(i+2)}:{})}));
+    const eligible=e=>e.active;
+    function legacyRank(mode){
+        return rows.filter(e=>mode===0||eligible(e)).sort((a,b)=>{
+            if(mode===1){const delta=b.score-a.score;if(Math.abs(delta)>0.001)return delta;}
+            const cpu=Number(b.cpu||0)-Number(a.cpu||0);
+            if(Math.abs(cpu)>0.001)return cpu;
+            const mem=Number(b.mem||0)-Number(a.mem||0);
+            if(Math.abs(mem)>0.001)return mem;
+            return Number(a.pid||0)-Number(b.pid||0);
+        }).map(id);
+    }
+    const count={score:0,visible:0};
+    const actual=create(rows,eligible,count);
+    assert.deepStrictEqual(actual.rebuild(0),legacyRank(0));
+    assert.equal(count.score,0);
+    count.visible=0;
+    const ranked=actual.rebuild(1);
+    assert.deepStrictEqual(ranked,legacyRank(1));
+    assert.equal(count.score,ranked.length,'one score per admitted task');
+    assert.equal(count.visible,rows.length);
+    count.visible=0;
+    assert.deepStrictEqual(actual.append(rows),ranked,'unchanged snapshot keeps slots');
+    assert.equal(count.visible,rows.length-ranked.length,'known rows skip eligibility');
+    const changed=[...rows.map(e=>({...e,active:!e.active})),
+        {pid:1002,active:true},{pid:1001,active:true},{pid:1001,active:true},null];
+    const known=new Set(ranked);
+    const expected=ranked.slice();
+    for(const entry of changed.filter(e=>e&&eligible(e)&&!known.has(id(e)))
+        .sort((a,b)=>a.pid-b.pid)){
+        if(!known.has(id(entry))){known.add(id(entry));expected.push(id(entry));}
+    }
+    assert.deepStrictEqual(actual.append(changed),expected,'late eligibility, duplicates and churn retain old order');
+    actual.mode(0);
+    assert.deepStrictEqual(actual.append([null,{pid:9000,active:false}]),[...expected,'task:9000']);
+    const model=app.slice(app.indexOf('id: killTaskResults'),app.indexOf('id: thermalResults'));
+    assert.match(model,/if \(appControlWindow.killTaskModelBlank\)/);
+    assert.match(model,/hunterTaskActive\(entry\)\s*&& appControlWindow.hunterTaskClassVisible\(entry\)/);
+    assert.match(model,/objectProp: "id"/);
+});

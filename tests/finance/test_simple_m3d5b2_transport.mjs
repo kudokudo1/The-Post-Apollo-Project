@@ -72,6 +72,51 @@ test("fixed stdout grammar never infers a successful write from exit status",()=
     "FINANCEW_CATEGORIZED_EXPENSE_RESULT committed extra\n"
   ])assert.equal(parse({stdout,exitCode:0}).state,"uncertain");
 });
+test("writer acknowledgment requires exactly one complete LF-terminated line",()=>{
+  const parse=inspectM3d5b2WriterOutcome;
+  const ok="FINANCEW_CATEGORIZED_EXPENSE_RESULT committed\n";
+  const malformed=[
+    {name:"extra trailing newline",stdout:ok+"\n"},
+    {name:"multiple extra blank lines",stdout:ok+"\n\n"},
+    {name:"missing final newline",stdout:ok.slice(0,-1)},
+    {name:"leading newline",stdout:"\n"+ok},
+    {name:"leading blank lines",stdout:"\n\n"+ok},
+    {name:"CRLF",stdout:ok.slice(0,-1)+"\r\n"},
+    {name:"bare CR",stdout:ok.slice(0,-1)+"\r"},
+    {name:"extra trailing text",stdout:ok+"extra\n"},
+    {name:"extra leading text",stdout:"extra\n"+ok},
+    {name:"leading spaces",stdout:" "+ok},
+    {name:"trailing spaces",stdout:ok.slice(0,-1)+" \n"},
+    {name:"trailing tab",stdout:ok.slice(0,-1)+"\t\n"},
+    {name:"embedded NUL",stdout:ok.slice(0,-1)+"\0\n"},
+    {name:"Unicode line separator",stdout:ok.slice(0,-1)+"\u2028\n"},
+    {name:"Unicode paragraph separator",stdout:ok.slice(0,-1)+"\u2029\n"},
+    {name:"double status",stdout:ok+ok}
+  ];
+  assert.deepEqual(parse({stdout:ok,exitCode:0}),
+    {state:"committed",canRetry:false});
+  for(const {name,stdout} of malformed)
+    assert.deepEqual(parse({stdout,exitCode:0}),
+      {state:"uncertain",canRetry:false},name);
+  for(const exitCode of [null,1,2,-1,"0",undefined])
+    assert.deepEqual(parse({stdout:ok,exitCode}),
+      {state:"uncertain",canRetry:false},"committed exit "+String(exitCode));
+});
+test("blocked result also requires exact LF frame and positive exit code",()=>{
+  const parse=inspectM3d5b2WriterOutcome;
+  const blocked="FINANCEW_CATEGORIZED_EXPENSE_RESULT blocked:recovery-needed\n";
+  assert.deepEqual(parse({stdout:blocked,exitCode:1}),
+    {state:"blocked",canRetry:false,reason:"recovery-needed"});
+  for(const exitCode of [0,-1,null,undefined,"1"])
+    assert.deepEqual(parse({stdout:blocked,exitCode}),
+      {state:"uncertain",canRetry:false},"blocked exit "+String(exitCode));
+  for(const stdout of [
+    blocked+"\n",blocked.slice(0,-1),"\n"+blocked,
+    blocked.slice(0,-1)+"\r\n",blocked+"other\n"
+  ])
+    assert.deepEqual(parse({stdout,exitCode:1}),
+      {state:"uncertain",canRetry:false});
+});
 test("durable intent survives process exit; same ID or same transaction refused after restart",async()=>{
   await fixture(async root=>{
     const first=childAttempt(root,cmd());

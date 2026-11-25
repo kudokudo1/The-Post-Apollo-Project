@@ -4115,28 +4115,19 @@ PanelWindow {
             }
         }
 
-        SharedComponents.DiagnosticsServicePopup {
-            id: gitDiagnosticsPane
+        Loader {
+            id: gitDiagnosticsLoader
             z: 110
-            visible: root.menuOpen && root.activePage === "git" && root.gitDiagnosticsOpen
-            enabled: visible
-            width: Math.max(0,Math.min(760,parent.width-36))
-            height: Math.max(0,parent.height-100)
-            anchors.right: parent.right
-            anchors.rightMargin: 18
-            anchors.top: parent.top
+            active: root.menuOpen && root.activePage === "git" && root.gitDiagnosticsOpen
+            anchors.fill: parent
             anchors.topMargin: 80
-            heading: "GIT HEALTH // DIAGNOSTICS"
-            displayedState: gitService.refreshing ? "READING" : gitService.available ? "LIVE" : "OFFLINE"
-            providerLabel: "LOCAL GIT // NOT INTERNET"
-            currentAge: gitService.refreshDiagLastSuccess ? new Date(gitService.refreshDiagLastSuccess).toLocaleTimeString() : "--"
-            showLocation: false
-            ageHeading: "DETAIL // "
-            serviceRows: []
-            reasonHeading: "FAILURE EXPLANATION // STAGE TIMINGS"
-            reason: gitService.refreshDiagnosticText()
-            footnote: "READ ONLY // SHELL TIMES ARE WALL CLOCK ESTIMATES, RECEIVED TIMES INCLUDE QML DELIVERY. TIMINGS ARE SUPPRESSED IF AN OVERLAPPING CHILD IS DETECTED. NO RAW STDERR OR REPO CONTENT. SESSION ONLY."
-            onCloseRequested: root.gitDiagnosticsOpen=false
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            anchors.bottomMargin: 12
+            sourceComponent: FullHistoryMap.GitDiagnosticsDashboard {
+                service: gitService
+                onCloseRequested: root.gitDiagnosticsOpen=false
+            }
         }
 
         // Git selectors intentionally use the shared component's legacy

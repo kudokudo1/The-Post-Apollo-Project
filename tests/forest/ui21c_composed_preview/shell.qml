@@ -67,6 +67,7 @@ ShellRoot {
     // Actual child records, captured and independently correlated before this
     // native replay. This is not a live Process-to-Loader connection.
     property var actualRows: null
+    property var hiddenOriginal: null
     function actualUnits(units) {
         for (const u of units) preview.item.receiveRuntimeUnit(u);
     }
@@ -217,6 +218,25 @@ ShellRoot {
                 "missing synthetic/locked labels");
         }
     }
+    function descendant(item,name) {
+        if (!item) return null;
+        if (item.objectName===name) return item;
+        for (const c of item.children) {
+            const match=descendant(c,name);
+            if (match) return match;
+        }
+        return null;
+    }
+    function catalogScope(n) {
+        return {treeKey:"CHERRY",viewKey:n.toString(16).padStart(32,"0"),catalogRevision:n};
+    }
+    function catalogRows() {
+        return ["a","b","c"].map(x=>({taskAlias:x.repeat(32)}));
+    }
+    function catalogPlan(n,alias) {
+        return {treeKey:"CHERRY",taskAlias:alias,viewKey:(100+n).toString(16).padStart(32,"0"),
+            planRevision:100+n};
+    }
     Window {
         id: scene
         width: 480
@@ -227,6 +247,12 @@ ShellRoot {
             anchors.fill: parent
             active: false
             sourceComponent: UI2.PublicConversationFixture {}
+        }
+        Loader {
+            id: selector
+            anchors.fill: parent
+            active: false
+            sourceComponent: UI2.PublicDormantTaskSelector {}
         }
         Loader {
             id: review
@@ -635,6 +661,286 @@ ShellRoot {
             case 40:
                 check(preview.item===null,"actual replay Loader survived");
                 break;
+            case 41:
+                preview.active=true;
+                break;
+            case 42: {
+                const d=Actual.replay;
+                hiddenOriginal=preview.item;
+                verifyLoaded();
+                check(hiddenOriginal.beginConnectedHistory(),"visibility connected mode");
+                openRuntime(d.b);
+                actualUnits(d.unitsB);
+                actualAttach(d.h2);
+                actualPage(d.h2,d.second[0]);
+                verifyConnected(2,"PARTIAL");
+                check(hiddenOriginal.nextHistoryPage(d.h2,d.second[1].requestId,2),
+                    "visibility pending continuation");
+                verifyConnected(2,"PENDING");
+                verifyConnectedStatus("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                preview.visible=false;
+                break;
+            }
+            case 43: {
+                const d=Actual.replay, item=preview.item;
+                check(item===hiddenOriginal && !item.visible,"original hidden, not unloaded");
+                check(!item.historyScopeActive && item.historyPendingRequest===null
+                    && actualFeed().messages.length===0 && item.runtimeState==="CLOSED"
+                    && item.runtimeStatusText==="","hidden original retains presentation");
+                check(!item.receiveHistoryPage(d.h2,d.second[1].frame),"hidden page accepted");
+                item.receiveRuntimeUnit(d.unitsB[0]);
+                preview.visible=true;
+                break;
+            }
+            case 44: {
+                const d=Actual.replay, item=preview.item;
+                check(item===hiddenOriginal && item.visible,"original re-shown");
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("");
+                check(!item.attachHistoryScope(d.h2),"retired history view reopened");
+                check(!item.openRuntimeLifetime(d.b),"retired status view reopened");
+                check(!item.receiveHistoryPage(d.h2,d.second[1].frame),"retired page accepted");
+                check(actualFeed().messages.length===0 && item.runtimeStatusText==="",
+                    "retired data revived");
+                actualRetire();
+                actualAttach(d.h3);
+                actualPage(d.h3,d.reopened[0]);
+                verifyConnected(2,"PARTIAL");
+                check(!item.receiveHistoryPage(d.h2,d.second[1].frame),"old page reached fresh scope");
+                actualPage(d.h3,d.reopened[1],true);
+                verifyConnected(4,"COMPLETE");
+                break;
+            }
+            case 45: {
+                const d=Actual.replay;
+                actualRetire();
+                openRuntime(d.c);
+                actualUnits(d.unitsC);
+                actualUnits(d.stop);
+                actualUnits(d.abort);
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(preview.item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),
+                    "visibility typed abort setup");
+                verifyConnectedStatus("LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED");
+                preview.visible=false;
+                break;
+            }
+            case 46: {
+                const d=Actual.replay,item=preview.item;
+                check(item===hiddenOriginal && !item.visible && item.runtimeState==="CLOSED"
+                    && item.runtimeStatusText==="","hidden abort survives");
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(!item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),"hidden abort accepted");
+                preview.visible=true;
+                break;
+            }
+            case 47: {
+                const d=Actual.replay,item=preview.item;
+                check(item===hiddenOriginal && item.visible,"abort original re-shown");
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("");
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(!item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),"old abort revived");
+                check(!item.openRuntimeLifetime(d.c),"old terminal lifetime reopened");
+                verifyConnectedStatus("");
+                preview.active=false;
+                hiddenOriginal=null;
+                break;
+            }
+            case 48:
+                check(preview.item===null,"visibility original survived unload");
+                break;
+            case 49:
+                selector.active=true;
+                break;
+            case 50: {
+                const item=selector.item, a=catalogScope(1);
+                check(item && item.catalogState==="CLOSED" && item.catalogRows.length===0,
+                    "selector default closed");
+                item.syntheticOwner=true;
+                item.ownerScope=a;
+                check(!item.receiveCatalog(a,catalogRows()) && item.openCatalog(a),
+                    "explicit catalog open");
+                check(item.catalogState==="PENDING" && !item.selectedAlias,"catalog pending");
+                check(item.receiveCatalog(a,catalogRows()) && item.catalogRows.length===3
+                    && !item.selectedAlias && item.reviewState==="CLOSED","no automatic selection");
+                check(item.catalogRows.every((row,i)=>row.label==="PUBLIC TASK "+(i+1)),
+                    "fixed local labels");
+                check(!item.selectTask(a,"f".repeat(32)),"unknown task");
+                break;
+            }
+            case 51: {
+                const item=selector.item,a=catalogScope(1), rows=catalogRows();
+                const plan=catalogPlan(1,rows[0].taskAlias);
+                item.ownerPlanScope=plan;
+                check(!item.openReview(a,plan),"no review before selection");
+                check(item.selectTask(a,rows[0].taskAlias) && item.reviewState==="CLOSED",
+                    "selection is not review");
+                check(!item.openReview(a,catalogPlan(2,rows[0].taskAlias)),"wrong plan");
+                const opener=descendant(item,"dormantOpenReview");
+                check(opener && opener.activeFocusOnTab,"review opener eligible");
+                if (opener) opener.forceActiveFocus();
+                check(item.openReview(a,plan) && item.reviewState==="PENDING"
+                    && item.catalogRows.length===0,"exclusive review");
+                check(opener && !opener.focus && !opener.activeFocusOnTab,"list focus retired");
+                check(item.receivePlan(a,plan,fixedReviewRows())
+                    && item.reviewRows.length===5,"explicit plan");
+                check(!item.receivePlan(a,catalogPlan(2,rows[0].taskAlias),fixedReviewRows()),
+                    "stale plan received");
+                break;
+            }
+            case 52: {
+                const item=selector.item,a=catalogScope(1), rows=catalogRows();
+                const plan=catalogPlan(1,rows[0].taskAlias);
+                check(item.dismissPlan(a,plan) && item.reviewState==="CLOSED"
+                    && item.catalogRows.length===3 && item.selectedAlias===rows[0].taskAlias,
+                    "review dismiss returns to list");
+                const opener=descendant(item,"dormantOpenReview");
+                check(opener && opener.focus && opener.activeFocusOnTab,"local opener focus returned");
+                check(!item.openReview(a,plan),"review view reused");
+                const next=catalogPlan(2,rows[0].taskAlias);
+                item.ownerPlanScope=next;
+                check(item.openReview(a,next)&&item.receivePlan(a,next,fixedReviewRows()),"fresh review");
+                check(item.selectTask(a,rows[1].taskAlias)&&item.reviewState==="CLOSED"
+                    && item.reviewRows.length===0,"selection retires review");
+                check(!item.receivePlan(a,next,fixedReviewRows()),"retired review packet");
+                const replacement=catalogPlan(4,rows[1].taskAlias);
+                item.ownerPlanScope=replacement;
+                check(item.openReview(a,replacement)&&item.receivePlan(a,replacement,fixedReviewRows()),
+                    "plan owner loss setup");
+                item.ownerPlanScope=null;
+                check(item.reviewState==="CLOSED"&&item.reviewRows.length===0
+                    && item.catalogRows.length===3,"plan owner loss retires only review");
+                check(!item.dismissPlan(a,replacement)&&!item.receivePlan(a,replacement,fixedReviewRows()),
+                    "retired plan owner callbacks");
+                item.ownerPlanScope=replacement;
+                check(!item.openReview(a,replacement),"lost plan owner replay");
+                break;
+            }
+            case 53: {
+                const item=selector.item,a=catalogScope(1),b=catalogScope(2);
+                item.ownerScope=b;
+                check(item.catalogState==="CLOSED"&&!item.selectedAlias,"replacement closes");
+                check(item.openCatalog(b),"new catalog");
+                check(!item.receiveCatalog(a,catalogRows())&&!item.dismissCatalog(a)
+                    && !item.selectTask(a,catalogRows()[0].taskAlias),"stale catalog intent");
+                check(item.receiveCatalog(b,[])&&item.catalogState==="EMPTY","empty distinct");
+                check(!item.receiveCatalog(b,catalogRows())&&item.catalogState==="UNAVAILABLE",
+                    "duplicate refuses current");
+                break;
+            }
+            case 54: {
+                const item=selector.item;
+                const malformed=[[{taskAlias:"raw",title:"private"}],
+                    [catalogRows()[0],catalogRows()[0]],catalogRows().concat(catalogRows()[0]),
+                    [{taskAlias:catalogScope(6).viewKey}]];
+                for(let i=0;i<malformed.length;i++) {
+                    const ref=catalogScope(3+i);
+                    item.ownerScope=ref;
+                    check(item.openCatalog(ref)&&!item.receiveCatalog(ref,malformed[i])
+                        && item.catalogState==="UNAVAILABLE"&&item.catalogRows.length===0,
+                        "malformed whole refusal "+i);
+                }
+                break;
+            }
+            case 55: {
+                const item=selector.item,a=catalogScope(7),rows=catalogRows(),plan=catalogPlan(3,rows[0].taskAlias);
+                item.ownerScope=a;
+                item.ownerPlanScope=plan;
+                check(item.openCatalog(a)&&item.receiveCatalog(a,rows)&&item.selectTask(a,rows[0].taskAlias)
+                    && item.openReview(a,plan)&&item.receivePlan(a,plan,fixedReviewRows()),"expiry setup");
+                check(!item.observeElapsed(a,119999)&&item.reviewState==="DISPLAYING","early expiry");
+                check(!item.observeElapsed(catalogScope(1),120000),"stale expiry");
+                check(item.observeElapsed(a,120000)&&item.catalogState==="CLOSED"
+                    && item.reviewState==="CLOSED"&&!item.selectedAlias,"exact expiry");
+                check(!item.openCatalog(a),"expired lifetime reopened");
+                break;
+            }
+            case 56: {
+                const item=selector.item,a=catalogScope(8);
+                item.ownerScope=a;
+                check(item.openCatalog(a)&&item.receiveCatalog(a,catalogRows()),"compact setup");
+                scene.width=300; scene.height=160;
+                break;
+            }
+            case 57: {
+                const item=selector.item;
+                const body=child(item,"dormantCatalogBody");
+                check(item.eligible&&body.visible&&body.implicitHeight<=body.height,
+                    "compact list geometry");
+                scene.width=299;
+                break;
+            }
+            case 58: {
+                const item=selector.item;
+                check(item.catalogState==="CLOSED"&&item.reviewState==="CLOSED"
+                    && !item.selectedAlias,"viewport loss");
+                scene.width=480; scene.height=240;
+                break;
+            }
+            case 59: {
+                const item=selector.item,a=catalogScope(9);
+                check(!item.openCatalog(catalogScope(8)),"viewport replay");
+                item.ownerScope=a;
+                check(item.openCatalog(a)&&item.receiveCatalog(a,catalogRows()),"owner loss setup");
+                item.syntheticOwner=false;
+                check(item.catalogState==="CLOSED"&&!item.selectedAlias,"owner loss");
+                item.syntheticOwner=true;
+                check(!item.openCatalog(a),"owner replay");
+                check(!item.sourceAuthenticated&&!item.permissionGranted&&!item.productionAuthority
+                    && !item.modelExecutionPermitted&&!item.restorationEnabled&&!item.sendEnabled
+                    && !item.stopEnabled,"selector authority");
+                selector.active=false;
+                break;
+            }
+            case 60:
+                check(selector.item===null&&review.item===null&&preview.item===null,"selector unload");
+                break;
+            case 61:
+                selector.active=true;
+                break;
+            case 62: {
+                const item=selector.item,a=catalogScope(1),rows=catalogRows();
+                item.syntheticOwner=true;
+                item.ownerScope=a;
+                check(item.openCatalog(a)&&item.receiveCatalog(a,rows)
+                    &&item.selectTask(a,rows[0].taskAlias),"cap setup");
+                for(let i=1;i<=64;i++) {
+                    const plan=catalogPlan(i,rows[0].taskAlias);
+                    item.ownerPlanScope=plan;
+                    check(item.openReview(a,plan)&&item.receivePlan(a,plan,fixedReviewRows())
+                        &&item.dismissPlan(a,plan),"review cap "+i);
+                }
+                const over=catalogPlan(65,rows[0].taskAlias);
+                item.ownerPlanScope=over;
+                check(!item.openReview(a,over)&&item.catalogState==="DISPLAYING",
+                    "review cap exhausted");
+                const b=catalogScope(2);
+                item.ownerScope=b;
+                check(item.openCatalog(b)&&item.receiveCatalog(b,rows)
+                    &&item.selectTask(b,rows[0].taskAlias)&&!item.openReview(b,over),
+                    "review cap survives list refresh");
+                break;
+            }
+            case 63: {
+                const item=selector.item;
+                for(let i=3;i<=64;i++) {
+                    const ref=catalogScope(i);
+                    item.ownerScope=ref;
+                    check(item.openCatalog(ref)&&item.receiveCatalog(ref,[])
+                        &&item.dismissCatalog(ref),"catalog cap "+i);
+                }
+                const over=catalogScope(65);
+                item.ownerScope=over;
+                check(!item.openCatalog(over)&&item.catalogState==="CLOSED",
+                    "catalog cap exhausted");
+                check(!item.openCatalog(catalogScope(64)),"old cap reuse");
+                selector.active=false;
+                break;
+            }
+            case 64:
+                check(selector.item===null,"cap fixture unloaded");
+                break;
             default:
                 check(false, "unexpected phase");
             }
@@ -642,7 +948,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 40) {
+            if (p === 64) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

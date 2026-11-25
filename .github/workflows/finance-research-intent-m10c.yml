@@ -1,0 +1,38 @@
+name: Finance Research M10c durable intent recovery native smoke
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/research_investigation_store.mjs"
+      - "scripts/finance/research_investigation_write_intent.mjs"
+      - "scripts/finance/research_investigation_recovery_probe.mjs"
+      - "tests/finance/test_research_m10c_write_intent.mjs"
+      - "tests/finance/test_research_m10b_recovery_probe.mjs"
+      - "tests/finance/test_research_m10a_store_commit_uncertainty.mjs"
+      - ".github/workflows/finance-research-intent-m10c.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-recovery:
+    name: Fedora native intent persistence and SIGKILL recovery comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    container:
+      image: fedora:44
+    steps:
+      - name: Install native Linux Node runtime
+        run: |
+          dnf install -y --setopt=install_weak_deps=False nodejs git
+          node --version
+      - uses: actions/checkout@v4
+      - name: Run M2 and M10a-M10c disposable regression matrix
+        run: |
+          set -eu
+          node tests/finance/test_research_investigations.mjs
+          node tests/finance/test_research_investigation_store.mjs
+          node tests/finance/test_research_m10a_store_commit_uncertainty.mjs
+          node tests/finance/test_research_m10b_recovery_probe.mjs
+          node tests/finance/test_research_m10c_write_intent.mjs

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
+import sqlite3
 import sys
 import unittest
 from unittest import mock
@@ -196,7 +197,8 @@ class StorageBoundaryTests(unittest.TestCase):
         bad = self.fixture.ledger.record(**self.fixture.args())
         bad["hostAuthenticated"] = True
         with mock.patch.object(self.local, "commit", return_value=bad):
-            with self.assertRaisesRegex(M.Refused, "AUTHORITY_PROMOTION"):
+            with self.assertRaisesRegex(
+                    M.UnknownAfterCommit, "COMMIT_RESPONSE_UNKNOWN_HOLD"):
                 self.dev.commit_signed_history(**self.fixture.args())
 
     def test_25_backend_outcome_invents_grant_refused(self):
@@ -234,6 +236,67 @@ class StorageBoundaryTests(unittest.TestCase):
         self.assertEqual(replay["testHeadSha256"], original["testHeadSha256"])
         self.denied(self.protected.protected_required_status())
         print("C3E_STORAGE_LOCAL_ROLLBACK_REPLAY // PROTECTED_AUTHORITY_STILL_HOLD")
+
+    def test_29_committed_then_malformed_ack_requires_original_lookup(self):
+        actual = self.local.commit
+        def commit_then_corrupt(**args):
+            out = actual(**args)
+            out.pop("nextHistorySequence")
+            return out
+        with mock.patch.object(self.local, "commit",
+                               side_effect=commit_then_corrupt) as called:
+            with self.assertRaisesRegex(
+                    M.UnknownAfterCommit, "COMMIT_RESPONSE_UNKNOWN_HOLD_QUERY_OUTCOME_NO_RETRY"
+            ) as caught:
+                self.dev.commit_signed_history(**self.fixture.args())
+            called.assert_called_once()
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+        out = self.dev.lookup_terminal_outcome(self.fixture.challenge)
+        self.denied(out)
+        self.assertEqual(out["testState"], "consumed")
+        self.assertEqual(self.fixture.ledger.snapshot()["previousSequence"],
+                         self.fixture.seq + 1)
+        with self.assertRaisesRegex(M.L.Refused, "ALREADY_CONSUMED"):
+            self.dev.commit_signed_history(**self.fixture.args())
+
+    def test_30_committed_then_database_error_is_unknown_not_refused(self):
+        actual = self.local.commit
+        def commit_then_error(**args):
+            actual(**args)
+            raise sqlite3.OperationalError("private test backend detail")
+        with mock.patch.object(self.local, "commit",
+                               side_effect=commit_then_error) as called:
+            with self.assertRaisesRegex(
+                    M.UnknownAfterCommit, "ACK_UNKNOWN_QUERY_OUTCOME_NO_RETRY"
+            ) as caught:
+                self.dev.commit_signed_history(**self.fixture.args())
+            called.assert_called_once()
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+        self.assertNotIn("private test backend detail", str(caught.exception))
+        out = self.dev.lookup_terminal_outcome(self.fixture.challenge)
+        self.denied(out)
+        self.assertEqual(out["testState"], "consumed")
+
+    def test_31_malformed_ack_primitives_do_not_execute_comparisons(self):
+        class Hostile(str):
+            __hash__ = str.__hash__
+            def __eq__(self, other):
+                raise AssertionError("caller equality must not execute")
+            def __ne__(self, other):
+                raise AssertionError("caller inequality must not execute")
+        good = self.fixture.ledger.record(**self.fixture.args())
+        bad_key = {Hostile(k) if k == "schema" else k: v
+                   for k, v in good.items()}
+        for bad in (bad_key, dict(good, schema=Hostile("schema")),
+                    dict(good, status=Hostile("status"))):
+            with self.subTest(case=type(bad).__name__):
+                with mock.patch.object(self.local, "commit", return_value=bad):
+                    with self.assertRaisesRegex(
+                            M.UnknownAfterCommit, "COMMIT_RESPONSE_UNKNOWN_HOLD"):
+                        self.dev.commit_signed_history(**self.fixture.args())
+        self.denied(self.dev.lookup_terminal_outcome(self.fixture.challenge))
 
 
 if __name__ == "__main__":

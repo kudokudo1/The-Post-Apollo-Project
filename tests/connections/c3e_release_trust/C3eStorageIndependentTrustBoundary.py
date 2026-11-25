@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import re
+import sqlite3
 import sys
 
 HERE = Path(__file__).resolve().parent
@@ -61,7 +62,9 @@ def deny(reason: str):
 
 
 def _no_authority(record: dict, required: set[str]):
-    if type(record) is not dict or set(record) != required:
+    if (type(record) is not dict or len(record) != len(required)
+            or any(type(key) is not str for key in record)
+            or set(record) != required):
         deny("C3E_STORAGE_UNEXPECTED_BACKEND_FIELDS")
     for flag in (set(record) & set(DENIED)):
         if record[flag] is not False:
@@ -154,24 +157,38 @@ class TrustBoundary:
     def commit_signed_history(self, **existing_verifier_args):
         """Call unchanged #2192 verifier via local ledger; never remote trust."""
         adapter = self._require_local()
+        # The adapter may have durably committed before its response can
+        # be validated. Never turn uncertainty after invocation into a
+        # definitive rejection or a reason to issue a second commit.
+        uncertain = False
         try:
             raw = adapter.commit(**existing_verifier_args)
-        except L.UnknownAfterCommit as exc:
+        except (L.UnknownAfterCommit, sqlite3.DatabaseError, OSError):
+            uncertain = True
+        if uncertain:
             raise UnknownAfterCommit(
-                "C3E_STORAGE_LOCAL_ACK_UNKNOWN_QUERY_OUTCOME_NO_RETRY"
-            ) from exc
+                "C3E_STORAGE_LOCAL_ACK_UNKNOWN_QUERY_OUTCOME_NO_RETRY")
         expected = {
             "schema", "status", "developmentOnlyHeadAdvanced",
             "nextHistoryHeadSha256", "nextHistorySequence", *L.DENIED,
         }
-        _no_authority(raw, expected)
-        if (raw["schema"] != L.SCHEMA or raw["status"] != L.STATUS
-                or raw["developmentOnlyHeadAdvanced"] is not True
-                or type(raw["nextHistoryHeadSha256"]) is not str
-                or HEX.fullmatch(raw["nextHistoryHeadSha256"]) is None
-                or type(raw["nextHistorySequence"]) is not int
-                or raw["nextHistorySequence"] < 2):
-            deny("C3E_STORAGE_UNTRUSTED_LOCAL_COMMIT_MALFORMED")
+        malformed = False
+        try:
+            _no_authority(raw, expected)
+            if (type(raw["schema"]) is not str
+                    or type(raw["status"]) is not str
+                    or raw["schema"] != L.SCHEMA or raw["status"] != L.STATUS
+                    or raw["developmentOnlyHeadAdvanced"] is not True
+                    or type(raw["nextHistoryHeadSha256"]) is not str
+                    or HEX.fullmatch(raw["nextHistoryHeadSha256"]) is None
+                    or type(raw["nextHistorySequence"]) is not int
+                    or raw["nextHistorySequence"] < 2):
+                deny("C3E_STORAGE_UNTRUSTED_LOCAL_COMMIT_MALFORMED")
+        except Refused:
+            malformed = True
+        if malformed:
+            raise UnknownAfterCommit(
+                "C3E_STORAGE_LOCAL_COMMIT_RESPONSE_UNKNOWN_HOLD_QUERY_OUTCOME_NO_RETRY")
         return {
             "schema": SCHEMA,
             "status": STATUS_LOCAL,

@@ -46,3 +46,34 @@ enforceable runtime settings, independently established model demand
 and headroom margins before safe native admission. Do not wire hints
 directly into P1 as trusted availability. H2 remains local fixture
 custody, not durable admission. DOC2F and Nurse2F review requested.
+
+
+## H10 // Optional selected-cgroup pressure and memory-event observation
+
+Reuse the H3 held leaf descriptor and before/after identity checks.
+Explicit opt-in only:
+    python3 -B scripts/forest/heart_memory_headroom_h3.py observe --cgroup /system.slice/ollama.service --pressure
+
+Use the actual independently inspected ControlGroup. No new monitor,
+polling service, CPU++ file edit or additional process. CPU++ owns host
+memory diagnostics and recovery; its swap helper already reads host PSI.
+H10 reads only selected cgroup memory.pressure and memory.events twice
+around the existing H3 sample. Both bounded at 4096 bytes per read;
+strict numeric rows, required fields, no symlink following; missing or
+invalid opt-in evidence refuses. Default H3 behavior unchanged.
+
+PSI some/full averages are hundredths of a percent, cumulative total
+and delta in microseconds. memory.events is hierarchical for the
+selected cgroup, includes descendants, not per-process attribution.
+Report known cumulative low/high/max/oom/oom_kill and optional
+oom_group_kill; missing optional counter is null. Unknown future event
+keys are validated for continuity but not emitted. Do not sum parent
+and child counters. Counter rollback or changed key set refuses.
+
+The two reads span a short, non-atomic window; zero observed delta is
+not proof of zero pressure, safe memory capacity, no active workload
+or absence of earlier OOM. Historical totals are not new events;
+host-wide pressure still needs separate evidence. No new thresholds,
+abort policy, trusted requirement or native execution authority.
+Future independently scoped trial must choose actual coverage and
+counter continuity/abort criteria separately. See H9 #2697.

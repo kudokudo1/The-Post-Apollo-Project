@@ -301,3 +301,21 @@ const mismatchPlan=compareCtx.plan(extendedDraft,{rows:[{name:"/dev/zram0",size:
 assert.equal(compareCtx.compare(mismatchPlan,"",false,zctx.parseAlgorithms,advCompareCtx.parse,advCompareCtx.previewSpec,advCompareCtx.validPreview).rows.find(x=>x.key==="zram").status,"SIZE MISMATCH // RESELECT");
 assert.equal(compareCtx.plan(extendedDraft,{rows:[]},false,catalogCtx.validDraft,zctx.algorithmPath,advCompareCtx.paths),null);
 console.log("CPU++ extended profile actual-target comparison PASS");
+
+const appDraft=catalogCtx.capture(extendedDraft,"capacityGiB",24);
+const app=profileCtx.applicationPreview("CUSTOM",appDraft,16777216,60,true,false,catalogCtx.validDraft);
+assert.equal(app.canApply,false);
+assert.equal(app.rows.find(x=>x.key==="capacity").assessment,"INCREASE CANDIDATE");
+assert.match(app.rows.find(x=>x.key==="zram").permission,/PROTECTED DEVICE IDENTITY/);
+assert.match(app.rows.find(x=>x.key==="background").assessment,/INCOMPATIBLE/);
+const shrink=profileCtx.applicationPreview("CUSTOM",appDraft,33554432,60,true,false,catalogCtx.validDraft);
+assert.match(shrink.rows.find(x=>x.key==="capacity").assessment,/REDUCTION/);
+const stale=profileCtx.applicationPreview("CUSTOM",appDraft,16777216,60,false,true,catalogCtx.validDraft);
+assert.equal(stale.rows.find(x=>x.key==="capacity").assessment,"OBSERVATION REQUIRED");
+assert.match(stale.status,/BUSY/);
+const zero=profileCtx.applicationPreview("CUSTOM",catalogCtx.capture(appDraft,"capacityGiB",0),0,60,true,false,catalogCtx.validDraft);
+assert.match(zero.rows.find(x=>x.key==="capacity").assessment,/REMOVAL NOT SUPPORTED/);
+assert.equal(profileCtx.applicationPreview("GAMING",appDraft,0,60,true,false,catalogCtx.validDraft),null);
+assert.equal(profileCtx.applicationPreview("CUSTOM",{...appDraft,unexpected:true},0,60,true,false,catalogCtx.validDraft),null);
+assert.match(profilePane,/objectName: "cpuplusProfileApplyLocked"[\s\S]*?available: false/);
+console.log("CPU++ profile application requirements preview PASS");

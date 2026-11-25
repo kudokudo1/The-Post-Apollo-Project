@@ -54,3 +54,7 @@ seat, or original terminal settlement. The existing isolated CI-only
 SYS_PTRACE capability is unchanged. No runtime or cross-owner source change.
 Operator has explicitly deferred NAS and second-PC setup; do not treat this
 test as approval to provision either machine.
+
+## FOLLOW-UP // Descriptor-bound installed-source digest
+
+The existing CI observer checked pathname metadata and separately reopened the path for its digest. Pin the immediate package directory and open the installed file relative to it with nonblocking/no-follow flags. Verify root ownership and expected modes on the actual descriptors, cap the installed script at 64 KiB, hash only those bounded bytes, and reject observed inode, size, metadata or directory/path changes during the read. Three added regressions exercise ordinary bounded files, oversize/symlink/FIFO refusal, same-byte pathname replacement and in-place modification. The test substitutes only disposable temporary files; the original RPM and runtime are unchanged. This is descriptor-bound snapshot evidence, not a continuous or atomic execution measurement, protection against a privileged administrator, independent source enrollment, or a production privilege decision. Fourteen total native tests expected; exact-head CI and independent review remain required. NAS/second-PC deferral and all production holds remain intact.

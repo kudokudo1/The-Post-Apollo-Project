@@ -57,6 +57,12 @@ jobs:
               'def authorize_disclose_session_titles(',
               'def authorize_disclose_provisional(',
               'def authorize_release_committed_reply(',
+              'def authorize_disclose_tool_input(',
+              'def authorize_delegate_capability(',
+              'def authorize_prune_knowledge(',
+              'TOOL_INPUT_SEPARATE_PROTECTED_DISCLOSURE_REQUIRED',
+              'DELEGATED_CAPABILITY_SEPARATE_PROTECTED_PERMISSION_REQUIRED',
+              'PRUNING_SEPARATE_PROTECTED_POLICY_REQUIRED',
               'PROVISIONAL_OUTPUT_SEPARATE_PROTECTED_PERMISSION_REQUIRED',
               'COMMITTED_REPLY_PROTECTED_RELEASE_POLICY_REQUIRED',
               '"forestListSessionsPermissionGranted": False',
@@ -77,7 +83,7 @@ jobs:
               assert 'ForestC5AuthorityBoundary' not in Path(path).read_text()
           print('FOREST_C5_AUTHORITY_BOUNDARY // NO_LOCAL_FALLBACK_OR_PRODUCTION_AUTHORITY')
           PY
-      - name: 31 Forest C5 refusal and B6 nonauthority tests
+      - name: 33 Forest C5 refusal and B6 nonauthority tests
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

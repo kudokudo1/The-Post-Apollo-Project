@@ -8,15 +8,19 @@ Item {
     id: avPane
     implicitHeight: footer.y + footer.height + 8
     property bool active: false
+    property bool sessionActive: active
+    enabled: active
     signal exitRequested()
     signal historyChosen(var identity, var listing, var snapshot)
 
     FinanceServices.FinanceAlphaVantageFreeService {
         id: av
-        monitoring: avPane.active
+        objectName: "marketAlphaReader"
+        monitoring: avPane.sessionActive
         onSnapshotChanged: avChart.requestPaint()
     }
     function inspectInstrument(item) {
+        if (!active) return false;
         const chosen=av.chooseIdentity(item);
         return chosen;
     }
@@ -235,6 +239,7 @@ Item {
                 width: content.width
                 visible: !!av.selectedListing
                 height: visible ? implicitHeight : 0
+                objectName: "marketAlphaDates"
                 feed: av
                 active: avPane.active
             }

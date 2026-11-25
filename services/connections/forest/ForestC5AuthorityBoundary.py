@@ -202,5 +202,24 @@ class ForestC5AuthorityBoundary:
     def authorize_tool_execution(self, *_args, **_kwargs):
         _deny("FOREST_TOOL_EXECUTION_DISABLED")
 
+    def authorize_disclose_tool_input(self, *_args, **_kwargs):
+        """Tool selection/execution is not permission to transmit its input.
+
+        Future release must bind exact data, purpose, target and recipient.
+        Historical Spirit labels and local availability never establish that.
+        """
+        _deny("TOOL_INPUT_SEPARATE_PROTECTED_DISCLOSURE_REQUIRED")
+
+    def authorize_delegate_capability(self, *_args, **_kwargs):
+        """A task, Tree or Clone selection cannot transfer another grant."""
+        _deny("DELEGATED_CAPABILITY_SEPARATE_PROTECTED_PERMISSION_REQUIRED")
+
+    def authorize_prune_knowledge(self, *_args, **_kwargs):
+        """Deliberate durable shaping is not ordinary context Shedding.
+
+        No historical policy, budget or recommendation authorizes mutation.
+        """
+        _deny("PRUNING_SEPARATE_PROTECTED_POLICY_REQUIRED")
+
     def production_admission(self, *_args, **_kwargs):
         _deny("FOREST_C5_PRODUCTION_AUTHORITY_HOLD")

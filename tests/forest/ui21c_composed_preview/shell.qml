@@ -45,6 +45,10 @@ ShellRoot {
         check(item.runtimeInitialized && item.runtimeEligible && item.openRuntimeLifetime(ref),
             "explicit runtime lifetime");
     }
+    readonly property var emptyHistory: ({treeKey:"CHERRY",generation:3,
+        sessionId:"1".repeat(32),revision:0,viewKey:"a".repeat(32)})
+    readonly property var reopenedHistory: ({treeKey:"CHERRY",generation:4,
+        sessionId:"1".repeat(32),revision:2,viewKey:"b".repeat(32)})
     readonly property var historyA: ({treeKey:"CHERRY", generation:1, sessionId:"1".repeat(32),
         revision:2, viewKey:"2".repeat(32)})
     readonly property var historyB: ({treeKey:"CHERRY", generation:2, sessionId:"1".repeat(32),
@@ -67,6 +71,21 @@ ShellRoot {
         check(!feed.sendEnabled && !feed.showComposer && !feed.richMessageActions,
             "connected execution gate");
         check(!feed.messages.some(row=>row.body==="What is a Tree?"), "literal history leaked");
+    }
+    function verifyConnectedStatus(label) {
+        const item=preview.item, runtime=child(item,"publicFixtureRuntimeStatus");
+        const historyStatus=child(item,"publicFixtureStatus"), feed=child(item,"publicFixtureFeed");
+        check(item && item.visible && !item.transcriptReady && runtime && historyStatus && feed,
+            "connected view depends on literal transcript");
+        if (!item || !runtime || !historyStatus || !feed) return;
+        check(item.runtimeStatusText===label && runtime.visible===(label!==""),
+            "connected operation label");
+        check(!runtime.sendEnabled && !runtime.stopEnabled && !runtime.sourceAuthenticated
+            && !runtime.permissionGranted && !runtime.productionAuthority && !runtime.modelExecutionPermitted,
+            "connected operation authority");
+        check(feed.height>0 && feed.y===historyStatus.height+runtime.height
+            && feed.height===item.height-historyStatus.height-runtime.height,
+            "connected status geometry");
     }
     function verifyLoaded(expectedLabel = "") {
         const item = preview.item;
@@ -238,6 +257,84 @@ ShellRoot {
                 break;
             case 13:
                 check(preview.item===null, "connected fixture survived unload");
+                scene.width=480;
+                scene.height=240;
+                preview.active=true;
+                break;
+            case 14:
+                verifyLoaded();
+                check(preview.item.beginConnectedHistory(), "fresh connected mode");
+                preview.item.historyCurrentScope=emptyHistory;
+                check(preview.item.attachHistoryScope(emptyHistory), "empty revision attach");
+                check(preview.item.openHistoryPage(emptyHistory,pageOne,2), "empty revision request");
+                check(preview.item.receiveHistoryPage(emptyHistory,{
+                    schema:"postapollo.forest.public-history-display.v1", requestId:pageOne,
+                    treeKey:emptyHistory.treeKey,generation:emptyHistory.generation,
+                    sessionId:emptyHistory.sessionId,revision:0,messages:[],complete:true
+                }), "empty complete snapshot");
+                verifyConnected(0,"COMPLETE");
+                check(preview.item.historyNextAfter===null && !preview.item.nextHistoryPage(emptyHistory,pageTwo,2),
+                    "empty completed snapshot offered continuation");
+                // Owner retires old history before NEXT, not in response to status.
+                preview.item.historyCurrentScope=null;
+                openRuntime(firstRef);
+                preview.item.receiveRuntimeUnit(unit(firstRef,1,"REQUEST_PENDING"));
+                scene.width=300;
+                scene.height=160;
+                break;
+            case 15:
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("REQUEST PENDING");
+                preview.item.receiveRuntimeUnit(unit(firstRef,2,"PREPARING"));
+                preview.item.receiveRuntimeUnit(unit(firstRef,3,"GENERATING"));
+                preview.item.receiveRuntimeUnit(unit(firstRef,4,"LOCAL_COMMIT_RECORDED"));
+                break;
+            case 16:
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                // Explicit history attachment/page, not implicit commit refresh.
+                preview.item.historyCurrentScope=reopenedHistory;
+                check(preview.item.attachHistoryScope(reopenedHistory), "committed scope attach");
+                check(preview.item.openHistoryPage(reopenedHistory,pageTwo,1), "committed first page");
+                check(preview.item.receiveHistoryPage(reopenedHistory,
+                    historyPage(reopenedHistory,pageTwo,1,false)), "committed partial");
+                break;
+            case 17:
+                verifyConnected(1,"PARTIAL");
+                verifyConnectedStatus("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                preview.item.invalidateRuntimeLifetime(firstRef);
+                verifyConnected(1,"PARTIAL");
+                verifyConnectedStatus("");
+                check(preview.item.nextHistoryPage(reopenedHistory,pageThree,1), "continuation after status clear");
+                check(preview.item.receiveHistoryPage(reopenedHistory,
+                    historyPage(reopenedHistory,pageThree,2,true)), "committed complete");
+                openRuntime(secondRef);
+                preview.item.receiveRuntimeUnit(unit(secondRef,1,"REQUEST_PENDING"));
+                break;
+            case 18:
+                verifyConnected(2,"COMPLETE");
+                verifyConnectedStatus("REQUEST PENDING");
+                preview.item.receiveRuntimeUnit(unit(secondRef,2,"PREPARING"));
+                preview.item.receiveRuntimeUnit(unit(secondRef,3,"GENERATING"));
+                preview.item.receiveRuntimeUnit(unit(secondRef,4,"STOP_REQUESTED"));
+                preview.item.refuseHistoryScope(reopenedHistory);
+                break;
+            case 19:
+                verifyConnected(0,"UNAVAILABLE");
+                verifyConnectedStatus("STOP REQUESTED // OUTCOME PENDING");
+                preview.item.receiveRuntimeUnit(unit(secondRef,5,"UNKNOWN_HOLD"));
+                preview.item.historyCurrentScope=null;
+                break;
+            case 20:
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("UNKNOWN HOLD // NO AUTOMATIC RETRY");
+                check(!preview.item.beginConnectedHistory(), "connected mode reopened");
+                preview.item.runtimeCurrentCorrelation=null;
+                verifyConnectedStatus("");
+                preview.active=false;
+                break;
+            case 21:
+                check(preview.item===null, "joined presentation survived unload");
                 break;
             default:
                 check(false, "unexpected phase");
@@ -246,7 +343,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 13) {
+            if (p === 21) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

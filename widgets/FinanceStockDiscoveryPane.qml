@@ -7,12 +7,14 @@ Item {
     id: discovery
     implicitHeight: footer.y + footer.height + 8
     property bool active: false
+    property bool sessionActive: active
+    enabled: active
     property bool priceOptionsOpen: false
     signal exitRequested()
     signal quotaRequested()
     signal historyChosen(var identity, var listing, var snapshot)
-    onActiveChanged: {
-        if (!active) priceOptionsOpen = false;
+    onSessionActiveChanged: {
+        if (!sessionActive) priceOptionsOpen = false;
     }
     function inspectPrice(item) {
         if (!active || finder.loading || !finder.ready || !item
@@ -32,9 +34,11 @@ Item {
 
     FinanceServices.FinanceStockDiscoveryService {
         id: finder
-        monitoring: discovery.active
+        objectName: "marketDiscoveryReader"
+        monitoring: discovery.sessionActive
     }
     function searchNow() {
+        if (!active) return;
         if (finder.search(queryInput.text)) priceOptionsOpen=false;
     }
 
@@ -114,6 +118,7 @@ Item {
         }
         TextInput {
             id: queryInput
+            objectName: "marketStockQueryInput"
             anchors.fill: parent
             anchors.margins: 8
             color: Colors.white
@@ -153,7 +158,7 @@ Item {
             accentColor: Colors.magenta
             available: discovery.active && finder.canNext && !finder.loading
             onLeftClicked: {
-                if (finder.nextPage()) discovery.priceOptionsOpen=false;
+                if (discovery.active && finder.nextPage()) discovery.priceOptionsOpen=false;
             }
         }
     }
@@ -277,6 +282,7 @@ Item {
         anchors.right: parent.right
         height: visible ? implicitHeight : 0
         visible: discovery.priceOptionsOpen
+        sessionActive: discovery.sessionActive && discovery.priceOptionsOpen
         active: discovery.active && discovery.priceOptionsOpen
         onExitRequested: discovery.priceOptionsOpen = false
         onHistoryChosen: function(identity, listing, snapshot) {

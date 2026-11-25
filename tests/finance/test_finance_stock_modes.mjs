@@ -65,9 +65,13 @@ assert.match(presetHandler,/startDate = window.from;/);
 assert.match(presetHandler,/endDate = window.to;/);
 assert.match(presetHandler,/clear\(\);/);
 assert.doesNotMatch(presetHandler,/reader.exec|refresh\(|writeFile|Qt.openUrlExternally/);
-for (const label of ["7D","30D","90D","180D"])
-  assert.ok(stocksPane.includes('label:"'+label+'"'));
-assert.ok(stocksPane.includes("stocks.stockFeed.selectPresetRange(modelData.days)"));
+for(const [file,feed] of [["FinanceGlobalPricePane.qml","priceFeed"],["FinanceAlphaVantageFreePane.qml","av"]]){
+  const providerPane=readSource("../../widgets/"+file);
+  for (const label of ["7D","30D","90D","180D"])
+    assert.ok(providerPane.includes('label:"'+label+'"'));
+  assert.ok(providerPane.includes(feed+".selectPreset(modelData.days)"));
+}
+assert.ok(!stocksPane.includes("stocks.stockFeed.selectPresetRange(modelData.days)"));
 assert.ok(stocksPane.includes("visible: !stocks.dayMode"));
 assert.equal((marketService.match(/reader.exec\(\[/g)||[]).length,1);
 

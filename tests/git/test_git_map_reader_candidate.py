@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import select
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,26 @@ time.sleep(60)
                 reader.Reader(*args)
         self.assertTrue(self.exclusive_available(self.path))
         self.assert_preserved()
+
+    def test_malformed_manifest_refuses_without_receipt_or_lock_leak(self):
+        db=self.path/manager.index.NAME
+        args=(self.cache,self.old["repoId"],self.old["key"],self.old["manifest"]["snapshot"])
+        for value in ("[]","null","true","42",'"string"',"{"):
+            with sqlite3.connect(db) as conn:
+                conn.execute("UPDATE manifest SET document=?",(value,))
+            conn.close()
+            digest=hashlib.sha256(db.read_bytes()).hexdigest()
+            with self.assertRaises(ValueError): reader.Reader(*args)
+            self.assertTrue(self.exclusive_available(self.path))
+            result=subprocess.run(self.cmd(self.old),env=self.env,input="",
+                    stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=5)
+            self.assertEqual(result.returncode,1)
+            self.assertEqual(result.stdout,"")
+            self.assertIn("Reader custody unavailable",result.stderr)
+            self.assertNotIn("Traceback",result.stderr)
+            self.assertTrue(self.exclusive_available(self.path))
+            self.assertEqual(hashlib.sha256(db.read_bytes()).hexdigest(),digest)
+            self.assertTrue(Path(self.new["directory"]).exists())
 
     def test_symlink_and_unexpected_pipe_data_refused(self):
         args=(self.cache,self.old["repoId"],self.old["key"],self.old["manifest"]["snapshot"])

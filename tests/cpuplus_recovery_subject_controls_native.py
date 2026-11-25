@@ -139,7 +139,7 @@ def run(trial):
                         break
                 else: raise AssertionError("Wrapper timeout")
             witness()
-            if proc.wait(timeout=5) or ("R6H_NATIVE_PASS // "+trial).encode() not in output or ("CPU_M8B_CONTROLS_PASS // "+trial).encode() not in output or exits!=set(range(1,final+1)):
+            if proc.wait(timeout=5) or ("R6H_NATIVE_PASS // "+trial).encode() not in output or ("CPU_M8B_CONTROLS_PASS // "+trial).encode() not in output or ("CPU_M8D_V2_SELECTION_PASS // "+trial).encode() not in output or exits!=set(range(1,final+1)):
                 raise AssertionError("Wrapper native qualification failed")
             cp=root/"checkpoint"
             for key,value in before.items():

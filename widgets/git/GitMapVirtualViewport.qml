@@ -13,6 +13,27 @@ Rectangle {
     border.color: Colors.cyan
     border.width: 1
     readonly property int rowHeight: 24
+    readonly property int lanePitch: 22
+    readonly property int laneMargin: 16
+    readonly property int laneTotal: mapState ? mapState.maxLane+1 : 1
+    // A lane window, not an unbounded canvas. Keep room for commit labels.
+    readonly property real graphSurfaceWidth: graph.width
+    readonly property int laneWindowCount: Math.max(1,Math.floor((graph.width-2*laneMargin)/lanePitch)+1)
+    readonly property int laneMaxOffset: Math.max(0,laneTotal-laneWindowCount)
+    property int laneOffset: 0
+    onLaneMaxOffsetChanged: setLaneOffset(laneOffset)
+    onLaneOffsetChanged: graph.requestPaint()
+    function setLaneOffset(value) {
+        laneOffset=Math.max(0,Math.min(laneMaxOffset,Math.floor(value)));
+    }
+    function graphLaneVisible(lane) {
+        return lane>=laneOffset && lane<laneOffset+laneWindowCount
+            && graph.laneX(lane)>=laneMargin && graph.laneX(lane)<=graph.width-laneMargin;
+    }
+    function ensureLaneVisible(lane) {
+        if (lane<laneOffset) setLaneOffset(lane);
+        else if (lane>=laneOffset+laneWindowCount) setLaneOffset(lane-laneWindowCount+1);
+    }
     property alias requestsEnabled: bridge.requestsEnabled
     property alias custodyBase: bridge.custodyBase
     property alias custodyLease: bridge.custodyLease
@@ -67,6 +88,7 @@ Rectangle {
     }
     onRecentRepoChanged: {
         recentY=0;
+        laneOffset=0;
         if (!indexedActive && flick) flick.contentY=0;
         if (!externalSelection) selectedSha="";
     }
@@ -102,8 +124,10 @@ Rectangle {
 
     function activate(directory, manifest, anchor, generation) {
         applyingGeometry = true;
+        const previousRepo=bridge.state ? bridge.state.repoId : "";
         const ok = bridge.activate(directory,manifest,rowHeight,Math.max(1,flick.height),anchor,generation);
         if (ok) {
+            if (previousRepo!==manifest.repoId) laneOffset=0;
             flick.cancelFlick();
             if (indexedActive) flick.contentY = bridge.state.y;
             if (!externalSelection) selectedSha = "";
@@ -126,6 +150,7 @@ Rectangle {
     function choose(ordinal) {
         const row = rowAt(ordinal);
         if (!row) return false;
+        ensureLaneVisible(row.lane);
         if (!externalSelection) selectedSha = row.sha;
         commitSelected(row.sha);
         return true;
@@ -144,14 +169,44 @@ Rectangle {
         id: header
         anchors.top: parent.top
         anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.right: laneControls.visible ? laneControls.left : parent.right
         anchors.margins: 8
         height: 24
-        text: root.mapState ? root.titleText + " // " + root.mapState.total + (root.indexedActive ? " LOCAL COMMITS" : " AVAILABLE COMMITS") + (graph.laneX(root.mapState.maxLane) >= graph.width-14 ? " // LANES CLIPPED" : "") : root.titleText + " // NO INDEX"
+        text: root.mapState ? root.titleText + " // " + root.mapState.total + (root.indexedActive ? " LOCAL COMMITS" : " AVAILABLE COMMITS") : root.titleText + " // NO INDEX"
         color: Colors.magenta
         font.pixelSize: 12
         textFormat: Text.PlainText
         elide: Text.ElideRight
+    }
+    Row {
+        id: laneControls
+        anchors.top: header.top
+        anchors.right: parent.right
+        anchors.rightMargin: 8
+        height: header.height
+        spacing: 4
+        visible: root.laneMaxOffset>0
+        ActionButton {
+            width: 32; height: parent.height
+            label: "◀"
+            available: root.laneOffset>0
+            onLeftClicked: root.setLaneOffset(root.laneOffset-root.laneWindowCount)
+        }
+        GohuText {
+            width: 112; height: parent.height
+            text: "LANES "+(root.laneOffset+1)+"-"+Math.min(root.laneTotal,root.laneOffset+root.laneWindowCount)+"/"+root.laneTotal
+            color: Colors.cyan
+            font.pixelSize: 10
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        ActionButton {
+            width: 32; height: parent.height
+            label: "▶"
+            available: root.laneOffset<root.laneMaxOffset
+            onLeftClicked: root.setLaneOffset(root.laneOffset+root.laneWindowCount)
+        }
     }
     Flickable {
         id: flick
@@ -184,7 +239,7 @@ Rectangle {
             id: graph
             x: 0
             y: flick.contentY
-            width: Math.min(190, Math.max(0,flick.width/3), 34+22*Math.min(7,root.mapState ? root.mapState.maxLane+1 : 1))
+            width: Math.min(2*root.laneMargin+root.lanePitch*(root.laneTotal-1), Math.max(0,Math.min(flick.width*0.60,flick.width-144)))
             height: flick.height
             onYChanged: requestPaint()
             onWidthChanged: requestPaint()
@@ -193,7 +248,7 @@ Rectangle {
                 target: bridge
                 function onStateChanged() { graph.requestPaint(); }
             }
-            function laneX(lane) { return 14 + lane * 22; }
+            function laneX(lane) { return root.laneMargin + (lane-root.laneOffset)*root.lanePitch; }
             function laneColor(lane) {
                 return [Colors.orange,Colors.cyan,Colors.magenta,Colors.blue,Colors.green,Colors.red][lane%6];
             }
@@ -223,7 +278,7 @@ Rectangle {
                             ctx.globalAlpha=0.90;
                             for (const key of Object.keys(frontier)) {
                                 const lane=frontier[key], x=laneX(lane);
-                                if (x>=width) continue;
+                                if (x<0 || x>=width) continue;
                                 ctx.strokeStyle=laneColor(lane);
                                 ctx.beginPath();ctx.moveTo(x,y);
                                 ctx.lineTo(x,key===row.sha?middle:y+root.rowHeight);ctx.stroke();
@@ -270,8 +325,9 @@ Rectangle {
                 Item {
                     width: graph.width
                     height: parent.height
-                    // The outer viewport clips the graph, not each 24px halo.
-                    visible: rowItem.record !== null && graph.laneX(rowItem.record.lane)<width-14
+                    // Clip graph-only effects before the separate label column.
+                    clip: true
+                    visible: !!rowItem.record && root.graphLaneVisible(rowItem.record.lane)
                     Rectangle {
                         width: rowItem.decoration.isHead || rowItem.decoration.refsText ? 10 : 8
                         height: width
@@ -306,7 +362,7 @@ Rectangle {
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         color: star.color
-                        layer.enabled: !!rowItem.record && graph.laneX(rowItem.record.lane)<graph.width-14
+                        layer.enabled: !!rowItem.record && root.graphLaneVisible(rowItem.record.lane)
                         layer.effect: DropShadow {
                             radius: 8
                             samples: 17
@@ -331,8 +387,19 @@ Rectangle {
                         layer.enabled: false
                     }
                 }
+                GohuText {
+                    width: graph.width; height: parent.height
+                    visible: !!rowItem.record && !root.graphLaneVisible(rowItem.record.lane)
+                    text: rowItem.record ? (rowItem.record.lane<root.laneOffset ? "◀ L" : "L")+ (rowItem.record.lane+1)+(rowItem.record.lane>=root.laneOffset ? " ▶" : "") : ""
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                }
                 Row {
-                    x: graph.width
+                    x: graph.width+8
+                    clip: true
                     width: Math.max(0,parent.width-x)
                     height: parent.height
                     spacing: 4

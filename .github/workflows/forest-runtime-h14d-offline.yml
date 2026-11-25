@@ -1,0 +1,20 @@
+name: Forest Runtime H14-D offline sequence
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/h14d_runtime_sequence.py'
+      - 'tests/forest/test_h14d_runtime_sequence.py'
+      - 'tests/forest/h14d_resource_witness.py'
+      - '.github/workflows/forest-runtime-h14d-offline.yml'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fixed-public offline reference and Heart regression
+        run: |
+          python3 -m unittest discover -s tests/forest -p 'test_h14d_runtime_sequence.py' -v
+          python3 -m unittest discover -s tests/forest -p 'test_h14d_resource_witness.py' -v

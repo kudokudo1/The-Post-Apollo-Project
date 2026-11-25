@@ -18,11 +18,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     for name in ("CpuPlusQueuePane.qml","CpuPlusQueueConsumer.js","CpuPlusQueuePresentation.js",
                  "CpuPlusQueueHistory.js","CpuPlusQueueRecovery.js","CpuPlusQueueRecoveryPane.qml"):
         shutil.copy2(ROOT/"widgets/cpuplus"/name,widgets/name)
-    # Only DOC 2's exact candidate pane and parser are overlaid. The host,
-    # owner, pipe and all other components come from actual checkout.
-    candidate=ROOT/"candidate-recovery-ui/widgets/cpuplus"
-    for name in ("CpuPlusQueueRecovery.js","CpuPlusQueueRecoveryPane.qml"):
-        shutil.copy2(candidate/name,widgets/name)
+    # Both candidates are merged: use actual checkout only.
     shutil.copytree(ROOT/"services/memory",config/"memory")
     shutil.copy2(ROOT/"tests/fixtures/CpuPlusQueueRecoveryNative.qml",config/"smoke.qml")
     child=config/"child.py"
@@ -40,3 +36,5 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     print(proc.stdout)
     if proc.returncode or "QUEUE_R3_RECOVERY_PASS" not in proc.stdout or "QUEUE_R3_RECOVERY_FAIL" in proc.stdout:
         raise SystemExit("Native recovery fixture failed")
+    if env.get("POST_APOLLO_QUEUE_WATCHDOG_TRIAL")=="1" and "QUEUE_R3_WATCHDOG_PASS" not in proc.stdout:
+        raise SystemExit("Native watchdog fixture failed")

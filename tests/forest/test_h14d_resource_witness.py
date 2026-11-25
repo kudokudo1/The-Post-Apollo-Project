@@ -185,6 +185,22 @@ class ResourceWitnessTests(unittest.TestCase):
             preflight_outer(fresh_parent, b, selected=(0,1),
                             now_ns=1_000_000_201, expected_leaf=(1,11))
 
+    def test_first_observation_completion_boundary_both_scopes(self):
+        # First start can be on time while the completed observation is late.
+        boundary = 200 + 1_000_000_000
+        first = replace(self.active, start_ns=boundary-100, end_ns=boundary)
+        final = replace(self.final, start_ns=boundary+100, end_ns=boundary+200)
+        for scope, baseline in (("DIRECT", None),
+                                ("RETAINED_OUTER", self.outer_baseline())):
+            with self.subTest(scope=scope):
+                args = dict(selected=(0,1), launch_ns=200,
+                            expected_leaf=(1,11), scope=scope, baseline=baseline)
+                self.assertEqual(evaluate(self.parent, (first, final), **args)["status"],
+                                 "RESOURCE_ENVELOPE_OBSERVED")
+                late = replace(first, end_ns=boundary+1)
+                with self.assertRaisesRegex(Hold, "FIRST_OBSERVATION_LATE"):
+                    evaluate(self.parent, (late, final), **args)
+
     def test_baseline_counter_continuity_and_first_active(self):
         b = self.outer_baseline()
         for active in (

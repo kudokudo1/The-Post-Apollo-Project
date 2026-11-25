@@ -239,7 +239,7 @@ Item {
         stdinEnabled: true
         onStarted: {
             if (root.startedSeen || root.phase !== "STARTING" || !processId
-                || !root.current || root.phaseClock.elapsedMs()>=5000) {
+                || !root.current || phaseClock.elapsedMs()>=5000) {
                 root.hold("START"); return;
             }
             root.startedSeen = true;

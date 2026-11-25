@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "./widgets" as Widgets
 
 // Actual ForestW PanelWindow, never an operator desktop or native model host.
@@ -19,6 +20,8 @@ ShellRoot {
     property string joinedLast: ""
     property bool joinedReopened: false
     property int joinedStart: 0
+    property string dbStage: ""
+    property int dbChecks: 0
     function check(ok, reason) {
         if (!ok) {
             failed = true;
@@ -219,7 +222,7 @@ ShellRoot {
         p.finished.connect(function() {
             check(p.reaped && !p.running && !p.failure && p.closeResult
                 && p.outcome==="ABORTED_LOCAL" && p.wire.snapshot().ended
-                && joinedCommits===2 && joinedPages===4 && joinedReopened
+                && joinedCommits===2 && joinedPages===4 && joinedReopened && dbChecks===3
                 && !item.historyScopeActive && item.runtimeState==="CLOSED","joined terminal");
             if (!failed) console.info("FOREST_HOST_JOINED_PASS");
             finish();
@@ -255,12 +258,12 @@ ShellRoot {
                 joinedAlias=p.sessionAlias;
                 joinedRows=feed.messages.map(x=>x.turnId);
                 ok=item.fixtureState==="COMPLETE" && feed.messages.length===4
-                    && p.request("REOPEN") && feed.messages.length===0;
+                    && waitForDb("BEFORE");
             } else {
                 ok=item.fixtureState==="COMPLETE" && feed.messages.length===4
                     && p.sessionAlias===joinedAlias
                     && feed.messages.every((x,i)=>x.turnId===joinedRows[i])
-                    && p.request("NEXT") && feed.messages.length===0;
+                    && waitForDb("AFTER");
             }
         } else if (joinedLast==="JOURNAL_REOPENED") {
             joinedReopened=true;
@@ -270,10 +273,51 @@ ShellRoot {
                 && p.outcome!=="ABORTED_LOCAL" && feed.messages.length===0 && p.request("STEP");
         else if (joinedLast==="ABORTED_LOCAL")
             ok=p.phase==="BLOCKED" && p.outcome==="ABORTED_LOCAL"
-                && feed.messages.length===0 && !p.request("NEXT") && p.request("CLOSE");
+                && feed.messages.length===0 && !p.request("NEXT") && waitForDb("ABORT");
         else if (joinedLast==="CLOSED") return;
         check(ok,"joined action "+joinedLast);
         if (failed) p.hold("JOINED_HARNESS");
+    }
+    // Private CI-only gate, not a Runtime frame or production authorization.
+    // The external harness observes the still-open journal independently.
+    FileView {
+        id: dbAck
+        path: Quickshell.shellPath("db-observer-ack")
+        blockLoading: false
+        printErrors: false
+    }
+    function waitForDb(stage) {
+        if (dbStage!=="" || !joinedParent.live() || joinedParent.pending) return false;
+        dbStage=stage;
+        console.info("FOREST_HOST_DB_STAGE "+stage);
+        dbPoll.start();
+        return true;
+    }
+    Timer {
+        id: dbPoll
+        interval: 75
+        repeat: true
+        onTriggered: {
+            const p=witness.joinedParent;
+            if (!p || !p.live() || p.pending || witness.failed) {
+                stop(); witness.check(false,"DB gate expired");
+                if (p) p.hold("DB_GATE");
+                return;
+            }
+            if (!dbAck.loaded || dbAck.text()!==witness.dbStage) {
+                dbAck.reload(); return;
+            }
+            stop();
+            const stage=witness.dbStage;
+            witness.dbStage="";
+            witness.dbChecks++;
+            const feed=witness.find(witness.parts.loader.item,"publicFixtureFeed");
+            const ok=stage==="BEFORE" ? p.request("REOPEN") && feed.messages.length===0
+                : stage==="AFTER" ? p.request("NEXT") && feed.messages.length===0
+                : stage==="ABORT" && p.request("CLOSE");
+            witness.check(ok,"DB gate action");
+            if (!ok) p.hold("DB_GATE");
+        }
     }
     Timer { id: joinedDrive; interval: 30; onTriggered: witness.driveJoined() }
     Timer { id: joinedMount; interval: 350; repeat:true

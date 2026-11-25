@@ -6,7 +6,9 @@ No native command or user-account provider is contacted.
 from __future__ import annotations
 
 import ast
+import hashlib
 import os
+import secrets
 from pathlib import Path
 import shutil
 import sqlite3
@@ -21,6 +23,7 @@ sys.path.insert(0, str(ROOT / "services" / "identity"))
 from local_command_outcome_hold_reference_v0 import (
     OutcomeHoldRefused, SCHEMA, TestOnlyLocalOutcomeFence,
 )
+from signed_command_receipt_v0 import build_request
 
 _FIXTURE = """
 CREATE TABLE command_attempt(
@@ -30,6 +33,17 @@ CREATE TABLE command_attempt(
     request_digest TEXT
 );
 PRAGMA user_version=1;
+"""
+_FIXTURE_V2 = """
+CREATE TABLE command_attempt(
+    slot INTEGER PRIMARY KEY CHECK(slot=1),
+    attempt_id TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('BEGIN','STATUS','CANCEL','RECOVER')),
+    request_digest TEXT,
+    nonce_digest TEXT NOT NULL,
+    frame_digest TEXT NOT NULL
+);
+PRAGMA user_version=2;
 """
 ID_A = "a" * 32
 ID_B = "b" * 32
@@ -53,6 +67,116 @@ class TestOnlyOutcomeHoldTests(unittest.TestCase):
                       "can_connect_provider", "issuer_reconciled",
                       "production_authority"):
             self.assertIs(getattr(state, field), False)
+
+    def _v2(self):
+        path = Path(self.temp.name) / "prepared.sqlite"
+        with sqlite3.connect(path) as db:
+            db.executescript(_FIXTURE_V2)
+        return path, TestOnlyLocalOutcomeFence(path)
+
+    def test_v2_exact_prepared_commitments_reopen_and_no_plaintext(self):
+        path, store = self._v2()
+        nonce = secrets.token_urlsafe(32)
+        result = store.reserve_prepared_command(
+            attempt_id=ID_A, action="CANCEL", request_id=REQUEST_ID,
+            client_nonce=nonce)
+        self.assert_held(result)
+        commitment = result.prepared_commitment
+        self.assertEqual(commitment.request_sha256,
+                         hashlib.sha256(REQUEST_ID.encode("ascii")).hexdigest())
+        self.assertEqual(commitment.nonce_sha256,
+                         hashlib.sha256(nonce.encode("ascii")).hexdigest())
+        wire = build_request("CANCEL", REQUEST_ID, nonce)
+        self.assertEqual(commitment.frame_sha256,
+                         hashlib.sha256(wire).hexdigest())
+        self.assertEqual(TestOnlyLocalOutcomeFence(path).inspect(), result)
+        raw = path.read_bytes()
+        for value in (REQUEST_ID.encode(), nonce.encode(), wire):
+            self.assertNotIn(value, raw)
+
+    def test_v2_child_abrupt_exit_preserves_original_prepared_frame(self):
+        path, store = self._v2()
+        nonce = secrets.token_urlsafe(32)
+        code = (
+            "import os,sys;"
+            "from pathlib import Path;"
+            "sys.path.insert(0,sys.argv[2]);"
+            "from local_command_outcome_hold_reference_v0 import TestOnlyLocalOutcomeFence;"
+            "s=TestOnlyLocalOutcomeFence(Path(sys.argv[1]));"
+            "s.reserve_prepared_command(attempt_id=sys.argv[3], action='BEGIN',"
+            "request_id=None,client_nonce=sys.argv[4]);"
+            "os._exit(23)"
+        )
+        child = subprocess.run(
+            [sys.executable, "-B", "-c", code, str(path),
+             str(ROOT / "services" / "identity"), ID_A, nonce],
+            capture_output=True, text=True, timeout=15)
+        self.assertEqual(child.returncode, 23, child.stderr)
+        result = store.inspect()
+        self.assert_held(result)
+        self.assertEqual(result.attempt_id, ID_A)
+        self.assertIsNone(result.prepared_commitment.request_sha256)
+        self.assertEqual(result.prepared_commitment.frame_sha256,
+                         hashlib.sha256(build_request("BEGIN", None, nonce)).hexdigest())
+        with self.assertRaises(OutcomeHoldRefused):
+            store.reserve_prepared_command(
+                attempt_id=ID_B, action="BEGIN", request_id=None,
+                client_nonce=secrets.token_urlsafe(32))
+
+    def test_v2_no_implicit_upgrade_or_legacy_partial_reservation(self):
+        nonce = secrets.token_urlsafe(32)
+        with self.assertRaises(OutcomeHoldRefused):
+            self.store.reserve_prepared_command(
+                attempt_id=ID_A, action="BEGIN", request_id=None,
+                client_nonce=nonce)
+        self.assertIsNone(self.store.inspect().prepared_commitment)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 1)
+        path, store = self._v2()
+        with self.assertRaises(OutcomeHoldRefused):
+            store.reserve_before_possible_send(attempt_id=ID_A, action="BEGIN")
+        self.assertEqual(store.inspect().reason, "EMPTY_OR_ROLLED_BACK_LOCAL_HISTORY")
+        self.assertIsNone(store.inspect().prepared_commitment)
+
+    def test_v2_wrong_native_request_or_nonce_refuses_without_row(self):
+        _, store = self._v2()
+        for action, rid, nonce in (
+            ("BEGIN", None, "bad"),
+            ("STATUS", "short-id", secrets.token_urlsafe(32)),
+            ("BEGIN", None, b"x"*43),
+            ("RECOVER", None, secrets.token_urlsafe(32)),
+        ):
+            with self.subTest(action=action, nonce_type=type(nonce).__name__):
+                with self.assertRaises(OutcomeHoldRefused):
+                    store.reserve_prepared_command(
+                        attempt_id=ID_A, action=action, request_id=rid,
+                        client_nonce=nonce)
+        self.assertEqual(store.inspect().reason, "EMPTY_OR_ROLLED_BACK_LOCAL_HISTORY")
+
+    def test_v2_corrupt_component_commitment_fails_closed(self):
+        path, store = self._v2()
+        store.reserve_prepared_command(
+            attempt_id=ID_A, action="BEGIN", request_id=None,
+            client_nonce=secrets.token_urlsafe(32))
+        with sqlite3.connect(path) as db:
+            db.execute("UPDATE command_attempt SET nonce_digest='bad'")
+        result = store.inspect()
+        self.assert_held(result)
+        self.assertEqual(result.reason, "INVALID_LOCAL_HISTORY")
+        self.assertIsNone(result.prepared_commitment)
+
+    def test_v2_rollback_remains_unknown_not_absence_proof(self):
+        path, store = self._v2()
+        backup = path.with_suffix(".backup")
+        shutil.copyfile(path, backup)
+        store.reserve_prepared_command(
+            attempt_id=ID_A, action="BEGIN", request_id=None,
+            client_nonce=secrets.token_urlsafe(32))
+        shutil.copyfile(backup, path)
+        result = store.inspect()
+        self.assert_held(result)
+        self.assertEqual(result.reason, "EMPTY_OR_ROLLED_BACK_LOCAL_HISTORY")
+        self.assertIsNone(result.prepared_commitment)
 
     def test_preexisting_empty_store_never_means_clear_to_send(self):
         state = self.store.inspect()

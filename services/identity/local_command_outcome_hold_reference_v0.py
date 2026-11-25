@@ -19,14 +19,26 @@ import re
 import sqlite3
 from urllib.parse import quote
 
+from signed_command_receipt_v0 import build_request, ReceiptRejected
+
 SCHEMA = "post-apollo.identity.local-command-outcome-hold.test-v0"
 ACTIONS = frozenset(("BEGIN", "STATUS", "CANCEL", "RECOVER"))
 _ATTEMPT = re.compile(r"[0-9a-f]{32}\Z", re.ASCII)
 _REQUEST = re.compile(r"[A-Za-z0-9_-]{8,128}\Z", re.ASCII)
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 
 
 class OutcomeHoldRefused(ValueError):
     """A local diagnostic cannot reserve another ambiguous native operation."""
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedCommandCommitment:
+    """Exact prepared frame digests, NOT an observation of actual transmission."""
+
+    request_sha256: str | None
+    nonce_sha256: str
+    frame_sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +55,7 @@ class LocalOutcomeHold:
     can_connect_provider: bool = False
     issuer_reconciled: bool = False
     production_authority: bool = False
+    prepared_commitment: PreparedCommandCommitment | None = None
 
 
 class TestOnlyLocalOutcomeFence:
@@ -78,9 +91,10 @@ class TestOnlyLocalOutcomeFence:
         return db
 
     @staticmethod
-    def _schema_ok(db: sqlite3.Connection) -> bool:
-        if db.execute("PRAGMA user_version").fetchone()[0] != 1:
-            return False
+    def _schema_version(db: sqlite3.Connection) -> int | None:
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (1, 2):
+            return None
         # This recognizes the local developer fixture, NOT trusted custody.
         columns = db.execute("PRAGMA table_info(command_attempt)").fetchall()
         expected = (
@@ -89,9 +103,14 @@ class TestOnlyLocalOutcomeFence:
             ("action", "TEXT", 0),
             ("request_digest", "TEXT", 0),
         )
-        return (len(columns) == len(expected)
+        if version == 2:
+            expected += (("nonce_digest", "TEXT", 0),
+                         ("frame_digest", "TEXT", 0))
+        if (len(columns) == len(expected)
                 and all((row[1], row[2], row[5]) == want
-                        for row, want in zip(columns, expected)))
+                        for row, want in zip(columns, expected))):
+            return version
+        return None
 
     @staticmethod
     def _validate(*, attempt_id: str, action: str,
@@ -111,10 +130,13 @@ class TestOnlyLocalOutcomeFence:
 
     @staticmethod
     def _held(reason: str, *, attempt_id: str | None = None,
-              action: str | None = None) -> LocalOutcomeHold:
+              action: str | None = None,
+              prepared_commitment: PreparedCommandCommitment | None = None
+              ) -> LocalOutcomeHold:
         return LocalOutcomeHold(
             schema=SCHEMA, state="UNKNOWN_HOLD", reason=reason,
             attempt_id=attempt_id, action=action,
+            prepared_commitment=prepared_commitment,
         )
 
     def reserve_before_possible_send(self, *, attempt_id: str,
@@ -129,41 +151,85 @@ class TestOnlyLocalOutcomeFence:
         """
         digest = self._validate(
             attempt_id=attempt_id, action=action, request_id=request_id)
+        return self._reserve(attempt_id=attempt_id, action=action,
+                             request_digest=digest, prepared=None)
+
+    def reserve_prepared_command(self, *, attempt_id: str, action: str,
+                                 request_id: str | None,
+                                 client_nonce: str) -> LocalOutcomeHold:
+        """Rehearse exact native pre-send binding in an explicit V2 fixture.
+
+        Derive the commitments from the existing strict request serializer;
+        never accept independently supplied frame/nonce hashes as matching.
+        Store no raw nonce, request ID or serialized bytes. No actual send,
+        native client integration, authority, auto migration or settlement.
+        """
+        digest = self._validate(attempt_id=attempt_id, action=action,
+                                request_id=request_id)
+        try:
+            wire = build_request(action, request_id, client_nonce)
+        except ReceiptRejected:
+            raise OutcomeHoldRefused("Invalid prepared native command") from None
+        prepared = PreparedCommandCommitment(
+            request_sha256=digest,
+            nonce_sha256=hashlib.sha256(client_nonce.encode("ascii")).hexdigest(),
+            frame_sha256=hashlib.sha256(wire).hexdigest(),
+        )
+        return self._reserve(attempt_id=attempt_id, action=action,
+                             request_digest=digest, prepared=prepared)
+
+    def _reserve(self, *, attempt_id: str, action: str,
+                 request_digest: str | None,
+                 prepared: PreparedCommandCommitment | None) -> LocalOutcomeHold:
+        version = 1 if prepared is None else 2
         try:
             with closing(self._connect(write=True)) as db, db:
                 db.execute("BEGIN IMMEDIATE")
-                if not self._schema_ok(db):
+                if self._schema_version(db) != version:
                     raise OutcomeHoldRefused("Local hold schema missing or changed")
                 if db.execute("SELECT COUNT(*) FROM command_attempt").fetchone()[0]:
                     raise OutcomeHoldRefused("Prior local command outcome remains unresolved")
-                db.execute(
-                    "INSERT INTO command_attempt"
-                    " (slot, attempt_id, action, request_digest)"
-                    " VALUES (1, ?, ?, ?)",
-                    (attempt_id, action, digest),
-                )
+                if prepared is None:
+                    db.execute(
+                        "INSERT INTO command_attempt"
+                        " (slot, attempt_id, action, request_digest)"
+                        " VALUES (1, ?, ?, ?)",
+                        (attempt_id, action, request_digest),
+                    )
+                else:
+                    db.execute(
+                        "INSERT INTO command_attempt"
+                        " (slot, attempt_id, action, request_digest,"
+                        " nonce_digest, frame_digest) VALUES (1, ?, ?, ?, ?, ?)",
+                        (attempt_id, action, request_digest,
+                         prepared.nonce_sha256, prepared.frame_sha256),
+                    )
                 db.execute("COMMIT")
-        except sqlite3.Error as exc:
-            raise OutcomeHoldRefused("Local hold store unavailable") from exc
-        return self._held("LOCAL_ATTEMPT_UNSETTLED",
-                          attempt_id=attempt_id, action=action)
+        except sqlite3.Error:
+            raise OutcomeHoldRefused("Local hold store unavailable") from None
+        return self._held("LOCAL_ATTEMPT_UNSETTLED", attempt_id=attempt_id,
+                          action=action, prepared_commitment=prepared)
 
     def inspect(self) -> LocalOutcomeHold:
         """Fail closed for missing, empty, malformed, rolled-back, or valid DB."""
         try:
             with closing(self._connect(write=False)) as db:
-                if not self._schema_ok(db):
+                db.execute("BEGIN")
+                version = self._schema_version(db)
+                if version is None:
                     return self._held("UNTRUSTED_OR_INVALID_LOCAL_SCHEMA")
+                fields = "slot, attempt_id, action, request_digest"
+                if version == 2:
+                    fields += ", nonce_digest, frame_digest"
                 rows = db.execute(
-                    "SELECT slot, attempt_id, action, request_digest"
-                    " FROM command_attempt LIMIT 2"
+                    "SELECT " + fields + " FROM command_attempt LIMIT 2"
                 ).fetchall()
                 if not rows:
                     # Could be a genuine fresh fixture or a same-UID rollback.
                     return self._held("EMPTY_OR_ROLLED_BACK_LOCAL_HISTORY")
                 if len(rows) != 1:
                     return self._held("AMBIGUOUS_LOCAL_HISTORY")
-                slot, attempt_id, action, digest = rows[0]
+                slot, attempt_id, action, digest = rows[0][:4]
                 if (type(slot) is not int or slot != 1
                         or type(attempt_id) is not str
                         or _ATTEMPT.fullmatch(attempt_id) is None
@@ -173,7 +239,18 @@ class TestOnlyLocalOutcomeFence:
                             and (type(digest) is not str
                                  or re.fullmatch(r"[0-9a-f]{64}", digest) is None))):
                     return self._held("INVALID_LOCAL_HISTORY")
+                prepared = None
+                if version == 2:
+                    nonce_digest, frame_digest = rows[0][4:]
+                    if not all(type(value) is str and _DIGEST.fullmatch(value)
+                               for value in (nonce_digest, frame_digest)):
+                        return self._held("INVALID_LOCAL_HISTORY")
+                    prepared = PreparedCommandCommitment(
+                        request_sha256=digest, nonce_sha256=nonce_digest,
+                        frame_sha256=frame_digest,
+                    )
                 return self._held("LOCAL_ATTEMPT_UNSETTLED",
-                                  attempt_id=attempt_id, action=action)
+                                  attempt_id=attempt_id, action=action,
+                                  prepared_commitment=prepared)
         except (sqlite3.Error, OSError, ValueError):
             return self._held("MISSING_OR_UNREADABLE_LOCAL_HISTORY")

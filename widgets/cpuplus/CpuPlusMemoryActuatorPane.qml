@@ -4,6 +4,7 @@ import qs.services.memory
 import qs.services.diagnostics
 import "../../components"
 import "CpuPlusMemorySnapshot.js" as Snapshot
+import "CpuPlusMemoryReadout.js" as Readout
 import "CpuPlusProfilePreview.js" as Profiles
 import "CpuPlusProfileCatalog.js" as Catalog
 
@@ -210,6 +211,8 @@ Item {
     ]
     property int capSection: 0 // TARGET / ACTIONS / DETAILS
     property string capDetailSubject: "SWAP"
+    property bool detailsInfoOpen: false
+    readonly property bool capDetailsActive: page==="CAP" && capSection===2
     readonly property var ramDetailRows: Snapshot.ramDetailRows(sample)
     // Operator-approved RAM dataset identities. Component identity remains
     // magenta; do not change the shared theme for a local dataset.
@@ -235,7 +238,7 @@ Item {
         // Only fixed labels and validated numeric observations reach rich text.
         const ink=ramDatasetColor(row.label), white=Colors.white;
         const token=(value,color)=>'<font color="'+color+'">'+value+'</font>';
-        const label=token(row.label,ink)+token(" // ",white);
+        const label=Readout.format(row.label,ink,white)+token(" // ",white);
         if(row.value===null)return label+token("UNAVAILABLE",Colors.orange);
         const parts=(row.value/1048576).toFixed(2).split(".");
         return label+token(parts[0],ink)+token(".",white)+token(parts[1],ink)+token(" GiB",white);
@@ -243,6 +246,7 @@ Item {
     function selectCapDetailSubject(subject) {
         if(page!=="CAP"||capSection!==2||!["RAM","SWAP"].includes(subject))return;
         capDetailSubject=subject;
+        detailsInfoOpen=false;
         scroll.contentY=0;
     }
     readonly property int menuIndex: CpuPlusDiagnostics.memoryMenuIndex
@@ -256,6 +260,7 @@ Item {
         if (page !== "CAP" || index < 0 || index > 2 || index === capSection) return;
         clearCapConfirmation();
         capSection = index;
+        detailsInfoOpen=false;
         scroll.contentY = 0;
     }
     function selectMenu(index) {
@@ -266,6 +271,7 @@ Item {
             clearCapConfirmation();
             capSection = 0;
         }
+        detailsInfoOpen=false;
         CpuPlusDiagnostics.memoryMenuIndex = index;
         scroll.contentY = 0;
     }
@@ -354,7 +360,7 @@ Item {
         anchors.bottom: parent.bottom
         spacing: 3
         Rectangle { width: parent.width; height: 1; color: Colors.cyan }
-        GohuText {
+        CpuPlusMemoryReadout {
             width: parent.width
             text: MemoryOperation.busy ? "OPERATION // IN PROGRESS"
                 : "AUTH // EXPLICIT ONE-SHOT ONLY"
@@ -362,7 +368,7 @@ Item {
             font.pixelSize: 10
             wrapMode: Text.WordWrap
         }
-        GohuText {
+        CpuPlusMemoryReadout {
             width: parent.width
             text: "QUEUE // NOT CONNECTED"
             color: Colors.orange
@@ -437,13 +443,13 @@ Item {
         anchors.topMargin: 6
         visible: root.page === "CAP"
         height: visible ? implicitHeight : 0
-        spacing: 5
+        spacing: root.capDetailsActive ? 3 : 5
 
         Row {
             width: parent.width
-            height: 25
+            height: root.capDetailsActive ? 22 : 25
             spacing: 5
-            GohuText {
+            CpuPlusMemoryReadout {
                 width: Math.max(0, parent.width - refreshCap.width - parent.spacing)
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
@@ -467,7 +473,7 @@ Item {
                 onLeftClicked: root.refresh()
             }
         }
-        GohuText {
+        CpuPlusMemoryReadout {
             width: parent.width
             text: root.sample ? "RAM AVAIL // " + root.gib(root.sample.available)
                 + " / " + root.gib(root.sample.total) : "RAM // UNAVAILABLE"
@@ -517,7 +523,7 @@ Item {
                 delegate: Rectangle {
                     required property var modelData
                     width: Math.max(0, (parent.width - 8) / 3)
-                    height: 40
+                    height: root.capDetailsActive ? 34 : 40
                     border.width: 1
                     border.color: modelData.accent
                     color: Colors.black
@@ -525,7 +531,7 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 4
                         spacing: 2
-                        GohuText {
+                        CpuPlusMemoryReadout {
                             width: parent.width
                             text: modelData.label
                             color: Colors.white
@@ -534,7 +540,7 @@ Item {
                             minimumPixelSize: 8
                             horizontalAlignment: Text.AlignHCenter
                         }
-                        GohuText {
+                        CpuPlusMemoryReadout {
                             width: parent.width
                             text: modelData.value
                             color: modelData.accent
@@ -561,7 +567,7 @@ Item {
                     && root.capacity !== null && !MemoryOperation.busy
                 onValueRequested: function(value) { root.stageCapacity(value); }
             }
-            GohuText {
+            CpuPlusMemoryReadout {
                 width: parent.width
                 text: !root.capacity ? "WAITING FOR LIVE CAPACITY"
                     : root.capacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
@@ -620,11 +626,13 @@ Item {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
-        contentHeight: Math.max(height, body.implicitHeight + 18)
+        contentHeight: Math.max(height, body.implicitHeight + (root.capDetailsActive ? 4 : 18))
+        // Fixed instrument whenever it fits; preserve access if the operator shrinks it.
+        interactive: !root.capDetailsActive || contentHeight > height + 1
         Column {
             id: body
             x: 5
-            y: 8
+            y: root.capDetailsActive ? 2 : 8
             width: Math.max(0, scroll.width - 17)
             spacing: 10
             GohuText {
@@ -715,25 +723,46 @@ Item {
             }
             Column {
                 width: parent.width
-                spacing: 6
-                visible: root.page === "CAP" && root.capSection === 2
-                GohuText {
+                id: detailBody
+                objectName: "cpuplusCapDetailsBody"
+                spacing: 2
+                visible: root.capDetailsActive
+                Row {
                     width: parent.width
-                    text: "DETAILS // LIVE "+root.capDetailSubject
-                    color: Colors.magenta
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
+                    height: 22
+                    spacing: 4
+                    CpuPlusMemoryReadout {
+                        width: Math.max(0,parent.width-infoButton.width-parent.spacing)
+                        height: parent.height
+                        text: "DETAILS // LIVE "+root.capDetailSubject
+                        color: Colors.magenta
+                        font.pixelSize: 11
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    ActionButton {
+                        id: infoButton
+                        objectName: "cpuplusCapDetailsInfo"
+                        width: 24
+                        height: parent.height
+                        label: "i"
+                        contentPadding: 2
+                        accentColor: Colors.cyan
+                        selected: root.detailsInfoOpen
+                        acceptedButtons: Qt.LeftButton
+                        keyboardActivationSignal: "leftClicked"
+                        onLeftClicked: root.detailsInfoOpen=!root.detailsInfoOpen
+                    }
                 }
                 Column {
                     objectName: "cpuplusCapRamDetails"
                     width: parent.width
-                    spacing: 4
+                    spacing: 2
                     visible: root.capDetailSubject==="RAM"
-                    GohuText {
+                    CpuPlusMemoryReadout {
                         width: parent.width
                         text: root.sample?"KERNEL USABLE RAM // "+root.gib(root.sample.total):"RAM SNAPSHOT UNAVAILABLE"
                         color: Colors.cyan
-                        font.pixelSize: 12
+                        font.pixelSize: 10
                         wrapMode: Text.Wrap
                     }
                     Grid {
@@ -741,22 +770,22 @@ Item {
                         objectName: "cpuplusRamCardGrid"
                         width: parent.width
                         columns: width >= 440 ? 2 : 1
-                        spacing: 4
+                        spacing: 2
                         Repeater {
                             model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
                             delegate: Rectangle {
                                 required property var modelData
                                 objectName: "cpuplusRamMetricCard"
                                 width: Math.max(0,(ramCardGrid.width-(ramCardGrid.columns-1)*ramCardGrid.spacing)/ramCardGrid.columns)
-                                height: ramCardContent.implicitHeight+10
-                                color: Colors.black
-                                border.color: root.ramDatasetColor(modelData.label)
+                                height: ramCardContent.implicitHeight
+                                color: "transparent"
+                                border.width: 0
                                 Column {
                                     id: ramCardContent
-                                    x: 5
-                                    y: 5
-                                    width: Math.max(0,parent.width-10)
-                                    spacing: 3
+                                    x: 0
+                                    y: 0
+                                    width: parent.width
+                                    spacing: 1
                                     Item {
                                         width: parent.width
                                         height: ramMetricText.implicitHeight
@@ -782,16 +811,17 @@ Item {
                                     Rectangle {
                                         objectName: "cpuplusRamMetricBar"
                                         width: parent.width
-                                        height: 5
+                                        height: 12
                                         visible: modelData.fraction!==null
                                         color: Colors.black
                                         border.color: root.ramDatasetColor(modelData.label)
                                         Rectangle {
                                             anchors.left: parent.left
-                                            anchors.leftMargin: 1
+                                            objectName: "cpuplusRamMetricFill"
+                                            anchors.leftMargin: 2
                                             anchors.verticalCenter: parent.verticalCenter
-                                            width: Math.max(0,parent.width-2)*(modelData.fraction===null?0:modelData.fraction)
-                                            height: parent.height-2
+                                            width: Math.max(0,parent.width-4)*(modelData.fraction===null?0:modelData.fraction)
+                                            height: parent.height-4
                                             color: root.ramDatasetColor(modelData.label)
                                         }
                                     }
@@ -799,16 +829,9 @@ Item {
                             }
                         }
                     }
-                    GohuText {
+                    CpuPlusMemoryReadout {
                         width: parent.width
                         text: root.sample?"PSI AVG10 // SOME "+root.sample.some+"% / FULL "+root.sample.full+"%":"PSI UNAVAILABLE"
-                        color: Colors.orange
-                        font.pixelSize: 10
-                        wrapMode: Text.Wrap
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: "INDEPENDENT KERNEL COUNTERS // OVERLAP; DO NOT ADD. AVAILABLE IS AN ESTIMATE, NOT FREE RAM. NO DIMM ATTRIBUTION."
                         color: Colors.orange
                         font.pixelSize: 10
                         wrapMode: Text.Wrap
@@ -829,39 +852,23 @@ Item {
                             y: 5
                             width: Math.max(0,parent.width-10)
                             spacing: 3
-                            GohuText {
+                            CpuPlusMemoryReadout {
                                 width: parent.width
-                                textFormat: Text.PlainText
                                 text: modelData.kind + " // " + modelData.name
                                 color: Colors.yellow
                                 font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
-                            GohuText {
+                            CpuPlusMemoryReadout {
                                 width: parent.width
-                                textFormat: Text.PlainText
                                 text: root.gib(modelData.used) + " / " + root.gib(modelData.size)
                                     + " // PRIORITY " + modelData.priority
-                                color: Colors.white
+                                color: Colors.yellow
                                 font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
                         }
                     }
-                }
-                GohuText {
-                    width: parent.width
-                    text: "RAM bright = estimated available. Swap bright = used, dim = free. ZRAM is logical compressed swap, not additional physical RAM. Target changes do not alter the live bars."
-                    color: Colors.white
-                    font.pixelSize: 11
-                    wrapMode: Text.WordWrap
-                }
-                GohuText {
-                    width: parent.width
-                    text: "Disk swap targets reserve storage. Zero and reduction remain previews until supported by the authorized capacity backend."
-                    color: Colors.orange
-                    font.pixelSize: 11
-                    wrapMode: Text.WordWrap
                 }
             }
             Loader {
@@ -1229,5 +1236,78 @@ Item {
             }
         }
     }
-    NeonScrollBar { flickable: scroll; visible: root.visible && scroll.visible && scrollable }
+    Rectangle {
+        id: detailInfoPopup
+        objectName: "cpuplusCapDetailsInfoPopup"
+        visible: root.capDetailsActive && root.detailsInfoOpen
+        z: 30
+        anchors.left: scroll.left
+        anchors.right: scroll.right
+        anchors.top: scroll.top
+        anchors.topMargin: 26
+        anchors.leftMargin: 5
+        anchors.rightMargin: 5
+        height: Math.max(0,Math.min(infoContents.implicitHeight+12,footer.y-y-4))
+        color: Colors.black
+        border.color: Colors.cyan
+        clip: true
+        MouseArea { anchors.fill: parent }
+        Flickable {
+            anchors.fill: parent
+            anchors.margins: 6
+            contentWidth: width
+            contentHeight: infoContents.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            Column {
+                id: infoContents
+                width: parent.width
+                spacing: 4
+                Row {
+                    width: parent.width
+                    height: 22
+                    CpuPlusMemoryReadout {
+                        width: Math.max(0,parent.width-24)
+                        height: parent.height
+                        text: "MEMORY // INFO"
+                        color: Colors.cyan
+                        font.pixelSize: 11
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    ActionButton {
+                        objectName: "cpuplusCapDetailsInfoClose"
+                        width: 24
+                        height: 22
+                        label: "×"
+                        contentPadding: 2
+                        acceptedButtons: Qt.LeftButton
+                        keyboardActivationSignal: "leftClicked"
+                        onLeftClicked: root.detailsInfoOpen=false
+                    }
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: "INDEPENDENT KERNEL COUNTERS // OVERLAP; DO NOT ADD. AVAILABLE IS AN ESTIMATE, NOT FREE RAM. NO DIMM ATTRIBUTION."
+                    color: Colors.orange
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: "RAM bright = estimated available. Swap bright = used, dim = free. ZRAM is logical compressed swap, not additional physical RAM. Target changes do not alter the live bars."
+                    color: Colors.white
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: "Disk swap targets reserve storage. Zero and reduction remain previews until supported by the authorized capacity backend."
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                }
+            }
+        }
+    }
+    NeonScrollBar { flickable: scroll; visible: root.visible && scroll.visible && scrollable && scroll.interactive }
 }

@@ -50,7 +50,7 @@ Scope {
                           cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, timeout=25, check=False)
     print(proc.stdout)
-    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_M11B_PINNED_PALETTE_PASS" not in proc.stdout or "CPU_M11C_COMPACT_CARDS_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
+    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_M11B_PINNED_PALETTE_PASS" not in proc.stdout or "CPU_M11C_COMPACT_CARDS_PASS" not in proc.stdout or "CPU_M11D_INSTRUMENT_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
         raise SystemExit("Native UI fixture failed")
 
     # Separate fixture preserves the M4h memory navigation test's ownership.

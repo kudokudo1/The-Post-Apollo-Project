@@ -432,3 +432,14 @@ assert.match(pane,/objectName: "cpuplusRamMetricCard"/);
 assert.match(pane,/objectName: "cpuplusRamMetricBar"[\s\S]*?visible: modelData\.fraction!==null/);
 assert.match(pane,/objectName: "cpuplusSwapDetailCard"/);
 console.log("CPU++ M11c compact detail card contract PASS");
+const readoutM11d=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusMemoryReadout.js"),"utf8"),readoutM11d);
+const htmlM11d=readoutM11d.format("RAM // 6.80 GiB [a-b] 'x' / <tag> & 50%","#abc","#fff");
+for(const tok of ["//",".","GiB","[","-","]","&#39;","/","&lt;","&gt;","&amp;","%"])
+    assert.ok(htmlM11d.includes('<font color="#fff">'+tok+'</font>'),tok);
+assert.ok(!htmlM11d.includes("<tag>"));
+assert.ok(htmlM11d.includes('<font color="#abc">80</font>'));
+assert.match(pane,/objectName: "cpuplusCapDetailsInfoPopup"/);
+assert.match(pane,/objectName: "cpuplusRamMetricFill"[\s\S]*?anchors.leftMargin: 2/);
+assert.match(pane,/interactive: !root.capDetailsActive \|\| contentHeight > height \+ 1/);
+console.log("CPU++ M11d punctuation escaping, inset bars and info contract PASS");

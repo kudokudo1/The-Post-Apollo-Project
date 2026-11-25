@@ -22,14 +22,14 @@ Column {
         if (kib < 1048576) return (kib / 1024).toFixed(1) + " MiB";
         return (kib / 1048576).toFixed(2) + " GiB";
     }
-    GohuText {
+    CpuPlusMemoryReadout {
         width: parent.width
         text: root.compact ? "SWAP // USED / ACTIVE" : "SWAP // LIVE COMPOSITION"
         color: Colors.magenta
         font.pixelSize: 12
         wrapMode: Text.WordWrap
     }
-    GohuText {
+    CpuPlusMemoryReadout {
         width: parent.width
         text: root.composition ? (root.compact ? root.amount(root.composition.used) + " / " + root.amount(root.composition.total)
               : "ACTIVE // " + root.amount(root.composition.total) + "   USED // " + root.amount(root.composition.used))
@@ -81,7 +81,7 @@ Column {
             }
         }
     }
-    GohuText {
+    CpuPlusMemoryReadout {
         width: parent.width
         visible: !root.compact
         text: "BRIGHT = USED   DIM = AVAILABLE"
@@ -96,14 +96,14 @@ Column {
             required property var modelData
             width: root.width
             spacing: 2
-            GohuText {
+            CpuPlusMemoryReadout {
                 width: parent.width
                 text: legend.modelData.label + " // " + (100 * legend.modelData.used / legend.modelData.size).toFixed(1) + "%"
                 color: root.accent(legend.modelData.id)
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
             }
-            GohuText {
+            CpuPlusMemoryReadout {
                 width: parent.width
                 text: root.amount(legend.modelData.used) + " USED / " + root.amount(legend.modelData.size)
                 color: Colors.white
@@ -118,7 +118,7 @@ Column {
         visible: root.compact
         Repeater {
             model: root.compact ? root.segments : []
-            delegate: GohuText {
+            delegate: CpuPlusMemoryReadout {
                 required property var modelData
                 text: modelData.label + " " + root.amount(modelData.size)
                 color: root.accent(modelData.id)
@@ -126,7 +126,7 @@ Column {
             }
         }
     }
-    GohuText {
+    CpuPlusMemoryReadout {
         visible: root.composition !== null && !root.composition.capacityMatches
         width: parent.width
         text: "KERNEL TOTALS CHANGED DURING READ // REFRESH"
@@ -134,7 +134,7 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    GohuText {
+    CpuPlusMemoryReadout {
         visible: !root.compact && root.capacity !== null && root.capacity.direction !== "unchanged"
         width: parent.width
         text: root.capacity ? "TARGET PREVIEW // " + root.amount(root.capacity.projectedKiB)
@@ -143,7 +143,7 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    GohuText {
+    CpuPlusMemoryReadout {
         width: parent.width
         visible: !root.compact
         text: "ZRAM CAPACITY IS LOGICAL COMPRESSED SWAP, NOT EXTRA PHYSICAL RAM."

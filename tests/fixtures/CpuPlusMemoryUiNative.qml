@@ -190,6 +190,27 @@ ShellRoot {
                     if (!smoke.check(rail.columns === 3 && pane.menuIndex === smoke.phase
                             && !slider.visible && !smoke.find(pane, "cpuplusSwappinessDial"),
                             "narrow menu layout/hidden controls")) return;
+                    if (smoke.phase === 3) {
+                        const queue = smoke.find(pane,"cpuplusQueuePane");
+                        if (!queue) return;
+                        if (!smoke.check(queue.display.state === "NOT CONNECTED"
+                            && queue.display.requestId === null && queue.capacityTargetGiB === 24
+                            && queue.observedDiskKiB === 16777212, "AUTO disconnected truth and capacity preview")) return;
+                        queue.runtimeProjection = {version:1,adjustment_outcome:"UNVERIFIED",can_execute:false,
+                            notification_candidate:null,notification_error:null,
+                            status:{version:1,request_id:"c23683a9-b2ab-4a2c-87ce-31bdf27a3012",
+                                target_gib:16,original_actual_kib:25165816,expires_at:200,
+                                state:"READY_ADVISORY",code:"FRESH_AUTH_AND_ROOT_CHECK_REQUIRED",
+                                can_execute:false,last_checked_at:100,next_check_monotonic_ms:11000,
+                                ready_valid_before_monotonic_ms:11000,transition:true}};
+                        if (!smoke.check(queue.display.state === "READY REPORTED // RECHECK REQUIRED"
+                            && queue.display.outcome === "UNVERIFIED" && !queue.display.canExecute
+                            && queue.display.originalActualKiB !== queue.observedDiskKiB,
+                            "AUTO historical report not live capacity or authorization")) return;
+                        queue.runtimeProjection = null;
+                        if (!smoke.check(queue.display.requestId === null && queue.display.state === "NOT CONNECTED"
+                            && MemoryOperation.requests === 0,"AUTO owner loss clears report")) return;
+                    }
                     if (smoke.phase < 5) pane.selectMenu(smoke.phase + 1);
                     else pane.selectMenu(0);
                     smoke.phase++;

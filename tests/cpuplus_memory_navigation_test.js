@@ -103,8 +103,34 @@ assert.match(pane,/active: root.page === "POL" && root.policySection === 3\s+vis
 assert.match(pane,/\(policyBottomRail.width - 12\) \/ 4/);
 const diagRunner=fs.readFileSync(path.join(__dirname,"cpuplus/test_diagnostic_continuity_native.py"),"utf8");
 const memoryRunner=fs.readFileSync(path.join(__dirname,"cpuplus_memory_ui_native.py"),"utf8");
-for (const name of ["CpuPlusZramPolicyPane.qml","CpuPlusZramPolicy.js","CpuPlusAdvancedPolicyPane.qml","CpuPlusAdvancedPolicy.js"]) {
+for (const name of ["CpuPlusZramPolicyPane.qml","CpuPlusZramPolicy.js","CpuPlusAdvancedPolicyPane.qml","CpuPlusAdvancedPolicy.js","CpuPlusQueuePane.qml","CpuPlusQueuePresentation.js"]) {
     assert.ok(diagRunner.includes('"'+name+'"'),"diagnostic fixture missing "+name);
     assert.ok(memoryRunner.includes('"'+name+'"'),"memory fixture missing "+name);
 }
+const queueCtx=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueuePresentation.js"),"utf8"),queueCtx);
+const packet={version:1,adjustment_outcome:"UNVERIFIED",can_execute:false,notification_candidate:null,notification_error:null,
+    status:{version:1,request_id:"c23683a9-b2ab-4a2c-87ce-31bdf27a3012",target_gib:16,original_actual_kib:25165816,
+        expires_at:200,state:"WAITING",code:"EXTENSION_OCCUPIED",can_execute:false,last_checked_at:100,
+        next_check_monotonic_ms:11000,ready_valid_before_monotonic_ms:null,transition:true}};
+assert.equal(queueCtx.project(null).state,"NOT CONNECTED");
+assert.equal(queueCtx.project(packet).state,"WAITING REPORTED");
+assert.equal(queueCtx.project(packet).originalActualKiB,25165816);
+assert.equal(queueCtx.project(packet).canExecute,false);
+const ready={...packet,status:{...packet.status,state:"READY_ADVISORY",code:"FRESH_AUTH_AND_ROOT_CHECK_REQUIRED",
+    ready_valid_before_monotonic_ms:11000}};
+assert.equal(queueCtx.project(ready).state,"READY REPORTED // RECHECK REQUIRED");
+assert.equal(queueCtx.project(ready).outcome,"UNVERIFIED");
+assert.equal(queueCtx.project({...ready,can_execute:true}).state,"UNSUPPORTED STATUS");
+assert.equal(queueCtx.project({...ready,adjustment_outcome:"VERIFIED"}).state,"UNSUPPORTED STATUS");
+assert.equal(queueCtx.project({...ready,status:{...ready.status,can_execute:true}}).state,"INVALID STATUS");
+assert.equal(queueCtx.project({...ready,status:{...ready.status,ready_valid_before_monotonic_ms:12000}}).state,"INVALID STATUS");
+assert.equal(queueCtx.project({...packet,status:{...packet.status,request_id:"forged"}}).state,"INVALID STATUS");
+assert.equal(queueCtx.project({...packet,status:{...packet.status,state:"VERIFIED"}}).state,"INVALID STATUS");
+assert.equal(queueCtx.project({...packet,status:{...packet.status,original_actual_kib:null}}).state,"INVALID STATUS");
+assert.equal(queueCtx.project({...packet,notification_error:"EVENT_STAGE_UNAVAILABLE"}).notificationIssue,true);
+assert.equal(queueCtx.project({...packet,status:{...packet.status,code:"UNKNOWN_FUTURE"}}).state,"INVALID STATUS");
+assert.match(pane,/active: root.page === "AUTO"[\s\S]*?sourceComponent: CpuPlusQueuePane[\s\S]*?runtimeProjection: null/);
+const queuePane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueuePane.qml"),"utf8");
+assert.doesNotMatch(queuePane,/\b(?:Process|Timer|ActionButton|MemoryOperation|pkexec|sudo|execDetached)\b/);
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");

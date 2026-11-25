@@ -90,7 +90,8 @@ class ConnectedPublicConversation(unittest.TestCase):
 
     def render_history(self, limit):
         first = self.host.history_page(limit=limit)
-        second = self.host.history_page(after=limit, limit=limit)
+        second = self.host.history_page(after=limit, limit=limit,
+            expected_revision=first["revision"], expected_view=self.current)
         def page(frame):
             return {"ref": dict(requestId=frame["requestId"], treeKey=frame["treeKey"],
                 generation=frame["generation"], sessionId=frame["sessionId"],
@@ -139,6 +140,74 @@ class ConnectedPublicConversation(unittest.TestCase):
                 [("COMMITTED",), ("COMMITTED",), ("ABORTED",)])
             self.assertEqual(db.execute("SELECT COUNT(*) FROM forest_turns "
                 "WHERE role='assistant'").fetchone()[0], 2)
+
+    def test_explicit_reopen_preserves_committed_pair_and_fresh_next_lifetime(self):
+        self.host.start_next()
+        self.finish_turn()
+        old_ref = self.current
+        old_status = self.units[-1]
+        original_db = self.host._db
+        original_session = self.host._session
+        self.assertEqual(self.host.reopen_journal(), "JOURNAL_REOPENED")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            original_db.execute("SELECT 1")
+        self.assertIsNot(self.host._db, original_db)
+        self.assertEqual(self.host._session, original_session)
+        self.assertEqual(self.view.property("labelText"), "")
+        with self.assertRaises(FixtureHostRefusal):
+            self.host.advance()
+        with self.assertRaises(FixtureHostRefusal):
+            self.host.history_page()
+        with self.assertRaises(FixtureHostRefusal):
+            self.host.reopen_journal()
+        self.host.start_next()
+        self.assertNotEqual(self.current, old_ref)
+        self.call("receiveUnit", old_status)
+        self.assertEqual(self.view.property("viewState"), "ATTACHED")
+        self.finish_turn()
+        self.assertEqual(self.render_history(2), 4)
+        self.assertEqual(self.history_text(), [
+            "What is a Tree?", "Public fixture: a Tree is a Forest agent identity.",
+            "What does its journal preserve?", "Public fixture: committed conversation turns."])
+
+    def test_continuation_rejects_changed_revision_and_view(self):
+        self.host.start_next()
+        for _ in range(4):
+            self.assertEqual(self.host.advance(), "ACTIVE")
+        first = self.host.history_page(limit=1)
+        old_ref = self.current
+        self.assertEqual(first["revision"], 1)
+        with self.assertRaisesRegex(FixtureHostRefusal, "HISTORY_CONTINUATION_UNAVAILABLE"):
+            self.host.history_page(after=1, limit=1)
+        self.finish_turn()
+        with self.assertRaisesRegex(FixtureHostRefusal, "HISTORY_CONTINUATION_UNAVAILABLE"):
+            self.host.history_page(after=1, limit=1,
+                expected_revision=first["revision"], expected_view=old_ref)
+        fresh = self.host.history_page(limit=1)
+        page = self.host.history_page(after=1, limit=1,
+            expected_revision=fresh["revision"], expected_view=old_ref)
+        self.assertEqual(page["messages"][0]["role"], "assistant")
+        self.assertNotEqual(fresh["requestId"], page["requestId"])
+        self.host.start_next()
+        current = self.host.history_page(limit=1)
+        with self.assertRaisesRegex(FixtureHostRefusal, "HISTORY_CONTINUATION_UNAVAILABLE"):
+            self.host.history_page(after=1, limit=1,
+                expected_revision=current["revision"], expected_view=old_ref)
+        self.finish_turn()
+
+    def test_reopen_refuses_active_or_aborted_turn(self):
+        self.host.start_next()
+        self.host.advance()
+        with self.assertRaisesRegex(FixtureHostRefusal, "REOPEN_UNAVAILABLE"):
+            self.host.reopen_journal()
+        for _ in range(3):
+            self.host.advance()
+        self.host.stop(self.current)
+        self.finish_turn()
+        with self.assertRaisesRegex(FixtureHostRefusal, "REOPEN_UNAVAILABLE"):
+            self.host.reopen_journal()
+        with self.assertRaises(FixtureHostRefusal):
+            self.host.start_next()
 
     def test_callback_failure_after_paint_does_not_retry_or_cancel_execution(self):
         self.host.start_next()

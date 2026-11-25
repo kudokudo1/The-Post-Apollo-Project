@@ -281,15 +281,83 @@ class PublicConversationHost:
                 self._apply("withdraw")
                 self._presentation_lost = True
 
-    def history_page(self, *, after=0, limit=16):
-        """Explicit M4 request; no status-triggered refresh or new history store."""
+    def reopen_journal(self):
+        """Explicit idle fixture connection reopen; not process-crash recovery.
+
+        Retain only this host-created path/session, never accept one from UI.
+        Close the old presentation before closing SQLite; the next explicit
+        turn owns a fresh task and view. No automatic replay or new bootstrap.
+        """
+        with self._action():
+            if (self._blocked or self._stream is not None or not self._terminal
+                    or self._binding is None or self._attempt is None):
+                raise FixtureHostRefusal("REOPEN_UNAVAILABLE")
+            old = self._binding
+            attempt = self._attempt
+            self._apply("withdraw")
+            self._clear(old.correlation)
+            self._binding = self._delivery = self._runtime = self._attempt = None
+            self._terminal = False
+            try:
+                self._db.close()
+                # mode=rw refuses a missing database instead of creating one.
+                self._db = sqlite3.connect(self._path.as_uri() + "?mode=rw", uri=True)
+                self._journal = ForestSessionJournal(self._db)
+                session = self._db.execute(
+                    "SELECT state,revision FROM forest_sessions "
+                    "WHERE owner_key=? AND tree_key=? AND session_id=?",
+                    (_OWNER, "cherry", self._session)).fetchone()
+                terminal = self._db.execute(
+                    "SELECT status,reply_turn_id FROM forest_attempts_b3 "
+                    "WHERE owner_key=? AND session_id=? AND attempt_id=? "
+                    "AND user_turn_id=? AND expected_revision=?",
+                    (_OWNER, self._session, attempt, old.operation.context_ref.user_turn_id,
+                     old.operation.context_ref.expected_revision)).fetchone()
+                if (session != ("OPEN", old.operation.context_ref.expected_revision + 1)
+                        or terminal is None or terminal[0] != "COMMITTED"
+                        or type(terminal[1]) is not str):
+                    raise FixtureHostRefusal("REOPEN_EVIDENCE_UNAVAILABLE")
+                reply = self._db.execute(
+                    "SELECT ordinal,role FROM forest_turns "
+                    "WHERE session_id=? AND turn_id=?", (self._session, terminal[1])).fetchone()
+                if reply != (session[1], "assistant"):
+                    raise FixtureHostRefusal("REOPEN_EVIDENCE_UNAVAILABLE")
+            except Exception:
+                self._blocked = True
+                raise FixtureHostRefusal("REOPEN_HOLD") from None
+            return "JOURNAL_REOPENED"
+
+    def history_page(self, *, after=0, limit=16, expected_revision=None,
+                     expected_view=None):
+        """Explicit M4 read; continuation pins the original revision/view.
+
+        The fixture owner retains the first page revision and independently
+        observed PresentationCorrelation. A continuation may not silently
+        use the newest revision or a replacement attachment.
+        """
         with self._action():
             current = self._current()
             if current is None:
                 raise FixtureHostRefusal("HISTORY_VIEW_UNAVAILABLE")
+            if type(after) is not int or after < 0:
+                raise FixtureHostRefusal("HISTORY_CURSOR_UNAVAILABLE")
+            pinned = expected_revision is not None or expected_view is not None
+            if after > 0 or pinned:
+                if (type(expected_revision) is not int or expected_revision < 0
+                        or type(expected_view) is not PresentationCorrelation
+                        or expected_view != current.correlation):
+                    raise FixtureHostRefusal("HISTORY_CONTINUATION_UNAVAILABLE")
             self._db.execute("BEGIN")
             try:
-                revision = self._journal.session(_OWNER, self._session)["revision"]
+                row = self._db.execute(
+                    "SELECT state,revision FROM forest_sessions "
+                    "WHERE owner_key=? AND tree_key=? AND session_id=?",
+                    (_OWNER, "cherry", self._session)).fetchone()
+                if row is None or row[0] != "OPEN":
+                    raise FixtureHostRefusal("HISTORY_VIEW_UNAVAILABLE")
+                revision = row[1]
+                if pinned and revision != expected_revision:
+                    raise FixtureHostRefusal("HISTORY_CONTINUATION_UNAVAILABLE")
                 rid = secrets.token_hex(16)
                 req = HistoryPageRef(PublicViewRef(current.attachment, rid),
                     self._session, revision, after, limit)

@@ -296,3 +296,78 @@ restarted=feed(fullRestartLookup.state,{...hist,receipt:saved});
 assert.ok(restarted.startupLocked && restarted.session.unresolved);
 assert.equal(restarted.reviewLost,null);
 console.log("R3q checkpoint host PASS: pre-send correlation, fresh-shell lookup only, no unlock");
+
+ // R3r: exercise the real one-shot Python adapter from the same controller
+// used by QML. This is composed IO evidence, not a native shell wrapper.
+{
+ const os=require("node:os"),cp=require("node:child_process"),crypto=require("node:crypto");
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),"queue-checkpoint-gate-"));
+ const helper=path.join(root,"services/memory/memory_queue_checkpoint_io.py");
+ const canonical=x=>x!==null&&typeof x==="object"
+     ? Array.isArray(x)?x.map(canonical):Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
+ const sha=x=>crypto.createHash("sha256").update(JSON.stringify(canonical(x))).digest("hex");
+ const io=(command,record,dir=folder)=>cp.spawnSync("python3",["-B",helper,command,dir],{
+    input:record===null?"":wire(record),encoding:"utf8",timeout:5000,maxBuffer:32768});
+ const result=x=>x.status===0&&!x.error?JSON.parse(x.stdout):null;
+ try {
+   let s=h.start(h.initial(c),c,1,"STAGED",true,true);
+   s=feed(s,wire(control("HELLO"))+wire(control("INVALIDATE"))+wire(status(1,1)));
+   const intent=c.prepare(s.session,"QUEUE",16,200).prepared;
+   assert.equal(h.confirm(s,intent,X,c).frame,null);
+   const gated=h.confirm({...s,startupLocked:false},intent,X,c);
+   assert.equal(gated.frame,null);
+   assert.equal(gated.checkpoint.kind,"ACTION");
+   assert.equal(h.context(gated.state).actionStage,"WAIT_CHECKPOINT");
+   assert.ok(h.waiting(gated.state).includes("ACTION"));
+   assert.equal(h.takeCommit(gated.state,1).frame,null);
+   assert.equal(feed(gated.state,receipt).phase,"FAILED");
+   assert.equal(h.finishCheckpoint(gated.state,null,2,c,recovery.row).state,gated.state);
+   const savedAction=result(io("SAVE",gated.checkpoint));
+   assert.ok(savedAction);
+   const released=h.finishCheckpoint(gated.state,savedAction,1,c,recovery.row);
+   assert.equal(JSON.parse(released.frame).kind,"PREPARE_ACTION");
+   assert.equal(h.finishCheckpoint(released.state,savedAction,1,c,recovery.row).frame,null);
+   const wrong=h.finishCheckpoint(gated.state,{...savedAction,record:{...gated.checkpoint,
+      message:{...gated.checkpoint.message,target_gib:20}}},1,c,recovery.row);
+   assert.equal(wrong.frame,null);assert.equal(wrong.state.phase,"FAILED");
+   const failed=h.finishCheckpoint(gated.state,result(io("SAVE",gated.checkpoint)),1,c,recovery.row);
+   assert.equal(failed.frame,null);assert.equal(failed.state.phase,"FAILED");
+   assert.ok(failed.state.session.unresolved);
+   const statusAfter=feed(gated.state,control("INVALIDATE"));
+   assert.equal(h.finishCheckpoint(statusAfter,savedAction,1,c,recovery.row).frame,null);
+   // The real helper computes the digest; use a correctly hashed snapshot.
+   const liveReview={...rv,snapshot:{...rv.snapshot,pending_digest:sha(null)}};
+   liveReview.review_digest=sha(liveReview.snapshot);
+   let next=h.stop(released.state,c,"LOST",1);
+   next=h.start(next,c,2,"STAGED",true,true);
+   next=feed(next,wire(control("HELLO",B))+wire(control("INVALIDATE",B))+wire(status(1,1,null,B)));
+   next=h.beginReview(next,X).state;
+   next=feed(next,{...rp,review:liveReview});
+   const select={reviewId:REVIEW,digest:liveReview.review_digest,sequence:2};
+   const gatedAck=h.acknowledgeReview(next,select,2,recovery.row);
+   assert.equal(gatedAck.frame,null);assert.equal(gatedAck.checkpoint.kind,"REVIEW_ACK");
+   assert.equal(h.reviewContext(gatedAck.state).phase,"WAIT_CHECKPOINT");
+   assert.ok(h.waiting(gatedAck.state).includes("RECOVERY"));
+   const savedAck=result(io("SAVE",gatedAck.checkpoint));
+   assert.ok(savedAck);
+   const releasedAck=h.finishCheckpoint(gatedAck.state,savedAck,2,c,recovery.row);
+   assert.equal(JSON.parse(releasedAck.frame).kind,"RECOVERY_ACK");
+   assert.equal(h.finishCheckpoint(releasedAck.state,savedAck,2,c,recovery.row).frame,null);
+   const loaded=result(io("LOAD",null));
+   assert.equal(loaded.kind,"CHECKPOINT_LOADED");
+   const restored=h.restoreCheckpoint(c,loaded.snapshot,recovery.row);
+   assert.ok(restored.startupLocked && restored.session.unresolved && restored.reviewLost);
+   assert.equal(h.takeCommit(restored,1).frame,null);
+   assert.equal(h.finishCheckpoint(restored,savedAck,1,c,recovery.row).frame,null);
+   assert.equal(h.acknowledgeReview(restored,select,1,recovery.row).frame,null);
+   const corrupted=path.join(folder,"corrupt");
+   fs.mkdirSync(corrupted,{mode:0o700});
+   fs.writeFileSync(path.join(corrupted,"action-v1.json"),"{",{mode:0o600});
+   const rejected=io("SAVE",gated.checkpoint,corrupted);
+   assert.notEqual(rejected.status,0);assert.equal(rejected.stdout,"");
+   assert.equal(h.finishCheckpoint(gated.state,result(rejected),1,c,recovery.row).frame,null);
+   assert.notEqual(io("LOAD",null,corrupted).status,0);
+   assert.notEqual(io("SAVE",{...gated.checkpoint,extra:true},corrupted).status,0);
+   console.log("R3r checkpoint gate PASS: actual helper save/load, no frame before durable result, duplicate/failed/stale refusal");
+ } finally {fs.rmSync(folder,{recursive:true,force:true});}
+}

@@ -187,3 +187,26 @@ outside scope; single cooperating writer required. This deliberately
 single-use prototype cannot support ordinary repeated operations until
 a reviewed terminal disposition and retention policy is implemented.
 No production directory or launch path selected. No DOC 2 edits.
+
+## R3r // checkpoint-gated transmission candidate
+
+Stacked on #2711 5a791eb2, 10/10 workflows and 7/7 storage tests PASS.
+Explicit checkpointRequired option on canonical staged start (default off
+for previous fixtures). confirm and acknowledgeReview now return checkpoint
+request and no transport frame in this mode. Publish state before launching
+the fixed one-shot Python adapter, feed one bounded record via stdin to EOF.
+Adapter returns exact CHECKPOINT_SAVED only after durable file+directory
+fsync, or nonzero exit; LOAD exposes bounded validated snapshot only.
+Wrapper MUST check successful exit, bounded stdout and generation, call
+finishCheckpoint with exact result (null on failure), publish consumed state
+before writing returned frame once. No resend, no second controller.
+While saving, any incoming channel bytes terminate conservatively, including
+scheduled status refresh: never send stale intent. Existing ACTION/RECOVERY
+watchdogs remain active across storage and transport. Lost/failed save
+conservatively preserves unknown; absence not proof of noncommit.
+Composed Node tests use actual Python subprocess and private disposable
+files to verify both save gates, mismatched/duplicate/stale completion,
+occupied/corrupt refusal and fresh restore. Actual QML process adapter,
+bounded native raw reads and full-shell SIGKILL remain next. No production
+path, timeout policy, startup unlock or repeated-use retention selected.
+No DOC 2 source changes.

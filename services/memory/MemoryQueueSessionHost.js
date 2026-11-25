@@ -57,15 +57,17 @@ function initial(consumer) {
         recoveryRead:null,inventory:null,localAction:null,
         buffer:"",phase:"STOPPED",sequence:0,generation:0,startupLocked:true,
         mode:"LEGACY",stage:null,reviewEnabled:false,reviewFlow:null,reviewReceipt:null,reviewLost:null,
+        checkpointRequired:false,checkpointWait:null,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
-function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false) {
+function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false,checkpointRequired=false) {
     if ((state.phase!=="STOPPED" && state.phase!=="FAILED")
         || !positive(generation) || generation<=state.generation
         || !["LEGACY","STAGED"].includes(mode) || typeof reviewEnabled!=="boolean"
-        || (reviewEnabled && mode!=="STAGED")) return state;
+        || typeof checkpointRequired!=="boolean"
+        || ((reviewEnabled || checkpointRequired) && mode!=="STAGED")) return state;
     return Object.assign({},initial(consumer),{
-        generation,mode,reviewEnabled,reviewLost:state.reviewLost,
+        generation,mode,reviewEnabled,checkpointRequired,reviewLost:state.reviewLost,
         session:consumer.disconnect(state.session),phase:"HELLO"});
 }
 function stop(state,consumer,reason,generation) {
@@ -100,7 +102,7 @@ function context(state) {
     return {state:session,projection:state.projection,startupLocked:state.startupLocked,
         historyPending:!!state.historyRead,phase:state.phase,waiting:waiting(state),failure:state.failure,
         recoveryPending:!!(state.recoveryRead || state.reviewFlow),
-        actionStage:state.stage?state.stage.phase:null};
+        actionStage:state.checkpointWait?.record.kind==="ACTION"?"WAIT_CHECKPOINT":state.stage?state.stage.phase:null};
 }
 function recoveryContext(state) {
     // Atomic snapshot for DOC 2's read-only pane. This metadata is not
@@ -114,7 +116,8 @@ function recoveryContext(state) {
 // Separate additive interface; existing DOC 2 recoveryContext stays stable.
 function reviewContext(state) {
     const flow=state.reviewFlow;
-    return {phase:flow?flow.phase:state.reviewLost?"ACK_UNKNOWN":"IDLE",
+    return {phase:state.checkpointWait?.record.kind==="REVIEW_ACK"?"WAIT_CHECKPOINT":
+        flow?flow.phase:state.reviewLost?"ACK_UNKNOWN":"IDLE",
         review:flow?.phase==="REVIEW_READY" && !state.awaitingStatus && !state.publicationRequired
             ? flow.review:null,
         reviewSequence:flow?.phase==="REVIEW_READY"?flow.sequence:null,
@@ -273,6 +276,11 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
 }
 function feed(state,chunk,consumer,project,historyProject,generation,recoveryProject,recoveryRow) {
     if (generation!==state.generation || (state.phase!=="HELLO" && state.phase!=="CONNECTED")) return state;
+    // No server reply can precede transmission. Conservatively terminate
+    // even on a scheduled publication during local checkpoint IO; never
+    // release a frame against a changed status or incomplete byte stream.
+    if (state.checkpointWait && chunk!=="")
+        return stop(state,consumer,"CHECKPOINT_CHANNEL_CHANGED",generation);
     if (typeof chunk!=="string" || chunk.length>MAX_CHUNK || /[^\x20-\x7e\n]/.test(chunk))
         return stop(state,consumer,"INVALID_CHUNK",generation);
     // The Python encoder emits ASCII JSON lines. Bound retained partial
@@ -300,16 +308,19 @@ function feed(state,chunk,consumer,project,historyProject,generation,recoveryPro
 function confirm(state,intent,actionId,consumer) {
     const no={state:state,frame:null};
     if (state.phase!=="CONNECTED" || state.startupLocked || state.historyRead || state.recoveryRead
-        || state.reviewFlow || state.reviewLost || state.awaitingStatus || state.publicationRequired || !state.projection || !uuid(actionId)
+        || state.reviewFlow || state.reviewLost || state.checkpointWait
+        || (state.checkpointRequired && state.buffer)
+        || state.awaitingStatus || state.publicationRequired || !state.projection || !uuid(actionId)
         || !exact(intent,["ownerId","statusSequence","actionSequence","kind","expectedId","targetGiB","expiresAt"])) return no;
     const prepared=consumer.prepare(state.session,intent.kind,intent.targetGiB,intent.expiresAt);
     if (!prepared.prepared || !Object.keys(intent).every(k=>intent[k]===prepared.prepared[k])) return no;
     const submitted=consumer.submit(prepared,actionId);
     if (!submitted.message) return no;
     const staged=state.mode==="STAGED" && submitted.message.kind!=="RECHECK";
-    return {state:Object.assign({},state,{session:submitted.state,projection:null,history:null,inventory:null,localAction:null,
+    const transition={state:Object.assign({},state,{session:submitted.state,projection:null,history:null,inventory:null,localAction:null,
         awaitingStatus:false,stage:staged?{phase:"WAIT_PREPARED"}:null}),
         frame:JSON.stringify({version:1,kind:staged?"PREPARE_ACTION":"ACTION",message:submitted.message})+"\n"};
+    return staged && state.checkpointRequired ? holdCheckpoint(state,transition) : transition;
 }
 function takeCommit(state,generation) {
     // Called by the transport only after feed has validated the complete
@@ -317,7 +328,7 @@ function takeCommit(state,generation) {
     // write or take a continuation from a recovered record.
     const no={state,frame:null};
     if (generation!==state.generation || state.phase!=="CONNECTED"
-        || state.mode!=="STAGED" || state.stage?.phase!=="RECEIPT_READY"
+        || state.mode!=="STAGED" || state.checkpointWait || state.stage?.phase!=="RECEIPT_READY"
         || state.startupLocked || !state.session.pending || state.session.unresolved
         || state.buffer || state.awaitingStatus || state.publicationRequired) return no;
     const frame=JSON.stringify({version:1,kind:"COMMIT_ACTION",message:state.session.pending,
@@ -358,15 +369,16 @@ function beginReview(state,actionId) {
     return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_REVIEW",actionId},reviewReceipt:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW",owner_id:state.session.ownerId,action_id:actionId})+"\n"};
 }
-function acknowledgeReview(state,selection,generation) {
+function acknowledgeReview(state,selection,generation,recoveryRow) {
     const no={state,frame:null};
     if (generation!==state.generation || !canAck(state)
         || !exact(selection,["reviewId","digest","sequence"])) return no;
     const f=state.reviewFlow,r=f.review;
     if (selection.reviewId!==r.review_id || selection.digest!==r.review_digest || selection.sequence!==f.sequence) return no;
-    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_ACK",review:r,sequence:f.sequence},reviewReceipt:null}),
+    const transition={state:Object.assign({},state,{reviewFlow:{phase:"WAIT_ACK",review:r,sequence:f.sequence},reviewReceipt:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_ACK",owner_id:state.session.ownerId,
             review_id:r.review_id,review_digest:r.review_digest,review_sequence:f.sequence})+"\n"};
+    return state.checkpointRequired ? holdCheckpoint(state,transition,recoveryRow) : transition;
 }
 function readReviewReceipt(state,reviewId) {
     const no={state,frame:null};
@@ -409,6 +421,32 @@ function checkpointForFrame(transition,recoveryRow) {
             return {version:1,kind:"REVIEW_ACK",review:JSON.parse(JSON.stringify(r))};
     }
     return null;
+}
+function holdCheckpoint(previous,transition,recoveryRow) {
+    const record=checkpointForFrame(transition,recoveryRow);
+    if (!record) return {state:previous,frame:null};
+    // Publish this state before starting the one-shot save process. No
+    // transport frame is returned until the successful exit is correlated.
+    return {state:Object.assign({},transition.state,{checkpointWait:{
+        record:JSON.parse(JSON.stringify(record)),frame:transition.frame}}),
+        checkpoint:JSON.parse(JSON.stringify(record)),frame:null};
+}
+function finishCheckpoint(state,result,generation,consumer,recoveryRow) {
+    const no={state,frame:null};
+    if (generation!==state.generation || state.phase!=="CONNECTED" || !state.checkpointWait) return no;
+    const held=state.checkpointWait;
+    // Wrapper must supply result only after observing successful helper
+    // exit and bounded stdout; null represents failed/unknown IO.
+    const fail=()=>({state:stop(state,consumer,"CHECKPOINT_UNAVAILABLE",generation),frame:null});
+    if (!result || !safe(result) || !exact(result,["version","kind","record","can_execute"])
+        || result.version!==1 || result.kind!=="CHECKPOINT_SAVED" || result.can_execute!==false
+        || !equal(result.record,held.record) || state.buffer
+        || state.awaitingStatus || state.publicationRequired) return fail();
+    const record=checkpointForFrame({state,frame:held.frame},recoveryRow);
+    if (!record || !equal(record,held.record)) return fail();
+    // Consume before writing. Repeated callback against current state has
+    // no frame; stale generations never release one.
+    return {state:Object.assign({},state,{checkpointWait:null}),frame:held.frame};
 }
 function restoreCheckpoint(consumer,snapshot,recoveryRow) {
     // Only for a fresh shell before start(). Corrupt or mismatched evidence

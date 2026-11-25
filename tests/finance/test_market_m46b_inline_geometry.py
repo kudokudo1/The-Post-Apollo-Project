@@ -1,4 +1,4 @@
-"""Offscreen Qt geometry of the actual inline Market panes, with inert process stubs."""
+"""Offscreen actual Market panes: layout, lifecycle and fictional end-to-end replies."""
 import os
 import json
 import shutil
@@ -38,16 +38,20 @@ Item { property string label; property int labelPixelSize; property color accent
     put("components/NeonScrollBar.qml", """import QtQuick
 Item { property var flickable; property Item mountingParent; property string geometryMode; property string handleStyle; property int rightInset }""")
     put("Quickshell/qmldir","module Quickshell\nsingleton Quickshell 1.0 Quickshell.qml\nScope 1.0 Scope.qml\n")
-    put("Quickshell/Quickshell.qml","pragma Singleton\nimport QtQuick\nQtObject { property int callCount: 0; function shellPath(path) { return '/no-exec/'+path } }")
+    put("Quickshell/Quickshell.qml","pragma Singleton\nimport QtQuick\nQtObject { property int callCount: 0; property string reply: ''; property var lastArgs: []; property int unexpectedCalls: 0; function shellPath(path) { return '/no-exec/'+path } }")
     put("Quickshell/Scope.qml","import QtQuick\nQtObject { default property list<QtObject> data }")
     put("Quickshell/Io/qmldir","module Quickshell.Io\nProcess 1.0 Process.qml\nStdioCollector 1.0 StdioCollector.qml\n")
-    put("Quickshell/Io/Process.qml","import QtQuick\nimport Quickshell\nQtObject { property bool running: false; property QtObject stdout; signal exited(int exitCode,int exitStatus); function exec(argv) { Quickshell.callCount++; throw Error('network/process forbidden in geometry test') } }")
+    put("Quickshell/Io/Process.qml","import QtQuick\nimport Quickshell\nQtObject { property bool running: false; property QtObject stdout; signal exited(int exitCode,int exitStatus); function exec(argv) { Quickshell.callCount++; Quickshell.lastArgs=argv; if (!Quickshell.reply) { Quickshell.unexpectedCalls++; throw Error('no fictional reply queued') } const reply=Quickshell.reply; Quickshell.reply=''; running=true; Qt.callLater(function() { stdout.text=reply; stdout.streamFinished(); running=false; exited(0,0); }); } }")
     put("Quickshell/Io/StdioCollector.qml","import QtQuick\nQtObject { property string text; signal streamFinished() }")
     put("widgets/Probe.qml","""import QtQuick
 import QtQuick.Window
 import Quickshell
 Window {
     readonly property int requestCount: Quickshell.callCount
+    readonly property int unexpectedCalls: Quickshell.unexpectedCalls
+    readonly property var lastArgs: Quickshell.lastArgs
+    property string fixtureReply: ""
+    onFixtureReplyChanged: Quickshell.reply=fixtureReply
     width: 620; height: 480; visible: true
     QtObject { id: monitor; objectName: "stocksMonitor"; property bool monitoring: true }
     FinanceStockHistoryPane { objectName: "stocksProbe"; anchors.fill: parent; sessionEnabled: monitor.monitoring }
@@ -160,7 +164,94 @@ Window {
     assert not alphaDates.property("singleDay") and not eodDates.property("singleDay")
     assert top.isVisible() and bottom.isVisible()
     assert root.property("requestCount")==0
+
+    # M47: through actual QML button signals, service request arguments, output
+    # validators and historyChosen handoff. The Process stub cannot spawn anything.
+    def queue(prefix,data):
+        assert root.setProperty("fixtureReply",prefix+" "+json.dumps(data)+"\n")
+    def by_label(label):
+        def walk(parent):
+            if parent.property("label")==label and parent.isVisible() and parent.isEnabled():
+                yield parent
+            for child in parent.childItems():
+                yield from walk(child)
+        matches=list(walk(stocks))
+        assert len(matches)==1,(label,len(matches))
+        return matches[0]
+    def click(button):
+        assert button.isVisible() and button.isEnabled() and button.property("available")
+        assert QMetaObject.invokeMethod(button,"leftClicked")
+        settle()
+    def press(label):
+        click(by_label(label))
+    def quota(provider,count):
+        return {"schemaVersion":1,"scope":"post-apollo-market-local-v1",
+            "provider":provider,"limit":20 if provider=="eodhd" else 25,
+            "reserved":count,"utcDay":"2026-11-25","notAccountBalance":True}
+    def assert_args(tail):
+        assert val(root,"lastArgs")[-len(tail):]==tail,val(root,"lastArgs")
+    assert obj("stocksMonitor").setProperty("monitoring",True)
+    settle()
+    if not stocks.property("discoveryOpen"):
+        click(item("marketUnifiedControls"))
+    apple={"figi":"BBG000000001","ticker":"AAPL","name":"Apple Inc.","exchCode":"US","securityType":"Common Stock"}
+    assert query.setProperty("text","AAPL")
+    queue("FINANCE_STOCK_SEARCH",{"schemaVersion":1,"source":"openfigi-v3",
+        "readOnly":True,"priceLinked":False,"query":"AAPL","cursor":"","next":"",
+        "retrievedAt":"2026-11-25T00:00:00Z","items":[apple]})
+    press("SEARCH")
+    assert finder.property("ready")
+    assert_args(["AAPL",""])
+    assert root.property("requestCount")==1
+    press("PRICE OPTIONS")
+    assert eodReader.property("demoEligible")
+    press("USE DOCUMENTED DEMO LISTING")
+    assert val(eodReader,"selectedListing")["demo"] is True
+    assert root.property("requestCount")==1
+    # Fixed historical fixture dates are well before the current UTC day.
+    assert eodReader.setProperty("startDate","2026-11-02")
+    assert eodReader.setProperty("endDate","2026-11-05")
+    settle()
+    bars=[{"date":"2026-11-02","price":100},{"date":"2026-11-05","price":110}]
+    history={"schemaVersion":1,"source":"eodhd-eod","readOnly":True,
+        "identityVerified":False,"symbol":"AAPL.US","currency":"USD",
+        "currencySource":"eodhd-demo-catalog","priceBasis":"CLOSE",
+        "from":"2026-11-02","to":"2026-11-05","retrievedAt":"2026-11-25T00:00:00Z",
+        "bars":bars,"first":bars[0],"last":bars[-1],"changePct":10,
+        "localQuota":quota("eodhd",1)}
+    queue("FINANCE_GLOBAL_EODHD",history)
+    press("LOAD SELECTED DAILY HISTORY")
+    assert_args(["demo-history","AAPL.US","USD","2026-11-02","2026-11-05"])
+    assert eodReader.property("ready"),eodReader.property("message")
+    assert root.property("requestCount")==2
+    click(item("marketUseEodhdInStocks"))
+    assert not controls.isVisible()
+    assert stocks.property("globalHistoryActive")
+    loaded=val(stocks,"globalHistory")
+    assert loaded["symbol"]=="AAPL.US" and loaded["currencySource"]=="eodhd-demo-catalog"
+    assert stocks.property("historySource")=="EODHD DEMO"
+    assert loaded["bars"]==bars
+    assert val(stocks,"rangeAnalysis")["sessions"]==2
+    press("DAY")
+    assert stocks.property("dayMode")
+    assert val(stocks,"dayResult")["close"]==110
+    press("RANGE")
+    assert not stocks.property("dayMode")
+    assert val(stocks,"globalHistory")==loaded
+    click(item("marketUnifiedControls"))
+    assert val(eodReader,"selectedListing")["symbol"]=="AAPL.US"
+    assert eodReader.property("ready")
+    # Resize with controls open: one inline layout, fixed rails, same data.
+    for w,h in [(360,480),(1000,700),(620,480)]:
+        root.resize(w,h)
+        settle()
+        assert controls.height()>0 and selection.y()>=controls.y()+controls.height()
+        assert top.isVisible() and bottom.isVisible()
+        assert val(stocks,"globalHistory")==loaded
+    click(item("marketUnifiedControls"))
+    assert root.property("requestCount")==2
+    assert root.property("unexpectedCalls")==0
     root.close()
     root.deleteLater()
     app.processEvents()
-print("M46b/c2 actual Qt inline geometry and provider selection continuity (inert processes): PASS")
+print("M47 actual Qt inline geometry, selection continuity, fictional search/demo/load/handoff/DAY/RANGE and resize: PASS")

@@ -595,9 +595,10 @@ Item {
         }
         Row {
             id: capDetailRail
+            // Same 46px mounting height as CpuPlusMemoryCapacitySlider.
             objectName: "cpuplusCapDetailRail"
             visible: root.capSection===2
-            height: visible ? Math.round(44*root.detailScale) : 0
+            height: visible ? 46 : 0
             width: parent.width
             spacing: 4
             Repeater {

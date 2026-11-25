@@ -451,3 +451,6 @@ assert.match(cpuWindowM9,/objectName: "cpuplusHeaderReload"/);
 assert.match(cpuWindowM9,/if\(activeMemoryPane\) activeMemoryPane.refresh\(\)/);
 assert.match(cpuWindowM9,/text: "CPU\+\+ \/\/ "\+cpuPlusWindow.cpuHeaderStatus/);
 console.log("CPU++ M11e stable CAP instrument, proportional meters and header refresh contract PASS");
+
+assert.match(cpuWindowM9,/readonly property bool showCpuObservation: selectedModeIndex<=3/);
+assert.match(cpuWindowM9,/visible: !cpuPlusWindow.showCpuObservation\s+text: "LIVE \/\/ NET \/\/ "/);

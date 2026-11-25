@@ -114,6 +114,7 @@ ShellRoot {
                     shared.requestStepDelta(1);
                     shared.requestStepDelta(1);
                     if (!smoke.check(pane.stagedGiB === 24 && pane.capacity.actualKiB === 16777212, "target versus actual")) return;
+                    const targetMountY=slider.mapToItem(pane,0,0).y;
                     pane.selectCapSection(1);
                     if (!smoke.check(!slider.visible && scroll.visible, "actions section")) return;
                     slider.valueRequested(32);
@@ -130,6 +131,8 @@ ShellRoot {
                         "RAM details selection and unavailable optional fields"))return;
                     const detailRail=smoke.find(pane,"cpuplusCapDetailRail");
                     if(!smoke.check(detailRail&&detailRail.parent===pinned
+                        &&Math.abs(detailRail.mapToItem(pane,0,0).y-targetMountY)<1
+                        &&detailRail.height===46
                         && scroll.y>=detailRail.mapToItem(pane,0,detailRail.height).y,
                         "subject rail outside scroll"))return;
                     const railY=detailRail.mapToItem(pane,0,0).y;

@@ -545,7 +545,8 @@ PanelWindow {
     readonly property string cpuHeaderStatus: activeMemoryPane ? activeMemoryPane.status
         : selectedModeIndex===2 || selectedModeIndex===3 ? ((selectedMonitorRows().length>0)?"OBSERVED":"WAITING")
         : modes[selectedModeIndex].name
-    readonly property color cpuHeaderColor: cpuHeaderStatus==="OBSERVED" ? Colors.omnitrix
+    readonly property bool showCpuObservation: selectedModeIndex<=3
+    readonly property color cpuHeaderColor: !showCpuObservation ? internetStatusColor : cpuHeaderStatus==="OBSERVED" ? Colors.omnitrix
         : cpuHeaderStatus==="UNAVAILABLE" ? Colors.orange : Colors.cyan
     function refreshCpuMenu() {
         refreshSharedMonitors();
@@ -1141,15 +1142,29 @@ PanelWindow {
                 anchors.centerIn: parent
                 width: parent.width-8
                 horizontalAlignment: Text.AlignHCenter
+                visible: cpuPlusWindow.showCpuObservation
                 text: "CPU++ // "+cpuPlusWindow.cpuHeaderStatus
                 textFormat: Text.PlainText
                 font.pixelSize: 9
                 elide: Text.ElideRight
                 color: cpuPlusWindow.cpuHeaderColor
             }
+            GohuText {
+                id: networkHeaderText
+                anchors.centerIn: parent
+                width: parent.width-8
+                horizontalAlignment: Text.AlignHCenter
+                visible: !cpuPlusWindow.showCpuObservation
+                text: "LIVE // NET // "+cpuPlusWindow.internetStatus.label
+                textFormat: Text.PlainText
+                font.pixelSize: 9
+                elide: Text.ElideRight
+                color: cpuPlusWindow.internetStatusColor
+            }
             SafeDropShadow {
-                anchors.fill: cpuPlusInternetText
-                safeSource: cpuPlusInternetText
+                anchors.fill: parent
+                anchors.margins: 4
+                safeSource: cpuPlusWindow.showCpuObservation ? cpuPlusInternetText : networkHeaderText
                 requestedVisible: cpuPlusWindow.menuOpen
                 horizontalOffset: 0
                 verticalOffset: 0

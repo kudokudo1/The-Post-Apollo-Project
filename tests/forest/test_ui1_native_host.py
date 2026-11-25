@@ -7,6 +7,9 @@ import signal
 import subprocess
 import tempfile
 import time
+import sqlite3
+import stat
+from contextlib import closing
 
 if os.environ.get("CI") != "true" or os.environ.get("GITHUB_ACTIONS") != "true":
     raise SystemExit("FOREST_HOST_REQUIRES_GITHUB_ACTIONS")
@@ -29,6 +32,71 @@ def stop(proc):
     except subprocess.TimeoutExpired:
         os.killpg(proc.pid, signal.SIGKILL)
         proc.wait(timeout=4)
+
+
+def joined_db_snapshot(private):
+    paths = list(private.glob("forest-r5-public-*/conversation.sqlite"))
+    if len(paths) != 1:
+        raise AssertionError("JOINED_DB_COUNT")
+    path = paths[0]
+    directory = path.parent.stat(follow_symlinks=False)
+    identity = path.stat(follow_symlinks=False)
+    if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.getuid()
+            or directory.st_mode & 0o077 or not stat.S_ISREG(identity.st_mode)
+            or identity.st_uid != os.getuid() or identity.st_nlink != 1):
+        raise AssertionError("JOINED_DB_IDENTITY")
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=0.5)) as db:
+        db.execute("PRAGMA query_only=ON")
+        db.execute("BEGIN")
+        revision = db.execute("SELECT revision FROM forest_sessions").fetchall()
+        turns = db.execute("SELECT ordinal,role,turn_id FROM forest_turns ORDER BY ordinal").fetchall()
+        attempts = db.execute("SELECT expected_revision,status,reply_turn_id FROM forest_attempts_b3 ORDER BY expected_revision").fetchall()
+        db.rollback()
+    observed = path.stat(follow_symlinks=False)
+    if (observed.st_dev, observed.st_ino) != (identity.st_dev, identity.st_ino):
+        raise AssertionError("JOINED_DB_CHANGED")
+    return (identity.st_dev, identity.st_ino), revision, turns, attempts
+
+
+def observe_joined_db(qs, scene, log):
+    expected = ("BEFORE", "AFTER", "ABORT")
+    snapshots = []
+    deadline = time.monotonic() + 30
+    while len(snapshots) < len(expected):
+        if qs.poll() is not None or time.monotonic() >= deadline:
+            raise AssertionError("JOINED_DB_GATE_INCOMPLETE")
+        stages = [line.split("FOREST_HOST_DB_STAGE ", 1)[1].strip()
+                  for line in log.read_text(errors="replace").splitlines()
+                  if "FOREST_HOST_DB_STAGE " in line]
+        if tuple(stages) != expected[:len(stages)] or len(stages) > len(snapshots)+1:
+            raise AssertionError("JOINED_DB_GATE_ORDER")
+        if len(stages) == len(snapshots):
+            time.sleep(0.025)
+            continue
+        stage = stages[-1]
+        snapshot = joined_db_snapshot(scene / "privateJoined")
+        identity, revision, turns, attempts = snapshot
+        roles = ["user", "assistant", "user", "assistant"]
+        if stage == "ABORT":
+            roles.append("user")
+        if (revision != [(len(roles),)] or
+                [(r[0], r[1]) for r in turns] != list(enumerate(roles, 1)) or
+                len({r[2] for r in turns}) != len(roles) or
+                [r[1] for r in attempts] != (["COMMITTED", "COMMITTED", "ABORTED"] if stage == "ABORT" else ["COMMITTED", "COMMITTED"]) or
+                [r[2] for r in attempts[:2]] != [turns[1][2], turns[3][2]]):
+            raise AssertionError("JOINED_DB_CONTENT")
+        if stage == "AFTER" and snapshot != snapshots[0]:
+            raise AssertionError("JOINED_DB_REOPEN_CHANGED")
+        if stage == "ABORT" and (identity != snapshots[0][0] or
+                turns[:4] != snapshots[0][2] or attempts[:2] != snapshots[0][3] or
+                attempts[2][2] is not None):
+            raise AssertionError("JOINED_DB_ABORT_CHANGED")
+        snapshots.append(snapshot)
+        # Only fixed test stage, no database identifiers or contents in QML.
+        temporary = scene / "db-observer-ack.tmp"
+        temporary.write_text(stage, encoding="ascii")
+        temporary.replace(scene / "db-observer-ack")
+        print("FOREST_HOST_DB_OBSERVED " + stage, flush=True)
 
 
 def trial(width, height, count):
@@ -61,6 +129,7 @@ def trial(width, height, count):
         (scene / "privateJoined").mkdir(mode=0o700)
         for n in (1, 2):
             (scene / f"privateNegative{n}").mkdir(mode=0o700)
+        (scene / "db-observer-ack").write_text("", encoding="ascii")
         for name in ("ParentWire.js", "ParentProcess.qml"):
             shutil.copyfile(ROOT / "tests/forest/r6_parent" / name, scene / name)
         for name in ("PublicRuntimeStatusDisplay.js", "PublicHistoryDisplay.js"):
@@ -117,6 +186,8 @@ def trial(width, height, count):
                     "--no-color", "--log-rules", env["QT_LOGGING_RULES"]],
                     env=env, cwd=work, stdin=subprocess.DEVNULL, stdout=log,
                     stderr=subprocess.STDOUT, start_new_session=True)
+                if width == 1366:
+                    observe_joined_db(qs, scene, qs_log)
                 code = qs.wait(timeout=35)
             output = qs_log.read_text(errors="replace")
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()

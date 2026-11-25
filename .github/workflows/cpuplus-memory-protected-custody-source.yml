@@ -1,0 +1,19 @@
+name: CPU++ protected custody candidate source gate
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_protected_custody_ci/**'
+      - '.github/workflows/cpuplus-memory-protected-custody-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test uninstalled candidate with private temporary fixtures only
+        run: |
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 8082bac43e3d8a0f506348e0ecee2e063d34935b
+          python3 -B tests/cpuplus_memory_protected_custody_ci/test_candidate.py

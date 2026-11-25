@@ -1990,23 +1990,28 @@ PanelWindow {
         if (hunterMetricMode === hunterMetricAge)
             return taskElapsedSeconds(entry.elapsed) > 0;
 
+        // COMBI's memory threshold independently admits a row.
+        // Avoid scanning CPU history when it already qualifies.
+        if (hunterMetricMode === hunterMetricCombined
+                && hunterTaskMemoryMiB(entry) >= 128)
+            return true;
+
         return hunterTaskPeak(entry) >= 0.35
-               || hunterTaskAverage(entry) >= 0.15
-               || (hunterMetricMode === hunterMetricCombined
-                   && hunterTaskMemoryMiB(entry) >= 128);
+               || hunterTaskAverage(entry) >= 0.15;
     }
 
     function hunterTaskClassVisible(entry) {
         if (!entry || !entry._taskRecord)
             return false;
 
-        const protectedTask = taskRequiresDangerUnlock(entry);
-
-        if (hunterVisibilityMode === hunterVisibilityProtected)
-            return protectedTask;
-
+        // ALL is only a display filter. Action gates and warnings retain
+        // their independent protection checks.
         if (hunterVisibilityMode === hunterVisibilityAll)
             return true;
+
+        const protectedTask = taskRequiresDangerUnlock(entry);
+        if (hunterVisibilityMode === hunterVisibilityProtected)
+            return protectedTask;
 
         return !protectedTask;
     }

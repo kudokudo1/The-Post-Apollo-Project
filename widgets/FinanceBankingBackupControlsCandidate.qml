@@ -16,6 +16,7 @@ Item {
     readonly property bool available: reviewEnabled&&active&&visible
     readonly property bool requestBusy: bridge.busy
     readonly property bool requestRetired: bridge.retired
+    readonly property bool requestDrained: bridge.drained
     property var rows: []
     property bool rowsLoaded: false
     property string selectedId: ""
@@ -105,7 +106,7 @@ Item {
         }
         onRefused: {
             panel.invalidate();
-            panel.notice=bridge.retired?"REQUEST TIMED OUT // REOPEN CONTROLS AND INSPECT FILES // NO RETRY":
+            panel.notice=bridge.retired?"REQUEST TIMED OUT // RESTART BANKING SESSION AND INSPECT FILES // NO RETRY":
                 "RESULT NOT CONFIRMED // REFRESH BEFORE ANY NEW ACTION";
         }
     }

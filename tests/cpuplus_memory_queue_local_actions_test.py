@@ -338,6 +338,108 @@ class Tests(unittest.TestCase):
             owner.prepare_action(self.message())
 
 
+    def interrupted_prepared(self):
+        old=self.staged_owner()
+        m=self.message()
+        old.prepare_action(m)
+        old.close()
+        self.q=Queue(self.path)
+        return self.staged_owner(),m
+
+    def test_recovery_ack_preserves_prepared_and_lock(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        self.assertEqual(review["snapshot"]["record"]["state"],"PREPARED")
+        self.assertFalse(review["startup_unlock"])
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,0)
+        r=owner.acknowledge_recovery_review(review_id=review["review_id"],
+                    review_digest=review["review_digest"])["receipt"]
+        self.assertEqual(r["disposition"],"REVIEW_ACKNOWLEDGED_ONLY")
+        self.assertFalse(r["startup_unlock"])
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_NOT_LIVE"):
+            owner.acknowledge_recovery_review(review_id=review["review_id"],
+                    review_digest=review["review_digest"])
+        owner.close()
+        self.q=Queue(self.path)
+        reopened=self.staged_owner()
+        self.assertEqual(reopened.recovery_review_history(review["review_id"])["receipt"],r)
+        with self.assertRaisesRegex(QueueError,"ACTION_RECONCILIATION_REQUIRED"):
+            reopened.prepare_action(self.message())
+        self.assertEqual(self.captures,0)
+
+    def test_recovery_review_missing_and_same_owner_refuse(self):
+        owner=self.staged_owner()
+        with self.assertRaisesRegex(QueueError,"ACTION_RECORD_UNAVAILABLE"):
+            owner.begin_recovery_review(str(uuid.uuid4()),max_age_ms=1000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_PENDING"):
+            owner.begin_recovery_review(m["action_id"],max_age_ms=1000)
+        owner.commit_action(m)
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REQUIRES_NEW_OWNER"):
+            owner.begin_recovery_review(m["action_id"],max_age_ms=1000)
+
+    def test_recovery_ack_expired_and_replaced_ticket(self):
+        owner,m=self.interrupted_prepared()
+        first=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        second=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_MISMATCH"):
+            owner.acknowledge_recovery_review(review_id=first["review_id"],
+                    review_digest=first["review_digest"])
+        self.assertIsNone(owner.recovery_review_history(first["review_id"])["receipt"])
+        third=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        self.wall+=1000
+        self.mono+=1000
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_EXPIRED"):
+            owner.acknowledge_recovery_review(review_id=third["review_id"],
+                    review_digest=third["review_digest"])
+        self.assertIsNone(owner.recovery_review_history(second["review_id"])["receipt"])
+
+    def test_recovery_ack_new_owner_cannot_use_old_ticket(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        owner.close()
+        self.q=Queue(self.path)
+        new=self.staged_owner()
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_NOT_LIVE"):
+            new.acknowledge_recovery_review(review_id=review["review_id"],
+                    review_digest=review["review_digest"])
+        self.assertIsNone(new.recovery_review_history(review["review_id"])["receipt"])
+
+    def test_recovery_ack_detects_changed_pending_record(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        owner.commit_action(m)
+        owner.close()
+        self.q=Queue(self.path)
+        new=self.staged_owner()
+        review=new.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        # Simulate a competing direct writer, not an approved path.
+        self.q.cancel(self.q.pending()["id"],now=101)
+        with self.assertRaisesRegex(QueueError,"RECOVERY_EVIDENCE_CHANGED"):
+            new.acknowledge_recovery_review(review_id=review["review_id"],
+                    review_digest=review["review_digest"])
+        self.assertIsNone(new.recovery_review_history(review["review_id"])["receipt"])
+
+    def test_recovery_review_committed_local_only(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        result=owner.commit_action(m)["result"]["request"]
+        owner.close()
+        self.q=Queue(self.path)
+        new=self.staged_owner()
+        review=new.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        self.assertEqual(review["snapshot"]["record"]["result_request_id"],result["id"])
+        receipt=new.acknowledge_recovery_review(review_id=review["review_id"],
+                    review_digest=review["review_digest"])["receipt"]
+        self.assertEqual(receipt["adjustment_outcome"],"UNVERIFIED")
+        self.assertFalse(receipt["can_execute"])
+        self.assertNotIn("inode",str(receipt))
+        self.assertEqual(self.q.pending()["id"],result["id"])
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

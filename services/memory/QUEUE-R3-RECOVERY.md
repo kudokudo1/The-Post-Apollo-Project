@@ -95,3 +95,28 @@ startup gate must require explicit operator review of exact outstanding
 evidence and revalidate current DB/session; no inference from missing row.
 Seven added disposable regression cases; native full-shell crash still
 requires qualification. No changes to DOC 2-owned UI or protected helper.
+
+## R3i // exact recovery review acknowledgment (prototype)
+
+Before release of an unresolved preparation, preserve what was actually
+reviewed. New owner only, explicit begin and acknowledge, exact old row
+and current pending ID plus digest bound to one short-lived review ticket.
+Atomic comparison and append of historical acknowledgment in existing
+private DB. No queue mutation, no capture/poll, no row deletion, no replay,
+no startup unlock. Missing row cannot be acknowledged. Selection change,
+wrong ticket/digest, changed pending record, timeout or owner loss refuses.
+Review of COMMITTED describes only local intent. Same-UID storage is not
+trusted, digests are correlation not signatures, no operator identity or
+protected consent claim. Historical acknowledgment is not current state.
+Six tests. No production UI/wire and no production deadline selected.
+
+Abandonment is deliberately separate: v1 PREPARED/COMMITTED and its unique
+partial index cannot represent a terminal abandoned preparation. Adding
+ABANDONED in place would break existing strict parser and old binaries.
+Proposed versioned migration (requires Nurse 2 + DOC 2 review and operator
+policy): preserve original action and append disposition, make old readers
+fail closed, validate exact old row plus current pending state under same
+owner lock/transaction, permanently refuse old action UUID, never resume or
+infer protected outcome, retain unknown if evidence incomplete. Acknowledging
+review is not abandonment and does not release the PREPARED fence. Decide
+retention and schema/version migration separately before enabling release.

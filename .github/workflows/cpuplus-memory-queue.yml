@@ -22,6 +22,7 @@ on:
       - 'services/memory/QUEUE-R2-OWNER.md'
       - 'tests/cpuplus_memory_queue_owner_test.py'
       - 'services/memory/memory_queue_local_actions.py'
+      - 'services/memory/memory_queue_recovery_review.py'
       - 'tests/cpuplus_memory_queue_local_actions_test.py'
       - 'services/memory/QUEUE-R3-RECOVERY.md'
       - 'services/memory/QUEUE-M1C3B.md'

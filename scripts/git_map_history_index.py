@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Disposable/offline Git map candidate. No live GitW integration or Git writes."""
 import argparse
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -261,6 +263,37 @@ def open_index(directory):
     return conn
 
 
+@contextmanager
+def locked_index(directory):
+    """Hold shared generation-directory custody for one finite read job.
+
+    Cooperating exclusive access is refused until this descriptor closes.
+    This is not a continuous viewport lease or deletion authorization.
+    """
+    directory = Path(directory)
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        opened = os.fstat(fd)
+        def still_named():
+            named = directory.lstat()
+            return (stat.S_ISDIR(named.st_mode) and stat.S_ISDIR(opened.st_mode)
+                    and named.st_uid == opened.st_uid == os.getuid()
+                    and not (named.st_mode | opened.st_mode) & 0o077
+                    and (named.st_dev,named.st_ino) == (opened.st_dev,opened.st_ino))
+        if not still_named():
+            raise ValueError("unsafe generation directory")
+        conn = open_index(directory)
+        try:
+            if not still_named():
+                raise ValueError("generation changed during acquisition")
+            yield conn
+        finally:
+            conn.close()
+    finally:
+        os.close(fd)
+
+
 def manifest_for(conn, snapshot=None):
     rows = conn.execute("SELECT document FROM manifest LIMIT 2").fetchall()
     if len(rows) != 1 or not isinstance(rows[0][0], str) or len(rows[0][0]) > 4096:
@@ -378,7 +411,7 @@ def main(argv=None):
         if args.action == "build":
             result = build(args.repo,args.directory)
         else:
-            with open_index(args.directory) as conn:
+            with locked_index(args.directory) as conn:
                 if args.action == "info":
                     result = manifest_for(conn)
                 elif args.action == "page":
@@ -387,7 +420,8 @@ def main(argv=None):
                     result = locate(conn,args.snapshot,args.sha)
                 else:
                     result = search(conn,args.snapshot,args.query,args.start)
-            conn.close()
+                print(json.dumps(result,ensure_ascii=True,separators=(",",":")))
+            return 0
         print(json.dumps(result,ensure_ascii=True,separators=(",",":")))
         return 0
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error, subprocess.SubprocessError):

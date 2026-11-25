@@ -1,4 +1,5 @@
 import hashlib
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -188,6 +189,56 @@ class HistoryIndexTests(unittest.TestCase):
             with index.open_index(target) as conn:
                 self.assertEqual(index.manifest_for(conn)["total"],4)
                 self.assertEqual(index.page(conn,m["snapshot"],0)["rows"][0]["sha"],head)
+
+    def test_finite_reader_cli_custody_and_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp)/"generation"
+            directory.mkdir(mode=0o700)
+            db=directory/index.NAME
+            with sqlite3.connect(db) as conn:
+                m=index.fill(conn,chain(3),snapshot="a"*32,repo_id="b"*64,
+                             roots_digest="c"*64,shallow=False)
+            conn.close()
+            db.chmod(0o600)
+            digest=hashlib.sha256(db.read_bytes()).hexdigest()
+            commands=[["info",str(directory)],
+                      ["page",str(directory),m["snapshot"],"0"],
+                      ["locate",str(directory),m["snapshot"],sha(1)],
+                      ["search",str(directory),m["snapshot"],"Fixture","0"]]
+            def invoke(args):
+                return subprocess.run([sys.executable,"-I","-B",
+                    str(ROOT/"scripts/git_map_history_index.py"),*args],
+                    text=True,capture_output=True,timeout=5)
+            fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY)
+            try:
+                with index.locked_index(directory) as conn:
+                    self.assertEqual(index.manifest_for(conn),m)
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    # A separate real CLI can hold another shared lock.
+                    for command in commands:
+                        result=invoke(command)
+                        self.assertEqual(result.returncode,0,result.stderr)
+                        self.assertTrue(result.stdout)
+                fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                for command in commands:
+                    result=invoke(command)
+                    self.assertEqual(result.returncode,1,result.stderr)
+                    self.assertEqual(result.stdout,"")
+                    self.assertNotIn("Traceback",result.stderr)
+                fcntl.flock(fd,fcntl.LOCK_UN)
+                with self.assertRaises(ValueError):
+                    with index.locked_index(directory) as conn:
+                        index.manifest_for(conn,"f"*32)
+                fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                fcntl.flock(fd,fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+            alias=Path(tmp)/"alias"
+            alias.symlink_to(directory,target_is_directory=True)
+            self.assertEqual(invoke(["info",str(alias)]).returncode,1)
+            self.assertEqual(hashlib.sha256(db.read_bytes()).hexdigest(),digest)
+            print("Finite info/page/locate/search custody: shared success, exclusive refusal, cleanup PASS")
 
     def test_build_changed_tips_not_published(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -19,6 +19,7 @@ Scope {
     property bool exitOk: false
     property string output: ""
     readonly property bool busy: activeRequest !== null
+    readonly property bool readerBusy: busy || worker.running
 
     function activate(path, manifest, rowHeight, viewportHeight, anchor) {
         if (faulted || typeof path !== "string" || !path.startsWith("/")) return false;

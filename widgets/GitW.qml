@@ -15,6 +15,9 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool gitDiagnosticsOpen: false
+    // Candidate gate remains OFF pending combined native qualification.
+    readonly property bool gitMapCustodyEnabled: false
+    FullHistoryMap.GitMapCustodyController { id: sharedMapCustody }
     // Rapid passive reopenings reuse the most recently published Git data.
     // Explicit refresh / repository selection / Git actions are unaffected.
     readonly property int passiveGitOpenFreshnessMs: 8000
@@ -5531,6 +5534,7 @@ PanelWindow {
                         // ===== BRANCH MAP ==============================
 
                         FullHistoryMap.GitMapControlHost {
+                            custodyController: root.gitMapCustodyEnabled ? sharedMapCustody : null
                             width: parent.width
                             height: gitControlCamera.branchMapHeight
                             repoRoot: gitService.repoIsLocal ? gitService.repoPath : ""
@@ -6248,6 +6252,7 @@ PanelWindow {
 
                     GitBranchesView {
                         id: gitBranchesView
+                        mapCustodyController: root.gitMapCustodyEnabled ? sharedMapCustody : null
 
                         anchors {
                             top: parent.top

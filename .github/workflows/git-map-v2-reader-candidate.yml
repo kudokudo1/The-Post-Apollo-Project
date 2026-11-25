@@ -1,0 +1,21 @@
+name: Git map V2 reader process candidate
+on:
+  pull_request:
+    paths:
+      - "scripts/git_map_v2_reader_candidate.py"
+      - "scripts/git_map_isolated_candidate.py"
+      - "tests/git/test_git_map_v2_reader_candidate.py"
+      - ".github/workflows/git-map-v2-reader-candidate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qualify V2 finite and continuous reader process lifetime
+        run: |
+          python3 -B tests/git/test_git_map_v2_reader_candidate.py
+          python3 -B tests/git/test_git_map_isolated_candidate.py

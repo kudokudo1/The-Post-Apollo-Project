@@ -221,5 +221,25 @@ class ForestC5AuthorityBoundary:
         """
         _deny("PRUNING_SEPARATE_PROTECTED_POLICY_REQUIRED")
 
+    def authorize_observe_learning_candidate(self, *_args, **_kwargs):
+        """Candidate observation is not approval or permission to read a protected source."""
+        _deny("LEARNING_CANDIDATE_SOURCE_POLICY_REQUIRED")
+
+    def authorize_use_learning_temporarily(self, *_args, **_kwargs):
+        """Temporary use requires current exact source, purpose and recipient authority."""
+        _deny("LEARNING_TEMPORARY_USE_POLICY_REQUIRED")
+
+    def authorize_absorb_learning(self, *_args, **_kwargs):
+        """Read/use cannot authorize durable promotion or retention."""
+        _deny("LEARNING_ABSORPTION_SEPARATE_APPROVAL_REQUIRED")
+
+    def authorize_reuse_retained_learning(self, *_args, **_kwargs):
+        """Historical approval and cache membership cannot establish current authority."""
+        _deny("LEARNING_REUSE_CURRENT_POLICY_REQUIRED")
+
+    def authorize_release_learning(self, *_args, **_kwargs):
+        """Retention or use cannot authorize external disclosure."""
+        _deny("LEARNING_RELEASE_SEPARATE_DISCLOSURE_REQUIRED")
+
     def production_admission(self, *_args, **_kwargs):
         _deny("FOREST_C5_PRODUCTION_AUTHORITY_HOLD")

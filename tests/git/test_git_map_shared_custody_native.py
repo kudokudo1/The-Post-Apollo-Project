@@ -26,6 +26,29 @@ with tempfile.TemporaryDirectory(prefix="git-map-shared-custody-") as tmp:
             shutil.copy2(ROOT/folder/name,dest/name)
     shutil.copy2(ROOT/"tests/git/fixtures/GitMapSharedCustodyNative.qml",scene/"smoke.qml")
     shutil.copy2(ROOT/"tests/git/fixtures/git_map_shared_custody_probe.py",scene/"probe.py")
+    # Test-only delay inside the real CLI search, after locked_index acquired
+    # its shared lock. An external witness controls release, not a guessed delay.
+    control=base/"inflight"
+    control.mkdir(mode=0o700)
+    helper=scene/"scripts/git_map_history_index.py"
+    source=helper.read_text()
+    anchor="def search(conn, snapshot, query, start):"
+    assert source.count(anchor)==1
+    source=source.replace(anchor, """def search(conn, snapshot, query, start):
+    if query == "commit 20":
+        import time
+        control=Path(os.environ["MAP_SHARED_INFLIGHT_DIR"])
+        (control/"started").touch()
+        deadline=time.monotonic()+3
+        while not (control/"release").exists():
+            if time.monotonic()>=deadline:
+                raise ValueError("fixture release timeout")
+            time.sleep(.01)
+    return fixture_original_search(conn,snapshot,query,start)
+
+
+def fixture_original_search(conn, snapshot, query, start):""")
+    helper.write_text(source)
     repo=base/"repo"
     repo.mkdir()
     for args in [("init","-b","main")]+[("commit","--allow-empty","-m",f"commit {i}") for i in range(40)]:
@@ -39,12 +62,14 @@ with tempfile.TemporaryDirectory(prefix="git-map-shared-custody-") as tmp:
         env[key]=str(d)
     env.update(QT_QPA_PLATFORM="offscreen",QT_QUICK_BACKEND="software",
                LIBGL_ALWAYS_SOFTWARE="1",QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",DISPLAY="",
-               MAP_MANAGED_REPO=str(repo))
+               MAP_MANAGED_REPO=str(repo),MAP_SHARED_INFLIGHT_DIR=str(control))
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,
                           text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=45)
     print(result.stdout)
     if result.stdout.count("SHARED_CUSTODY_KERNEL_WITNESS_PASS")!=4:
         raise SystemExit("Missing integrated kernel witness")
+    if "SHARED_CUSTODY_INFLIGHT_LOCK_PASS" not in result.stdout:
+        raise SystemExit("Missing independent finite reader witness")
     cache=Path(env["XDG_CACHE_HOME"])/"post-apollo-git-map-v1"
     def all_released():
         for path in cache.glob("*/*"):

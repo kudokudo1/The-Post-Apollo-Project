@@ -52,3 +52,12 @@ Scope {
     print(proc.stdout)
     if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
         raise SystemExit("Native UI fixture failed")
+
+    # Separate fixture preserves the M4h memory navigation test's ownership.
+    shutil.copy2(ROOT / "tests/fixtures/CpuPlusProfileApplicationNative.qml", config / "application.qml")
+    preview = subprocess.run(["qs", "-p", str(config / "application.qml"), "--no-color"],
+                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, timeout=15, check=False)
+    print(preview.stdout)
+    if preview.returncode or "CPU_PROFILE_APPLICATION_NATIVE_PASS" not in preview.stdout or "CPU_PROFILE_APPLICATION_NATIVE_FAIL" in preview.stdout:
+        raise SystemExit("Native application preview fixture failed")

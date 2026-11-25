@@ -15,6 +15,7 @@ Item {
     property string selectedSha: ""
     signal commitSelected(string sha)
 
+    property alias viewport: candidate
     property bool allocated: false
     property string activeRepo: ""
     property var pendingResult: null
@@ -46,9 +47,6 @@ Item {
 
     function openFull() {
         if (!operatorActive || busy || faulted) return false;
-        if (activeRepo === repoRoot && candidate.mapState) {
-            return request("lookup");
-        }
         return request("lookup");
     }
     function request(action) {
@@ -216,6 +214,8 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         indexedActive: root.fullVisible
+        externalSelection: true
+        selectedSha: root.selectedSha
         recentTopology: root.topologyService
         recentRepo: root.repoRoot
         titleText: root.titleText

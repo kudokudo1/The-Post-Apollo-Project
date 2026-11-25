@@ -1,0 +1,19 @@
+name: Forest R6 parent framing
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/r6_parent/**'
+      - 'tests/forest/test_r6_parent_wire.js'
+      - '.github/workflows/forest-r6-parent-wire.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-parent-framing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node tests/forest/test_r6_parent_wire.js

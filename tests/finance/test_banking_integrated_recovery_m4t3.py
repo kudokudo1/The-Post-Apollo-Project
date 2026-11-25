@@ -19,7 +19,7 @@ PASSWORD = "fictional only M4t3 passphrase"
 ORIGINAL = {"mode":"manual","accounts":[
     {"id":"acct-1","providerId":"chime","productId":"chime-checking",
      "nickname":"Fictional checking","openingCents":10000,"origin":"manual"},
-    {"id":"acct-2","providerId":"cashapp","productId":"cashapp-balance",
+    {"id":"acct-2","providerId":"cashapp","productId":"cash-balance",
      "nickname":"Fictional wallet","openingCents":5000,"origin":"manual"}],
     "entries":[
         {"id":"entry-3","accountId":"acct-1","amountCents":-1200,"date":"2026-01-01",

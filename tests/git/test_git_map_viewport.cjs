@@ -18,9 +18,11 @@ function page(r,manifest=m) {
 }
 let s=P.activate(null,m,24,480);
 assert.equal(P.extent(s),2400000);
+assert.equal(P.scroll(s,0),s,"unchanged geometry must not cause a new state");
 let plan=P.requests(s);s=plan.state;
 assert.equal(plan.requests[0].start,0);
 const top=plan.requests[0];
+assert.equal(P.requests(s).state,s,"no new requests must not republish state");
 s=P.scroll(s,Infinity);
 assert.equal(s.y,0);
 s=P.scroll(s,999999999);

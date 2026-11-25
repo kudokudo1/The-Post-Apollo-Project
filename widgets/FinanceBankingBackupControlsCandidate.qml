@@ -13,7 +13,10 @@ Item {
     property bool dirty: true
     property bool localSaved: false
     property int savedRevision: 0
-    readonly property bool available: reviewEnabled&&active
+    readonly property bool available: reviewEnabled&&active&&visible
+    readonly property bool requestBusy: bridge.busy
+    readonly property bool requestRetired: bridge.retired
+    readonly property bool requestDrained: bridge.drained
     property var rows: []
     property bool rowsLoaded: false
     property string selectedId: ""
@@ -24,12 +27,17 @@ Item {
     }) || null
     implicitHeight: contents.implicitHeight
 
-    onAvailableChanged: invalidate()
-    onSavedRevisionChanged: armed=null
-    onDirtyChanged: armed=null
-    onStoreReadyChanged: armed=null
-    onLocalSavedChanged: armed=null
-    onSelectedIdChanged: armed=null
+    onAvailableChanged: { discardContext(); invalidate(); }
+    onSavedRevisionChanged: discardContext()
+    onDirtyChanged: discardContext()
+    onStoreReadyChanged: discardContext()
+    onLocalSavedChanged: discardContext()
+    onSelectedIdChanged: discardContext()
+
+    function discardContext() {
+        armed=null;
+        if(bridge)bridge.discardContext();
+    }
 
     function invalidate() {
         armed=null;
@@ -58,6 +66,8 @@ Item {
     }
     function confirm(request) {
         if(request===null||!available||bridge.busy)return false;
+        var current=request.action==="create"?createRequest():request.action==="delete"?deleteRequest():null;
+        if(!Policy.sameRequest(current,request))return false;
         if(!Policy.sameRequest(armed,request)) {
             armed=request;
             notice=request.action==="create"
@@ -96,7 +106,8 @@ Item {
         }
         onRefused: {
             panel.invalidate();
-            panel.notice="RESULT NOT CONFIRMED // REFRESH BEFORE ANY NEW ACTION";
+            panel.notice=bridge.retired?"REQUEST TIMED OUT // RESTART BANKING SESSION AND INSPECT FILES // NO RETRY":
+                "RESULT NOT CONFIRMED // REFRESH BEFORE ANY NEW ACTION";
         }
     }
 

@@ -43,14 +43,14 @@ const root=new URL("../../",import.meta.url);
 const read=path=>readFileSync(new URL(path,root),"utf8");
 const candidate=read("widgets/FinanceBankingBackupControlsCandidate.qml");
 const service=read("services/finance/FinanceBankingBackupCandidateService.qml");
-for(const expected of ["property bool reviewEnabled: false","onSavedRevisionChanged: armed=null",
-    "onDirtyChanged: armed=null","onSelectedIdChanged: armed=null","Policy.sameRequest(armed,request)",
+for(const expected of ["property bool reviewEnabled: false","onSavedRevisionChanged: discardContext()",
+    "onDirtyChanged: discardContext()","onSelectedIdChanged: discardContext()","Policy.sameRequest(armed,request)",
     "CONFIRM CREATE BACKUP","CONFIRM DELETE BACKUP","CANCEL CONFIRMATION","panel.invalidate()",
     "RESULT NOT CONFIRMED // REFRESH BEFORE ANY NEW ACTION"])
     assert.ok(candidate.includes(expected),expected);
 for(const expected of ["property bool allowed: false","!Policy.validRequest(request)",
     "pending=JSON.parse(JSON.stringify(request))","banking_manual_archive.py",
-    "Policy.accept(service.output,code,service.pending)"])
+    "Policy.accept(service.output,code,service.pending)","discarded=true","retired=true","interval: 35000"])
     assert.ok(service.includes(expected),expected);
 assert.ok(!service.includes("Component.onCompleted"));
 assert.ok(!service.includes("banking_manual_portable.py"));

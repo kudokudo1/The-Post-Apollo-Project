@@ -44,6 +44,44 @@ class HistoryIndexTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 index.page(conn,"d"*32,0)
 
+    def test_batch_page_matches_previous_and_bounds_sql(self):
+        # Compare every ordered edge and row against the former per-row query.
+        def graph():
+            for i in range(300):
+                parents = [sha(i+1)] if i<299 else []
+                if i in (0,127,129):
+                    parents.append(sha(i+10))
+                yield sha(i),parents,i,"Fixture","Graph "+str(i)
+        with make_index(graph()) as conn:
+            for start in (0,128,256):
+                statements=[]
+                conn.set_trace_callback(statements.append)
+                actual=index.page(conn,"a"*32,start)
+                conn.set_trace_callback(None)
+                self.assertEqual(len(statements),4,statements)
+                self.assertEqual(sum("FROM edges" in stmt for stmt in statements),1)
+                expected=[dict(row) for row in conn.execute(
+                    "SELECT * FROM commits WHERE ordinal>=? AND ordinal<? ORDER BY ordinal",
+                    (start,start+index.PAGE))]
+                for row in expected:
+                    row["parents"]=[dict(edge) for edge in conn.execute("""
+                        SELECT e.position, e.parent_sha AS sha, p.ordinal, e.parent_lane AS lane
+                        FROM edges e JOIN commits p ON p.sha=e.parent_sha
+                        WHERE e.child=? ORDER BY e.position LIMIT ?
+                        """,(row["ordinal"],index.MAX_PARENTS+1))]
+                self.assertEqual(actual["rows"],expected)
+            # A corrupt index cannot silently lose a missing parent or
+            # publish a wrong lane, position, or over-limit parent list.
+            conn.execute("UPDATE edges SET parent_sha=? WHERE child=0 AND position=0",("f"*40,))
+            with self.assertRaises(ValueError): index.page(conn,"a"*32,0)
+            conn.execute("UPDATE edges SET parent_sha=?,parent_lane=511 WHERE child=0 AND position=0",(sha(1),))
+            with self.assertRaises(ValueError): index.page(conn,"a"*32,0)
+        with make_index(chain(100)) as conn:
+            for position in range(1,index.MAX_PARENTS+1):
+                conn.execute("INSERT INTO edges VALUES (?,?,?,?)",(0,position,sha(position+1),0))
+            with self.assertRaises(ValueError): index.page(conn,"a"*32,0)
+        print("Page read: four SQL statements; previous ordered ancestry parity PASS")
+
     def test_literal_search_bounded_and_snapshot_bound(self):
         with make_index(chain(1000)) as conn:
             first=index.search(conn,"a"*32,"COMMIT 12",0)

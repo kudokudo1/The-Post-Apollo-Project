@@ -73,7 +73,8 @@ def run(guard):
         require(not prepared and data["state"] == "PREPARED",
                 "unexpected repeated intent")
         intent = guard.protected_bytes(intent_path)
-        require(json.loads(intent) == data and not os.path.lexists(outcome_path),
+        require(json.loads(intent) == json.loads(json.dumps(data))
+                and not os.path.lexists(outcome_path),
                 "durable intent not observed")
         # A cooperating privileged helper must refuse while the current
         # candidate holds its lock. No mutation is requested by the probe.

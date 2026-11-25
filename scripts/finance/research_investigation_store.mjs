@@ -37,6 +37,7 @@ function privateDirectory(dir, create) {
   // and may create Research paths outside the intended data root.
   let current=path.parse(dir).root;
   const parts=dir.slice(current.length).split(path.sep).filter(Boolean);
+  if (parts.length === 0) refuse("UNSAFE_DIRECTORY");
   for (const part of parts) {
     current=path.join(current,part);
     let info;

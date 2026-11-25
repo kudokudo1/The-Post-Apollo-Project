@@ -143,6 +143,30 @@ class Runtime:
         with self._serialized():
             return self._finish(expected_id, expire=True)
 
+    def local_action(self, message):
+        """Opt-in durable local correlation; not yet wired to Owner/pipe.
+
+        Never call on startup or retry an interrupted action. Existing
+        explicit runtime methods remain unchanged pending joint integration.
+        """
+        from memory_queue_local_actions import LocalActions, validate
+        with self._serialized():
+            m = validate(message)
+            wall, _ = self._now()
+            journal = LocalActions(self.queue)
+            journal.prepare(m, now=wall // 1000)
+            if m["kind"] in {"QUEUE", "REPLACE"}:
+                source, now = self._capture(m["target_gib"], m["expires_at"])
+                record = journal.commit(m, now=now, source=source)
+                return self._action_result(record)
+            wall, _ = self._now()
+            record = journal.commit(m, now=wall // 1000)
+            try:
+                event = self.events.stage_terminal(record["id"])
+                return self._action_result(record, event=event)
+            except QueueError:
+                return self._action_result(record, error="EVENT_STAGE_UNAVAILABLE")
+
     def detail(self, request_id):
         with self._serialized():
             return self.history.detail(request_id)

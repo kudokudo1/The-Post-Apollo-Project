@@ -25,6 +25,8 @@ ShellRoot {
     property bool negativeTriggered: false
     property int reviewPhase: 0
     property int dormantPhase: 0
+    property int seasonPhase: 0
+    property var seasonRows: []
     property bool catalogDismissed: false
     property var originalPreviewComponent: null
     property var firstReviewScope: null
@@ -655,6 +657,148 @@ ShellRoot {
             if (n===13) {
                 stop();
                 console.info("FOREST_HOST_DORMANT_PLACEMENT_PASS");
+                seasonPhase=0;
+                seasonTimer.start();
+            }
+        }
+    }
+    // Test-only placement on existing actual Tree rows. No ForestW source
+    // changes, no real entity mapping, no owner data or installed indicator.
+    Component { id: seasonType; Review.PublicSeasonIndicator {} }
+    function treeLabel(item,textValue,size) {
+        if (!item) return null;
+        if (item.text===textValue && item.pixelSize===size
+                && item.baseColor!==undefined && item.visibleGlyphWidth!==undefined) return item;
+        if (item.children) {
+            for (let i=0;i<item.children.length;i++) {
+                const match=treeLabel(item.children[i],textValue,size);
+                if (match) return match;
+            }
+        }
+        return null;
+    }
+    function seasonRef(i,revision) {
+        return {kind:"TREE",entityAlias:(i+1).toString(16).repeat(32),
+            viewKey:(revision===1?"a":"b")+(i+1).toString(16).repeat(31),revision:revision};
+    }
+    function seasonGeometry() {
+        const a=parts;
+        check(seasonRows.length===forest.treeSlots.length && !a.loader.active
+            && !forest.chatHostTrusted && !forest.voiceHostTrusted && forest.activeChatSessions.length===0
+            && !a.send.enabledAction && !a.voice.backendReady,"season host remains locked");
+        for (const entry of seasonRows) {
+            const row=entry.row, name=entry.name, role=entry.role, title=name.parent, icon=entry.icon;
+            check(row.height===59 && row.width===forest.sideWidth-18
+                && row.interactive===entry.interactive && row.open===(entry.index===forest.selectedTreeIndex)
+                && title.height===26 && title.width===row.width-18
+                && name.x===32 && name.width>0 && name.width===title.width-52
+                && icon.width===16 && icon.height===16 && icon.x===name.x+name.width+4
+                && icon.x+icon.width===title.width && icon.y===5
+                && role.width===row.width-18 && role.height===12
+                && role.text===forest.treeSlots[entry.index].role
+                && name.text===forest.treeSlots[entry.index].name
+                && !icon.focus && !icon.activeFocusOnTab
+                && !icon.sourceAuthenticated && !icon.permissionGranted
+                && !icon.productionAuthority && !icon.restorationEnabled,
+                "actual Tree row season geometry "+entry.index);
+        }
+    }
+    function seasonStep(n) {
+        if (n===0) {
+            check(!forest.menuOpen && !parts.loader.active,"season default host closed");
+            forest.menuOpen=true;
+        } else if (n===1) {
+            const entries=[];
+            for (let i=0;i<forest.treeSlots.length;i++) {
+                forest.selectedTreeIndex=i;
+                const row=forest.selectedTreeButton, slot=forest.treeSlots[i];
+                const name=treeLabel(row,slot.name,12), role=treeLabel(row,slot.role,9);
+                check(row && name && role && name.parent.height===26,"actual Tree row lookup "+i);
+                if (failed) return;
+                const title=name.parent;
+                const art=title.children.find(x=>x.width===26 && x.height===26 && x.source!==undefined);
+                check(art && art.x===0 && name.x===32 && name.anchors.rightMargin===0,
+                    "actual Tree artwork before reservation");
+                if (failed) return;
+                name.anchors.rightMargin=20;
+                const icon=seasonType.createObject(title,{x:Qt.binding(()=>title.width-16),y:5});
+                check(icon && icon.season==="UNKNOWN" && icon.seasonLabel==="Season unknown",
+                    "actual Tree unknown default");
+                if (failed) return;
+                entries.push({index:i,row:row,name:name,role:role,art:art,icon:icon,interactive:row.interactive});
+            }
+            seasonRows=entries;
+            forest.selectedTreeIndex=0;
+        } else if (n===2) {
+            seasonGeometry();
+            for (const entry of seasonRows) {
+                check(entry.art.width===26 && entry.art.height===26 && entry.art.x===0,
+                    "actual Tree artwork retained");
+                const ref=seasonRef(entry.index,1);
+                entry.icon.syntheticOwner=true;
+                entry.icon.ownerScope=ref;
+                check(entry.icon.receive(ref,["SUMMER","WINTER","SPRING","FALL","UNKNOWN"][entry.index]),
+                    "CI only independent fixed public season");
+            }
+        } else if (n===3) {
+            const entries=seasonRows;
+            check(entries.map(e=>e.icon.season).join(",")==="SUMMER,WINTER,SPRING,FALL,UNKNOWN",
+                "actual Tree independent status");
+            entries[1].row.leftClicked(null);
+            check(forest.selectedTreeIndex===1,"actual Tree selection retained");
+            check(!entries[0].icon.receive(seasonRef(1,1),"WINTER")
+                && entries[0].icon.season==="SUMMER","other Tree stale isolated");
+            seasonGeometry();
+        } else if (n===4) {
+            // Independently retire the original example before loss/replacement.
+            const icon=seasonRows[0].icon;
+            icon.ownerScope=null;
+            icon.syntheticOwner=false;
+            check(icon.season==="UNKNOWN" && !icon.receive(seasonRef(0,1),"WINTER")
+                && seasonRows[1].icon.season==="WINTER","original retirement only");
+            icon.syntheticOwner=true;
+            icon.ownerScope=seasonRef(0,2);
+            check(!icon.receive(seasonRef(0,1),"WINTER")
+                && icon.receive(seasonRef(0,2),"FALL"),"fresh example scope");
+        } else if (n===5) {
+            for (const entry of seasonRows) {
+                entry.icon.ownerScope=null;
+                entry.icon.syntheticOwner=false;
+            }
+            forest.menuOpen=false;
+        } else if (n===6) {
+            check(seasonRows.every(e=>e.icon.season==="UNKNOWN" &&
+                !e.icon.receive(seasonRef(e.index,1),"WINTER")),"closed original scope retired");
+            forest.menuOpen=true;
+        } else if (n===7) {
+            seasonGeometry();
+            check(seasonRows.every(e=>e.icon.season==="UNKNOWN"),"reopen no automatic season");
+            for (const entry of seasonRows) {
+                entry.icon.destroy();
+                entry.name.anchors.rightMargin=0;
+            }
+        } else if (n===8) {
+            for (const entry of seasonRows)
+                check(entry.name.width===entry.name.parent.width-32
+                    && entry.name.anchors.rightMargin===0 && entry.art.width===26,
+                    "actual Tree original geometry restored");
+            seasonRows=[];
+            forest.selectedTreeIndex=0;
+            forest.menuOpen=false;
+        }
+    }
+    Timer {
+        id: seasonTimer
+        interval: 350
+        repeat: true
+        onTriggered: {
+            const n=seasonPhase++;
+            seasonStep(n);
+            if (failed) { stop(); finish(); return; }
+            console.info("FOREST_HOST_SEASON_PHASE_PASS "+n);
+            if (n===8) {
+                stop();
+                console.info("FOREST_HOST_SEASON_PLACEMENT_PASS");
                 finish();
             }
         }

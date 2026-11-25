@@ -144,3 +144,22 @@ Use IMPLEMENTATION, HOW TO USE, VERIFY, WATCH OUT FOR, CHECKLIST, NEXT, DECISION
 - Trusted installer and bounded authorization owner/contract, #2412.
 - Native expansion, withdrawal, boot and visual acceptance deliberately pending; operator decides test timing.
 
+
+
+## M11b // OPERATOR-APPROVED SEMANTIC MEMORY PALETTE (2026-11-25)
+
+CAP > DETAILS RAM/SWAP subject rail belongs to the fixed CAP instrument, outside the scroll viewport. Only detail body scrolls; TARGET/ACTIONS/DETAILS footer stays fixed. Operator's screenshots confirm M11a loaded and both subjects visible; operator requested the pinned correction.
+
+Universal identities remain separate from local dataset identities: RAM magenta, swap yellow, disk blue, GPU green, network/signals cyan, danger red. Preserve existing shared theme and other widget ownership.
+
+| RAM dataset | Approved color |
+| --- | --- |
+| AVAILABLE | Omnitrix |
+| FREE | Green (Sub-Omnitrix) |
+| ANONYMOUS | Purple |
+| FILE CACHE | Blue |
+| SHARED / TMPFS | Magenta |
+| RECLAIMABLE SLAB | Yellow |
+| UNRECLAIMABLE SLAB | White |
+
+Data labels, values, and units are distinct text roles. White unit suffixes, decimal points, hashes and structural separators carry the contextual dataset glow; ambiguous white uses cyan. Use existing named safe text-glow recipe, no new background processes. For this local implementation purple uses the approved preview swatch #ac69ff because shared Colors.qml has no purple token; do not silently alter global palette. White dataset uses cyan fallback. These are approved dataset identities, not new status meanings, thresholds, or permission. Global color governance and condensed/expandable cards remain separate operator discussion.

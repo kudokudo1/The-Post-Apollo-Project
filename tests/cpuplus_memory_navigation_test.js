@@ -392,3 +392,36 @@ assert.match(pane,/hostState: null\s+recoverySession: root.recoverySession/);
 assert.doesNotMatch(cpuWindowM9,/MemoryQueueDesktopSession\s*\{/);
 assert.doesNotMatch(pane,/MemoryQueueDesktopSession\s*\{|recoverySession\.(?:open|close)\s*\(/);
 console.log("CPU++ M9 external session binding source contract PASS");
+
+const ramCtxM11=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusMemorySnapshot.js"),"utf8"),ramCtxM11);
+const ramRawM11="MemTotal: 32768 kB\nMemAvailable: 8192 kB\nMemFree: 1024 kB\nAnonPages: 4096 kB\nCached: 3072 kB\nShmem: 512 kB\nSReclaimable: 0 kB\nSUnreclaim: 256 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\nFilename Type Size Used Priority\nsome avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n60\n";
+const ramM11=ramCtxM11.parseSnapshot(ramRawM11);
+assert.equal(ramM11.ramDetails.MemFree,1024);
+assert.equal(ramM11.ramDetails.SReclaimable,0);
+assert.equal(ramCtxM11.ramDetailRows(ramM11)[0].fraction,.25);
+assert.equal(ramCtxM11.ramDetailRows(ramM11)[5].fraction,0);
+for(const raw of [ramRawM11.replace("Cached: 3072 kB\n",""),ramRawM11.replace("Cached: 3072 kB","Cached: 32769 kB"),ramRawM11.replace("Cached: 3072 kB","Cached: 3072 kB\nCached: 0 kB")]){
+    const s=ramCtxM11.parseSnapshot(raw);
+    assert.equal(s.ramDetails.Cached,null);
+    assert.equal(ramCtxM11.ramDetailRows(s)[3].fraction,null);
+    assert.equal(s.available,8192);
+}
+assert.equal(ramCtxM11.ramDetailRows({...ramM11,ramDetails:null})[1].value,null);
+assert.equal(ramCtxM11.ramDetailRows(null).length,0);
+assert.match(pane,/objectName: "cpuplusCapRamDetails"/);
+assert.match(pane,/OVERLAP; DO NOT ADD/);
+console.log("CPU++ M11a independent live RAM details PASS");
+
+const capHeaderM11b=pane.slice(pane.indexOf("id: capInstrument"),pane.indexOf("id: scroll"));
+assert.match(capHeaderM11b,/objectName: "cpuplusCapDetailRail"/);
+assert.match(capHeaderM11b,/visible: root\.capSection===2/);
+assert.doesNotMatch(pane.slice(pane.indexOf("id: scroll")),/objectName: "cpuplusCapDetailRail"/);
+for(const [name,color] of [["AVAILABLE","omnitrix"],["FREE","green"],["FILE CACHE","blue"],["SHARED / TMPFS","magenta"],["RECLAIMABLE SLAB","yellow"],["UNRECLAIMABLE SLAB","white"]])
+    assert.ok(pane.includes('case "'+name+'": return Colors.'+color+';'));
+assert.match(pane,/case "ANONYMOUS": return ramAnonymousPurple/);
+assert.match(pane,/ink===Colors.white\?Colors.cyan:ink/);
+assert.match(pane,/token\("\.",white\)/);
+assert.match(pane,/token\(" GiB",white\)/);
+assert.match(pane,/preferredGlowColor: root.ramDatasetGlow\(modelData.label\)/);
+console.log("CPU++ M11b pinned RAM/SWAP and semantic palette contract PASS");

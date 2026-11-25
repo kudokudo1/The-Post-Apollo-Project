@@ -30,7 +30,8 @@ function parseSnapshot(raw) {
     }
     if (!active) return null;
     return {total:total, available:available, swap:swap, free:free,
-            some:Number(some[1]), full:Number(full[1]), swappiness:Number(swappiness[1]), rows:rows};
+            some:Number(some[1]), full:Number(full[1]), swappiness:Number(swappiness[1]), rows:rows,
+            ramDetails:parseRamDetails(raw.split(/^Filename\s+Type\s+Size\s+Used\s+Priority/m)[0],total)};
 }
 
 // The slider denotes desired managed NVMe capacity, not an extra allocation.
@@ -80,4 +81,31 @@ function swapComposition(sample) {
     if (!Number.isSafeInteger(total) || !Number.isSafeInteger(used)) return null;
     return {groups:groups, total:total, used:used,
         capacityMatches:total === sample.swap};
+}
+
+
+// Optional read-only facts from the SAME meminfo read. These overlap and
+// cannot be summed; absent/duplicate/out-of-range values remain null.
+function parseRamDetails(raw,total) {
+    const keys=["MemFree","AnonPages","Cached","Shmem","SReclaimable","SUnreclaim"];
+    const out={};
+    for(const key of keys) {
+        const lines=raw.split("\n").filter(line=>line.startsWith(key+":"));
+        const m=lines.length===1?lines[0].match(new RegExp("^"+key+":[ \\t]+(\\d+)[ \\t]+kB[ \\t]*$")):null;
+        const n=m?Number(m[1]):null;
+        out[key]=Number.isSafeInteger(n)&&n>=0&&n<=total?n:null;
+    }
+    return out;
+}
+function ramDetailRows(sample) {
+    if(!sample||!Number.isSafeInteger(sample.total)||sample.total<=0)return [];
+    const rows=[["AVAILABLE",sample.available],["FREE",sample.ramDetails?.MemFree],
+        ["ANONYMOUS",sample.ramDetails?.AnonPages],["FILE CACHE",sample.ramDetails?.Cached],
+        ["SHARED / TMPFS",sample.ramDetails?.Shmem],["RECLAIMABLE SLAB",sample.ramDetails?.SReclaimable],
+        ["UNRECLAIMABLE SLAB",sample.ramDetails?.SUnreclaim]];
+    return rows.map(pair=>{
+        const n=pair[1];
+        const valid=Number.isSafeInteger(n)&&n>=0&&n<=sample.total;
+        return {label:pair[0],value:valid?n:null,fraction:valid?n/sample.total:null};
+    });
 }

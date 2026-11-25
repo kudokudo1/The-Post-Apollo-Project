@@ -209,6 +209,42 @@ Item {
         "AUTOMATION & SAFETY", "DIAGNOSTICS", "PROFILES"
     ]
     property int capSection: 0 // TARGET / ACTIONS / DETAILS
+    property string capDetailSubject: "SWAP"
+    readonly property var ramDetailRows: Snapshot.ramDetailRows(sample)
+    // Operator-approved RAM dataset identities. Component identity remains
+    // magenta; do not change the shared theme for a local dataset.
+    // Purple is the approved preview swatch until a canonical token exists.
+    readonly property color ramAnonymousPurple: "#ac69ff"
+    function ramDatasetColor(label) {
+        switch(label) {
+        case "AVAILABLE": return Colors.omnitrix;
+        case "FREE": return Colors.green;
+        case "ANONYMOUS": return ramAnonymousPurple;
+        case "FILE CACHE": return Colors.blue;
+        case "SHARED / TMPFS": return Colors.magenta;
+        case "RECLAIMABLE SLAB": return Colors.yellow;
+        case "UNRECLAIMABLE SLAB": return Colors.white;
+        default: return Colors.cyan;
+        }
+    }
+    function ramDatasetGlow(label) {
+        const ink=ramDatasetColor(label);
+        return ink===Colors.white?Colors.cyan:ink;
+    }
+    function ramDetailText(row) {
+        // Only fixed labels and validated numeric observations reach rich text.
+        const ink=ramDatasetColor(row.label), white=Colors.white;
+        const token=(value,color)=>'<font color="'+color+'">'+value+'</font>';
+        const label=token(row.label,ink)+token(" // ",white);
+        if(row.value===null)return label+token("UNAVAILABLE",Colors.orange);
+        const parts=(row.value/1048576).toFixed(2).split(".");
+        return label+token(parts[0],ink)+token(".",white)+token(parts[1],ink)+token(" GiB",white);
+    }
+    function selectCapDetailSubject(subject) {
+        if(page!=="CAP"||capSection!==2||!["RAM","SWAP"].includes(subject))return;
+        capDetailSubject=subject;
+        scroll.contentY=0;
+    }
     readonly property int menuIndex: CpuPlusDiagnostics.memoryMenuIndex
     readonly property string page: menus[menuIndex]
     function clearCapConfirmation() {
@@ -546,6 +582,30 @@ Item {
                 onLeftClicked: root.stageCapacity(Math.max(4, Math.min(64, Math.round(root.capacity.actualGiB / 4) * 4)))
             }
         }
+        Row {
+            id: capDetailRail
+            objectName: "cpuplusCapDetailRail"
+            visible: root.capSection===2
+            height: visible ? 28 : 0
+            width: parent.width
+            spacing: 4
+            Repeater {
+                model: ["RAM","SWAP"]
+                delegate: ActionButton {
+                    required property string modelData
+                    objectName: modelData==="RAM"?"cpuplusCapDetailRam":"cpuplusCapDetailSwap"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 28
+                    label: modelData
+                    accentColor: modelData==="RAM"?Colors.magenta:Colors.yellow
+                    selected: root.capDetailSubject===modelData
+                    available: root.page==="CAP"&&root.capSection===2
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectCapDetailSubject(modelData)
+                }
+            }
+        }
     }
     Flickable {
         id: scroll
@@ -659,13 +719,86 @@ Item {
                 visible: root.page === "CAP" && root.capSection === 2
                 GohuText {
                     width: parent.width
-                    text: "DETAILS // LIVE SWAP DEVICES"
+                    text: "DETAILS // LIVE "+root.capDetailSubject
                     color: Colors.magenta
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
+                Column {
+                    objectName: "cpuplusCapRamDetails"
+                    width: parent.width
+                    spacing: 4
+                    visible: root.capDetailSubject==="RAM"
+                    GohuText {
+                        width: parent.width
+                        text: root.sample?"KERNEL USABLE RAM // "+root.gib(root.sample.total):"RAM SNAPSHOT UNAVAILABLE"
+                        color: Colors.cyan
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                    }
+                    Repeater {
+                        model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
+                        delegate: Column {
+                            required property var modelData
+                            width: parent.width
+                            spacing: 2
+                            Item {
+                                width: parent.width
+                                height: ramMetricText.implicitHeight
+                                GohuText {
+                                    id: ramMetricText
+                                    objectName: "cpuplusRamMetricText"
+                                    width: parent.width
+                                    text: root.ramDetailText(modelData)
+                                    textFormat: Text.RichText
+                                    color: Colors.white
+                                    font.pixelSize: 11
+                                    wrapMode: Text.Wrap
+                                }
+                                // One existing safe sampled effect per visible dataset,
+                                // not one effect per punctuation mark or number token.
+                                TextHashGlow {
+                                    objectName: "cpuplusRamMetricGlow"
+                                    safeSource: ramMetricText.visible ? ramMetricText : null
+                                    requestedVisible: ramMetricText.visible
+                                    foregroundColor: Colors.white
+                                    preferredGlowColor: root.ramDatasetGlow(modelData.label)
+                                }
+                            }
+                            Rectangle {
+                                width: parent.width
+                                height: 9
+                                visible: modelData.fraction!==null
+                                color: Colors.black
+                                border.color: root.ramDatasetColor(modelData.label)
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 1
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: Math.max(0,parent.width-2)*(modelData.fraction===null?0:modelData.fraction)
+                                    height: parent.height-2
+                                    color: root.ramDatasetColor(modelData.label)
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: root.sample?"PSI AVG10 // SOME "+root.sample.some+"% / FULL "+root.sample.full+"%":"PSI UNAVAILABLE"
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "INDEPENDENT KERNEL COUNTERS // OVERLAP; DO NOT ADD. AVAILABLE IS AN ESTIMATE, NOT FREE RAM. NO DIMM ATTRIBUTION."
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                }
                 Repeater {
-                    model: root.page === "CAP" && root.capSection === 2 && root.sample ? root.sample.rows : []
+                    model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.sample ? root.sample.rows : []
                     delegate: GohuText {
                         required property var modelData
                         width: parent.width

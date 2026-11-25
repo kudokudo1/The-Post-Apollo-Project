@@ -63,5 +63,5 @@ Scope {
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=25, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

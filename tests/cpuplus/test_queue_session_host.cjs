@@ -371,3 +371,42 @@ console.log("R3q checkpoint host PASS: pre-send correlation, fresh-shell lookup 
    console.log("R3r checkpoint gate PASS: actual helper save/load, no frame before durable result, duplicate/failed/stale refusal");
  } finally {fs.rmSync(folder,{recursive:true,force:true});}
 }
+
+ // R4 notification offer is generation/publication-bound and synchronous.
+{
+ const hubAdapter=load(path.join(root,"services/memory/MemoryQueueNotificationAdapter.js"));
+ const rows=[];
+ const hub={historyReady:true,policyReady:true,historyStatus:"ready",policyStatus:"ready",
+   notifications:{get count(){return rows.length;},get(i){return rows[i];}},
+   normalize:x=>x,shouldBlockNotification:()=>false,pushRich:x=>rows.push(x)};
+ let active=h.start(h.initial(c),c,1,"STAGED",true,true,true);
+ active=feed(active,wire(control("HELLO"))+wire(control("INVALIDATE"))+wire(status(1,1,R)));
+ const notice={version:1,event_id:"apollo-cpu-memory-"+R+"-deferred",request_id:R,
+   kind:"DEFERRED",code:"EXTENSION_OCCUPIED",observed_at:100,target_gib:16,
+   original_actual_kib:25165816,delivery_state:"ATTEMPT_RESERVED",can_execute:false,
+   checked_at_ms:100000,valid_before_wall_ms:101000};
+ const packet={...control("NOTIFICATION"),status_sequence:1,notice};
+ const results=[];
+ const deliver=(s,x,g=s.generation)=>h.feed(s,wire(x),c,p.project,history.project,g,recovery.project,recovery.row,
+     n=>results.push(hubAdapter.offer(hub,n,100100)));
+ assert.equal(deliver(active,packet,2),active);
+ assert.equal(results.length,0);
+ const received=deliver(active,packet);
+ assert.equal(received.lastNoticeSequence,1);
+ assert.equal(rows.length,1);
+ assert.equal(results[0],"HISTORY_OBSERVED");
+ assert.equal(deliver(received,packet),received);
+ assert.equal(rows.length,1);
+ assert.equal(deliver(active,{...packet,status_sequence:2}).phase,"FAILED");
+ assert.equal(deliver(active,{...packet,notice:{...notice,can_execute:true}}).phase,"FAILED");
+ assert.equal(deliver({...active,notificationEnabled:false},packet).phase,"FAILED");
+ assert.equal(deliver({...active,session:{...active.session,pending:{}}},packet).lastNoticeSequence,1);
+ assert.equal(results.length,1);
+ let idle=feed(received,wire(control("INVALIDATE"))+wire(status(2,1,null)));
+ const terminal={...notice,kind:"CANCELLED",code:"CANCELLED",event_id:"apollo-cpu-memory-"+R+"-cancelled"};
+ idle=deliver(idle,{...packet,status_sequence:2,notice:terminal});
+ assert.equal(rows.length,2);
+ assert.equal(idle.startupLocked,true);
+ assert.match(rows[1].message,/No adjustment is verified/);
+ console.log("R4 notification host PASS: actual Hub adapter, publication fence, duplicate/disabled/busy refusal");
+}

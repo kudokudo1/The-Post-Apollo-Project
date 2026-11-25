@@ -15,6 +15,7 @@ import uuid
 from memory_adjustment_queue import QueueError, _int, _uuid
 from memory_queue_owner import MAX_SAFE
 from memory_queue_local_actions import validate as validate_local_action
+from memory_queue_delivery import Delivery
 
 MAX_FRAME = 16384
 INPUT_CHUNK = 4096
@@ -176,11 +177,17 @@ def _receipt_wire(receipt):
 
 
 class Session:
-    def __init__(self, owner, emit, *, review_max_age_ms=None):
+    def __init__(self, owner, emit, *, review_max_age_ms=None, notification_max_age_ms=None):
         if review_max_age_ms is not None:
             if owner.staged_max_age_ms is None:
                 raise QueueError("STAGED_ACTION_MODE_REQUIRED")
             _int(review_max_age_ms, 1, 60000)
+        if notification_max_age_ms is not None:
+            _int(notification_max_age_ms,1,60000)
+            if notification_max_age_ms > owner.runtime.max_age:
+                raise QueueError("INVALID_NOTIFICATION_AGE")
+        self.notification_max_age_ms = notification_max_age_ms
+        self.delivery = Delivery(owner.runtime.events) if notification_max_age_ms is not None else None
         self.review_max_age_ms = review_max_age_ms
         self.review = None
         self.review_deadline = None
@@ -206,7 +213,52 @@ class Session:
         return {"version": 1, "kind": kind, "owner_id": self.owner.owner_id,
                 "can_execute": False}
 
-    def publish(self):
+    def _notify(self, packet, terminal_reply):
+        # Single session thread, no extra observation, no client-triggered
+        # delivery, no recovery backlog scan. Reservation is durable before
+        # emission; a lost frame is never retransmitted.
+        if self.delivery is None:
+            return
+        status = packet["projection"]["status"]
+        candidate = packet["projection"]["notification_candidate"]
+        try:
+            event = None
+            if candidate and candidate["created"]:
+                event = candidate["event"]
+            if terminal_reply and terminal_reply.get("disposition")=="REPORTED":
+                request = (terminal_reply.get("result") or {}).get("request")
+                if request and request["state"] in {"CANCELLED","EXPIRED"}:
+                    matches = [x for x in self.owner.runtime.events.for_request(request["id"])
+                               if x["kind"]==request["state"]]
+                    if len(matches)==1:
+                        event = matches[0]
+            if event is None:
+                return
+            def current():
+                publication = self.owner.status()
+                if publication is None or publication["sequence"]!=packet["sequence"]:
+                    raise QueueError("NOTIFICATION_PUBLICATION_CHANGED")
+                return publication["projection"]["status"]
+            emit_failed = []
+            def offer(notice):
+                # Terminal notifications also require the same live
+                # publication. Never let a queued packet become an outbox.
+                current()
+                try:
+                    self.emit(dict(self._control("NOTIFICATION"),
+                                   status_sequence=packet["sequence"],notice=notice))
+                except Exception as exc:
+                    emit_failed.append(exc)
+                    raise
+                return "OFFER_OUTCOME_UNKNOWN"
+            self.delivery.attempt(event["event_id"],read_status=current,
+                        clock=self.owner.runtime._now,max_age_ms=self.notification_max_age_ms,offer=offer)
+        except (QueueError,OSError,ValueError,TypeError):
+            return
+        if emit_failed:
+            raise QueueError("NOTIFICATION_PIPE_WRITE_FAILED") from emit_failed[0]
+
+    def publish(self, terminal_reply=None):
         # Invalidate before potentially slow collection, not after it.
         self.deadline = None
         self.owner.invalidate()
@@ -225,6 +277,7 @@ class Session:
                 raise QueueError("SCHEDULE_ELAPSED")
             self.deadline = due
         self.emit(status_for_ui(packet))
+        self._notify(packet,terminal_reply)
 
     def start(self):
         if self.closed or self.started:
@@ -291,7 +344,7 @@ class Session:
             self.prepare_deadline = None
             reply = self.owner.commit_action(message)
             self.emit(reply)
-            self.publish()
+            self.publish(terminal_reply=reply)
             return
         if self.review is not None:
             if time.monotonic() >= self.review_deadline:
@@ -356,7 +409,7 @@ class Session:
             self.deadline = None
             reply = self.owner.action(obj["message"])
             self.emit(reply)
-            self.publish()
+            self.publish(terminal_reply=reply)
         elif obj.get("kind") == "HISTORY" and set(obj) == {
                 "version", "kind", "owner_id", "request_id"}:
             if obj["owner_id"] != self.owner.owner_id:
@@ -377,7 +430,7 @@ class Session:
             raise QueueError("WIRE_COMMAND")
 
 
-def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None):
+def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None, notification_max_age_ms=None):
     """Single session loop; caller owns descriptors and must close them.
 
     Blocking sleep when idle; a pending request arms just one timeout.
@@ -404,7 +457,8 @@ def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None):
             if count <= 0:
                 raise QueueError("PIPE_WRITE_FAILED")
             data = data[count:]
-    session = Session(owner, emit, review_max_age_ms=review_max_age_ms)
+    session = Session(owner, emit, review_max_age_ms=review_max_age_ms,
+                      notification_max_age_ms=notification_max_age_ms)
     buffer = bytearray()
     partial_deadline = None
     try:

@@ -559,5 +559,59 @@ class PipeTests(unittest.TestCase):
         self.assertEqual(self.lookup(aid)["record"]["state"],"PREPARED")
         self.assertIsNone(self.queue.pending())
 
+    def test_opt_in_notification_reservation_and_terminal_event(self):
+        self.session=Session(self.owner,self.sent.append,notification_max_age_ms=3000)
+        self.session.start()
+        self.assertEqual(len(self.sent),3)
+        self.send(self.message())
+        notices=[p for p in self.sent if p["kind"]=="NOTIFICATION"]
+        self.assertEqual(len(notices),1)
+        n=notices[0]
+        self.assertEqual(n["notice"]["delivery_state"],"ATTEMPT_RESERVED")
+        self.assertFalse(n["notice"]["can_execute"])
+        self.assertEqual(n["notice"]["kind"],"ATTENTION")
+        self.assertEqual(n["status_sequence"],self.sent[-2]["sequence"])
+        self.assertIsNone(self.sent[-2]["projection"]["notification_candidate"])
+        with self.queue._transaction() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM memory_queue_attempts_v1").fetchone()[0],1)
+        self.wall+=1000
+        self.mono+=1000
+        self.session.due()
+        self.assertEqual(len([p for p in self.sent if p["kind"]=="NOTIFICATION"]),1)
+        self.send(self.message("CANCEL",self.queue.pending()["id"],2))
+        self.assertEqual(self.sent[-1]["kind"],"NOTIFICATION")
+        self.assertEqual(self.sent[-1]["notice"]["kind"],"CANCELLED")
+        self.assertIsNone(self.session.wait_seconds())
+        with self.queue._transaction() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM memory_queue_attempts_v1").fetchone()[0],2)
+
+    def test_notification_transport_failure_consumes_reservation(self):
+        def emit(packet):
+            if packet["kind"]=="NOTIFICATION":
+                raise OSError("test lost notification frame")
+            self.sent.append(packet)
+        self.session=Session(self.owner,emit,notification_max_age_ms=3000)
+        self.session.start()
+        with self.assertRaisesRegex(QueueError,"NOTIFICATION_PIPE_WRITE_FAILED"):
+            self.send(self.message())
+        with self.queue._transaction() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM memory_queue_attempts_v1").fetchone()[0],1)
+        self.session.close()
+        self.owner=Owner(self.queue,self.factory)
+        self.addCleanup(self.owner.close)
+        self.sent=[]
+        self.session=Session(self.owner,self.sent.append,notification_max_age_ms=3000)
+        self.session.start()
+        self.assertFalse(any(p["kind"]=="NOTIFICATION" for p in self.sent))
+        with self.queue._transaction() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM memory_queue_attempts_v1").fetchone()[0],1)
+
+    def test_notification_disabled_and_age_bound(self):
+        with self.assertRaisesRegex(QueueError,"INVALID_NOTIFICATION_AGE"):
+            Session(self.owner,self.sent.append,notification_max_age_ms=3001)
+        self.session.start()
+        self.send(self.message())
+        self.assertFalse(any(p["kind"]=="NOTIFICATION" for p in self.sent))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

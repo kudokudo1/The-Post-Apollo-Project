@@ -11,6 +11,12 @@ Column {
     required property bool operationBusy
     spacing: 6
     readonly property var devices: Policy.activeDevices(sample)
+    signal profileCopyRequested(var value)
+    function copyToProfile() {
+        if(!canStage||!received||!exited||!exitOk||!observation.options.includes(targetAlgorithm)
+            ||!Policy.observedDevice(sample,selectedDevice,selectedSize))return;
+        profileCopyRequested({deviceHint:selectedDevice,sizeKiB:selectedSize,algorithm:targetAlgorithm});
+    }
     property string selectedDevice: ""
     property real selectedSize: 0
     property var observation: null
@@ -203,6 +209,13 @@ Column {
         label: "RESET TARGET"
         available: root.canStage
         onLeftClicked: root.stageAlgorithm(root.observation.actual)
+    }
+    ActionButton {
+        width: parent.width
+        height: 28
+        label: "COPY ZRAM TO CUSTOM"
+        available: root.canStage && root.received && root.exited && root.exitOk
+        onLeftClicked: root.copyToProfile()
     }
     GohuText {
         width: parent.width

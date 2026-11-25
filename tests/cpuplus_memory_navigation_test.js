@@ -250,3 +250,27 @@ assert.equal(catalogCtx.accepted(JSON.stringify(deleted)+"\n",deleteRequest,rena
 assert.equal(catalogCtx.expectedDocument(renamed,{...deleteRequest,extra:true}),null);
 assert.equal(catalogCtx.accepted(JSON.stringify(renamed)+"\n",deleteRequest,renamed),null);
 console.log("CPU++ profile management exact revision contract PASS");
+
+const v2Base={schema:"post-apollo-cpuplus-profiles-v2",revision:0,profiles:[]};
+let extendedDraft=catalogCtx.empty();
+extendedDraft=catalogCtx.capture(extendedDraft,"zram",{deviceHint:"/dev/zram0",sizeKiB:8388608,algorithm:"zstd"});
+extendedDraft=catalogCtx.capture(extendedDraft,"priority",{deviceHint:"/dev/zram0",sizeKiB:8388608,value:101});
+extendedDraft=catalogCtx.captureAdvanced(extendedDraft,"background","%",15);
+extendedDraft=catalogCtx.captureAdvanced(extendedDraft,"writer","B",1048576);
+extendedDraft=catalogCtx.capture(extendedDraft,"capacityGiB",24);
+assert.equal(extendedDraft.advanced.background.value,15);
+assert.equal(extendedDraft.advanced.writer.unit,"B");
+assert.equal(catalogCtx.captureAdvanced(extendedDraft,"background","%",101),null);
+assert.equal(catalogCtx.capture(extendedDraft,"priority",{deviceHint:"/dev/../x",sizeKiB:1,value:1}),null);
+assert.equal(catalogCtx.capture(extendedDraft,"automation",true),null);
+const v2Req=catalogCtx.create(v2Base,"Extended",extendedDraft);
+assert.equal(v2Req.schema,v2Base.schema);
+const v2Saved=catalogCtx.expectedDocument(v2Base,v2Req);
+assert.equal(catalogCtx.accepted(JSON.stringify(v2Saved)+"\n",v2Req,v2Base).profiles[0].targets.zram.algorithm,"zstd");
+assert.equal(catalogCtx.accepted(JSON.stringify(v2Saved)+"\n",{action:"list"},null),null);
+assert.equal(catalogCtx.accepted(JSON.stringify(v2Saved)+"\n",{action:"list",schema:v2Base.schema},null).revision,1);
+assert.equal(catalogCtx.expectedDocument(v2Saved,{...v2Req,expectedRevision:1}),null);
+const v2Rename=catalogCtx.change(v2Saved,"rename","Extended","Extended New");
+assert.equal(catalogCtx.expectedDocument(v2Saved,v2Rename).profiles[0].targets.advanced.writer.value,1048576);
+assert.match(pane,/onProfileCopyRequested: value => root.copyZramProfile\(value\)/);
+console.log("CPU++ V2 profile capture and catalog contract PASS");

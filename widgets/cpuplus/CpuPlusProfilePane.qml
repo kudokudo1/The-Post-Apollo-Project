@@ -57,7 +57,7 @@ Column {
     onCatalogBusyChanged: confirmation=null
     onVisibleChanged: if(!visible)confirmation=null
     onCatalogChanged: { confirmation=null; if(!catalog || !catalog.profiles.some(x=>x.name===selectedSaved)) selectedSaved=""; }
-    readonly property var view: Profile.preview(selectedProfile,customDraft,actualKiB,actualSwappiness)
+    readonly property var view: Catalog.validDraft(customDraft) ? Profile.preview(selectedProfile,{capacityGiB:customDraft.capacityGiB,swappiness:customDraft.swappiness},actualKiB,actualSwappiness) : null
     spacing: 6
     GohuText {
         parent: root.headerTarget || root
@@ -105,9 +105,18 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "NOT INCLUDED // ZRAM, DEVICE PRIORITY, ADVANCED POLICY, PROCESS LIMITS, AUTOMATION, NOTIFICATIONS\nNo automatic defaults, apply or rollback. Saved profiles are local data only. Zero disk target is not supported removal. Changes would require independent permission and readback."
+        text: "NOT INCLUDED // PROCESS LIMITS, AUTOMATION, NOTIFICATIONS\nNo automatic defaults, apply or rollback. Saved profiles are local data only. Zero disk target is not supported removal. Changes would require independent permission and readback."
         color: Colors.orange
         font.pixelSize: 10
+        wrapMode: Text.Wrap
+    }
+    GohuText {
+        width: parent.width
+        text: "EXTENDED PROFILE TARGETS // HISTORICAL PREVIEW\n"+Catalog.extendedSummary(root.selectedProfile==="CUSTOM"?root.customDraft:Catalog.empty())
+            +"\nCOPY FROM POL // PRIORITY / ZRAM / ADV. SAVED LOCATORS ARE NOT DEVICE IDENTITY; ACTUAL VALUES REQUIRE FRESH OBSERVATION."
+        color: Colors.cyan
+        font.pixelSize: 10
+        textFormat: Text.PlainText
         wrapMode: Text.Wrap
     }
     GohuText {
@@ -144,7 +153,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "NEW / RENAME PROFILE NAME // MAX 32 CHARACTERS"
+        text: "NEW / RENAME PROFILE NAME // MAX 32 CHARACTERS\nSAVING OR CHANGING A PROFILE UPGRADES THE CATALOG TO V2. OLDER CLIENTS WILL REFUSE V2."
         color: Colors.cyan
         font.pixelSize: 10
         wrapMode: Text.Wrap
@@ -253,7 +262,7 @@ Column {
                 width: parent.width
                 text: root.confirmation ? root.confirmation.action.toUpperCase()+" // "+root.confirmation.name
                     +(root.confirmation.action==="rename"?" → "+root.confirmation.newName:
-                        root.confirmation.action==="edit"?" // REPLACE SAVED TARGETS WITH CUSTOM":" // REMOVE SAVED PROFILE")
+                        root.confirmation.action==="edit"?" // REPLACE ALL SAVED TARGETS WITH CUSTOM":" // REMOVE SAVED PROFILE")
                     +" // LOCAL DATA ONLY":""
                 color: Colors.orange
                 font.pixelSize: 10

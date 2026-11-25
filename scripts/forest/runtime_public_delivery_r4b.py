@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import re
+import inspect
 import secrets
 import threading
 
@@ -102,7 +103,9 @@ class LocalFixtureDelivery:
 
     def __init__(self, original, *, resolve_current, deliver):
         if (type(original) is not FixtureDeliveryBinding or
-                not callable(resolve_current) or not callable(deliver)):
+                not callable(resolve_current) or not callable(deliver) or
+                inspect.iscoroutinefunction(resolve_current) or
+                inspect.iscoroutinefunction(deliver)):
             raise ValueError("INVALID_DELIVERY_DEPENDENCY")
         self._original = original
         self._resolve = resolve_current
@@ -112,6 +115,7 @@ class LocalFixtureDelivery:
         self._thread = threading.get_ident()
         self._sequence = 0
         self._closed = False
+        self._invalidated = False
         self._busy = False
         self._terminal = False
 
@@ -121,12 +125,16 @@ class LocalFixtureDelivery:
         return self._original.correlation
 
     def _invalidate(self):
+        self._invalidated = True
         self._closed = True
         self._projection.withdraw()
         return DeliveryResult.INVALIDATED
 
     def _current(self):
         current = self._resolve()
+        if inspect.iscoroutine(current):
+            current.close()
+            return None
         if type(current) is not FixtureDeliveryBinding or current != self._original:
             return None
         return current
@@ -177,9 +185,11 @@ class LocalFixtureDelivery:
                 self._projection.withdraw()
             elif packet["status"] in _TERMINAL:
                 self._terminal = True
-            self._deliver(unit)
-            if self._closed and kind != "WITHDRAW":
-                return DeliveryResult.INVALIDATED
+            returned = self._deliver(unit)
+            if inspect.iscoroutine(returned):
+                returned.close()
+            if returned is not None or self._invalidated:
+                return self._invalidate()
             return DeliveryResult.CALLBACK_RETURNED
         except Exception:
             # Do not expose exception text or attempt any retry.

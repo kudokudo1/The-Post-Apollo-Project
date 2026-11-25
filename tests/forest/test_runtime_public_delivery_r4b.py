@@ -158,6 +158,32 @@ class LocalDeliveryTests(unittest.TestCase):
         self.assertEqual(len(self.units), 1)
         self.assertIs(d.finish(), DeliveryResult.CLOSED)
 
+    def test_reentrant_withdrawal_cannot_report_callback_success(self):
+        def callback(unit):
+            self.units.append(unit)
+            self.assertIs(d.finish(), DeliveryResult.INVALIDATED)
+        d = self.delivery(callback=callback)
+        self.assertIs(d.withdraw(), DeliveryResult.INVALIDATED)
+        self.assertEqual(len(self.units), 1)
+        self.assertEqual(self.units[0]["kind"], "WITHDRAW")
+        self.assertIs(d.withdraw(), DeliveryResult.CLOSED)
+
+    def test_non_none_callback_result_invalidates_not_acknowledges(self):
+        def callback(unit):
+            self.units.append(unit)
+            return True
+        d = self.delivery(callback=callback)
+        self.assertIs(d.observe(self.frames()[0]), DeliveryResult.INVALIDATED)
+        self.assertEqual(len(self.units), 1)
+        self.assertIs(d.finish(), DeliveryResult.CLOSED)
+
+    def test_async_callback_refuses_at_construction(self):
+        async def callback(unit):
+            self.units.append(unit)
+        with self.assertRaisesRegex(ValueError, "INVALID_DELIVERY_DEPENDENCY"):
+            self.delivery(callback=callback)
+        self.assertEqual(self.units, [])
+
     def test_wrong_thread_refuses_without_mutation(self):
         d = self.delivery()
         f = self.frames()[0]

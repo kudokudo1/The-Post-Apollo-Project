@@ -42,3 +42,10 @@ C5 release, terminal receipt, resource admission or model execution claimed.
 Tests use actual R4a/R3/B3 fixture with a recording callback, not real UI2.
 DOC3F and UI2 acceptance of placement/invalidation/consumer required before
 any actual integration. Independent Nurse review and operator merge separate.
+
+Synchronous callbacks must return None; a non-None return is not a delivery
+ACK and invalidates. Coroutine functions are refused, and an accidentally
+returned coroutine is closed without execution. Re-entry during explicit
+withdrawal also invalidates. These checks cannot prove a host callback
+has not independently queued work; actual placement review must establish
+that no asynchronous queue is used.

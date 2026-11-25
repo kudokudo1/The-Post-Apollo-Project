@@ -246,3 +246,24 @@ counts and checkpoint identities. Previous ten tests retained. No
 production code changes, no startup release, no kernel memory mutation.
 This tests process crash, not power loss, kernel failure or installed
 whole desktop lifecycle. CI pending.
+
+## R3u // stronger crash identity and process death evidence
+
+R3t #2731 merged e3e6abc8 after five native crash scenarios and 5/5
+workflows PASS (raw job 139208904836, independent scoped PASS).
+R3u strengthens only disposable test evidence against merged main
+eafaff53. The original Quickshell session generates a fresh UUIDv4
+through a one-shot standard-library Python process; the restored shell
+starts with an empty action identity and never invokes the generator.
+Its exact action lookup derives from the loaded checkpoint, including
+full persisted action message equality for present rows. Supervisor
+compares independent generation/restore markers and read-only checkpoint
+identity, and refuses any change to checkpoint bytes. No action UUID or
+old owner identity is passed into the restored shell. Owner emits PID
+and Linux process start ticks; supervisor verifies identity and child
+argv, opens pidfd before killing the disposable shell, requires exit
+notification from that exact kernel process handle before cleanup or
+restart, then independently verifies DB flock release. Prior native
+scenarios preserved. Linux pidfd support required, no weak fallback.
+No production implementation, authorization, retention, raw-byte bounds,
+or power-loss claim. New CI pending.

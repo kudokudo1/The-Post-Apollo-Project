@@ -7,6 +7,7 @@ opens a database, grants rights, sends bytes, or resumes execution.
 from dataclasses import dataclass
 import json
 import re
+import secrets
 import sqlite3
 
 from shared_context_b6r1 import BarkAttachment
@@ -193,3 +194,170 @@ def history_public_fixture_in_transaction(journal, requested, *, current):
             break
     frame["complete"] = requested.after + len(frame["messages"]) == last
     return frame
+
+
+# R6 candidate: owner-local projection only, not the process wire or an
+# admission mechanism. Keep the original M4 API for existing fixture callers.
+_R6_TOKEN = re.compile(r"[0-9a-f]{32}\Z", re.ASCII)
+_R6_MAX_ROWS = 5
+
+
+def _r6_token(value):
+    if type(value) is not str or _R6_TOKEN.fullmatch(value) is None:
+        raise ContextRefusal("INVALID_PUBLIC_ALIAS")
+
+
+@dataclass(frozen=True, slots=True)
+class ReadOnlyHistoryScope:
+    """Internal owner reference. Never serialize the attachment itself."""
+    attachment: BarkAttachment
+    session_alias: str
+    revision: int
+    view_key: str
+
+    def __post_init__(self):
+        if (type(self.attachment) is not BarkAttachment
+                or not self.attachment.attached
+                or self.attachment.context.clone_key is not None
+                or self.attachment.context.tree_key != "cherry"
+                or self.attachment.requested_tree != "CHERRY"):
+            raise ContextRefusal("INVALID_HISTORY_ATTACHMENT")
+        _r6_token(self.session_alias)
+        _r6_token(self.view_key)
+        _integer(self.revision, 0, _R6_MAX_ROWS)
+        if self.session_alias == self.view_key:
+            raise ContextRefusal("PUBLIC_ALIAS_COLLISION")
+
+    def public_fields(self):
+        return {"treeKey": "CHERRY", "generation": self.attachment.view_generation,
+                "sessionId": self.session_alias, "revision": self.revision,
+                "viewKey": self.view_key}
+
+
+class FixtureHistoryAliases:
+    """One host-owned disposable journal/session; no IO opener or sender.
+
+    Owner supplies independently resolved idle/read-only custody and exact
+    original/current attachment/scope. This does not prove provenance,
+    terminal B3 evidence, or that a reopened connection is the same file.
+    Runtime must establish those invariants before invoking this seam.
+    Only the fixed five-row R6 trial is supported. Aliases are in-memory,
+    stable across connection reopen within the same owner lifetime, never
+    durable identifiers or authorization. No operation reference required.
+    """
+
+    def __init__(self, owner_key, session_id):
+        _key(owner_key)
+        _key(session_id)
+        self._owner = owner_key
+        self._session = session_id
+        self._session_alias = self._new_alias({session_id})
+        self._turn_aliases = {}
+
+    @staticmethod
+    def _new_alias(excluded):
+        token = secrets.token_hex(16)
+        _r6_token(token)
+        if token in excluded:
+            raise ContextRefusal("PUBLIC_ALIAS_COLLISION")
+        return token
+
+    def _metadata(self, journal, attachment):
+        # Check exact scope before reading even turn metadata. This is not
+        # a general publicness classifier; caller owns isolated provenance.
+        if (type(attachment) is not BarkAttachment
+                or not attachment.attached
+                or attachment.context.principal_key != self._owner
+                or attachment.context.tree_key != "cherry"
+                or attachment.context.clone_key is not None
+                or attachment.requested_tree != "CHERRY"):
+            raise ContextRefusal("INVALID_HISTORY_ATTACHMENT")
+        if type(journal) is not ForestSessionJournal:
+            raise ContextRefusal("INVALID_JOURNAL")
+        db = journal.db
+        if not db.in_transaction:
+            raise ContextRefusal("TRANSACTION_REQUIRED")
+        try:
+            row = db.execute(
+                "SELECT state,revision FROM forest_sessions "
+                "WHERE owner_key=? AND tree_key='cherry' AND session_id=?",
+                (self._owner, self._session)).fetchone()
+            if row is None or row[0] != "OPEN":
+                raise ContextRefusal("SESSION_SCOPE_MISMATCH")
+            revision = row[1]
+            _integer(revision, 0, _R6_MAX_ROWS)
+            count, last = db.execute(
+                "SELECT COUNT(*),COALESCE(MAX(ordinal),0) FROM forest_turns "
+                "WHERE session_id=?", (self._session,)).fetchone()
+            if count != revision or last != revision:
+                raise ContextRefusal("INVALID_HISTORY_ORDER")
+        except sqlite3.Error as exc:
+            raise ContextRefusal("STORAGE_REFUSED") from exc
+        return revision
+
+    def scope_in_transaction(self, journal, attachment, *, current_attachment,
+                             view_key):
+        """Metadata-only offer for an explicitly requested history lifetime."""
+        if (type(attachment) is not BarkAttachment
+                or type(current_attachment) is not BarkAttachment
+                or attachment != current_attachment):
+            raise ContextRefusal("VIEW_CHANGED")
+        _r6_token(view_key)
+        if view_key in {self._session_alias, *self._turn_aliases.values()}:
+            raise ContextRefusal("PUBLIC_ALIAS_COLLISION")
+        revision = self._metadata(journal, current_attachment)
+        return ReadOnlyHistoryScope(attachment, self._session_alias,
+                                    revision, view_key)
+
+    def page_in_transaction(self, journal, requested, *, current,
+                            request_id, after=0, limit=2):
+        """Use accepted scope, not fields learned from a received page.
+
+        Caller validates the parent request against its accepted public
+        scope, owns the fresh request-ID/cursor lifecycle and rechecks
+        currentness at actual delivery. Only the aliased candidate leaves
+        this method; R6 envelope serialization and byte budget remain
+        Runtime's responsibility.
+        """
+        if (type(requested) is not ReadOnlyHistoryScope
+                or type(current) is not ReadOnlyHistoryScope
+                or requested != current
+                or current.session_alias != self._session_alias):
+            raise ContextRefusal("VIEW_CHANGED")
+        _r6_token(request_id)
+        _integer(after, 0, current.revision)
+        _integer(limit, 1, 2)
+        if current.view_key in {self._session_alias, *self._turn_aliases.values()}:
+            raise ContextRefusal("PUBLIC_ALIAS_COLLISION")
+        revision = self._metadata(journal, current.attachment)
+        if revision != current.revision:
+            raise ContextRefusal("STALE_REVISION")
+        original = HistoryPageRef(PublicViewRef(requested.attachment, request_id),
+                                  self._session, requested.revision, after, limit)
+        observed = HistoryPageRef(PublicViewRef(current.attachment, request_id),
+                                  self._session, revision, after, limit)
+        frame = history_public_fixture_in_transaction(journal, original,
+                                                       current=observed)
+        # Build candidate aliases privately; refusal must not partially
+        # allocate a page. No original raw ID is sent in the public frame.
+        aliases = dict(self._turn_aliases)
+        excluded = {self._session, self._session_alias, current.view_key,
+                    request_id, *aliases, *aliases.values(),
+                    *(row["turn_id"] for row in frame["messages"])}
+        for row in frame["messages"]:
+            if any(not 32 <= ord(c) <= 126 for c in row["text"]):
+                raise ContextRefusal("INVALID_R6_FIXTURE_TEXT")
+            raw = row["turn_id"]
+            if raw not in aliases:
+                if len(aliases) >= _R6_MAX_ROWS:
+                    raise ContextRefusal("PUBLIC_ALIAS_LIMIT")
+                aliases[raw] = self._new_alias(excluded)
+                excluded.add(aliases[raw])
+            if aliases[raw] in (request_id, current.view_key):
+                raise ContextRefusal("PUBLIC_ALIAS_COLLISION")
+            row["turn_id"] = aliases[raw]
+        frame["sessionId"] = self._session_alias
+        if _size(frame) > MAX_FRAME_BYTES:
+            raise ContextRefusal("DISPLAY_TOO_LARGE")
+        self._turn_aliases = aliases
+        return frame

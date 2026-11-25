@@ -37,3 +37,31 @@ VERIFY:
 
 NEXT: UI2 and Nurse 2F review exact display/page contract; independent
 integrated public-only acceptance. No production, native run or deployment.
+
+
+## R6 read-only alias projection candidate
+
+DOC 4F owns only the additive local M4 seam. FixtureHistoryAliases is
+constructed by the owner for its fixed canonical cherry session. The owner
+retains it across connection reopen, not process death. An independently
+observed B6 read-only attachment (no SessionContextRef or OperationRef)
+produces a metadata-only ReadOnlyHistoryScope in a read transaction. Only
+public_fields() may be offered to the parent. The exact accepted scope
+and independently current scope must agree before page projection. The
+parent selects a fresh request ID; the owner validates the complete public
+request against the accepted scope and retains its exact cursor/lifetime
+before invoking page_in_transaction. The existing M4 projection is reused,
+then raw session/turn keys are substituted with stable random 32-hex
+aliases. Max five durable rows, two rows per page, printable ASCII only;
+collisions refuse, no partial alias allocation on refusal. No title read,
+new DB, execution, implicit refresh, or replay.
+
+This is NOT a wire freeze or sender. Host must establish isolated public
+provenance, same host-created journal custody across connection reopen,
+known idle/committed or independently proven ABORTED state, exact original
+and current view, request freshness, and actual send-time currentness.
+Alias equality does not establish any of these. Runtime owns complete
+canonical ASCII outer envelope and 16KiB including LF limit, trial/action
+budget and lifecycle. Never serialize the internal scope/attachment or
+raw M4 frame. Existing M4 API unchanged. UI2 owns receiver currentness and
+explicit history reattach. DOC3F and Nurse2F review required before wiring.

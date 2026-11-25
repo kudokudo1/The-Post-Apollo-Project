@@ -38,3 +38,10 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-workspace-") as temporary:
     print(proc.stdout)
     if proc.returncode or "QUEUE_WORKSPACE_PASS" not in proc.stdout or "QUEUE_WORKSPACE_FAIL" in proc.stdout:
         raise SystemExit("Native AUTO workspace fixture failed")
+
+    shutil.copy2(ROOT/"tests/fixtures/CpuPlusRecoveryReviewNative.qml",config/"review.qml")
+    review=subprocess.run(["qs","-p",str(config/"review.qml"),"--no-color"],cwd=config,env=env,
+                          text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=20,check=False)
+    print(review.stdout)
+    if review.returncode or "CPU_RECOVERY_REVIEW_NATIVE_PASS" not in review.stdout or "CPU_RECOVERY_REVIEW_NATIVE_FAIL" in review.stdout:
+        raise SystemExit("Native recovery review UI fixture failed")

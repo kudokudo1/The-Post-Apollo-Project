@@ -17,8 +17,12 @@ MAX_SAFE = 2**53 - 1
 
 
 class Owner:
-    def __init__(self, queue, runtime_factory):
+    def __init__(self, queue, runtime_factory, *, durable_actions=False):
+        if type(durable_actions) is not bool:
+            raise QueueError("INVALID_ACTION_MODE")
         self.queue = queue
+        self._durable_actions = durable_actions
+        self._journal = None
         self.pid = os.getpid()
         self.owner_id = str(uuid.uuid4())
         self._sequence = 0
@@ -37,6 +41,13 @@ class Owner:
             except BlockingIOError as exc:
                 raise QueueError("OWNER_BUSY") from exc
             self._check()
+            # Select one action path under the existing owner flock. Do not
+            # downgrade a journal-enabled database to legacy owner dispatch.
+            if self._durable_actions:
+                from memory_queue_local_actions import LocalActions
+                self._journal = LocalActions(queue)
+            else:
+                self._legacy_fence()
             self.runtime = runtime_factory(queue)
             if self.runtime.queue is not queue:
                 raise QueueError("OWNER_QUEUE_MISMATCH")
@@ -46,6 +57,12 @@ class Owner:
                 os.close(self._fd)
                 self._fd = None
             raise
+
+    def _legacy_fence(self):
+        with self.queue._transaction() as db:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE name=?",
+                          ("memory_queue_local_actions_v1",)).fetchone():
+                raise QueueError("DURABLE_ACTION_MODE_REQUIRED")
 
     def _check(self):
         if os.getpid() != self.pid or self._fd is None:
@@ -193,6 +210,8 @@ class Owner:
             elif target is not None or expires is not None:
                 raise QueueError("INVALID_ACTION_FIELDS")
 
+            if not self._durable_actions:
+                self._legacy_fence()
             # Consume sequence before dispatch. It is not authorization and
             # does not survive owner restart. Never retry a lost response.
             self._next_action += 1
@@ -206,7 +225,10 @@ class Owner:
                                           code="STALE_REQUEST", result=None,
                                           invalidate=True)
             try:
-                if kind == "QUEUE":
+                if self._durable_actions and kind != "RECHECK":
+                    # No legacy fallback, including on journal/capture error.
+                    result = self.runtime.local_action(message)
+                elif kind == "QUEUE":
                     result = self.runtime.enqueue(target_gib=target, expires_at=expires)
                 elif kind == "REPLACE":
                     result = self.runtime.replace(expected, target_gib=target, expires_at=expires)
@@ -226,6 +248,21 @@ class Owner:
                                   action_sequence=seq, disposition="REPORTED",
                                   code="READ_STATUS_REQUIRED", result=self._action_summary(result),
                                   invalidate=True)
+
+    def inventory(self, *, limit):
+        """Bounded owner-bound read; never an unlock or fresh observation."""
+        with self._call():
+            if self._journal is None:
+                raise QueueError("DURABLE_ACTION_MODE_REQUIRED")
+            return self._envelope("INVENTORY", inventory=self._journal.inventory(limit=limit))
+
+    def lookup_action(self, action_id):
+        """Exact local action read; missing evidence is not noncommit proof."""
+        with self._call():
+            if self._journal is None:
+                raise QueueError("DURABLE_ACTION_MODE_REQUIRED")
+            return self._envelope("LOCAL_ACTION", action_id=_uuid(action_id),
+                                  record=self._journal.lookup(action_id))
 
     def detail(self, request_id):
         """Developer-only history payload; transport encoding not selected."""

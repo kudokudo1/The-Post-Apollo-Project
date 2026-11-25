@@ -21,6 +21,9 @@ on:
       - 'services/memory/memory_queue_owner.py'
       - 'services/memory/QUEUE-R2-OWNER.md'
       - 'tests/cpuplus_memory_queue_owner_test.py'
+      - 'services/memory/memory_queue_local_actions.py'
+      - 'tests/cpuplus_memory_queue_local_actions_test.py'
+      - 'services/memory/QUEUE-R3-RECOVERY.md'
       - 'services/memory/QUEUE-M1C3B.md'
       - '.github/workflows/cpuplus-memory-queue.yml'
   workflow_dispatch:
@@ -49,3 +52,5 @@ jobs:
         run: python3 -B tests/cpuplus_memory_queue_runtime_test.py
       - name: Notify-only runtime ownership and transport reference (Linux fixtures)
         run: python3 -B tests/cpuplus_memory_queue_owner_test.py
+      - name: Durable local action correlation (disposable SQLite fixtures)
+        run: python3 -B tests/cpuplus_memory_queue_local_actions_test.py

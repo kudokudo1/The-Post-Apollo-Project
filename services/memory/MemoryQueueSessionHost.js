@@ -71,7 +71,7 @@ function recoveryContext(state) {
         historyPending:!!(state.historyRead || state.recoveryRead),
         actionPending:!!state.session.pending,unresolved:!!state.session.unresolved},
         inventory:state.inventory,localAction:state.localAction,
-        recoveryPending:!!state.recoveryRead
+        recoveryPending:!!state.recoveryRead};
 }
 function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow) {
     const fail=reason=>stop(state,consumer,reason,state.generation);

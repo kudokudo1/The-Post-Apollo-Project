@@ -662,9 +662,8 @@ ShellRoot {
             }
         }
     }
-    // Test-only placement on existing actual Tree rows. No ForestW source
-    // changes, no real entity mapping, no owner data or installed indicator.
-    Component { id: seasonType; Review.PublicSeasonIndicator {} }
+    // The actual source mounts UNKNOWN-only indicators. Fixed example scopes
+    // are supplied exclusively here, then retired back to the source default.
     function treeLabel(item,textValue,size) {
         if (!item) return null;
         if (item.text===textValue && item.pixelSize===size
@@ -703,31 +702,39 @@ ShellRoot {
                 "actual Tree row season geometry "+entry.index);
         }
     }
+    function collectSeasonRows() {
+        const entries=[];
+        const original=forest.selectedTreeIndex;
+        for (let i=0;i<forest.treeSlots.length;i++) {
+            forest.selectedTreeIndex=i;
+            const row=forest.selectedTreeButton, slot=forest.treeSlots[i];
+            const name=treeLabel(row,slot.name,12), role=treeLabel(row,slot.role,9);
+            check(row && name && role && name.parent.height===26,"actual Tree row lookup "+i);
+            if (failed) return false;
+            const title=name.parent;
+            const art=title.children.find(x=>x.width===26 && x.height===26 && x.source!==undefined);
+            const icons=title.children.filter(x=>x.objectName==="forestTreeSeasonIndicator");
+            const icon=icons[0];
+            check(art && art.x===0 && name.x===32 && name.anchors.rightMargin===20,
+                "actual Tree artwork and source reservation");
+            check(icons.length===1 && icon && icon.season==="UNKNOWN"
+                && icon.seasonLabel==="Season unknown" && !icon.syntheticOwner
+                && icon.ownerScope===null && !icon.eligible,
+                "actual Tree source unknown default");
+            if (failed) return false;
+            entries.push({index:i,row:row,name:name,role:role,art:art,icon:icon,interactive:row.interactive});
+        }
+        seasonRows=entries;
+        forest.selectedTreeIndex=original;
+        seasonGeometry();
+        return !failed;
+    }
     function seasonStep(n) {
         if (n===0) {
             check(!forest.menuOpen && !parts.loader.active,"season default host closed");
             forest.menuOpen=true;
         } else if (n===1) {
-            const entries=[];
-            for (let i=0;i<forest.treeSlots.length;i++) {
-                forest.selectedTreeIndex=i;
-                const row=forest.selectedTreeButton, slot=forest.treeSlots[i];
-                const name=treeLabel(row,slot.name,12), role=treeLabel(row,slot.role,9);
-                check(row && name && role && name.parent.height===26,"actual Tree row lookup "+i);
-                if (failed) return;
-                const title=name.parent;
-                const art=title.children.find(x=>x.width===26 && x.height===26 && x.source!==undefined);
-                check(art && art.x===0 && name.x===32 && name.anchors.rightMargin===0,
-                    "actual Tree artwork before reservation");
-                if (failed) return;
-                name.anchors.rightMargin=20;
-                const icon=seasonType.createObject(title,{x:Qt.binding(()=>title.width-16),y:5});
-                check(icon && icon.season==="UNKNOWN" && icon.seasonLabel==="Season unknown",
-                    "actual Tree unknown default");
-                if (failed) return;
-                entries.push({index:i,row:row,name:name,role:role,art:art,icon:icon,interactive:row.interactive});
-            }
-            seasonRows=entries;
+            if (!collectSeasonRows()) return;
             forest.selectedTreeIndex=0;
         } else if (n===2) {
             seasonGeometry();
@@ -773,15 +780,14 @@ ShellRoot {
         } else if (n===7) {
             seasonGeometry();
             check(seasonRows.every(e=>e.icon.season==="UNKNOWN"),"reopen no automatic season");
-            for (const entry of seasonRows) {
-                entry.icon.destroy();
-                entry.name.anchors.rightMargin=0;
-            }
         } else if (n===8) {
+            seasonGeometry();
             for (const entry of seasonRows)
-                check(entry.name.width===entry.name.parent.width-32
-                    && entry.name.anchors.rightMargin===0 && entry.art.width===26,
-                    "actual Tree original geometry restored");
+                check(entry.icon===find(entry.name.parent,"forestTreeSeasonIndicator")
+                    && entry.icon.season==="UNKNOWN" && !entry.icon.syntheticOwner
+                    && entry.icon.ownerScope===null && !entry.icon.eligible
+                    && entry.name.anchors.rightMargin===20 && entry.art.width===26,
+                    "actual source UNKNOWN and reserved geometry restored");
             seasonRows=[];
             forest.selectedTreeIndex=0;
             forest.menuOpen=false;
@@ -856,6 +862,9 @@ ShellRoot {
                 break;
             case 1:
                 witness.geometry(false);
+                if (!witness.collectSeasonRows()) return;
+                witness.seasonRows=[];
+                console.info("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS");
                 if (witness.small) {
                     witness.check(!parts.preview.interactive, "small viewport eligible");
                     parts.preview.leftClicked(null); // direct signal, not a physical pointer event

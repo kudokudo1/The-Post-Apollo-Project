@@ -647,6 +647,7 @@ PanelWindow {
                                 anchors.left: treeGlyph.right
                                 anchors.leftMargin: 6
                                 anchors.right: parent.right
+                                anchors.rightMargin: 20
                                 anchors.verticalCenter: parent.verticalCenter
                                 height: 26
                                 text: modelData.name
@@ -656,6 +657,14 @@ PanelWindow {
                                 accentColor: treeRow.energized
                                     ? treeRow.foregroundColor : modelData.gradientAccentColor
                                 accentTopRight: modelData.gradientTopRight
+                            }
+                            // Neutral until a separately approved lifecycle source exists.
+                            PublicPreview.PublicSeasonIndicator {
+                                objectName: "forestTreeSeasonIndicator"
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 16
+                                height: 16
                             }
                             TextHashGlow {
                                 id: treeNameGlow

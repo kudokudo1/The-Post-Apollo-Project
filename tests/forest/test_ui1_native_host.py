@@ -203,7 +203,8 @@ def trial(width, height, count):
                        for line in output.splitlines() if "FOREST_HOST_DORMANT_PHASE_PASS " in line]
             season = [line.split("FOREST_HOST_SEASON_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_SEASON_PHASE_PASS " in line]
-            if (season != ([str(i) for i in range(9)] if width >= 770 else []) or
+            if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
+                    season != ([str(i) for i in range(9)] if width >= 770 else []) or
                     output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
                     dormant != ([str(i) for i in range(14)] if width >= 770 else []) or
                     output.count("FOREST_HOST_DORMANT_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

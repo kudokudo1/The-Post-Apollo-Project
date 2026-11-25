@@ -1,0 +1,22 @@
+name: Forest Heart H6 context footprint CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/heart_context_footprint_h6.py'
+      - 'scripts/forest/HEART_CONTEXT_FOOTPRINT_H6.md'
+      - 'scripts/forest/performance_snapshot_p0.py'
+      - 'tests/forest/test_heart_context_footprint_h6.py'
+      - '.github/workflows/forest-heart-h6-context-footprint.yml'
+permissions:
+  contents: read
+jobs:
+  context-footprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_heart_context_footprint_h6.py' -v
+      - run: python3 -B -m unittest discover -s tests/forest -p 'test_resource_calibration_i3.py' -v
+      - run: python3 -m py_compile scripts/forest/heart_context_footprint_h6.py tests/forest/test_heart_context_footprint_h6.py

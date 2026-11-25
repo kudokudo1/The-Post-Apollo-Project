@@ -128,8 +128,26 @@ ShellRoot {
                     if(!smoke.check(ramView.visible&&pane.ramDetailRows[0].fraction===0.25
                         &&pane.ramDetailRows[1].value===null&&pane.stagedGiB===24&&MemoryOperation.requests===0,
                         "RAM details selection and unavailable optional fields"))return;
+                    const detailRail=smoke.find(pane,"cpuplusCapDetailRail");
+                    if(!smoke.check(detailRail&&detailRail.parent===pinned
+                        && scroll.y>=detailRail.mapToItem(pane,0,detailRail.height).y,
+                        "subject rail outside scroll"))return;
+                    const railY=detailRail.mapToItem(pane,0,0).y;
+                    scroll.contentY=Math.max(0,scroll.contentHeight-scroll.height);
+                    if(!smoke.check(detailRail.mapToItem(pane,0,0).y===railY
+                        &&ram.visible&&swap.visible,"RAM scroll preserves fixed subjects"))return;
+                    const textItem=smoke.find(ramView,"cpuplusRamMetricText");
+                    const glow=smoke.find(ramView,"cpuplusRamMetricGlow");
+                    if(!smoke.check(textItem&&glow&&textItem.text.indexOf("GiB")>=0
+                        &&textItem.text.indexOf("#00f782")>=0
+                        &&String(glow.preferredGlowColor).toLowerCase()==="#00f782"
+                        &&String(pane.ramDatasetGlow("UNRECLAIMABLE SLAB")).toLowerCase()==="#55cfca",
+                        "semantic text and contextual white glow"))return;
                     swap.leftClicked(null);
-                    if(!smoke.check(!ramView.visible&&pane.capDetailSubject==="SWAP","return to swap details"))return;
+                    if(!smoke.check(!ramView.visible&&pane.capDetailSubject==="SWAP"
+                        &&detailRail.mapToItem(pane,0,0).y===railY&&scroll.contentY===0,
+                        "return to swap details resets only body"))return;
+                    console.log("CPU_M11B_PINNED_PALETTE_PASS // fixed rail and contextual glow");
                     console.log("CPU_M11A_RAM_DETAILS_PASS // native RAM/SWAP selection, no mutation");
                     pane.selectCapSection(0);
                     if (!smoke.check(!scroll.visible && slider.visible, "target section scroll-free")) return;

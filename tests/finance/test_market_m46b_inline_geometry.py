@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory() as tmp:
         path.parent.mkdir(parents=True,exist_ok=True)
         shutil.copyfile(ROOT/"services"/"finance"/name,path)
     put("widgets/FinanceMarketQuotaStatusPane.qml", "import QtQuick\nItem { property bool active: false; signal exitRequested() }")
-    put("components/qmldir", "singleton Colors 1.0 Colors.qml\n")
+    put("components/qmldir", "singleton Colors 1.0 Colors.qml\nGohuText 1.0 GohuText.qml\nActionButton 1.0 ActionButton.qml\nNeonScrollBar 1.0 NeonScrollBar.qml\n")
     for name in ["Colors.qml","GohuText.qml"]:
         shutil.copyfile(ROOT/"components"/name,p/"components"/name)
     put("components/ActionButton.qml", """import QtQuick

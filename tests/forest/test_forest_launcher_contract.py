@@ -716,7 +716,10 @@ class ForestLauncherContract(unittest.TestCase):
         selector = (ROOT / "components/SelectorSlider.qml").read_text()
 
         self.assertEqual(view.count("id: reasoningCoffeeButton"), 1)
-        self.assertEqual(view.count("ActionButton {"), 1)
+        # One Coffee action in its own rail, not one action in all ForestW.
+        rail = view.split("id: reasoningRailHost", 1)[1].split("id: promptRow", 1)[0]
+        self.assertEqual(rail.count("ActionButton {"), 1)
+        self.assertIn("id: reasoningCoffeeButton", rail)
         self.assertIn("property bool reasoningRailExpanded: false", view)
         self.assertIn("reasoningRailExpanded = false;", view)
         self.assertIn("y: root.reasoningRailExpanded", view)

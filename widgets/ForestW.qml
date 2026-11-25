@@ -734,6 +734,7 @@ PanelWindow {
 
         Item {
             id: chatPane
+            objectName: "forestChatPane"
             anchors.left: activeChatRail.right
             anchors.right: parent.right
             anchors.top: header.bottom
@@ -741,6 +742,7 @@ PanelWindow {
 
             Item {
                 id: chatHeadingRow
+                objectName: "forestChatHeading"
                 anchors.top: parent.top
                 anchors.topMargin: 9
                 anchors.left: parent.left
@@ -855,6 +857,7 @@ PanelWindow {
 
             Rectangle {
                 id: modelPopup
+                objectName: "forestModelPopup"
                 visible: root.modelPopupOpen
                 z: 30
                 anchors.right: promptRow.right
@@ -1539,6 +1542,7 @@ PanelWindow {
             // The selector lives in its own overlay and cannot cover the prompt.
             Item {
                 id: sessionPreview
+                objectName: "forestSessionPreview"
                 anchors.top: chatDivider.bottom
                 anchors.topMargin: 12
                 anchors.bottom: promptRow.top
@@ -1623,6 +1627,7 @@ PanelWindow {
             // not a separate button floating above the bar.
             Item {
                 id: reasoningRailHost
+                objectName: "forestReasoningRail"
                 z: 12
                 enabled: root.menuOpen
                 anchors.top: chatDivider.bottom
@@ -1634,6 +1639,7 @@ PanelWindow {
 
                 ActionButton {
                     id: reasoningCoffeeButton
+                    objectName: "forestReasoningCoffee"
                     // Inset the red close state INSIDE the slider's own
                     // 40px frame/38px top cap. The surround is part of the
                     // existing SelectorSlider, not another floating row.
@@ -1966,6 +1972,7 @@ PanelWindow {
 
             Item {
                 id: promptRow
+                objectName: "forestPromptRow"
                 z: 40
                 anchors.left: parent.left
                 anchors.leftMargin: 12
@@ -2002,6 +2009,7 @@ PanelWindow {
 
                     TextInput {
                         id: forestPromptInput
+                        objectName: "forestPromptInput"
                         anchors.left: parent.left
                         anchors.leftMargin: 11
                         anchors.right: voiceToTextButton.left
@@ -2052,6 +2060,7 @@ PanelWindow {
                     // supplies recorder custody, consent and stop behavior.
                     VoiceToTextButton {
                         id: voiceToTextButton
+                        objectName: "forestVoiceButton"
                         anchors.right: modelPickerButton.left
                         anchors.rightMargin: 4
                         anchors.top: parent.top
@@ -2164,6 +2173,7 @@ PanelWindow {
                 // in Forest. It owns presentation, never provider calls.
                 AskSendButton {
                     id: forestAskSendButton
+                    objectName: "forestSendButton"
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom

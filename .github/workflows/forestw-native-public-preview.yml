@@ -1,0 +1,32 @@
+name: ForestW native public preview host
+on:
+  pull_request:
+    paths:
+      - 'widgets/ForestW.qml'
+      - 'widgets/forest/ui2/**'
+      - 'components/**'
+      - 'tests/forest/ui1_native_host/**'
+      - 'tests/forest/test_ui1_native_host.py'
+      - '.github/workflows/forestw-native-public-preview.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-wayland-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
+    steps:
+      - name: Prepare isolated native Fedora stack
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui qt6-qtwayland qt6-qtsvg sway python3 git coreutils findutils diffutils grep shadow-utils util-linux
+          quickshell --version
+          quickshell --version | grep '0.3.'
+          useradd --create-home --shell /bin/sh forest-preview-ci
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Actual ForestW on fresh private headless Wayland outputs
+        run: runuser -u forest-preview-ci -- env CI=true GITHUB_ACTIONS=true python3 -B "$GITHUB_WORKSPACE/tests/forest/test_ui1_native_host.py"

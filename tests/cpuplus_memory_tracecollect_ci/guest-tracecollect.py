@@ -55,12 +55,26 @@ def bounded(path,limit=1048576):
     return raw.decode("ascii")
 
 def write(path,value):
-    with path.open("w",encoding="ascii") as stream:
-        stream.write(value+"\n")
+    # Fixed guest control names only, no raw trace contents or addresses.
+    try:
+        with path.open("w",encoding="ascii") as stream:
+            stream.write(value+"\n")
+    except OSError as exc:
+        raise RuntimeError("trace control refused: "+str(path.relative_to(ROOT))+
+                           " errno="+str(exc.errno)) from exc
 
 def append_probe(value):
-    with (ROOT/"kprobe_events").open("a",encoding="ascii") as stream:
-        stream.write(value+"\n")
+    # The specification is a fixed fixture literal. Log the event name
+    # only; don't dump tracefs error logs that may include addresses.
+    operation=value.split()[0]
+    stage("PROBE_CONTROL_BEGIN "+operation)
+    try:
+        with (ROOT/"kprobe_events").open("a",encoding="ascii") as stream:
+            stream.write(value+"\n")
+    except OSError as exc:
+        raise RuntimeError("probe control refused: "+operation+
+                           " errno="+str(exc.errno)) from exc
+    stage("PROBE_CONTROL_COMPLETE "+operation)
 
 def stage(message):
     print("CPU_MEM_TRACECOLLECT_STAGE // "+message,flush=True)
@@ -131,14 +145,19 @@ def run(guard):
     created=[]
     instance_created=False
     try:
+        stage("PRIVATE_INSTANCE_CREATE_BEGIN")
         INSTANCE.mkdir()
         instance_created=True
+        stage("PRIVATE_INSTANCE_CREATED")
         write(INSTANCE/"tracing_on","0")
         write(INSTANCE/"current_tracer","nop")
         write(INSTANCE/"events"/"enable","0")
+        stage("PRIVATE_INSTANCE_DISABLED")
         write(INSTANCE/"trace_clock","global")
         require("[global]" in bounded(INSTANCE/"trace_clock",4096),"global clock not selected")
+        stage("GLOBAL_CLOCK_SELECTED")
         write(INSTANCE/"buffer_size_kb","64")
+        stage("PRIVATE_BUFFER_CONFIGURED")
         append_probe("p:"+GROUP+"/unuse_enter try_to_unuse")
         created.append("unuse_enter")
         append_probe("r:"+GROUP+"/unuse_return try_to_unuse ret=$retval:s64")
@@ -201,12 +220,29 @@ def run(guard):
                 "original unknown operation not fenced")
         print("CPU_MEM_TRACECOLLECT_PASS // ORIGINAL_EFFECT_UNKNOWN_RESULT_RETAINED",flush=True)
     finally:
+        # Preserve the first exception instead of masking it with cleanup.
+        # Cleanup only our exact private scope; any failure still fails CI.
+        original_failure = sys.exc_info()[0] is not None
+        cleanup_errors = []
         if instance_created:
-            write(INSTANCE/"tracing_on","0")
-            write(INSTANCE/"events"/"enable","0")
-            INSTANCE.rmdir()
+            for name, action in (
+                ("tracing_on", lambda: write(INSTANCE/"tracing_on","0")),
+                ("events", lambda: write(INSTANCE/"events"/"enable","0")),
+                ("instance", INSTANCE.rmdir),
+            ):
+                try:
+                    action()
+                except (OSError,RuntimeError) as exc:
+                    cleanup_errors.append(name)
+                    stage("PRIVATE_CLEANUP_FAILED "+name+" "+type(exc).__name__)
         for event in reversed(created):
-            append_probe("-:"+GROUP+"/"+event)
+            try:
+                append_probe("-:"+GROUP+"/"+event)
+            except (OSError,RuntimeError) as exc:
+                cleanup_errors.append(event)
+                stage("PRIVATE_CLEANUP_FAILED "+event+" "+type(exc).__name__)
+        if cleanup_errors and not original_failure:
+            raise RuntimeError("private trace cleanup failed")
     require(not INSTANCE.exists() and not (ROOT/"events"/GROUP).exists(),
             "private trace scope not retired")
     print("CPU_MEM_TRACECOLLECT_PASS // PRIVATE_TRACE_SCOPE_RETIRED",flush=True)

@@ -6233,6 +6233,7 @@ PanelWindow {
                         }
 
                         visible: root.gitView === "branches"
+                        mapOperatorActive: root.menuOpen && root.activePage === "git" && root.gitView === "branches"
 
                         gitService: gitService
                         branchWorkspaceService: branchWorkspaceService

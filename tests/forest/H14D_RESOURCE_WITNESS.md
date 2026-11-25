@@ -72,7 +72,7 @@ Baseline requires exact cap/CPU/swap/pids, populated=0, pids.current=0,
 zero swap/events, current and peak observed, never reset or presumed
 zero. The existing parent preflight, ancestry, host pressure and margin
 requirements remain. Call evaluate with scope="RETAINED_OUTER" and
-that same baseline; first active sample within 1s of launch, <=1s gaps,
+that same baseline; first active sample must complete within 1s of launch, <=1s gaps,
 <=60s total, peak/CPU monotonic from baseline through final empty.
 DIRECT refuses any outer baseline; retained mode refuses missing baseline.
 Outputs distinguish scope, preserve observed baseline current/peak, and
@@ -82,7 +82,7 @@ Separate Runtime/Spirit evidence must bind the preselected scope, exact
 same Reader lifetime, independent mount/boot/container/PID identity,
 fresh creation, inner effective limits before payload progression, exact
 one subtree, no foreign/escaped tasks or untrusted controller writes,
-original terminal outcome and final original empty outer group before
+first active sample starts after independent original pin and completes before payload release; original terminal outcome and final original empty outer group before
 disposal. Outer accounting cannot prove inner limits or terminal. Any
 unknown HOLD, no retry/fallback. No new observer or launcher; no actual
 invocation or model. Offline tests exercise both paths and baseline

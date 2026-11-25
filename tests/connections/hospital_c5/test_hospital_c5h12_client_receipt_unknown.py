@@ -63,9 +63,10 @@ class HospitalC5H12ClientDeliveryUnknown(unittest.TestCase):
         self.sent(FakeClient())
 
     def test_02_actual_linux_seqpacket_client_receives_minimal_committed(self):
-        with socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET) as pair:
-            S._send_committed_client_receipt_or_unknown(pair[0], RECEIPT)
-            self.assertEqual(pair[1].recv(4096), C.canonical(RECEIPT))
+        sender, receiver = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        with sender, receiver:
+            S._send_committed_client_receipt_or_unknown(sender, RECEIPT)
+            self.assertEqual(receiver.recv(4096), C.canonical(RECEIPT))
             self.assertNotIn(b"signedGrant", C.canonical(RECEIPT))
 
     def test_03_actual_linux_closed_client_receipt_is_unknown(self):

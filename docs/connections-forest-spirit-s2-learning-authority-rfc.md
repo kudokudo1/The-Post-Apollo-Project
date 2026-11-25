@@ -43,3 +43,61 @@ Future integration regression matrix using the actual owned seams: candidate can
 ## DECISIONS
 
 Proposed semantic recovery only. No positive authority, durable-learning implementation, new wire/flags, original repository writes, model execution, deployment or protected activation. Operator and owners must agree current policy before implementation; independent custodian/actual writer and release remain blockers.
+
+
+## S3 // Owner reconciliation and exact effect ordering (proposal, 2026-11-25)
+
+S2 #2745 is merged at 4706775c (6/6 workflows; 144/144 dedicated tests).
+Its five refusal methods are not a protected integration. Mind M7d-a #2735,
+DOC3F scope acceptance #7165714136, Runtime #7162779126 in Forest #2161,
+and Connections DOC1 #7162375593 / DOC2 #7162425518 in #2119 agree on
+semantic separation but require independent custody before protected freeze.
+This addendum addresses their ordering requirements; no producer is selected
+or enrolled by this document.
+
+| Boundary | Independently established facts | Actual owner / effect |
+| --- | --- | --- |
+| Metadata enumeration | source identity, permitted metadata class, current purpose and destination scope | Mind metadata query, before any private lookup |
+| Candidate or exact-version use | immutable version and protected commitment, provenance, classification, principal/Tree/Clone/Task, purpose, recipient, current policy/revocation head | Mind authorized snapshot/body read; bind authorization and immutable source read in custodian-defined ordering |
+| Temporary assembly and reuse | original read evidence and independently current eligibility, same exact destination and source restrictions | Mind cache/assembly; recheck before admission and every reuse; no fallback to latest |
+| Durable absorption/mutation | separate approval, exact content/version and destination/retention scope, original effect identity, independent durable spend/fence | Mind actual writer transaction, immutable revision and domain-clock advancement; original writer receipt |
+| Outbound release | separate current disclosure grant, actual enrolled recipient/channel lifetime, exact serialized unit and original effect | Runtime actual submission; durable spend/fence before possible send, serialized against revoke |
+
+Current source seams at a2554b3d: scripts/forest/turn_bridge_b3.py
+`_reserve` (line 145) reads/assembles context before the streamer is called;
+`exchange` checks current context/STOP before reserve and again before the
+streamer, but these checks do not establish independent source authority.
+scripts/forest/ollama_chat_transport.py constructs JSON at line 135 and
+calls `connection.request("POST", "/api/chat", ...)` at line 191.
+The actual serialized payload and independently established recipient must
+be bound at the latter owner's send boundary, not inferred from a model name,
+endpoint string, or creation of a generator. No protected input may be loaded
+merely to construct a commitment: compute it inside already authorized source
+custody. B3 `_commit_fenced` (line 242) is a distinct synthetic SQLite
+commit seam, not proof of a learning writer transaction or of provider
+delivery. Existing provisional-output C5 disclosure and terminal-receipt
+contracts remain separate; do not reinterpret their action/receipt schema.
+
+Required ordering: authorize source access before body read; authorize
+temporary use before assembly; authorize actual serialized outbound effect
+before first possible send; separately authorize any durable learning
+effect before its actual transaction. Historical approval validity and
+independently current policy head must be verified separately. Revoke
+prevents new effects and invalidates derived eligibility; post-read or
+post-send recheck cannot undo bytes already read or sent. Unknown spend ACK,
+partial send, lost append ACK, interrupted execution, or unavailable original
+terminal evidence keeps the original affected scope fenced across restart
+and key rotation. No new effect ID, expiry, rollback assertion, retry or
+refund bypass. Recover only through independently authorized original-effect
+lookup; a provider return or local COMMITTED does not settle independent C5.
+
+Before executable protected integration, DOC1 identifies actual independent
+policy/current-head, revocation, durable fence and historical custody sources;
+DOC2 identifies actual enrolled source/writer/recipient and channel lifetime
+evidence; Mind identifies actual immutable snapshot and writer/receipt
+transaction; Runtime identifies actual serialized submission/terminal
+boundary. DOC3F owns operation policy/consumption semantics, not those
+producers. Nurse2F and Connections Nurse2 review their respective scopes;
+operator approval is separate. No new schema, signer, store, daemon,
+private read, protected grant, or native activation. Existing public
+fixtures and R6 wire remain unchanged.

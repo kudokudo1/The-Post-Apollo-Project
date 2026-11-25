@@ -8,6 +8,10 @@ QtObject {
     id: root
     property string pythonPath: ""
     property string helperPath: ""
+    // Canonical desktop wrapper requires supervisor custody. Older isolated
+    // test callers retain their direct-helper mode; no mode downgrade.
+    property string custodyLauncherPath: ""
+    property var pinnedPaths: null
     property string directory: ""
     property int timeoutMs: 0
     // Explicit generation namespace. Never downgrade an adapter after use.
@@ -23,9 +27,13 @@ QtObject {
     signal completed(int generation, int ticket, string operation, var result)
 
     function begin(operation,generation,record) {
+        const paths=[pythonPath,helperPath,directory,custodyLauncherPath];
         const allowed=generationMode?["GEN_LOAD","GEN_SAVE","GEN_ADVANCE"]:["LOAD","SAVE"];
         if (retired || busy || proc.running || !allowed.includes(operation)
             || (pinnedMode!==null && pinnedMode!==generationMode)
+            || (pinnedPaths!==null && !paths.every((v,i)=>v===pinnedPaths[i]))
+            || (custodyLauncherPath!=="" && (!generationMode || !custodyLauncherPath.startsWith("/")
+                || /[\x00-\x1f]/.test(custodyLauncherPath)))
             || !Number.isInteger(generation) || generation<1 || generation>2147483646
             || ticket>=2147483646 || timeoutMs<1 || timeoutMs>60000
             || ![pythonPath,helperPath,directory].every(x=>x.startsWith("/") && !/[\x00-\x1f]/.test(x)))
@@ -45,11 +53,14 @@ QtObject {
             if (input.length>8192) return 0;
         } else if (record!==null) return 0;
         pinnedMode=generationMode;
+        pinnedPaths=paths;
         const id=++ticket;
         request={operation,generation,ticket:id,input};
         reply=null;
         invalid=false;
-        proc.command=[pythonPath,"-B",helperPath,operation,directory];
+        proc.command=custodyLauncherPath
+            ? [pythonPath,"-I","-B",custodyLauncherPath,"--checkpoint",helperPath,operation,directory]
+            : [pythonPath,"-B",helperPath,operation,directory];
         proc.stdinEnabled=true;
         deadline.interval=timeoutMs;
         deadline.start();

@@ -52,8 +52,31 @@ def checked_path(value, *, interpreter=False):
 def run(owner, generation):
     if not generation.isascii() or not generation.isdecimal() or str(int(generation)) != generation or not 1 <= int(generation) <= 2147483646:
         raise ValueError("generation")
-    script = checked_path(owner)
+    return supervise(checked_path(owner), [generation], checkpoint=False)
+
+
+def checkpoint(helper, operation, directory):
+    if operation not in {"GEN_LOAD", "GEN_SAVE", "GEN_ADVANCE"}:
+        raise ValueError("checkpoint operation")
+    root = Path(directory)
+    if not root.is_absolute() or str(root) != directory or root.resolve(strict=True) != root:
+        raise ValueError("checkpoint directory path")
+    info = root.stat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise ValueError("private checkpoint directory required")
+    return supervise(checked_path(helper), [operation, directory], checkpoint=True)
+
+
+def supervise(script, arguments, *, checkpoint):
     python = checked_path(sys.executable, interpreter=True)
+    # Isolated Python permits sibling imports only from the checked helper
+    # directory; never from ambient PYTHONPATH or the working directory.
+    if checkpoint:
+        boot = ("import os,runpy,sys; p=sys.argv.pop(1); sys.argv[0]=p; "
+                "sys.path.insert(0,os.path.dirname(p)); runpy.run_path(p,run_name='__main__')")
+        argv = [python, "-I", "-B", "-c", boot, script, *arguments]
+    else:
+        argv = [python, "-I", "-B", script, *arguments]
     # Do not inherit loader injection, PYTHONPATH, user site or arbitrary
     # process configuration. The existing disposable test guard is the
     # only forwarded application variable; no installed provider selected.
@@ -71,7 +94,7 @@ def run(owner, generation):
             if os.read(read_fd, 1) != b"1":
                 os._exit(FAILED)
             os.close(read_fd)
-            os.execve(python, [python, "-I", "-B", script, generation], env)
+            os.execve(python, argv, env)
         except BaseException:
             os._exit(FAILED)
     os.close(read_fd)
@@ -112,6 +135,8 @@ def run(owner, generation):
 
 def main():
     try:
+        if len(sys.argv) == 5 and sys.argv[1] == "--checkpoint":
+            return checkpoint(*sys.argv[2:])
         if len(sys.argv) != 3:
             raise ValueError("arguments")
         return run(sys.argv[1], sys.argv[2])

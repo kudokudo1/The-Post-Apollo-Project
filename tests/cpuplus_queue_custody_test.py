@@ -45,6 +45,27 @@ class Custody(unittest.TestCase):
         self.assertNotEqual(subprocess.run(self.command(),timeout=5).returncode,0)
         self.assertFalse(marker.exists())
 
+    def test_checkpoint_custody(self):
+        directory=self.root/"checkpoint"
+        directory.mkdir(mode=0o700)
+        helper=self.root/"helper.py"
+        (self.root/"sibling.py").write_text("VALUE=17\n")
+        helper.write_text("import os,sys,sibling\nassert sibling.VALUE==17\nassert 'PYTHONPATH' not in os.environ\nassert sys.argv[1]=='GEN_LOAD'\nassert sys.stdin.read()=='payload'\nprint('exact helper')\n")
+        cmd=[sys.executable,"-I","-B",str(LAUNCHER),"--checkpoint",str(helper),"GEN_LOAD",str(directory)]
+        result=subprocess.run(cmd,input="payload",encoding="utf8",capture_output=True,timeout=5,
+                              env=dict(os.environ,PYTHONPATH="/untrusted"))
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),"exact helper")
+        helper.write_text("print('not a successful persistence receipt')\nraise SystemExit(7)\n")
+        self.assertNotEqual(subprocess.run(cmd,timeout=5).returncode,0)
+        marker=self.root/"ran"
+        helper.write_text("from pathlib import Path\nPath("+repr(str(marker))+").touch()\n")
+        for operation in ("LOAD","COMMIT","GEN_UNKNOWN"):
+            self.assertNotEqual(subprocess.run(cmd[:-2]+[operation,str(directory)],timeout=5).returncode,0)
+        directory.chmod(0o755)
+        self.assertNotEqual(subprocess.run(cmd,timeout=5).returncode,0)
+        self.assertFalse(marker.exists())
+
     def test_supervisor_death_terminates_exact_child(self):
         identity = self.root / "pid"
         self.owner.write_text("import os,time\nfrom pathlib import Path\nPath("+repr(str(identity))+").write_text(str(os.getpid()))\nwhile True: time.sleep(.1)\n")

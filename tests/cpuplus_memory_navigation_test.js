@@ -366,3 +366,21 @@ assert.match(autoWorkspace,/property var recoverySession: null/);
 assert.match(autoWorkspace,/objectName: "cpuplusRecoverySessionControls"/);
 assert.doesNotMatch(autoWorkspace,/MemoryQueueDesktopSession\s*\{|Host\.(?:dismissReview|takeRetentionAdvance)\s*\(/);
 console.log("CPU++ M8 dismissal and retention presentation PASS");
+
+const v2Inventory={version:2,recent:[{record:reviewRecord,disposition:dismissalReceipt}],truncated:false,prepared:null,pending_request_id:null,startup_unlock:false,adjustment_outcome:"UNVERIFIED",can_execute:false};
+const dismissedInventory=reviewCtx.dispositionInventory(v2Inventory);
+assert.equal(dismissedInventory.recent[0].dismissed,true);
+assert.equal(dismissedInventory.recent[0].dispositionReviewId,reviewId);
+assert.equal(dismissedInventory.prepared,null);
+const openInventory={...v2Inventory,recent:[{record:reviewRecord,disposition:null}],prepared:reviewRecord};
+assert.equal(reviewCtx.dispositionInventory(openInventory).prepared.actionId,reviewAction);
+assert.equal(reviewCtx.dispositionInventory({...openInventory,prepared:null}),null);
+assert.equal(reviewCtx.dispositionInventory({...v2Inventory,prepared:reviewRecord}),null);
+assert.equal(reviewCtx.dispositionInventory({...v2Inventory,recent:[{record:{...reviewRecord,message:{...reviewRecord.message,owner_id:reviewId}},disposition:dismissalReceipt}]}),null);
+for(const change of [{version:1},{startup_unlock:true},{can_execute:true},{truncated:true},{recent:Array(5).fill(v2Inventory.recent[0])},{recent:[...v2Inventory.recent,...v2Inventory.recent]}])
+    assert.equal(reviewCtx.dispositionInventory({...v2Inventory,...change}),null);
+assert.match(autoWorkspace,/kind==="INVENTORY" && value===4\) recoverySession.readInventory/);
+const recoveryPaneM8c=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueueRecoveryPane.qml"),"utf8");
+assert.match(recoveryPaneM8c,/inventoryLimit: recoverySession \? 4 : 16/);
+assert.match(recoveryPaneM8c,/objectName: "cpuplusRecoverySelectRecord"/);
+console.log("CPU++ M8c V2 inventory and disposition distinction PASS");

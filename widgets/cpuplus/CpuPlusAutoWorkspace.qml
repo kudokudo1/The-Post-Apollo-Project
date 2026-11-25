@@ -92,7 +92,7 @@ Column {
     function forwardRecovery(kind,value) {
         if (recoverySession) {
             if (!visible || section!=="RECOVERY" || !sessionReadAvailable) return;
-            if (kind==="INVENTORY" && value===16) recoverySession.readInventory(value);
+            if (kind==="INVENTORY" && value===4) recoverySession.readInventory(value);
             else if (kind==="LOCAL_ACTION" && Recovery.uuid(value)) recoverySession.readAction(value);
             return;
         }

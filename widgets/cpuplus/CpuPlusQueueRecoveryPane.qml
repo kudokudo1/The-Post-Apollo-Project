@@ -99,12 +99,22 @@ Column {
 
     readonly property var snapshot: atomicMode ? Recovery.context(recoveryContext) : null
     readonly property var effectiveHost: atomicMode ? (snapshot ? snapshot.host : null) : hostStatus
-    readonly property var view: atomicMode ? (snapshot ? snapshot.inventory : null) : Recovery.project(inventory)
+    readonly property var view: recoverySession
+        ? (sessionActive && snapshot && !snapshot.host.historyPending && !snapshot.host.actionPending
+            && !snapshot.localAction && dispositionContext && dispositionContext.enabled===true
+            ? Recovery.dispositionInventory(dispositionContext.inventory) : null)
+        : atomicMode ? (snapshot ? snapshot.inventory : null) : Recovery.project(inventory)
+    readonly property int inventoryLimit: recoverySession ? 4 : 16
+    function selectRecord(actionId) {
+        if(!visible || !atomicMode || !Recovery.uuid(actionId))return;
+        const rows=localView ? (localView.record?[localView.record]:[]) : view ? view.recent : [];
+        if(rows.some(item=>item.actionId===actionId))lookupText=actionId;
+    }
     readonly property var localView: snapshot ? snapshot.localAction : null
     readonly property bool canRead: atomicMode && Recovery.canRead(recoveryContext,readAvailable)
     function requestRead(kind,value) {
         if (!visible || !atomicMode || !Recovery.canRead(recoveryContext,readAvailable)) return;
-        if (kind==="INVENTORY" && value===16) recoveryReadRequested(kind,value);
+        if (kind==="INVENTORY" && value===inventoryLimit) recoveryReadRequested(kind,value);
         else if (kind==="LOCAL_ACTION" && Recovery.uuid(value)) recoveryReadRequested(kind,value);
     }
     spacing: 5
@@ -164,7 +174,7 @@ Column {
             height: body.implicitHeight + 8
             color: Colors.black
             border.width: 1
-            border.color: Colors.cyan
+            border.color: root.lookupText===modelData.actionId ? Colors.yellow : Colors.cyan
             Column {
                 id: body
                 anchors.left: parent.left
@@ -174,8 +184,8 @@ Column {
                 spacing: 2
                 GohuText {
                     width: parent.width
-                    text: modelData.kind + " // " + (modelData.state==="COMMITTED"
-                        ? "LOCAL INTENT COMMITTED" : "PREPARED // UNRESOLVED")
+                    text: modelData.kind + " // " + (modelData.dismissed===true ? "LOCAL PREPARATION DISMISSED" : modelData.state==="COMMITTED"
+                        ? "LOCAL INTENT COMMITTED" : root.recoverySession && root.localView ? "PREPARED RECORD // DISPOSITION NOT SHOWN" : "PREPARED // UNRESOLVED")
                     color: Colors.orange
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
@@ -189,10 +199,22 @@ Column {
                             + "\nEXPIRY // "+Recovery.utc(modelData.expiry))
                         + "\nPREPARED // "+Recovery.utc(modelData.preparedAt)
                         + (modelData.committedAt===null?"":"\nCOMMITTED // "+Recovery.utc(modelData.committedAt))
+                        + (modelData.dismissed===true?"\nDISPOSITION REVIEW // "+modelData.dispositionReviewId:"")
                     textFormat: Text.PlainText
                     color: Colors.white
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
+                }
+                ActionButton {
+                    objectName: "cpuplusRecoverySelectRecord"
+                    width: parent.width
+                    height: 26
+                    label: "SELECT"
+                    selected: root.lookupText===modelData.actionId
+                    available: root.atomicMode
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectRecord(modelData.actionId)
                 }
             }
         }
@@ -239,7 +261,7 @@ Column {
                 available: root.canRead
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"
-                onLeftClicked: root.requestRead("INVENTORY",16)
+                onLeftClicked: root.requestRead("INVENTORY",root.inventoryLimit)
             }
             ActionButton {
                 objectName: "cpuplusRecoveryActionRead"

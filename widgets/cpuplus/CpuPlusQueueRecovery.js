@@ -172,3 +172,32 @@ function sameRetention(a,b) {
         &&a.storageGeneration===b.storageGeneration&&a.actionId===b.actionId&&a.reviewDigest===b.reviewDigest
         &&a.sequence===b.sequence&&a.generation===b.generation&&a.mode===b.mode);
 }
+
+// V2 inventory is a separate bounded protocol: a historical PREPARED row
+// with a dismissal receipt is not an unresolved preparation.
+function dispositionInventory(v) {
+    if(!exact(v,["version","recent","truncated","prepared","pending_request_id","startup_unlock","adjustment_outcome","can_execute"])
+        ||v.version!==2||v.startup_unlock!==false||v.can_execute!==false||v.adjustment_outcome!=="UNVERIFIED"
+        ||typeof v.truncated!=="boolean"||!Array.isArray(v.recent)||v.recent.length>4
+        ||(v.truncated&&v.recent.length!==4)||(v.pending_request_id!==null&&!uuid(v.pending_request_id)))return null;
+    const recent=[],ids=new Set();
+    const sameRow=(a,b)=>!!(row(a)&&row(b)&&Object.keys(a).every(k=>k==="message"
+        ?Object.keys(a.message).every(m=>a.message[m]===b.message[m]):a[k]===b[k]));
+    let last=Infinity,open=null;
+    for(const entry of v.recent) {
+        if(!exact(entry,["record","disposition"]))return null;
+        const item=row(entry.record);
+        if(!item||item.ordinal>=last||ids.has(item.actionId))return null;
+        ids.add(item.actionId);last=item.ordinal;
+        const dismissed=entry.disposition===null?null:dispositionReceipt(entry.disposition);
+        if(entry.disposition!==null&&(!dismissed||!sameRow(entry.record,entry.disposition.review.snapshot.record)))return null;
+        if(item.state==="PREPARED"&&!dismissed){if(open)return null;open=entry.record;}
+        recent.push(Object.assign({},item,{dismissed:!!dismissed,dispositionReviewId:dismissed?dismissed.reviewId:null}));
+    }
+    const prepared=v.prepared===null?null:row(v.prepared);
+    if(v.prepared!==null&&(!prepared||prepared.state!=="PREPARED"))return null;
+    if(open){if(!sameRow(open,v.prepared))return null;}
+    else if(prepared&&(!v.truncated||prepared.ordinal>=last||ids.has(prepared.actionId)))return null;
+    return {recent,prepared,truncated:v.truncated,pendingId:v.pending_request_id,
+        outcome:"UNVERIFIED",startupLocked:true,canExecute:false};
+}

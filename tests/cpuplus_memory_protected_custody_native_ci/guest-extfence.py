@@ -17,7 +17,7 @@ FENCE = Path("/var/lib/post-apollo-memory-reclaim")
 WITNESS = Path("/var/lib/postapollo-memory-native-extfence-witness.json")
 ARCHIVE = Path("/var/lib/post-apollo-memory-reclaim-archive.json")
 WRITER = Path("/usr/local/libexec/postapollo-memory-ci-custody.py")
-WRITER_PIN = "eeb44525e797cfc824d186d21018c1a1ca85b1fd"
+WRITER_PIN = "95af22255db13baa829a68c7a9b90b25c50a6bdd"
 PREPARED = FENCE / "prepared.json"
 COMMANDS = (("add","4"),("add-authorized","4"),("persist-authorized",),
             ("expand-authorized","8"),("withdraw-authorized","4"),

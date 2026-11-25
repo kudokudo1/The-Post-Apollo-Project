@@ -2,6 +2,7 @@
 """Explicit disposable V2 reader process interface. No production activation."""
 import argparse
 import json
+import re
 import os
 from pathlib import Path
 import sqlite3
@@ -25,6 +26,8 @@ def main(argv=None):
         return 1
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base",type=Path,required=True)
+    parser.add_argument("--device")
+    parser.add_argument("--inode")
     sub=parser.add_subparsers(dest="action",required=True)
     for action in ("info","page","locate","search","hold"):
         sp=sub.add_parser(action)
@@ -40,13 +43,21 @@ def main(argv=None):
     try:
         if args.action=="hold" and not stat.S_ISFIFO(os.fstat(sys.stdin.fileno()).st_mode):
             raise ValueError("lifetime pipe required")
-        with v2.read(args.base,args.repo_id,args.key,args.snapshot) as (conn,m):
+        expected=None
+        if args.device is not None or args.inode is not None:
+            if not all(isinstance(x,str) and re.fullmatch(r"0|[1-9][0-9]{0,19}",x)
+                       for x in (args.device,args.inode)):
+                raise ValueError("invalid expected directory identity")
+            expected=(args.device,args.inode)
+        evidence={}
+        with v2.read(args.base,args.repo_id,args.key,args.snapshot,
+                     expected_identity=expected,evidence=evidence) as (conn,m):
             if args.action=="hold":
                 # The directory descriptor remains held by read() even after
                 # the SQLite connection closes. No heartbeat, no open DB.
                 conn.close()
                 emit({"schema":SCHEMA,"status":"HELD","repoId":args.repo_id,
-                      "key":args.key,"snapshot":m["snapshot"],"reclamationAllowed":False})
+                      "key":args.key,"snapshot":m["snapshot"],"reclamationAllowed":False,**evidence})
                 if sys.stdin.buffer.read(1):
                     raise ValueError("unexpected lifetime channel data")
                 return 0
@@ -57,7 +68,7 @@ def main(argv=None):
             # Serialize and flush before relinquishing the finite shared lock.
             emit({"schema":SCHEMA,"status":"READY","repoId":args.repo_id,
                   "key":args.key,"snapshot":m["snapshot"],"reclamationAllowed":False,
-                  "result":result})
+                  "result":result,**evidence})
         return 0
     except (OSError,ValueError,TypeError,KeyError,sqlite3.Error,subprocess.SubprocessError):
         print("V2 candidate reader unavailable; no generation changed.",file=sys.stderr)

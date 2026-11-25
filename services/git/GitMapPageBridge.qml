@@ -8,6 +8,13 @@ import "GitMapViewportPolicy.js" as Policy
 Scope {
     id: root
     property var state: null
+    property string custodyBase: ""
+    property var custodyLease: null
+    property var custodyGeneration: null
+    property var requestCustody: null
+    property bool custodyRefused: false
+    signal custodyFault(var g)
+    function sameCustody(a,b) { return a && b && a.directory===b.directory && a.repoId===b.repoId && a.key===b.key && a.manifest.snapshot===b.manifest.snapshot && a.device===b.device && a.inode===b.inode; }
     property bool requestsEnabled: true
     onRequestsEnabledChanged: if (requestsEnabled) schedule()
     property string directory: ""
@@ -21,10 +28,12 @@ Scope {
     readonly property bool busy: activeRequest !== null
     readonly property bool readerBusy: busy || worker.running
 
-    function activate(path, manifest, rowHeight, viewportHeight, anchor) {
+    function activate(path, manifest, rowHeight, viewportHeight, anchor, generation) {
         if (faulted || typeof path !== "string" || !path.startsWith("/")) return false;
         const candidate = Policy.activate(state, manifest, rowHeight, viewportHeight, anchor);
         if (!candidate) return false;
+        custodyGeneration=generation || null;
+        custodyRefused=false;
         directory = path;
         state = candidate;
         schedule();
@@ -53,6 +62,8 @@ Scope {
     }
     function pump() {
         if (!requestsEnabled || !state || faulted || busy || worker.running) return;
+        if (custodyRefused) return;
+        if (custodyBase && (!custodyGeneration || !custodyLease || !custodyLease.held || !sameCustody(custodyLease.generation,custodyGeneration))) { custodyRefused=true; custodyFault(custodyGeneration); return; }
         const plan = Policy.requests(state);
         state = plan.state;
         const wanted = Policy.wantedPages(state);
@@ -64,6 +75,7 @@ Scope {
             }
         }
         if (!request) return;
+        requestCustody=custodyBase ? custodyGeneration : null;
         activeRequest = request;
         activeDirectory = directory;
         received = false;
@@ -71,7 +83,8 @@ Scope {
         exitOk = false;
         output = "";
         deadline.restart();
-        worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",
+        if (requestCustody) worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),"--base",custodyBase,"--device",requestCustody.device,"--inode",requestCustody.inode,"page",request.repoId,requestCustody.key,request.snapshot,String(request.start)]);
+        else worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",
                      Quickshell.shellPath("scripts/git_map_history_index.py"),
                      "page", activeDirectory, request.snapshot, String(request.start)]);
     }
@@ -82,13 +95,19 @@ Scope {
         if (state && Policy.sameRequest(state, request)) {
             let accepted = null;
             if (exitOk && output.length <= 4194304) {
-                try { accepted = Policy.accept(state,request,JSON.parse(output)); }
+                if (requestCustody) {
+                    try { const reply=JSON.parse(output), g=requestCustody;
+                        if (custodyLease && custodyLease.held && sameCustody(custodyLease.generation,g) && sameCustody(custodyGeneration,g) && reply.schema==="post-apollo-git-map-reader-v2-candidate" && reply.status==="READY" && reply.repoId===g.repoId && reply.key===g.key && reply.snapshot===g.manifest.snapshot && reply.device===g.device && reply.inode===g.inode && reply.reclamationAllowed===false) accepted=Policy.accept(state,request,reply.result);
+                    } catch (error) {}
+                } else try { accepted = Policy.accept(state,request,JSON.parse(output)); }
                 catch (error) {}
             }
             state = accepted || Policy.fail(state,request);
+            if (!accepted && requestCustody && sameCustody(requestCustody,custodyGeneration)) { custodyRefused=true; custodyFault(requestCustody); }
         }
         output = "";
         activeRequest = null;
+        requestCustody=null;
         activeDirectory = "";
         schedule();
     }

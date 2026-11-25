@@ -260,3 +260,87 @@ def public_summary(summary):
         "modelExecutionPermitted": False,
         "safeActions": [],
     }
+
+
+def residency_budget_reference(binding_result, current_profile, *, cold=None, warm=None):
+    """H8: select matching measured incremental references, never a budget.
+
+    Recover historical residency-aware accounting without subtracting a
+    provider's aggregate resident bytes. Both profiles must describe the
+    same workload/config/hardware, differing only in residency and baseline
+    state. The caller's current profile is a reference, NOT an observation
+    of actual currentness or proof that the model is still resident.
+    """
+    if type(current_profile) is not CalibrationProfile:
+        raise CalibrationRefusal("INVALID_PROFILE")
+    if not match_turn(binding_result, current_profile):
+        raise CalibrationRefusal("CURRENT_BINDING_MISMATCH")
+
+    # Compare all fields except the two intentionally distinct baseline
+    # fields. Never compare memory across configurations or measurements.
+    def workload_key(profile):
+        return (profile.binding, profile.machine_id, profile.boot_id,
+                profile.hardware_digest, profile.measurement_scope_id,
+                profile.accelerator_id, profile.workload_digest,
+                profile.reasoning_mode, profile.prompt_tokens,
+                profile.cpu_thread_limit)
+
+    for label, candidate in (("cold", cold), ("warm", warm)):
+        if candidate is None:
+            continue
+        if (type(candidate) is not CalibrationSummary
+                or candidate != summarize(candidate.profile, candidate.trials)):
+            raise CalibrationRefusal("INVALID_SUMMARY")
+        if candidate.profile.residency != label:
+            raise CalibrationRefusal("RESIDENCY_LABEL_MISMATCH")
+        if workload_key(candidate.profile) != workload_key(current_profile):
+            raise CalibrationRefusal("WORKLOAD_REFERENCE_MISMATCH")
+    if cold is not None and warm is not None:
+        if cold.profile.baseline_state_digest == warm.profile.baseline_state_digest:
+            raise CalibrationRefusal("BASELINE_REFERENCE_NOT_DISTINCT")
+        if {t.trial_id for t in cold.trials} & {t.trial_id for t in warm.trials}:
+            raise CalibrationRefusal("DUPLICATE_TRIAL")
+    selected = cold if current_profile.residency == "cold" else warm
+    reason = "MATCHING_CAMPAIGN_MISSING"
+    if selected is not None:
+        if selected.profile != current_profile:
+            reason = "BASELINE_REFERENCE_CHANGED"
+            selected = None
+        elif selected.reason != "OBSERVED_REFERENCE_ONLY":
+            reason = "INCOMPLETE_CAMPAIGN"
+            selected = None
+        else:
+            reason = "OBSERVED_REFERENCE_ONLY"
+
+    def incremental(summary, field):
+        if summary is None or summary.reason != "OBSERVED_REFERENCE_ONLY":
+            return None
+        value = getattr(summary, field)
+        return None if value is None else (value + _MIB - 1) // _MIB
+
+    return {
+        "schema": "post-apollo.forest.residency-budget-reference.h8",
+        "status": "UNKNOWN_HOLD",
+        "reason": reason,
+        "requestedResidencyReference": current_profile.residency,
+        "matchingCampaignReference": selected is not None,
+        "coldHostObservedIncrementalMiB": incremental(cold, "host_incremental_bytes"),
+        "warmHostObservedIncrementalMiB": incremental(warm, "host_incremental_bytes"),
+        "coldAcceleratorObservedIncrementalMiB": incremental(cold, "accelerator_incremental_bytes"),
+        "warmAcceleratorObservedIncrementalMiB": incremental(warm, "accelerator_incremental_bytes"),
+        "selectedHostObservedIncrementalMiB": incremental(selected, "host_incremental_bytes"),
+        "selectedAcceleratorObservedIncrementalMiB": incremental(selected, "accelerator_incremental_bytes"),
+        "hostRequirementMiB": None,
+        "acceleratorRequirementMiB": None,
+        "cpuRequirementThreads": None,
+        "actualResidencyVerified": False,
+        "freshnessVerified": False,
+        "sourceAuthenticated": False,
+        "requirementsEstablished": False,
+        "availabilityEstablished": False,
+        "resourceReserved": False,
+        "safeToStartInference": False,
+        "permissionGranted": False,
+        "productionAuthority": False,
+        "safeActions": [],
+    }

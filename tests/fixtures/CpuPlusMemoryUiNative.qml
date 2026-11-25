@@ -148,12 +148,12 @@ ShellRoot {
                     const bar=smoke.find(ramView,"cpuplusRamMetricBar");
                     if(!smoke.check(grid&&card&&bar&&grid.columns===(grid.width>=440?2:1)
                         &&card.width<=grid.width&&card.height>textItem.implicitHeight
-                        &&bar.height===12&&String(pane.ramDatasetColor("ANONYMOUS")).toLowerCase()==="#a46aff",
+                        &&bar.height===pane.detailMeterHeight&&String(pane.ramDatasetColor("ANONYMOUS")).toLowerCase()==="#a46aff",
                         "compact RAM card geometry and local purple"))return;
                     const fill=smoke.find(bar,"cpuplusRamMetricFill");
                     const info=smoke.find(pane,"cpuplusCapDetailsInfo");
                     const popup=smoke.find(pane,"cpuplusCapDetailsInfoPopup");
-                    if(!smoke.check(fill&&fill.x===2&&fill.height===8&&info&&popup&&!popup.visible,
+                    if(!smoke.check(fill&&fill.x===2&&fill.height===bar.height-4&&info&&popup&&!popup.visible,
                         "inset gauge and closed info"))return;
                     info.leftClicked(null);
                     if(!smoke.check(popup.visible&&pane.detailsInfoOpen,"info opens"))return;

@@ -541,6 +541,16 @@ PanelWindow {
         onActivated: cpuPlusWindow.close()
     }
 
+    readonly property var activeMemoryPane: memoryActuatorLoader.active ? memoryActuatorLoader.item : null
+    readonly property string cpuHeaderStatus: activeMemoryPane ? activeMemoryPane.status
+        : selectedModeIndex===2 || selectedModeIndex===3 ? ((selectedMonitorRows().length>0)?"OBSERVED":"WAITING")
+        : modes[selectedModeIndex].name
+    readonly property color cpuHeaderColor: cpuHeaderStatus==="OBSERVED" ? Colors.omnitrix
+        : cpuHeaderStatus==="UNAVAILABLE" ? Colors.orange : Colors.cyan
+    function refreshCpuMenu() {
+        refreshSharedMonitors();
+        if(activeMemoryPane) activeMemoryPane.refresh();
+    }
     function refreshSharedMonitors() {
         if (systemTelemetry)
             systemTelemetry.refresh();
@@ -1091,33 +1101,51 @@ PanelWindow {
             }
         }
 
+        ActionButton {
+            id: cpuPlusReloadButton
+            objectName: "cpuplusHeaderReload"
+            anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
+            anchors.right: cpuPlusCloseButton.left
+            anchors.rightMargin: 5
+            width: 24
+            height: 22
+            label: "↻"
+            labelPixelSize: 15
+            contentPadding: 1
+            accentColor: Colors.cyan
+            available: cpuPlusWindow.menuOpen && (!cpuPlusWindow.activeMemoryPane || !cpuPlusWindow.activeMemoryPane.refreshBusy)
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            Accessible.name: "Refresh CPU++ observations"
+            onLeftClicked: cpuPlusWindow.refreshCpuMenu()
+        }
         Rectangle {
             id: cpuPlusInternetIndicator
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
-            anchors.right: cpuPlusCloseButton.left
+            anchors.right: cpuPlusReloadButton.left
             anchors.rightMargin: 7
             width: 156
             height: 22
             color: Colors.black
             border.width: 1
-            border.color: cpuPlusWindow.internetStatusColor
+            border.color: cpuPlusWindow.cpuHeaderColor
             RectangularShadow {
                 anchors.fill: parent
                 z: -1
                 spread: 3
                 opacity: cpuPlusWindow.menuOpen ? 0.46 : 0
-                color: cpuPlusWindow.internetStatusColor
+                color: cpuPlusWindow.cpuHeaderColor
             }
             GohuText {
                 id: cpuPlusInternetText
                 anchors.centerIn: parent
                 width: parent.width-8
                 horizontalAlignment: Text.AlignHCenter
-                text: "LIVE // NET // "+cpuPlusWindow.internetStatus.label
+                text: "CPU++ // "+cpuPlusWindow.cpuHeaderStatus
                 textFormat: Text.PlainText
                 font.pixelSize: 9
                 elide: Text.ElideRight
-                color: cpuPlusWindow.internetStatusColor
+                color: cpuPlusWindow.cpuHeaderColor
             }
             SafeDropShadow {
                 anchors.fill: cpuPlusInternetText
@@ -1128,7 +1156,7 @@ PanelWindow {
                 radius: 6
                 samples: 9
                 opacity: 0.72
-                color: cpuPlusWindow.internetStatusColor
+                color: cpuPlusWindow.cpuHeaderColor
                 transparentBorder: true
             }
         }
@@ -3088,6 +3116,7 @@ PanelWindow {
             }
         }
         Loader {
+            id: memoryActuatorLoader
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actuatorHeader.bottom
@@ -3106,6 +3135,7 @@ PanelWindow {
             visible: active
             sourceComponent: CpuPlusMemoryActuatorPane {
                 recoverySession: cpuPlusWindow.memoryRecoverySession
+                headerRefreshAvailable: true
             }
         }
 

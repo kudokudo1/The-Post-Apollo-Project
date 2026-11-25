@@ -29,5 +29,6 @@ Item {
         requestedVisible: root.visible
         foregroundColor: Colors.white
         preferredGlowColor: root.color===Colors.white?Colors.cyan:root.color
+        opacity: 0.95
     }
 }

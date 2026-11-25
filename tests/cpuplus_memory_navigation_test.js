@@ -443,3 +443,11 @@ assert.match(pane,/objectName: "cpuplusCapDetailsInfoPopup"/);
 assert.match(pane,/objectName: "cpuplusRamMetricFill"[\s\S]*?anchors.leftMargin: 2/);
 assert.match(pane,/interactive: !root.capDetailsActive \|\| contentHeight > height \+ 1/);
 console.log("CPU++ M11d punctuation escaping, inset bars and info contract PASS");
+
+assert.match(pane,/readonly property int detailMeterHeight: Math.max\(12, Math.round\(12\*detailScale\)\)/);
+assert.doesNotMatch(pane,/spacing: root.capDetailsActive \? 3 : 5|height: root.capDetailsActive \? 34 : 40|height: root.capDetailsActive \? 22 : 25/);
+assert.match(pane,/visible: !root.headerRefreshAvailable/);
+assert.match(cpuWindowM9,/objectName: "cpuplusHeaderReload"/);
+assert.match(cpuWindowM9,/if\(activeMemoryPane\) activeMemoryPane.refresh\(\)/);
+assert.match(cpuWindowM9,/text: "CPU\+\+ \/\/ "\+cpuPlusWindow.cpuHeaderStatus/);
+console.log("CPU++ M11e stable CAP instrument, proportional meters and header refresh contract PASS");

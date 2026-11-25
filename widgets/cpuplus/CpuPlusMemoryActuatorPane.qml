@@ -15,9 +15,12 @@ Item {
     property var recoverySession: null
     property var sample: null
     property var lastGoodSample: null
-    readonly property var displaySample: sample || lastGoodSample
+    readonly property var displaySample: lastGoodSample
     readonly property var displayCapacity: Snapshot.capacityPlan(displaySample,stagedGiB)
-    property bool scanLive: true
+    property string scanMode: "LIVE"
+    readonly property bool scanLive: scanMode==="LIVE"
+    property int pausedRemainingMs: 0
+    property int scanDelayMs: scanIntervalSeconds*1000
     property int scanIntervalSeconds: 10
     property bool scanDiagnosticsOpen: false
     property double scanClockMs: Date.now()
@@ -26,23 +29,30 @@ Item {
     property var scanRows: []
     property var pendingReport: null
     property string scanReason: "No completed attempt"
-    readonly property string scanBadge: status==="READING" ? (lastGoodSample?"RESCANNING":"SCANNING") : !scanLive ? "PAUSED" : status==="OBSERVED" ? "LIVE // "+Math.max(0,Math.ceil((scanNextMs-scanClockMs)/1000))+"s" : lastGoodSample ? "STALE // "+Math.max(0,Math.ceil((scanNextMs-scanClockMs)/1000))+"s" : "UNAVAILABLE"
-    function scheduleScan() {
+    readonly property string scanBadge: status==="READING" ? (lastGoodSample?"RESCANNING":"SCANNING") : !scanLive ? (scanMode==="STOPPED"?"MANUAL":"PAUSED") : status==="OBSERVED" ? "LIVE // "+Math.max(0,Math.ceil((scanNextMs-scanClockMs)/1000))+"s" : lastGoodSample ? "STALE // "+Math.max(0,Math.ceil((scanNextMs-scanClockMs)/1000))+"s" : "UNAVAILABLE"
+    function scheduleScan(delay) {
         scanTimer.stop();
         scanClockMs=Date.now();
-        scanNextMs=scanLive ? scanClockMs+scanIntervalSeconds*1000 : 0;
+        scanDelayMs=Number.isFinite(delay)?Math.max(1,Math.min(scanIntervalSeconds*1000,delay)):scanIntervalSeconds*1000;
+        scanNextMs=scanLive ? scanClockMs+scanDelayMs : 0;
         if(scanLive&&visible&&status!=="READING")scanTimer.start();
     }
-    function setScanLive(value) {
-        if(scanLive===value)return;
-        scanLive=value;
-        if(!value){sample=null;clearCapConfirmation();}
-        if(value&&status!=="READING")refresh();
-        else scheduleScan();
+    function setScanMode(value) {
+        if(!["LIVE","PAUSED","STOPPED"].includes(value)||scanMode===value)return;
+        const previous=scanMode;
+        if(value==="PAUSED")pausedRemainingMs=scanNextMs>0?Math.max(0,scanNextMs-Date.now()):scanIntervalSeconds*1000;
+        if(value==="STOPPED")pausedRemainingMs=0;
+        scanMode=value;
+        if(!scanLive){sample=null;clearCapConfirmation();scheduleScan();return;}
+        if(status==="READING")return;
+        if(previous==="PAUSED"&&pausedRemainingMs>0)scheduleScan(pausedRemainingMs);
+        else refresh();
     }
+    function setScanLive(value) { setScanMode(value?"LIVE":"PAUSED"); }
     function setScanInterval(value) {
-        if(![5,10,30,60].includes(value))return;
+        if(!Number.isInteger(value)||value<5||value>60||value%5!==0||value===scanIntervalSeconds)return;
         scanIntervalSeconds=value;
+        if(scanMode==="PAUSED")pausedRemainingMs=value*1000;
         scheduleScan();
     }
     property string status: "READING"
@@ -222,7 +232,7 @@ Item {
     }
     Timer {
         id: scanTimer
-        interval: root.scanIntervalSeconds*1000
+        interval: root.scanDelayMs
         repeat: false
         onTriggered: if(root.scanLive&&root.visible)root.refresh()
     }
@@ -569,13 +579,13 @@ Item {
             columns: 3
             spacing: 4
             Repeater {
-                model: [
-                    {label:"ACTUAL DISK",value:root.displayCapacity ? root.gib(root.displayCapacity.actualKiB) : "—",accent:Colors.cyan},
-                    {label:"TARGET DISK",value:root.stagedGiB + " GiB",accent:Colors.yellow},
-                    {label:"TOTAL PLAN",value:root.displayCapacity ? root.gib(root.displayCapacity.projectedKiB) : "—",accent:Colors.yellow}
-                ]
+                model: 3
                 delegate: Rectangle {
-                    required property var modelData
+                    required property int index
+                    readonly property var modelData: index===0
+                        ? {label:"ACTUAL DISK",value:root.displayCapacity?root.gib(root.displayCapacity.actualKiB):"—",accent:Colors.cyan}
+                        : index===1 ? {label:"TARGET DISK",value:root.stagedGiB+" GiB",accent:Colors.yellow}
+                        : {label:"TOTAL PLAN",value:root.displayCapacity?root.gib(root.displayCapacity.projectedKiB):"—",accent:Colors.yellow}
                     width: Math.max(0, (parent.width - 8) / 3)
                     height: 40
                     border.width: 1
@@ -623,11 +633,11 @@ Item {
             }
             CpuPlusMemoryReadout {
                 width: parent.width
-                text: !root.capacity ? "WAITING FOR LIVE CAPACITY"
-                    : root.capacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
-                    : root.capacity.direction === "expand" && root.capacity.baseActive && !root.capacity.extensionActive
+                text: !root.displayCapacity ? "WAITING FOR LIVE CAPACITY"
+                    : root.displayCapacity.direction === "unchanged" ? "TARGET MATCHES ACTIVE CAPACITY"
+                    : root.displayCapacity.direction === "expand" && root.displayCapacity.baseActive && !root.displayCapacity.extensionActive
                         ? "EXPANSION // SEPARATE TEMPORARY SWAP"
-                    : root.capacity.active ? "PREVIEW ONLY // RESIZE NOT AVAILABLE YET"
+                    : root.displayCapacity.active ? "PREVIEW ONLY // RESIZE NOT AVAILABLE YET"
                     : "TARGET // RESERVES DISK SPACE"
                 color: Colors.white
                 font.pixelSize: 11
@@ -834,9 +844,10 @@ Item {
                         columns: width >= 440 ? 2 : 1
                         spacing: Math.round(2*root.detailScale)
                         Repeater {
-                            model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
+                            model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"&&root.displaySample?7:0
                             delegate: Rectangle {
-                                required property var modelData
+                                required property int index
+                                readonly property var modelData: root.ramDetailRows[index]
                                 objectName: "cpuplusRamMetricCard"
                                 width: Math.max(0,(ramCardGrid.width-(ramCardGrid.columns-1)*ramCardGrid.spacing)/ramCardGrid.columns)
                                 height: ramCardContent.implicitHeight
@@ -901,9 +912,10 @@ Item {
                     }
                 }
                 Repeater {
-                    model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.displaySample ? root.displaySample.rows : []
+                    model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.displaySample ? root.displaySample.rows.length : 0
                     delegate: Rectangle {
-                        required property var modelData
+                        required property int index
+                        readonly property var modelData: root.displaySample.rows[index]
                         objectName: "cpuplusSwapDetailCard"
                         width: parent.width
                         height: swapCardContent.implicitHeight+10
@@ -1412,30 +1424,84 @@ Item {
         color: "#110319"
         border.color: Colors.magenta
         MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
-        Row {
+        Column {
             id: scanControls
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 5
-            height: 30
-            spacing: 4
-            ActionButton {
-                width: (parent.width-20)/5
-                height: parent.height
-                label: root.scanLive?"LIVE":"PAUSED"
-                selected: root.scanLive
-                onLeftClicked: root.setScanLive(!root.scanLive)
+            spacing: 3
+            Row {
+                width: parent.width
+                height: 30
+                spacing: 5
+                ActionButton {
+                    objectName: "cpuplusScanPlayPause"
+                    width: 42
+                    height: parent.height
+                    label: root.scanLive?"Ⅱ":"▶"
+                    accentColor: Colors.white
+                    selected: root.scanLive
+                    Accessible.name: root.scanLive?"Pause automatic scans":"Play automatic scans"
+                    acceptedButtons: Qt.LeftButton
+                    onLeftClicked: root.setScanMode(root.scanLive?"PAUSED":"LIVE")
+                }
+                ActionButton {
+                    objectName: "cpuplusScanStop"
+                    width: 42
+                    height: parent.height
+                    label: "■"
+                    accentColor: Colors.red
+                    selected: root.scanMode==="STOPPED"
+                    idleForegroundColor: Colors.red
+                    selectedForegroundColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    selectedContentGlowColor: Colors.red
+                    selectedFillColor: Colors.black
+                    Accessible.name: "Stop automatic scans; reload manually"
+                    acceptedButtons: Qt.LeftButton
+                    onLeftClicked: root.setScanMode("STOPPED")
+                }
+                CpuPlusMemoryReadout {
+                    width: Math.max(0,parent.width-94)
+                    height: parent.height
+                    text: root.scanBadge
+                    color: root.scanLive?Colors.white:Colors.orange
+                    font.pixelSize: 11
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
-            Repeater {
-                model: [5,10,30,60]
-                delegate: ActionButton {
-                    required property int modelData
-                    width: (scanControls.width-20)/5
-                    height: scanControls.height
-                    label: modelData+"s"
-                    selected: root.scanIntervalSeconds===modelData
-                    onLeftClicked: root.setScanInterval(modelData)
+            CpuPlusMemoryReadout {
+                width: parent.width
+                text: "SCAN INTERVAL // "+root.scanIntervalSeconds+" s"
+                color: Colors.white
+                font.pixelSize: 11
+            }
+            Item {
+                width: parent.width
+                height: 46
+                SelectorSlider {
+                    objectName: "cpuplusScanFrequencySlider"
+                    anchors.centerIn: parent
+                    width: 44
+                    height: parent.width
+                    rotation: 90
+                    horizontalStepPresentation: true
+                    selectorProfile: "step"
+                    minimumValue: 5
+                    maximumValue: 60
+                    valueStep: 5
+                    valueDecimals: 0
+                    valueSuffix: "s"
+                    currentValue: root.scanIntervalSeconds
+                    enabledSlider: true
+                    accentColor: Colors.white
+                    handleColor: Colors.white
+                    handleGradientBaseColor: Colors.white
+                    handleGradientAccentColor: Colors.white
+                    handleGlowColor: Colors.white
+                    activityGlowColor: Colors.white
+                    onValueRequested: value=>root.setScanInterval(value)
                 }
             }
         }
@@ -1446,7 +1512,7 @@ Item {
             anchors.right: parent.right
             anchors.margins: 4
             heading: "MEMORY // SCAN DIAGNOSTICS"
-            displayedState: root.status==="READING"?"READING":!root.scanLive?"MANUAL":root.status==="OBSERVED"?"LIVE":root.lastGoodSample?"CACHE STALE":"WAITING"
+            displayedState: root.status==="READING"?"READING":!root.scanLive?(root.scanMode==="STOPPED"?"MANUAL":"IDLE"):root.status==="OBSERVED"?"LIVE":root.lastGoodSample?"CACHE STALE":"WAITING"
             providerLabel: "LOCAL LINUX // PROCFS"
             currentAge: root.scanLastSuccessMs ? Math.max(0,Math.floor((root.scanClockMs-root.scanLastSuccessMs)/1000))+"s" : "--"
             showLocation: false

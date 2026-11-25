@@ -148,3 +148,11 @@ assert "refreshDiagStderr++" in service
 assert "refreshDiagLastFailure=null" not in service.replace(" ", "")
 assert 'onCloseRequested: root.gitDiagnosticsOpen=false' in widget
 print("Git offline diagnostics source contracts PASS")
+
+# A soft-deadline overrun is not a terminal failure.
+assert 'selectedFailed ? Colors.red : doneMs>budget ? Colors.orange : Colors.cyan' in dash
+assert dash.count('root.completionInk') == 2
+assert 'PUBLISHED // ABOVE SOFT DEADLINE' in dash
+assert 'root.doneMs>root.budget?Colors.red:Colors.cyan' not in dash
+assert 'gitService.refreshDiagTimedOut ? "READING // SLOW" : "READING"' in widget
+print("Git slow-success diagnostic presentation source guards PASS")

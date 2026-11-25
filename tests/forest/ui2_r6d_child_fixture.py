@@ -12,8 +12,10 @@ with ProcessTrial() as t:
             return [db.execute("SELECT revision FROM forest_sessions").fetchone()[0],
                     db.execute("SELECT COUNT(*) FROM forest_turns WHERE role='assistant'").fetchone()[0]]
     def page(scope, after):
-        request_id = f"{t.action+1001:032x}"
-        return dict(requestId=request_id, after=after, frame=t.page(scope, after))
+        request_id = f"{t.action+1000:032x}"
+        frame = t.page(scope, after)
+        assert frame["requestId"] == request_id
+        return dict(requestId=request_id, after=after, frame=frame)
     a = t.next()
     units_a = t.finish(a)
     h1 = t.history()
@@ -24,6 +26,10 @@ with ProcessTrial() as t:
     before = snapshot()
     second = [page(h2, 0), page(h2, 2)]
     assert snapshot() == before == [4, 2]
+    assert t.result("REOPEN", {}, "JOURNAL_REOPENED") == []
+    h3 = t.history()
+    reopened = [page(h3, 0), page(h3, 2)]
+    assert snapshot() == before
     c = t.next()
     units_c = []
     for _ in range(4):
@@ -38,4 +44,4 @@ with ProcessTrial() as t:
     assert t.result("CLOSE", {}, "CLOSED") == []
     t.closed(0)
     print(json.dumps(dict(a=a,b=b,c=c,unitsA=units_a,unitsB=units_b,unitsC=units_c,
-        stop=stop,abort=abort,h1=h1,h2=h2,first=first,second=second)))
+        stop=stop,abort=abort,h1=h1,h2=h2,h3=h3,first=first,second=second,reopened=reopened)))

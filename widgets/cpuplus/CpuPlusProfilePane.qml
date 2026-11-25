@@ -16,6 +16,7 @@ Column {
     required property int policyTarget
     required property bool observationReady
     required property bool operationBusy
+    property var memorySample: null
     signal profileSelected(string name)
     signal draftCapture(string key)
     signal draftCleared()
@@ -119,6 +120,14 @@ Column {
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
     }
+    CpuPlusProfileComparison {
+        width: parent.width
+        draft: root.selectedProfile==="CUSTOM"?root.customDraft:Catalog.empty()
+        sample: root.memorySample
+        observationReady: root.observationReady
+        operationBusy: root.operationBusy
+        controlsTarget: profileControls
+    }
     GohuText {
         width: parent.width
         text: "SAVED PROFILES // "+root.catalogStatus
@@ -178,6 +187,7 @@ Column {
     }
     Column {
         parent: root.footerTarget || root
+        id: profileControls
         objectName: "cpuplusProfileBottomControls"
         width: parent.width
         spacing: 3

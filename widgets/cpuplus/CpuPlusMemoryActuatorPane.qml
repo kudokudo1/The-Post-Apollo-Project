@@ -1036,6 +1036,7 @@ Item {
                     onProfileSelected: name => root.chooseProfile(name)
                     onDraftCapture: key => root.captureProfileTarget(key)
                     onDraftCleared: root.clearProfileDraft()
+                    memorySample: root.sample
                     catalog: profileCatalog.document
                     catalogStatus: profileCatalog.status
                     catalogBusy: profileCatalog.busy || profileCatalog.faulted

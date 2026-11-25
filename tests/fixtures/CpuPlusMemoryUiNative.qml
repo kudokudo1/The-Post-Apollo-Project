@@ -353,6 +353,24 @@ ShellRoot {
                         if (!smoke.check(prof.view.capacity.target===null && pane.customProfileDraft.capacityGiB===24,
                             "unconfigured preset cannot alter custom draft")) return;
                         pane.chooseProfile("CUSTOM");
+                        const cmp=smoke.find(pane,"cpuplusProfileComparison");
+                        const compareButton=smoke.find(pane,"cpuplusProfileCompare");
+                        if(!cmp||!compareButton)return;
+                        if(!smoke.check(compareButton.available&&compareButton.parent===bottom
+                            &&cmp.comparison===null,"explicit comparison, fixed control"))return;
+                        // Use real comparator with synthetic output from previously observed POL fixture.
+                        cmp.pending={draft:JSON.parse(JSON.stringify(pane.customProfileDraft)),
+                            rows:[{name:"/dev/zram0",size:8388608,priority:100}],zramRead:true,advancedRead:true};
+                        cmp.capturedSample=pane.sample;
+                        cmp.output="lzo [lz4] zstd\n100\n10\n0\n20\n0\n500\n3000\n";
+                        cmp.received=true;cmp.exited=true;cmp.exitOk=true;cmp.finish();
+                        if(!smoke.check(cmp.comparison&&!cmp.comparison.canApply
+                            &&cmp.comparison.rows.find(x=>x.key==="background").delta===5
+                            &&cmp.comparison.rows.find(x=>x.key==="priority").delta===1,
+                            "actual-target comparison fixture"))return;
+                        pane.chooseProfile("GAMING");
+                        if(!smoke.check(cmp.comparison===null,"comparison invalidated on profile change"))return;
+                        pane.chooseProfile("CUSTOM");
                         const load=smoke.find(pane,"cpuplusProfileLoadList");
                         const save=smoke.find(pane,"cpuplusProfileSaveNew");
                         if (!smoke.check(load && save && load.available && !save.available

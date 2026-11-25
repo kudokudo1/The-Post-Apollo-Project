@@ -10,6 +10,8 @@ on:
       - 'widgets/cpuplus/CpuPlusProfileCatalogStore.qml'
       - 'scripts/cpuplus_profile_catalog.py'
       - 'widgets/cpuplus/CpuPlusProfileCatalog.js'
+      - 'widgets/cpuplus/CpuPlusProfileComparison.qml'
+      - 'widgets/cpuplus/CpuPlusProfileComparison.js'
       - 'widgets/cpuplus/CpuPlusZramPolicyPane.qml'
       - 'widgets/cpuplus/CpuPlusZramPolicy.js'
       - 'widgets/cpuplus/CpuPlusAdvancedPolicyPane.qml'

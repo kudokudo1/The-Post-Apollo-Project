@@ -241,3 +241,6 @@ await import("./test_market_m43_global_handoff.mjs");
 
 // M44: shared same-stock analytics for both global providers.
 await import("./test_market_m44_global_analysis.mjs");
+
+// M45: worldwide matched-date comparative research.
+await import("./test_market_m45_global_cross_stock.mjs");

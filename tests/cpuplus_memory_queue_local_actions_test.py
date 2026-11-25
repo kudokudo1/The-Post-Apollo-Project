@@ -1,5 +1,10 @@
 """R3d durable local correlation, disposable private DB only."""
 import copy
+import contextlib
+import sqlite3
+import threading
+import time
+from unittest import mock
 from pathlib import Path
 import sys
 import tempfile
@@ -440,6 +445,241 @@ class Tests(unittest.TestCase):
         self.assertFalse(receipt["can_execute"])
         self.assertNotIn("inode",str(receipt))
         self.assertEqual(self.q.pending()["id"],result["id"])
+
+    @contextlib.contextmanager
+    def contended_write(self, *, wall_delta, mono_delta):
+        """A real separate SQLite writer holds BEGIN IMMEDIATE until the
+        tested connection attempts its own BEGIN IMMEDIATE. Advance only
+        the injected clocks during that wait, not via a pre-lock fixture.
+        The original code would wrongly accept the old timestamp.
+        """
+        real_connect=sqlite3.connect
+        held,attempted,released,abort=(threading.Event() for _ in range(4))
+        errors=[]
+
+        def hold():
+            try:
+                with contextlib.closing(real_connect(self.path,timeout=1,
+                                                     isolation_level=None)) as db:
+                    db.execute("BEGIN IMMEDIATE")
+                    held.set()
+                    if not attempted.wait(3) or abort.is_set():
+                        return
+                    # The tested connection is entering SQLite while our
+                    # writer lock is held. Keep it briefly to exercise wait.
+                    time.sleep(0.05)
+                    self.wall+=wall_delta
+                    self.mono+=mono_delta
+                    db.rollback()
+                    released.set()
+            except BaseException as exc:
+                errors.append(exc)
+                held.set()
+
+        class Contended(sqlite3.Connection):
+            def execute(self, sql, *args, **kwargs):
+                if sql=="BEGIN IMMEDIATE" and not attempted.is_set():
+                    attempted.set()
+                    cursor=super().execute(sql,*args,**kwargs)
+                    if not released.wait(1):
+                        raise AssertionError("contention fixture did not release")
+                    return cursor
+                return super().execute(sql,*args,**kwargs)
+
+        def connect(*args,**kwargs):
+            return real_connect(*args,factory=Contended,**kwargs)
+
+        worker=threading.Thread(target=hold,daemon=True)
+        worker.start()
+        try:
+            self.assertTrue(held.wait(3))
+            self.assertFalse(errors)
+            with mock.patch("memory_adjustment_queue.sqlite3.connect",side_effect=connect):
+                yield
+            self.assertTrue(attempted.is_set())
+            self.assertTrue(released.is_set())
+        finally:
+            abort.set()
+            attempted.set()
+            worker.join(4)
+            self.assertFalse(worker.is_alive())
+            self.assertFalse(errors)
+
+    def test_staged_write_lock_wait_expires_wall(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=1000,mono_delta=0):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            owner.commit_action(m)
+        self.assertEqual(self.captures,1)
+
+    def test_staged_write_lock_wait_expires_monotonic(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=0,mono_delta=1000):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_staged_write_lock_wait_stales_source(self):
+        owner=self.staged_owner(max_age=10000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=3001,mono_delta=3001):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertEqual(self.captures,1)
+
+    def test_staged_write_lock_wait_expires_request(self):
+        self.wall=199999
+        owner=self.staged_owner(max_age=10000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=1,mono_delta=1):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_staged_write_lock_admission_timestamp(self):
+        owner=self.staged_owner(max_age=3000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=1000,mono_delta=1000):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"REPORTED")
+        self.assertEqual(self.q.pending()["requested_at"],101)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["committed_at"],101)
+
+    def test_recovery_ack_write_lock_wait_expires_wall(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.contended_write(wall_delta=1000,mono_delta=0):
+            with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_EXPIRED"):
+                owner.acknowledge_recovery_review(review_id=review["review_id"],
+                            review_digest=review["review_digest"])
+        self.assertIsNone(owner.recovery_review_history(review["review_id"])["receipt"])
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_NOT_LIVE"):
+            owner.acknowledge_recovery_review(review_id=review["review_id"],
+                        review_digest=review["review_digest"])
+
+    def test_recovery_ack_write_lock_wait_expires_monotonic(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.contended_write(wall_delta=0,mono_delta=1000):
+            with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_EXPIRED"):
+                owner.acknowledge_recovery_review(review_id=review["review_id"],
+                            review_digest=review["review_digest"])
+        self.assertIsNone(owner.recovery_review_history(review["review_id"])["receipt"])
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_recovery_ack_write_lock_admission_timestamp(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.contended_write(wall_delta=200,mono_delta=200):
+            receipt=owner.acknowledge_recovery_review(review_id=review["review_id"],
+                            review_digest=review["review_digest"])["receipt"]
+        self.assertEqual(receipt["acknowledged_at_ms"],100200)
+        self.assertEqual(owner.recovery_review_history(review["review_id"])["receipt"],receipt)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_disconnect_consumes_both_live_continuations(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        runtime=owner.runtime
+        journal=runtime._staged[0]
+        owner.close()
+        owner.close()
+        self.assertIsNone(owner._staged_message)
+        self.assertIsNone(runtime._staged)
+        self.assertIsNone(journal._fresh)
+        with self.assertRaisesRegex(QueueError,"OWNER_LOST"):
+            owner.commit_action(m)
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            runtime.commit_staged_action(m)
+        with self.assertRaisesRegex(QueueError,"ACTION_RECONCILIATION_REQUIRED"):
+            journal.commit(m,now=100,source=SOURCE)
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(LocalActions(self.q).lookup(m["action_id"])["state"],"PREPARED")
+        self.assertEqual(self.captures,0)
+
+    def test_disconnect_consumes_review_ticket(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        reviewer=owner._recovery_review
+        owner.close()
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_NOT_LIVE"):
+            reviewer.acknowledge(review_id=review["review_id"],
+                review_digest=review["review_digest"],clock=owner.runtime._now)
+        self.assertIsNone(reviewer.lookup(review["review_id"]))
+        self.assertEqual(LocalActions(self.q).lookup(m["action_id"])["state"],"PREPARED")
+
+    def test_malformed_and_mismatch_discard_runtime_continuation(self):
+        for malformed in (False,True):
+            with self.subTest(malformed=malformed):
+                # Distinct disposable DB for each blocked preparation.
+                self.q=Queue(self.path.parent/str(uuid.uuid4()))
+                owner=self.staged_owner()
+                m=self.message()
+                owner.prepare_action(m)
+                runtime=owner.runtime
+                journal=runtime._staged[0]
+                bad={} if malformed else dict(m,expires_at=201)
+                with self.assertRaises(QueueError):
+                    owner.commit_action(bad)
+                self.assertIsNone(runtime._staged)
+                self.assertIsNone(journal._fresh)
+                with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+                    runtime.commit_staged_action(m)
+                self.assertIsNone(self.q.pending())
+                self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+                owner.close()
+        self.assertEqual(self.captures,0)
+
+    def test_publication_invalidation_is_not_disconnect(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        owner.invalidate()
+        owner.publish()
+        self.assertEqual(owner.commit_action(m)["disposition"],"REPORTED")
+        self.assertEqual(self.captures,1)
+
+    def test_failed_prepare_envelope_discards_live_state(self):
+        owner=self.staged_owner()
+        m=self.message()
+        with mock.patch.object(owner,"_envelope",side_effect=QueueError("TEST_REPLY_FAILURE")):
+            with self.assertRaisesRegex(QueueError,"TEST_REPLY_FAILURE"):
+                owner.prepare_action(m)
+        self.assertIsNone(owner._staged_message)
+        self.assertIsNone(owner.runtime._staged)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+
+    def test_busy_disconnect_refuses_without_releasing_owner(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with owner._call():
+            with self.assertRaisesRegex(QueueError,"OWNER_BUSY"):
+                owner.close()
+        with self.assertRaisesRegex(QueueError,"OWNER_BUSY"):
+            Owner(self.q,lambda q:self.make_runtime(),durable_actions=True)
+        owner.close()
+        self.assertIsNone(owner.runtime._staged)
+        self.assertIsNone(self.q.pending())
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

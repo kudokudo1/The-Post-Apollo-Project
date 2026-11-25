@@ -120,3 +120,46 @@ owner lock/transaction, permanently refuse old action UUID, never resume or
 infer protected outcome, retain unknown if evidence incomplete. Acknowledging
 review is not abandonment and does not release the PREPARED fence. Decide
 retention and schema/version migration separately before enabling release.
+
+## R3j // P1 transaction-admission deadline correction
+
+Post-merge #2654 Nurse 2 review 6055525024 / 6055951300: both staged
+commit and review acknowledgment checked time before SQLite BEGIN
+IMMEDIATE (up to 1 second of lock wait). Recheck wall and monotonic
+deadline after the write lock and exact journal/current request validation,
+before request mutation. Staged QUEUE/REPLACE retain original validated
+capture and collection start timestamps; reject stale source or expired
+request at admission; use admitted wall seconds for durable correlation.
+Legacy explicit timestamp APIs unchanged. No external provider call under
+the DB lock. Review acknowledgment consumes ticket once, rechecks clock
+inside transaction after evidence validation and before insert (including
+after any schema creation), records admitted time, rolls back on expiration.
+Deadline means mutation admission, not a guarantee of fsync completion.
+Eight disposable real SQLite contention tests use a separate writer and
+advance injected wall/monotonic clocks during BEGIN IMMEDIATE wait:
+independent clock expiry, source age, request expiry, and valid admission
+timestamps for both paths. No replay, clearing, or startup unlock.
+Explicit session disconnect/continuation invalidation is a distinct next
+correction; ordinary publication invalidation is not session teardown.
+No wire changes or production policy.
+
+## R3k // explicit disconnect and continuation retirement
+
+Stacked on independently reviewed #2675 exact 5c228392; do not edit its
+reviewed head or merge it without operator decision. Ordinary invalidate()
+remains publication-only. Terminal Owner.close() (already used by serve on
+EOF/failure) clears both owner and Runtime live staged messages, journal
+fresh continuation and recovery review ticket before releasing owner flock.
+No persistent row changes, no provider calls. Owner gate and Runtime lock
+serialize teardown with cooperating dispatch; busy teardown refuses rather
+than releasing a live owner. Caller must stop accepting commands and
+serialize terminal teardown. Invalid/malformed COMMIT consumes both live
+states; failed PREPARE receipt construction retires live state as well.
+Direct Runtime completion always clears journal transient continuation.
+Six regression cases cover late owner/runtime/journal continuation,
+review ticket, malformed/mismatch, ordinary publication, failed receipt,
+and busy teardown. No change to #2675 deadline checks, startup gate, wire
+protocol or production policy. An already admitted synchronous transaction
+is not undone by disconnect; full shell crash and actual staged wire still
+require native qualification. Direct callers outside cooperating owner fence
+remain outside protected trust boundary.

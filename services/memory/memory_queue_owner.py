@@ -4,6 +4,7 @@ No socket, service, timer, Hub calls or privilege. Host chooses the transport.
 The Linux flock is a coordination guard, not a security boundary or SQLite lock.
 """
 import contextlib
+import copy
 import fcntl
 import os
 import stat
@@ -24,6 +25,7 @@ class Owner:
         self._next_action = 1
         self._gate = threading.Lock()
         self._fd = None
+        self._published = None
         try:
             identity = queue._check_file()
             fd = os.open(queue.path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
@@ -96,10 +98,55 @@ class Owner:
                     next_action_sequence=self._next_action, kind=kind,
                     can_execute=False, **payload)
 
-    def status(self):
-        """Explicit read/wake. R1 projection is unchanged inside the envelope."""
+    def publish(self):
+        """Owner scheduler/wake only. May observe and stage events."""
         with self._call():
-            return self._envelope("STATUS", projection=self.runtime.tick())
+            self._published = None
+            packet = self._envelope("STATUS", projection=self.runtime.tick())
+            self._published = copy.deepcopy(packet)
+            return packet
+
+    def status(self):
+        """Passive read of the last publication; no tick or event staging.
+
+        None means no valid publication; the host must invalidate the client.
+        Never synthesize a new sequence for a cached packet.
+        """
+        with self._call():
+            if self._published is None:
+                return None
+            s = self._published["projection"]["status"]
+            try:
+                wall, mono = self.runtime._now()
+                due = s["next_check_monotonic_ms"]
+                expiry = s["expires_at"]
+                # At a due boundary the scheduler, not the reader, must
+                # publish a new observation. Do not retain expired READY.
+                if ((due is not None and mono >= due)
+                        or (expiry is not None and wall // 1000 >= expiry)):
+                    self._published = None
+            except (QueueError, OSError, ValueError, TypeError):
+                self._published = None
+            return copy.deepcopy(self._published)
+
+    def invalidate(self):
+        """Host-owned observer loss/deadline/disconnect invalidation."""
+        with self._call():
+            self._published = None
+
+    @staticmethod
+    def _action_summary(result):
+        # Do not send source device/inode values or ephemeral Hub packets to
+        # the JS consumer. The durable candidate stays in the event ledger.
+        summary = {"version": 1, "can_execute": False,
+                   "adjustment_outcome": "UNVERIFIED"}
+        if "request" in result:
+            r = result["request"]
+            summary["request"] = {k: r[k] for k in
+                                  ("id", "state", "target_gib", "expires_at")}
+            summary["wake_required"] = True
+            summary["notification_error"] = result["notification_error"]
+        return summary
 
     def action(self, message):
         """One strictly ordered local action per owner epoch; never replay.
@@ -140,6 +187,7 @@ class Owner:
             # Consume sequence before dispatch. It is not authorization and
             # does not survive owner restart. Never retry a lost response.
             self._next_action += 1
+            self._published = None
             if kind != "QUEUE":
                 current = self.queue.pending()
                 if current is None or current["id"] != expected:
@@ -167,7 +215,7 @@ class Owner:
                                       invalidate=True)
             return self._envelope("ACTION", action_id=action_id,
                                   action_sequence=seq, disposition="REPORTED",
-                                  code="READ_STATUS_REQUIRED", result=result,
+                                  code="READ_STATUS_REQUIRED", result=self._action_summary(result),
                                   invalidate=True)
 
     def detail(self, request_id):

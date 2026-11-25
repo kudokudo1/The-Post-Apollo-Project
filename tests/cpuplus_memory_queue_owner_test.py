@@ -62,14 +62,14 @@ sys.exit(0)
         old = self.message()
         self.owner.close()
         with self.assertRaisesRegex(QueueError, "OWNER_LOST"):
-            self.owner.status()
+            self.owner.publish()
         with Owner(Queue(self.path), self.factory) as other:
             self.assertNotEqual(other.owner_id, self.owner.owner_id)
             with self.assertRaisesRegex(QueueError, "STALE_OR_INVALID_OWNER"):
                 other.action(old)
 
     def test_action_and_status_envelopes(self):
-        status = self.owner.status()
+        status = self.owner.publish()
         self.assertEqual(status["projection"]["status"]["state"], "IDLE")
         msg = self.message()
         reply = self.owner.action(msg)
@@ -77,7 +77,7 @@ sys.exit(0)
         self.assertEqual(reply["disposition"], "REPORTED")
         self.assertTrue(reply["invalidate"])
         self.assertFalse(reply["can_execute"])
-        pending = self.owner.status()
+        pending = self.owner.publish()
         self.assertGreater(pending["sequence"], reply["sequence"])
         self.assertEqual(pending["next_action_sequence"], 2)
         self.assertEqual(pending["projection"]["status"]["request_id"], self.queue.pending()["id"])
@@ -104,7 +104,7 @@ sys.exit(0)
         record = self.queue.pending()
         result = self.owner.action(self.message("CANCEL", record["id"], 2))
         self.assertEqual(result["result"]["request"]["state"], "CANCELLED")
-        self.assertEqual(self.owner.status()["projection"]["status"]["state"], "IDLE")
+        self.assertEqual(self.owner.publish()["projection"]["status"]["state"], "IDLE")
         self.assertEqual(self.owner.detail(record["id"])["detail"]["adjustment_outcome"], "UNVERIFIED")
 
     def test_lost_reply_reconcile_without_replay(self):
@@ -119,7 +119,7 @@ sys.exit(0)
         self.assertIsNotNone(self.queue.pending())
         with self.assertRaisesRegex(QueueError, "STALE_ACTION_SEQUENCE"):
             self.owner.action(msg)
-        self.assertEqual(self.owner.status()["projection"]["status"]["request_id"], self.queue.pending()["id"])
+        self.assertEqual(self.owner.publish()["projection"]["status"]["request_id"], self.queue.pending()["id"])
 
     def test_invalid_fields_refused(self):
         msg = self.message()
@@ -132,7 +132,44 @@ sys.exit(0)
         os.rename(self.path, self.path.with_suffix(".old"))
         Queue(self.path)
         with self.assertRaises(QueueError):
-            self.owner.status()
+            self.owner.publish()
+
+    def test_passive_read_no_monitor_or_new_revision(self):
+        self.assertIsNone(self.owner.status())
+        first = self.owner.publish()
+        def fail(*args, **kwargs):
+            self.fail("passive status must not tick")
+        self.owner.runtime.tick = fail
+        cached = self.owner.status()
+        self.assertEqual(cached, first)
+        cached["projection"]["status"]["state"] = "FORGED"
+        self.assertEqual(self.owner.status(), first)
+
+    def test_action_invalidates_publication(self):
+        self.owner.publish()
+        reply = self.owner.action(self.message())
+        self.assertIsNone(self.owner.status())
+        self.assertNotIn("source", reply["result"]["request"])
+        self.assertNotIn("notification_candidate", reply["result"])
+        self.assertEqual(reply["result"]["request"]["id"], self.queue.pending()["id"])
+        self.assertGreater(self.owner.publish()["sequence"], reply["sequence"])
+
+    def test_due_boundary_read_invalidates_without_tick(self):
+        self.owner.action(self.message())
+        status = self.owner.publish()
+        due = status["projection"]["status"]["next_check_monotonic_ms"]
+        self.assertIsNotNone(due)
+        self.owner.runtime.clock = lambda: (101000, due)
+        def fail(*args, **kwargs):
+            self.fail("due passive read must not tick")
+        self.owner.runtime.tick = fail
+        self.assertIsNone(self.owner.status())
+
+    def test_explicit_invalidation(self):
+        self.owner.publish()
+        self.owner.invalidate()
+        self.assertIsNone(self.owner.status())
+        self.assertEqual(self.owner.publish()["projection"]["status"]["state"], "IDLE")
 
 
 if __name__ == "__main__":

@@ -116,7 +116,7 @@ MARKERS = ("M11C_NATIVE_LIST_PASS", "M11C_NATIVE_INSPECT_RESIZE_PASS",
 
 # A controlled PATH shim passes through to the actual unchanged Python bridge,
 # except for two delays and one deliberately failed exit. Never emits fake JSON.
-WRAPPER = '''import json, os, sys, time
+WRAPPER = '''import json, os, signal, sys, time
 from pathlib import Path
 trace = Path(os.environ["TIMEW_M11C_TRACE"])
 args = sys.argv[1:]
@@ -126,13 +126,22 @@ assert Path(args[2]).resolve() == expected and args[3] in ("list","inspect")
 assert (len(args) == 5) == (args[3] == "list")
 n = len(trace.read_text().splitlines()) + 1 if trace.exists() else 1
 with trace.open("a") as f:
-    f.write(json.dumps({"n": n, "args": args[3:]}) + "\\n")
+    f.write(json.dumps({"n": n, "pid": os.getpid(), "args": args[3:]}) + "\\n")
     f.flush()
 if n == 4:
     time.sleep(2)
 if n == 6:
-    time.sleep(47)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    while True:
+        time.sleep(1)
 if n == 7:
+    previous = json.loads(trace.read_text().splitlines()[5])["pid"]
+    try:
+        os.kill(previous, 0)
+    except ProcessLookupError:
+        trace.with_name("hung-reaped-before-next").write_text("yes")
+    else:
+        raise RuntimeError("M11D_PREVIOUS_HUNG_CHILD_NOT_REAPED")
     sys.exit(9)
 os.execv(os.environ["TIMEW_M11C_PYTHON"], [os.environ["TIMEW_M11C_PYTHON"], *args])
 '''
@@ -236,7 +245,35 @@ def main():
         assert [x["args"][2] for x in events if x["args"][0] == "inspect"] == [PREPARED_ID, COMPLETE_ID, PREPARED_ID]
         assert len({x["args"][1] for x in events}) == 8
         assert {p: digest(p) for p in paths} == before, "native panel changed fixture main files"
-        print("TIMEW M11C // REAL QUICKSHELL 8 explicit Process launches, real 45s deadline, local data unchanged PASS")
+        assert (work / "hung-reaped-before-next").read_text() == "yes"
+        print("TIMEW M11D // REAL QUICKSHELL hung child killed and reaped BEFORE next explicit Process, 8 launches, local data unchanged PASS")
+        # No python3 exists in this private PATH. The same real panel must
+        # retire a failed launch even without streamFinished/exited.
+        empty = work / "empty-bin"
+        empty.mkdir(mode=0o700)
+        missing_env = dict(env, PATH=str(empty), TIMEW_M11D_MISSING_EXEC="1")
+        missing = subprocess.Popen([qs, "-p", str(work / "shell.qml"), "--no-color"],
+                                   cwd=work, env=missing_env, stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT, text=True,
+                                   errors="replace", start_new_session=True)
+        try:
+            output, _ = missing.communicate(timeout=90)
+        except subprocess.TimeoutExpired:
+            os.killpg(missing.pid, signal.SIGKILL)
+            output, _ = missing.communicate(timeout=10)
+            print(output[-16000:])
+            raise RuntimeError("M11D_MISSING_EXEC_WATCHDOG")
+        finally:
+            try:
+                os.killpg(missing.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        print(output[-16000:])
+        assert missing.returncode == 0 and "M11C_NATIVE_FAIL" not in output
+        assert "M11D_NATIVE_MISSING_EXEC_PASS" in output
+        assert [json.loads(x) for x in (work / "trace.jsonl").read_text().splitlines()] == events
+        assert {p: digest(p) for p in paths} == before
+        print("TIMEW M11D // REAL missing-executable launch retired after actual deadline, no extra read or database mutation PASS")
 
 
 if __name__ == "__main__":

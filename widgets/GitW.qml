@@ -4261,7 +4261,7 @@ PanelWindow {
                             }
                             color: {
                                 if (root.activePage === "git")
-                                    return gitService.available ? Colors.orange : Colors.red;
+                                    return (gitService.refreshing || gitService.available) ? Colors.orange : Colors.red;
 
                                 return githubService.available ? Colors.orange : Colors.red;
                             }
@@ -4273,7 +4273,7 @@ PanelWindow {
 
                             text: {
                                 if (root.activePage === "git")
-                                    return gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE";
+                                    return gitService.refreshing ? (gitService.refreshDiagTimedOut ? "READING // SLOW" : "READING") : gitService.available ? "LOCAL LIVE" : "OFFLINE";
 
                                 return githubService.refreshing ? "READING" : githubService.available ? "PX LIVE" : "OFFLINE";
                             }
@@ -4281,7 +4281,7 @@ PanelWindow {
                             font.pixelSize: 8
                             color: {
                                 if (root.activePage === "git")
-                                    return gitService.available ? Colors.orange : Colors.red;
+                                    return (gitService.refreshing || gitService.available) ? Colors.orange : Colors.red;
 
                                 return githubService.available ? Colors.orange : Colors.red;
                             }

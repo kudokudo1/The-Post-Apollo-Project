@@ -21,8 +21,8 @@ Window {
             sourceKey:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             month:"2026-11",toBudgetCents:12000,
             accounts:[{id:"checking",name:"Personal Checking",balanceCents:35000}],
-            categoryGroups:[{id:"needs",name:"Needs"}],
-            categories:[{id:"groceries",name:"Groceries",groupId:"needs",
+            categoryGroups:[{id:"needs",name:"Needs",hidden:false,isIncome:false}],
+            categories:[{id:"groceries",name:"Groceries",groupId:"needs",hidden:false,
                 availableCents:7500,spentCents:-2500,budgetedCents:10000}]
         };
     }

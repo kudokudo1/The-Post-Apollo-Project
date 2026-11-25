@@ -1,6 +1,7 @@
 import QtQuick
 import "../components"
 import "../services/finance/FinanceExpenseCategoryPreview.js" as ExpenseRules
+import "../services/finance/FinanceCategorizedSaveReview.js" as SaveReview
 
 // M3c // mounted categorization PREVIEW ONLY. No save/request signal.
 // The real transaction Save stays category-free and is explicitly blocked
@@ -13,6 +14,7 @@ Item {
     property bool open: false
     property string selectedCategoryId: ""
     property var proposal: null
+    property var saveReview: null // Offline financial-field check. NEVER write authority.
     property string errorText: ""
 
     readonly property bool sourceReady: !!snapshot
@@ -41,6 +43,7 @@ Item {
 
     function invalidate() {
         proposal=null;
+        saveReview=null;
         errorText="";
     }
     function clear() {
@@ -91,6 +94,36 @@ Item {
             return false;
         }
         proposal=result;
+        return true;
+    }
+
+    function reviewForSave() {
+        // This is a screen-only inspection. The original M3c Save block
+        // remains armed and no request ID/action is ever formed or emitted.
+        saveReview=null;
+        if(!open || !sourceReady || !proposal || !proposal.ok
+                || proposal.writeAllowed!==false || proposal.savesToActual!==false) {
+            errorText="VALID CATEGORY PREVIEW REQUIRED";
+            return false;
+        }
+        const input={snapshot:snapshot,candidate:candidate,proposal:proposal,
+            selectedCategoryId:selectedCategoryId};
+        const result=SaveReview.prepareOfflineCategorizedReview(input);
+        if(!result.ok || result.canSave!==false || result.writeAllowed!==false) {
+            errorText="CATEGORY SAVE REVIEW REFUSED // "
+                +String(result.reason || "invalid-review").toUpperCase();
+            return false;
+        }
+        const checked=SaveReview.recheckOfflineCategorizedReview({
+            previous:result,snapshot:snapshot,candidate:candidate,
+            proposal:proposal,selectedCategoryId:selectedCategoryId
+        });
+        if(!checked.ok || checked.canSave!==false || checked.writeAllowed!==false) {
+            errorText="CATEGORY SAVE REVIEW CHANGED // NO WRITE";
+            return false;
+        }
+        errorText="";
+        saveReview=result;
         return true;
     }
 
@@ -221,6 +254,29 @@ Item {
                 color: Colors.orange
                 textFormat: Text.PlainText
             }
+        }
+        ActionButton {
+            objectName: "expenseCategoryStagedSaveReview"
+            width: parent.width
+            height: 30
+            label: "CHECK CATEGORY SAVE READINESS"
+            labelPixelSize: 9
+            accentColor: Colors.cyan
+            trackLabelGlowLocally: true
+            available: expense.open && !!expense.proposal
+                && expense.proposal.ok && !expense.saveReview
+            onLeftClicked: expense.reviewForSave()
+        }
+        GohuText {
+            objectName: "expenseCategoryStagedSaveStatus"
+            width: parent.width
+            text: expense.saveReview && expense.saveReview.ok
+                ? "REVIEW MATCHED // CATEGORY SAVE DISABLED"
+                : "PROTECTED CATEGORY SAVE // HOLD // NO WRITE PERMIT"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
         }
         GohuText {
             width: parent.width

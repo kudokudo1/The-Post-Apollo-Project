@@ -145,6 +145,7 @@ def trial(width, height, count):
         for relative in ("widgets/ForestW.qml", "widgets/forest/ui2/PublicConversationFixture.qml",
                          "widgets/forest/ui2/PublicPreviewGate.qml",
                          "widgets/forest/ui2/PublicRestorationReview.qml",
+                         "widgets/forest/ui2/PublicDormantTaskSelector.qml",
                          "widgets/forest/ui2/PublicRuntimeStatusView.qml",
                          "widgets/forest/ui2/PublicRuntimeStatusDisplay.js",
                          "components/ConversationFeed.qml", helper):
@@ -197,7 +198,11 @@ def trial(width, height, count):
                         for line in output.splitlines() if "FOREST_HOST_HISTORY_NEGATIVE_PASS " in line]
             review = [line.split("FOREST_HOST_REVIEW_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_REVIEW_PHASE_PASS " in line]
-            if (review != ([str(i) for i in range(11)] if width >= 770 else []) or
+            dormant = [line.split("FOREST_HOST_DORMANT_PHASE_PASS ", 1)[1].strip()
+                       for line in output.splitlines() if "FOREST_HOST_DORMANT_PHASE_PASS " in line]
+            if (dormant != ([str(i) for i in range(14)] if width >= 770 else []) or
+                    output.count("FOREST_HOST_DORMANT_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
+                    review != ([str(i) for i in range(11)] if width >= 770 else []) or
                     output.count("FOREST_HOST_REVIEW_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
                     negative != (["1", "2"] if width == 1366 else []) or
                     code != 0 or "FOREST_HOST_FAIL" in output or

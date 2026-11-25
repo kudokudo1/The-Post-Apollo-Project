@@ -20,6 +20,25 @@ ShellRoot {
     property int readCount: 0
     property var lastIntent: null
     property var comparisonDraft: null
+    // Inert external owner: verify the actual actuator passes the same
+    // instance through its Loader without launching or retiring it.
+    QtObject {
+        id: externalSession
+        property string phase: "IDLE"
+        property int generation: 0
+        property int storageGeneration: -1
+        property bool startupLocked: true
+        property bool canExecute: false
+        property var recoveryContext: null
+        property var reviewContext: null
+        property var dispositionContext: null
+        property var retentionSelection: null
+        property int opens: 0
+        property int closes: 0
+        function active() { return false; }
+        function open() { if(phase!=="IDLE")return false; opens++;phase="LOADING";return true; }
+        function close() { closes++;return false; }
+    }
 
     function find(item, name) {
         if (item.objectName === name) return item;
@@ -493,9 +512,38 @@ ShellRoot {
                     if (!queue) return;
                     if (!smoke.check(!queue.preparation && !queue.sessionUsable && MemoryOperation.requests===0,
                         "return to requests remains locked")) return;
-                    pane.selectMenu(4);
-                    smoke.phase=4;
+                    pane.recoverySession=externalSession;
+                    workspace.selectSection("RECOVERY");
+                    smoke.phase=33;
                     return;
+                }
+                if (smoke.phase===33) {
+                    const workspace=smoke.find(pane,"cpuplusAutoWorkspace");
+                    const header=smoke.find(pane,"cpuplusRecoverySessionControls");
+                    const connect=smoke.find(pane,"cpuplusRecoverySessionOpen");
+                    const close=smoke.find(pane,"cpuplusRecoverySessionClose");
+                    if(!workspace||!header||!connect||!close)return;
+                    if(!smoke.check(workspace.recoverySession===externalSession && connect.available && !close.available
+                        && header.parent===smoke.find(pane,"cpuplusWorkHeader")
+                        && externalSession.opens===0 && externalSession.closes===0,"borrowed session and fixed header"))return;
+                    connect.leftClicked(null);connect.leftClicked(null);
+                    if(!smoke.check(externalSession.opens===1&&!connect.available,"one explicit session open"))return;
+                    pane.selectMenu(0);smoke.phase=34;return;
+                }
+                if(smoke.phase===34) {
+                    if(!smoke.check(!smoke.find(pane,"cpuplusAutoWorkspace")&&externalSession.opens===1
+                        &&externalSession.closes===0,"unmount does not stop session"))return;
+                    pane.selectMenu(3);smoke.phase=35;return;
+                }
+                if(smoke.phase===35) {
+                    const workspace=smoke.find(pane,"cpuplusAutoWorkspace");
+                    if(!workspace)return;
+                    if(!smoke.check(workspace.recoverySession===externalSession&&externalSession.opens===1
+                        &&externalSession.closes===0&&!workspace.actionContext,"reopen preserves owner and lock"))return;
+                    pane.recoverySession=null;
+                    if(!smoke.check(workspace.recoverySession===null&&!workspace.actionContext,"detach fails closed"))return;
+                    console.log("CPU_M9_EXTERNAL_SESSION_PASS // borrowed owner, header, single open, unload/reopen, detach");
+                    pane.selectMenu(4);smoke.phase=4;return;
                 }
                 if (smoke.phase>=50 && smoke.phase<=60) {
                     const prof=smoke.find(pane,"cpuplusProfilePane");

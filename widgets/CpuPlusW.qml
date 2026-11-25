@@ -863,6 +863,8 @@ PanelWindow {
     // preserve the top and align its actual bottom with the compositor-
     // resolved Notifications surface, not the physical screen height.
     property var notificationsReference: null
+    // Shell-owned recovery-only session; null until trusted integration.
+    property var memoryRecoverySession: null
     readonly property int visualBottomGap: notificationsReference
         ? notificationsReference.panelBottomMargin + notificationsReference.frameInset
         : 13
@@ -3102,7 +3104,9 @@ PanelWindow {
                                 (cpuPlusWindow.selectedMonitorEntry() || {}).category || ""
                             ).toUpperCase()) >= 0))
             visible: active
-            sourceComponent: CpuPlusMemoryActuatorPane {}
+            sourceComponent: CpuPlusMemoryActuatorPane {
+                recoverySession: cpuPlusWindow.memoryRecoverySession
+            }
         }
 
         // All live Sway input mutations remain behind this exact-device

@@ -384,3 +384,11 @@ const recoveryPaneM8c=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/Cp
 assert.match(recoveryPaneM8c,/inventoryLimit: recoverySession \? 4 : 16/);
 assert.match(recoveryPaneM8c,/objectName: "cpuplusRecoverySelectRecord"/);
 console.log("CPU++ M8c V2 inventory and disposition distinction PASS");
+const cpuWindowM9=fs.readFileSync(path.join(__dirname,"../widgets/CpuPlusW.qml"),"utf8");
+assert.match(cpuWindowM9,/property var memoryRecoverySession: null/);
+assert.match(cpuWindowM9,/sourceComponent: CpuPlusMemoryActuatorPane\s*\{\s*recoverySession: cpuPlusWindow.memoryRecoverySession/);
+assert.match(pane,/property var recoverySession: null/);
+assert.match(pane,/hostState: null\s+recoverySession: root.recoverySession/);
+assert.doesNotMatch(cpuWindowM9,/MemoryQueueDesktopSession\s*\{/);
+assert.doesNotMatch(pane,/MemoryQueueDesktopSession\s*\{|recoverySession\.(?:open|close)\s*\(/);
+console.log("CPU++ M9 external session binding source contract PASS");

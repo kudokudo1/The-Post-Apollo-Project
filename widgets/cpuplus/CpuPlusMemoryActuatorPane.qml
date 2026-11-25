@@ -10,6 +10,8 @@ import "CpuPlusProfileCatalog.js" as Catalog
 // Demand-loaded by SYSTEM memory/swap selection. No privileged operations.
 Item {
     id: root
+    // Borrowed session: this view does not own its lifecycle or launch paths.
+    property var recoverySession: null
     property var sample: null
     property string status: "READING"
     property bool received: false
@@ -1014,6 +1016,7 @@ Item {
                     // Production launch/lifecycle remains HOLD. No session
                     // owner is constructed inside the demand-loaded widget.
                     hostState: null
+                    recoverySession: root.recoverySession
                     onSectionChangedByUser: scroll.contentY = 0
                 }
             }

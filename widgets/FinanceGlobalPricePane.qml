@@ -8,16 +8,20 @@ Item {
     id: priceView
     implicitHeight: (alphaOpen ? alphaPane.y + alphaPane.height : footer.y + footer.height) + 8
     property bool active: false
+    property bool sessionActive: active
+    enabled: active
     property bool alphaOpen: false
     signal exitRequested()
     signal historyChosen(var identity, var listing, var snapshot)
 
     FinanceServices.FinanceGlobalPriceService {
         id: priceFeed
-        monitoring: priceView.active
+        objectName: "marketEodhdReader"
+        monitoring: priceView.sessionActive
         onSnapshotChanged: historyChart.requestPaint()
     }
     function inspectInstrument(item) {
+        if (!active) return false;
         const ok=priceFeed.chooseIdentity(item);
         if (ok) {
             alphaOpen=false;
@@ -282,6 +286,7 @@ Item {
                 width: body.width
                 visible: !!priceFeed.selectedListing
                 height: visible ? implicitHeight : 0
+                objectName: "marketEodhdDates"
                 feed: priceFeed
                 active: priceView.active
             }
@@ -380,8 +385,8 @@ Item {
             }
         }
     }
+    onSessionActiveChanged: { if (!sessionActive) alphaOpen=false; }
     onActiveChanged: {
-        if (!active) alphaOpen=false;
         if (active && priceFeed.ready) historyChart.requestPaint();
     }
     FinanceAlphaVantageFreePane {
@@ -393,6 +398,7 @@ Item {
         anchors.right: parent.right
         height: visible ? implicitHeight : 0
         visible: priceView.alphaOpen
+        sessionActive: priceView.sessionActive && priceView.alphaOpen
         active: priceView.active && priceView.alphaOpen
         onExitRequested: priceView.alphaOpen=false
         onHistoryChosen: function(identity, listing, snapshot) {

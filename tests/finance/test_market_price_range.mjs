@@ -310,3 +310,5 @@ await import("./test_market_m46b_unified_controls.mjs");
 await import("./test_market_m46b_inline_controls.mjs");
 
 await import("./test_market_m46c_global_dates.mjs");
+
+await import("./test_market_m46c2_selection_continuity.mjs");

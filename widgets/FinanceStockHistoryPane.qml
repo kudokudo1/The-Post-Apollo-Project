@@ -363,8 +363,10 @@ Item {
                 width: parent.width
                 height: visible ? implicitHeight : 0
                 visible: stocks.discoveryOpen
-                active: stocks.discoveryOpen && stocks.visible
-                    && stocks.stockFeed && stocks.stockFeed.monitoring
+                // Disclosure is not the lifetime of an authorized read session.
+                // Closing controls retains their validated, in-memory selections.
+                sessionActive: stocks.visible && !!stocks.stockFeed && stocks.stockFeed.monitoring
+                active: stocks.discoveryOpen && sessionActive
                 onExitRequested: stocks.discoveryOpen = false
                 onQuotaRequested: stocks.openQuotaStatus()
                 onHistoryChosen: function(identity, listing, snapshot) {

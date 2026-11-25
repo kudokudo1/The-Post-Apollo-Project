@@ -52,8 +52,20 @@ ShellRoot {
             && feed.height === item.height - status.height && feed.height > 0
             && viewport.y === 0 && viewport.height === feed.height,
             "composed geometry");
+        const input = child(composer, "conversationInput");
+        check(input && !input.enabled && !input.activeFocus && !input.focus,
+            "hidden composer input enabled or focused");
+        if (!input) return;
+        input.text = "must never dispatch";
+        const before = witness.sent;
+        const countSend = function() { witness.sent++; };
+        feed.sendRequested.connect(countSend);
         feed.trySend();
         feed.focusMessageInput();
+        feed.sendRequested.disconnect(countSend);
+        check(witness.sent === before, "fixture dispatched a send");
+        check(!input.activeFocus && !input.focus, "hidden input gained focus");
+        input.text = "";
     }
     Window {
         id: scene

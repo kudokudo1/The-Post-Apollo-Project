@@ -29,7 +29,9 @@ Scope {
     }
     function scroll(y) {
         if (!state) return;
-        state = Policy.scroll(state,y);
+        const next = Policy.scroll(state,y);
+        if (next === state) return;
+        state = next;
         schedule();
     }
     function resize(height) {
@@ -109,6 +111,7 @@ Scope {
     }
     Process {
         id: worker
+        onRunningChanged: if (!running && !root.faulted) root.schedule()
         stdout: StdioCollector {
             onStreamFinished: {
                 if (!root.busy) return;

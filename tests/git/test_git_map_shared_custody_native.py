@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os
+import fcntl
+import time
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +25,7 @@ with tempfile.TemporaryDirectory(prefix="git-map-shared-custody-") as tmp:
         for name in names:
             shutil.copy2(ROOT/folder/name,dest/name)
     shutil.copy2(ROOT/"tests/git/fixtures/GitMapSharedCustodyNative.qml",scene/"smoke.qml")
+    shutil.copy2(ROOT/"tests/git/fixtures/git_map_shared_custody_probe.py",scene/"probe.py")
     repo=base/"repo"
     repo.mkdir()
     for args in [("init","-b","main")]+[("commit","--allow-empty","-m",f"commit {i}") for i in range(40)]:
@@ -40,6 +43,23 @@ with tempfile.TemporaryDirectory(prefix="git-map-shared-custody-") as tmp:
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,
                           text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=45)
     print(result.stdout)
+    if result.stdout.count("SHARED_CUSTODY_KERNEL_WITNESS_PASS")!=4:
+        raise SystemExit("Missing integrated kernel witness")
+    cache=Path(env["XDG_CACHE_HOME"])/"post-apollo-git-map-v1"
+    def all_released():
+        for path in cache.glob("*/*"):
+            if not path.is_dir() or path.name.startswith("."): continue
+            fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+            try:
+                try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                except BlockingIOError: return False
+            finally: os.close(fd)
+        return True
+    deadline=time.monotonic()+5
+    while not all_released():
+        if time.monotonic()>=deadline: raise SystemExit("Integrated owner exit left locks held")
+        time.sleep(.02)
+    print("SHARED_CUSTODY_ALL_RELEASED")
     if (result.returncode or "GIT_MAP_SHARED_CUSTODY_PASS" not in result.stdout
             or any(x in result.stdout for x in ("GIT_MAP_SHARED_CUSTODY_FAIL","Binding loop detected","TypeError:","ReferenceError:"))):
         raise SystemExit("Native managed Git map fixture failed")

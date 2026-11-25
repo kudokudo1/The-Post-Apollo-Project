@@ -26,7 +26,21 @@ ShellRoot {
         return null;
     }
     function near(a,b) { return Math.abs(a-b) < 0.1; }
+    function referenceVocabulary(body) {
+        const seasons = find(body,"forestSeasonReference");
+        const spirit = find(body,"forestSpiritReference");
+        check(seasons && spirit, "missing recovered reference vocabulary");
+        if (!seasons || !spirit) return;
+        check(seasons.text === "SEASONS // STATE UNKNOWN (REFERENCE)\nSUMMER // GROWING\nFALL // SHEDDING\nWINTER // DORMANT\nSPRING // CLEANING"
+            && spirit.text === "SPIRIT // DETERMINISTIC GUIDANCE AND CONTROLS\nTOOLS LOCKED // NO LIVE AUTHORITY",
+            "reference must not assert active season or authority");
+        check(seasons.textFormat === Text.PlainText && spirit.textFormat === Text.PlainText
+            && near(seasons.width,body.width) && near(spirit.width,body.width)
+            && seasons.height > 0 && spirit.height > 0,
+            "reference width/text geometry");
+    }
     function geometry(s, body, bar) {
+        referenceVocabulary(body);
         check(bar.parent === workshop && s.parent === workshop, "non-scrolling sibling");
         check(near(body.width,s.width) && near(s.contentHeight,body.implicitHeight), "body geometry");
         check(bar.x - bar.effectiveGlowPadding >= s.width, "content/rail overlap");

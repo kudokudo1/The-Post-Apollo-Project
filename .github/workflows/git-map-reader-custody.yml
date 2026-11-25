@@ -1,0 +1,22 @@
+name: Git map reader custody candidate
+on:
+  pull_request:
+    paths:
+      - "scripts/git_map_reader_candidate.py"
+      - "scripts/git_map_index_manager.py"
+      - "scripts/git_map_history_index.py"
+      - "tests/git/test_git_map_reader_candidate.py"
+      - ".github/workflows/git-map-reader-custody.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real Linux shared locks and forced process-death fixtures
+        run: |
+          python3 -B tests/git/test_git_map_index_manager.py
+          python3 -B tests/git/test_git_map_reader_candidate.py

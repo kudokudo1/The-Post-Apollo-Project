@@ -8,7 +8,6 @@ Column {
     property bool active: false
     property bool singleDay: false
     readonly property bool editable: active && !!feed && !!feed.selectedListing && !feed.loading
-    onVisibleChanged: { if (!visible) singleDay=false; }
     spacing: 5
     Row {
         width: parent.width
@@ -71,6 +70,9 @@ Column {
     // A preset is a range, never silently reinterpret it as a day.
     Connections {
         target: dates.feed
+        function onSelectedListingChanged() {
+            if (!dates.feed || !dates.feed.selectedListing) dates.singleDay=false;
+        }
         function onPresetDaysChanged() {
             if (dates.feed && dates.feed.presetDays>0) dates.singleDay=false;
         }

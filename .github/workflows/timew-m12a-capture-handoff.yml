@@ -1,0 +1,29 @@
+name: TimeW M12a proposed fractional capture handoff
+on:
+  pull_request:
+    paths:
+      - 'services/time/MachineV3CaptureHandoff.py'
+      - 'services/time/MachineV3CoordinatedLocalSave.py'
+      - 'tests/timew/test_machine_v12a_capture_handoff.py'
+      - 'docs/timew-m12a-capture-handoff.md'
+      - '.github/workflows/timew-m12a-capture-handoff.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-capture-handoff:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Proposed source batches to real disposable coordinated Save
+        run: |
+          python3 -B -I tests/timew/test_machine_v12a_capture_handoff.py
+          python3 -B -I tests/timew/test_machine_v10_coordinated_local_save.py
+          python3 -B -I tests/timew/test_machine_v9_original_save_identity.py
+          python3 -B -I tests/timew/test_machine_v8_local_fractional_attempt_journal.py
+          python3 -B -I tests/timew/test_machine_v7_local_save_recovery.py
+          python3 -B -I tests/timew/test_machine_v6_local_exact_checkpoint_admission.py
+          python3 -B -I tests/timew/test_machine_save_ui_contract.py

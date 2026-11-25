@@ -1,0 +1,23 @@
+name: Git map V2 manager transport
+on:
+  pull_request:
+    paths:
+      - "scripts/git_map_v2_manager_candidate.py"
+      - "scripts/git_map_isolated_candidate.py"
+      - "scripts/git_map_v2_reader_candidate.py"
+      - "tests/git/test_git_map_v2_manager_candidate.py"
+      - ".github/workflows/git-map-v2-manager-candidate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qualify V2 manager process and finite read contract
+        run: |
+          python3 -B tests/git/test_git_map_v2_manager_candidate.py
+          python3 -B tests/git/test_git_map_isolated_candidate.py
+          python3 -B tests/git/test_git_map_v2_reader_candidate.py

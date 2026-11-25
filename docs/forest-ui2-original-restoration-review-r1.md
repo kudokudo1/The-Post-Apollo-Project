@@ -430,3 +430,107 @@ witnesses. Do not count fixture as actual status or operator acceptance.
 User has approved the design direction, not guessed entity definitions,
 new data producers or real lifecycle transitions. No real status is
 displayed until independently verified owner evidence exists.
+
+
+## S2 // Reconciled distributed Colony / member / Assignment design
+
+Status: coordination record, **not executable approval**. S1 reusable
+indicator #2831, actual-row rehearsal #2839 and UNKNOWN-only Tree source
+mount #2843 are merged. Operator screenshot and visual acceptance
+#7175409015 confirm current neutral glyph appearance, not lifecycle
+truth, physical pointer/keyboard qualification or other row coverage.
+Keep that appearance. Nurse withdrew the centralized H1 entry priority;
+do not implement the earlier global DORMANT button. R1/R2 remain
+contextual fixed-public fixtures, not a live metadata producer.
+
+### Canonical identity boundary (resolved non-equivalence)
+
+Original frozen 28895aaf checkpoints 0d15621d, 58408002 and d1780343
+describe a Colony as one Tree and its Clones, grouped by tree_id.
+An Ortet or Ramet is independently addressed by execution_context_id;
+binding and runtime-session identities are separate. A member's current
+foreground/background or dormant state is not its identity. These are
+historical architecture references, not modern authenticated records.
+
+Runtime #7175745212 confirms actual B1 chat records are not Colony,
+member, Clone or Assignment records. B1 d1533f15 has session_id,
+owner_key, tree_key, title, state and revision, without member/task
+lineage. B6r1 b7fdcfc5 TaskContext separates principal, Tree, optional
+Clone, task, execution context, generation and origin. It is an
+owner-side reference, not a roster or proof of active process.
+M2 1085bc56 currently refuses Clone contexts. BarkAttachment can link
+multiple presentation recipients to one task, and background work may
+have no attachment. Detach is presentation-only. Neither session rows
+nor Bark counts establish a roster or lifecycle. Do not derive new
+identities, mutate B1 or equate B1 PAUSED/ARCHIVED with Winter.
+
+### Reconciled placement and intent
+
+UI1 #7176088888/#7177006429 and UI2 #7176099165 agree on a future
+explicitly selected Colony view reusing the existing secondary rail.
+Keep CHATS default, identity and OPEN-only filter unchanged. Rail width
+184/148/0 means the compact hidden rail stays hidden; no extra window
+or squeezed review. Existing Tree rows and indicators remain unchanged.
+No fake live rows, sample fallback, guessed counts or automatic first
+selection. The following are required behaviors, subject to a separately
+approved actual owner projection and host scope:
+
+| User intent | Presentation result | Not implied |
+| --- | --- | --- |
+| Open Colony view | Independently authorized member rows under exact selected Tree/Colony | Chat membership, inherited season |
+| Select member | Exact current member selection, contextual Assignment metadata only | History retrieval, process activation |
+| Select Assignment | Exact current Assignment selection | Task claim, Spring entry |
+| Explicit Cleaning review | Independently pinned plan for an eligible dormant Assignment, in existing bounded workspace if separately approved | Restoration/apply, authority or automatic conversation |
+| Dismiss review | Return to original valid member/Assignment context | Activate or restore whole Colony |
+| Scope/visibility loss | Retire original affected selection/review, withdraw stale display | Clear unrelated chat draft/history or replacement |
+
+R1/R2 require at least 300x160. A future contextual review belongs in
+the existing sessionPreview workspace only with separate UI1 approval.
+Current PublicPreviewGate is CHERRY-only synthetic conversation, not
+membership authority. Preserve existing Escape overlay precedence,
+local draft on contextual dismiss, and existing menu-close behavior.
+Do not replace an active conversation implicitly. No proposed new
+Loader mode or executable action is authorized by this record.
+
+### Projection and disclosure requirements
+
+UI2 #7177004561 and Spirit #7177013987 agree that a future owner
+projection must bind independently resolved parent/member/task
+identity, exact lifetime and current snapshot. Runtime defines the
+source, not the UI. Spirit requires independently current recipient
+and purpose with separate enumeration, alias, count/completeness,
+season and action-detail entitlements. Completeness means completeness
+of the authorized projection, not the global roster. If completeness
+itself is unavailable or forbidden, show unavailable rather than a
+count/empty signal that leaks hidden membership. Authorized row with
+denied or unknown season displays UNKNOWN; unauthorized row is absent.
+No raw execution, owner or credential IDs exposed as labels.
+
+Acceptance criteria for that later contract:
+- Multiple Barks attached to one canonical Assignment do not duplicate
+  it. Authorized background Assignment without a Bark remains eligible
+  for discovery. Detach never infers retirement.
+- Complete authorized empty differs from unavailable/partial/refused;
+  no forbidden counts or inferred zero.
+- Tree/Colony/member/Assignment states independent; unknown season
+  remains neutral; no aggregation from child, model, cache or session.
+- Member replacement/lifetime change retires original selection and
+  review. Stale or cross-member snapshot cannot populate or clear a
+  replacement. Revocation/lost current scope withdraws affected rows,
+  selection and cached visible details. Preserve unrelated context.
+- Separate explicit Cleaning review and current action entitlement;
+  row visibility/selection never grants history, Spring or execution.
+- Preserve accepted S1 72 composed phases, 18 actual Tree placement
+  phases, 3 default UNKNOWN markers, 28 R2 and 22 R1 placement phases,
+  joined DB/STOP/negative and all-size regressions.
+
+### Open owner dependency
+
+No authoritative modern member/Assignment roster or independent
+lifecycle producer has been established. Nurse #7176450660 retains
+design-only status. Runtime and Spirit must specify exact actual
+owner source, mapping, freshness, parent binding and disclosure first;
+UI1 and UI2 then request exact bounded implementation approval.
+Mind M7g derived-cache design is separate from lifecycle evidence.
+No new schema, producer, executable source, synthetic membership,
+installed mount, query or authority is proposed in this reconciliation.

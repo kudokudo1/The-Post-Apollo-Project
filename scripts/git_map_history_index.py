@@ -309,6 +309,25 @@ def locate(conn, snapshot, sha):
             "sha":sha,"ordinal":row[0] if row else None}
 
 
+def search(conn, snapshot, query, start):
+    """One literal match in frozen ordinal order; no history materialization."""
+    m = manifest_for(conn, snapshot)
+    if (not isinstance(query, str) or not query.strip() or len(query) > 128
+            or len(query.encode("utf-8")) > 512 or any(ord(c) < 32 or ord(c) == 127 for c in query)
+            or type(start) is not int or not 0 <= start <= m["total"]):
+        raise ValueError("invalid search request")
+    # SQLite lower() is ASCII-case-insensitive, otherwise literal. No LIKE
+    # wildcards, regexp, shell or query-language interpretation.
+    row = conn.execute("""
+        SELECT ordinal, sha FROM commits
+        WHERE ordinal>=? AND (instr(lower(sha),lower(?))>0
+            OR instr(lower(author),lower(?))>0 OR instr(lower(subject),lower(?))>0)
+        ORDER BY ordinal LIMIT 1
+        """, (start,query,query,query)).fetchone()
+    return {"schema":SCHEMA,"snapshot":snapshot,"repoId":m["repoId"],
+            "query":query,"start":start,"match":dict(row) if row else None}
+
+
 def main(argv=None):
     os.umask(0o077)
     p = argparse.ArgumentParser(description=__doc__)
@@ -316,7 +335,7 @@ def main(argv=None):
     b = sub.add_parser("build")
     b.add_argument("repo")
     b.add_argument("directory")
-    for action in ("info","page","locate"):
+    for action in ("info","page","locate","search"):
         sp = sub.add_parser(action)
         sp.add_argument("directory")
         if action != "info":
@@ -325,6 +344,9 @@ def main(argv=None):
             sp.add_argument("start",type=int)
         if action == "locate":
             sp.add_argument("sha")
+        if action == "search":
+            sp.add_argument("query")
+            sp.add_argument("start",type=int)
     args = p.parse_args(argv)
     try:
         if args.action == "build":
@@ -335,8 +357,10 @@ def main(argv=None):
                     result = manifest_for(conn)
                 elif args.action == "page":
                     result = page(conn,args.snapshot,args.start)
-                else:
+                elif args.action == "locate":
                     result = locate(conn,args.snapshot,args.sha)
+                else:
+                    result = search(conn,args.snapshot,args.query,args.start)
             conn.close()
         print(json.dumps(result,ensure_ascii=True,separators=(",",":")))
         return 0

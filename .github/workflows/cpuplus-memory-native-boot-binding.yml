@@ -1,0 +1,60 @@
+name: CPU++ memory boot-bound withdrawal native (production HOLD)
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_boot_binding_ci/**'
+      - '.github/workflows/cpuplus-memory-native-boot-binding.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-boot-binding:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 187ae61eaff5c026bd77e4aab78f583848aa3fa0
+          path: reviewed-memory-source
+          persist-credentials: false
+      - name: Gate isolated runner and exact reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test -c /dev/kvm || { echo "CPU_MEM_NATIVE_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          test "$(git hash-object reviewed-memory-source/scripts/post-apollo-memory-add-swap)" = 8082bac43e3d8a0f506348e0ecee2e063d34935b
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 8082bac43e3d8a0f506348e0ecee2e063d34935b
+          test "$(df -B1 --output=avail / | tail -n 1)" -ge 24000000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_DISK"; exit 2; }
+          test "$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)" -ge 7000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_RAM"; exit 2; }
+          bash -n tests/cpuplus_memory_native/guest-cycle.sh
+          bash -n tests/cpuplus_memory_boot_binding_ci/run-silverblue-extfence.sh
+          bash -n tests/cpuplus_memory_boot_binding_ci/guest-extfence-phase.sh
+          python3 -B -m py_compile tests/cpuplus_memory_native_faults/guest-recovery.py tests/cpuplus_memory_boot_binding_ci/guest-extfence.py
+          set +e
+          output="$(python3 -I -B tests/cpuplus_memory_boot_binding_ci/guest-extfence.py guard 2>&1)"
+          rc="$?"
+          set -e
+          test "$rc" = 2
+          grep -Fq 'CPU_MEM_EXTFENCE_FAIL // RuntimeError: not a root Silverblue guest' <<<"$output"
+      - name: Run isolated offline KVM guest, no host swap changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 5100s docker run --rm --device=/dev/kvm \
+            --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted \
+            --env GITHUB_ACTOR="$GITHUB_ACTOR" --env POST_APOLLO_MEMORY_NATIVE_CI_ONLY=1 \
+            --env POST_APOLLO_MEMORY_EXTFENCE_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            fedora:44 /usr/bin/bash -c '
+              set -euo pipefail
+              dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install curl qemu-system-x86 qemu-img xorriso genisoimage
+              /usr/bin/bash /src/tests/cpuplus_memory_boot_binding_ci/run-silverblue-extfence.sh /src/reviewed-memory-source/scripts/post-apollo-memory-add-swap
+            '

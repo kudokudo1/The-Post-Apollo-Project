@@ -834,6 +834,15 @@ def archive_cycle_authorized():
             if any(actual is not None and actual != expected
                    for actual, expected in zip(remaining, bundle["records"])):
                 raise ReductionRecovery("ARCHIVE_RECORD_MISMATCH")
+            # A valid pending record may have survived a process death before
+            # its original fsync completed. Re-establish both file and parent
+            # directory durability before retiring even one live record.
+            # The archive itself has already been synchronized above.
+            sync_archive(ARCHIVE_PENDING)
+            if (extension_identity() != identity
+                    or read_protected_record(ARCHIVE_PENDING) != pending
+                    or read_cycle_archive(digest, identity, read_reduction_snapshot()) != bundle):
+                raise ReductionRecovery("ARCHIVE_EVIDENCE_CHANGED")
             for path, expected in zip(cycle_paths(), bundle["records"]):
                 current = read_protected_record(path)
                 if current is None:

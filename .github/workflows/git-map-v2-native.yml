@@ -4,6 +4,8 @@ on:
     paths:
       - "tests/git/test_git_map_v2_native.py"
       - "scripts/git_map_v2_manager_candidate.py"
+      - "scripts/git_map_stage_compact_holder.py"
+      - "scripts/git_map_compact_holder.c"
       - "widgets/git/GitMapControlHost.qml"
       - "widgets/git/GitMapCustodyController.qml"
       - "widgets/git/GitMapGenerationLease.qml"
@@ -26,7 +28,7 @@ jobs:
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins \
+            git ca-certificates python3 coreutils gcc libc6-dev quickshell=0.3.2-1 qt6-qpa-plugins \
             qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
             qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
             qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
@@ -34,6 +36,7 @@ jobs:
       - name: Native V2 two-host custody and interrupted search
         run: |
           python3 -B tests/git/test_git_map_v2_native.py
+          MAP_V2_COMPACT_NATIVE=yes python3 -B tests/git/test_git_map_v2_native.py
           python3 -B tests/git/test_git_map_shared_custody_native.py
         env:
           POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY

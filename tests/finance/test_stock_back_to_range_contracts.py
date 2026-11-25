@@ -56,17 +56,17 @@ assert 'returnTicket = null;' in service.split("    function refresh()",1)[1]
 assert 'reader.exec([' in service
 assert 'read_market_price_range_optional_hub.mjs' in service
 
+# M46b: the visible stock universe is worldwide; the old backend remains tested above/below.
+assert 'label: "CONTROLS"' in pane and 'stocks.openControls()' in pane
+assert 'readonly property var snapshot: globalHistory' in pane
+assert 'StockModePolicy.stockItems()' not in pane and 'stocks.stockFeed.refresh()' not in pane
+assert 'RETURN TO LEGACY STOCKS' not in pane
+assert 'stocks.openLoadedDay(' in pane and 'stocks.returnToRange()' in pane
+assert 'StockModePolicy.loadedGlobalDay(snapshot, dayDate)' in pane
 assert 'label: "BACK TO RANGE"' in pane
 assert 'id: backToRange' in pane
-assert 'visible: stocks.dayMode && stocks.stockFeed' in pane
-assert 'stocks.stockFeed.canReturnToRange' in pane
-assert 'stocks.stockFeed.returnToRange()' in pane
-assert 'stocks.snapshot.restoredFromDay' in pane
-assert 'RANGE SOURCE // RESTORED FROM MEMORY // NO NEW REQUEST' in pane
 assert 'label: "OPEN IN DAY"' in pane
-assert 'stocks.stockFeed.openRangePointInDay(' in pane
 assert 'label: "DAY"' in pane and 'label: "RANGE"' in pane
-assert pane.count("FinanceDateInput {")==3
 assert 'priceCanvas.requestPaint()' in pane
 
 assert 'function rangeReturnTicket(snapshot, index, cik, from, to)' in policy

@@ -36,6 +36,11 @@ assert 'stockFeed.acceptOutput(text)' in service
 assert '"provider-key-required"' in service
 assert '"demo-not-authorized"' in service
 assert '"hub-unhealthy"' in service
+# M46b: the visible stock universe is worldwide; the old backend remains tested above/below.
+assert 'label: "CONTROLS"' in pane and 'stocks.openControls()' in pane
+assert 'readonly property var snapshot: globalHistory' in pane
+assert 'StockModePolicy.stockItems()' not in pane and 'stocks.stockFeed.refresh()' not in pane
+assert 'RETURN TO LEGACY STOCKS' not in pane
 assert 'reader.exec([' in service and 'reader.exec([' not in pane
 assert 'reader.exec([' not in market
 
@@ -47,17 +52,6 @@ assert 'FinanceStockHistoryPane {' in market
 assert 'stockFeed: pane.stockFeed' in market
 assert 'FinanceOsirisPane {' in market
 
-assert 'FinanceDateInput {' in pane
-assert 'onValueEdited: function(value)' in pane
-assert 'stocks.stockFeed.selectStartDate(value)' in pane
-assert 'stocks.stockFeed.selectEndDate(value)' in pane
-assert 'label: stocks.stockFeed && stocks.stockFeed.loading ? "READING"' in pane
-assert 'stocks.stockFeed.refresh()' in pane
-assert 'HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS' in pane
-assert 'Select an issuer and START/END dates' in pane
-assert 'SOURCE EODHD EOD' in pane
-assert 'stocks.snapshot.delivery.cachedAt' in pane
-assert 'stocks.snapshot.delivery.servedAt' in pane
 assert 'Canvas {' in pane
 assert 'onPriceBarsChanged: {' in pane
 assert 'selectedPointIndex = -1;' in pane

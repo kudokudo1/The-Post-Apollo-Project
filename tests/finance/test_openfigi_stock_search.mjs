@@ -106,7 +106,7 @@ assert.ok(searchUi.includes('FinanceServices.FinanceStockDiscoveryService {'));
 assert.ok(searchUi.includes('TextInput {'));
 assert.ok(searchUi.includes('textFormat: Text.PlainText'));
 assert.ok(searchUi.includes('available: discovery.active && !finder.loading'));
-assert.ok(historyUi.includes('label: "GLOBAL SEARCH"'));
+assert.ok(historyUi.includes('label: "CONTROLS"'));
 assert.ok(historyUi.includes('FinanceStockDiscoveryPane {'));
 assert.ok(historyUi.includes('onExitRequested: stocks.discoveryOpen = false'));
 assert.equal((original.match(/reader.exec\(\[/g)||[]).length,1);

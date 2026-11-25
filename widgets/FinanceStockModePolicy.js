@@ -208,3 +208,18 @@ function rangeFromReturnTicket(ticket, daySnapshot, cik, from, to) {
     restored.returnedFromDay = ticket.openedDay;
     return restored;
 }
+
+// M46b: only an actual returned global daily close can enter local DAY.
+// The caller retains the complete original snapshot for RANGE. No I/O.
+function loadedGlobalDay(snapshot, requestedDay) {
+    if (!snapshot || snapshot.readOnly !== true || snapshot.identityVerified !== false
+            || ["eodhd-eod","alpha-vantage-daily-compact"].indexOf(snapshot.source)<0
+            || calendarDay(requestedDay)===null || !Array.isArray(snapshot.bars)
+            || requestedDay<snapshot.from || requestedDay>snapshot.to)
+        return {state:"invalid",date:requestedDay,close:null};
+    const matches=snapshot.bars.filter(function(bar) { return bar && bar.date===requestedDay; });
+    if (matches.length!==1 || typeof matches[0].price!=="number"
+            || !Number.isFinite(matches[0].price) || matches[0].price<=0)
+        return {state:"invalid",date:requestedDay,close:null};
+    return {state:"session",date:requestedDay,close:matches[0].price};
+}

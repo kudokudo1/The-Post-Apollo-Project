@@ -20,16 +20,11 @@ const viewport=section("Flickable {","id: body");
 assert.ok(viewport.includes("anchors.top: stockCommandRail.bottom"));
 assert.ok(viewport.includes("anchors.bottom: researchRail.top"));
 assert.ok(viewport.includes("clip: true"));
-const disclosure=section('objectName: "marketResearchControlsSection"','objectName: "marketCompactSelection"');
-for(const token of ["visible: stocks.controlsExpanded","height: visible ? implicitHeight : 0",
-    "id: issuers","id: rangePresets","id: dateControls",'label: "QUOTA STATUS"'])
-    assert.ok(disclosure.includes(token),token);
-assert.equal(disclosure.split("FinanceDateInput {").length-1,3);
-assert.ok(!disclosure.includes("stockFeed.refresh()"));
-const always=section('objectName: "marketCompactSelection"','objectName: "marketResearchCrossStockSection"');
-for(const token of ["id: load",'stocks.stockFeed.refresh()',"id: status","stocks.stockFeed.message",
-    "!stocks.controlsExpanded","stocks.historySource"])
-    assert.ok(always.includes(token),token);
+const command=section('objectName: "marketStockCommandRail"','objectName: "marketDayRangeRail"');
+for(const token of ['label: "CONTROLS"','stocks.openControls()','label: "QUOTA STATUS"','stocks.openQuotaStatus()','stocks.toggleResearchControls()']) assert.ok(command.includes(token),token);
+assert.ok(!command.includes('label: "GLOBAL SEARCH"'));
+assert.ok(!qml.includes("StockModePolicy.stockItems()"));
+assert.ok(!qml.includes("stocks.stockFeed.refresh()"));
 assert.ok(qml.includes("property bool controlsExpanded: false"));
 const f=section("function toggleResearchControls() {","function selectResearchView(view) {").trim();
 const ctx={controlsExpanded:false,scroll:{contentY:123}};
@@ -40,7 +35,7 @@ ctx.scroll.contentY=45;ctx.toggleResearchControls();
 assert.equal(ctx.controlsExpanded,false);assert.equal(ctx.scroll.contentY,45);
 for(const forbidden of ["stockFeed","snapshot","clearPinned","clearSaved","clearStock","SelectedStep","researchView","fetch(","refresh("])
     assert.ok(!f.includes(forbidden),forbidden);
-assert.ok(qml.includes('label: stocks.controlsExpanded ? "HIDE CONTROLS" : "CONTROLS"'));
-assert.ok(qml.includes('visible: !!stocks.snapshot && stocks.controlsExpanded'));
+assert.ok(qml.includes('label: stocks.controlsExpanded ? "HIDE DETAILS" : "DETAILS"'));
+assert.ok(qml.includes('visible: stocks.globalHistoryActive && stocks.controlsExpanded'));
 assert.ok(qml.includes("stocks.rangeAnalysis !== null && stocks.controlsExpanded"));
 console.log("Finance Market M42 fixed bottom mode rails, compact disclosure, reachable load and no data side effects: PASS");

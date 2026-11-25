@@ -304,3 +304,5 @@ await import("./test_market_m45_global_cross_stock.mjs");
   assert.equal(reservations,3);
   console.log("Finance M46a injected quota boundary, cache and single-flight: PASS");
 }
+
+await import("./test_market_m46b_unified_controls.mjs");

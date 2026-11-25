@@ -431,11 +431,25 @@ ShellRoot {
                     smoke.phase=4;
                     return;
                 }
-                if (smoke.phase>=50 && smoke.phase<=58) {
+                if (smoke.phase>=50 && smoke.phase<=60) {
                     const prof=smoke.find(pane,"cpuplusProfilePane");
                     if(smoke.phase===52) {
                         if (!smoke.check(!prof && pane.page==="CAP","profile page unloaded"))return;
-                        pane.selectMenu(5); smoke.phase=53; return;
+                        pane.stageCapacity(32);
+                        if (!smoke.check(pane.stagedGiB===32,"distinct CAP target before profile load"))return;
+                        pane.selectMenu(1); smoke.phase=59; return;
+                    }
+                    if(smoke.phase===59) {
+                        pane.selectPolicySection(0);
+                        pane.stagePolicy(80);
+                        if(!smoke.check(pane.stagedSwappiness===80,"distinct POL target before profile load"))return;
+                        pane.selectPolicySection(1);smoke.phase=60;return;
+                    }
+                    if(smoke.phase===60) {
+                        pane.selectPriorityDevice("/dev/zram0");
+                        pane.stagePriority(110);
+                        if(!smoke.check(pane.stagedPriority===110,"distinct priority target before profile load"))return;
+                        pane.selectMenu(5);smoke.phase=53;return;
                     }
                     if(!prof)return;
                     if(smoke.phase===50) {
@@ -506,9 +520,9 @@ ShellRoot {
                     if(!smoke.check(loadDraft && loadDraft.available,"load draft available"))return;
                     loadDraft.leftClicked(null);
                     if(!smoke.check(prof.view.capacity.target===24 && prof.view.swappiness.target===150
-                        && pane.stagedGiB===24 && pane.stagedSwappiness===150 && MemoryOperation.requests===0
+                        && pane.stagedGiB===32 && pane.stagedSwappiness===80 && pane.stagedPriority===110 && MemoryOperation.requests===0
                         &&pane.customProfileDraft.zram.algorithm==="zstd"&&pane.customProfileDraft.priority.value===101
-                        &&pane.customProfileDraft.advanced.background.unit==="%",
+                        &&pane.customProfileDraft.advanced.background.unit==="%"&&pane.customProfileDraft.advanced.background.value===15,
                         "loaded draft only, no setting changes"))return;
                     pane.clearProfileDraft();pane.captureProfileTarget("capacityGiB");
                     prof.selectedSaved="Native Work";
@@ -521,8 +535,8 @@ ShellRoot {
                     smoke.phase=55;return;
                 }
                 if (!smoke.check(pane.page === "CAP" && slider.visible
-                        && pane.stagedGiB === 24 && pane.stagedSwappiness === 150
-                        && pane.customProfileDraft.capacityGiB===24 && pane.customProfileDraft.swappiness===150
+                        && pane.stagedGiB === 32 && pane.stagedSwappiness === 80 && pane.stagedPriority===110
+                        && pane.customProfileDraft.capacityGiB===32 && pane.customProfileDraft.swappiness===80
                         && MemoryOperation.requests === 0, "navigation continuity or unexpected dispatch")) return;
                 console.log("CPU_MEMORY_UI_NATIVE_PASS");
                 smoke.done = true;

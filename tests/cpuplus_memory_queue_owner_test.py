@@ -171,6 +171,38 @@ sys.exit(0)
         self.assertIsNone(self.owner.status())
         self.assertEqual(self.owner.publish()["projection"]["status"]["state"], "IDLE")
 
+    def test_expiry_publication_remains_passively_readable(self):
+        msg = self.message()
+        msg["expires_at"] = 101
+        self.owner.action(msg)
+        record = self.queue.pending()
+        self.owner.publish()
+        self.owner.runtime.clock = lambda: (101000, 11000)
+        self.assertIsNone(self.owner.status())
+        expired = self.owner.publish()
+        status = expired["projection"]["status"]
+        self.assertEqual(status["code"], "EXPIRY_RECONCILIATION_REQUIRED")
+        self.assertIsNone(status["next_check_monotonic_ms"])
+        self.assertFalse(status["can_execute"])
+        self.assertEqual(self.owner.status(), expired)
+        self.assertEqual(self.queue.pending(), record)
+        self.owner.runtime.clock = lambda: (102000, 12000)
+        self.assertEqual(self.owner.status(), expired)
+        reply = self.owner.action(self.message("EXPIRE", record["id"], 2))
+        self.assertEqual(reply["result"]["request"]["state"], "EXPIRED")
+        self.assertIsNone(self.owner.status())
+        self.assertEqual(self.owner.publish()["projection"]["status"]["state"], "IDLE")
+
+    def test_expired_publication_invalidates_on_clock_rollback(self):
+        msg = self.message()
+        msg["expires_at"] = 101
+        self.owner.action(msg)
+        self.owner.runtime.clock = lambda: (101000, 11000)
+        self.owner.publish()
+        self.assertIsNotNone(self.owner.status())
+        self.owner.runtime.clock = lambda: (100000, 10000)
+        self.assertIsNone(self.owner.status())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

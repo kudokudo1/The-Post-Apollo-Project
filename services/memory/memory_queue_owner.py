@@ -122,8 +122,17 @@ class Owner:
                 expiry = s["expires_at"]
                 # At a due boundary the scheduler, not the reader, must
                 # publish a new observation. Do not retain expired READY.
+                # A freshly published expiry-reconciliation status is
+                # deliberately terminal for scheduling, not a readiness claim.
+                # Keep it readable so the operator can explicitly expire the
+                # exact pending intent. All pre-expiry publications still lapse.
+                expired_report = (s["state"] == "WAITING"
+                                  and s["code"] == "EXPIRY_RECONCILIATION_REQUIRED"
+                                  and due is None
+                                  and s["ready_valid_before_monotonic_ms"] is None)
                 if ((due is not None and mono >= due)
-                        or (expiry is not None and wall // 1000 >= expiry)):
+                        or (expiry is not None and wall // 1000 >= expiry
+                            and not expired_report)):
                     self._published = None
             except (QueueError, OSError, ValueError, TypeError):
                 self._published = None

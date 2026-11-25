@@ -29,3 +29,22 @@ fixture call counts, not measured native CPU, PSS, memory or wakeups.
 Native protected reader, actual transport/host scheduling, notification
 routing and resource acceptance remain pending. No new daemon or live
 memory adjustment. Protected completion/automatic execution HOLD.
+
+## R2c // merged-source verification and explicit expiry
+
+The initial pinned qualification #2568 passed 4/4 workflows and merged.
+All four pinned contributors #2558/#2560/#2564/#2565 are now on main.
+This revision replaces the pinned overlay workflow with a single checkout
+of the actual PR merge candidate (and main push), triggered on runtime
+or consumer/projector changes. No production transport selected.
+
+Owner.status previously discarded every publication at request expiry,
+including the freshly published EXPIRY_RECONCILIATION_REQUIRED state.
+Preserve only the explicit WAITING expiry report with null schedule and
+null readiness deadline; pre-expiry status still lapses and clock failure,
+owner loss, mutation and explicit invalidation still clear publication.
+Expiry status is advisory and never authorizes adjustment. The operator
+must explicitly reconcile the pending UUID; repeated passive reads do not
+sample or stage events. Two owner fixtures and a sixth combined scenario
+exercise this boundary, including clock rollback. No implicit expiry
+writes or repeated monitoring. No native reader/IPC/Hub connection.

@@ -20,6 +20,8 @@ ShellRoot {
     property string joinedLast: ""
     property bool joinedReopened: false
     property int joinedStart: 0
+    property int negativeCase: 0
+    property bool negativeTriggered: false
     property string dbStage: ""
     property int dbChecks: 0
     function check(ok, reason) {
@@ -224,8 +226,11 @@ ShellRoot {
                 && p.outcome==="ABORTED_LOCAL" && p.wire.snapshot().ended
                 && joinedCommits===2 && joinedPages===4 && joinedReopened && dbChecks===3
                 && !item.historyScopeActive && item.runtimeState==="CLOSED","joined terminal");
-            if (!failed) console.info("FOREST_HOST_JOINED_PASS");
-            finish();
+            if (failed) { finish(); return; }
+            console.info("FOREST_HOST_JOINED_PASS");
+            joinedParent=null;
+            p.destroy();
+            startNegative(1);
         });
         if (!p.start()) { check(false,"joined start"); finish(); }
     }
@@ -317,6 +322,84 @@ ShellRoot {
                 : stage==="ABORT" && p.request("CLOSE");
             witness.check(ok,"DB gate action");
             if (!ok) p.hold("DB_GATE");
+        }
+    }
+    // Actual original Loader consumer, not an alternate parser or fixture.
+    // The independent harness changes scope or Tree synchronously on offer.
+    function startNegative(n) {
+        negativeCase=n;
+        negativeTriggered=false;
+        forest.menuOpen=false;
+        negativeMount.restart();
+    }
+    Timer {
+        id: negativeMount
+        interval: 350
+        onTriggered: {
+            forest.selectedTreeIndex=0;
+            forest.menuOpen=true;
+            negativeOpen.restart();
+        }
+    }
+    Timer {
+        id: negativeOpen
+        interval: 350
+        onTriggered: {
+            parts.preview.leftClicked(null);
+            negativeConnect.restart();
+        }
+    }
+    Timer {
+        id: negativeConnect
+        interval: 350
+        onTriggered: {
+            const item=parts.loader.item;
+            if (!item || !parts.loader.visible) { check(false,"negative loader"); finish(); return; }
+            const p=parentType.createObject(witness,{trial:String(negativeCase+6).repeat(32),
+                fixtureDirectory:Quickshell.shellPath("privateNegative"+negativeCase),
+                originalOwner:item,originalLoader:parts.loader,joined:true,acceptOffer:true});
+            if (!p) { check(false,"negative create"); finish(); return; }
+            p.observedOwner=Qt.binding(function(){return parts.loader.item;});
+            p.eligible=Qt.binding(function(){return forest.menuOpen && forest.visible
+                && parts.loader.active && parts.loader.visible && forest.activeTree.sessionKey==="CHERRY";});
+            joinedParent=p;
+            item.historyCurrentScopeChanged.connect(function(){
+                if (negativeTriggered || !item.historyCurrentScope) return;
+                negativeTriggered=true;
+                if (negativeCase===1) item.historyCurrentScope=null;
+                else forest.selectedTreeIndex=1;
+            });
+            p.actionFinished.connect(function(code){
+                if (code==="READY") negativeDrive.restart();
+                else if (code!=="REFUSED") { check(false,"unexpected negative result"); p.hold("NEGATIVE"); }
+            });
+            p.finished.connect(function(){
+                let ok=negativeTriggered && p.reaped && !p.running && p.action===2
+                    && p.positiveHistoryAcks===0 && p.historyScope===null && !p.historyConfirmed;
+                if (negativeCase===1)
+                    ok=ok && p.negativeHistoryAcks===1 && p.refusedResult && !p.failure
+                        && p.wire.snapshot().ended && !item.historyScopeActive;
+                else ok=ok && p.negativeHistoryAcks===0 && p.failure==="OWNER_LOST"
+                    && parts.loader.item===null;
+                check(ok,"negative history acceptance "+negativeCase);
+                if (failed) { finish(); return; }
+                console.info("FOREST_HOST_HISTORY_NEGATIVE_PASS "+negativeCase);
+                joinedParent=null;
+                p.destroy();
+                if (negativeCase===1) startNegative(2);
+                else finish();
+            });
+            if (!p.start()) { check(false,"negative start"); finish(); }
+        }
+    }
+    Timer {
+        id: negativeDrive
+        interval: 30
+        onTriggered: {
+            if (!joinedParent.request("HISTORY_ATTACH")) {
+                check(false,"negative attach");
+                joinedParent.hold("NEGATIVE");
+            }
         }
     }
     Timer { id: joinedDrive; interval: 30; onTriggered: witness.driveJoined() }

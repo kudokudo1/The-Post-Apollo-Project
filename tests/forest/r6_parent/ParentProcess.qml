@@ -17,6 +17,9 @@ Item {
     property bool joined: false
     property var originalLoader: null
     property bool reopenReady: false
+    property bool historyConfirmed: false
+    property int positiveHistoryAcks: 0
+    property int negativeHistoryAcks: 0
     property bool eligible: false
     property bool acceptOffer: false
     readonly property bool current: eligible && originalOwner !== null
@@ -84,6 +87,7 @@ Item {
         if (joined && originalOwner && historyScope
             && originalOwner.sameHistoryScope(historyScope,originalOwner.historyCurrentScope))
             originalOwner.historyCurrentScope = null;
+        historyConfirmed = false;
         historyScope = null;
         pageRequest = null;
         historyDisplay = historyController ? historyController.close() : null;
@@ -152,7 +156,7 @@ Item {
             if (phase !== "IDLE") return false;
             clearHistory();
         } else if (kind === "HISTORY_PAGE") {
-            if (phase !== "IDLE" || historyScope === null || !Wire.token(pageId)
+            if (phase !== "IDLE" || !historyConfirmed || historyScope === null || !Wire.token(pageId)
                 || pageId === trial || used.indexOf(pageId)>=0 || pageId === sessionAlias
                 || used.length >= 128 || !Wire.integer(limit,1,2)) return false;
             if (joined) {
@@ -253,17 +257,31 @@ Item {
                 || used.indexOf(v.viewKey)>=0 || used.indexOf(v.sessionId)>=0
                 || (sessionAlias && v.sessionId !== sessionAlias) || used.length>=128) return false;
             offered = true;
-            const accepted = current && acceptOffer;
+            let accepted = live() && acceptOffer;
             if (accepted) {
                 historyScope = Object.assign({},v);
-                historyGeneration = v.generation;
-                sessionAlias = v.sessionId;
-                used = used.concat([v.viewKey]);
+                if (joined) {
+                    // The actual original consumer must accept before a positive ACK.
+                    originalOwner.historyCurrentScope = historyScope;
+                    accepted = live() && historyScope !== null
+                        && originalOwner.attachHistoryScope(historyScope)
+                        && live() && originalOwner.historyScopeActive
+                        && originalOwner.sameHistoryScope(historyScope,originalOwner.historyCurrentScope);
+                }
+                if (accepted) {
+                    historyGeneration = v.generation;
+                    sessionAlias = v.sessionId;
+                    used = used.concat([v.viewKey]);
+                } else clearHistory();
             }
-            return send("HISTORY_ACK",{scope:v,accepted:accepted});
+            if (!live()) return false;
+            if (!send("HISTORY_ACK",{scope:v,accepted:accepted})) return false;
+            if (accepted) positiveHistoryAcks++;
+            else negativeHistoryAcks++;
+            return true;
         }
         if (frame.kind === "PAGE") {
-            if (pending !== "HISTORY_PAGE" || !pageRequest || !historyScope
+            if (pending !== "HISTORY_PAGE" || !historyConfirmed || !pageRequest || !historyScope
                 || !Wire.exact(data,["scope","page"])
                 || !Wire.exact(data.scope,Object.keys(historyScope))
                 || !Object.keys(historyScope).every(k=>data.scope[k]===historyScope[k])) return false;
@@ -303,10 +321,9 @@ Item {
             next = "IDLE";
         else if (pending === "HISTORY_ATTACH" && offered && historyScope !== null
                 && code === "HISTORY_ATTACHED" && !data.units.length) {
-            if (joined) {
-                originalOwner.historyCurrentScope = historyScope;
-                if (!live() || !originalOwner.attachHistoryScope(historyScope) || !live()) return false;
-            }
+            if (joined && (!live() || !originalOwner.historyScopeActive
+                || !originalOwner.sameHistoryScope(historyScope,originalOwner.historyCurrentScope))) return false;
+            historyConfirmed = true;
             next = "IDLE";
         } else if (pending === "REOPEN" && code === "JOURNAL_REOPENED" && !data.units.length)
             next = "IDLE";

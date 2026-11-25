@@ -145,3 +145,21 @@ receipts, stale selection, publication, explicit one-use ACK and history.
 No full-shell durable host-loss record, native ACK fixture, startup unlock,
 PREPARED release, production launch or protected consent. Combined actual
 main verification required after operator merge decisions.
+
+## R3p // native acknowledgment qualification candidate
+
+Stacked on #2701 exact 865e356e (8/8 workflows, existing five native
+scenarios passed; raw host job 139176185929 and native 139176187189).
+Extend disposable actual-checkout fixture only. Stage a local QUEUE and
+close stdin after PREPARED; restart locked and explicitly review exact
+old action. Three additional trials: ACK (one explicit fixture
+confirmation, received receipt), LOST (harness drops committed ACK before
+host feed), EOF (close stdin after review but before ACK). Third owner
+retrieves exact historical receipt or null. No startup unlock, no action
+replay, no protected operation. Independently verify SQLite action remains
+PREPARED and acknowledgment count is exactly one/one/zero after process
+exit. Existing five trials retained. Actual Quickshell, watchdog, canonical
+host, Python pipe and existing recovery pane; acknowledgment UI is still
+fixture-driven, not DOC 2 production controls. No installed wrapper or
+full-shell persistent host correlation. CI pending. Review timeout and
+staged duration are disposable fixture parameters only.

@@ -52,3 +52,12 @@ jobs:
           for trial in ROUNDTRIP LOST EOF; do
             POST_APOLLO_QUEUE_STAGED_TRIAL="$trial" python3 -B tests/cpuplus_queue_recovery_native.py
           done
+      - name: Native explicit recovery acknowledgment and lost receipt
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+          POST_APOLLO_QUEUE_STAGED_TRIAL: "EOF"
+        run: |
+          set -eu
+          for trial in ACK LOST EOF; do
+            POST_APOLLO_QUEUE_ACK_TRIAL="$trial" python3 -B tests/cpuplus_queue_recovery_native.py
+          done

@@ -1,0 +1,64 @@
+name: Forest R6 native parent connection
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/r6_parent/**'
+      - '.github/workflows/forest-r6-parent-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-parent-child:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: fedora:44
+    steps:
+      - name: Install coherent Quickshell stack
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qtbase-gui python3 git coreutils grep shadow-utils util-linux diffutils
+          quickshell --version
+          quickshell --version | grep '0.3.'
+          useradd --create-home --shell /bin/sh forest-r6-ci
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned Runtime counterpart (draft dependency)
+        uses: actions/checkout@v4
+        with:
+          ref: ec9ca309b1836a35ae3e5506236bb36cf86f887a
+          path: r6-counterpart
+          persist-credentials: false
+      - name: Stage fixed sources and run nonroot disposable trials
+        run: |
+          set -eu
+          test "$(git -C r6-counterpart rev-parse HEAD)" = "ec9ca309b1836a35ae3e5506236bb36cf86f887a"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir -p "$work/scene/runtime" "$work/home" "$work/run" "$work/config" "$work/cache" "$work/data"
+          for n in 0 1 2; do mkdir -m 700 "$work/scene/private$n"; done
+          for f in ParentWire.js ParentProcess.qml shell.qml; do
+            cp "tests/forest/r6_parent/$f" "$work/scene/$f"
+            cmp "tests/forest/r6_parent/$f" "$work/scene/$f"
+          done
+          cp widgets/forest/ui2/PublicRuntimeStatusDisplay.js "$work/scene/"
+          cmp widgets/forest/ui2/PublicRuntimeStatusDisplay.js "$work/scene/PublicRuntimeStatusDisplay.js"
+          for f in runtime_public_child_r6b.py runtime_public_conversation_r5.py session_journal_v0.py turn_bridge_b3.py shared_context_b6r1.py context_first_tree_m2.py runtime_events_r3.py runtime_public_status_r4.py runtime_public_delivery_r4b.py history_public_fixture_m4.py recovery_inspect_b4d.py ollama_chat_transport.py ollama_inventory.py capability_registry_b6r2.py runtime_stop_control_r2.py local_terminal_outbox_b4f.py; do
+            cp "r6-counterpart/scripts/forest/$f" "$work/scene/runtime/$f"
+            cmp "r6-counterpart/scripts/forest/$f" "$work/scene/runtime/$f"
+          done
+          chown -R forest-r6-ci:forest-r6-ci "$work"
+          chmod 700 "$work/run"
+          set +e
+          runuser -u forest-r6-ci -- setpriv --no-new-privs env -i PATH=/usr/bin:/bin HOME="$work/home" XDG_RUNTIME_DIR="$work/run" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software LANG=C.UTF-8 timeout --signal=TERM --kill-after=3s 45s quickshell --path "$work/scene/shell.qml" --no-color --log-rules 'qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true' > "$work/log" 2>&1
+          code=$?
+          set -e
+          cat "$work/log"
+          test "$code" -eq 0
+          if grep -q R6_PARENT_FAIL "$work/log"; then exit 1; fi
+          observed="$(grep -oE 'R6_PARENT_CASE_PASS [0-2]' "$work/log" || true)"
+          expected="$(printf 'R6_PARENT_CASE_PASS %s\n' 0 1 2)"
+          test "$observed" = "$expected"
+          test "$(grep -c R6_PARENT_NATIVE_PASS "$work/log")" -eq 1

@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - "scripts/git_map_isolated_candidate.py"
+      - "scripts/git_map_index_manager.py"
+      - "tests/git/test_git_map_index_manager.py"
       - "tests/git/test_git_map_isolated_candidate.py"
       - ".github/workflows/git-map-isolated-candidate.yml"
   workflow_dispatch:

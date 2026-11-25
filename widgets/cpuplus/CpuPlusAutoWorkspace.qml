@@ -20,13 +20,34 @@ Column {
     signal intentConfirmed(var intent)
     signal historyReadRequested(string requestId)
     signal recoveryReadRequested(string kind, var value)
+    signal reviewRequested(string actionId)
+    signal acknowledgmentRequested(var selection, int generation)
+    signal reviewReceiptRequested(string reviewId)
+    readonly property var reviewContext: hostState ? Host.reviewContext(hostState) : null
+    readonly property bool reviewAvailable: !!hostState && Host.reviewAvailable(hostState) && !hostState.checkpointWait
+    readonly property var reviewGeneration: hostState ? hostState.generation : null
+    function forwardReview(actionId) {
+        if (visible && section==="RECOVERY" && reviewAvailable && !hostState.reviewLost && Recovery.uuid(actionId))
+            reviewRequested(actionId);
+    }
+    function forwardAcknowledgment(selection,generation) {
+        if (!visible || section!=="RECOVERY" || !hostState || generation!==hostState.generation || hostState.checkpointWait) return;
+        const current=Recovery.reviewSelection(Host.reviewContext(hostState),generation);
+        if (current && Recovery.sameSelection(current,selection))
+            acknowledgmentRequested({reviewId:current.reviewId,digest:current.digest,sequence:current.sequence},generation);
+    }
+    function forwardReceipt(reviewId) {
+        if (visible && section==="RECOVERY" && reviewAvailable && Recovery.uuid(reviewId)
+            && (!hostState.reviewLost || hostState.reviewLost.review_id===reviewId))
+            reviewReceiptRequested(reviewId);
+    }
     readonly property var actionContext: hostState ? Host.context(hostState) : null
     readonly property var recoveryContext: hostState ? Host.recoveryContext(hostState) : null
     readonly property bool readAvailable: canRead(hostState)
     function canRead(s) {
         return !!(s && s.phase==="CONNECTED" && s.session && s.session.status
             && !s.session.pending && !s.historyRead && !s.recoveryRead
-            && !s.awaitingStatus && !s.publicationRequired);
+            && !s.awaitingStatus && !s.publicationRequired && !s.reviewFlow && !s.checkpointWait && !s.buffer);
     }
     function selectSection(name) {
         if (!visible || !["REQUESTS","HISTORY","RECOVERY"].includes(name) || section===name) return;
@@ -135,6 +156,12 @@ Column {
             recoveryContext: root.recoveryContext
             readAvailable: root.readAvailable
             onRecoveryReadRequested: (kind,value) => root.forwardRecovery(kind,value)
+            reviewContext: root.reviewContext
+            reviewGeneration: root.reviewGeneration
+            reviewAvailable: root.reviewAvailable
+            onReviewRequested: actionId => root.forwardReview(actionId)
+            onAcknowledgmentRequested: (selection,generation) => root.forwardAcknowledgment(selection,generation)
+            onReviewReceiptRequested: reviewId => root.forwardReceipt(reviewId)
         }
     }
 }

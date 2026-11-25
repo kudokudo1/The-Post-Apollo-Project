@@ -63,3 +63,60 @@ Owner expiry change #2573 touches separate status() region; combined
 merged-source verification still required. #2577 existing pipe ACTION
 delegates to Owner.action, but its launcher/INVENTORY/LOCAL_ACTION
 commands and composed recovery qualification are not implemented yet.
+
+## R3h // staged local admission (in-process candidate)
+
+Nurse 2 accepted #2636 corrected native watchdog, 5/5 PASS and merged.
+#2635 actual AUTO workspace merged 7/7 PASS. Single canonical host retained.
+Before an eventual two-message wire handshake, split local durable action
+admission from mutation in the existing owner/runtime. Opt-in explicit
+staged_max_age_ms (1..60000, no production default), requires durable mode.
+Direct mutating Owner.action refuses in staged mode. prepare_action validates
+exact owner/sequence/message, consumes sequence, stores PREPARED using the
+existing journal before any provider capture or request mutation, returns
+PREPARED_ACTION envelope with exact durable row. commit_action accepts only
+the same message on same live owner and runtime instance, consumes live
+continuation before checking/capture/transaction, returns existing ACTION
+envelope. Deadline uses both owner wall and monotonic time, checked before
+capture and again before commit. Stale/mismatched/failed/expired continuation
+does not replay, durable PREPARED remains. No automatic clearing or fallback.
+A reopened owner cannot commit the old PREPARED, but can read it; a lost
+prepare reply must not trigger commit. A future host may send commit only
+after matching PREPARED_ACTION, never on startup/retry. No second database,
+process, polling or protected authority. Receipt is local intent only.
+
+Existing legacy and one-call durable paths retained for fixture compatibility;
+explicit staged selection is not persisted as a deployment policy. Direct
+runtime APIs/old binaries still outside cooperating fence. No new wire
+commands, actual host integration, durable reconciliation acknowledgment or
+production startup unlock here. PREPARED remains blocking until independently
+reviewed disposition protocol, not deletion or guessed rollback. Future
+startup gate must require explicit operator review of exact outstanding
+evidence and revalidate current DB/session; no inference from missing row.
+Seven added disposable regression cases; native full-shell crash still
+requires qualification. No changes to DOC 2-owned UI or protected helper.
+
+## R3i // exact recovery review acknowledgment (prototype)
+
+Before release of an unresolved preparation, preserve what was actually
+reviewed. New owner only, explicit begin and acknowledge, exact old row
+and current pending ID plus digest bound to one short-lived review ticket.
+Atomic comparison and append of historical acknowledgment in existing
+private DB. No queue mutation, no capture/poll, no row deletion, no replay,
+no startup unlock. Missing row cannot be acknowledged. Selection change,
+wrong ticket/digest, changed pending record, timeout or owner loss refuses.
+Review of COMMITTED describes only local intent. Same-UID storage is not
+trusted, digests are correlation not signatures, no operator identity or
+protected consent claim. Historical acknowledgment is not current state.
+Six tests. No production UI/wire and no production deadline selected.
+
+Abandonment is deliberately separate: v1 PREPARED/COMMITTED and its unique
+partial index cannot represent a terminal abandoned preparation. Adding
+ABANDONED in place would break existing strict parser and old binaries.
+Proposed versioned migration (requires Nurse 2 + DOC 2 review and operator
+policy): preserve original action and append disposition, make old readers
+fail closed, validate exact old row plus current pending state under same
+owner lock/transaction, permanently refuse old action UUID, never resume or
+infer protected outcome, retain unknown if evidence incomplete. Acknowledging
+review is not abandonment and does not release the PREPARED fence. Decide
+retention and schema/version migration separately before enabling release.

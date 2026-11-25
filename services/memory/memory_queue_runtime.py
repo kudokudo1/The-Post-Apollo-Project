@@ -27,6 +27,7 @@ class Runtime:
         self.clock = clock
         self._last_clock = None
         self._lock = threading.Lock()
+        self._staged = None
         self.max_age = _int(max_age_ms, 1)
         self.monitor = Monitor(queue, observe, interval_ms=interval_ms,
                                max_age_ms=max_age_ms, max_gap_ms=max_gap_ms,
@@ -143,29 +144,63 @@ class Runtime:
         with self._serialized():
             return self._finish(expected_id, expire=True)
 
-    def local_action(self, message):
-        """Opt-in durable local correlation; not yet wired to Owner/pipe.
+    def _complete_local_action(self, journal, m, *, deadline=None):
+        source = None
+        if m["kind"] in {"QUEUE", "REPLACE"}:
+            source, _ = self._capture(m["target_gib"], m["expires_at"])
+        wall, mono = self._now()
+        if deadline is not None and (wall >= deadline[0] or mono >= deadline[1]):
+            raise QueueError("STAGED_ACTION_EXPIRED")
+        record = journal.commit(m, now=wall // 1000, source=source)
+        if m["kind"] in {"QUEUE", "REPLACE"}:
+            return self._action_result(record)
+        try:
+            event = self.events.stage_terminal(record["id"])
+            return self._action_result(record, event=event)
+        except QueueError:
+            return self._action_result(record, error="EVENT_STAGE_UNAVAILABLE")
 
-        Never call on startup or retry an interrupted action. Existing
-        explicit runtime methods remain unchanged pending joint integration.
-        """
+    def local_action(self, message):
+        """Existing one-call durable local action; never startup recovery."""
         from memory_queue_local_actions import LocalActions, validate
         with self._serialized():
+            if self._staged is not None:
+                raise QueueError("STAGED_ACTION_PENDING")
             m = validate(message)
             wall, _ = self._now()
             journal = LocalActions(self.queue)
             journal.prepare(m, now=wall // 1000)
-            if m["kind"] in {"QUEUE", "REPLACE"}:
-                source, now = self._capture(m["target_gib"], m["expires_at"])
-                record = journal.commit(m, now=now, source=source)
-                return self._action_result(record)
-            wall, _ = self._now()
-            record = journal.commit(m, now=wall // 1000)
-            try:
-                event = self.events.stage_terminal(record["id"])
-                return self._action_result(record, event=event)
-            except QueueError:
-                return self._action_result(record, error="EVENT_STAGE_UNAVAILABLE")
+            return self._complete_local_action(journal, m)
+
+    def prepare_staged_action(self, message, *, max_age_ms):
+        """Durably reserve exact local intent, without capture or mutation."""
+        from memory_queue_local_actions import LocalActions, validate
+        _int(max_age_ms, 1, 60000)
+        with self._serialized():
+            if self._staged is not None:
+                raise QueueError("STAGED_ACTION_PENDING")
+            m = validate(message)
+            wall, mono = self._now()
+            journal = LocalActions(self.queue)
+            record = journal.prepare(m, now=wall // 1000)
+            self._staged = (journal, m, (wall + max_age_ms, mono + max_age_ms))
+            return record
+
+    def commit_staged_action(self, message):
+        """One explicit same-instance continuation, never replay after reopen."""
+        from memory_queue_local_actions import validate
+        with self._serialized():
+            staged, self._staged = self._staged, None
+            if staged is None:
+                raise QueueError("STAGED_ACTION_NOT_LIVE")
+            journal, expected, deadline = staged
+            m = validate(message)
+            if m != expected:
+                raise QueueError("STAGED_ACTION_MISMATCH")
+            wall, mono = self._now()
+            if wall >= deadline[0] or mono >= deadline[1]:
+                raise QueueError("STAGED_ACTION_EXPIRED")
+            return self._complete_local_action(journal, m, deadline=deadline)
 
     def detail(self, request_id):
         with self._serialized():

@@ -17,12 +17,20 @@ MAX_SAFE = 2**53 - 1
 
 
 class Owner:
-    def __init__(self, queue, runtime_factory, *, durable_actions=False):
+    def __init__(self, queue, runtime_factory, *, durable_actions=False,
+                 staged_max_age_ms=None):
         if type(durable_actions) is not bool:
             raise QueueError("INVALID_ACTION_MODE")
+        if staged_max_age_ms is not None:
+            if not durable_actions:
+                raise QueueError("DURABLE_ACTION_MODE_REQUIRED")
+            _int(staged_max_age_ms, 1, 60000)
+        self._staged_max_age_ms = staged_max_age_ms
+        self._staged_message = None
         self.queue = queue
         self._durable_actions = durable_actions
         self._journal = None
+        self._recovery_review = None
         self.pid = os.getpid()
         self.owner_id = str(uuid.uuid4())
         self._sequence = 0
@@ -46,6 +54,9 @@ class Owner:
             if self._durable_actions:
                 from memory_queue_local_actions import LocalActions
                 self._journal = LocalActions(queue)
+                if self._staged_max_age_ms is not None:
+                    from memory_queue_recovery_review import RecoveryReview
+                    self._recovery_review = RecoveryReview(self._journal,self.owner_id)
             else:
                 self._legacy_fence()
             self.runtime = runtime_factory(queue)
@@ -210,6 +221,11 @@ class Owner:
             elif target is not None or expires is not None:
                 raise QueueError("INVALID_ACTION_FIELDS")
 
+            if self._staged_max_age_ms is not None:
+                if kind != "RECHECK":
+                    raise QueueError("STAGED_ACTION_REQUIRED")
+                if self._staged_message is not None:
+                    raise QueueError("STAGED_ACTION_PENDING")
             if not self._durable_actions:
                 self._legacy_fence()
             # Consume sequence before dispatch. It is not authorization and
@@ -248,6 +264,94 @@ class Owner:
                                   action_sequence=seq, disposition="REPORTED",
                                   code="READ_STATUS_REQUIRED", result=self._action_summary(result),
                                   invalidate=True)
+
+    def prepare_action(self, message):
+        """Opt-in staged local admission; not an execution permission.
+
+        Future transport must await this correlated durable receipt before
+        sending a commit. Any disconnect discards live continuation.
+        """
+        from memory_queue_local_actions import validate
+        with self._call():
+            if self._staged_max_age_ms is None:
+                raise QueueError("STAGED_ACTION_MODE_REQUIRED")
+            if self._staged_message is not None:
+                raise QueueError("STAGED_ACTION_PENDING")
+            m = validate(message)
+            if m["owner_id"] != self.owner_id:
+                raise QueueError("STALE_OR_INVALID_OWNER")
+            if m["action_sequence"] != self._next_action:
+                raise QueueError("STALE_ACTION_SEQUENCE")
+            if self._recovery_review is not None:
+                self._recovery_review.invalidate()
+            self._next_action += 1
+            self._published = None
+            record = self.runtime.prepare_staged_action(
+                m, max_age_ms=self._staged_max_age_ms)
+            self._staged_message = m
+            return self._envelope("PREPARED_ACTION", record=record)
+
+    def commit_action(self, message):
+        """Consume exact live continuation; exceptions leave durable evidence."""
+        from memory_queue_local_actions import validate
+        with self._call():
+            if self._staged_max_age_ms is None:
+                raise QueueError("STAGED_ACTION_MODE_REQUIRED")
+            expected, self._staged_message = self._staged_message, None
+            if expected is None:
+                raise QueueError("STAGED_ACTION_NOT_LIVE")
+            m = validate(message)
+            if m != expected or m["owner_id"] != self.owner_id:
+                # No matching retry after an invalid continuation.
+                raise QueueError("STAGED_ACTION_MISMATCH")
+            self._published = None
+            try:
+                result = self.runtime.commit_staged_action(m)
+            except (QueueError, OSError, ValueError, TypeError):
+                return self._envelope("ACTION", action_id=m["action_id"],
+                                      action_sequence=m["action_sequence"],
+                                      disposition="UNKNOWN", code="RECONCILE_REQUIRED",
+                                      result=None, invalidate=True)
+            return self._envelope("ACTION", action_id=m["action_id"],
+                                  action_sequence=m["action_sequence"],
+                                  disposition="REPORTED", code="READ_STATUS_REQUIRED",
+                                  result=self._action_summary(result), invalidate=True)
+
+    def begin_recovery_review(self, action_id, *, max_age_ms):
+        """Inspect exact old action under the live staged owner; no mutation."""
+        with self._call():
+            if self._recovery_review is None:
+                raise QueueError("STAGED_ACTION_MODE_REQUIRED")
+            if self._staged_message is not None:
+                raise QueueError("STAGED_ACTION_PENDING")
+            wall, mono = self.runtime._now()
+            review = self._recovery_review.begin(action_id,wall_ms=wall,
+                                                mono_ms=mono,max_age_ms=max_age_ms)
+            return self._envelope("RECOVERY_REVIEW",review=review)
+
+    def acknowledge_recovery_review(self, *, review_id, review_digest):
+        """Explicit confirmation of reviewed local evidence only, no unlock."""
+        with self._call():
+            if self._recovery_review is None:
+                raise QueueError("STAGED_ACTION_MODE_REQUIRED")
+            if self._staged_message is not None:
+                self._recovery_review.invalidate()
+                raise QueueError("STAGED_ACTION_PENDING")
+            try:
+                wall, mono = self.runtime._now()
+                receipt = self._recovery_review.acknowledge(review_id=review_id,
+                            review_digest=review_digest,wall_ms=wall,mono_ms=mono)
+            except BaseException:
+                self._recovery_review.invalidate()
+                raise
+            return self._envelope("RECOVERY_ACK",receipt=receipt)
+
+    def recovery_review_history(self, review_id):
+        with self._call():
+            if self._recovery_review is None:
+                raise QueueError("STAGED_ACTION_MODE_REQUIRED")
+            return self._envelope("RECOVERY_REVIEW_HISTORY",review_id=_uuid(review_id),
+                                  receipt=self._recovery_review.lookup(review_id))
 
     def inventory(self, *, limit):
         """Bounded owner-bound read; never an unlock or fresh observation."""

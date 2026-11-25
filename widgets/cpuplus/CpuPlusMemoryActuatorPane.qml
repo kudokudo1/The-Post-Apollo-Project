@@ -228,17 +228,24 @@ Item {
         spacing: 3
         visible: root.fixedWorkPage
         height: visible ? implicitHeight : 0
+        GohuText {
+            width: parent.width
+            text: "MEMORY // " + root.menuTitles[root.menuIndex]
+            color: Colors.magenta
+            font.pixelSize: 11
+            wrapMode: Text.WordWrap
+        }
         Row {
             width: parent.width
             spacing: 4
             GohuText {
                 width: Math.max(0,parent.width-72-parent.spacing)
-                height: 26
+                height: Math.max(26,implicitHeight)
                 text: "SOURCE // " + root.status
                 color: root.sample ? Colors.cyan : Colors.orange
                 font.pixelSize: 10
                 verticalAlignment: Text.AlignVCenter
-                elide: Text.ElideRight
+                wrapMode: Text.Wrap
             }
             ActionButton {
                 objectName: "cpuplusWorkRefresh"

@@ -383,6 +383,9 @@ Column {
                     height: 27
                     label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : "STORE"
                     labelPixelSize: 9
+                    labelFontSizeMode: Text.HorizontalFit
+                    labelMinimumPixelSize: 8
+                    contentPadding: 2
                     selected: root.selectedReport === modelData
                     onLeftClicked: {
                         CpuPlusDiagnostics.selectLatest(modelData);

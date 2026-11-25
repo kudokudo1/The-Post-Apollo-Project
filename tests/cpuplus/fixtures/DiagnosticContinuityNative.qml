@@ -185,11 +185,19 @@ ShellRoot {
                 start.leftClicked();
                 if (!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="census"
                     && cancel.available,"census started; cancel enabled")) return;
-                cancel.leftClicked();
+                // Give the disposable child a turn to start before cancellation.
                 root.phase=10;
                 return;
             }
             if (root.phase === 10 && pane.item) {
+                const cancel=root.findItem(pane.item,"cpuplusProcCancel");
+                if (!root.check(cancel && cancel.available && CpuPlusDiagnostics.busy,
+                    "running census can be cancelled")) return;
+                cancel.leftClicked();
+                root.phase=11;
+                return;
+            }
+            if (root.phase === 11 && pane.item) {
                 if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
                 const report=CpuPlusDiagnostics.reports.census;
                 const cancel=root.findItem(pane.item,"cpuplusProcCancel");

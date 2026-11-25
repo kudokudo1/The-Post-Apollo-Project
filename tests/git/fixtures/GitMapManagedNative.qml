@@ -131,6 +131,26 @@ ShellRoot {
                         && anchor.sha===root.oldAnchor.sha && anchor.offset===root.oldAnchor.offset
                         && anchor.ordinal===root.oldAnchor.ordinal+1,
                         "new index exact SHA and intra-row position preserved")) return;
+                host.searchQuery="commit 20";
+                if (!root.check(host.searchHistory(false),"search launches on adopted snapshot")) return;
+                root.phase=7;
+                return;
+            }
+            if (root.phase===7 && !host.busy) {
+                if (!root.check(host.lastMatch && host.lastMatch.ordinal===20,
+                        "exact historical ordinal found")) return;
+                const row=host.viewport.rowAt(host.lastMatch.ordinal);
+                if (!row) return;
+                if (!root.check(row.sha===host.lastMatch.sha && row.subject==="commit 20",
+                        "same virtual viewport loads matching commit")) return;
+                if (!root.check(host.searchHistory(true),"next search launches")) return;
+                root.phase=8;
+                return;
+            }
+            if (root.phase===8 && !host.busy) {
+                if (!root.check(host.searchStatus.startsWith("NO FURTHER MATCH"),"no-match terminal result")) return;
+                root.operatorActive=false;
+                if (!root.check(!host.searchHistory(false),"hidden search refused")) return;
                 console.log("GIT_MAP_MANAGED_PASS");
                 root.done=true;
                 Qt.quit();

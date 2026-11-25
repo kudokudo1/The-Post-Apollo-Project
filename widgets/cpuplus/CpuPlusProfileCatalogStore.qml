@@ -20,7 +20,7 @@ Scope {
     property bool exitSeen: false
     property bool exitOk: false
     readonly property bool ready: !busy && !faulted && document!==null
-    function list() {return invoke({action:"list"},null);}
+    function list() {return invoke({action:"list",schema:"post-apollo-cpuplus-profiles-v2"},null);}
     function saveNew(name,targets) {
         if(!ready)return false;
         const request=Catalog.create(document,name,targets);

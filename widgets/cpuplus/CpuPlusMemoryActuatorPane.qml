@@ -5,6 +5,7 @@ import qs.services.diagnostics
 import "../../components"
 import "CpuPlusMemorySnapshot.js" as Snapshot
 import "CpuPlusProfilePreview.js" as Profiles
+import "CpuPlusProfileCatalog.js" as Catalog
 
 // Demand-loaded by SYSTEM memory/swap selection. No privileged operations.
 Item {
@@ -22,13 +23,13 @@ Item {
     }
     // Draft belongs to this memory pane, not the demand-loaded PROF subpage.
     property string selectedProfile: ""
-    property var customProfileDraft: Profiles.empty()
+    property var customProfileDraft: Catalog.empty()
     CpuPlusProfileCatalogStore { id: profileCatalog }
     function loadProfileDraft(name) {
         if(page!=="PROF" || !profileCatalog.ready) return;
         const row=profileCatalog.document.profiles.find(x=>x.name===name);
-        if(!row || !Profiles.valid(row.targets)) return;
-        customProfileDraft={capacityGiB:row.targets.capacityGiB,swappiness:row.targets.swappiness};
+        if(!row || !Catalog.validDraft(row.targets)) return;
+        customProfileDraft=Catalog.copyTargets(row.targets,"post-apollo-cpuplus-profiles-v2");
         selectedProfile="CUSTOM";
     }
     function chooseProfile(name) {
@@ -38,11 +39,31 @@ Item {
         if (page !== "PROF" || selectedProfile !== "CUSTOM" || !sample || status !== "OBSERVED" || MemoryOperation.busy) return;
         if (key === "capacityGiB" && !capacity) return;
         if (key === "swappiness" && !Profiles.policy(sample.swappiness)) return;
-        const next = Profiles.capture(customProfileDraft,key,key === "capacityGiB" ? stagedGiB : stagedSwappiness);
+        if (!["capacityGiB","swappiness"].includes(key)) return;
+        const next = Catalog.capture(customProfileDraft,key,key === "capacityGiB" ? stagedGiB : stagedSwappiness);
         if (next) customProfileDraft = next;
     }
     function clearProfileDraft() {
-        if (page === "PROF" && selectedProfile === "CUSTOM") customProfileDraft = Profiles.empty();
+        if (page === "PROF" && selectedProfile === "CUSTOM") customProfileDraft = Catalog.empty();
+    }
+    // Copies are explicit, historical preview data, not re-observed authority.
+    function copyPriorityProfile() {
+        if(page!=="POL"||policySection!==1||MemoryOperation.busy||status!=="OBSERVED")return;
+        const row=matchingPriorityRow(priorityBaseline,priorityObservations(sample));
+        if(!row||stagedPriority<0)return;
+        const next=Catalog.capture(customProfileDraft,"priority",{deviceHint:row.name,sizeKiB:row.size,value:stagedPriority});
+        if(next)customProfileDraft=next;
+    }
+    function copyZramProfile(value) {
+        if(page!=="POL"||policySection!==2||MemoryOperation.busy||status!=="OBSERVED"||!value)return;
+        if(!priorityObservations(sample).some(x=>x.name===value.deviceHint&&x.size===value.sizeKiB))return;
+        const next=Catalog.capture(customProfileDraft,"zram",value);
+        if(next)customProfileDraft=next;
+    }
+    function copyAdvancedProfile(key,unit,value) {
+        if(page!=="POL"||policySection!==3||MemoryOperation.busy)return;
+        const next=Catalog.captureAdvanced(customProfileDraft,key,unit,value);
+        if(next)customProfileDraft=next;
     }
     property int stagedGiB: 16
     property bool initializedTarget: false
@@ -943,6 +964,13 @@ Item {
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
                     }
+                    ActionButton {
+                        width: parent.width
+                        height: 28
+                        label: "COPY PRIORITY TO CUSTOM"
+                        available: root.priorityEditable && root.stagedPriority>=0 && root.status==="OBSERVED"
+                        onLeftClicked: root.copyPriorityProfile()
+                    }
                     GohuText {
                         width: parent.width
                         text: "Higher priority is preferred for new swap allocation. Equal priorities share allocation. Changing an active device may require safe deactivation."
@@ -960,6 +988,7 @@ Item {
                 sourceComponent: CpuPlusZramPolicyPane {
                     sample: root.sample
                     operationBusy: MemoryOperation.busy
+                    onProfileCopyRequested: value => root.copyZramProfile(value)
                 }
             }
             Loader {
@@ -967,7 +996,10 @@ Item {
                 height: active && item ? item.implicitHeight : 0
                 active: root.page === "POL" && root.policySection === 3
                 visible: active
-                sourceComponent: CpuPlusAdvancedPolicyPane {}
+                sourceComponent: CpuPlusAdvancedPolicyPane {
+                    operationBusy: MemoryOperation.busy
+                    onProfileCopyRequested: (key,unit,value) => root.copyAdvancedProfile(key,unit,value)
+                }
             }
             Loader {
                 width: parent.width
@@ -1004,6 +1036,7 @@ Item {
                     onProfileSelected: name => root.chooseProfile(name)
                     onDraftCapture: key => root.captureProfileTarget(key)
                     onDraftCleared: root.clearProfileDraft()
+                    memorySample: root.sample
                     catalog: profileCatalog.document
                     catalogStatus: profileCatalog.status
                     catalogBusy: profileCatalog.busy || profileCatalog.faulted
@@ -1014,9 +1047,8 @@ Item {
                     onSavedDraftRequested: name => root.loadProfileDraft(name)
                     onCatalogChangeRequested: request => {
                         if(root.page!=="PROF" || !request)return;
-                        if(request.action==="edit" && (root.selectedProfile!=="CUSTOM" || !Profiles.valid(request.targets)
-                            || request.targets.capacityGiB!==root.customProfileDraft.capacityGiB
-                            || request.targets.swappiness!==root.customProfileDraft.swappiness))return;
+                        if(request.action==="edit" && (root.selectedProfile!=="CUSTOM" || !Catalog.validDraft(request.targets)
+                            || JSON.stringify(Catalog.copyTargets(request.targets,"post-apollo-cpuplus-profiles-v2"))!==JSON.stringify(root.customProfileDraft)))return;
                         profileCatalog.changeExisting(request);
                     }
                 }

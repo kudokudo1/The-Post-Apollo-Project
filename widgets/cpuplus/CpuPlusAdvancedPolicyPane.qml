@@ -8,6 +8,13 @@ Column {
     id: root
     objectName: "cpuplusAdvancedPolicyPane"
     spacing: 6
+    property bool operationBusy: false
+    signal profileCopyRequested(string key,string unit,var value)
+    function copyToProfile() {
+        const spec=Policy.previewSpec(observation,selectedKey);
+        if(operationBusy||!canStage||!received||!exited||!exitOk||!Policy.validPreview(spec,stagedValue))return;
+        profileCopyRequested(selectedKey,spec.unit,stagedValue);
+    }
     property var observation: null
     property string status: "NOT CHECKED"
     property bool received: false
@@ -214,6 +221,14 @@ Column {
                         onLeftClicked: {
                             if (root.selectedKey === policyCard.modelData.key) root.resetPreview();
                         }
+                    }
+                    ActionButton {
+                        width: parent.width
+                        height: 26
+                        label: "COPY TARGET TO CUSTOM"
+                        available: !root.operationBusy && root.canStage && root.received && root.exited && root.exitOk
+                            && root.selectedKey === policyCard.modelData.key
+                        onLeftClicked: root.copyToProfile()
                     }
                     GohuText {
                         width: parent.width

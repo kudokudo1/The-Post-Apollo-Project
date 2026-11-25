@@ -137,6 +137,8 @@ ShellRoot {
                     priority.valueRequested(101);
                     if (!smoke.check(pane.stagedPriority === 101 && pane.priorityRow.priority === 100
                         && MemoryOperation.requests === 0, "priority preview only")) return;
+                    pane.copyPriorityProfile();
+                    if(!smoke.check(pane.customProfileDraft.priority.value===101,"explicit priority copy"))return;
                     pane.selectPolicySection(2);
                     smoke.phase = 11;
                     return;
@@ -158,6 +160,8 @@ ShellRoot {
                         && MemoryOperation.requests === 0,"ZRAM synthetic preview")) return;
                     zram.stageAlgorithm("invalid");
                     if (!smoke.check(zram.targetAlgorithm === "zstd","ZRAM invalid target refusal")) return;
+                    zram.copyToProfile();
+                    if(!smoke.check(pane.customProfileDraft.zram.algorithm==="zstd","explicit ZRAM copy"))return;
                     pane.selectPolicySection(3);
                     smoke.phase = 12;
                     return;
@@ -180,6 +184,8 @@ ShellRoot {
                     adv.stagePreview(15);
                     if (!smoke.check(adv.stagedValue === 15 && adv.observation.background.ratio === 10
                         && MemoryOperation.requests === 0, "ADV actual versus preview")) return;
+                    adv.copyToProfile();
+                    if(!smoke.check(pane.customProfileDraft.advanced.background.value===15 && pane.customProfileDraft.advanced.background.unit==="%","explicit ADV copy"))return;
                     pane.selectPolicySection(0);
                     smoke.phase = 13;
                     return;
@@ -347,6 +353,24 @@ ShellRoot {
                         if (!smoke.check(prof.view.capacity.target===null && pane.customProfileDraft.capacityGiB===24,
                             "unconfigured preset cannot alter custom draft")) return;
                         pane.chooseProfile("CUSTOM");
+                        const cmp=smoke.find(pane,"cpuplusProfileComparison");
+                        const compareButton=smoke.find(pane,"cpuplusProfileCompare");
+                        if(!cmp||!compareButton)return;
+                        if(!smoke.check(compareButton.available&&compareButton.parent===bottom
+                            &&cmp.comparison===null,"explicit comparison, fixed control"))return;
+                        // Use real comparator with synthetic output from previously observed POL fixture.
+                        cmp.pending={draft:JSON.parse(JSON.stringify(pane.customProfileDraft)),
+                            rows:[{name:"/dev/zram0",size:8388608,priority:100}],zramRead:true,advancedRead:true};
+                        cmp.capturedSample=pane.sample;
+                        cmp.output="lzo [lz4] zstd\n100\n10\n0\n20\n0\n500\n3000\n";
+                        cmp.received=true;cmp.exited=true;cmp.exitOk=true;cmp.finish();
+                        if(!smoke.check(cmp.comparison&&!cmp.comparison.canApply
+                            &&cmp.comparison.rows.find(x=>x.key==="background").delta===5
+                            &&cmp.comparison.rows.find(x=>x.key==="priority").delta===1,
+                            "actual-target comparison fixture"))return;
+                        pane.chooseProfile("GAMING");
+                        if(!smoke.check(cmp.comparison===null,"comparison invalidated on profile change"))return;
+                        pane.chooseProfile("CUSTOM");
                         const load=smoke.find(pane,"cpuplusProfileLoadList");
                         const save=smoke.find(pane,"cpuplusProfileSaveNew");
                         if (!smoke.check(load && save && load.available && !save.available
@@ -428,7 +452,9 @@ ShellRoot {
                     if(smoke.phase===51) {
                         if(prof.catalogBusy)return;
                         if(!smoke.check(prof.catalogReady && prof.catalog.revision===1
-                            && prof.savedRows.length===1 && prof.savedRows[0].name==="Native Work",
+                            && prof.savedRows.length===1 && prof.savedRows[0].name==="Native Work"
+                            &&prof.savedRows[0].targets.zram.algorithm==="zstd"&&prof.savedRows[0].targets.priority.value===101
+                            &&prof.savedRows[0].targets.advanced.background.value===15,
                             "one actual persisted profile"))return;
                         pane.clearProfileDraft();
                         pane.selectMenu(0);smoke.phase=52;return;
@@ -480,7 +506,9 @@ ShellRoot {
                     if(!smoke.check(loadDraft && loadDraft.available,"load draft available"))return;
                     loadDraft.leftClicked(null);
                     if(!smoke.check(prof.view.capacity.target===24 && prof.view.swappiness.target===150
-                        && pane.stagedGiB===24 && pane.stagedSwappiness===150 && MemoryOperation.requests===0,
+                        && pane.stagedGiB===24 && pane.stagedSwappiness===150 && MemoryOperation.requests===0
+                        &&pane.customProfileDraft.zram.algorithm==="zstd"&&pane.customProfileDraft.priority.value===101
+                        &&pane.customProfileDraft.advanced.background.unit==="%",
                         "loaded draft only, no setting changes"))return;
                     pane.clearProfileDraft();pane.captureProfileTarget("capacityGiB");
                     prof.selectedSaved="Native Work";

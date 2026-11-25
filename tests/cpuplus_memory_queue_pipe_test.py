@@ -249,14 +249,14 @@ class PipeTests(unittest.TestCase):
         with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
             self.lookup(str(uuid.uuid4()))
 
-    def staged(self, *, start=True, max_age=10000):
+    def staged(self, *, start=True, max_age=10000, review_age=None):
         self.owner.close()
         self.queue=Queue(self.queue.path)
         self.owner=Owner(self.queue,self.factory,durable_actions=True,
                          staged_max_age_ms=max_age)
         self.addCleanup(self.owner.close)
         self.sent=[]
-        self.session=Session(self.owner,self.sent.append)
+        self.session=Session(self.owner,self.sent.append,review_max_age_ms=review_age)
         if start:
             self.session.start()
 
@@ -412,6 +412,151 @@ class PipeTests(unittest.TestCase):
         self.assertEqual(self.lookup(prepare["message"]["action_id"])["record"]["state"],"PREPARED")
         with self.assertRaisesRegex(QueueError,"STAGED_PIPE_NOT_PREPARED"):
             self.send(self.commit_frame(packets[-1]))
+        self.assertIsNone(self.queue.pending())
+
+    def interrupted_review(self, *, review_age=10000):
+        self.staged()
+        prepare=self.prepare_frame()
+        self.send(prepare)
+        self.session.close()
+        self.staged(review_age=review_age)
+        return prepare["message"]["action_id"]
+
+    def review_frame(self, action_id):
+        return {"version":1,"kind":"RECOVERY_REVIEW","owner_id":self.owner.owner_id,
+                "action_id":action_id}
+
+    def ack_frame(self, packet):
+        review=packet["review"]
+        return {"version":1,"kind":"RECOVERY_ACK","owner_id":self.owner.owner_id,
+                "review_id":review["review_id"],"review_digest":review["review_digest"],
+                "review_sequence":packet["sequence"]}
+
+    def review_history(self, review_id):
+        self.send({"version":1,"kind":"RECOVERY_REVIEW_HISTORY","owner_id":self.owner.owner_id,
+                   "review_id":review_id})
+        return self.sent[-1]["receipt"]
+
+    def test_review_wire_explicit_ack_preserves_prepared(self):
+        aid=self.interrupted_review()
+        self.send(self.review_frame(aid))
+        packet=self.sent[-1]
+        self.assertEqual(packet["kind"],"RECOVERY_REVIEW")
+        self.assertEqual(packet["review"]["snapshot"]["record"]["state"],"PREPARED")
+        self.assertFalse(packet["review"]["startup_unlock"])
+        self.assertEqual(packet["next_action_sequence"],1)
+        self.assertIsNone(self.owner.recovery_review_history(packet["review"]["review_id"])["receipt"])
+        self.send(self.ack_frame(packet))
+        ack=self.sent[-1]
+        self.assertEqual(ack["kind"],"RECOVERY_ACK")
+        self.assertEqual(ack["receipt"]["disposition"],"REVIEW_ACKNOWLEDGED_ONLY")
+        self.assertFalse(ack["receipt"]["startup_unlock"])
+        self.assertEqual(ack["next_action_sequence"],1)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.lookup(aid)["record"]["state"],"PREPARED")
+        self.assertEqual((self.captures,self.samples),(0,0))
+        self.session.close()
+        self.staged(review_age=10000)
+        self.assertEqual(self.review_history(packet["review"]["review_id"]),ack["receipt"])
+        with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_NOT_LIVE"):
+            self.send(self.ack_frame(packet))
+
+    def test_review_wire_mismatch_and_duplicate_refused(self):
+        aid=self.interrupted_review()
+        self.send(self.review_frame(aid))
+        packet=self.sent[-1]
+        ack=self.ack_frame(packet)
+        with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_MISMATCH"):
+            self.send(dict(ack,review_sequence=True))
+        self.assertTrue(self.session.closed)
+        self.staged(review_age=10000)
+        self.assertIsNone(self.review_history(packet["review"]["review_id"]))
+        self.assertEqual(self.lookup(aid)["record"]["state"],"PREPARED")
+
+    def test_review_wire_expiry_closes_without_ack(self):
+        aid=self.interrupted_review()
+        self.send(self.review_frame(aid))
+        packet=self.sent[-1]
+        with mock.patch("memory_queue_pipe.time.monotonic",return_value=self.session.review_deadline):
+            with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_EXPIRED"):
+                self.session.due()
+        self.assertTrue(self.session.closed)
+        self.staged(review_age=10000)
+        self.assertIsNone(self.review_history(packet["review"]["review_id"]))
+        self.assertIsNone(self.queue.pending())
+
+    def test_review_wire_disabled_by_default(self):
+        self.staged()
+        with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_MODE_REQUIRED"):
+            self.send(self.review_frame(str(uuid.uuid4())))
+        self.assertTrue(self.session.closed)
+
+    def test_review_wire_missing_ack_not_replayed(self):
+        aid=self.interrupted_review()
+        self.send(self.review_frame(aid))
+        packet=self.sent[-1]
+        self.session.emit=lambda _: (_ for _ in ()).throw(OSError("lost ACK"))
+        with self.assertRaises(OSError):
+            self.send(self.ack_frame(packet))
+        self.assertTrue(self.session.closed)
+        self.staged(review_age=10000)
+        saved=self.review_history(packet["review"]["review_id"])
+        self.assertEqual(saved["disposition"],"REVIEW_ACKNOWLEDGED_ONLY")
+        self.assertFalse(saved["startup_unlock"])
+        self.assertEqual(self.lookup(aid)["record"]["state"],"PREPARED")
+        self.assertIsNone(self.queue.pending())
+
+    def test_review_wire_unrelated_action_retires_ticket(self):
+        aid=self.interrupted_review()
+        self.send(self.review_frame(aid))
+        packet=self.sent[-1]
+        with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_MISMATCH"):
+            self.send(self.prepare_frame())
+        self.staged(review_age=10000)
+        self.assertIsNone(self.review_history(packet["review"]["review_id"]))
+        self.assertEqual(self.lookup(aid)["record"]["state"],"PREPARED")
+        self.assertEqual(self.captures,0)
+
+    def test_review_wire_actual_eof_after_review(self):
+        aid=self.interrupted_review()
+        self.staged(start=False,review_age=10000)
+        r,w=os.pipe()
+        out_r,out_w=os.pipe()
+        errors=[]
+        def target():
+            try:
+                serve(self.owner,r,out_w,io_timeout_ms=1000,review_max_age_ms=10000)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                os.close(r)
+                os.close(out_w)
+        worker=threading.Thread(target=target,daemon=True)
+        worker.start()
+        try:
+            data=b""
+            while data.count(b"\n")<3:
+                self.assertTrue(select.select([out_r],[],[],3)[0])
+                chunk=os.read(out_r,4096)
+                self.assertTrue(chunk)
+                data+=chunk
+            os.write(w,encode(self.review_frame(aid)))
+            while data.count(b"\n")<4:
+                self.assertTrue(select.select([out_r],[],[],3)[0])
+                chunk=os.read(out_r,4096)
+                self.assertTrue(chunk)
+                data+=chunk
+            packet=json.loads(data.splitlines()[-1])
+            self.assertEqual(packet["kind"],"RECOVERY_REVIEW")
+        finally:
+            os.close(w)
+            worker.join(4)
+            os.close(out_r)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(errors,[])
+        self.staged(review_age=10000)
+        self.assertIsNone(self.review_history(packet["review"]["review_id"]))
+        self.assertEqual(self.lookup(aid)["record"]["state"],"PREPARED")
         self.assertIsNone(self.queue.pending())
 
 if __name__ == "__main__":

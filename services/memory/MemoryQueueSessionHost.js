@@ -57,17 +57,17 @@ function initial(consumer) {
         recoveryRead:null,inventory:null,localAction:null,
         buffer:"",phase:"STOPPED",sequence:0,generation:0,startupLocked:true,
         mode:"LEGACY",stage:null,reviewEnabled:false,reviewFlow:null,reviewReceipt:null,reviewLost:null,
-        checkpointRequired:false,checkpointWait:null,
+        checkpointRequired:false,checkpointWait:null,notificationEnabled:false,lastNoticeSequence:0,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
-function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false,checkpointRequired=false) {
+function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false,checkpointRequired=false,notificationEnabled=false) {
     if ((state.phase!=="STOPPED" && state.phase!=="FAILED")
         || !positive(generation) || generation<=state.generation
         || !["LEGACY","STAGED"].includes(mode) || typeof reviewEnabled!=="boolean"
-        || typeof checkpointRequired!=="boolean"
+        || typeof checkpointRequired!=="boolean" || typeof notificationEnabled!=="boolean"
         || ((reviewEnabled || checkpointRequired) && mode!=="STAGED")) return state;
     return Object.assign({},initial(consumer),{
-        generation,mode,reviewEnabled,checkpointRequired,reviewLost:state.reviewLost,
+        generation,mode,reviewEnabled,checkpointRequired,notificationEnabled,reviewLost:state.reviewLost,
         session:consumer.disconnect(state.session),phase:"HELLO"});
 }
 function stop(state,consumer,reason,generation) {
@@ -131,7 +131,7 @@ function canAck(state) {
         && !!status && (status.requestId!==null || status.state==="IDLE REPORTED")
         && status.requestId===f.review.snapshot.pending_request_id;
 }
-function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow) {
+function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow,offerNotice) {
     const fail=reason=>stop(state,consumer,reason,state.generation);
     if (!p || typeof p!=="object" || Array.isArray(p) || !safe(p) || p.version!==1 || p.can_execute!==false) return fail("INVALID_PACKET");
     if (state.phase==="HELLO") {
@@ -153,6 +153,36 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         return Object.assign({},state,{session:consumer.invalidate(state.session,"FRESH STATUS REQUIRED"),
             projection:null,history:null,inventory:null,localAction:null,
             awaitingStatus:true,publicationRequired:true});
+    }
+    if (p.kind==="NOTIFICATION") {
+        const n=p.notice;
+        if (!state.notificationEnabled
+            || !exact(p,["version","kind","owner_id","can_execute","status_sequence","notice"])
+            || !positive(p.status_sequence) || p.status_sequence!==state.sequence
+            || !exact(n,["version","event_id","request_id","kind","code","observed_at","target_gib",
+                "original_actual_kib","delivery_state","can_execute","checked_at_ms","valid_before_wall_ms"])
+            || n.version!==1 || n.can_execute!==false || n.delivery_state!=="ATTEMPT_RESERVED"
+            || !uuid(n.request_id) || !["DEFERRED","ATTENTION","READY_ADVISORY","EXPIRED","CANCELLED"].includes(n.kind)
+            || n.event_id!=="apollo-cpu-memory-"+n.request_id+"-"+n.kind.toLowerCase().replace(/_/g,"-"))
+            return fail("INVALID_NOTIFICATION");
+        if (state.lastNoticeSequence>=p.status_sequence) return state;
+        // Consume this publication's offer even if the host is busy or
+        // no sink exists. A dropped alert is preferable to stale/replayed
+        // advice. Notification sink is synchronous and never receives a
+        // queue operation, raw source or authority.
+        const next=Object.assign({},state,{lastNoticeSequence:p.status_sequence});
+        const status=state.projection?.status;
+        if (state.awaitingStatus || state.publicationRequired || state.session.pending
+            || state.reviewFlow || state.historyRead || state.recoveryRead || !status)
+            return next;
+        const terminal=["EXPIRED","CANCELLED"].includes(n.kind);
+        const matches=terminal ? status.state==="IDLE" && status.request_id===null
+            : status.request_id===n.request_id && status.code===n.code
+              && status.target_gib===n.target_gib && status.original_actual_kib===n.original_actual_kib;
+        if (matches && typeof offerNotice==="function") {
+            try { offerNotice(JSON.parse(JSON.stringify(n))); } catch (_) {}
+        }
+        return next;
     }
     if (!positive(p.sequence) || p.sequence<=state.sequence) return fail("SEQUENCE_MISMATCH");
     if (p.kind==="STATUS") {
@@ -274,7 +304,7 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
     }
     return fail("INVALID_KIND");
 }
-function feed(state,chunk,consumer,project,historyProject,generation,recoveryProject,recoveryRow) {
+function feed(state,chunk,consumer,project,historyProject,generation,recoveryProject,recoveryRow,offerNotice) {
     if (generation!==state.generation || (state.phase!=="HELLO" && state.phase!=="CONNECTED")) return state;
     // No server reply can precede transmission. Conservatively terminate
     // even on a scheduled publication during local checkpoint IO; never
@@ -299,7 +329,7 @@ function feed(state,chunk,consumer,project,historyProject,generation,recoveryPro
                 return stop(next,consumer,"NONCANONICAL_JSON",generation);
         } catch (_) { return stop(next,consumer,"INVALID_JSON",generation); }
         buffer=buffer.slice(i+1);
-        next=packet(next,p,consumer,project,historyProject,recoveryProject,recoveryRow);
+        next=packet(next,p,consumer,project,historyProject,recoveryProject,recoveryRow,offerNotice);
         if (next.phase==="FAILED") return next;
     }
     if (buffer.length>=MAX_FRAME) return stop(next,consumer,"FRAME_SIZE",generation);

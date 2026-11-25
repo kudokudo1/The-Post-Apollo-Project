@@ -1,0 +1,19 @@
+name: CPU++ guarded reclaim custody source gate
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_reclaim_ci/**'
+      - '.github/workflows/cpuplus-memory-reclaim-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test proposed custody rules without storage effects
+        run: |
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 6bac8be7b1de6883f480a95944d6ba1130852270
+          python3 -B tests/cpuplus_memory_reclaim_ci/test_reclaim_custody.py

@@ -21,7 +21,7 @@ Column {
     signal historyReadRequested(string requestId)
     signal recoveryReadRequested(string kind, var value)
     signal reviewRequested(string actionId)
-    signal acknowledgmentRequested(var selection, int generation)
+    signal acknowledgmentRequested(var selection, var generation)
     signal reviewReceiptRequested(string reviewId)
     readonly property var reviewContext: hostState ? Host.reviewContext(hostState) : null
     readonly property bool reviewAvailable: !!hostState && Host.reviewAvailable(hostState) && !hostState.checkpointWait

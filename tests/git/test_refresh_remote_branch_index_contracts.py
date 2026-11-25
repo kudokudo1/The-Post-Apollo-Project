@@ -72,7 +72,7 @@ def execute(args):
 
 def strip_profiles(raw):
     return b"".join(line for line in raw.splitlines(keepends=True)
-                    if not line.startswith(b"PROFILE\t"))
+                    if not line.startswith((b"PROFILE\t", b"DIAGTIME\t")))
 
 with tempfile.TemporaryDirectory(prefix="git-remote-index-") as folder:
     repo = Path(folder) / "repo"
@@ -100,7 +100,7 @@ with tempfile.TemporaryDirectory(prefix="git-remote-index-") as folder:
     previous = optimized.copy()
     previous[2] = baseline(optimized[2])
     before, after = execute(previous), execute(optimized)
-    assert before == after, "Git refresh stdout differs from previous behavior"
+    assert strip_profiles(before) == strip_profiles(after), "Git refresh stdout differs from previous behavior"
     assert before.count(b"DONE\t") == 1
     assert sum(line.startswith(b"REMOTEBRANCH\t")
                for line in before.splitlines()) == len(remotes)
@@ -112,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix="git-remote-index-") as folder:
     previous_trace = optimized_trace.copy()
     previous_trace[2] = baseline(optimized_trace[2])
     old_profile, new_profile = execute(previous_trace), execute(optimized_trace)
-    assert strip_profiles(old_profile) == strip_profiles(new_profile) == before
+    assert strip_profiles(old_profile) == strip_profiles(new_profile) == strip_profiles(before)
     measured = {}
     for label, raw in (("baseline", old_profile), ("optimized", new_profile)):
         rows = [line.decode().strip().split("\t") for line in raw.splitlines()

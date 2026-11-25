@@ -70,7 +70,7 @@ test("QML and Node refuse stale and malformed visibility/identity/amount identic
     x=>{x.snapshot.categories[0].hidden=true;},
     x=>{x.snapshot.categoryGroups[0].isIncome=true;},
     x=>{x.snapshot.categories[0].availableCents=400;},
-    x=>{x.snapshot.toBudgetCents=11000;},
+    x=>{x.snapshot.toBudgetCents="11000";},
     x=>{x.snapshot.month="2026-12";},
     x=>{x.candidate.sourceKey="b".repeat(64);},
     x=>{x.candidate.description="Other";},

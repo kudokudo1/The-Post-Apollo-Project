@@ -27,7 +27,7 @@ Item {
     function clearSensitive() {
         armed=null;
         receipt=null;
-        secret.text="";
+        if(secret)secret.text="";
     }
     function context() {
         return {enabled:reviewEnabled,active:available,busy:bridge.busy,
@@ -93,14 +93,14 @@ Item {
             width: parent.width
             height: 28
             color: Colors.cyan
-            maximumLength: 52
+            maximumLength: 53
             clip: true
             enabled: panel.available&&!bridge.busy
             selectByMouse: true
             onTextChanged: {
                 panel.armed=null;
                 panel.receipt=null;
-                secret.text="";
+                if(secret)secret.text="";
             }
         }
         GohuText { text: "PASSPHRASE // AT LEAST 12 CHARACTERS"; color: Colors.magenta }
@@ -109,7 +109,7 @@ Item {
             width: parent.width
             height: 28
             color: Colors.cyan
-            maximumLength: 1024
+            maximumLength: 1025
             clip: true
             enabled: panel.available&&!bridge.busy
             echoMode: TextInput.Password

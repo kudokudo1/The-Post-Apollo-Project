@@ -94,3 +94,39 @@ The existing native Identity probe emits signed UNAVAILABLE, not authoritative p
 - Forest actual sender/recipient/seat measurements remain pending approved Core/Runtime final-send handles; current R4b public-only fixture correlation stays nonauthorizing and unblocked. Keep C4b production observation privilege separate from CI-only SYS_PTRACE.
 
 DOC 1 owns independent history, original fence and lookup currentness; DOC 6/Identity C5 and relevant effect owners own command outcome, consent and query authorization; Forest Runtime/Mind/C5 own actual protected serialization, context and permission. DOC 2 supplies approved native installed origin and recipient/seat observations, not custody or settlement. Existing test-only release roots, raw challenge encodings and signed denial tests stay nonauthorizing. Exact historical evidence retention, lookup authorization, schema, release/observer privileges, transport, host selection and independent enrollment await owner/operator decisions. NAS and second-PC setup remain deferred. No workstation, key, service, protected action or production activation authorized.
+
+
+## Native service versus human login-session observation (CI-only)
+
+The existing C4b gateway is an inert, separately supervised system service in
+`/system.slice/post-apollo-identity-silverblue-ci.service` with a dedicated
+nonhuman UID. Identity's existing
+[LogindSeatGuard](../MODEL/contracts/identity-center-logind-seat-guard-v0.md)
+instead resolves the actual host process's login session and its owner, activity
+and lock hint. A service's UID/cgroup, package signature or signed command denial
+cannot establish the human session required by that guard.
+
+The disposable official Silverblue guest now queries the actual gateway through
+the installed libsystemd `sd_pidfd_get_unit` and `sd_pidfd_get_session` APIs
+([upstream contract](https://www.freedesktop.org/software/systemd/man/latest/sd_pid_get_session.html)).
+Within each existing origin check, use a live process handle, check the expected
+unit and require precisely negative ENODATA for absence of login-session
+membership; any other error or actual session association fails the diagnostic.
+Recheck process lifetime and start ticks and close the descriptor. No session
+identifier is emitted, no login1 state is changed, no desktop environment value
+is adopted, and no new package dependency is installed. The host runner requires
+the new exact marker after all four existing signed UNAVAILABLE commands, alongside
+existing native boot/SELinux/rollback checks. Two source-contract tests check
+placement and marker requirements; actual KVM evidence remains necessary.
+
+This is a native system-service membership/absence diagnostic, not a D-Bus
+LogindSeatGuard execution, positive seat observation, compositor lock witness,
+continuous authentication or admission decision. DOC6/Identity and the Sway
+owner must agree a separately authenticated session-bound desktop endpoint and
+its actual lock/currentness lifecycle, rather than substitute the daemon's UID,
+an environment ID, the first active session or an unlocked logind hint. Preserve
+the original service identity, original operation/recipient and current seat
+as distinct evidence. DOC1 independently enrolls/verifies source and current
+custody; C5 independently owns human consent. No new production privileges,
+wire, signer, model, service, hardware provisioning or protected action.
+NAS and second PC remain deferred. Production HOLD.

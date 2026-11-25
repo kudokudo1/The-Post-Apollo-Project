@@ -45,7 +45,8 @@ assert.match(newSummary,/HOST AVAILABLE MIN \x28OBSERVED\x29 \/\/ 5\.9 MiB/);
 assert.match(newSummary,/CORRELATION ONLY \/\/ CAUSE NOT ESTABLISHED/);
 assert.doesNotMatch(oldSummary,/HOST CONTEXT/);
 const after={...current,tsMs:current.tsMs+10000,cpuTicks:current.cpuTicks+10,cpuPct:1,sampleIntervalMs:10000,
-    memoryKiB:{...current.memoryKiB,Pss:150+1024},
+    memoryKiB:{...current.memoryKiB,Rss:200+1024,Pss:150+1024,Pss_Anon:100+1024},
+    pssPlusSwapPssKiB:180+1024,
     hostObservation:{...current.hostObservation,afterKiB:{...current.hostObservation.afterKiB,MemAvailable:3952}}};
 const summaryFor=(rows)=>policy.summarize("memory",[...rows,terminal].map(x=>JSON.stringify(x)).join("\n"));
 let summary=summaryFor([current,after]);

@@ -30,6 +30,10 @@ The original distinct-receiver check also compared Python object identity, which
 
 Regression cases observe real kernel packets while deliberately changing caller-owned C5 history or native timeout values after the read. The result must still describe the matched original bytes. A real duplicated descriptor carrying both role packets is refused before read. All existing no-authority flags and the private test encoding for valid fixture responses remain unchanged. No new issuer, service, hardware setup, production interface or native permission.
 
+### Follow-up: original prior-head comparison baseline
+
+The #2477 response-copy correction did not copy the two optional caller-provided previous history heads. The adapter could therefore compare the received response against a different prior head if the caller modified a nested sequence or replaced the native prior entry during packet observation. The follow-up privately copies the outer pair and each present plain head dictionary before either read, validates the existing strict head shape, and compares only those copies. Malformed baselines (including boolean sequence values and dictionary subclasses) refuse before consumption. Real Linux regressions change the caller's prior C5 sequence or replace its native entry after actual kernel reads; the original rollback/fork diagnostic must survive. This is local evidence consistency only, not independent current-head authentication, a cross-source atomic snapshot or a change to protected epoch/operation continuity. No new authority, packet schema, provider, or Restore path.
+
 ## HOW TO USE
 
 In GitHub, review the four added files and the dedicated workflow. The real Linux tests run **only** under root on a disposable GitHub-hosted Ubuntu runner. The workflow guards against outside forks and does not run on the operator's machine.

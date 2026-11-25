@@ -83,6 +83,51 @@ the R6 synthetic child.
    shared weights may stay only under independently current accounting;
    do not add resident bytes to available capacity.
 
+## Revision 1 // Heart owner correction
+
+Heart #7169431384 requests preventive enforcement, not retrospective
+confirmation. The prospective integrated conversation route is B2 via
+B3/R3 with the existing H11 reference. P2B is a separate timing experiment
+which currently bypasses B3/H11; it must not be presented as the integrated
+route or reuse its attempt. No route is currently authorized to execute.
+
+Three distinct evidence objects must be agreed before executable scope:
+
+- Requested immutable native manifest: versioned canonical commitment
+  separate from H1's existing config digest. Bind exact original H11
+  attempt, installed artifact and runtime release/instance, selected
+  placement, fixed public workload/serialized payload commitment,
+  requested options/limits and exclusive execution lifetime before claim
+  and possible send. The future claim/settlement owner must retain this
+  original commitment durably across loss/restart, not reconstruct it
+  from a mutable tag, provider PID, later settings or current label.
+  No persistence or new schema authorized by this document.
+- Independently established preventive envelope: actual enforceable
+  pre-send resource ceilings, placement, exclusion of competing clients,
+  original process lifetime and current capacity/authority. Requested
+  options alone, API success and measurements collected after send cannot
+  qualify this envelope. Failure or unknown before send remains HOLD.
+  Preserve existing H1 ZERO_DEMAND_UNESTABLISHED refusal. A CPU-only route
+  cannot use guessed zero accelerator demand or dummy positive values;
+  independent no-accelerator proof and a separately coordinated H1
+  revision would be required.
+- During-run observation: independently attributable effective runner
+  settings, placement, process lifetime, actual context/template usage and
+  bounded baseline/peak/post evidence tied to that original commitment.
+  Evidence of a mismatch after dispatch is not a preventive control.
+  Fence the original effect, refuse further admission, retain custody;
+  do not infer rollback, retry, or alter a shared provider. Provider
+  replacement invalidates new dispatch and cannot replace original
+  terminal evidence. Terminal/quiescence and accounting must independently
+  reference the original attempt and immutable manifest even after loss;
+  missing original evidence remains UNKNOWN_HOLD.
+
+H14 needs supported conservative incremental RAM/VRAM/CPU demand
+including overhead and a safety margin for the exact artifact/runtime/
+placement. Disk size, hypothetical KV arithmetic, a stale free-memory
+snapshot and unmatched observed peaks cannot establish a bound.
+Qualification on another approved host is a separate option only.
+
 ## Required review and negative acceptance matrix
 
 - Wrong artifact, runtime generation, model label, config, workload,

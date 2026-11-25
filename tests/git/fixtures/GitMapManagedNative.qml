@@ -68,38 +68,27 @@ ShellRoot {
                 recent.repoRoot=root.repo;
                 if (!root.check(host.viewport.mapState.total===2,"recover matching recent repo")) return;
                 root.operatorActive=true;
-                if (!root.check(host.openFull(),"explicit lookup")) return;
                 root.phase=1;
                 return;
             }
-            if (root.phase===1 && !host.busy) {
-                if (!root.check(host.statusText.indexOf("NO MATCHING INDEX")===0 && !host.allocated,"missing lookup must not build")) return;
-                if (!root.check(host.request("build"),"explicit build")) return;
+            if (root.phase===1) {
+                if (!host.fullVisible || !host.viewport.rowAt(0)) return;
+                if (!root.check(host.jobsStarted===2 && host.viewport.mapState.total===1,
+                        "automatic lookup and single missing-cache build/adopt")) return;
                 root.operatorActive=false;
                 root.phase=2;
                 return;
             }
-            if (root.phase===2 && !host.busy) {
-                if (!root.check(host.pendingResult && !host.allocated && !host.fullVisible,"hidden result waits for adoption")) return;
-                if (!root.check(!host.openPending(),"hidden adoption refused")) return;
+            if (root.phase===2) {
+                if (!root.check(host.jobsStarted===2 && host.fullVisible,
+                        "hidden state retained, no new work")) return;
                 root.operatorActive=true;
-                if (!root.check(host.openPending(),"explicit adoption")) return;
                 root.phase=3;
                 return;
             }
-            if (root.phase===3) {
-                if (!host.fullVisible || !host.viewport.rowAt(0)) return;
-                if (!root.check(host.viewport.mapState.total===1 && host.viewport.indexedActive,"same viewport adopts real index")) return;
-                root.operatorActive=false;
-                if (!root.check(host.fullVisible && host.allocated && !host.busy,"hidden map retains adopted index")) return;
-                root.operatorActive=true;
-                if (!root.check(host.fullVisible && !host.busy,"reopen retains index")) return;
-                if (!root.check(host.openFull(),"explicit recheck")) return;
-                root.phase=4;
-                return;
-            }
-            if (root.phase===4 && !host.busy) {
-                if (!root.check(host.statusText==="INDEX CURRENT // POSITION RETAINED" && host.fullVisible && !host.pendingResult,"recheck reuses snapshot")) return;
+            if (root.phase===3 && !host.busy && host.jobsStarted===3) {
+                if (!root.check(host.statusText==="INDEX CURRENT // POSITION RETAINED" && host.fullVisible,
+                        "reopen automatically reuses snapshot")) return;
                 console.log("GIT_MAP_MANAGED_PASS");
                 root.done=true;
                 Qt.quit();

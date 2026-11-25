@@ -44,7 +44,11 @@ Rectangle {
         flick.contentY = Policy.clamp(mapState,y);
     }
     function rowAt(ordinal) { return mapState ? Policy.rowAt(mapState,ordinal) : null; }
-    function rowStatus(ordinal) { return mapState ? Policy.rowState(mapState,ordinal) : "NO INDEX"; }
+    function rowStatus(ordinal) {
+        if (!mapState) return "NO INDEX";
+        const status = Policy.rowState(mapState,ordinal);
+        return bridgeFaulted && status === "LOADING" ? "UNAVAILABLE" : status;
+    }
     function retry(ordinal) { bridge.retry(ordinal); }
     function choose(ordinal) {
         const row = rowAt(ordinal);
@@ -180,7 +184,7 @@ Rectangle {
                     font.pixelSize: 11
                     color: rowItem.record ? (root.selectedSha===rowItem.record.sha ? Colors.yellow : Colors.cyan) : Colors.orange
                     text: rowItem.record ? rowItem.record.sha.slice(0,8)+" // "+rowItem.record.subject
-                        : rowItem.status==="UNAVAILABLE" ? "UNAVAILABLE // TAP TO RETRY" : "LOADING COMMIT "+(rowItem.ordinal+1)
+                        : rowItem.status==="UNAVAILABLE" ? (root.bridgeFaulted ? "READER UNAVAILABLE" : "UNAVAILABLE // TAP TO RETRY") : "LOADING COMMIT "+(rowItem.ordinal+1)
                 }
                 TapHandler {
                     property int pressedOrdinal: -1
@@ -199,7 +203,7 @@ Rectangle {
                                 || pressedOrdinal !== rowItem.ordinal) return;
                         if (rowItem.record && pressedSha === rowItem.record.sha)
                             root.choose(rowItem.ordinal);
-                        else if (!pressedSha && rowItem.status==="UNAVAILABLE")
+                        else if (!pressedSha && rowItem.status==="UNAVAILABLE" && !root.bridgeFaulted)
                             root.retry(rowItem.ordinal);
                     }
                 }

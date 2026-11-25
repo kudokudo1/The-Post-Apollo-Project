@@ -5,6 +5,11 @@ on:
     paths:
       - 'services/identity/installed_gateway_witness_v1.py'
       - 'services/identity/installed_command_adapter_v1.py'
+      - 'services/identity/desktop_signed_command_client_v0.py'
+      - 'services/identity/native_attempt_fingerprint_v0.py'
+      - 'services/identity/local_command_outcome_hold_reference_v0.py'
+      - 'services/identity/signed_command_receipt_v0.py'
+      - 'tests/identity/test_local_command_outcome_hold_reference_v0.py'
       - 'tests/identity/test_installed_gateway_v1_ci.py'
       - 'tests/identity/test_native_adapter_only_call_path_v1.py'
       - 'tests/identity/fixtures/identity_gateway_installed_ci'
@@ -15,6 +20,11 @@ on:
     paths:
       - 'services/identity/installed_gateway_witness_v1.py'
       - 'services/identity/installed_command_adapter_v1.py'
+      - 'services/identity/desktop_signed_command_client_v0.py'
+      - 'services/identity/native_attempt_fingerprint_v0.py'
+      - 'services/identity/local_command_outcome_hold_reference_v0.py'
+      - 'services/identity/signed_command_receipt_v0.py'
+      - 'tests/identity/test_local_command_outcome_hold_reference_v0.py'
       - 'tests/identity/test_installed_gateway_v1_ci.py'
       - 'tests/identity/test_native_adapter_only_call_path_v1.py'
       - 'tests/identity/fixtures/identity_gateway_installed_ci'
@@ -55,6 +65,8 @@ jobs:
           python3 -m py_compile services/identity/installed_gateway_witness_v1.py
           python3 -m py_compile services/identity/installed_command_adapter_v1.py
           python3 -m py_compile tests/identity/test_installed_gateway_v1_ci.py
+          python3 -m py_compile services/identity/local_command_outcome_hold_reference_v0.py
+          python3 -m py_compile tests/identity/test_local_command_outcome_hold_reference_v0.py
           python3 -m py_compile tests/identity/test_native_adapter_only_call_path_v1.py
           python3 -m py_compile tests/identity/fixtures/identity_gateway_installed_ci
       - name: Real signed package install, systemd PID/LSM/module witness and mandatory deny-only receipts

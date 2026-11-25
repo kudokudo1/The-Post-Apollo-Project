@@ -21,6 +21,7 @@ import pwd
 import secrets
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -50,6 +51,8 @@ from signed_gateway_origin_probe_v0 import (
 from signed_command_receipt_v0 import (
     build_request, verify_receipt, ReceiptRejected,
 )
+import local_command_outcome_hold_reference_v0 as local_hold
+from test_local_command_outcome_hold_reference_v0 import _FIXTURE_V2
 
 # Exact real modules loaded by the installed IdentityCommandGateway. No
 # second OAuth stack, fake native listener or separately trusted repo copy.
@@ -569,6 +572,102 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
             self.assertEqual(inspect_witness.call_count, 2)
         self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
         self.assertTrue(self.witness.consistent(self.peer))
+
+    def _exercise_prepared_delivery(self, *, lose_seat):
+        # CI-only orchestration, not a native pre-send hook or admission gate.
+        # Reserve before calling the actual installed adapter. Control only
+        # its generated nonce to make the original bytes comparable.
+        with tempfile.TemporaryDirectory(prefix="identity-prepared-ci-") as tmp:
+            path = Path(tmp) / "prepared.sqlite"
+            with sqlite3.connect(path) as db:
+                db.executescript(_FIXTURE_V2)
+            store = local_hold.TestOnlyLocalOutcomeFence(path)
+            nonce = secrets.token_urlsafe(32)
+            attempt = secrets.token_hex(16)
+            original = store.reserve_prepared_command(
+                attempt_id=attempt, action="BEGIN", request_id=None,
+                client_nonce=nonce)
+            self.assertEqual(original.state, "UNKNOWN_HOLD")
+            checks = []
+
+            def seat():
+                # The production client calls this before send and after
+                # signature verification. Independently reopen the row.
+                checks.append(local_hold.TestOnlyLocalOutcomeFence(path).inspect())
+                return not lose_seat or len(checks) == 1
+
+            adapter = self._strict_adapter(seat=seat)
+            self.assertEqual(adapter.delivery_snapshot().wire_outcome, "UNOBSERVED")
+            with patch("desktop_signed_command_client_v0.secrets.token_urlsafe",
+                       return_value=nonce) as generated:
+                if lose_seat:
+                    with self.assertRaises(ReceiptRejected):
+                        adapter.begin()
+                else:
+                    observed = adapter.begin()
+                    self.assertEqual(observed.phase, "UNAVAILABLE")
+                generated.assert_called_once_with(32)
+            self.assertEqual(checks, [original, original])
+            delivery = adapter.delivery_snapshot()
+            self.assertEqual(delivery.wire_outcome,
+                             "UNKNOWN_HOLD" if lose_seat else "SIGNED_FRAME_SEEN")
+            self.assertIs(delivery.faulted, lose_seat)
+            actual = delivery.last_attempted_wire
+            prepared = original.prepared_commitment
+            self.assertEqual(actual.action, original.action)
+            self.assertEqual(actual.request_id_sha256, prepared.request_sha256)
+            self.assertEqual(actual.client_nonce_sha256, prepared.nonce_sha256)
+            self.assertEqual(actual.frame_sha256, prepared.frame_sha256)
+            self.assertEqual(store.inspect(), original)
+            self.assertNotIn(nonce.encode("ascii"), path.read_bytes())
+
+            # Fresh Python reader receives only the database path. It
+            # does not get the original raw nonce, adapter or receipt key.
+            script = (
+                "import sys,json,dataclasses;"
+                "from pathlib import Path;"
+                "sys.path.insert(0,sys.argv[2]);"
+                "from local_command_outcome_hold_reference_v0 "
+                "import TestOnlyLocalOutcomeFence;"
+                "print(json.dumps(dataclasses.asdict("
+                "TestOnlyLocalOutcomeFence(Path(sys.argv[1])).inspect())))"
+            )
+            child = subprocess.run(
+                [sys.executable, "-B", "-c", script, str(path),
+                 str(ROOT / "services" / "identity")],
+                check=True, capture_output=True, text=True, timeout=15)
+            recovered = json.loads(child.stdout)
+            self.assertEqual(recovered["state"], "UNKNOWN_HOLD")
+            self.assertEqual(recovered["attempt_id"], attempt)
+            self.assertEqual(recovered["action"], "BEGIN")
+            self.assertEqual(recovered["prepared_commitment"], {
+                "request_sha256": actual.request_id_sha256,
+                "nonce_sha256": actual.client_nonce_sha256,
+                "frame_sha256": actual.frame_sha256,
+            })
+            self.assertEqual(recovered["safe_actions"], [])
+            self.assertFalse(recovered["production_authority"])
+            self.assertFalse(recovered["can_begin_sign_in"])
+            self.assertNotIn(nonce, child.stdout)
+            with self.assertRaises(local_hold.OutcomeHoldRefused):
+                store.reserve_prepared_command(
+                    attempt_id=secrets.token_hex(16), action="BEGIN",
+                    request_id=None, client_nonce=secrets.token_urlsafe(32))
+            self.assertEqual(store.inspect(), original)
+            # Existing adapter refuses same-instance repeated BEGIN. This
+            # is not a cross-process native fence. No new client is invoked.
+            with self.assertRaises(ReceiptRejected):
+                adapter.begin()
+            self.assertEqual(adapter.delivery_snapshot().last_attempted_wire,
+                             actual)
+            self.assertEqual(store.inspect(), original)
+            self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+
+    def test_h_prepared_record_matches_real_installed_signed_denial(self):
+        self._exercise_prepared_delivery(lose_seat=False)
+
+    def test_i_prepared_record_survives_real_installed_post_reply_seat_loss(self):
+        self._exercise_prepared_delivery(lose_seat=True)
 
     def test_z_restart_and_receipt_key_rotation_require_new_enrollment(self):
         previous_pid = self.pid

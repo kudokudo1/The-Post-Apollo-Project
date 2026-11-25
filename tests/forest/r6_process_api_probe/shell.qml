@@ -85,7 +85,7 @@ ShellRoot {
         Process {
             id: child
             required property string mode
-            property alias clock: elapsed
+            property ElapsedTimer clock: ElapsedTimer {}
             property bool startedSeen: false
             property bool exitedSeen: false
             property var originalPid: null
@@ -103,7 +103,6 @@ ShellRoot {
             property real termAt: -1
             property real killAt: -1
             property string sample: ""
-            ElapsedTimer { id: elapsed }
             command: ["/usr/bin/python3", "-I", "-B", "-u",
                 Quickshell.shellPath("child.py"), mode]
             clearEnvironment: true

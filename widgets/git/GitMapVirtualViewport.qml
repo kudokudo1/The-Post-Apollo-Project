@@ -15,6 +15,7 @@ Rectangle {
     readonly property int rowHeight: 24
     property alias requestsEnabled: bridge.requestsEnabled
     property bool indexedActive: true
+    property bool externalSelection: false
     property var recentTopology: null
     property string recentRepo: ""
     property string titleText: "BRANCH MAP"
@@ -24,7 +25,7 @@ Rectangle {
         recentTopology ? recentTopology.topologyRevision : -1)
     readonly property var recentState: ({
         total: recentPage.rows.length, maxLane: recentPage.maxLane,
-        rowHeight: rowHeight, viewportHeight: Math.max(1,flick.height),
+        rowHeight: root.rowHeight, viewportHeight: Math.max(1,flick ? flick.height : 1),
         y: recentY, snapshot: "recent:" + recentRepo,
         epoch: recentTopology ? recentTopology.topologyRevision : 0,
         shallow: false, cache: {0: recentPage}, errors: {}
@@ -32,7 +33,7 @@ Rectangle {
     readonly property var mapState: indexedActive ? bridge.state : recentState
     function recentRows(service, repo, revision) {
         const result = {start:0, frontier:[], rows:[], maxLane:0};
-        if (!service || !repo || service.repoPath !== repo || service.refreshing) return result;
+        if (!service || !repo || service.repoPath !== repo || service.repoRoot !== repo || service.refreshing) return result;
         const ordinals = {};
         for (let i=0; i<Math.min(48,service.commitCount); ++i) {
             const row=service.commitAt(i);
@@ -63,16 +64,19 @@ Rectangle {
     }
     onRecentRepoChanged: {
         recentY=0;
-        if (!indexedActive) flick.contentY=0;
+        if (!indexedActive && flick) flick.contentY=0;
+        if (!externalSelection) selectedSha="";
     }
     onIndexedActiveChanged: {
+        if (!flick || !graph) return;
         applyingGeometry=true;
         flick.cancelFlick();
         flick.contentY=mapState ? Policy.clamp(mapState,mapState.y) : 0;
         applyingGeometry=false;
+        graph.requestPaint();
     }
     onRecentPageChanged: {
-        if (!indexedActive) {
+        if (!indexedActive && recentState && flick && graph) {
             recentY=Policy.clamp(recentState,recentY);
             flick.contentY=recentY;
             graph.requestPaint();
@@ -98,7 +102,7 @@ Rectangle {
         if (ok) {
             flick.cancelFlick();
             if (indexedActive) flick.contentY = bridge.state.y;
-            selectedSha = "";
+            if (!externalSelection) selectedSha = "";
         }
         applyingGeometry = false;
         return ok;
@@ -118,7 +122,7 @@ Rectangle {
     function choose(ordinal) {
         const row = rowAt(ordinal);
         if (!row) return false;
-        selectedSha = row.sha;
+        if (!externalSelection) selectedSha = row.sha;
         commitSelected(row.sha);
         return true;
     }
@@ -256,7 +260,7 @@ Rectangle {
                 width: flick.width
                 height: root.rowHeight
                 readonly property var decoration: root.decoration(record)
-                readonly property bool selected: record && root.selectedSha===record.sha
+                readonly property bool selected: !!record && root.selectedSha===record.sha
                 Item {
                     width: graph.width
                     height: parent.height

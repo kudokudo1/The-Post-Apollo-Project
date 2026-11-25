@@ -26,15 +26,18 @@ Column {
     property bool exited: false
     property bool exitOk: false
     property string output: ""
-    readonly property bool canRead: visible && observationReady && !operationBusy && !reader.running && pending===null
+    property var activeReader: null
+    readonly property bool canRead: visible && observationReady && !operationBusy && activeReader===null && pending===null
         && Catalog.validDraft(draft) && (draft.zram!==null || draft.priority!==null || draft.advanced!==null)
     function invalidate() {
         comparison=null; pending=null; capturedSample=null; completedAt=0;
         status="RECHECK REQUIRED";
-        if(reader.running)reader.running=false;
+        // Keep a cancelled reader isolated until its exit and stream have drained.
+        if(activeReader && activeReader.running)activeReader.running=false;
     }
     onDraftChanged: invalidate()
     onOperationBusyChanged: if(operationBusy)invalidate()
+    onObservationReadyChanged: if(!observationReady && pending!==null)invalidate()
     onVisibleChanged: if(!visible)invalidate()
     // A finished report is a dated observation, not continuously live.
     // While reading, discard any result if the parent snapshot changed.
@@ -47,30 +50,50 @@ Column {
         received=false; exited=false; exitOk=false; output="";
         status="READING";
         if(!next.paths.length){received=true;exited=true;exitOk=true;finish();return;}
-        reader.command=["/usr/bin/timeout","--kill-after=1s","3s","/usr/bin/cat"].concat(next.paths);
-        reader.running=true;
+        const child=readerFactory.createObject(root,{command:["/usr/bin/timeout","--kill-after=1s","3s","/usr/bin/cat"].concat(next.paths)});
+        if(!child){invalidate();status="READ UNAVAILABLE";return;}
+        activeReader=child;
+        child.running=true;
     }
     function finish() {
         if(!pending||!received||!exited)return;
-        if(!observationReady||operationBusy||sample!==capturedSample){invalidate();return;}
+        if(!visible||!observationReady||operationBusy||sample!==capturedSample){invalidate();return;}
         comparison=Compare.compare(pending,output,exitOk,Zram.parseAlgorithms,Advanced.parse,Advanced.previewSpec,Advanced.validPreview);
         pending=null;capturedSample=null;output="";
         completedAt=Date.now();
         status=comparison?(exitOk?"OBSERVED // HISTORICAL":"PARTIAL // READ FAILED"):"UNAVAILABLE";
     }
-    Process {
-        id: reader
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if(!root.pending)return;
-                root.output=this.text;root.received=true;root.finish();
-            }
+    // Each read owns its own callback source and collector. Never reuse a
+    // cancelled process or accept callbacks from a different object.
+    function readerProgress(child) {
+        if(child!==activeReader || !child.streamDone || !child.exitDone)return;
+        if(pending!==null){
+            output=child.payload;received=true;exited=true;exitOk=child.success;
+            finish();
         }
-        stderr: StdioCollector {}
-        onExited: function(code,exitStatus) {
-            if(!root.pending)return;
-            root.exitOk=code===0&&exitStatus===0;root.exited=true;root.finish();
+        activeReader=null;
+        child.destroy();
+    }
+    Component {
+        id: readerFactory
+        Process {
+            id: child
+            running: false
+            property bool streamDone: false
+            property bool exitDone: false
+            property bool success: false
+            property string payload: ""
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    child.payload=this.text;child.streamDone=true;
+                    root.readerProgress(child);
+                }
+            }
+            stderr: StdioCollector {}
+            onExited: function(code,exitStatus) {
+                child.success=code===0&&exitStatus===0;child.exitDone=true;
+                root.readerProgress(child);
+            }
         }
     }
     spacing: 4

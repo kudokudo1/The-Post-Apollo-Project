@@ -196,6 +196,40 @@ class RetirementTests(unittest.TestCase):
                 self.db.rollback()
                 self.db.execute("PRAGMA query_only=OFF")
 
+    def test_independent_owner_or_session_mismatch_refuses_before_sql(self):
+        self.begin()
+        scope = self.scope
+        ref = scope.operation.context_ref
+        for context, session in ((replace(self.ctx, principal_key="other-owner"), self.session),
+                                 (self.ctx, "other-session")):
+            other = replace(scope, operation=replace(scope.operation,
+                context_ref=replace(ref, context=context, session_id=session)),
+                attempt=replace(scope.attempt, context=context))
+            self.assert_hold(current=other)
+            self.assertEqual(self.reads, [])
+        self.assertTrue(self.db.in_transaction)
+        self.assertEqual(self.denied, [])
+
+    def test_consistent_fixture_refs_cannot_override_durable_owner_session_revision(self):
+        before = self.db.total_changes
+        self.begin()
+        scope = self.scope
+        ref = scope.operation.context_ref
+        for context, session, revision in (
+                (replace(self.ctx, principal_key="other-owner"), self.session, 2),
+                (self.ctx, "other-session", 2),
+                (self.ctx, self.session, 4)):
+            other = replace(scope, operation=replace(scope.operation,
+                context_ref=replace(ref, context=context, session_id=session,
+                                    expected_revision=revision-1)),
+                attempt=replace(scope.attempt, context=context),
+                session_revision=revision)
+            observations = tuple(replace(o, scope=other) for o in self.observations)
+            self.assert_hold(original=other, current=other, observations=observations)
+            self.assertTrue(self.db.in_transaction)
+            self.assertEqual(self.denied, [])
+            self.assertEqual(self.db.total_changes, before)
+
     def test_equal_current_scope_cannot_override_durable_model(self):
         self.db.execute("UPDATE forest_attempts_b3 SET model_key='other'")
         self.db.commit()

@@ -63,3 +63,35 @@ Owner expiry change #2573 touches separate status() region; combined
 merged-source verification still required. #2577 existing pipe ACTION
 delegates to Owner.action, but its launcher/INVENTORY/LOCAL_ACTION
 commands and composed recovery qualification are not implemented yet.
+
+## R3h // staged local admission (in-process candidate)
+
+Nurse 2 accepted #2636 corrected native watchdog, 5/5 PASS and merged.
+#2635 actual AUTO workspace merged 7/7 PASS. Single canonical host retained.
+Before an eventual two-message wire handshake, split local durable action
+admission from mutation in the existing owner/runtime. Opt-in explicit
+staged_max_age_ms (1..60000, no production default), requires durable mode.
+Direct mutating Owner.action refuses in staged mode. prepare_action validates
+exact owner/sequence/message, consumes sequence, stores PREPARED using the
+existing journal before any provider capture or request mutation, returns
+PREPARED_ACTION envelope with exact durable row. commit_action accepts only
+the same message on same live owner and runtime instance, consumes live
+continuation before checking/capture/transaction, returns existing ACTION
+envelope. Deadline uses both owner wall and monotonic time, checked before
+capture and again before commit. Stale/mismatched/failed/expired continuation
+does not replay, durable PREPARED remains. No automatic clearing or fallback.
+A reopened owner cannot commit the old PREPARED, but can read it; a lost
+prepare reply must not trigger commit. A future host may send commit only
+after matching PREPARED_ACTION, never on startup/retry. No second database,
+process, polling or protected authority. Receipt is local intent only.
+
+Existing legacy and one-call durable paths retained for fixture compatibility;
+explicit staged selection is not persisted as a deployment policy. Direct
+runtime APIs/old binaries still outside cooperating fence. No new wire
+commands, actual host integration, durable reconciliation acknowledgment or
+production startup unlock here. PREPARED remains blocking until independently
+reviewed disposition protocol, not deletion or guessed rollback. Future
+startup gate must require explicit operator review of exact outstanding
+evidence and revalidate current DB/session; no inference from missing row.
+Seven added disposable regression cases; native full-shell crash still
+requires qualification. No changes to DOC 2-owned UI or protected helper.

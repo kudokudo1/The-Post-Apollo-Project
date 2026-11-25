@@ -230,6 +230,114 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
             owner.lookup_action(str(uuid.uuid4()))
 
+    def staged_owner(self, *, max_age=1000):
+        owner=Owner(self.q,lambda q:self.make_runtime(),durable_actions=True,
+                    staged_max_age_ms=max_age)
+        self.addCleanup(owner.close)
+        self.owner=owner.owner_id
+        self.seq=0
+        return owner
+
+    def test_staged_prepare_durable_before_any_mutation(self):
+        owner=self.staged_owner()
+        m=self.message()
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_REQUIRED"):
+            owner.action(m)
+        self.assertEqual(self.captures,0)
+        receipt=owner.prepare_action(m)
+        self.assertEqual(receipt["kind"],"PREPARED_ACTION")
+        self.assertEqual(receipt["record"]["message"],m)
+        self.assertEqual(receipt["record"]["state"],"PREPARED")
+        self.assertEqual(receipt["next_action_sequence"],2)
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,0)
+        self.assertFalse(receipt["can_execute"])
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"],receipt["record"])
+        reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"REPORTED")
+        self.assertEqual(reply["next_action_sequence"],2)
+        self.assertEqual(self.captures,1)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"COMMITTED")
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            owner.commit_action(m)
+        self.assertEqual(self.captures,1)
+
+    def test_staged_lost_prepare_reply_restart_no_continuation(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        owner.close()
+        self.q=Queue(self.path)
+        next_owner=self.staged_owner()
+        self.assertEqual(next_owner.inventory(limit=16)["inventory"]["prepared"]["message"],m)
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            next_owner.commit_action(m)
+        with self.assertRaisesRegex(QueueError,"ACTION_RECONCILIATION_REQUIRED"):
+            next_owner.prepare_action(self.message())
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_staged_mismatch_consumes_live_continuation(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_MISMATCH"):
+            owner.commit_action(dict(m,expires_at=201))
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            owner.commit_action(m)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_staged_expiry_before_capture(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        self.wall+=1000
+        self.mono+=1000
+        self.assertEqual(owner.commit_action(m)["disposition"],"UNKNOWN")
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_staged_expiry_during_capture(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        def slow():
+            self.wall+=1000
+            self.mono+=1000
+            return self.capture()
+        owner.runtime.capture_source=slow
+        self.assertEqual(owner.commit_action(m)["disposition"],"UNKNOWN")
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,1)
+
+    def test_staged_replace_cancel_and_expire(self):
+        owner=self.staged_owner()
+        def act(kind,expected=None):
+            m=self.message(kind,expected)
+            self.assertEqual(owner.prepare_action(m)["record"]["state"],"PREPARED")
+            r=owner.commit_action(m)
+            self.assertEqual(r["disposition"],"REPORTED")
+            return r["result"]["request"]
+        old=act("QUEUE")
+        new=act("REPLACE",old["id"])
+        self.assertEqual(act("CANCEL",new["id"])["state"],"CANCELLED")
+        third=act("QUEUE")
+        self.wall,self.mono=200000,110000
+        self.assertEqual(act("EXPIRE",third["id"])["state"],"EXPIRED")
+        self.assertIsNone(self.q.pending())
+
+    def test_staged_requires_explicit_durable_mode(self):
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            Owner(self.q,lambda q:self.make_runtime(),staged_max_age_ms=1000)
+        owner=self.make_owner()
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_MODE_REQUIRED"):
+            owner.prepare_action(self.message())
+
+
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

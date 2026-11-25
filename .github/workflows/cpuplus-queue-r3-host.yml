@@ -7,6 +7,8 @@ on:
       - 'services/memory/QUEUE-R3-HOST.md'
       - 'widgets/cpuplus/CpuPlusQueueConsumer.js'
       - 'widgets/cpuplus/CpuPlusQueuePresentation.js'
+      - 'widgets/cpuplus/CpuPlusQueueHistory.js'
+      - 'widgets/cpuplus/CpuPlusQueueRecovery.js'
       - '.github/workflows/cpuplus-queue-r3-host.yml'
   workflow_dispatch:
 permissions:
@@ -18,12 +20,5 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: 546bd0c3c422ad5a9d15c925ae9f46261a8b5244
-          path: candidate-history
-          persist-credentials: false
-      - name: Host controller against actual consumer, projector and pinned history parser
-        run: |
-          test "$(git -C candidate-history rev-parse HEAD)" = 546bd0c3c422ad5a9d15c925ae9f46261a8b5244
-          node tests/cpuplus/test_queue_session_host.cjs candidate-history/widgets/cpuplus/CpuPlusQueueHistory.js
+      - name: Host controller against actual checkout consumer and history/recovery parsers
+        run: node tests/cpuplus/test_queue_session_host.cjs

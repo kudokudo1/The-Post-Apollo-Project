@@ -46,3 +46,19 @@ watchdog and per-wait timeout fencing remain unimplemented. Upstream raw
 read bounds still required. Host API is pre-mount and can change; DOC 2
 presentation must consume explicit gate metadata. No startup unlock or
 recovery acknowledgment; #2603 durable local action integration next.
+
+## R3e // recovery projection
+
+Canonical #2593 host now consumes owner-bound INVENTORY and LOCAL_ACTION
+with one outstanding read across history/recovery/action, shared global
+sequence, actual DOC 2 recovery parser, and explicit RECOVERY wait category.
+Read calls are explicit and permitted under startup lock. Validated raw
+inventory is retained only for the existing #2604 pane; recoveryContext()
+provides agreed hostStatus and inventory atomically, with localAction
+separately marked UNVERIFIED. Selection/read, publication invalidation,
+action, owner loss and timeout discard stale recovery view. No unlock or
+acknowledgment. Exact lookup null not noncommit evidence. Actual merged
+history/recovery parsers now tested without candidate overlays. #2594
+was also merged despite prior HOLD recommendation; no duplicate mount,
+cleanup remains Nurse 2 disposition. Native wrapper, client watchdog and
+full-shell durable pre-send/acknowledgment remain pending.

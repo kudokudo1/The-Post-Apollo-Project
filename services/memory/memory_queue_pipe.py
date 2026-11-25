@@ -171,6 +171,16 @@ class Session:
             if obj["owner_id"] != self.owner.owner_id:
                 raise QueueError("STALE_OR_INVALID_OWNER")
             self.emit(detail_for_ui(self.owner.detail(_uuid(obj["request_id"]))))
+        elif obj.get("kind") == "INVENTORY" and set(obj) == {
+                "version", "kind", "owner_id", "limit"}:
+            if obj["owner_id"] != self.owner.owner_id:
+                raise QueueError("STALE_OR_INVALID_OWNER")
+            self.emit(self.owner.inventory(limit=_int(obj["limit"], 1, 16)))
+        elif obj.get("kind") == "LOCAL_ACTION" and set(obj) == {
+                "version", "kind", "owner_id", "action_id"}:
+            if obj["owner_id"] != self.owner.owner_id:
+                raise QueueError("STALE_OR_INVALID_OWNER")
+            self.emit(self.owner.lookup_action(_uuid(obj["action_id"])))
         else:
             # No UI-triggered STATUS, publish, shell, path, or raw receipt.
             raise QueueError("WIRE_COMMAND")

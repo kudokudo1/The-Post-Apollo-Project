@@ -1,0 +1,47 @@
+name: CPU++ queue R3 native recovery transport
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_queue_recovery_native.py'
+      - 'tests/fixtures/CpuPlusQueueRecoveryNative.qml'
+      - 'tests/fixtures/cpuplus_queue_recovery_child.py'
+      - 'services/memory/memory_queue_*.py'
+      - 'services/memory/memory_adjustment_queue.py'
+      - 'services/memory/MemoryQueueSessionHost.js'
+      - 'widgets/cpuplus/CpuPlusQueue*.js'
+      - 'widgets/cpuplus/CpuPlusQueue*.qml'
+      - '.github/workflows/cpuplus-queue-r3-recovery-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: f21740ed5d4786c487ffa4b31d24c2377e0fd9a9
+          path: candidate-recovery-ui
+          persist-credentials: false
+      - name: Actual checkout recovery fixture with reviewed UI candidate
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+        run: |
+          set -eu
+          git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE/candidate-recovery-ui" -C "$GITHUB_WORKSPACE/candidate-recovery-ui" rev-parse HEAD)" = f21740ed5d4786c487ffa4b31d24c2377e0fd9a9
+          python3 -B tests/cpuplus_queue_recovery_native.py

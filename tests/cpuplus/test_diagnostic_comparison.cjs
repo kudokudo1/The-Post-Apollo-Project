@@ -39,6 +39,43 @@ assert.match(compare(original,null).error,/SELECT TWO/);
 assert.match(compare(original,report("memory",[sample(1048576,null,null),sample(1048576,0,1),end],true)).error,/EVIDENCE/);
 assert.match(compare(original,report("memory",[sample(1048576,null,null),sample(1048576,10000,1,99),end],true)).error,/EVIDENCE/);
 assert.match(compare(original,report("memory",[sample(1048576,null,null),sample(1048576,10000,1),end],true)).note,/UNEQUAL DURATIONS/);
+// RSS/PSS may fall while proportional swapped footprint grows.
+const swapSample = (pss,swap,ms,cpu,priv) => {
+    const r = sample(pss,ms,cpu);
+    r.memoryKiB.SwapPss = swap;
+    if (priv !== undefined) {
+        r.memoryKiB.Rss = 4000000;
+        r.memoryKiB.Private_Clean = 100;
+        r.memoryKiB.Private_Dirty = priv-100;
+        r.privateResidentKiB = priv;
+    }
+    return r;
+};
+const oldCapture = report("memory",[swapSample(1048576,0,null,null),
+    swapSample(524288,786432,10000,10),end]);
+const newCapture = report("memory",[swapSample(1048576,0,null,null,524288),
+    swapSample(524288,786432,10000,10,786432),end],true);
+result = compare(oldCapture,newCapture);
+assert.equal(result.error,"");
+assert.equal(get(result,"PSS NET CHANGE").after,-512);
+assert.equal(get(result,"PSS + SWAP PSS NET CHANGE").after,256);
+assert.equal(get(result,"PRIVATE RESIDENT NET CHANGE").before,null);
+assert.equal(get(result,"PRIVATE RESIDENT NET CHANGE").after,256);
+assert.equal(get(result,"PRIVATE RESIDENT NET CHANGE").delta,null);
+assert.match(result.note,/boot identity and continuity/);
+const otherProcess = report("memory",[{...swapSample(1048576,0,null,null,524288),pid:13},
+    {...swapSample(524288,786432,10000,10,786432),pid:13},
+    {...end,pid:13}],true);
+assert.match(compare(oldCapture,otherProcess).note,/PROCESS IDENTITY CHANGED/);
+const partial = report("memory",[swapSample(1048576,0,null,null),
+    swapSample(524288,786432,10000,10,786432),end],true);
+assert.equal(get(compare(oldCapture,partial),"PRIVATE RESIDENT FINAL").after,null);
+const invalidPrivate = swapSample(524288,786432,10000,10,786432);
+invalidPrivate.privateResidentKiB++;
+assert.match(compare(oldCapture,report("memory",[swapSample(1048576,0,null,null,524288),
+    invalidPrivate,end],true)).error,/EVIDENCE/);
+assert.equal(get(compare({...newCapture,id:beforeId,finishedAt:original.finishedAt},newCapture),
+    "PRIVATE RESIDENT NET CHANGE").delta,0);
 const inventory = {schema:"post-apollo-qml-workload-inventory-v1",scannedQml:826,trackedQml:826,skipped:[],
     totals:{Timer:426,Process:415,Repeater:743}};
 result = compare(report("inventory",JSON.stringify(inventory)),report("inventory",JSON.stringify({...inventory,totals:{...inventory.totals,Timer:420}}),true));

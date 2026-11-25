@@ -1,0 +1,66 @@
+name: Connections DOC4 C5-H12 post-commit client receipt uncertainty
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/hospital_c5/test_hospital_c5h12_client_receipt_unknown.py'
+      - '.github/workflows/connections-hospital-c5-h12-client-receipt-ci.yml'
+      - 'docs/connections-hospital-c5-h12-client-receipt-hold.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-post-commit-client-delivery:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin disposable signature-verifier dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Verify issuer source syntax and unchanged pre-key hard consent refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m py_compile \
+            services/connections/hospital/HospitalNativeIssuerService.py \
+            tests/connections/hospital_c5/test_hospital_c5h12_client_receipt_unknown.py
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("services/connections/hospital/HospitalNativeIssuerService.py").read_text()
+          step=source[source.index("def _native_step(client, policy):"):source.index("def _commit_with_terminal_receipt_or_unknown(")]
+          assert step.index("_require_independent_room_consent(request, prepared, peer, first_seat)") < step.index("key = C.load_installed_key()")
+          assert 'C.deny("INDEPENDENT_EXACT_ROOM_HUMAN_CONSENT_UNAVAILABLE")' in source
+          commit=source[source.index("def _commit_with_terminal_receipt_or_unknown("):source.index("def _send_committed_client_receipt_or_unknown(")]
+          assert commit.count("_writer_exchange(")==1
+          assert "PX_COMMIT_OUTCOME_UNKNOWN_HOLD_NO_AUTO_RETRY" in commit
+          helper=source[source.index("def _send_committed_client_receipt_or_unknown("):source.index("def main():")]
+          assert helper.count("client.send(")==1
+          assert "_writer_exchange(" not in helper
+          assert "C.load_installed_key(" not in helper
+          assert "PX_COMMITTED_CLIENT_RECEIPT_UNKNOWN_HOLD_NO_AUTO_RETRY" in helper
+          print("C5H12_PRE_SIGN_HARD_HOLD_AND_ONE_CLIENT_SEND // PASS")
+          PY
+      - name: 16 new post-COMMIT client delivery cases over real Linux socket
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h12_client_receipt_unknown.py
+          echo "C5H12_POST_PX_COMMIT_CLIENT_RECEIPT_UNKNOWN // PASS"
+      - name: Preserve original H11/H4/H10 and H6 denial details
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h11_commit_unknown_hold.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h10_ancillary_fd_cleanup.py
+          python3 -B -I tests/connections/test_connections_hospital_doc4_consent_details.py
+          echo "C5H12_INHERITED_H11_H4_H10_H6_NO_AUTHORITY // PASS"

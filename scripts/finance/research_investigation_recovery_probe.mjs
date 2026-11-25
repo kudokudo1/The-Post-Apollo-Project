@@ -7,6 +7,9 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { run, rootDirectory, Refusal } from "./research_investigation_store.mjs";
+import {
+  MAX_INTENT_BYTES, parseWriteIntent, compareObservedWriteIntent
+} from "./research_investigation_write_intent.mjs";
 
 export const RESULT_PREFIX = "FINANCE_RESEARCH_RECOVERY_RESULT ";
 export const ERROR_PREFIX = "FINANCE_RESEARCH_RECOVERY_ERROR ";
@@ -19,6 +22,12 @@ const READ_CODES = new Set([
 ]);
 const digest = x => createHash("sha256").update(x).digest("hex");
 
+function blankIntent() {
+  return {state:"NONE",operationId:null,action:null,
+    priorRevision:null,proposedRevision:null,
+    priorFingerprint:null,proposedFingerprint:null,
+    comparison:"UNAVAILABLE"};
+}
 function baseResult() {
   return {
     schemaVersion: 1, readOnly: true, canUnlock: false,
@@ -27,6 +36,7 @@ function baseResult() {
     store: {state: "UNKNOWN",revision:null,fingerprint:null,
       caseCount:null,evidenceCount:null},
     lock: {state:"UNKNOWN",fingerprint:null},
+    intent: blankIntent(),
     tempCount:null, unexpectedCount:null
   };
 }
@@ -36,20 +46,61 @@ function readCode(e) {
 }
 function statLock(dir) {
   const file=path.join(dir,"investigations.lock");
+  const emptyIntent=blankIntent();
+  const wrap=(state,fingerprint,intent=emptyIntent,record=null)=>({
+    lock:{state,fingerprint},intent,record
+  });
   let s;
   try {s=fs.lstatSync(file);}
   catch(e) {
-    if(e.code==="ENOENT") return {state:"ABSENT",fingerprint:null};
-    return {state:"UNKNOWN",fingerprint:null};
+    if(e.code==="ENOENT") return wrap("ABSENT",null);
+    return wrap("UNKNOWN",null);
   }
   if(!s.isFile() || s.isSymbolicLink()
       || s.uid!==process.getuid() || (s.mode&0o077)!==0
-      || s.nlink!==1 || s.size!==0)
-    return {state:"UNSAFE",fingerprint:null};
+      || s.nlink!==1 || s.size>MAX_INTENT_BYTES)
+    return wrap("UNSAFE",null);
   const fingerprint=digest(JSON.stringify([
     s.dev,s.ino,s.uid,s.mode&0o777,s.nlink,s.ctimeMs
   ]));
-  return {state:"PRESENT",fingerprint};
+  if(s.size===0) return wrap("PRESENT",fingerprint);
+  // Open the exact lstat inode with O_NOFOLLOW, and bound the read even
+  // if an untrusted process extends the lock between the two operations.
+  let fd;
+  try {
+    fd=fs.openSync(file,fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW
+      | fs.constants.O_NONBLOCK);
+    const st=fs.fstatSync(fd);
+    if(!st.isFile() || st.uid!==process.getuid() || (st.mode&0o077)
+        || st.nlink!==1 || st.dev!==s.dev || st.ino!==s.ino
+        || st.size>MAX_INTENT_BYTES)
+      return wrap("UNSAFE",null);
+    const bytes=Buffer.alloc(MAX_INTENT_BYTES+1);
+    let total=0;
+    while(total<bytes.length) {
+      const n=fs.readSync(fd,bytes,total,bytes.length-total,null);
+      if(n===0) break;
+      total+=n;
+    }
+    if(total>MAX_INTENT_BYTES) return wrap("UNSAFE",null);
+    let record;
+    try {record=parseWriteIntent(bytes.subarray(0,total).toString("utf8"));}
+    catch {
+      return wrap("PRESENT",fingerprint,{...blankIntent(),state:"INVALID"});
+    }
+    return wrap("PRESENT",fingerprint,{
+      state:"VALID",operationId:record.operationId,action:record.action,
+      priorRevision:record.priorRevision,
+      proposedRevision:record.proposedRevision,
+      priorFingerprint:record.priorFingerprint,
+      proposedFingerprint:record.proposedFingerprint,
+      comparison:"UNAVAILABLE"
+    },record);
+  } catch {
+    return wrap("UNSAFE",null);
+  } finally {
+    if(fd!==undefined) fs.closeSync(fd);
+  }
 }
 function inventory(dir) {
   let entries,seen=0,tempCount=0,unexpectedCount=0;
@@ -122,7 +173,12 @@ export function inspectResearchRecovery(dir=rootDirectory()) {
     return result;
   }
 
-  result.lock=statLock(dir);
+  const observation=statLock(dir);
+  result.lock=observation.lock;
+  result.intent=observation.intent;
+  if(observation.record && document && !readProblem)
+    result.intent.comparison=compareObservedWriteIntent(
+      observation.record,document);
   const files=inventory(dir);
   result.tempCount=files.tempCount;
   result.unexpectedCount=files.unexpectedCount;
@@ -141,6 +197,10 @@ export function inspectResearchRecovery(dir=rootDirectory()) {
   }
   if(result.lock.state==="UNKNOWN" || result.lock.state==="UNSAFE") {
     result.reason="LOCK_UNSAFE_OR_UNAVAILABLE";
+    return result;
+  }
+  if(result.intent.state==="INVALID") {
+    result.reason="INVALID_INTENT";
     return result;
   }
   if(result.lock.state==="PRESENT"

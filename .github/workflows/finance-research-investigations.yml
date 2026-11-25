@@ -5,6 +5,7 @@ on:
     paths:
       - "scripts/finance/research_investigations.mjs"
       - "scripts/finance/research_investigation_store.mjs"
+      - "scripts/finance/research_investigation_write_intent.mjs"
       - "scripts/finance/research_investigation_recovery_probe.mjs"
       - "scripts/finance/research_investigation_read_bridge.mjs"
       - "scripts/finance/research_investigation_write_contract.mjs"
@@ -32,6 +33,7 @@ on:
       - "tests/finance/test_research_investigation_store.mjs"
       - "tests/finance/test_research_m10a_store_commit_uncertainty.mjs"
       - "tests/finance/test_research_m10b_recovery_probe.mjs"
+      - "tests/finance/test_research_m10c_write_intent.mjs"
       - "tests/finance/test_research_investigation_read_bridge.mjs"
       - "tests/finance/test_research_investigation_write_contract.mjs"
       - "tests/finance/test_research_investigation_write_attempt.mjs"
@@ -57,6 +59,7 @@ on:
     paths:
       - "scripts/finance/research_investigations.mjs"
       - "scripts/finance/research_investigation_store.mjs"
+      - "scripts/finance/research_investigation_write_intent.mjs"
       - "scripts/finance/research_investigation_recovery_probe.mjs"
       - "scripts/finance/research_investigation_read_bridge.mjs"
       - "scripts/finance/research_investigation_write_contract.mjs"
@@ -83,6 +86,7 @@ on:
       - "tests/finance/test_research_investigation_store.mjs"
       - "tests/finance/test_research_m10a_store_commit_uncertainty.mjs"
       - "tests/finance/test_research_m10b_recovery_probe.mjs"
+      - "tests/finance/test_research_m10c_write_intent.mjs"
       - "tests/finance/test_research_investigation_read_bridge.mjs"
       - "tests/finance/test_research_investigation_write_contract.mjs"
       - "tests/finance/test_research_investigation_write_attempt.mjs"
@@ -121,6 +125,7 @@ jobs:
         run: |
           node --check scripts/finance/research_investigations.mjs
           node --check scripts/finance/research_investigation_store.mjs
+          node --check scripts/finance/research_investigation_write_intent.mjs
           node --check scripts/finance/research_investigation_recovery_probe.mjs
           node --check scripts/finance/research_investigation_read_bridge.mjs
           node --check scripts/finance/research_investigation_write_contract.mjs
@@ -136,6 +141,7 @@ jobs:
           node --check tests/finance/test_research_investigation_store.mjs
           node --check tests/finance/test_research_m10a_store_commit_uncertainty.mjs
           node --check tests/finance/test_research_m10b_recovery_probe.mjs
+          node --check tests/finance/test_research_m10c_write_intent.mjs
           node --check tests/finance/test_research_investigation_read_bridge.mjs
           node --check tests/finance/test_research_investigation_write_contract.mjs
           node --check tests/finance/test_research_investigation_write_attempt.mjs
@@ -152,6 +158,7 @@ jobs:
           node tests/finance/test_research_investigation_store.mjs
           node tests/finance/test_research_m10a_store_commit_uncertainty.mjs
           node tests/finance/test_research_m10b_recovery_probe.mjs
+          node tests/finance/test_research_m10c_write_intent.mjs
           node tests/finance/test_research_investigation_read_bridge.mjs
           node tests/finance/test_research_investigation_write_contract.mjs
           node tests/finance/test_research_investigation_write_attempt.mjs

@@ -54,11 +54,40 @@ class ManagedCacheTests(unittest.TestCase):
         self.assertEqual(new["manifest"]["total"],2)
         with manager.index.open_index(old["directory"]) as conn:
             self.assertEqual(manager.index.manifest_for(conn),old["manifest"])
-        with patch.object(manager,"MAX_GENERATIONS",2):
+        with patch.object(manager,"V1_MAX_GENERATIONS",2):
             self.git("commit","--allow-empty","-m","third")
             self.assertEqual(manager.build(self.repo,self.root)["status"],"CACHE LIMIT")
         self.assertTrue(Path(old["directory"]).exists())
         self.assertTrue(Path(new["directory"]).exists())
+
+    def test_eight_historical_generations_do_not_block_current(self):
+        old={}
+        for n in range(8):
+            receipt=manager.build(self.repo,self.root)
+            db=Path(receipt["directory"])/manager.index.NAME
+            old[db]=(db.stat().st_ino,hashlib.sha256(db.read_bytes()).hexdigest())
+            self.git("commit","--allow-empty","-m",f"new tip {n}")
+        head=self.git("rev-parse","HEAD")
+        status=self.git("status","--porcelain")
+        inventory=manager.inventory(self.repo,self.root)
+        self.assertEqual(inventory["observedSlots"],8)
+        self.assertEqual(inventory["generationLimit"],64)
+        self.assertTrue(all(e["state"]=="HISTORICAL" for e in inventory["entries"]))
+        self.assertEqual(manager.lookup(self.repo,self.root)["status"],"MISSING")
+        current=manager.build(self.repo,self.root)
+        self.assertEqual(current["status"],"READY")
+        self.assertEqual(current["manifest"]["total"],9)
+        self.assertEqual(manager.lookup(self.repo,self.root),current)
+        with manager.index.open_index(current["directory"]) as conn:
+            self.assertEqual(manager.index.search(conn,current["manifest"]["snapshot"],"first",0)["match"]["ordinal"],8)
+        after=manager.inventory(self.repo,self.root)
+        self.assertEqual(after["observedSlots"],9)
+        self.assertFalse(after["reclamationAllowed"])
+        self.assertEqual(manager.MAX_GENERATIONS,8)
+        for db,expected in old.items():
+            self.assertEqual((db.stat().st_ino,hashlib.sha256(db.read_bytes()).hexdigest()),expected)
+        self.assertEqual(self.git("rev-parse","HEAD"),head)
+        self.assertEqual(self.git("status","--porcelain"),status)
 
     def test_incomplete_and_unsafe_refuse(self):
         identity=manager.identity(self.repo)

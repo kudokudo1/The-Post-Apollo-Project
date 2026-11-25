@@ -109,3 +109,35 @@ These outcomes are **required policy**, not outputs of a deployed protocol. Neit
 | Operator | Decide eventual service/host/admin/key custody, merge, native installation and production acceptance **separately** | **NO PRODUCTION AUTHORIZATION** |
 
 This document is a **DOC 5-owned proposal**, not a unilateral decision for the other workers. It introduces **no code, CI fixture, deployed file, service, key, network listener, signed packet, native side effect, QML UI or Store migration**. Future owner feedback should be recorded as ACCEPT / REVISE / HOLD on the relevant responsibility before anyone locks the packet shape. **TimeW Restore remains HOLD.**
+
+## 8. Original-effect fence continuity across custody and source epochs (proposed 2026-11-24)
+
+**DOC 5 disposition to DOC 1 [#2581](https://github.com/kudokudo1/The-Post-Apollo-Project/pull/2581), source `13fc31491492abb86e15903a1c5f074785085ae1`: ACCEPT custody/effect separation and original-fence continuity as required semantics; REVISE TimeW-specific partial-effect/no-effect and affected-scope rules below; HOLD real wire, recovery service, signer enrollment and native execution.** This is an owner proposal for joint acceptance, not new production policy.
+
+### Separate the three lifetimes
+
+- **Original historical operation:** immutable TimeW purpose, original grant and operation, checkpoint, exact before/target binary64, selected XDG lifetime and original seat/source epochs, plus original instruction binding for each potentially effective resize/move. Retain enough authoritative correlation before any corresponding effect can be submitted. An independently current history must retain the original SPENT/fence even when the original actor or grant is no longer usable. A later lookup ID, process start or issuer epoch is never a replacement execution identity.
+- **Current admission:** expiry, revocation, source restart/unmap/remap, seat/lock changes, key rotation or custody restore can invalidate permission to submit a new effect or continue R2. They do not prove the earlier R1/R2 did not happen. Do not transplant consent to a similar window, silently renew it or discard the original unresolved fence when an old key is retired.
+- **Current read-only recovery:** a separately and presently authorized, purpose-bounded lookup may resolve the original historical operation after its admission expires. Authenticate current reader permission and independent history currency separately from historical issuer/source identity and key validity at the time of the recorded event. An old signature alone, or a current key signing a caller-supplied old record, proves neither. Rotation/recovery must preserve independently verified historical key/status/lineage and original-effect fences; if that continuity is absent, hold rather than reinterpret the old evidence. No chosen retention interval, query protocol or root is implied.
+
+### TimeW-specific effect dispositions
+
+These are candidate review outcomes, not executable state names or new positive return values. An independently current C5 SPENT is irreversible even when no window movement occurred.
+
+| C5 history and effect-owner evidence | Proposed recovery treatment |
+| --- | --- |
+| Custody/current-history unavailable, stale, rolled back, forked or incomplete | UNKNOWN/HOLD; no terminal conclusion even with an apparently valid old native receipt |
+| Original consent spent; R1 or R2 receipt absent, conflicting, partial, timed out or unverifiable | UNKNOWN/HOLD; preserve original spent state and affected-scope fence; no replay, undo, refund or fresh grant to bypass |
+| Authenticated R1 settled but R2 absent/unknown | Record only the supported partial effect in reconciliation; whole operation is not no-effect or complete. Uncertain recovery never triggers a move. Ordinary same-grant continuation in the original active execution path still requires the jointly accepted R1 settlement and current live checks in section 3; a lookup is not that path. |
+| Authenticated original no-effect for R1 and R2, with durable effect-owner proof that delayed, queued or duplicate submission of either step is impossible | Candidate terminal no-effect for this original operation only; retain any historical SPENT. No automatic grant refund, retry or release of a fence for a new overlapping operation. If one step did occur, no-effect of the other is only a partial outcome, not whole-operation no-effect. |
+| Independently current original C5 spend and authentic selected-view R1/R2 terminal settlement agree with exact original lineage | Candidate settled original effect; never re-execute. Actual terminal policy, producer evidence and consumer implementation still require joint review. |
+| Original identity or evidence lost beyond recovery | UNKNOWN/HOLD for the affected operation scope pending independently reviewed resolution. A new UUID, restored desktop layout or remapped same app ID cannot erase uncertainty. |
+
+A missing row, output PRESENT, stable surface sequence, same client-buffer wrapper at one sample, timeout, canceled lookup or process exit is **not** proof of no effect and no delayed submission. [SwayPX #210](https://github.com/kudokudo1/Post-Apollo-SwayPx/pull/210) describes a diagnostic live wrapper-object comparison, not the effect-owner's durable terminal fence or final selected-frame receipt. The effect owner must account for already queued/in-flight instructions before a proposed no-effect disposition; preventing future calls only is insufficient.
+
+### Owner boundary and acceptance
+
+- DOC 5 owns TimeW-specific C5 original consent/spend/revoke and recovery semantics. DOC 1/2 own independent current history and enrollment/source trust. SwayPX owns actual original selected-view and per-instruction terminal/no-effect/future-submission evidence. TimeW owns the journal/consumer and how an affected scope is represented or safely resolved. The precise affected-scope matching and release procedure remain joint REVISE/HOLD; do not presume a global lock on unrelated ordinary Save, local previews or other users/applications.
+- Before actual integration, require lost ACK before/after each effect; R1 applied with R2 absent; no-effect with delayed work pending; restart/epoch rotation after SPENT; restored custodian/effect-owner histories; original lookup after expiry/revoke under separate current reader authorization; wrong-purpose signer and changed selected lifetime; and an attempted new ID for the same unresolved effect. Review authoritative history and actual native evidence independently.
+- Existing #2333/#2350/#2368/#2477 sources remain caller-fixture or disposable Linux non-authorizing tests. No shared grant, new fixture issuer, signed schema, permission, root, hardware selection or production transition is created. Preserve the [operator's infrastructure deferral](https://github.com/kudokudo1/The-Post-Apollo-Project/issues/2119#issuecomment-7132962989). **TIMEW RESTORE HOLD.**
+

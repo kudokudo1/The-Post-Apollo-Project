@@ -233,7 +233,8 @@ Scope {
         let failure="";
         if (stale) failure="STALE REPOSITORY RESULT";
         else if (!refreshExitSeen) failure="CHILD DID NOT START";
-        else if (refreshExitCode===124 || refreshExitCode===137) failure="GIT READ TIMEOUT";
+        else if (refreshExitCode===124) failure="GIT READ TIMEOUT";
+        else if (refreshExitCode===137) failure="READ KILLED // TIMEOUT OR SIGNAL";
         else if (refreshExitCode!==0 || refreshExitStatus!==0) failure="CHILD NONZERO EXIT";
         else if (!refreshDoneSeen || refreshDuplicateDone) failure="INVALID COMPLETION MARKER";
         else if (lastError) failure=refreshDiagOutcome==="REPOSITORY CHECK ERROR"
@@ -1677,8 +1678,7 @@ Scope {
         const key = parts.length > 0 ? parts[0] : "";
 
         if (refreshDoneSeen) {
-            if (key==="DONE") refreshDuplicateDone=true;
-            else refreshDuplicateDone=true; // no protocol data is legal after DONE
+            if (raw.length>0) refreshDuplicateDone=true; // no nonempty protocol data is legal after DONE
             return;
         }
         if (key === "DIAGTIME") {

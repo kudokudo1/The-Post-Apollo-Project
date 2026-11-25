@@ -9,6 +9,8 @@ on:
       - "widgets/cpuplus/CpuPlusProcessPresentation.js"
       - "widgets/cpuplus/CpuPlusProfilePane.qml"
       - "widgets/cpuplus/CpuPlusProfilePreview.js"
+      - "widgets/cpuplus/CpuPlusProfileCatalogStore.qml"
+      - "widgets/cpuplus/CpuPlusProfileCatalog.js"
       - "widgets/cpuplus/CpuPlusZramPolicyPane.qml"
       - "widgets/cpuplus/CpuPlusZramPolicy.js"
       - "widgets/cpuplus/CpuPlusAdvancedPolicyPane.qml"

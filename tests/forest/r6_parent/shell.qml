@@ -8,7 +8,11 @@ ShellRoot {
     property int steps: 0
     property string last: ""
     property bool failed: false
-    property var modes: ["commit","refuse","detach"]
+    property var modes: ["commit","refuse","detach","two-commit-stop"]
+    property int commits: 0
+    property bool sawStop: false
+    property bool sawAbort: false
+    property var oldRef: null
     QtObject { id: ownerA }
     QtObject { id: ownerB }
     function fail(reason) {
@@ -20,7 +24,7 @@ ShellRoot {
     }
     function startCase() {
         if (active !== null || scenario >= modes.length) { fail("case start"); return; }
-        steps=0; last="";
+        steps=0; last=""; commits=0; sawStop=false; sawAbort=false; oldRef=null;
         const p = trialType.createObject(witness,{
             trial:String(scenario+1).repeat(32),
             fixtureDirectory:Quickshell.shellPath("private"+scenario),
@@ -47,9 +51,13 @@ ShellRoot {
             else if (scenario===1)
                 ok=ok && !p.failure && p.refusedResult && last==="REFUSED"
                     && p.outcome==="REFUSED" && p.action===2 && stats.ended;
-            else
+            else if (scenario===2)
                 ok=ok && p.failure==="OWNER_LOST" && p.outcome==="UNKNOWN_HOLD"
                     && p.action===2 && p.cleanupStarted;
+            else
+                ok=ok && !p.failure && p.closeResult && last==="CLOSED"
+                    && commits===2 && sawStop && sawAbort && p.turnsStarted===3
+                    && p.action===21 && p.outcome==="ABORTED_LOCAL" && stats.ended;
             if (!ok) { fail("terminal evidence "+scenario); return; }
             console.info("R6_PARENT_CASE_PASS "+scenario+" "+modes[scenario]
                 +" actions="+p.action+" bytes="+stats.bytes+" frames="+stats.frames);
@@ -76,6 +84,38 @@ ShellRoot {
                 // Different owner object, independently observed after true ACK.
                 p.observedOwner=ownerB;
                 ok=p.cleanupStarted && p.ref===null && p.outcome==="UNKNOWN_HOLD";
+            } else if (witness.scenario===3) {
+                if (witness.last==="TURN_STARTED") {
+                    if (p.sequence!==0 || p.status!=="" || !p.ref
+                        || (witness.oldRef && (p.ref.requestId===witness.oldRef.requestId
+                            || p.ref.viewKey===witness.oldRef.viewKey))) {
+                        witness.fail("new lifetime"); return;
+                    }
+                    witness.steps=1;
+                    ok=p.request("STEP");
+                } else if (witness.last==="ACTIVE") {
+                    if (p.turnsStarted===3 && witness.steps===4) {
+                        ok=!p.request("STEP") && p.status==="GENERATING"
+                            && p.request("STOP");
+                    } else {
+                        witness.steps++;
+                        ok=witness.steps<=5 && p.request("STEP");
+                    }
+                } else if (witness.last==="COMMITTED_LOCAL") {
+                    witness.commits++;
+                    witness.oldRef=p.ref;
+                    ok=witness.steps===5 && p.sequence===4
+                        && p.status==="LOCAL_COMMIT_RECORDED"
+                        && witness.commits<=2 && p.request("NEXT");
+                } else if (witness.last==="STOP_OBSERVED") {
+                    witness.sawStop=p.phase==="ACTIVE" && p.status==="STOP_REQUESTED"
+                        && p.outcome!=="ABORTED_LOCAL";
+                    ok=witness.sawStop && !p.request("STOP") && p.request("STEP");
+                } else if (witness.last==="ABORTED_LOCAL") {
+                    witness.sawAbort=p.phase==="BLOCKED" && p.outcome==="ABORTED_LOCAL";
+                    ok=witness.sawAbort && !p.request("NEXT") && !p.request("STEP")
+                        && !p.request("STOP") && p.request("CLOSE");
+                } else if (witness.last==="CLOSED") return;
             } else if (witness.last==="TURN_STARTED" || witness.last==="ACTIVE") {
                 witness.steps++;
                 ok=witness.steps<=5 && p.request("STEP");

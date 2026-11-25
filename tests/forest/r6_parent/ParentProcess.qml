@@ -25,6 +25,9 @@ Item {
     property var ref: null
     property var used: []
     property int sequence: 0
+    property bool stopRequested: false
+    property int turnsStarted: 0
+    property int turnSteps: 0
     property string status: ""
     property int originalPid: 0
     property bool startedSeen: false
@@ -99,10 +102,16 @@ Item {
         if (kind === "HELLO") {
             if (phase !== "STARTING" || action !== 0) return false;
         } else if (kind === "NEXT") {
-            if (phase !== "IDLE") return false;
+            if (phase !== "IDLE" || turnsStarted >= 3) return false;
             clearOriginal();
-        } else if (kind === "STEP") {
+            stopRequested = false;
+            turnSteps = 0;
+        } else if (kind === "STEP" || kind === "STOP") {
             if (phase !== "ACTIVE" || ref === null) return false;
+            if (kind === "STOP" && (stopRequested || turnSteps < 4)) return false;
+            // Third fixed public turn is STOP-only, never allow sixth row.
+            if (kind === "STEP" && turnsStarted === 3 && turnSteps >= 4
+                && !stopRequested) return false;
             data = {ref:ref};
         } else if (kind === "CLOSE") {
             if (phase !== "IDLE" && phase !== "ACTIVE" && phase !== "BLOCKED")
@@ -115,7 +124,7 @@ Item {
         offered = false;
         phaseClock.restartMs();
         // ACK/STEP/CLOSE writes may race effects; never infer rollback.
-        if (kind === "STEP" || kind === "CLOSE") possibleEffect = true;
+        if (kind === "STEP" || kind === "STOP" || kind === "CLOSE") possibleEffect = true;
         if (!send(kind,data)) { hold("WRITE"); return false; }
         return true;
     }
@@ -175,15 +184,24 @@ Item {
         } else if (pending === "HELLO" && code === "READY" && !data.units.length)
             next = "IDLE";
         else if (pending === "NEXT" && offered && ref !== null
-                && code === "TURN_STARTED" && !data.units.length)
+                && code === "TURN_STARTED" && !data.units.length) {
+            turnsStarted++;
             next = "ACTIVE";
-        else if (pending === "STEP" && ["ACTIVE","COMMITTED_LOCAL","ABORTED_LOCAL","UNKNOWN_HOLD"].indexOf(code)>=0) {
+        } else if (pending === "STOP" && !stopRequested && code === "STOP_OBSERVED") {
+            batch = prevalidateUnits(data.units);
+            if (!batch || batch.status !== "STOP_REQUESTED") return false;
+            stopRequested = true;
+            next = "ACTIVE";
+        } else if (pending === "STEP" && ["ACTIVE","COMMITTED_LOCAL","ABORTED_LOCAL","UNKNOWN_HOLD"].indexOf(code)>=0) {
             batch = prevalidateUnits(data.units);
             if (!batch) return false;
             if ((code === "ACTIVE" && ["LOCAL_COMMIT_RECORDED","UNKNOWN_HOLD"].indexOf(batch.status)>=0)
                 || (code === "COMMITTED_LOCAL" && batch.status !== "LOCAL_COMMIT_RECORDED")
                 || ((code === "ABORTED_LOCAL" || code === "UNKNOWN_HOLD")
                     && batch.status === "LOCAL_COMMIT_RECORDED")) return false;
+            if (code === "ABORTED_LOCAL" && !stopRequested) return false;
+            if (turnsStarted === 3 && code === "COMMITTED_LOCAL") return false;
+            turnSteps++;
             next = code === "ACTIVE" ? "ACTIVE" : code === "COMMITTED_LOCAL" ? "IDLE" : "BLOCKED";
         } else if (pending === "CLOSE" && code === "CLOSED" && !data.units.length) {
             next = "CLOSE_EXIT";

@@ -13,7 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts/forest"
 sys.path.insert(0, str(SCRIPTS))
-from runtime_public_child_r6b import canonical, decode, WireError, CONTROL, RESPONSE
+from runtime_public_child_r6b import canonical, decode, WireError, CONTROL, RESPONSE, Child, Wire, TOTAL
 
 TRIAL = "a"*32
 
@@ -233,6 +233,79 @@ class ChildTests(unittest.TestCase):
             t.send("NEXT",{})
             t.read()
             t.closed(2)
+
+
+class OwnerBoundaryTests(unittest.TestCase):
+    def test_failed_open_ack_never_appends_before_cleanup(self):
+        class FakeWire:
+            def __init__(self, mode):
+                self.mode = mode
+                self.offer = None
+
+            def send(self, obj):
+                self.offer = obj
+
+            def read(self):
+                if self.mode == "missing":
+                    raise WireError()
+                ref = dict(self.offer["data"]["ref"])
+                if self.mode == "wrong":
+                    ref["viewKey"] = "f"*32
+                return dict(v=1, trial=TRIAL, action=2, kind="OPEN_ACK",
+                            data=dict(ref=ref, accepted=self.mode != "false"))
+
+            def check(self):
+                return 1
+
+            def room(self, *args):
+                pass
+
+        for mode in ("missing", "wrong", "false"):
+            with self.subTest(mode=mode):
+                child = Child(FakeWire(mode))
+                child.trial, child.action = TRIAL, 1
+                child.dispatch("HELLO", {})
+                try:
+                    child.action = 2
+                    with self.assertRaises(Exception) as e:
+                        child.dispatch("NEXT", {})
+                    if mode != "false":
+                        self.assertIsInstance(e.exception, WireError)
+                    self.assertFalse(child.effect_possible)
+                    self.assertEqual(child.host._db.execute(
+                        "SELECT COUNT(*) FROM forest_turns").fetchone(), (0,))
+                    self.assertEqual(child.host._db.execute(
+                        "SELECT COUNT(*) FROM forest_attempts_b3").fetchone(), (0,))
+                finally:
+                    child.current = None
+                    child.host.close()
+
+    def test_blocked_output_and_capacity_reserve(self):
+        ir, iw = os.pipe()
+        rr, rw = os.pipe()
+        try:
+            wire = Wire(ir, rw)
+            wire.phase()
+            wire.bytes = TOTAL - 100
+            wire.last_read = 0
+            with self.assertRaises(WireError):
+                wire.reserve(False)
+            wire.bytes = 0
+            wire.frames = 0
+            # Fill a nonblocking pipe without retaining its contents.
+            while True:
+                try:
+                    os.write(rw, b"x"*4096)
+                except BlockingIOError:
+                    break
+            wire.deadline = time.monotonic()+.05
+            with self.assertRaises(WireError):
+                wire.send(dict(v=1,trial=TRIAL,action=1,kind="RESULT",
+                    data=dict(code="READY",units=[])))
+            self.assertGreater(wire.bytes, 0)
+        finally:
+            for fd in (ir, iw, rr, rw):
+                os.close(fd)
 
 
 class CodecTests(unittest.TestCase):

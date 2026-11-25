@@ -228,6 +228,8 @@ class Child:
         self.steps = 0
         self.stopped = False
         self.effect_possible = False
+        self.open_wire_failed = False
+        self.turn_aliases = set()
 
     def send(self, kind, data):
         self.wire.send(dict(v=1, trial=self.trial, action=self.action,
@@ -239,7 +241,7 @@ class Child:
 
     def _remember(self, value):
         require(token(value) and value not in self.used and value != self.trial
-                and len(self.used) < 256)
+                and value not in self.turn_aliases and len(self.used) < 256)
         self.used.add(value)
 
     def _new_token(self):
@@ -265,8 +267,14 @@ class Child:
         c = correlation(ref)
         self._remember(c.request_id)
         self._remember(c.view_key)
-        if not self._offer("OPEN_OFFER", "OPEN_ACK", "ref", ref):
-            return False
+        try:
+            if not self._offer("OPEN_OFFER", "OPEN_ACK", "ref", ref):
+                return False
+        except WireError:
+            # R5's callback wrapper translates exceptions to fixture refusal.
+            # Preserve the wire failure locally; never reply to a bad ACK.
+            self.open_wire_failed = True
+            raise
         # Matching timely true ACK consumed. This is only a local observation,
         # not authenticated QML state. Any failure from here can have an effect.
         self.effect_possible = True
@@ -426,6 +434,12 @@ class Child:
                 require(req["after"] <= i < self.revision and token(row["turn_id"])
                         and row["role"] == ("user" if i%2 == 0 else "assistant")
                         and row["text"] == _TURNS[i//2][i%2])
+            public_turns = {row["turn_id"] for row in page["messages"]}
+            require(len(public_turns) == len(page["messages"])
+                    and not public_turns.intersection(self.used)
+                    and not self.trial in public_turns
+                    and len(public_turns | self.turn_aliases) <= 5)
+            self.turn_aliases.update(public_turns)
             require(page["sessionId"] == scope["sessionId"]
                     and page["revision"] == scope["revision"]
                     and page["requestId"] == req["requestId"])
@@ -444,12 +458,24 @@ class Child:
                 invalidate_lifetime=self._invalidate)
             self.identity = self._db_identity()
             self.aliases = FixtureHistoryAliases(_OWNER, self.host._session)
+            self._remember(self.aliases._session_alias)
             self.phase = "IDLE"
             self.result("READY")
         elif kind == "NEXT":
             require(self.phase == "IDLE" and data == {} and self.host._index < 3)
+            self.host._db.execute("BEGIN")
+            try:
+                self._idle_snapshot()
+            finally:
+                self.host._db.rollback()
             self._retire()
-            self.host.start_next()
+            self.open_wire_failed = False
+            try:
+                self.host.start_next()
+            except Exception:
+                if self.open_wire_failed:
+                    raise WireError() from None
+                raise
             require(self.current is not None)
             self.phase = "ACTIVE"
             self.reopen_ready = False

@@ -31,7 +31,9 @@ STOP-only (no sixth row). After aborted/unknown only CLOSE allowed.
 Tests: isolated subprocess happy path, independent SQLite row/attempt
 evidence, same-session alias continuity across reopen, stale/false ACK,
 lost result with actual durable append, stale request, replay, malformed
-raw input/EOF/timeout and bounded canonical codec. Actual Quickshell
-parent parser/drain/currentness, native joined panel, blocked-write and
-budget-exhaustion stress evidence and security review remain separate.
+raw input/EOF/timeout and bounded canonical codec. Direct owner tests inspect
+missing/wrong/false ACK before cleanup, plus blocked pipe write deadline
+and conservative reserve refusal. Actual Quickshell parent parser/drain/
+currentness, native joined panel, full cumulative budget-exhaustion matrix
+and security review remain separate.
 No live SEND/STOP, native Ollama, protected disclosure or production.

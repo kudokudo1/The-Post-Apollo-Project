@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createInvestigation, attachEvidence, removeEvidence, validateCollection } from "./research_investigations.mjs";
+import { prepareWriteIntent, encodeWriteIntent } from "./research_investigation_write_intent.mjs";
 
 const PREFIX = "FINANCE_RESEARCH_STORE_";
 const MAX_BYTES = 500000;
@@ -184,6 +185,13 @@ function run(command,dir=rootDirectory()) {
       else investigations=removeEvidence(current.investigations,command.investigationId,command.evidenceId,command.timestamp);
     } catch { refuse("INVALID_RESEARCH_CHANGE"); }
     const next={schemaVersion:1,revision:current.revision+1,investigations};
+    // Write and fsync the metadata-only operation intent into the durable
+    // exclusive lock BEFORE any rename attempt. A SIGKILL at this point may
+    // leave a partial lock: recovery must preserve it and mark it untrusted.
+    // This is NOT a completion receipt and never grants a retry or unlock.
+    const intent=prepareWriteIntent(command,current,next);
+    fs.writeFileSync(lockfd,encodeWriteIntent(intent),"utf8");
+    fs.fsyncSync(lockfd);
     save(dir,next,()=>{ uncertainCommit=true; });
     durableCommit=true;
     return next;

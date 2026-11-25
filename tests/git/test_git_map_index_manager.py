@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -75,6 +76,65 @@ class ManagedCacheTests(unittest.TestCase):
             manager.lookup(self.repo,self.root)
         with self.assertRaises(ValueError):
             manager.build(self.repo,self.root)
+
+    def test_inventory_missing_never_creates_cache(self):
+        result=manager.inventory(self.repo,self.root)
+        self.assertEqual(result["observedSlots"],0)
+        self.assertFalse(result["reclamationAllowed"])
+        self.assertFalse(self.root.exists())
+
+    def test_inventory_current_history_staging_and_unsafe(self):
+        old=manager.build(self.repo,self.root)
+        self.git("commit","--allow-empty","-m","second")
+        current=manager.build(self.repo,self.root)
+        folder=Path(current["directory"]).parent
+        stage=folder/(".candidate-"+"a"*32)
+        stage.mkdir(mode=0o700)
+        (stage/".building.sqlite3").write_bytes(b"incomplete")
+        (stage/".building.sqlite3").chmod(0o600)
+        unsafe=folder/("e"*64)
+        unsafe.symlink_to(self.repo,target_is_directory=True)
+        incomplete=folder/("f"*64)
+        incomplete.mkdir(mode=0o700)
+        (folder/"unknown-entry").write_text("not a generation")
+        def frozen():
+            return {str(p):hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in (Path(old["directory"])/manager.index.NAME,
+                              Path(current["directory"])/manager.index.NAME,
+                              stage/".building.sqlite3",folder/"unknown-entry")}
+        before=frozen()
+        names=set(p.name for p in folder.iterdir())
+        head=self.git("rev-parse","HEAD")
+        state=self.git("status","--porcelain")
+        result=manager.inventory(self.repo,self.root)
+        rows={r["key"]:r for r in result["entries"]}
+        self.assertEqual(result["observedSlots"],6)
+        self.assertFalse(result["truncated"])
+        self.assertEqual(rows[old["key"]]["state"],"HISTORICAL")
+        self.assertEqual(rows[current["key"]]["state"],"CURRENT")
+        self.assertEqual(rows[stage.name]["state"],"STAGING")
+        self.assertEqual(rows[unsafe.name]["state"],"UNSAFE OR INVALID")
+        self.assertEqual(rows[incomplete.name]["state"],"INCOMPLETE OR MOVED")
+        self.assertEqual(rows[None]["state"],"UNKNOWN ENTRY")
+        self.assertEqual(result["observedDatabaseBytes"],
+                         sum(Path(p).stat().st_size for p in before if not p.endswith("unknown-entry")))
+        self.assertTrue(all(row["readerStatus"]=="UNKNOWN" and not row["reclamationAllowed"]
+                            for row in rows.values()))
+        self.assertEqual(frozen(),before)
+        self.assertEqual(set(p.name for p in folder.iterdir()),names)
+        self.assertEqual(self.git("rev-parse","HEAD"),head)
+        self.assertEqual(self.git("status","--porcelain"),state)
+        with patch.object(manager,"MAX_INVENTORY_ENTRIES",2):
+            limited=manager.inventory(self.repo,self.root)
+        self.assertEqual(limited["observedSlots"],2)
+        self.assertTrue(limited["truncated"])
+        self.assertFalse(limited["reclamationAllowed"])
+
+    def test_inventory_rejects_changed_repo_identity(self):
+        ident=manager.identity(self.repo)
+        with patch.object(manager,"identity",side_effect=[ident,(*ident[:3],"f"*64)]):
+            with self.assertRaises(ValueError):
+                manager.inventory(self.repo,self.root)
 
     def test_shallow_deepen_changes_key_without_new_tip(self):
         for n in range(3):

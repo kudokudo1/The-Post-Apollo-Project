@@ -8,6 +8,7 @@ on:
       - 'widgets/cpuplus/CpuPlusProfilePane.qml'
       - 'widgets/cpuplus/CpuPlusProfilePreview.js'
       - 'widgets/cpuplus/CpuPlusProfileCatalogStore.qml'
+      - 'scripts/cpuplus_profile_catalog.py'
       - 'widgets/cpuplus/CpuPlusProfileCatalog.js'
       - 'widgets/cpuplus/CpuPlusZramPolicyPane.qml'
       - 'widgets/cpuplus/CpuPlusZramPolicy.js'

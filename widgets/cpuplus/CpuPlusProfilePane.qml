@@ -29,7 +29,7 @@ Column {
     signal catalogLoadRequested()
     signal catalogSaveRequested(string name)
     signal savedDraftRequested(string name)
-    onCatalogChanged: if(!catalog || !savedRows.some(x=>x.name===selectedSaved)) selectedSaved=""
+    onCatalogChanged: if(!catalog || !catalog.profiles.some(x=>x.name===selectedSaved)) selectedSaved=""
     readonly property var view: Profile.preview(selectedProfile,customDraft,actualKiB,actualSwappiness)
     spacing: 6
     GohuText {

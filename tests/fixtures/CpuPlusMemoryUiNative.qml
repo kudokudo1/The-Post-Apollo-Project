@@ -347,6 +347,14 @@ ShellRoot {
                         if (!smoke.check(prof.view.capacity.target===null && pane.customProfileDraft.capacityGiB===24,
                             "unconfigured preset cannot alter custom draft")) return;
                         pane.chooseProfile("CUSTOM");
+                        const load=smoke.find(pane,"cpuplusProfileLoadList");
+                        const save=smoke.find(pane,"cpuplusProfileSaveNew");
+                        if (!smoke.check(load && save && load.available && !save.available
+                            && prof.catalog===null && prof.catalogStatus==="NOT LOADED"
+                            && scroll.height>0,"catalog idle and fixed footer")) return;
+                        load.leftClicked(null);
+                        smoke.phase=50;
+                        return;
                     }
                     if (smoke.phase < 5) pane.selectMenu(smoke.phase + 1);
                     else pane.selectMenu(0);
@@ -399,6 +407,51 @@ ShellRoot {
                     smoke.phase=4;
                     return;
                 }
+                if (smoke.phase>=50 && smoke.phase<=54) {
+                    const prof=smoke.find(pane,"cpuplusProfilePane");
+                    if(smoke.phase===52) {
+                        if (!smoke.check(!prof && pane.page==="CAP","profile page unloaded"))return;
+                        pane.selectMenu(5); smoke.phase=53; return;
+                    }
+                    if(!prof)return;
+                    if(smoke.phase===50) {
+                        if(prof.catalogBusy)return;
+                        if(!smoke.check(prof.catalogReady && prof.catalog.revision===0
+                            && prof.savedRows.length===0,"actual empty catalog read"))return;
+                        prof.saveName="Native Work";
+                        const save=smoke.find(pane,"cpuplusProfileSaveNew");
+                        if(!smoke.check(save && save.available,"named save available"))return;
+                        save.leftClicked(null);
+                        save.leftClicked(null);
+                        smoke.phase=51;return;
+                    }
+                    if(smoke.phase===51) {
+                        if(prof.catalogBusy)return;
+                        if(!smoke.check(prof.catalogReady && prof.catalog.revision===1
+                            && prof.savedRows.length===1 && prof.savedRows[0].name==="Native Work",
+                            "one actual persisted profile"))return;
+                        pane.clearProfileDraft();
+                        pane.selectMenu(0);smoke.phase=52;return;
+                    }
+                    if(smoke.phase===53) {
+                        const load=smoke.find(pane,"cpuplusProfileLoadList");
+                        if(!smoke.check(load && load.available && prof.view.capacity.target===null,
+                            "reopened PROF with cleared draft"))return;
+                        load.leftClicked(null);smoke.phase=54;return;
+                    }
+                    if(prof.catalogBusy)return;
+                    if(!smoke.check(prof.catalogReady && prof.catalog.revision===1
+                        && prof.savedRows.length===1,"disk re-read after reopen"))return;
+                    prof.selectedSaved="Native Work";
+                    const loadDraft=smoke.find(pane,"cpuplusProfileLoadDraft");
+                    if(!smoke.check(loadDraft && loadDraft.available,"load draft available"))return;
+                    loadDraft.leftClicked(null);
+                    if(!smoke.check(prof.view.capacity.target===24 && prof.view.swappiness.target===150
+                        && pane.stagedGiB===24 && pane.stagedSwappiness===150 && MemoryOperation.requests===0,
+                        "loaded draft only, no setting changes"))return;
+                    console.log("CPU_PROFILE_NATIVE_PASS // persisted save, unload/reopen, reload and draft only");
+                    pane.selectMenu(0);smoke.phase=6;return;
+                }
                 if (!smoke.check(pane.page === "CAP" && slider.visible
                         && pane.stagedGiB === 24 && pane.stagedSwappiness === 150
                         && pane.customProfileDraft.capacityGiB===24 && pane.customProfileDraft.swappiness===150
@@ -415,7 +468,7 @@ ShellRoot {
         repeat: true
         running: smoke.armed && !smoke.done
         onTriggered: {
-            if (++smoke.ticks > 60) {
+            if (++smoke.ticks > 150) {
                 smoke.check(false, "timeout phase=" + smoke.phase);
                 return;
             }

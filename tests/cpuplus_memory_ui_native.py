@@ -36,6 +36,8 @@ Scope {
     function request(action, value) { requests++; }
 }
 """)
+    (config / "scripts").mkdir()
+    shutil.copy2(ROOT / "scripts/cpuplus_profile_catalog.py", config / "scripts/cpuplus_profile_catalog.py")
     env = os.environ.copy()
     for key in ("HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_RUNTIME_DIR"):
         directory = base / key
@@ -48,5 +50,5 @@ Scope {
                           cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, timeout=25, check=False)
     print(proc.stdout)
-    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
+    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
         raise SystemExit("Native UI fixture failed")

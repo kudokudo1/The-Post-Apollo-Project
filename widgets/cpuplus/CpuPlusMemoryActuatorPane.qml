@@ -23,6 +23,14 @@ Item {
     // Draft belongs to this memory pane, not the demand-loaded PROF subpage.
     property string selectedProfile: ""
     property var customProfileDraft: Profiles.empty()
+    CpuPlusProfileCatalogStore { id: profileCatalog }
+    function loadProfileDraft(name) {
+        if(page!=="PROF" || !profileCatalog.ready) return;
+        const row=profileCatalog.document.profiles.find(x=>x.name===name);
+        if(!row || !Profiles.valid(row.targets)) return;
+        customProfileDraft={capacityGiB:row.targets.capacityGiB,swappiness:row.targets.swappiness};
+        selectedProfile="CUSTOM";
+    }
     function chooseProfile(name) {
         if (page === "PROF" && Profiles.names().includes(name)) selectedProfile = name;
     }
@@ -996,6 +1004,21 @@ Item {
                     onProfileSelected: name => root.chooseProfile(name)
                     onDraftCapture: key => root.captureProfileTarget(key)
                     onDraftCleared: root.clearProfileDraft()
+                    catalog: profileCatalog.document
+                    catalogStatus: profileCatalog.status
+                    catalogBusy: profileCatalog.busy || profileCatalog.faulted
+                    onCatalogLoadRequested: if(root.page==="PROF") profileCatalog.list()
+                    onCatalogSaveRequested: name => {
+                        if(root.page==="PROF" && root.selectedProfile==="CUSTOM") profileCatalog.saveNew(name,root.customProfileDraft);
+                    }
+                    onSavedDraftRequested: name => root.loadProfileDraft(name)
+                    onCatalogChangeRequested: request => {
+                        if(root.page!=="PROF" || !request)return;
+                        if(request.action==="edit" && (root.selectedProfile!=="CUSTOM" || !Profiles.valid(request.targets)
+                            || request.targets.capacityGiB!==root.customProfileDraft.capacityGiB
+                            || request.targets.swappiness!==root.customProfileDraft.swappiness))return;
+                        profileCatalog.changeExisting(request);
+                    }
                 }
             }
         }

@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-memory-ui-") as tmp:
     (config / "widgets/cpuplus").mkdir(parents=True)
     for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js", "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js", "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js", "CpuPlusDiagnosticsPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
-    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js", "CpuPlusAutoWorkspace.qml", "CpuPlusQueueHistoryPane.qml", "CpuPlusQueueHistory.js", "CpuPlusQueueRecoveryPane.qml", "CpuPlusQueueRecovery.js"):
+    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js", "CpuPlusProfileCatalog.js", "CpuPlusProfileCatalogStore.qml", "CpuPlusAutoWorkspace.qml", "CpuPlusQueueHistoryPane.qml", "CpuPlusQueueHistory.js", "CpuPlusQueueRecoveryPane.qml", "CpuPlusQueueRecovery.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
     shutil.copy2(ROOT / "tests/fixtures/CpuPlusMemoryUiNative.qml", config / "smoke.qml")
     shutil.copytree(ROOT / "services/diagnostics", config / "services/diagnostics")
@@ -36,6 +36,8 @@ Scope {
     function request(action, value) { requests++; }
 }
 """)
+    (config / "scripts").mkdir()
+    shutil.copy2(ROOT / "scripts/cpuplus_profile_catalog.py", config / "scripts/cpuplus_profile_catalog.py")
     env = os.environ.copy()
     for key in ("HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_RUNTIME_DIR"):
         directory = base / key
@@ -48,5 +50,5 @@ Scope {
                           cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, timeout=25, check=False)
     print(proc.stdout)
-    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
+    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
         raise SystemExit("Native UI fixture failed")

@@ -52,3 +52,92 @@ seasonal shedding of derived context only, explicit selective rehydration;
 M7d approved knowledge retrieval and versioned provenance, subject to
 storage/security owner agreement; M7e final composition with Heart capacity
 and Runtime settings. Do not wire into the fixed public R6 trial.
+
+## M7g-a // Seasonal memory lifecycle integration (design only)
+
+Nurse design scope ACCEPT #2161 comment 7175665347; Spirit refinement
+7175441242; original proposal 7175428109. Runtime and Heart compatibility
+requested, not assumed. Main 293c9f33: M7f-b correction #2844 integrated,
+cache 982f8e5f, tests 59f031c3, exact-head eight workflows and 141 Python
+tests including 17 focused. This proposal changes no executable behavior.
+
+### Ownership and identity
+
+Runtime owns lifecycle and exact original retirement/restoration. Mind
+owns only derived task-local context and the existing TaskStickyContext
+lock, route and two bounded pools. No additional lifecycle registry,
+cache, durable knowledge store, producer or UI state. The proposed
+consumer needs independently resolved exact principal/Tree/optional
+Clone/task/execution context/generation/origin (existing TaskContext),
+the Runtime-owned mapping/slot/session and lifecycle revision, and the
+original cache object lifetime. Runtime must confirm which identity
+fields and ordering witness are available; this is not a frozen wire API.
+Neither B1 session identity nor R7c synthetic transaction state proves
+a real task lifecycle. No parent/child seasonal aggregation.
+
+### Behavioral contract
+
+- Spring Cleaning first: within an existing live lifetime, revalidate
+  current selection and independently eligible layers, selectively rebuild
+  as necessary. After confirmed Winter retirement, require a separately
+  authorized fresh TaskContext and new empty cache lifetime, fresh exact
+  selection/use and explicit owner resupply. No transfer of old entries,
+  route, grant or in-flight attempt; no auto replay.
+- Summer Growing: existing bounded reuse only on exact independently
+  current selection, version, dependencies and use; recheck final use
+  before assembly. Summer is not permission, nor an inference from a hit.
+- Fall Shedding: explicit owner-requested domain discard using existing
+  shed semantics; preserve independently eligible unaffected pool, retire
+  selection and require strictly newer input before explicit reselection.
+  No durable deletion, model eviction or physical resource credit.
+- Winter Dormant: independently confirmed exact original retirement
+  permits closing only that original cache lifetime. Existing close()
+  is unscoped, so a future owner must validate exact object/lifetime and
+  serialize validation/close against replacement. Retire old derived
+  attachment separately through its owner; preserve B1 rows, revision
+  lineage, H11/H2 and original effect settlement. Unknown outcome never
+  authorizes close or retry. New Spring is separate.
+
+### Refusal and invalidation ordering
+
+First establish exact lifetime and independently current scope/dependency
+observations; stale, malformed or mismatched observations cannot mutate
+a replacement. A valid current explicit revoke must be processed before
+any seasonal/pending/unknown/missing-record refusal: clear both pools,
+retire route, fence policy using existing M7f semantics. This includes
+final-use revocation on partial misses (#2844). Unknown eligibility or
+lifecycle blocks new derived body exposure without inventing revocation,
+season, retirement or terminal receipt. Preserve existing monotonic
+policy/domain/input floors and exact re-selection requirements.
+An already-admitted original effect's settlement is independent and
+remains Runtime/Security-owned; cache invalidation does not settle it,
+erase external copies, or acknowledge recipient revocation. No new body
+released from partial selection. No lock across IO/network. No proposed
+local lock is a substitute for external atomic authority.
+
+### Future fixed-public witness matrix (not authorized executable scope)
+
+Use existing public-versioned cache and existing focused regressions;
+no real lifecycle producer. Demonstrate fresh Spring after exact old
+retirement, independent eligible-layer reuse within live Spring, Summer
+current-use refusal, Fall selective discard and newer input fence,
+pending/unknown no body, valid current revoke before seasonal/miss
+refusal, stale/mismatched lifecycle or revoke nonmutation, exact old
+close without affecting replacement, no implicit resupply/replay.
+Keep existing 32-record / 4096-byte bounds and joint assembly budget.
+No durable history write, H2/resource release, model/transport call,
+UI field, physical heap claim or protected source. Runtime must agree
+on identity/order seam and Heart on derived accounting before a
+specific executable proposal is reviewed by Nurse. Security review
+of exact implementation remains separate.
+
+### Owner dispositions requested
+
+DOC2F: confirm independently current original lifecycle identity,
+ordering, pending vs terminal and replacement serialization, and
+fresh restoration scope without changing Runtime-owned source.
+DOC1F: confirm bounded derived retention/discard only, no physical
+release credit or model admission. DOC3F: confirm refined ordering
+and authority isolation; UI1/UI2 retain UNKNOWN without a real producer.
+Nurse2F: review exact design and later separately authorize fixed-public
+witness implementation, not production. No live seasonal claim.

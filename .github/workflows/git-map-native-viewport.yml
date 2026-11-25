@@ -3,6 +3,12 @@ on:
   pull_request:
     paths:
       - "scripts/git_map_history_index.py"
+      - "scripts/git_map_index_manager.py"
+      - "widgets/git/GitMapControlHost.qml"
+      - "widgets/GitW.qml"
+      - "tests/git/test_git_map_index_manager.py"
+      - "tests/git/test_git_map_managed_native.py"
+      - "tests/git/fixtures/GitMapManagedNative.qml"
       - "services/git/GitMapViewportPolicy.js"
       - "services/git/GitMapPageBridge.qml"
       - "widgets/git/GitMapVirtualViewport.qml"
@@ -32,6 +38,7 @@ jobs:
         run: |
           python3 -B tests/git/test_git_map_history_index.py
           node tests/git/test_git_map_viewport.cjs
+          python3 -B tests/git/test_git_map_index_manager.py
       - name: Offscreen asynchronous paging, boundary and merge continuity
         run: python3 -B tests/git/test_git_map_viewport_native.py
         env:
@@ -41,3 +48,7 @@ jobs:
         env:
           POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY
           POST_APOLLO_GIT_MAP_INPUT: "1"
+      - name: Managed index startup gate, explicit build and cache reuse
+        run: python3 -B tests/git/test_git_map_managed_native.py
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY

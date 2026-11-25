@@ -327,3 +327,32 @@ test('mini COMBI histories copy only on demand and preserve snapshot isolation',
     assert.match(refresh, /onTaskIdentityChanged\(\)/);
     assert.match(refresh, /onRowItemChanged\(\)/);
 });
+
+test('mini graph scroll moves one trace layer, not every rectangle', () => {
+    const start = app.indexOf('id: killMiniCpuCanvas');
+    const stop = app.indexOf('id: selectorAppIconBox', start);
+    assert.ok(start >= 0 && stop > start);
+    const mini = app.slice(start, stop);
+    const layerStart = mini.indexOf('id: miniTraceLayer');
+    assert.ok(layerStart > 0);
+    const controls = mini.slice(0, layerStart);
+    const trace = mini.slice(layerStart);
+    assert.match(controls, /clip: true/);
+    assert.match(controls, /duration: appControlWindow.taskMiniGraphScrollDuration/);
+    assert.match(controls, /model: 3\s+delegate: Rectangle/);
+    assert.match(controls, /readonly property bool fillReady:\s*graphPoints.length >= 2/);
+    assert.match(trace, /anchors.fill: parent\s+transform: Translate \{\s*x: killMiniCpuCanvas.graphScrollOffset\s*\}/);
+    assert.equal((mini.match(/killMiniCpuCanvas\.graphScrollOffset/g) || []).length, 1,
+        'only one animated geometry dependency per mini graph');
+    assert.match(trace, /model:\s*killMiniCpuCanvas.combiView\s*\? killMiniCpuCanvas.combiSeries : \[\]/);
+    assert.match(trace, /x:\s*graphPoint.x\s*- width \/ 2\s+y: graphPoint.y/);
+    assert.match(trace, /x:\s*leftX\s+y: topY/);
+    assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y: parent\.p1\.y/g) || []).length, 4);
+    assert.match(trace, /rotation: parent.segmentAngle/);
+    assert.match(trace, /transformOrigin: Item.Left/);
+    assert.match(trace, /killMiniCpuCanvas\.graphPoints.length - 1/);
+    // The polling, history and destructive-action owners remain outside this
+    // presentation change. Never reduce safety refreshes to improve rendering.
+    assert.match(app, /\? 600\s*:\s*appControlWindow.menuOpen/);
+    assert.match(app, /id: taskMiniDisplayTimer[\s\S]*?interval: 1200/);
+});

@@ -14702,270 +14702,275 @@ PanelWindow {
                                 );
                             }
 
-                            // COMBI overlays the four real histories in the same
-                            // mini graph. Each metric keeps its own vertical scale, but
-                            // every series is trimmed to the same common history length
-                            // so CPU/MEM/I-O/AGE begin at the same x/time origin.
-                            Repeater {
-                                model:
-                                    killMiniCpuCanvas.combiView
-                                    ? killMiniCpuCanvas.combiSeries : []
-
-                                delegate: Item {
-                                    id: miniCombiTrace
-                                    required property var modelData
-                                    required property int index
-                                    anchors.fill: parent
-                                    z: 5
-
-                                    readonly property var metricHistory: {
-                                        const epoch = killMiniCpuCanvas.graphEpoch;
-                                        const metrics = ["cpu", "mem", "io", "age"];
-                                        const histories = [];
-                                        let commonLength = Number.MAX_SAFE_INTEGER;
-
-                                        for (let i = 0; i < metrics.length; i++) {
-                                            const values =
-                                                killMiniCpuCanvas.combiHistories[
-                                                    metrics[i]
-                                                ];
-                                            const history = Array.isArray(values)
-                                                            ? values : [];
-                                            histories.push(history);
-                                            commonLength = Math.min(
-                                                commonLength,
-                                                history.length
-                                            );
-                                        }
-
-                                        if (!Number.isFinite(commonLength)
-                                                || commonLength <= 0)
-                                            return [];
-
-                                        const ownIndex = metrics.indexOf(modelData.metric);
-                                        const own = ownIndex >= 0
-                                                    ? histories[ownIndex] : [];
-                                        return own.slice(
-                                            Math.max(0, own.length - commonLength)
-                                        );
-                                    }
-                                    readonly property var metricPoints:
-                                        graphHistory.linePoints(
-                                            metricHistory,
-                                            width,
-                                            height,
-                                            appControlWindow.hunterMetricRangeForKey(
-                                                modelData.metric
-                                            ),
-                                            appControlWindow.taskMiniHistoryLimit,
-                                            2,
-                                            3
-                                        )
-
-                                    // Very light per-series area fill. The four fills
-                                    // intentionally overlap, matching the overlaid lines.
-                                    Repeater {
-                                        model: miniCombiTrace.metricPoints.length
-
-                                        delegate: Rectangle {
-                                            readonly property point graphPoint:
-                                                miniCombiTrace.metricPoints[index]
-                                            x:
-                                                graphPoint.x
-                                                - width / 2
-                                                + killMiniCpuCanvas.graphScrollOffset
-                                            y: graphPoint.y
-                                            width: Math.max(
-                                                1.5,
-                                                miniCombiTrace.width
-                                                / Math.max(
-                                                    2,
-                                                    appControlWindow.taskMiniHistoryLimit - 1
-                                                )
-                                                + 0.8
-                                            )
-                                            height: Math.max(
-                                                0,
-                                                miniCombiTrace.height - graphPoint.y - 1
-                                            )
-                                            color: miniCombiTrace.modelData.accent
-                                            opacity: 0.055
-                                            antialiasing: true
-                                            z: 1
-                                        }
-                                    }
-
-                                    Repeater {
-                                        model: Math.max(
-                                            0,
-                                            miniCombiTrace.metricPoints.length - 1
-                                        )
-
-                                        delegate: Item {
-                                            anchors.fill: parent
-                                            z: 3
-                                            readonly property point p1:
-                                                miniCombiTrace.metricPoints[index]
-                                            readonly property point p2:
-                                                miniCombiTrace.metricPoints[index + 1]
-                                            readonly property real dx: p2.x - p1.x
-                                            readonly property real dy: p2.y - p1.y
-                                            readonly property real segmentLength:
-                                                Math.sqrt(dx * dx + dy * dy)
-                                            readonly property real segmentAngle:
-                                                Math.atan2(dy, dx) * 180 / Math.PI
-
-                                            Rectangle {
-                                                x:
-                                                    parent.p1.x
-                                                    + killMiniCpuCanvas.graphScrollOffset
-                                                y: parent.p1.y - height / 2
-                                                width: parent.segmentLength
-                                                height: 4
-                                                radius: 2
-                                                rotation: parent.segmentAngle
-                                                transformOrigin: Item.Left
-                                                color: miniCombiTrace.modelData.accent
-                                                opacity: 0.18
-                                                antialiasing: true
-                                            }
-
-                                            Rectangle {
-                                                x:
-                                                    parent.p1.x
-                                                    + killMiniCpuCanvas.graphScrollOffset
-                                                y: parent.p1.y - height / 2
-                                                width: parent.segmentLength
-                                                height: 1.5
-                                                radius: 0.75
-                                                rotation: parent.segmentAngle
-                                                transformOrigin: Item.Left
-                                                color: miniCombiTrace.modelData.accent
-                                                opacity: 1.0
-                                                antialiasing: true
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Fixed timeline geometry means the fill can be enabled as
-                            // soon as one real segment exists. There is no delayed six-
-                            // sample transition anymore, so the graph does not visibly
-                            // "pop" into a malformed filled state after several seconds.
                             readonly property bool fillReady:
                                 graphPoints.length >= 2
 
-                            // Match the large TASK MANAGER graphs with a
-                            // translucent filled area beneath the mini trace. This is
-                            // ordinary QML geometry, so it keeps the same hide/show
-                            // stability as the segment renderer.
-                            // Fill only underneath segments that already have
-                            // two valid endpoints. The older point-cell fill could
-                            // briefly paint ahead of the trace while a delegate was
-                            // initializing, which produced the startup overhang.
-                            Repeater {
-                                model: !killMiniCpuCanvas.combiView
-                                       && killMiniCpuCanvas.fillReady
-                                       ? Math.max(
-                                             0,
-                                             killMiniCpuCanvas.graphPoints.length - 1
-                                         )
-                                       : 0
-
-                                delegate: Rectangle {
-                                    readonly property point p1:
-                                        killMiniCpuCanvas.graphPoints[index]
-                                    readonly property point p2:
-                                        killMiniCpuCanvas.graphPoints[index + 1]
-                                    readonly property real leftX:
-                                        Math.max(0, Math.min(p1.x, p2.x))
-                                    readonly property real rightX:
-                                        Math.min(
-                                            killMiniCpuCanvas.width,
-                                            Math.max(p1.x, p2.x)
-                                        )
-                                    readonly property real topY:
-                                        Math.max(
-                                            0,
-                                            Math.min(
-                                                killMiniCpuCanvas.height - 1,
-                                                Math.min(p1.y, p2.y)
-                                            )
-                                        )
-
-                                    x:
-                                        leftX
-                                        + killMiniCpuCanvas.graphScrollOffset
-                                    y: topY
-                                    width: Math.max(0, rightX - leftX + 0.8)
-                                    height: Math.max(
-                                        0,
-                                        killMiniCpuCanvas.height - topY - 1
-                                    )
-                                    visible:
-                                        Number.isFinite(p1.x)
-                                        && Number.isFinite(p1.y)
-                                        && Number.isFinite(p2.x)
-                                        && Number.isFinite(p2.y)
-                                        && width > 0
-                                        && height > 0
-                                    color: killMiniGraphBox.accent
-                                    opacity: 0.20
-                                    antialiasing: true
+                            // Move all trace geometry as one scene-graph layer.
+                            // Keep the grid stationary and the original outer clip.
+                            Item {
+                                id: miniTraceLayer
+                                anchors.fill: parent
+                                transform: Translate {
+                                    x: killMiniCpuCanvas.graphScrollOffset
                                 }
-                            }
+                                // COMBI overlays the four real histories in the same
+                                // mini graph. Each metric keeps its own vertical scale, but
+                                // every series is trimmed to the same common history length
+                                // so CPU/MEM/I-O/AGE begin at the same x/time origin.
+                                Repeater {
+                                    model:
+                                        killMiniCpuCanvas.combiView
+                                        ? killMiniCpuCanvas.combiSeries : []
 
-                            Repeater {
-                                model: killMiniCpuCanvas.combiView
-                                       ? 0
-                                       : Math.max(0, killMiniCpuCanvas.graphPoints.length - 1)
+                                    delegate: Item {
+                                        id: miniCombiTrace
+                                        required property var modelData
+                                        required property int index
+                                        anchors.fill: parent
+                                        z: 5
 
-                                delegate: Item {
-                                    anchors.fill: parent
+                                        readonly property var metricHistory: {
+                                            const epoch = killMiniCpuCanvas.graphEpoch;
+                                            const metrics = ["cpu", "mem", "io", "age"];
+                                            const histories = [];
+                                            let commonLength = Number.MAX_SAFE_INTEGER;
 
-                                    // graphEpoch is deliberately referenced here as well.
-                                    // It forces already-created delegates to refresh their
-                                    // coordinates even when the Repeater count is unchanged.
-                                    readonly property point p1: {
-                                        const epoch = killMiniCpuCanvas.graphEpoch;
-                                        return killMiniCpuCanvas.graphPoints[index];
+                                            for (let i = 0; i < metrics.length; i++) {
+                                                const values =
+                                                    killMiniCpuCanvas.combiHistories[
+                                                        metrics[i]
+                                                    ];
+                                                const history = Array.isArray(values)
+                                                                ? values : [];
+                                                histories.push(history);
+                                                commonLength = Math.min(
+                                                    commonLength,
+                                                    history.length
+                                                );
+                                            }
+
+                                            if (!Number.isFinite(commonLength)
+                                                    || commonLength <= 0)
+                                                return [];
+
+                                            const ownIndex = metrics.indexOf(modelData.metric);
+                                            const own = ownIndex >= 0
+                                                        ? histories[ownIndex] : [];
+                                            return own.slice(
+                                                Math.max(0, own.length - commonLength)
+                                            );
+                                        }
+                                        readonly property var metricPoints:
+                                            graphHistory.linePoints(
+                                                metricHistory,
+                                                width,
+                                                height,
+                                                appControlWindow.hunterMetricRangeForKey(
+                                                    modelData.metric
+                                                ),
+                                                appControlWindow.taskMiniHistoryLimit,
+                                                2,
+                                                3
+                                            )
+
+                                        // Very light per-series area fill. The four fills
+                                        // intentionally overlap, matching the overlaid lines.
+                                        Repeater {
+                                            model: miniCombiTrace.metricPoints.length
+
+                                            delegate: Rectangle {
+                                                readonly property point graphPoint:
+                                                    miniCombiTrace.metricPoints[index]
+                                                x:
+                                                    graphPoint.x
+                                                    - width / 2
+                                                y: graphPoint.y
+                                                width: Math.max(
+                                                    1.5,
+                                                    miniCombiTrace.width
+                                                    / Math.max(
+                                                        2,
+                                                        appControlWindow.taskMiniHistoryLimit - 1
+                                                    )
+                                                    + 0.8
+                                                )
+                                                height: Math.max(
+                                                    0,
+                                                    miniCombiTrace.height - graphPoint.y - 1
+                                                )
+                                                color: miniCombiTrace.modelData.accent
+                                                opacity: 0.055
+                                                antialiasing: true
+                                                z: 1
+                                            }
+                                        }
+
+                                        Repeater {
+                                            model: Math.max(
+                                                0,
+                                                miniCombiTrace.metricPoints.length - 1
+                                            )
+
+                                            delegate: Item {
+                                                anchors.fill: parent
+                                                z: 3
+                                                readonly property point p1:
+                                                    miniCombiTrace.metricPoints[index]
+                                                readonly property point p2:
+                                                    miniCombiTrace.metricPoints[index + 1]
+                                                readonly property real dx: p2.x - p1.x
+                                                readonly property real dy: p2.y - p1.y
+                                                readonly property real segmentLength:
+                                                    Math.sqrt(dx * dx + dy * dy)
+                                                readonly property real segmentAngle:
+                                                    Math.atan2(dy, dx) * 180 / Math.PI
+
+                                                Rectangle {
+                                                    x:
+                                                        parent.p1.x
+                                                    y: parent.p1.y - height / 2
+                                                    width: parent.segmentLength
+                                                    height: 4
+                                                    radius: 2
+                                                    rotation: parent.segmentAngle
+                                                    transformOrigin: Item.Left
+                                                    color: miniCombiTrace.modelData.accent
+                                                    opacity: 0.18
+                                                    antialiasing: true
+                                                }
+
+                                                Rectangle {
+                                                    x:
+                                                        parent.p1.x
+                                                    y: parent.p1.y - height / 2
+                                                    width: parent.segmentLength
+                                                    height: 1.5
+                                                    radius: 0.75
+                                                    rotation: parent.segmentAngle
+                                                    transformOrigin: Item.Left
+                                                    color: miniCombiTrace.modelData.accent
+                                                    opacity: 1.0
+                                                    antialiasing: true
+                                                }
+                                            }
+                                        }
                                     }
-                                    readonly property point p2: {
-                                        const epoch = killMiniCpuCanvas.graphEpoch;
-                                        return killMiniCpuCanvas.graphPoints[index + 1];
-                                    }
-                                    readonly property real dx: p2.x - p1.x
-                                    readonly property real dy: p2.y - p1.y
-                                    readonly property real segmentLength:
-                                        Math.sqrt(dx * dx + dy * dy)
-                                    readonly property real segmentAngle:
-                                        Math.atan2(dy, dx) * 180 / Math.PI
+                                }
 
-                                    Rectangle {
-                                        x: parent.p1.x + killMiniCpuCanvas.graphScrollOffset
-                                        y: parent.p1.y - height / 2
-                                        width: parent.segmentLength
-                                        height: 6
-                                        radius: 3
-                                        rotation: parent.segmentAngle
-                                        transformOrigin: Item.Left
+                                // Fixed timeline geometry means the fill can be enabled as
+                                // soon as one real segment exists. There is no delayed six-
+                                // sample transition anymore, so the graph does not visibly
+                                // "pop" into a malformed filled state after several seconds.
+                                // Match the large TASK MANAGER graphs with a
+                                // translucent filled area beneath the mini trace. This is
+                                // ordinary QML geometry, so it keeps the same hide/show
+                                // stability as the segment renderer.
+                                // Fill only underneath segments that already have
+                                // two valid endpoints. The older point-cell fill could
+                                // briefly paint ahead of the trace while a delegate was
+                                // initializing, which produced the startup overhang.
+                                Repeater {
+                                    model: !killMiniCpuCanvas.combiView
+                                           && killMiniCpuCanvas.fillReady
+                                           ? Math.max(
+                                                 0,
+                                                 killMiniCpuCanvas.graphPoints.length - 1
+                                             )
+                                           : 0
+
+                                    delegate: Rectangle {
+                                        readonly property point p1:
+                                            killMiniCpuCanvas.graphPoints[index]
+                                        readonly property point p2:
+                                            killMiniCpuCanvas.graphPoints[index + 1]
+                                        readonly property real leftX:
+                                            Math.max(0, Math.min(p1.x, p2.x))
+                                        readonly property real rightX:
+                                            Math.min(
+                                                killMiniCpuCanvas.width,
+                                                Math.max(p1.x, p2.x)
+                                            )
+                                        readonly property real topY:
+                                            Math.max(
+                                                0,
+                                                Math.min(
+                                                    killMiniCpuCanvas.height - 1,
+                                                    Math.min(p1.y, p2.y)
+                                                )
+                                            )
+
+                                        x:
+                                            leftX
+                                        y: topY
+                                        width: Math.max(0, rightX - leftX + 0.8)
+                                        height: Math.max(
+                                            0,
+                                            killMiniCpuCanvas.height - topY - 1
+                                        )
+                                        visible:
+                                            Number.isFinite(p1.x)
+                                            && Number.isFinite(p1.y)
+                                            && Number.isFinite(p2.x)
+                                            && Number.isFinite(p2.y)
+                                            && width > 0
+                                            && height > 0
                                         color: killMiniGraphBox.accent
                                         opacity: 0.20
                                         antialiasing: true
                                     }
+                                }
 
-                                    Rectangle {
-                                        x: parent.p1.x + killMiniCpuCanvas.graphScrollOffset
-                                        y: parent.p1.y - height / 2
-                                        width: parent.segmentLength
-                                        height: 2
-                                        radius: 1
-                                        rotation: parent.segmentAngle
-                                        transformOrigin: Item.Left
-                                        color: killMiniGraphBox.accent
-                                        opacity: 1.0
-                                        antialiasing: true
+                                Repeater {
+                                    model: killMiniCpuCanvas.combiView
+                                           ? 0
+                                           : Math.max(0, killMiniCpuCanvas.graphPoints.length - 1)
+
+                                    delegate: Item {
+                                        anchors.fill: parent
+
+                                        // graphEpoch is deliberately referenced here as well.
+                                        // It forces already-created delegates to refresh their
+                                        // coordinates even when the Repeater count is unchanged.
+                                        readonly property point p1: {
+                                            const epoch = killMiniCpuCanvas.graphEpoch;
+                                            return killMiniCpuCanvas.graphPoints[index];
+                                        }
+                                        readonly property point p2: {
+                                            const epoch = killMiniCpuCanvas.graphEpoch;
+                                            return killMiniCpuCanvas.graphPoints[index + 1];
+                                        }
+                                        readonly property real dx: p2.x - p1.x
+                                        readonly property real dy: p2.y - p1.y
+                                        readonly property real segmentLength:
+                                            Math.sqrt(dx * dx + dy * dy)
+                                        readonly property real segmentAngle:
+                                            Math.atan2(dy, dx) * 180 / Math.PI
+
+                                        Rectangle {
+                                            x: parent.p1.x
+                                            y: parent.p1.y - height / 2
+                                            width: parent.segmentLength
+                                            height: 6
+                                            radius: 3
+                                            rotation: parent.segmentAngle
+                                            transformOrigin: Item.Left
+                                            color: killMiniGraphBox.accent
+                                            opacity: 0.20
+                                            antialiasing: true
+                                        }
+
+                                        Rectangle {
+                                            x: parent.p1.x
+                                            y: parent.p1.y - height / 2
+                                            width: parent.segmentLength
+                                            height: 2
+                                            radius: 1
+                                            rotation: parent.segmentAngle
+                                            transformOrigin: Item.Left
+                                            color: killMiniGraphBox.accent
+                                            opacity: 1.0
+                                            antialiasing: true
+                                        }
                                     }
                                 }
                             }

@@ -111,6 +111,52 @@ class CandidateTests(unittest.TestCase):
         with self.assertRaises(c.CustodyRefused):
             c.strict_object(b'{"x":1,"x":2}')
 
+    def test_final_fence_identity_mismatch_keeps_custody(self):
+        original=c.secure_dir.side_effect
+        def mismatch(fd,**kw):
+            identity=original(fd,**kw)
+            return (identity[0],identity[1]+1) if kw.get("private") else identity
+        c.secure_dir.side_effect=mismatch
+        with self.assertRaisesRegex(c.CustodyRefused,"FENCE_IDENTITY_CHANGED"):
+            c.prepare_candidate()
+        self.assertTrue(self.archive.is_file())
+        self.assertTrue((self.fence/"prepared.json").is_file())
+
+    def test_final_fence_contents_mismatch_keeps_custody(self):
+        real=c.write_once
+        def extra(fd,name,data):
+            real(fd,name,data)
+            if name=="prepared.json":
+                (self.fence/"unexpected").write_bytes(b"fixture")
+        with patch.object(c,"write_once",side_effect=extra):
+            with self.assertRaisesRegex(c.CustodyRefused,"FENCE_CONTENTS_CHANGED"):
+                c.prepare_candidate()
+        self.assertTrue(self.archive.is_file())
+        self.assertTrue((self.fence/"prepared.json").is_file())
+
+    def test_final_marker_readback_mismatch_keeps_custody(self):
+        real=c.write_once
+        def changed(fd,name,data):
+            real(fd,name,data)
+            if name=="prepared.json":
+                (self.fence/name).write_bytes(b"changed")
+        with patch.object(c,"write_once",side_effect=changed):
+            with self.assertRaisesRegex(c.CustodyRefused,"PREPARED_READBACK_CHANGED"):
+                c.prepare_candidate()
+        self.assertTrue(self.archive.is_file())
+        self.assertTrue(self.fence.is_dir())
+
+    def test_final_archive_readback_mismatch_keeps_custody(self):
+        real=c.write_once
+        def changed(fd,name,data):
+            real(fd,name,data)
+            if name=="prepared.json":
+                self.archive.write_bytes(b"changed")
+        with patch.object(c,"write_once",side_effect=changed):
+            with self.assertRaisesRegex(c.CustodyRefused,"ARCHIVE_READBACK_CHANGED"):
+                c.prepare_candidate()
+        self.assertTrue((self.fence/"prepared.json").is_file())
+
     def test_no_cli(self):
         self.assertFalse(hasattr(c,"main"))
 

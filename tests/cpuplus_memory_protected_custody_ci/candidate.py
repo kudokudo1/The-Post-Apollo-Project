@@ -203,10 +203,17 @@ def prepare_candidate():
                         "can_execute":False,"can_clear":False})
                     write_once(child,"prepared.json",marker)
                     s = os.stat(FENCE.name,dir_fd=fd,follow_symlinks=False)
-                    require((s.st_dev,s.st_ino) == original and
-                            set(os.listdir(child)) == {"prepared.json"} and
-                            read(child,"prepared.json") == marker and
-                            read(fd,ARCHIVE.name) == archive,"CUSTODY_CHANGED")
+                    # Keep every original post-publication predicate. Report
+                    # the exact failing boundary, not sensitive record bytes.
+                    actual = (s.st_dev, s.st_ino)
+                    require(actual == original,
+                            "FENCE_IDENTITY_CHANGED expected=%r actual=%r" % (original, actual))
+                    names = set(os.listdir(child))
+                    require(names == {"prepared.json"},
+                            "FENCE_CONTENTS_CHANGED count=%d prepared=%s" %
+                            (len(names), "prepared.json" in names))
+                    require(read(child,"prepared.json") == marker, "PREPARED_READBACK_CHANGED")
+                    require(read(fd,ARCHIVE.name) == archive, "ARCHIVE_READBACK_CHANGED")
                 finally:
                     os.close(child)
                 return {"state":"PREPARED_REVIEW_REQUIRED","can_execute":False,"can_clear":False}

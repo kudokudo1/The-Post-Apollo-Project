@@ -454,3 +454,19 @@ console.log("CPU++ M11e stable CAP instrument, proportional meters and header re
 
 assert.match(cpuWindowM9,/readonly property bool showCpuObservation: selectedModeIndex<=3/);
 assert.match(cpuWindowM9,/visible: !cpuPlusWindow.showCpuObservation\s+text: "LIVE \/\/ NET \/\/ "/);
+
+const scanPartsM11f=ramRawM11.split(/(?=^Filename |^some |^60$)/m);
+const scanPathsM11f=ramCtxM11.scanPaths();
+const scanPayloadM11f=scanPathsM11f.map((path,i)=>({path,ok:true,text:scanPartsM11f[i],error:""}));
+assert.ok(ramCtxM11.scanReport(JSON.stringify(scanPayloadM11f)).sample);
+const failedM11f=scanPayloadM11f.map((v,i)=>i===2?{...v,ok:false,text:"",error:"PermissionError errno=13"}:v);
+const reportM11f=ramCtxM11.scanReport(JSON.stringify(failedM11f));
+assert.equal(reportM11f.sample,null);
+assert.equal(reportM11f.rows[2].state,"FAILED");
+assert.equal(reportM11f.rows[0].state,"READY");
+assert.equal(ramCtxM11.scanReport("bad").rows[0].state,"UNVERIFIED");
+assert.match(pane,/readonly property var displaySample: sample \|\| lastGoodSample/);
+assert.match(pane,/sample = scanLive \? result : null/);
+assert.match(cpuWindowM9,/ReloadButton \{\s+id: cpuPlusReloadButton/);
+assert.match(cpuWindowM9,/DiagnosticsDockButton \{\s+id: cpuPlusScanDiagnosticsButton/);
+console.log("CPU++ M11f source scan reports and retained display PASS");

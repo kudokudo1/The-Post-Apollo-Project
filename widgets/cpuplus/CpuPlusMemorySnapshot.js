@@ -109,3 +109,25 @@ function ramDetailRows(sample) {
         return {label:pair[0],value:valid?n:null,fraction:valid?n/sample.total:null};
     });
 }
+
+/* Fixed four-source read report. A successful file read is not automatically
+   a valid snapshot; independently validate each source before publication. */
+function scanPaths() { return ["/proc/meminfo","/proc/swaps","/proc/pressure/memory","/proc/sys/vm/swappiness"]; }
+function scanReport(raw) {
+    const paths=scanPaths(), defaults=["MemTotal: 1024 kB\nMemAvailable: 512 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n","Filename Type Size Used Priority\n","some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n","60\n"];
+    let data=null;
+    if(typeof raw==="string"&&raw.length<=1048576)try{data=JSON.parse(raw);}catch(e){}
+    const validEnvelope=Array.isArray(data)&&data.length===4&&data.every((x,i)=>x&&x.path===paths[i]&&typeof x.ok==="boolean"&&typeof x.text==="string"&&x.text.length<=65536&&typeof x.error==="string"&&x.error.length<=80);
+    const rows=paths.map((path,i)=>{
+        if(!validEnvelope)return {label:path,state:"UNVERIFIED",age:"--",reason:"Missing or invalid scan envelope"};
+        const item=data[i];
+        if(!item.ok)return {label:path,state:"FAILED",age:"--",reason:item.error||"Read failed"};
+        const parts=defaults.slice();parts[i]=item.text;
+        const parsed=parseSnapshot(parts.join("\n"));
+        // The original parser permits optional meminfo fields to be absent.
+        const missing=i===0&&parsed?Object.keys(parsed.ramDetails).filter(k=>parsed.ramDetails[k]===null):[];
+        return {label:path,state:parsed?"READY":"INVALID",age:"THIS ATTEMPT",reason:parsed?(missing.length?"Read OK; unavailable fields: "+missing.join(", "):"Read and validation passed"):"Read succeeded; required data invalid"};
+    });
+    const sample=validEnvelope&&rows.every(x=>x.state==="READY")?parseSnapshot(data.map(x=>x.text).join("\n")):null;
+    return {sample:sample,rows:rows,reason:sample?"Validated combined snapshot":rows.every(x=>x.state==="READY")?"Combined snapshot invalid; no publication":"One or more sources failed or could not be verified"};
+}

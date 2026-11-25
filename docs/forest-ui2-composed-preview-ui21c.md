@@ -16,3 +16,6 @@ Base 83473371. #2556 merged c1058472, independent scoped native PASS; #2561 merg
 
 ## NEXT
 UI1 exact proposed insertion seam/threshold disposition and native test review, then separate narrow ForestW patch. DOC2F/DOC3F corrected R4 binding and public delivery correlation review before runtime status consumption. Nurse2F independent review and operator visual acceptance. Production HOLD.
+
+## R1 native recovery
+Original 7f12c618 native run 45545111038 reached startup and phase 0, then failed history status, transcript and message-list assertions. Root and child Component.onCompleted ordering is unspecified; the history child's completion reset could clear a parent-populated snapshot. R1 explicitly waits for both completions (child initialized only after reset), populates once without queued work, and exposes a local transcriptReady plus fixed fixture diagnostics. This is a targeted correction, not confirmed root cause until fresh native CI. Existing six phases and dispatch/focus assertions preserved. Host should consider transcriptReady as well as Loader.Ready before replacing the placeholder; UI1 owns that decision.

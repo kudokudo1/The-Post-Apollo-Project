@@ -30,7 +30,8 @@ ShellRoot {
         check(item && status && feed, "missing composed production objects");
         if (!item || !status || !feed) return;
         check(item.fixtureReady, "fixed session validation failed");
-        check(status.statusText === "HISTORY SNAPSHOT COMPLETE", "history status");
+        check(item.transcriptReady && status.statusText === "HISTORY SNAPSHOT COMPLETE",
+            "history status " + item.fixtureState + "/" + item.fixtureReason + "/" + status.statusText);
         check(status.executionText === "PUBLIC FIXTURE // SEND / STOP LOCKED", "execution label");
         check(!status.sendEnabled && !status.stopEnabled && !status.permissionGranted
             && !status.sourceAuthenticated, "status authority changed");

@@ -14,6 +14,8 @@ QtObject {
 
     readonly property var _controller: History.createController()
     property var _snapshot: null
+    property bool _initialized: false
+    readonly property bool initialized: _initialized
     readonly property string state: attached && _snapshot ? _snapshot.state : "CLOSED"
     readonly property string reason: attached && _snapshot ? _snapshot.reason : ""
     readonly property var messages: attached && _snapshot ? _snapshot.messages : []
@@ -42,7 +44,10 @@ QtObject {
     onSessionIdChanged: observeScope()
     onRevisionChanged: observeScope()
     onViewKeyChanged: observeScope()
-    Component.onCompleted: resetAttachment()
+    Component.onCompleted: {
+        resetAttachment();
+        _initialized = true;
+    }
 
     // Explicit presentation requests only. Nothing dispatches pendingRequest.
     function openPage(requestId, limit) {

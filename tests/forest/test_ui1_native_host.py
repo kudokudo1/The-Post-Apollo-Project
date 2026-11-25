@@ -13,6 +13,8 @@ if os.environ.get("CI") != "true" or os.environ.get("GITHUB_ACTIONS") != "true":
 if os.getuid() == 0:
     raise SystemExit("FOREST_HOST_REQUIRES_UNPRIVILEGED_UID")
 ROOT = Path(__file__).resolve().parents[2]
+if not any(line.strip() == "NoNewPrivs:\t1" for line in Path("/proc/self/status").read_text().splitlines()):
+    raise SystemExit("FOREST_HOST_REQUIRES_NO_NEW_PRIVS")
 
 
 def stop(proc):
@@ -34,6 +36,19 @@ def trial(width, height, count):
         work = Path(name)
         for d in ("run", "home", "cache", "config-home", "data", "config"):
             (work / d).mkdir(mode=0o700)
+        # Fedora may ship sway with file capabilities outside the Docker
+        # capability bounding set, causing execve EPERM. Copy only bytes,
+        # not xattrs or mode bits, into the private unprivileged directory.
+        # Do not change /usr/bin/sway, container privileges or host policy.
+        packaged_sway = Path("/usr/bin/sway")
+        sway = work / "sway-headless"
+        shutil.copyfile(packaged_sway, sway)
+        sway.chmod(0o700)
+        if (sway.read_bytes() != packaged_sway.read_bytes() or
+                "security.capability" in os.listxattr(sway) or
+                sway.stat().st_mode & 0o6000):
+            raise AssertionError("PRIVATE_SWAY_BINARY_MISMATCH_OR_PRIVILEGE")
+        print("FOREST_HOST_UNPRIVILEGED_SWAY_COPY_VERIFIED", flush=True)
         scene = work / "config"
         # Stage actual sources under the isolated Quickshell config root.
         for directory in ("components", "widgets", "services", "assets"):
@@ -65,7 +80,7 @@ def trial(width, height, count):
         sway_log = work / "sway.log"
         try:
             with sway_log.open("wb") as log:
-                compositor = subprocess.Popen(["sway", "--config", str(config)], env=env,
+                compositor = subprocess.Popen([str(sway), "--config", str(config)], env=env,
                     cwd=work, stdin=subprocess.DEVNULL, stdout=log,
                     stderr=subprocess.STDOUT, start_new_session=True)
             for _ in range(100):
@@ -86,7 +101,6 @@ def trial(width, height, count):
                     stderr=subprocess.STDOUT, start_new_session=True)
                 code = qs.wait(timeout=35)
             output = qs_log.read_text(errors="replace")
-            print(output, flush=True)
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
             if (code != 0 or "FOREST_HOST_FAIL" in output or
@@ -99,8 +113,8 @@ def trial(width, height, count):
             stop(compositor)
             if sway_log.exists():
                 print(sway_log.read_text(errors="replace")[-5000:], flush=True)
-            if (work / "quickshell.log").exists() and qs and qs.returncode is None:
-                print((work / "quickshell.log").read_text(errors="replace")[-10000:], flush=True)
+            if (work / "quickshell.log").exists():
+                print((work / "quickshell.log").read_text(errors="replace"), flush=True)
 
 
 if __name__ == "__main__":

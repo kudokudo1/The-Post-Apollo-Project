@@ -1,6 +1,6 @@
 # CPU++ R3b // Native candidate pipe qualification
 
-Test-only integration, separate direct-main draft. DOC 2 #2575 b7819842,
+Test-only integration, separate direct-main draft. DOC 2 #2575 7982ff18,
 DOC 4 #2577 659321a3 and #2573 d7b42622 are pinned exact candidate heads.
 All individual workflows passed at preflight. The native CI uses the same
 Quickshell 0.3.2-1 package/environment as the existing memory UI native
@@ -44,3 +44,18 @@ retain unresolved context on disconnect. Add explicit pending-context,
 latch-retirement and preparation diagnostics. This is a host-fixture fix,
 not a DOC 2 source change or relaxation of confirmation guards. The exact
 cause of the native refusal remains a hypothesis until revised CI passes.
+
+## R3b revision 3 // DOC 2 latch correction qualification
+
+Revision 2 f65e9db7 passed all three workflows with the original DOC 2
+b7819842 pane. Raw native run 45544876951/job 138971970511 confirms queue
+commit/latch retirement, new epoch/unresolved preservation, replacement
+history reconciliation and full cancel/EOF PASS. This demonstrates the
+host-context correction is sufficient for that fixture, not that it is
+the sole cause of the original failure. DOC 2 independently corrected
+QML binding order in #2575 head 7982ff18 (6/6 CI PASS), reading the new
+context directly rather than relying on a derived binding during change
+notification. Pin that exact revision and repeat the unchanged native
+scenario. No source changes to either candidate; no weakened checks.
+Production host, real provider, Hub delivery and native resource acceptance
+remain outstanding. New combined CI must pass before merge review.

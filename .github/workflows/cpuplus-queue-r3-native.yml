@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: b7819842757b9cb6ad21510ea7b8f2d925ed6420
+          ref: 7982ff18b04bdaf369f93f086d9d251640755b24
           path: candidate-ui
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
           POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
         run: |
           set -eu
-          test "$(git -C candidate-ui rev-parse HEAD)" = b7819842757b9cb6ad21510ea7b8f2d925ed6420
+          test "$(git -C candidate-ui rev-parse HEAD)" = 7982ff18b04bdaf369f93f086d9d251640755b24
           test "$(git -C candidate-pipe rev-parse HEAD)" = 659321a3d1d627e889841e9a74bec277aa50274a
           test "$(git -C candidate-expiry rev-parse HEAD)" = d7b42622e6a96bdad6bc7e694408e6b4f6456fb5
           python3 -B tests/cpuplus_queue_pipe_native.py

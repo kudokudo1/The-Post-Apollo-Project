@@ -65,6 +65,13 @@ with TemporaryDirectory() as d:
     other.mkdir()
     (other / "comm").write_text("firefox\n")
     (other / "stat").write_text(stat(900, "firefox", start=200))
+    wrapper = proc / "555"
+    wrapper.mkdir()
+    (wrapper / "stat").write_text(stat(555, "timeout").replace(" R 0 ", " R 123 ", 1))
+    assert sampler.launching_quickshell(proc, parent=555) == 123
+    assert sampler.launching_quickshell(proc, parent=123) == 123
+    assert sampler.launching_quickshell(proc, parent=900) is None
+    assert sampler.launching_quickshell(proc, parent=555, uid=999999) is None
     assert sampler.find_quickshell(proc) == 124
     assert sampler.find_quickshell(proc, uid=999999) is None
     assert sampler.read_threads(proc, 124)[124]["ticks"] == 10

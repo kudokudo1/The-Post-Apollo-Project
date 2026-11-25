@@ -563,10 +563,10 @@ test('opt-in AppControl opening markers preserve synchronous operation order', (
     assert.ok(begin >= 0 && end > begin);
     let clockReads = 0;
     const messages = [];
-    const trace = new Function('Date', 'console', app.slice(begin, end)
+    const trace = new Function('Date', 'console', 'diagnosticCaptureActive', 'appControlSnapshotTraceEnabled', 'diagnosticOpeningStage', app.slice(begin, end)
         + '\nreturn traceAppControlOpen;')(
         {now: () => { clockReads++; return 150; }},
-        {warn: message => messages.push(message)});
+        {warn: message => messages.push(message)}, false, true, () => {});
     assert.equal(trace('selection', 0, 100), 0);
     assert.equal(clockReads, 0);
     assert.equal(messages.length, 0);
@@ -577,7 +577,7 @@ test('opt-in AppControl opening markers preserve synchronous operation order', (
     ]);
     const opening = app.slice(app.indexOf('    onMenuOpenChanged: {'),
         app.indexOf('        } else {\n            recentModeIndex', app.indexOf('    onMenuOpenChanged: {')));
-    assert.match(opening, /const openTrace = appControlSnapshotTraceEnabled\s*\? \+\+appControlOpenTraceSequence : 0/);
+    assert.match(opening, /const openTrace = \(appControlSnapshotTraceEnabled \|\| diagnosticCaptureActive\)\s*\? \+\+appControlOpenTraceSequence : 0/);
     assert.match(opening, /const openStart = openTrace \? Date\.now\(\) : 0/);
     let prev = -1;
     for (const marker of [

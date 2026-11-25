@@ -49,6 +49,27 @@ def find_quickshell(proc_root=Path("/proc"), uid=None):
     return max(found)[1] if found else None
 
 
+def launching_quickshell(proc_root=Path("/proc"), parent=None, uid=None):
+    """Resolve only the direct launcher or the fixed timeout wrapper's parent."""
+    parent = os.getppid() if parent is None else parent
+    uid = os.getuid() if uid is None else uid
+    try:
+        for depth in range(2):
+            entry = proc_root / str(parent)
+            if parent <= 1 or entry.stat().st_uid != uid:
+                return None
+            raw = (entry / "stat").read_text()
+            identity = parse_stat_line(raw)
+            if identity["name"] == "quickshell":
+                return parent
+            if depth != 0 or identity["name"] != "timeout":
+                return None
+            parent = int(raw[raw.rfind(")") + 1:].strip().split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
 def read_threads(proc_root, pid):
     """Snapshot thread CPU ticks and state; omit threads exiting mid-scan."""
     task_dir = proc_root / str(pid) / "task"
@@ -109,6 +130,7 @@ def emit(record):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pid", type=int, help="Quickshell PID (default: newest owned process)")
+    parser.add_argument("--parent-quickshell", action="store_true", help="Require the launching Quickshell process")
     parser.add_argument("--duration", type=float, default=180,
                         help="Seconds to sample (default 180)")
     parser.add_argument("--interval", type=float, default=0.25,
@@ -124,7 +146,10 @@ def main(argv=None):
         parser.error("--top must be between 1 and 12")
 
     proc_root = Path("/proc")
-    pid = args.pid if args.pid is not None else find_quickshell(proc_root)
+    if args.parent_quickshell and args.pid is not None:
+        parser.error("Choose one PID source")
+    pid = (launching_quickshell(proc_root) if args.parent_quickshell else
+           args.pid if args.pid is not None else find_quickshell(proc_root))
     if pid is None:
         print("No same-user Quickshell process found.", file=sys.stderr)
         return 2

@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: 55c48aeea1357c1e5110eed32882f61e8658a188
+          ref: a906e717eddf6dd566065c080de9c87f64429085
           path: reviewed-memory-source
           persist-credentials: false
       - name: Gate isolated runner and exact reviewed source
@@ -32,8 +32,8 @@ jobs:
           test -r /dev/kvm && test -w /dev/kvm
           test "$(git hash-object reviewed-memory-source/scripts/post-apollo-memory-add-swap)" = 9dfd8331445ecf60d3a37ea630d08b1f3f6789a2
           test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 9dfd8331445ecf60d3a37ea630d08b1f3f6789a2
-          test "$(git hash-object reviewed-memory-source/tests/cpuplus_memory_protected_custody_ci/candidate.py)" = b3d239bd3beea76d9ebfb62e41a5ed1c41f23cda
-          test "$(git hash-object tests/cpuplus_memory_protected_custody_ci/candidate.py)" = b3d239bd3beea76d9ebfb62e41a5ed1c41f23cda
+          test "$(git hash-object reviewed-memory-source/tests/cpuplus_memory_protected_custody_ci/candidate.py)" = eeb44525e797cfc824d186d21018c1a1ca85b1fd
+          test "$(git hash-object tests/cpuplus_memory_protected_custody_ci/candidate.py)" = eeb44525e797cfc824d186d21018c1a1ca85b1fd
           test "$(df -B1 --output=avail / | tail -n 1)" -ge 24000000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_DISK"; exit 2; }
           test "$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)" -ge 7000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_RAM"; exit 2; }
           bash -n tests/cpuplus_memory_native/guest-cycle.sh

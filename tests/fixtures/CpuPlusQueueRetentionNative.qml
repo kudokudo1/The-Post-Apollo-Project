@@ -103,7 +103,7 @@ ShellRoot {
                 return;
             }
             if (!check(!!p.receipt && Host.equal(p.receipt.review,review)
-                && !take({...selection,sequence:selection.sequence+1}).request
+                && !take(Object.assign({},selection,{sequence:selection.sequence+1})).request
                 && !take(selection,generation-1).request,"exact real history and stale refusal"))return;
             const next=take(selection);
             if (!check(!!next.request && !next.frame && next.state.retentionPending
@@ -210,7 +210,7 @@ ShellRoot {
                     const intent=Consumer.prepare(smoke.host.session,"QUEUE",16,Math.floor(Date.now()/1000)+180).prepared;
                     if (!smoke.check(!Host.confirm(smoke.host,intent,smoke.actionId,Consumer).frame,"startup locked"))return;
                     // The fixture alone injects confirmation to create PREPARED evidence.
-                    smoke.host={...smoke.host,startupLocked:false};
+                    smoke.host=Object.assign({},smoke.host,{startupLocked:false});
                     smoke.phase="SAVE_ACTION";
                     smoke.checkpoint(Host.confirm(smoke.host,intent,smoke.actionId,Consumer));
                 } else if (smoke.generation===2) {

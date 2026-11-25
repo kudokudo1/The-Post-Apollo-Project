@@ -9,6 +9,7 @@ import stat
 import sys
 
 SCHEMA = "post-apollo-cpuplus-profiles-v1"
+SCHEMA_V2 = "post-apollo-cpuplus-profiles-v2"
 LIMIT = 16
 MAX_BYTES = 16384
 MAX_REV = 2**53 - 1
@@ -41,12 +42,88 @@ def targets(value):
     return {"capacityGiB": cap, "swappiness": policy}
 
 
+def device_hint(value, zram=False):
+    # A saved locator is a descriptive hint, never trusted device identity.
+    if not isinstance(value, str) or not re.fullmatch(r"/[A-Za-z0-9_./ -]{1,255}", value):
+        raise ValueError("device hint")
+    if any(part in ("", ".", "..") for part in value.split("/")[1:]):
+        raise ValueError("device hint")
+    if zram and not re.fullmatch(r"/dev/zram[0-9]{1,6}", value):
+        raise ValueError("zram hint")
+    return value
+
+
+def advanced(value):
+    fields = ("cachePressure", "background", "writer", "writebackCentisecs", "expireCentisecs")
+    if not exact(value, fields) or all(value[k] is None for k in fields):
+        raise ValueError("advanced fields")
+    for key in ("cachePressure", "writebackCentisecs", "expireCentisecs"):
+        if value[key] is not None and not integer(value[key], 0, MAX_REV):
+            raise ValueError("advanced numeric target")
+    for key in ("background", "writer"):
+        pair = value[key]
+        if pair is None:
+            continue
+        if not exact(pair, ("unit", "value")) or pair["unit"] not in ("%", "B"):
+            raise ValueError("threshold unit")
+        if not integer(pair["value"], 1, 100 if pair["unit"] == "%" else MAX_REV):
+            raise ValueError("threshold target")
+    return {key: value[key] for key in fields}
+
+
+def targets_v2(value):
+    fields = ("capacityGiB", "swappiness", "zram", "priority", "advanced")
+    if not exact(value, fields) or all(value[k] is None for k in fields):
+        raise ValueError("v2 target shape")
+    cap, policy = value["capacityGiB"], value["swappiness"]
+    if (cap is not None and (not integer(cap, 0, 64) or cap % 4)
+            or policy is not None and not integer(policy, 0, 200)):
+        raise ValueError("base targets")
+    zram = value["zram"]
+    if zram is not None:
+        if (not exact(zram, ("deviceHint", "sizeKiB", "algorithm"))
+                or not integer(zram["sizeKiB"], 1, MAX_REV)
+                or not isinstance(zram["algorithm"], str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", zram["algorithm"])):
+            raise ValueError("zram target")
+        device_hint(zram["deviceHint"], zram=True)
+    priority = value["priority"]
+    if priority is not None:
+        if (not exact(priority, ("deviceHint", "sizeKiB", "value"))
+                or not integer(priority["sizeKiB"], 1, MAX_REV)
+                or not integer(priority["value"], 0, 32767)):
+            raise ValueError("priority target")
+        device_hint(priority["deviceHint"])
+    adv = value["advanced"]
+    return {"capacityGiB": cap, "swappiness": policy, "zram": zram,
+            "priority": priority, "advanced": None if adv is None else advanced(adv)}
+
+
+def upgrade(document):
+    # Projection only: a v2 list never changes the on-disk schema or revision.
+    validate(document)
+    if document["schema"] == SCHEMA_V2:
+        return document
+    return validate({"schema": SCHEMA_V2, "revision": document["revision"],
+        "profiles": [{"name": row["name"], "targets": {
+            **row["targets"], "zram": None, "priority": None, "advanced": None}}
+            for row in document["profiles"]]})
+
+
+def requested_schema(request):
+    if "schema" not in request:
+        return SCHEMA
+    if request["schema"] != SCHEMA_V2:
+        raise ValueError("unsupported request schema")
+    return SCHEMA_V2
+
+
 def initial():
     return {"schema": SCHEMA, "revision": 0, "profiles": []}
 
 
 def validate(document):
-    if (not exact(document, ("schema", "revision", "profiles")) or document["schema"] != SCHEMA
+    if (not exact(document, ("schema", "revision", "profiles")) or document["schema"] not in (SCHEMA, SCHEMA_V2)
             or not integer(document["revision"], 0, MAX_REV)
             or not isinstance(document["profiles"], list) or len(document["profiles"]) > LIMIT):
         raise ValueError("catalog shape")
@@ -55,7 +132,7 @@ def validate(document):
         if not exact(row, ("name", "targets")):
             raise ValueError("profile shape")
         key = name(row["name"]).upper()
-        targets(row["targets"])
+        (targets_v2 if document["schema"] == SCHEMA_V2 else targets)(row["targets"])
         if key in seen:
             raise ValueError("duplicate name")
         seen.add(key)
@@ -84,14 +161,15 @@ def request_valid(request):
         "rename": ("action", "expectedRevision", "name", "newName"),
         "delete": ("action", "expectedRevision", "name"),
     }
-    if not isinstance(action, str) or action not in fields or not exact(request, fields[action]):
+    schema = requested_schema(request)
+    if not isinstance(action, str) or action not in fields or not exact(request, fields[action] + (("schema",) if schema == SCHEMA_V2 else ())):
         raise ValueError("request shape")
     if action != "list":
         if not integer(request["expectedRevision"], 0, MAX_REV):
             raise ValueError("revision")
         name(request["name"])
         if action in ("create", "edit"):
-            targets(request["targets"])
+            (targets_v2 if schema == SCHEMA_V2 else targets)(request["targets"])
         if action == "rename":
             name(request["newName"])
     return action
@@ -100,6 +178,12 @@ def request_valid(request):
 def mutate(document, request):
     action = request_valid(request)
     validate(document)
+    schema = requested_schema(request)
+    if schema == SCHEMA_V2:
+        document = upgrade(document)
+    elif document["schema"] != SCHEMA:
+        raise ValueError("v1 client cannot access v2 catalog")
+    normalize = targets_v2 if schema == SCHEMA_V2 else targets
     if action == "list":
         return document
     if request["expectedRevision"] != document["revision"] or document["revision"] == MAX_REV:
@@ -110,12 +194,12 @@ def mutate(document, request):
     if action == "create":
         if index is not None or len(rows) >= LIMIT:
             raise ValueError("name collision or full")
-        rows.append({"name": request["name"], "targets": targets(request["targets"])})
+        rows.append({"name": request["name"], "targets": normalize(request["targets"])})
     else:
         if index is None or rows[index]["name"] != request["name"]:
             raise ValueError("exact profile name required")
         if action == "edit":
-            rows[index] = {"name": rows[index]["name"], "targets": targets(request["targets"])}
+            rows[index] = {"name": rows[index]["name"], "targets": normalize(request["targets"])}
         elif action == "rename":
             new = request["newName"]
             if any(i != index and row["name"].upper() == new.upper() for i, row in enumerate(rows)):
@@ -123,7 +207,7 @@ def mutate(document, request):
             rows[index] = {"name": new, "targets": rows[index]["targets"]}
         elif action == "delete":
             del rows[index]
-    return validate({"schema": SCHEMA, "revision": document["revision"]+1, "profiles": rows})
+    return validate({"schema": schema, "revision": document["revision"]+1, "profiles": rows})
 
 
 def private(fd, directory=False):
@@ -200,7 +284,7 @@ def execute(folder, request):
         directory = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
     except FileNotFoundError:
         if action == "list":
-            return initial()
+            return mutate(initial(), request)
         raise
     try:
         private(directory, directory=True)
@@ -208,9 +292,9 @@ def execute(folder, request):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             document = read(directory)
-            if action == "list":
-                return document
             updated = mutate(document, request)
+            if action == "list":
+                return updated
             commit(directory, updated)
             return updated
         finally:

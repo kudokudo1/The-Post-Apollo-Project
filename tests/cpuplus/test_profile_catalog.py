@@ -99,6 +99,67 @@ class CatalogTests(unittest.TestCase):
             self.create(catalog.LIMIT, "Overflow")
         self.assertEqual(len(self.call("list")["profiles"]), catalog.LIMIT)
 
+    def v2(self, action, **fields):
+        return self.call(action, schema=catalog.SCHEMA_V2, **fields)
+
+    def extended(self):
+        return {"capacityGiB": None, "swappiness": None,
+                "zram": {"deviceHint": "/dev/zram0", "sizeKiB": 8388608, "algorithm": "zstd"},
+                "priority": {"deviceHint": "/var/swap/base", "sizeKiB": 16777216, "value": 20},
+                "advanced": {"cachePressure": 100, "background": {"unit": "%", "value": 10},
+                             "writer": {"unit": "B", "value": 1048576},
+                             "writebackCentisecs": 500, "expireCentisecs": None}}
+
+    def test_v2_read_projection_and_explicit_migration(self):
+        before = self.create()
+        path = self.folder / "profiles.json"
+        raw = path.read_bytes()
+        view = self.v2("list")
+        self.assertEqual(view["schema"], catalog.SCHEMA_V2)
+        self.assertEqual(view["revision"], before["revision"])
+        self.assertEqual(view["profiles"][0]["targets"], {
+            "capacityGiB": 24, "swappiness": None, "zram": None, "priority": None, "advanced": None})
+        self.assertEqual(path.read_bytes(), raw)
+        after = self.v2("create", expectedRevision=1, name="Extended", targets=self.extended())
+        self.assertEqual(after["revision"], 2)
+        self.assertEqual(after["profiles"][1]["targets"], self.extended())
+        self.assertEqual(self.v2("list"), after)
+        with self.assertRaises(ValueError):
+            self.call("list")
+        with self.assertRaises(ValueError):
+            self.call("delete", expectedRevision=2, name="Extended")
+        self.assertEqual(self.v2("list"), after)
+
+    def test_v2_empty_list_no_file(self):
+        self.assertEqual(self.v2("list"), {"schema":catalog.SCHEMA_V2,"revision":0,"profiles":[]})
+        self.assertFalse(self.folder.exists())
+
+    def test_v2_invalid_fields_refused(self):
+        for key, value in [
+            ("zram", {"deviceHint":"/dev/sda","sizeKiB":1,"algorithm":"zstd"}),
+            ("zram", {"deviceHint":"/dev/zram0","sizeKiB":1,"algorithm":"bad algo"}),
+            ("priority", {"deviceHint":"/var/../swap","sizeKiB":1,"value":20}),
+            ("priority", {"deviceHint":"/dev/zram0","sizeKiB":1,"value":-1}),
+            ("advanced", {**self.extended()["advanced"],"background":{"unit":"B","value":0}}),
+            ("advanced", {**self.extended()["advanced"],"writer":{"unit":"%","value":101}}),
+            ("advanced", {**self.extended()["advanced"],"automation":True}),
+        ]:
+            with self.assertRaises(ValueError):
+                self.v2("create", expectedRevision=0, name="Work", targets={**self.extended(),key:value})
+            self.assertFalse(self.folder.exists())
+
+    def test_v2_crud_stale_and_preserve(self):
+        first = self.v2("create", expectedRevision=0, name="Work", targets=self.extended())
+        with self.assertRaises(ValueError):
+            self.v2("edit", expectedRevision=0, name="Work", targets=self.extended())
+        renamed = self.v2("rename", expectedRevision=1, name="Work", newName="Office")
+        self.assertEqual(renamed["profiles"][0]["targets"], first["profiles"][0]["targets"])
+        changed = {**self.extended(),"priority":None}
+        edited = self.v2("edit", expectedRevision=2, name="Office", targets=changed)
+        self.assertEqual(edited["profiles"][0]["targets"], changed)
+        self.assertEqual(self.v2("delete",expectedRevision=3,name="Office")["profiles"], [])
+        self.assertEqual(self.v2("list")["revision"],4)
+
     def test_process_restart(self):
         env = dict(os.environ, XDG_STATE_HOME=self.tmp.name)
         def run(request):

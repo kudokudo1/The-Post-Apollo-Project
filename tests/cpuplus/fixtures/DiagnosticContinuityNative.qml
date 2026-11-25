@@ -145,6 +145,24 @@ ShellRoot {
                     && ui.memoryDetails.rows.length === 5 && ui.memoryDetails.rows[1].change === 524288
                     && !CpuPlusDiagnostics.busy && root.completions === 1,
                     "historical memory presentation without new capture")) return;
+                if (!root.check(!ui.memoryDetails.privateResidentAvailable,"legacy private total unavailable")) return;
+                const report = CpuPlusDiagnostics.reports.memory;
+                const lines = report.text.split("\n").map(line=>JSON.parse(line));
+                for (let i=0;i<lines.length-1;i++) {
+                    lines[i].memoryKiB.Private_Clean = (i+1)*262144;
+                    lines[i].privateResidentKiB = lines[i].memoryKiB.Private_Clean + lines[i].memoryKiB.Private_Dirty;
+                }
+                CpuPlusDiagnostics.reports = Object.assign({},CpuPlusDiagnostics.reports,{
+                    memory:Object.assign({},report,{text:lines.map(row=>JSON.stringify(row)).join("\n")})});
+                root.phase = 8;
+                return;
+            }
+            if (root.phase === 8 && pane.item) {
+                const ui = root.findItem(pane.item,"cpuplusDiagnosticControls");
+                if (!root.check(ui && ui.memoryDetails && ui.memoryDetails.privateResidentAvailable
+                        && ui.memoryDetails.rows.length === 7
+                        && ui.memoryDetails.rows.find(row=>row.label==="PRIVATE RESIDENT").change === 786432
+                        && !CpuPlusDiagnostics.busy,"extended capture private resident breakdown")) return;
                 CpuPlusDiagnostics.selectLatest("inventory");
                 root.phase = 7;
                 return;

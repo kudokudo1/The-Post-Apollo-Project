@@ -134,3 +134,27 @@ assert.match(ui,/objectName: "cpuplusMemoryBreakdown"/);
 assert.match(ui,/HISTORICAL CAPTURE \/\/ NOT LIVE/);
 assert.match(ui,/Private dirty is not total private memory/);
 console.log("CPU++ completed memory capture presentation PASS");
+
+const extendedFirst={...memorySample,memoryKiB:{...memorySample.memoryKiB,Private_Clean:262144},privateResidentKiB:786432};
+const extendedNext={...memoryNext,memoryKiB:{...memoryNext.memoryKiB,Private_Clean:524288},privateResidentKiB:1572864};
+const extendedReport={...memoryReport,text:jsonl([extendedFirst,extendedNext,done])};
+const extended=breakdown.memoryBreakdown("memory",extendedReport,true);
+assert.equal(extended.privateResidentAvailable,true);
+assert.equal(extended.rows.length,7);
+assert.equal(extended.rows.find(r=>r.label==="PRIVATE RESIDENT").change,786432);
+assert.equal(extended.rows.find(r=>r.label==="PRIVATE CLEAN").last,524288);
+const legacy=breakdown.memoryBreakdown("memory",memoryReport,true);
+assert.equal(legacy.privateResidentAvailable,false);
+assert.equal(legacy.rows.length,5);
+assert.deepEqual(JSON.parse(JSON.stringify(breakdown.memoryBreakdown("memory",extendedReport))),
+    JSON.parse(JSON.stringify(result)));
+for (const row of [
+    {...extendedNext,privateResidentKiB:1},
+    {...extendedNext,memoryKiB:{...extendedNext.memoryKiB,Private_Clean:-1}},
+    {...extendedNext,memoryKiB:{...extendedNext.memoryKiB,Private_Clean:4194304},privateResidentKiB:5242880},
+    memoryNext
+]) assert.equal(breakdown.memoryBreakdown("memory",{...memoryReport,text:jsonl([extendedFirst,row,done])},true),null);
+assert.equal(breakdown.memoryBreakdown("memory",{...memoryReport,text:jsonl([extendedFirst,done])},true)
+    .rows.find(r=>r.label==="PRIVATE RESIDENT").change,null);
+assert.match(ui,/memoryBreakdown\(selectedReport, report, true\)/);
+console.log("CPU++ private resident capture presentation PASS");

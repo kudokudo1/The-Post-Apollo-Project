@@ -364,7 +364,7 @@ function acknowledgeReview(state,selection,generation) {
         || !exact(selection,["reviewId","digest","sequence"])) return no;
     const f=state.reviewFlow,r=f.review;
     if (selection.reviewId!==r.review_id || selection.digest!==r.review_digest || selection.sequence!==f.sequence) return no;
-    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_ACK",review:r},reviewReceipt:null}),
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_ACK",review:r,sequence:f.sequence},reviewReceipt:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_ACK",owner_id:state.session.ownerId,
             review_id:r.review_id,review_digest:r.review_digest,review_sequence:f.sequence})+"\n"};
 }
@@ -374,6 +374,59 @@ function readReviewReceipt(state,reviewId) {
         || (state.reviewLost && state.reviewLost.review_id!==reviewId)) return no;
     return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW_HISTORY",owner_id:state.session.ownerId,review_id:reviewId})+"\n"};
+}
+// R3q: bounded durable checkpoint contract. The actual storage adapter
+// must save the exact returned record before emitting the associated frame.
+// No storage or IO performed by this controller.
+function checkpointMessage(m) {
+    return exact(m,["version","owner_id","action_id","action_sequence","kind",
+        "expected_request_id","target_gib","expires_at"]) && m.version===1
+        && uuid(m.owner_id) && uuid(m.action_id) && positive(m.action_sequence)
+        && m.action_sequence<Number.MAX_SAFE_INTEGER
+        && ["QUEUE","REPLACE","CANCEL","EXPIRE"].includes(m.kind)
+        && (m.kind==="QUEUE"?m.expected_request_id===null:uuid(m.expected_request_id))
+        && (["QUEUE","REPLACE"].includes(m.kind)
+            ? positive(m.target_gib) && m.target_gib>=4 && m.target_gib<=64 && m.target_gib%4===0 && positive(m.expires_at)
+            : m.target_gib===null && m.expires_at===null);
+}
+function checkpointForFrame(transition,recoveryRow) {
+    if (!transition || !transition.state || typeof transition.frame!=="string") return null;
+    const s=transition.state;
+    if (s.phase!=="CONNECTED" || s.mode!=="STAGED") return null;
+    let p;
+    try { p=JSON.parse(transition.frame); } catch (_) { return null; }
+    if (!safe(p) || JSON.stringify(p)+"\n"!==transition.frame || p.version!==1) return null;
+    if (p.kind==="PREPARE_ACTION" && s.stage?.phase==="WAIT_PREPARED"
+        && exact(p,["version","kind","message"]) && checkpointMessage(p.message)
+        && equal(p.message,s.session.pending))
+        return {version:1,kind:"ACTION",message:JSON.parse(JSON.stringify(p.message))};
+    if (p.kind==="RECOVERY_ACK" && s.reviewFlow?.phase==="WAIT_ACK"
+        && exact(p,["version","kind","owner_id","review_id","review_digest","review_sequence"])) {
+        const r=s.reviewFlow.review;
+        if (reviewValue(r,recoveryRow) && p.owner_id===s.session.ownerId
+            && r.owner_id===p.owner_id && r.review_id===p.review_id && r.review_digest===p.review_digest
+            && positive(p.review_sequence) && p.review_sequence===s.reviewFlow.sequence)
+            return {version:1,kind:"REVIEW_ACK",review:JSON.parse(JSON.stringify(r))};
+    }
+    return null;
+}
+function restoreCheckpoint(consumer,snapshot,recoveryRow) {
+    // Only for a fresh shell before start(). Corrupt or mismatched evidence
+    // returns null; caller must refuse startup. Empty evidence stays locked.
+    if (!safe(snapshot) || !exact(snapshot,["version","action","acknowledgment","startup_unlock","can_execute"])
+        || snapshot.version!==1 || snapshot.startup_unlock!==false || snapshot.can_execute!==false) return null;
+    const a=snapshot.action,b=snapshot.acknowledgment;
+    if (a!==null && (!exact(a,["version","kind","message"]) || a.version!==1
+        || a.kind!=="ACTION" || !checkpointMessage(a.message))) return null;
+    if (b!==null && (!exact(b,["version","kind","review"]) || b.version!==1
+        || b.kind!=="REVIEW_ACK" || !reviewValue(b.review,recoveryRow))) return null;
+    const old=b!==null?b.review.snapshot.record.message:null;
+    if (a!==null && old!==null && !equal(a.message,old)) return null;
+    const s=initial(consumer),m=a!==null?a.message:old;
+    return Object.assign({},s,{reviewLost:b!==null?JSON.parse(JSON.stringify(b.review)):null,
+        session:Object.assign({},s.session,{unresolved:m?JSON.parse(JSON.stringify(m)):null,
+            previousOwnerId:b!==null?b.review.owner_id:m?m.owner_id:null,
+            feedback:m?"OUTCOME UNKNOWN // RECONCILE":"NOT CONNECTED"})});
 }
 // Deliberately no public startup unlock or action-reconciliation release.
 // Complete durable inventory / lost action correlation is a prerequisite for

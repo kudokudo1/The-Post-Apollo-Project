@@ -163,3 +163,27 @@ host, Python pipe and existing recovery pane; acknowledgment UI is still
 fixture-driven, not DOC 2 production controls. No installed wrapper or
 full-shell persistent host correlation. CI pending. Review timeout and
 staged duration are disposable fixture parameters only.
+
+## R3q // persistent host pre-send checkpoint candidate
+
+Stack on #2706 c5bc7891, 5/5 workflows and eight native scenarios PASS
+(raw native job 139180239877, ACK/LOST/EOF exact database counts).
+Before actual PREPARE and explicit ACK writes, future trusted wrapper must
+call checkpointForFrame, save exact returned record through HostCheckpoint,
+wait for successful file and directory fsync, publish transition state and
+write exactly once. A bounded private caller-supplied directory has two
+fixed write-once slots (one action, one review ACK), strict canonical JSON
+and SHA-256 corruption detection, no symlinks/hardlinks or unsafe mode,
+no overwrite/delete/clear, bounded reads; partial/corrupt files refuse.
+The review digest is independently checked before saving. This is a
+library contract, not a second controller or a daemon. On restart load
+and restoreCheckpoint create fresh stopped state with only unresolved
+action and historical review-loss identity, never pending, live challenge,
+review ticket or startup unlock. Null snapshot is a blocker; empty slots
+do not establish noncommit. Full-shell lookup requires fresh owner. Actual
+wrapper integration and crash-before-send qualification still outstanding.
+Same-UID adversaries, directory rollback and physical storage guarantees
+outside scope; single cooperating writer required. This deliberately
+single-use prototype cannot support ordinary repeated operations until
+a reviewed terminal disposition and retention policy is implemented.
+No production directory or launch path selected. No DOC 2 edits.

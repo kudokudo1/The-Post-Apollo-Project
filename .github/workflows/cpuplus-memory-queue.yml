@@ -23,6 +23,8 @@ on:
       - 'tests/cpuplus_memory_queue_owner_test.py'
       - 'services/memory/memory_queue_local_actions.py'
       - 'services/memory/memory_queue_recovery_review.py'
+      - 'services/memory/memory_queue_host_checkpoint.py'
+      - 'tests/cpuplus_memory_queue_host_checkpoint_test.py'
       - 'tests/cpuplus_memory_queue_local_actions_test.py'
       - 'services/memory/QUEUE-R3-RECOVERY.md'
       - 'services/memory/QUEUE-M1C3B.md'
@@ -55,3 +57,5 @@ jobs:
         run: python3 -B tests/cpuplus_memory_queue_owner_test.py
       - name: Durable local action correlation (disposable SQLite fixtures)
         run: python3 -B tests/cpuplus_memory_queue_local_actions_test.py
+      - name: Host checkpoint crash persistence (disposable files only)
+        run: python3 -B tests/cpuplus_memory_queue_host_checkpoint_test.py

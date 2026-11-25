@@ -264,3 +264,35 @@ assert.equal(h.reviewContext(recovered).receipt.disposition,"REVIEW_ACKNOWLEDGED
 assert.ok(recovered.startupLocked && recovered.session.unresolved);
 assert.equal(h.takeCommit(recovered,3).frame,null);
 console.log("R3o review host PASS: explicit ack, exact receipt, publication fencing, lost ACK lookup and no unlock");
+
+ // R3q: pre-send checkpoint records contain no live continuation or grant.
+const actionCheckpoint=h.checkpointForFrame(prep,recovery.row);
+const ackCheckpoint=h.checkpointForFrame(issued,recovery.row);
+assert.equal(actionCheckpoint.kind,"ACTION");
+assert.equal(ackCheckpoint.kind,"REVIEW_ACK");
+assert.equal(h.checkpointForFrame(commit,recovery.row),null);
+assert.equal(h.checkpointForFrame({...issued,frame:issued.frame.replace('"review_sequence":2','"review_sequence":9')},recovery.row),null);
+const snapshot={version:1,action:actionCheckpoint,acknowledgment:ackCheckpoint,startup_unlock:false,can_execute:false};
+let restarted=h.restoreCheckpoint(c,snapshot,recovery.row);
+assert.ok(restarted.startupLocked && restarted.session.unresolved && restarted.reviewLost);
+assert.equal(restarted.session.pending,null);assert.equal(restarted.stage,null);
+assert.equal(restarted.reviewFlow,null);assert.equal(h.takeCommit(restarted,1).frame,null);
+assert.equal(h.acknowledgeReview(restarted,selection,1).frame,null);
+assert.equal(h.restoreCheckpoint(c,{...snapshot,startup_unlock:true},recovery.row),null);
+assert.equal(h.restoreCheckpoint(c,{...snapshot,action:{...actionCheckpoint,message:{...actionCheckpoint.message,target_gib:20}}},recovery.row),null);
+let onlyAction=h.restoreCheckpoint(c,{...snapshot,acknowledgment:null},recovery.row);
+assert.ok(onlyAction.session.unresolved && !onlyAction.reviewLost);
+let onlyAck=h.restoreCheckpoint(c,{...snapshot,action:null},recovery.row);
+assert.ok(onlyAck.session.unresolved && onlyAck.reviewLost);
+let empty=h.restoreCheckpoint(c,{...snapshot,action:null,acknowledgment:null},recovery.row);
+assert.ok(empty.startupLocked && !empty.session.unresolved);
+restarted=h.start(restarted,c,1,"STAGED",true);
+assert.equal(feed(restarted,control("HELLO",B)).phase,"FAILED");
+restarted=feed(restarted,wire(control("HELLO",R))+wire(control("INVALIDATE",R))+wire(status(1,1,null,R)));
+assert.equal(h.beginReview(restarted,X).frame,null);
+const fullRestartLookup=h.readReviewReceipt(restarted,REVIEW);
+assert.ok(fullRestartLookup.frame);
+restarted=feed(fullRestartLookup.state,{...hist,receipt:saved});
+assert.ok(restarted.startupLocked && restarted.session.unresolved);
+assert.equal(restarted.reviewLost,null);
+console.log("R3q checkpoint host PASS: pre-send correlation, fresh-shell lookup only, no unlock");

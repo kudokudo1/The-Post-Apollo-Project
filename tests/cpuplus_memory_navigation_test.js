@@ -319,3 +319,24 @@ assert.equal(profileCtx.applicationPreview("GAMING",appDraft,0,60,true,false,cat
 assert.equal(profileCtx.applicationPreview("CUSTOM",{...appDraft,unexpected:true},0,60,true,false,catalogCtx.validDraft),null);
 assert.match(profilePane,/objectName: "cpuplusProfileApplyLocked"[\s\S]*?available: false/);
 console.log("CPU++ profile application requirements preview PASS");
+
+const reviewCtx=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueueRecovery.js"),"utf8"),reviewCtx);
+const reviewOld="11111111-1111-1111-1111-111111111111",reviewOwner="22222222-2222-2222-2222-222222222222",reviewAction="33333333-3333-3333-3333-333333333333",reviewId="44444444-4444-4444-4444-444444444444";
+const reviewRecord={version:1,ordinal:1,message:{version:1,owner_id:reviewOld,action_id:reviewAction,action_sequence:1,kind:"QUEUE",expected_request_id:null,target_gib:24,expires_at:200},state:"PREPARED",prepared_at:100,result_request_id:null,committed_at:null,adjustment_outcome:"UNVERIFIED",can_execute:false};
+const reviewValue={version:1,review_id:reviewId,owner_id:reviewOwner,action_id:reviewAction,snapshot:{version:1,record:reviewRecord,pending_request_id:null,pending_digest:"a".repeat(64),adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false},review_digest:"b".repeat(64),reviewed_at_ms:100000,can_execute:false,startup_unlock:false};
+const reviewContext={phase:"REVIEW_READY",review:reviewValue,reviewSequence:9,receipt:null,unknownReviewId:null,canAcknowledge:true,startupLocked:true,canExecute:false};
+const selection=reviewCtx.reviewSelection(reviewContext,4294967297);
+assert.equal(selection.generation,4294967297);
+assert.equal(reviewCtx.sameSelection(selection,{...selection}),true);
+for(const key of ["sequence","generation","digest","reviewId"])assert.equal(reviewCtx.sameSelection(selection,{...selection,[key]:null}),false);
+for(const change of [{phase:"WAIT_CHECKPOINT"},{phase:"ACK_UNKNOWN"},{canAcknowledge:false},{startupLocked:false},{canExecute:true},{review:null}])assert.equal(reviewCtx.reviewSelection({...reviewContext,...change},1),null);
+assert.equal(reviewCtx.reviewEvidence({...reviewValue,review_digest:"bad"}),null);
+assert.equal(reviewCtx.reviewEvidence({...reviewValue,owner_id:reviewOld}),null);
+assert.equal(reviewCtx.reviewEvidence({...reviewValue,snapshot:{...reviewValue.snapshot,can_execute:true}}),null);
+const ackReceipt={version:1,review:reviewValue,acknowledged_at_ms:100001,disposition:"REVIEW_ACKNOWLEDGED_ONLY",adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false};
+assert.equal(reviewCtx.reviewReceipt(ackReceipt).reviewId,reviewId);
+assert.equal(reviewCtx.reviewReceipt({...ackReceipt,acknowledged_at_ms:160000}),null);
+assert.equal(reviewCtx.reviewReceipt({...ackReceipt,startup_unlock:true}),null);
+assert.doesNotMatch(autoWorkspace,/Host\.(?:beginReview|acknowledgeReview|readReviewReceipt)\s*\(/);
+console.log("CPU++ M7a recovery selection and receipt presentation PASS");

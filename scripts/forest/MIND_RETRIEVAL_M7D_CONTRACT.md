@@ -110,3 +110,25 @@ handoff, effect settlement; no model dispatch in M7d. DOC1F: byte budget is
 not admission or tokenizer capacity. Nurse2F: independent M7d-a scope
 review, then explicit M7d-b disposable scope decision. Preserve R6 critical
 path, M7c review and operator final acceptance.
+
+## M7d-b disposable implementation
+
+Nurse2F #7169077778 authorizes this narrow witness; Security #7165714136
+conditionally accepted. Implemented entirely in tests/forest/test_mind_version_resolution_m7d.py
+with a fixed public literal catalog and bodies, immutable selections and
+separate fixture metadata/read-use observations. All selected versions
+validated before any body read; compare source, exact current scope and
+version/commitment, reject ambiguity, superseded/future or revoked records.
+Visible history resolves at the independently held snapshot, never a
+fallback to latest. Recheck fixture currentness before/after reads and
+assembly, project to the existing M7a assembler, keep exact revision
+references separate from domain snapshot generation.
+
+Decision: no sticky-cache admission even on success. Existing M7b records
+cannot retain exact revision/source/current-use commitments, so inserting
+them would lose provenance. No protected producer or general reader is
+implemented; the witness contains only known public strings and no I/O
+other than Python test discovery. No actual permission, atomic custody,
+storage, learned record, automatic matching, provider dispatch, or R6
+change. Twelve focused tests in existing Mind CI; independent exact-head
+review required. Production HOLD.

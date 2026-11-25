@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "forest"))
 from shared_context_b6r1 import TaskContext, BarkAttachment
@@ -13,6 +14,7 @@ from context_first_tree_m2 import ContextRefusal
 from history_public_fixture_m4 import (
     PublicViewRef, ListRef, HistoryPageRef, list_public_fixture_in_transaction,
     history_public_fixture_in_transaction, MAX_FRAME_BYTES, _size,
+    FixtureHistoryAliases, ReadOnlyHistoryScope,
 )
 
 
@@ -212,6 +214,187 @@ class HistoryTests(unittest.TestCase):
         for kwargs in ({"limit":0},{"limit":17},{"after":True},{"revision":True}):
             with self.subTest(kwargs=kwargs),self.assertRaises(ContextRefusal):
                 replace(self.page(),**kwargs)
+
+
+
+class ReadOnlyAliasTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = Path(tmp.name) / "r6-public.sqlite"
+        self.db = sqlite3.connect(self.path)
+        self.addCleanup(lambda: self.db.close())
+        bootstrap_synthetic(self.db)
+        self.j = ForestSessionJournal(self.db)
+        self.sid = self.j.create_session("fixture-owner", "cherry",
+                                        "Not a public title", now_ms=1)["session_id"]
+        self.attachment = BarkAttachment(
+            TaskContext("fixture-owner", "cherry", None, "history-task-a",
+                        "read-context-a", 1, "INTERACTIVE"),
+            "bark-a", "requester-a", "release-a", "seat-a", "recipient-a",
+            "CHERRY", 1)
+        self.aliases = FixtureHistoryAliases("fixture-owner", self.sid)
+        self.rev = 0
+        self.ids = []
+
+    def add(self, role, text):
+        row = self.j.append_turn("fixture-owner", self.sid,
+            expected_revision=self.rev, role=role, body=text,
+            provider="ollama" if role == "assistant" else "",
+            model="fixture-model" if role == "assistant" else "",
+            now_ms=self.rev + 2)
+        self.rev = row["revision"]
+        self.ids.append(row["turn_id"])
+
+    def transaction(self, method, *args, **kwargs):
+        self.db.execute("BEGIN")
+        try:
+            return method(self.j, *args, **kwargs)
+        finally:
+            self.db.rollback()
+
+    def scope(self, attachment=None, *, current=None, view_key="a"*32):
+        attachment = self.attachment if attachment is None else attachment
+        return self.transaction(self.aliases.scope_in_transaction, attachment,
+            current_attachment=attachment if current is None else current,
+            view_key=view_key)
+
+    def page(self, scope, *, current=None, request_id="b"*32, after=0, limit=2):
+        return self.transaction(self.aliases.page_in_transaction, scope,
+            current=scope if current is None else current,
+            request_id=request_id, after=after, limit=limit)
+
+    def test_metadata_offer_never_reads_title_or_body(self):
+        self.add("user", "Public question")
+        reads = []
+        def auth(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                reads.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(auth)
+        try:
+            scope = self.scope()
+            self.assertEqual(reads, [])
+            self.assertEqual(scope.public_fields(), {
+                "treeKey":"CHERRY", "generation":1, "sessionId":scope.session_alias,
+                "revision":1, "viewKey":"a"*32})
+            self.assertNotEqual(scope.session_alias, self.sid)
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_empty_and_two_page_projection_no_raw_identifiers(self):
+        empty = self.page(self.scope())
+        self.assertTrue(empty["complete"])
+        self.assertEqual(empty["messages"], [])
+        for role, text in (("user","One"), ("assistant","Two"),
+                           ("user","Three"), ("assistant","Four")):
+            self.add(role, text)
+        scope = self.scope()
+        first = self.page(scope)
+        second = self.page(scope, request_id="c"*32, after=2)
+        rows = first["messages"] + second["messages"]
+        self.assertFalse(first["complete"])
+        self.assertTrue(second["complete"])
+        self.assertEqual([r["ordinal"] for r in rows], [1,2,3,4])
+        self.assertEqual([r["text"] for r in rows], ["One","Two","Three","Four"])
+        self.assertEqual(first["sessionId"], scope.session_alias)
+        self.assertEqual(second["requestId"], "c"*32)
+        self.assertEqual(len({r["turn_id"] for r in rows}), 4)
+        for r in rows:
+            self.assertRegex(r["turn_id"], r"^[0-9a-f]{32}$")
+            self.assertNotIn(r["turn_id"], self.ids + [scope.session_alias])
+        self.assertEqual(self.page(scope, request_id="d"*32)["messages"],
+                         first["messages"])
+
+    def test_reopen_same_connection_owner_preserves_aliases_without_new_turn(self):
+        self.add("user", "Public question")
+        self.add("assistant", "Public answer")
+        old = self.scope()
+        first = self.page(old)
+        self.db.close()
+        self.db = sqlite3.connect(self.path)
+        self.j = ForestSessionJournal(self.db)
+        ctx = replace(self.attachment.context, task_id="history-task-b",
+                      execution_context_id="read-context-b", generation=2)
+        self.attachment = replace(self.attachment, context=ctx, view_generation=2)
+        fresh = self.scope(view_key="c"*32)
+        self.assertEqual(fresh.session_alias, old.session_alias)
+        self.assertEqual(fresh.revision, 2)
+        with self.assertRaisesRegex(ContextRefusal, "VIEW_CHANGED"):
+            self.page(old, current=fresh)
+        before = self.db.total_changes
+        reopened = self.page(fresh, request_id="d"*32)
+        self.assertEqual(reopened["messages"], first["messages"])
+        self.assertEqual(reopened["generation"], 2)
+        self.assertEqual(self.db.total_changes, before)
+
+    def test_stale_revision_and_wrong_alias_before_body(self):
+        self.add("user", "Public question")
+        old = self.scope()
+        self.add("assistant", "Public answer")
+        reads = []
+        def auth(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                reads.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(auth)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "STALE_REVISION"):
+                self.page(old)
+            wrong = replace(old, session_alias="e"*32)
+            with self.assertRaisesRegex(ContextRefusal, "VIEW_CHANGED"):
+                self.page(wrong)
+            self.assertEqual(reads, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_attachment_exact_currentness_and_tree_scope(self):
+        for changed in (self.attachment.detach(),
+                replace(self.attachment, recipient_id="recipient-b"),
+                replace(self.attachment, context=replace(
+                    self.attachment.context, tree_key="maple")),
+                replace(self.attachment, context=replace(
+                    self.attachment.context, principal_key="other")),
+                replace(self.attachment, requested_tree="MAPLE"),
+                replace(self.attachment, context=replace(
+                    self.attachment.context, clone_key="clone-a"))):
+            with self.assertRaises(ContextRefusal):
+                self.scope(current=changed)
+            if changed.recipient_id != "recipient-b":
+                with self.assertRaises(ContextRefusal):
+                    self.scope(changed)
+        with self.assertRaisesRegex(ContextRefusal, "TRANSACTION_REQUIRED"):
+            self.aliases.scope_in_transaction(self.j, self.attachment,
+                current_attachment=self.attachment, view_key="a"*32)
+
+    def test_fixed_trial_limits_and_ascii_refusal(self):
+        self.add("user", "Public question")
+        self.add("assistant", "Non ASCII \u00e9")
+        scope = self.scope()
+        for kwargs in ({"limit":3}, {"limit":True}, {"after":True},
+                       {"request_id":"not-a-token"}):
+            with self.assertRaises(ContextRefusal):
+                self.page(scope, **kwargs)
+        with self.assertRaisesRegex(ContextRefusal, "INVALID_R6_FIXTURE_TEXT"):
+            self.page(scope)
+        self.assertEqual(self.aliases._turn_aliases, {})
+        for _ in range(4):
+            self.add("user", "Extra row")
+        with self.assertRaises(ContextRefusal):
+            self.scope()
+
+    def test_collision_refuses_without_partial_mapping(self):
+        self.add("user", "One")
+        self.add("assistant", "Two")
+        scope = self.scope()
+        with patch("history_public_fixture_m4.secrets.token_hex",
+                   side_effect=["f"*32, "f"*32]):
+            with self.assertRaisesRegex(ContextRefusal, "PUBLIC_ALIAS_COLLISION"):
+                self.page(scope)
+        self.assertEqual(self.aliases._turn_aliases, {})
+        self.assertEqual(len(self.page(scope)["messages"]), 2)
 
 
 if __name__ == "__main__":

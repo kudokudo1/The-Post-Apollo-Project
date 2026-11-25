@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {spawn,spawnSync} from "node:child_process";
-import {fileURLToPath} from "node:url";
+import {fileURLToPath,pathToFileURL} from "node:url";
 import {run,Refusal} from "../../scripts/finance/research_investigation_store.mjs";
 
 // M10a: fault injection only in freshly-created disposable directories.
@@ -151,6 +151,39 @@ try {
   fs.writeFileSync(grownFile,originalBytes);
   assert.equal(run({action:"list"},grow).revision,1);
   console.log("M10A_CHECK // GROWING_STORE_READ_BOUNDED");
+
+  // A real SIGKILL before or immediately after rename must leave the
+  // durable lock in place, not grant a fresh write after process death.
+  const storeScript=fileURLToPath(new URL(
+    "../../scripts/finance/research_investigation_store.mjs",import.meta.url));
+  const killSource=[
+    'import fs from "node:fs";',
+    'import {run} from '+JSON.stringify(pathToFileURL(storeScript).href)+';',
+    'const previous=fs.renameSync.bind(fs);',
+    'fs.renameSync=(...args)=>{',
+    '  if(process.env.KILL_STAGE==="before") process.kill(process.pid,"SIGKILL");',
+    '  const value=previous(...args);',
+    '  if(process.env.KILL_STAGE==="after") process.kill(process.pid,"SIGKILL");',
+    '  return value;',
+    '};',
+    'run({action:"create",expectedRevision:0,id:"killed",',
+    'title:"Discardable",question:"Can the writer recover?",',
+    'timestamp:"2026-11-25T12:00:00.000Z"},process.env.TEST_RESEARCH_DIR);'
+  ].join("\n");
+  for (const stage of ["before","after"]) {
+    const killedDir=path.join(root,"sigkill-"+stage);
+    const child=spawnSync(process.execPath,[
+      "--input-type=module","-e",killSource
+    ],{env:{...process.env,KILL_STAGE:stage,TEST_RESEARCH_DIR:killedDir},
+       encoding:"utf8",timeout:5000});
+    assert.equal(child.signal,"SIGKILL",child.stderr);
+    assert.equal(child.stdout,"");
+    checkLock(killedDir);
+    const expected=stage==="before"?0:1;
+    assert.equal(run({action:"list"},killedDir).revision,expected);
+    tryWrite(killedDir,expected);
+    console.log("M10A_CHECK // SIGKILL_"+stage.toUpperCase()+"_RETAINS_LOCK");
+  }
 
   // A child must finish on one newline-terminated frame even when its
   // parent leaves stdin open. Unlike old readFileSync(0), this does not

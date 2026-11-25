@@ -1,0 +1,25 @@
+name: CPU++ queue session coordinator
+on:
+  pull_request:
+    paths:
+      - 'widgets/cpuplus/CpuPlusQueueSession.js'
+      - 'tests/cpuplus/test_queue_session.cjs'
+      - '.github/workflows/cpuplus-queue-session.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  coordinator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 546bd0c3c422ad5a9d15c925ae9f46261a8b5244
+          path: candidate-history
+          persist-credentials: false
+      - run: |
+          test "$(git -C candidate-history rev-parse HEAD)" = 546bd0c3c422ad5a9d15c925ae9f46261a8b5244
+          node tests/cpuplus/test_queue_session.cjs

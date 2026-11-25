@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts/forest"
@@ -173,6 +174,21 @@ class ChildTests(unittest.TestCase):
             self.assertEqual(t.result("CLOSE",{},"CLOSED"),[])
             t.closed(0)
 
+    def test_reopen_rejects_missing_replaced_or_symlink_path(self):
+        for mode in ("missing", "replacement", "symlink"):
+            with self.subTest(mode=mode), ProcessTrial() as t:
+                t.result("HELLO", {}, "READY")
+                t.finish(t.next())
+                path, = t.path.glob("forest-r5-public-*/conversation.sqlite")
+                saved = path.with_name("original.sqlite")
+                path.rename(saved)
+                if mode == "replacement":
+                    path.write_bytes(b"not the original journal")
+                elif mode == "symlink":
+                    path.symlink_to(saved)
+                self.assertEqual(t.result("REOPEN", {}, "REFUSED"), [])
+                t.closed(2)
+
     def test_wrong_or_false_ack_closes(self):
         for false in (True,False):
             with self.subTest(false=false),ProcessTrial() as t:
@@ -279,6 +295,110 @@ class OwnerBoundaryTests(unittest.TestCase):
                 finally:
                     child.current = None
                     child.host.close()
+
+    def _committed_child(self):
+        class AcceptWire:
+            def send(self, obj):
+                self.last = obj
+
+            def read(self):
+                offer = self.last
+                return dict(v=1, trial=TRIAL, action=offer["action"],
+                            kind="OPEN_ACK",
+                            data=dict(ref=offer["data"]["ref"], accepted=True))
+
+            def check(self):
+                return 1
+
+            def room(self, *args):
+                pass
+
+        child = Child(AcceptWire())
+        child.trial, child.action = TRIAL, 1
+        child.dispatch("HELLO", {})
+        try:
+            child.action += 1
+            child.dispatch("NEXT", {})
+            c = child.current
+            ref = dict(requestId=c.request_id, viewKey=c.view_key,
+                       generation=c.generation)
+            for _ in range(5):
+                child.action += 1
+                child.dispatch("STEP", {"ref": ref})
+            self.assertEqual(child.wire.last["data"]["code"], "COMMITTED_LOCAL")
+            self.assertTrue(child.reopen_ready)
+            return child
+        except BaseException:
+            child.current = None
+            child.host.close()
+            raise
+
+    def test_reopen_precheck_refuses_before_retirement_or_sqlite_open(self):
+        for mode in ("missing", "replacement", "symlink", "directory_mode"):
+            with self.subTest(mode=mode):
+                child = self._committed_child()
+                host = child.host
+                path = host._path
+                saved = path.with_name("original.sqlite")
+                original = host._db
+                try:
+                    if mode == "directory_mode":
+                        path.parent.chmod(0o755)
+                    else:
+                        path.rename(saved)
+                        if mode == "replacement":
+                            # Even valid SQLite must never reach the opener.
+                            with sqlite3.connect(path) as alternate:
+                                alternate.execute("CREATE TABLE unrelated(x)")
+                        elif mode == "symlink":
+                            path.symlink_to(saved)
+                    with patch.object(child, "_retire", wraps=child._retire) as retire, \
+                         patch.object(sqlite3, "connect", wraps=sqlite3.connect) as connect:
+                        child.action += 1
+                        with self.assertRaises(Exception):
+                            child.dispatch("REOPEN", {})
+                        retire.assert_not_called()
+                        connect.assert_not_called()
+                    self.assertIs(host._db, original)
+                    self.assertFalse(original.in_transaction)
+                    self.assertFalse(child.effect_possible)
+                    self.assertNotEqual(child.wire.last["data"]["code"], "JOURNAL_REOPENED")
+                finally:
+                    path.parent.chmod(0o700)
+                    if saved.exists():
+                        path.unlink(missing_ok=True)
+                        saved.rename(path)
+                    child.current = None
+                    host.close()
+
+    def test_reopen_retains_post_open_identity_check(self):
+        child = self._committed_child()
+        host = child.host
+        path = host._path
+        saved = path.with_name("original.sqlite")
+        reopen = host.reopen_journal
+
+        def changed_after_reopen():
+            result = reopen()
+            path.rename(saved)
+            path.write_bytes(b"substituted after original reopen")
+            return result
+
+        try:
+            with patch.object(host, "reopen_journal", side_effect=changed_after_reopen) as call:
+                child.action += 1
+                with self.assertRaises(Exception):
+                    child.dispatch("REOPEN", {})
+                call.assert_called_once_with()
+            self.assertTrue(child.effect_possible)
+            self.assertFalse(host._db.in_transaction)
+            self.assertNotEqual(child.wire.last["data"]["code"], "JOURNAL_REOPENED")
+        finally:
+            if saved.exists():
+                path.unlink(missing_ok=True)
+                saved.rename(path)
+            child.current = None
+            host.close()
 
     def test_blocked_output_and_capacity_reserve(self):
         ir, iw = os.pipe()

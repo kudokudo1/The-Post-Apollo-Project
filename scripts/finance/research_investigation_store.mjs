@@ -46,6 +46,31 @@ function secureRegular(file) {
     refuse("UNSAFE_FILE");
   return true;
 }
+// The writer's lock must be on stable storage before the first mutation.
+function syncPrivateDirectory(dir) {
+  const fd=fs.openSync(dir,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW);
+  try {
+    const st=fs.fstatSync(fd);
+    if (!st.isDirectory() || st.uid !== process.getuid() || (st.mode & 0o077))
+      refuse("UNSAFE_DIRECTORY");
+    fs.fsyncSync(fd);
+  } finally {fs.closeSync(fd);}
+}
+function releaseWriterLock(dir, lock, lockfd) {
+  // Only release the exact inode created by this writer. A replaced lock
+  // is NOT this process's lock and must never be removed by cleanup.
+  try {
+    const held=fs.fstatSync(lockfd);
+    let named;
+    try {named=fs.lstatSync(lock);} catch {refuse("UNSAFE_LOCK");}
+    if (!named.isFile() || named.isSymbolicLink()
+        || named.uid !== process.getuid() || (named.mode & 0o077)
+        || named.nlink !== 1 || named.dev !== held.dev || named.ino !== held.ino)
+      refuse("UNSAFE_LOCK");
+    fs.unlinkSync(lock);
+  } finally {fs.closeSync(lockfd);}
+  syncPrivateDirectory(dir);
+}
 function empty() { return {schemaVersion:1,revision:0,investigations:[]}; }
 function validDocument(doc) {
   return exactFields(doc,["schemaVersion","revision","investigations"])
@@ -70,7 +95,7 @@ function load(dir) {
     return doc;
   } finally { fs.closeSync(fd); }
 }
-function save(dir,doc) {
+function save(dir,doc,markCommitUncertain) {
   if (!validDocument(doc)) refuse("INVALID_DOCUMENT");
   const payload = JSON.stringify(doc) + "\n";
   if (Buffer.byteLength(payload,"utf8") > MAX_BYTES) refuse("STORE_LIMIT");
@@ -84,9 +109,12 @@ function save(dir,doc) {
     fs.closeSync(fd);
     fd=undefined;
     secureRegular(file);
+    // Once rename is attempted, its outcome may be unknown after I/O or
+    // process failure. Mark BEFORE the syscall and retain the lock until
+    // a confirmed directory fsync establishes durable commit.
+    markCommitUncertain();
     fs.renameSync(temp,file);
-    const dfd=fs.openSync(dir,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW);
-    try {fs.fsyncSync(dfd);} finally {fs.closeSync(dfd);}
+    syncPrivateDirectory(dir);
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
     try {fs.unlinkSync(temp);}catch(e){if(e.code !== "ENOENT") throw e;}
@@ -105,7 +133,11 @@ function run(command,dir=rootDirectory()) {
   try {
     lockfd=fs.openSync(lock,fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW,0o600);
   } catch(e) { if(e.code === "EEXIST") refuse("WRITE_BUSY"); refuse("UNSAFE_LOCK"); }
+  let uncertainCommit=false;
+  let durableCommit=false;
   try {
+    fs.fsyncSync(lockfd);
+    syncPrivateDirectory(dir);
     const current=load(dir);
     if (current.revision !== command.expectedRevision) refuse("STALE_REVISION");
     let investigations;
@@ -117,19 +149,49 @@ function run(command,dir=rootDirectory()) {
       else investigations=removeEvidence(current.investigations,command.investigationId,command.evidenceId,command.timestamp);
     } catch { refuse("INVALID_RESEARCH_CHANGE"); }
     const next={schemaVersion:1,revision:current.revision+1,investigations};
-    save(dir,next);
+    save(dir,next,()=>{ uncertainCommit=true; });
+    durableCommit=true;
     return next;
+  } catch(error) {
+    if (uncertainCommit && !durableCommit)
+      refuse("COMMIT_OUTCOME_UNKNOWN");
+    throw error;
   } finally {
-    fs.closeSync(lockfd);
-    fs.unlinkSync(lock);
+    if (uncertainCommit && !durableCommit) {
+      // Deliberately strand the durable lock; an operator must inspect
+      // the last revision before any manual recovery. No auto-retry.
+      fs.closeSync(lockfd);
+    } else {
+      releaseWriterLock(dir,lock,lockfd);
+    }
   }
+}
+// One line is sufficient: the writer must finish even if a Quickshell
+// caller leaves stdin open. Do not allocate an unbounded stdin buffer.
+function readBoundedCommand(fd) {
+  const parts=[];
+  let total=0;
+  while (total <= MAX_COMMAND_BYTES) {
+    const part=Buffer.allocUnsafe(Math.min(1024,MAX_COMMAND_BYTES+1-total));
+    const n=fs.readSync(fd,part,0,part.length,null);
+    if (n===0) refuse("INVALID_INPUT_FRAME");
+    const chunk=part.subarray(0,n);
+    total+=n;
+    if (total>MAX_COMMAND_BYTES) refuse("INVALID_INPUT_FRAME");
+    const newline=chunk.indexOf(10);
+    if (newline!==-1) {
+      if (newline!==chunk.length-1) refuse("INVALID_INPUT_FRAME");
+      parts.push(chunk);
+      return Buffer.concat(parts).toString("utf8");
+    }
+    parts.push(chunk);
+  }
+  refuse("INVALID_INPUT_FRAME");
 }
 export {run,rootDirectory,Refusal};
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
   try {
-    const raw=fs.readFileSync(0,{encoding:"utf8"});
-    if (Buffer.byteLength(raw,"utf8") > MAX_COMMAND_BYTES || !raw.endsWith("\n"))
-      refuse("INVALID_INPUT_FRAME");
+    const raw=readBoundedCommand(0);
     let command;
     try {command=JSON.parse(raw);} catch {refuse("INVALID_JSON");}
     const doc=run(command);

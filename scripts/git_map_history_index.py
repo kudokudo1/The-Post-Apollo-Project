@@ -284,14 +284,27 @@ def page(conn, snapshot, start):
         (start,stop))]
     if len(rows) != stop-start or any(row["ordinal"] != start+i for i,row in enumerate(rows)):
         raise ValueError("incomplete page")
+    # One bounded ancestry query per page instead of one per commit.
+    # The child/position primary key preserves each ordered parent list.
     for row in rows:
-        row["parents"] = [dict(edge) for edge in conn.execute("""
-            SELECT e.position, e.parent_sha AS sha, p.ordinal, e.parent_lane AS lane
-            FROM edges e JOIN commits p ON p.sha=e.parent_sha
-            WHERE e.child=? ORDER BY e.position LIMIT ?
-            """, (row["ordinal"], MAX_PARENTS+1))]
-        if len(row["parents"]) > MAX_PARENTS:
-            raise ValueError("invalid edge count")
+        row["parents"] = []
+    for edge in conn.execute("""
+        SELECT e.child, e.position, e.parent_sha AS sha,
+               p.ordinal, e.parent_lane AS lane, p.lane AS actual_lane
+        FROM edges e LEFT JOIN commits p ON p.sha=e.parent_sha
+        WHERE e.child>=? AND e.child<? ORDER BY e.child,e.position
+        LIMIT ?
+        """, (start,stop,(stop-start)*MAX_PARENTS+1)):
+        child = edge["child"]
+        parents = rows[child-start]["parents"]
+        if (len(parents) >= MAX_PARENTS or edge["position"] != len(parents)
+                or not valid_sha(edge["sha"])
+                or type(edge["ordinal"]) is not int
+                or not child < edge["ordinal"] < m["total"]
+                or type(edge["lane"]) is not int or not 0 <= edge["lane"] < MAX_LANES
+                or edge["lane"] != edge["actual_lane"]):
+            raise ValueError("invalid page ancestry")
+        parents.append({key:edge[key] for key in ("position","sha","ordinal","lane")})
     boundary = conn.execute("SELECT frontier FROM boundaries WHERE ordinal=?", (start,)).fetchone()
     if boundary is None:
         raise ValueError("missing boundary")

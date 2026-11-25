@@ -24,6 +24,8 @@ REACTIVATE_MARKER = EXT_DIRECTORY / "reactivation.json"
 REACTIVATE_RESULT = EXT_DIRECTORY / "reactivation-result.json"
 ARCHIVE_PENDING = EXT_DIRECTORY / "archive-pending.json"
 HISTORY_DIRECTORY = PARENT / "post-apollo-memory-history"
+# Reserved sibling fence: no writer, clearer or reclaim command in this slice.
+RECLAIM_FENCE = PARENT / "post-apollo-memory-reclaim"
 REDUCTION_VERSION = 1
 # Single-threaded helper; ownership remains with the open file description.
 _mutation_fd = None
@@ -184,7 +186,7 @@ def status():
     base = active_swap()
     extension = active_swap(EXT_FILE)
     extension_exists = os.path.lexists(EXT_DIRECTORY)
-    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "recoveryInspectionVersion": 1, "reactivationVersion": 1, "cycleArchiveVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
+    return {"reductionVersion": REDUCTION_VERSION, "reductionCrashFenceVersion": 1, "externalReclaimFenceVersion": 1, "recoveryInspectionVersion": 1, "reactivationVersion": 1, "cycleArchiveVersion": 1, "nativeAuthVersion": 1, "persistenceVersion": 1, "persistence": persistence_state(), "filesystem": fs, "mountpoint": mountpoint, "availableGiB": available // GIB,
             "reserveGiB": (reserve + GIB - 1) // GIB,
             "maximumGiB": max(0, min(64, ((available - reserve) // (4 * GIB)) * 4)),
             "existing": existing, "active": base,
@@ -301,6 +303,25 @@ def check_recovery_fence():
             continue
         raise ReductionRecovery("RECOVERY_REQUIRED")
 
+def check_external_reclaim_fence():
+    """Presence (including partial/unsafe objects) blocks all protected entrypoints.
+
+    The fixed sibling path survives removal of the managed extension directory.
+    No parsing, creation, repair, or retirement is permitted in this version.
+    """
+    try:
+        secure_parent()
+    except (OSError, RuntimeError) as error:
+        raise ReductionRecovery("RECLAIM_FENCE_UNVERIFIED") from error
+    try:
+        RECLAIM_FENCE.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise ReductionRecovery("RECLAIM_FENCE_UNVERIFIED") from error
+    raise ReductionRecovery("RECLAIM_RECOVERY_REQUIRED")
+
+
 @contextmanager
 def mutation_lock(*, inspection=False):
     # Shared by all helper mutations; this does not serialize external root tools.
@@ -324,6 +345,11 @@ def mutation_lock(*, inspection=False):
             raise ReductionBlocked("OPERATION_BUSY") from error
         _mutation_fd = fd
         try:
+            # Unlike the internal extension journals, the external fence
+            # cannot be bypassed by the inspection-mode lock. Until a
+            # separately reviewed reader exists, protected inspection also
+            # returns recovery-required rather than reporting path absence.
+            check_external_reclaim_fence()
             if not inspection:
                 check_recovery_fence()
             yield

@@ -19,12 +19,15 @@ from pathlib import Path
 import secrets
 import socket
 import stat
+from threading import Lock
 import time
 from collections.abc import Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from native_attempt_fingerprint_v0 import AttemptedWireFingerprint
+from native_attempt_fingerprint_v0 import (
+    AttemptedWireFingerprint, NativeCommandDeliverySnapshot,
+)
 from desktop_command_gateway_v0 import KernelPeer, _peer
 from signed_command_receipt_v0 import (
     ReceiptRejected, build_request, verify_receipt,
@@ -77,6 +80,9 @@ class SignedIdentityCommandClient:
         self._nonces: set[str] = set()
         self._begin_consumed = False
         self._faulted = False
+        # One in-flight transaction owns the request, sequence and wire
+        # evidence. Never queue another command or permit callback reentry.
+        self._command_lock = Lock()
         # Local process observation only. A fresh client cannot prove that
         # an earlier process did not dispatch a command before crashing.
         self._last_wire_outcome = "UNOBSERVED"
@@ -137,7 +143,35 @@ class SignedIdentityCommandClient:
         except Exception:
             return False
 
+    def delivery_snapshot(self) -> NativeCommandDeliverySnapshot | None:
+        """Read a coherent completed-call observation; None means busy.
+
+        Never wait behind a command (including reentry from a trust guard).
+        None is not proof of no send, no effect or a retry permission.
+        Legacy individual properties are retained for CI compatibility.
+        """
+        if not self._command_lock.acquire(blocking=False):
+            return None
+        try:
+            return NativeCommandDeliverySnapshot(
+                wire_outcome=self._last_wire_outcome,
+                last_attempted_wire=self._last_attempted_wire,
+                faulted=self._faulted,
+            )
+        finally:
+            self._command_lock.release()
+
     def _transact(self, action: str) -> HostCommandObservation:
+        # Refuse overlap before touching any state, nonce, socket or guard.
+        # Do not queue a delayed effect or overwrite in-flight evidence.
+        if not self._command_lock.acquire(blocking=False):
+            raise ReceiptRejected("Native command already in flight")
+        try:
+            return self._transact_serial(action)
+        finally:
+            self._command_lock.release()
+
+    def _transact_serial(self, action: str) -> HostCommandObservation:
         if self._faulted:
             # Preserve the outcome of the last actual transport attempt,
             # especially UNKNOWN_HOLD. A denied retry is NOT reconciliation.

@@ -15,8 +15,8 @@ with tempfile.TemporaryDirectory(prefix="git-map-managed-native-") as tmp:
     shutil.copytree(ROOT/"components",scene/"components")
     for folder,names in (
         ("services/git",("GitMapPageBridge.qml","GitMapViewportPolicy.js")),
-        ("widgets/git",("GitMapVirtualViewport.qml","GitMapControlHost.qml")),
-        ("scripts",("git_map_history_index.py","git_map_index_manager.py")),
+        ("widgets/git",("GitMapVirtualViewport.qml","GitMapControlHost.qml","GitMapCustodyController.qml","GitMapGenerationLease.qml")),
+        ("scripts",("git_map_history_index.py","git_map_index_manager.py","git_map_reader_candidate.py")),
     ):
         dest=scene/folder
         dest.mkdir(parents=True)

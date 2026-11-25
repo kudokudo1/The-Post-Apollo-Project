@@ -41,3 +41,24 @@ Verify exact-head CI, fix fixture/renderer issues, add native gesture and
 cross-page complex graph tests; then G3 explicit persistent index owner
 and GitW integration with old map fallback. No data migration or live
 machine mutation.
+
+## G2b follow-up
+
+Exact G2a head 952e9f0c0d486ad5424ea260a35fc6b1d403aaa9:
+3/4 workflows passed; native workflow 45515916574 failed before instantiation
+because Qt QML rejected JavaScript object spread in the G1 policy (Node
+accepted it). Replaced spread with explicit Object.assign and property
+assignment in the stacked candidate. The G1 PR remains at its prior head;
+this compatibility correction is part of G2, and must not be omitted when
+reconciling the stack. Added a contract for no-op state updates, reader
+terminal wakeup and explicit unavailable rows after reader fault.
+
+Expanded native fixture requires actual outstanding old-repository page,
+checks merge frontier/parent identity across a page boundary, hides and
+shows the candidate item without changing its scroll position, and runs a
+separate Xvfb/xdotool input exercise (star drag to bottom, wheel at bottom,
+reverse wheel, drag to top, wheel at top). The workflow reruns the G1
+contracts as well as offscreen and X11 fixture variants. This is synthetic
+input in disposable X11, not native Wayland touchpad acceptance; pixel-level
+wide graph rendering, frame timing, production integration, and generation
+anchor adoption remain unverified. New-head CI pending. No live changes.

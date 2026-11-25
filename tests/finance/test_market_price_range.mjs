@@ -238,3 +238,6 @@ await import("./test_market_m42_compact_navigation.mjs");
 
 // M43: retained global-provider history in Stocks.
 await import("./test_market_m43_global_handoff.mjs");
+
+// M44: shared same-stock analytics for both global providers.
+await import("./test_market_m44_global_analysis.mjs");

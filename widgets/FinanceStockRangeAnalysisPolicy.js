@@ -15,10 +15,29 @@ function sameBar(reference, bar) {
 function roundPct(value) {
     return Math.round(value * 100) / 100;
 }
+// M44: revalidate the retained global listing before any analytical use.
+// Legacy EODHD ranges retain their existing source contract.
+function retainedGlobalRange(snapshot) {
+    if (!snapshot || snapshot.noProviderCalls !== true
+            || snapshot.identityVerified !== false || !snapshot.identity
+            || !snapshot.listing || snapshot.cik !== undefined)
+        return false;
+    const l=snapshot.listing;
+    const listing={symbol:l.symbol,name:l.name,currency:l.currency,
+        code:l.code,exchange:l.exchange,region:l.region};
+    return captureGlobalHistory(snapshot.identity,listing,snapshot)!==null
+        && l.venue === (snapshot.source==="eodhd-eod"?l.exchange:l.region);
+}
+function rangeSource(snapshot) {
+    return snapshot.source==="alpha-vantage-daily-compact"
+        ? "loaded-alpha-vantage-range-only" : "loaded-eodhd-range-only";
+}
 function summarizeRange(snapshot) {
     if (!snapshot || snapshot.schemaVersion !== 1
             || snapshot.readOnly !== true
-            || snapshot.source !== "eodhd-eod"
+            || (snapshot.identity || snapshot.listing || snapshot.identityVerified !== undefined
+                || snapshot.source === "alpha-vantage-daily-compact"
+                ? !retainedGlobalRange(snapshot) : snapshot.source !== "eodhd-eod")
             || !["CLOSE", "ADJUSTED CLOSE"].includes(snapshot.priceBasis)
             || !calendarDay(snapshot.from) || !calendarDay(snapshot.to)
             || snapshot.from > snapshot.to
@@ -77,7 +96,7 @@ function summarizeRange(snapshot) {
         upSteps:up, downSteps:down, flatSteps:flat,
         largestUpPct:largestUp === null ? null : roundPct(largestUp),
         largestDownPct:largestDown === null ? null : roundPct(largestDown),
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         noProviderCalls:true, readOnly:true
     };
 }
@@ -104,7 +123,7 @@ function compareSelectedToLast(snapshot, index) {
         deltaPct:roundPct(relative),
         sessionSteps:snapshot.bars.length - index - 1,
         priceBasis:summary.priceBasis,
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         noProviderCalls:true,
         readOnly:true
     };
@@ -139,7 +158,7 @@ function movingAverageSeries(snapshot) {
         latest20:twenty.length ? twenty[twenty.length - 1].price : null,
         sessions:rows.length,
         priceBasis:valid.priceBasis,
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         readOnly:true,
         noProviderCalls:true
     };
@@ -155,7 +174,7 @@ function movingAverageRelationship(snapshot) {
     if (moving.sessions < 20) {
         return {
             state:"insufficient", sessions:moving.sessions, requiredSessions:20,
-            source:"loaded-eodhd-range-only", readOnly:true, noProviderCalls:true
+            source:rangeSource(snapshot), readOnly:true, noProviderCalls:true
         };
     }
     let previousDefinite = null;
@@ -194,7 +213,7 @@ function movingAverageRelationship(snapshot) {
         movedAbove:aboveChanges, movedBelow:belowChanges,
         lastChange:lastChange,
         priceBasis:moving.priceBasis,
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         readOnly:true,
         noProviderCalls:true
     };
@@ -228,7 +247,7 @@ function comparePinnedRangeSessions(snapshot, firstIndex, secondIndex) {
         order:secondIndex > firstIndex ? "FORWARD"
             : secondIndex < firstIndex ? "BACKWARD" : "SAME",
         priceBasis:validated.priceBasis,
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         readOnly:true,
         noProviderCalls:true
     };
@@ -275,7 +294,7 @@ function summarizePinnedInterval(snapshot, firstIndex, secondIndex) {
         upSteps:up,downSteps:down,flatSteps:flat,
         priceBasis:compared.priceBasis,
         pathOrder:"CHRONOLOGICAL",
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         readOnly:true,noProviderCalls:true
     };
 }
@@ -355,7 +374,7 @@ function normalizedIntervalChart(snapshot, a, b, c, d) {
         first:first, second:second, low:low, high:high,
         maxSteps:Math.max(first.length,second.length)-1,
         priceBasis:comparison.first.priceBasis,
-        source:"loaded-eodhd-range-only",
+        source:rangeSource(snapshot),
         readOnly:true,noProviderCalls:true
     };
 }
@@ -390,7 +409,7 @@ function normalizedStepAtX(chart, width, x) {
 }
 
 function inspectNormalizedStep(chart, step) {
-    if (!chart || chart.source !== "loaded-eodhd-range-only"
+    if (!chart || !["loaded-eodhd-range-only","loaded-alpha-vantage-range-only"].includes(chart.source)
             || chart.readOnly !== true || chart.noProviderCalls !== true
             || !Number.isInteger(chart.maxSteps) || chart.maxSteps < 1
             || chart.maxSteps > 131 || !Number.isInteger(step)
@@ -424,7 +443,8 @@ function inspectNormalizedStep(chart, step) {
 // M36: capture one detached, bounded closing-price range in memory.
 // Caller supplies the exact identity from the existing six-stock catalog.
 function captureStockReference(snapshot, cik, symbol) {
-    if (!summarizeRange(snapshot) || snapshot.bars.length < 2
+    if (!summarizeRange(snapshot) || snapshot.identity || snapshot.listing
+            || snapshot.source !== "eodhd-eod" || snapshot.bars.length < 2
             || typeof cik !== "string" || !/^\d{10}$/.test(cik)
             || typeof symbol !== "string" || !/^[A-Z]+\.US$/.test(symbol)
             || snapshot.cik !== cik || snapshot.symbol !== symbol
@@ -678,7 +698,11 @@ function captureGlobalHistory(identity, listing, data) {
         priceBasis:data.priceBasis,from:data.from,to:data.to,retrievedAt:data.retrievedAt,
         identity:{figi:identity.figi,ticker:identity.ticker,name:identity.name,exchCode:identity.exchCode},
         listing:{symbol:listing.symbol,name:listing.name,currency:listing.currency,
-            venue:eod?listing.exchange:listing.region},
+            venue:eod?listing.exchange:listing.region,
+            code:eod?listing.code:null,exchange:eod?listing.exchange:null,
+            region:alpha?listing.region:null},
+        compactMaxBars:alpha?data.compactMaxBars:null,
+        returnedBars:alpha?data.returnedBars:null,
         compactMayBeTruncated:alpha && data.compactMayBeTruncated,
         bars:bars,first:bars.length?{date:bars[0].date,price:bars[0].price}:null,
         last:bars.length?{date:bars[bars.length-1].date,price:bars[bars.length-1].price}:null,changePct:changePct,

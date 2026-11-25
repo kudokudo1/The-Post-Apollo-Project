@@ -48,9 +48,9 @@ ctx.discoveryOpen=true;assert.equal(ctx.acceptGlobalHistory(identity,listing,nul
 assert.equal(ctx.globalHistory,saved);assert.match(ctx.globalHandoffMessage,/REFUSED/);
 ctx.returnToLegacyHistory();assert.equal(ctx.globalHistory,null);
 for(const token of ["readonly property var snapshot: globalHistoryActive ? globalHistory",
-    "readonly property var rangeAnalysis: !globalHistoryActive && !dayMode && snapshot",
+    "RangeAnalysisPolicy.retainedGlobalRange(snapshot)",
     "readonly property string priceUnit: globalHistoryActive ? globalHistory.currency",
-    "RETURN TO LEGACY STOCKS","FIGI MATCH NOT VERIFIED","ADVANCED TOOLS PENDING",
+    "RETURN TO LEGACY STOCKS","FIGI MATCH NOT VERIFIED","CROSS-STOCK PENDING",
     "onHistoryChosen: function(identity, listing, snapshot)","id: priceCanvas",
     "if (!stocks.globalHistoryActive && stocks.stockFeed) stocks.stockFeed.refresh()"])
     assert.ok(qml.includes(token),token);

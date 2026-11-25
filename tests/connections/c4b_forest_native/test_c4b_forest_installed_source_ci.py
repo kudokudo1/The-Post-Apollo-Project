@@ -11,7 +11,9 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 HOST = Path("/usr/libexec/post-apollo/forest-ci/forest-host")
 PYTHON = "/usr/bin/python3"
@@ -74,14 +76,55 @@ def boot_id():
         raise Refused("C4B_KERNEL_BOOT_ID_UNAVAILABLE")
     return v
 
+MAX_INSTALLED_BYTES = 64 * 1024
+
+
+def source_stamp(st):
+    return (st.st_dev, st.st_ino, st.st_mode, st.st_uid, st.st_gid,
+            st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
 def installed_sha():
-    f, d = HOST.lstat(), HOST.parent.lstat()
-    if ((not stat.S_ISREG(f.st_mode)) or (f.st_uid, f.st_gid,
-          stat.S_IMODE(f.st_mode)) != (0, 0, 0o555) or
-          not stat.S_ISDIR(d.st_mode) or (d.st_uid, d.st_gid,
-          stat.S_IMODE(d.st_mode)) != (0, 0, 0o755)):
-        raise Refused("C4B_UNEXPECTED_INSTALLED_SOURCE")
-    return hashlib.sha256(HOST.read_bytes()).hexdigest()
+    """Hash the same bounded regular-file descriptor whose metadata we check."""
+    directory = fd = None
+    try:
+        directory = os.open(HOST.parent, os.O_RDONLY | os.O_DIRECTORY |
+                            os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+        d = os.fstat(directory)
+        if (not stat.S_ISDIR(d.st_mode) or
+                (d.st_uid, d.st_gid, stat.S_IMODE(d.st_mode)) != (0, 0, 0o755)):
+            raise Refused("C4B_UNEXPECTED_INSTALLED_SOURCE")
+        fd = os.open(HOST.name, os.O_RDONLY | os.O_NOFOLLOW |
+                     os.O_CLOEXEC | os.O_NONBLOCK, dir_fd=directory)
+        f = os.fstat(fd)
+        if (not stat.S_ISREG(f.st_mode) or
+                (f.st_uid, f.st_gid, stat.S_IMODE(f.st_mode)) != (0, 0, 0o555)
+                or not 0 < f.st_size <= MAX_INSTALLED_BYTES):
+            raise Refused("C4B_UNEXPECTED_INSTALLED_SOURCE")
+        digest, size = hashlib.sha256(), 0
+        while True:
+            block = os.read(fd, min(8192, MAX_INSTALLED_BYTES + 1 - size))
+            if not block:
+                break
+            size += len(block)
+            if size > MAX_INSTALLED_BYTES:
+                raise Refused("C4B_INSTALLED_SOURCE_OVERSIZE")
+            digest.update(block)
+        if (size != f.st_size or
+                source_stamp(f) != source_stamp(os.fstat(fd)) or
+                source_stamp(f) != source_stamp(os.stat(
+                    HOST.name, dir_fd=directory, follow_symlinks=False)) or
+                source_stamp(d) != source_stamp(os.fstat(directory)) or
+                source_stamp(d) != source_stamp(HOST.parent.lstat())):
+            raise Refused("C4B_INSTALLED_SOURCE_CHANGED")
+        return digest.hexdigest()
+    except OSError:
+        raise Refused("C4B_INSTALLED_SOURCE_UNAVAILABLE") from None
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if directory is not None:
+            os.close(directory)
 
 def fd_links(pid):
     values = []
@@ -359,6 +402,91 @@ class C4bActualInstalledSourceCI(unittest.TestCase):
 
     def test_11_actual_installed_host_exit_before_send_gate_refused(self):
         self.scenario("STATUS", exit_before_gate="host")
+
+
+    def test_12_source_digest_bounded_regular_descriptor(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder) / "package"
+            directory.mkdir(mode=0o755)
+            directory.chmod(0o755)
+            source = directory / "forest-host"
+            source.write_bytes(b"fixed public fixture")
+            source.chmod(0o555)
+            with mock.patch(__name__ + ".HOST", source):
+                self.assertEqual(installed_sha(), hashlib.sha256(
+                    b"fixed public fixture").hexdigest())
+                source.chmod(0o755)
+                source.write_bytes(b"x" * (MAX_INSTALLED_BYTES + 1))
+                source.chmod(0o555)
+                with self.assertRaises(Refused):
+                    installed_sha()
+                source.unlink()
+                source.symlink_to(HOST.parent / "missing-target")
+                with self.assertRaises(Refused):
+                    installed_sha()
+                source.unlink()
+                os.mkfifo(source, 0o555)
+                # Real FIFO with no writer; O_NONBLOCK must precede fstat.
+                with self.assertRaises(Refused):
+                    installed_sha()
+
+    def test_13_same_bytes_path_replacement_during_hash_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder) / "package"
+            directory.mkdir()
+            directory.chmod(0o755)
+            source = directory / "forest-host"
+            original = b"public fixture bytes"
+            source.write_bytes(original)
+            source.chmod(0o555)
+            replacement = directory / "replacement"
+            replacement.write_bytes(original)
+            replacement.chmod(0o555)
+            read = os.read
+            replaced = False
+
+            def swap_after_read(fd, count):
+                nonlocal replaced
+                block = read(fd, count)
+                if block and not replaced:
+                    os.replace(replacement, source)
+                    replaced = True
+                return block
+
+            with mock.patch(__name__ + ".HOST", source), mock.patch.object(
+                    os, "read", side_effect=swap_after_read):
+                with self.assertRaisesRegex(Refused, "C4B_INSTALLED_SOURCE_CHANGED"):
+                    installed_sha()
+            self.assertTrue(replaced)
+            self.assertEqual(source.read_bytes(), original)
+
+    def test_14_same_inode_edit_during_hash_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder) / "package"
+            directory.mkdir()
+            directory.chmod(0o755)
+            source = directory / "forest-host"
+            source.write_bytes(b"original")
+            source.chmod(0o555)
+            read = os.read
+            changed = False
+
+            def change_after_read(fd, count):
+                nonlocal changed
+                block = read(fd, count)
+                if block and not changed:
+                    source.chmod(0o755)
+                    source.write_bytes(b"modified")
+                    source.chmod(0o555)
+                    changed = True
+                return block
+
+            with mock.patch(__name__ + ".HOST", source), mock.patch.object(
+                    os, "read", side_effect=change_after_read):
+                with self.assertRaisesRegex(Refused, "C4B_INSTALLED_SOURCE_CHANGED"):
+                    installed_sha()
+            self.assertTrue(changed)
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--renderer":

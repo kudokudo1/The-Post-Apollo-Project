@@ -60,6 +60,16 @@ jobs:
               'def authorize_disclose_tool_input(',
               'def authorize_delegate_capability(',
               'def authorize_prune_knowledge(',
+              'def authorize_observe_learning_candidate(',
+              'LEARNING_CANDIDATE_SOURCE_POLICY_REQUIRED',
+              'def authorize_use_learning_temporarily(',
+              'LEARNING_TEMPORARY_USE_POLICY_REQUIRED',
+              'def authorize_absorb_learning(',
+              'LEARNING_ABSORPTION_SEPARATE_APPROVAL_REQUIRED',
+              'def authorize_reuse_retained_learning(',
+              'LEARNING_REUSE_CURRENT_POLICY_REQUIRED',
+              'def authorize_release_learning(',
+              'LEARNING_RELEASE_SEPARATE_DISCLOSURE_REQUIRED',
               'TOOL_INPUT_SEPARATE_PROTECTED_DISCLOSURE_REQUIRED',
               'DELEGATED_CAPABILITY_SEPARATE_PROTECTED_PERMISSION_REQUIRED',
               'PRUNING_SEPARATE_PROTECTED_POLICY_REQUIRED',
@@ -83,7 +93,7 @@ jobs:
               assert 'ForestC5AuthorityBoundary' not in Path(path).read_text()
           print('FOREST_C5_AUTHORITY_BOUNDARY // NO_LOCAL_FALLBACK_OR_PRODUCTION_AUTHORITY')
           PY
-      - name: 33 Forest C5 refusal and B6 nonauthority tests
+      - name: 35 Forest C5 refusal and B6 nonauthority tests
         run: |
           set -euo pipefail
           python3 -B -I -m unittest discover -s tests/connections \

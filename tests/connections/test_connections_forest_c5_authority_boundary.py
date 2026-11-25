@@ -511,5 +511,55 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
                     self.assert_denied(authority.status())
 
 
+    def test_34_learning_operations_have_distinct_fixed_refusals(self):
+        cases = (
+            ("authorize_observe_learning_candidate", "LEARNING_CANDIDATE_SOURCE_POLICY_REQUIRED"),
+            ("authorize_use_learning_temporarily", "LEARNING_TEMPORARY_USE_POLICY_REQUIRED"),
+            ("authorize_absorb_learning", "LEARNING_ABSORPTION_SEPARATE_APPROVAL_REQUIRED"),
+            ("authorize_reuse_retained_learning", "LEARNING_REUSE_CURRENT_POLICY_REQUIRED"),
+            ("authorize_release_learning", "LEARNING_RELEASE_SEPARATE_DISCLOSURE_REQUIRED"),
+        )
+        marker = "SYNTHETIC_PRIVATE_LEARNING"
+        for authority in (self.local, self.protected):
+            for method, reason in cases:
+                for evidence in (
+                    {"active": True, "approved": True, "confidence": 1,
+                     "body": marker, "permissionGranted": True},
+                    {"readGranted": True, "retained": True, "releaseGranted": True,
+                     "revision": 3, "policyGeneration": 99, "body": marker},
+                    {"revoked": True, "expired": True, "body": marker},
+                ):
+                    with self.subTest(method=method, mode=authority.status()["requiredMode"]):
+                        with self.assertRaises(C.ForestC5Hold) as caught:
+                            getattr(authority, method)(evidence, currentConsent=True)
+                        self.assertEqual(str(caught.exception),
+                                         "FOREST_C5_AUTHORITY_HOLD // " + reason)
+                        self.assertNotIn(marker, str(caught.exception))
+                        self.assertIsNone(caught.exception.__cause__)
+                        self.assertIsNone(caught.exception.__context__)
+                        self.assert_denied(authority.status())
+
+    def test_35_learning_refusal_never_inspects_payload_or_evidence(self):
+        class Untouchable:
+            def fail(self, *args, **kwargs):
+                raise AssertionError("caller data inspected")
+
+            __getattribute__ = __bool__ = __iter__ = __len__ = fail
+            __eq__ = __repr__ = __bytes__ = __hash__ = fail
+
+        for authority in (self.local, self.protected):
+            for method in (
+                "authorize_observe_learning_candidate",
+                "authorize_use_learning_temporarily",
+                "authorize_absorb_learning",
+                "authorize_reuse_retained_learning",
+                "authorize_release_learning",
+            ):
+                with self.subTest(method=method):
+                    with self.assertRaises(C.ForestC5Hold):
+                        getattr(authority, method)(Untouchable(), evidence=Untouchable())
+                    self.assert_denied(authority.status())
+
+
 if __name__ == "__main__":
     unittest.main()

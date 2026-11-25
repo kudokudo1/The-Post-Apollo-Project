@@ -22,6 +22,7 @@ Rectangle {
     property alias scrollViewport: flick
     readonly property string bottomStatus: mapState ? Policy.bottomState(mapState) : "NO INDEX"
     readonly property bool bridgeFaulted: bridge.faulted
+    readonly property int activePageStart: bridge.activeRequest ? bridge.activeRequest.start : -1
     property bool applyingGeometry: false
     property string selectedSha: ""
     signal commitSelected(string sha)

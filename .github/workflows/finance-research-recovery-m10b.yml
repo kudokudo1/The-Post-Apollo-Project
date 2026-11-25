@@ -1,0 +1,33 @@
+name: Finance Research M10b read-only recovery inventory native smoke
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/research_investigation_recovery_probe.mjs"
+      - "scripts/finance/research_investigation_store.mjs"
+      - "tests/finance/test_research_m10b_recovery_probe.mjs"
+      - "tests/finance/test_research_m10a_store_commit_uncertainty.mjs"
+      - ".github/workflows/finance-research-recovery-m10b.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-recovery:
+    name: Fedora read-only crashed-store lock and corruption inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    container:
+      image: fedora:44
+    steps:
+      - name: Install native Linux Node runtime
+        run: |
+          dnf install -y --setopt=install_weak_deps=False nodejs git
+          node --version
+      - uses: actions/checkout@v4
+      - name: Verify Research M10a store crash boundary and M10b no-unlock probe
+        run: |
+          set -eu
+          node tests/finance/test_research_m10a_store_commit_uncertainty.mjs
+          node tests/finance/test_research_m10b_recovery_probe.mjs

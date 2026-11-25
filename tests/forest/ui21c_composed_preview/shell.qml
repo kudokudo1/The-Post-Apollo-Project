@@ -67,6 +67,7 @@ ShellRoot {
     // Actual child records, captured and independently correlated before this
     // native replay. This is not a live Process-to-Loader connection.
     property var actualRows: null
+    property var hiddenOriginal: null
     function actualUnits(units) {
         for (const u of units) preview.item.receiveRuntimeUnit(u);
     }
@@ -635,6 +636,95 @@ ShellRoot {
             case 40:
                 check(preview.item===null,"actual replay Loader survived");
                 break;
+            case 41:
+                preview.active=true;
+                break;
+            case 42: {
+                const d=Actual.replay;
+                hiddenOriginal=preview.item;
+                verifyLoaded();
+                check(hiddenOriginal.beginConnectedHistory(),"visibility connected mode");
+                openRuntime(d.b);
+                actualUnits(d.unitsB);
+                actualAttach(d.h2);
+                actualPage(d.h2,d.second[0]);
+                verifyConnected(2,"PARTIAL");
+                check(hiddenOriginal.nextHistoryPage(d.h2,d.second[1].requestId,2),
+                    "visibility pending continuation");
+                verifyConnected(2,"PENDING");
+                verifyConnectedStatus("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                preview.visible=false;
+                break;
+            }
+            case 43: {
+                const d=Actual.replay, item=preview.item;
+                check(item===hiddenOriginal && !item.visible,"original hidden, not unloaded");
+                check(!item.historyScopeActive && item.historyPendingRequest===null
+                    && actualFeed().messages.length===0 && item.runtimeState==="CLOSED"
+                    && item.runtimeStatusText==="","hidden original retains presentation");
+                check(!item.receiveHistoryPage(d.h2,d.second[1].frame),"hidden page accepted");
+                item.receiveRuntimeUnit(d.unitsB[0]);
+                preview.visible=true;
+                break;
+            }
+            case 44: {
+                const d=Actual.replay, item=preview.item;
+                check(item===hiddenOriginal && item.visible,"original re-shown");
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("");
+                check(!item.attachHistoryScope(d.h2),"retired history view reopened");
+                check(!item.openRuntimeLifetime(d.b),"retired status view reopened");
+                check(!item.receiveHistoryPage(d.h2,d.second[1].frame),"retired page accepted");
+                check(actualFeed().messages.length===0 && item.runtimeStatusText==="",
+                    "retired data revived");
+                actualRetire();
+                actualAttach(d.h3);
+                actualPage(d.h3,d.reopened[0]);
+                verifyConnected(2,"PARTIAL");
+                check(!item.receiveHistoryPage(d.h2,d.second[1].frame),"old page reached fresh scope");
+                actualPage(d.h3,d.reopened[1],true);
+                verifyConnected(4,"COMPLETE");
+                break;
+            }
+            case 45: {
+                const d=Actual.replay;
+                actualRetire();
+                openRuntime(d.c);
+                actualUnits(d.unitsC);
+                actualUnits(d.stop);
+                actualUnits(d.abort);
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(preview.item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),
+                    "visibility typed abort setup");
+                verifyConnectedStatus("LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED");
+                preview.visible=false;
+                break;
+            }
+            case 46: {
+                const d=Actual.replay,item=preview.item;
+                check(item===hiddenOriginal && !item.visible && item.runtimeState==="CLOSED"
+                    && item.runtimeStatusText==="","hidden abort survives");
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(!item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),"hidden abort accepted");
+                preview.visible=true;
+                break;
+            }
+            case 47: {
+                const d=Actual.replay,item=preview.item;
+                check(item===hiddenOriginal && item.visible,"abort original re-shown");
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("");
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(!item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),"old abort revived");
+                check(!item.openRuntimeLifetime(d.c),"old terminal lifetime reopened");
+                verifyConnectedStatus("");
+                preview.active=false;
+                hiddenOriginal=null;
+                break;
+            }
+            case 48:
+                check(preview.item===null,"visibility original survived unload");
+                break;
             default:
                 check(false, "unexpected phase");
             }
@@ -642,7 +732,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 40) {
+            if (p === 48) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

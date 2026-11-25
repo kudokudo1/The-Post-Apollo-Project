@@ -4,7 +4,7 @@ import Quickshell.Io
 import "../../components"
 import "../../services/git/GitMapViewportPolicy.js" as Policy
 
-// Explicit opt-in control-page host. Existing recent map stays mounted.
+// One public map; bounded available rows are replaced by an explicitly adopted index.
 // No index lookup/build at startup, on visibility change, or on repo change.
 Item {
     id: root
@@ -15,12 +15,11 @@ Item {
     property string selectedSha: ""
     signal commitSelected(string sha)
 
-    property bool fullWanted: false
     property bool allocated: false
     property string activeRepo: ""
     property var pendingResult: null
     property string pendingRepo: ""
-    property string statusText: "RECENT // 48 COMMITS MAX"
+    property string statusText: "AVAILABLE HISTORY // 48 COMMITS MAX"
     property string job: ""
     property string jobRepo: ""
     property int repoEpoch: 0
@@ -33,30 +32,22 @@ Item {
     readonly property bool busy: job !== ""
     readonly property bool canRequest: operatorActive && !busy && !faulted && !worker.running
         && repoRoot.startsWith("/") && repoRoot.length > 1
-    readonly property bool fullVisible: fullWanted && activeRepo === repoRoot
-        && activeRepo !== "" && candidate.item !== null
+    readonly property bool fullVisible: activeRepo === repoRoot && activeRepo !== ""
     readonly property bool canAdopt: operatorActive && pendingResult !== null
         && pendingRepo === repoRoot && !busy && !faulted
 
     onRepoRootChanged: {
         repoEpoch += 1;
-        fullWanted = false;
         activeRepo = "";
         pendingResult = null;
         pendingRepo = "";
-        statusText = "RECENT // REPOSITORY CHANGED";
+        statusText = "AVAILABLE HISTORY // REPOSITORY CHANGED";
     }
 
-    function recent() {
-        fullWanted = false;
-        statusText = "RECENT // 48 COMMITS MAX";
-    }
     function openFull() {
         if (!operatorActive || busy || faulted) return false;
-        if (activeRepo === repoRoot && candidate.item && candidate.item.mapState) {
-            fullWanted = true;
-            statusText = "FROZEN INDEX // RECHECK FOR NEW HISTORY";
-            return true;
+        if (activeRepo === repoRoot && candidate.mapState) {
+            return request("lookup");
         }
         return request("lookup");
     }
@@ -71,7 +62,7 @@ Item {
         exited = false;
         exitOk = false;
         output = "";
-        statusText = action === "build" ? "BUILDING INDEX // RECENT MAP AVAILABLE" : "CHECKING DISK INDEX";
+        statusText = action === "build" ? "BUILDING INDEX // AVAILABLE HISTORY RETAINED" : "CHECKING DISK INDEX";
         watchdog.restart();
         worker.exec(["/usr/bin/timeout","--kill-after=2s",action === "build" ? "120s" : "20s",
                      "/usr/bin/python3","-I","-B",
@@ -102,7 +93,7 @@ Item {
         output = "";
         if (repo !== repoRoot || jobEpoch !== repoEpoch) return; // no old-repository receipt can activate
         if (!validReceipt(result)) {
-            statusText = "INDEX UNAVAILABLE // RECENT MAP SAFE";
+            statusText = "INDEX UNAVAILABLE // AVAILABLE HISTORY SAFE";
             return;
         }
         if (result.status === "MISSING") {
@@ -115,8 +106,8 @@ Item {
         }
         pendingResult = result;
         pendingRepo = repo;
-        if (activeRepo === repo && candidate.item && candidate.item.mapState
-                && candidate.item.mapState.snapshot === result.manifest.snapshot) {
+        if (activeRepo === repo && candidate.mapState
+                && candidate.mapState.snapshot === result.manifest.snapshot) {
             pendingResult = null;
             pendingRepo = "";
             statusText = "INDEX CURRENT // POSITION RETAINED";
@@ -128,25 +119,21 @@ Item {
     }
     function openPending() {
         if (!canAdopt) return false;
-        if (!allocated) {
-            allocated = true;
-            return true; // onLoaded owns first adoption
-        }
-        return candidate.item ? adoptPending() : true;
+        return adoptPending();
     }
     function adoptPending() {
-        if (!canAdopt || !candidate.item) return false;
+        if (!canAdopt) return false;
         const result = pendingResult;
         // This action is explicitly labelled OPEN FROM TOP. Anchor-preserving
         // automatic generation replacement is not enabled in this phase.
-        if (!candidate.item.activate(result.directory,result.manifest,{top:true})) {
-            statusText = "INDEX OPEN FAILED // RECENT MAP SAFE";
+        if (!candidate.activate(result.directory,result.manifest,{top:true})) {
+            statusText = "INDEX OPEN FAILED // AVAILABLE HISTORY SAFE";
             return false;
         }
         activeRepo = pendingRepo;
         pendingResult = null;
         pendingRepo = "";
-        fullWanted = true;
+        allocated = true;
         statusText = "FROZEN INDEX // "+result.manifest.total+" COMMITS";
         return true;
     }
@@ -161,7 +148,7 @@ Item {
             root.job = "";
             root.jobRepo = "";
             root.output = "";
-            root.statusText = "INDEX WORKER FAULT // RECENT MAP SAFE";
+            root.statusText = "INDEX WORKER FAULT // AVAILABLE HISTORY SAFE";
             worker.running = false;
         }
     }
@@ -190,30 +177,21 @@ Item {
         height: 24
         spacing: 4
         ActionButton {
-            width: Math.max(0,(actions.width-12)/4)
+            width: Math.max(0,(actions.width-8)/3)
             height: parent.height
-            label: "RECENT"
-            selected: !root.fullVisible
-            available: root.operatorActive
-            onLeftClicked: root.recent()
-        }
-        ActionButton {
-            width: Math.max(0,(actions.width-12)/4)
-            height: parent.height
-            label: root.fullVisible ? "RECHECK" : "FULL MAP"
-            selected: root.fullVisible
+            label: root.fullVisible ? "RECHECK INDEX" : "CHECK INDEX"
             available: root.canRequest
-            onLeftClicked: root.fullVisible ? root.request("lookup") : root.openFull()
+            onLeftClicked: root.openFull()
         }
         ActionButton {
-            width: Math.max(0,(actions.width-12)/4)
+            width: Math.max(0,(actions.width-8)/3)
             height: parent.height
             label: root.job === "build" ? "BUILDING" : "BUILD INDEX"
             available: root.canRequest
             onLeftClicked: root.request("build")
         }
         ActionButton {
-            width: Math.max(0,(actions.width-12)/4)
+            width: Math.max(0,(actions.width-8)/3)
             height: parent.height
             label: "OPEN // TOP"
             available: root.canAdopt
@@ -231,31 +209,19 @@ Item {
         text: root.statusText
         elide: Text.ElideRight
     }
-    BranchMap {
-        anchors.top: status.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        visible: !root.fullVisible
-        topologyService: root.topologyService
-        titleText: root.titleText
-        selectedSha: root.selectedSha
-        onCommitSelected: function(sha) {root.commitSelected(sha);}
-    }
-    Loader {
+    GitMapVirtualViewport {
         id: candidate
         anchors.top: status.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        active: root.allocated
-        visible: root.fullVisible
-        sourceComponent: GitMapVirtualViewport {
-            requestsEnabled: root.operatorActive && root.fullVisible
-            onCommitSelected: function(sha) {
-                if (root.operatorActive && root.fullVisible) root.commitSelected(sha);
-            }
+        indexedActive: root.fullVisible
+        recentTopology: root.topologyService
+        recentRepo: root.repoRoot
+        titleText: root.titleText
+        requestsEnabled: root.operatorActive && root.fullVisible
+        onCommitSelected: function(sha) {
+            if (root.operatorActive) root.commitSelected(sha);
         }
-        onLoaded: root.adoptPending()
     }
 }

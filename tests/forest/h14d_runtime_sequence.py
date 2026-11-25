@@ -236,6 +236,15 @@ def _reader(ref, boot, scope):
             and type(ref.key) is str and bool(ref.key), "READER_REFERENCE_MISMATCH")
 
 
+def _check_readers(plan, parent_reader, outer_reader):
+    require(type(plan) is Plan and type(plan.boot) is str and bool(plan.boot)
+            and _scope(plan.parent) and _scope(plan.outer), "INVALID_JOIN_INPUT")
+    _reader(parent_reader, plan.boot, plan.parent)
+    _reader(outer_reader, plan.boot, plan.outer)
+    require(parent_reader is not outer_reader and parent_reader.key != outer_reader.key,
+            "READER_REFERENCE_REUSED")
+
+
 def _observation(obs, reader):
     require(type(obs) is Observation and obs.reader is reader
             and type(obs.sample) is Sample and type(obs.sample.levels) is tuple
@@ -262,10 +271,7 @@ def begin_join(plan, *, parent_reader, outer_reader, parent, baseline, first,
     """
     require(type(plan) is Plan and _scope(plan.parent) and _scope(plan.outer)
             and type(launch) is JoinedLaunch, "INVALID_JOIN_INPUT")
-    _reader(parent_reader, plan.boot, plan.parent)
-    _reader(outer_reader, plan.boot, plan.outer)
-    require(parent_reader is not outer_reader and parent_reader.key != outer_reader.key,
-            "READER_REFERENCE_REUSED")
+    _check_readers(plan, parent_reader, outer_reader)
     p = _observation(parent, parent_reader)
     b = _observation(baseline, outer_reader)
     f = _observation(first, outer_reader)
@@ -285,18 +291,20 @@ def begin_join(plan, *, parent_reader, outer_reader, parent, baseline, first,
                          first, derived, isolation)
 
 
-def finish_join(prefix, *, parent, baseline, observations, terminal, isolation):
+def finish_join(prefix, *, plan, parent_reader, outer_reader, parent, baseline,
+                observations, terminal, isolation):
     """Audit original caller-held fixture references; no effects or authority.
 
-    The caller must retain the actual begin_join result and original isolation
-    reference independently. Object identity checks cannot authenticate a
+    The caller must retain the actual begin_join result and original plan,
+    Reader and isolation references independently. Object identity checks cannot authenticate a
     constructed or coherently replaced fixture, or prove kernel provenance.
     """
     require(type(prefix) is _JoinedPrefix and type(terminal) is TerminalRef,
             "JOIN_OR_TERMINAL_MISSING")
     require(type(prefix.launch) is Launch, "INVALID_JOIN_INPUT")
-    _check_isolation(prefix.isolation, prefix.launch)
-    require(isolation is prefix.isolation, "ISOLATION_REFERENCE_REPLACED")
+    _check_readers(plan, parent_reader, outer_reader)
+    require(plan is prefix.plan and parent_reader is prefix.parent_reader
+            and outer_reader is prefix.outer_reader, "PLAN_OR_READER_REPLACED")
     require(parent is prefix.parent and baseline is prefix.baseline
             and type(observations) is tuple and 2 <= len(observations) <= MAX_SAMPLES
             and observations[0] is prefix.first, "PREFIX_REPLACED")
@@ -306,6 +314,17 @@ def finish_join(prefix, *, parent, baseline, observations, terminal, isolation):
     evaluate(p, samples, selected=prefix.plan.cpus, launch_ns=prefix.launch.launch_ns,
              expected_leaf=(prefix.plan.outer.device, prefix.plan.outer.inode),
              scope="RETAINED_OUTER", baseline=b)
+    require(p.levels[-1].identity == (plan.parent.device, plan.parent.inode),
+            "PARENT_IDENTITY_MISMATCH")
+    first = samples[0]
+    require(_scope(prefix.launch.first_active_scope)
+            and prefix.launch.first_active_scope == plan.outer
+            and first.levels[-1].identity == (plan.outer.device, plan.outer.inode)
+            and _uint(prefix.launch.first_active_start_ns)
+            and _uint(prefix.launch.first_active_ns)
+            and prefix.launch.first_active_start_ns == first.start_ns
+            and prefix.launch.first_active_ns == first.end_ns,
+            "FIRST_SAMPLE_BINDING_MISMATCH")
     final = samples[-1]
     require(_uint(terminal.observed_ns) and terminal.observed_ns < final.start_ns,
             "TERMINAL_NOT_BEFORE_FINAL_READ")
@@ -315,6 +334,8 @@ def finish_join(prefix, *, parent, baseline, observations, terminal, isolation):
     result = check_sequence(prefix.plan, parent_preflight_end_ns=p.end_ns,
                             outer_baseline_end_ns=b.end_ns, launch=prefix.launch,
                             terminal=derived)
+    _check_isolation(prefix.isolation, prefix.launch)
+    require(isolation is prefix.isolation, "ISOLATION_REFERENCE_REPLACED")
     return dict(result, status="JOINED_OFFLINE_REFERENCE",
                 progression_authorized=False, reader_provenance_verified=False,
                 isolation_verified=False)

@@ -162,7 +162,8 @@ class JoinedTests(unittest.TestCase):
         return begin_join(**args)
 
     def finish(self, prefix, **kw):
-        args = dict(parent=self.parent, baseline=self.baseline,
+        args = dict(plan=self.plan, parent_reader=self.pr, outer_reader=self.orr,
+                    parent=self.parent, baseline=self.baseline,
                     observations=(self.first, self.final), terminal=self.terminal, isolation=self.iso)
         args.update(kw)
         return finish_join(prefix, **args)
@@ -246,6 +247,50 @@ class JoinedTests(unittest.TestCase):
                 self.finish(prefix, isolation=replacement)
         with self.assertRaisesRegex(Hold, "ISOLATION_REFERENCE_REPLACED"):
             self.finish(prefix, isolation=None)
+
+    def test_final_binds_first_sample_timestamps_and_scope(self):
+        prefix = self.begin()
+        for launch in (replace(prefix.launch, first_active_start_ns=280, first_active_ns=290),
+                       replace(prefix.launch, first_active_start_ns=300, first_active_ns=399),
+                       replace(prefix.launch, first_active_start_ns=300.0),
+                       replace(prefix.launch, first_active_scope=self.plan.parent),
+                       replace(prefix.launch, first_active_scope=replace(self.plan.outer, inode=11.0))):
+            with self.subTest(launch=launch), self.assertRaisesRegex(Hold, "FIRST_SAMPLE_BINDING_MISMATCH"):
+                self.finish(replace(prefix, launch=launch))
+
+    def test_final_retains_independent_plan_and_reader_objects(self):
+        prefix = self.begin()
+        for field, replacement in (("plan", replace(self.plan)),
+                                   ("parent_reader", replace(self.pr)),
+                                   ("outer_reader", replace(self.orr))):
+            with self.subTest(field=field), self.assertRaisesRegex(Hold, "PLAN_OR_READER_REPLACED"):
+                self.finish(replace(prefix, **{field: replacement}))
+            with self.subTest(field=field), self.assertRaisesRegex(Hold, "PLAN_OR_READER_REPLACED"):
+                self.finish(prefix, **{field: replacement})
+
+    def test_final_revalidates_reader_scope_boot_mount_and_distinct_keys(self):
+        prefix = self.begin()
+        for ref in (None, replace(self.orr, boot="other"), replace(self.orr, key=""),
+                    replace(self.orr, scope=self.plan.parent),
+                    replace(self.orr, scope=replace(self.plan.outer, mount_id=2))):
+            with self.subTest(ref=ref), self.assertRaisesRegex(Hold, "READER_REFERENCE_MISMATCH"):
+                self.finish(replace(prefix, outer_reader=ref), outer_reader=ref)
+        reused = replace(self.orr, key=self.pr.key)
+        with self.assertRaisesRegex(Hold, "READER_REFERENCE_REUSED"):
+            self.finish(replace(prefix, outer_reader=reused), outer_reader=reused)
+        with self.assertRaisesRegex(Hold, "INVALID_JOIN_INPUT"):
+            self.finish(replace(prefix, plan=None), plan=None)
+
+    def test_final_binds_parent_device_inode_to_original_sample(self):
+        prefix = self.begin()
+        for scope in (replace(self.plan.parent, inode=99),
+                      replace(self.plan.parent, device=2)):
+            plan = replace(self.plan, parent=scope)
+            reader = replace(self.pr, scope=scope)
+            parent = replace(self.parent, reader=reader)
+            altered = replace(prefix, plan=plan, parent_reader=reader, parent=parent)
+            with self.subTest(scope=scope), self.assertRaisesRegex(Hold, "PARENT_IDENTITY_MISMATCH"):
+                self.finish(altered, plan=plan, parent_reader=reader, parent=parent)
 
     def test_equal_value_prefix_replacement_refused(self):
         prefix = self.begin()

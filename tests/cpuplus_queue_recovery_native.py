@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 
@@ -55,3 +56,19 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     trial=env.get("POST_APOLLO_QUEUE_STAGED_TRIAL")
     if trial and "QUEUE_R3_STAGED_PASS //" not in proc.stdout:
         raise SystemExit("Native staged transport fixture failed")
+    ack_trial=env.get("POST_APOLLO_QUEUE_ACK_TRIAL")
+    if ack_trial:
+        if "QUEUE_R3_ACK_PASS // "+ack_trial not in proc.stdout:
+            raise SystemExit("Native review acknowledgment fixture failed")
+        # Independently verify durable row counts after child and shell exit.
+        # Read-only URI; no startup migration or fixture repair.
+        dbpath=config/"private"/"queue.db"
+        with sqlite3.connect(dbpath.as_uri()+"?mode=ro",uri=True) as db:
+            rows=db.execute("SELECT state,result_id FROM memory_queue_local_actions_v1").fetchall()
+            if rows!=[("PREPARED",None)]:
+                raise SystemExit("Unexpected durable local action state")
+            table=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_queue_recovery_reviews_v1'").fetchone()
+            count=db.execute("SELECT count(*) FROM memory_queue_recovery_reviews_v1").fetchone()[0] if table else 0
+            if count!=(0 if ack_trial=="EOF" else 1):
+                raise SystemExit("Unexpected durable acknowledgment count")
+        print("QUEUE_R3_ACK_DB_PASS // "+ack_trial+" exact persistent counts",flush=True)

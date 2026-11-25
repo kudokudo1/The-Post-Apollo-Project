@@ -1,0 +1,25 @@
+name: Forest UI2.2a Runtime Status Consumer
+on:
+  pull_request:
+    paths:
+      - 'widgets/forest/ui2/PublicRuntimeStatusDisplay.js'
+      - 'tests/forest/test_ui22a_runtime_status.js'
+      - 'tests/forest/ui2_r4b_public_fixture.py'
+      - 'scripts/forest/runtime_public_delivery_r4b.py'
+      - 'scripts/forest/runtime_public_status_r4.py'
+      - 'scripts/forest/runtime_events_r3.py'
+      - 'tests/forest/test_runtime_public_delivery_r4b.py'
+      - 'tests/forest/test_runtime_public_status_r4.py'
+      - 'tests/forest/test_runtime_events_r3.py'
+      - '.github/workflows/forest-ui2-runtime-status.yml'
+permissions:
+  contents: read
+jobs:
+  public-status-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node tests/forest/test_ui22a_runtime_status.js

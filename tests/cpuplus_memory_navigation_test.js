@@ -476,3 +476,15 @@ assert.match(pane,/objectName: "cpuplusScanStop"[\s\S]*?setScanMode\("STOPPED"\)
 assert.match(pane,/if\(!scanLive\)\{sample=null;clearCapConfirmation\(\);scheduleScan\(\);return;\}/);
 assert.match(pane,/model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"&&root.displaySample\?7:0/);
 console.log("CPU++ M11g stable models and scan transport contract PASS");
+
+const sliderM11h=fs.readFileSync(path.join(__dirname,"../components/SelectorSlider.qml"),"utf8");
+const popupM11h=fs.readFileSync(path.join(__dirname,"../components/DiagnosticsServicePopup.qml"),"utf8");
+assert.match(sliderM11h,/property color valueFillColor: accentColor/);
+assert.match(sliderM11h,/id: valueFill[\s\S]*?color: slider.valueFillColor/);
+assert.match(popupM11h,/property Component headerAccessory: null/);
+assert.match(popupM11h,/anchors.top: diagnosticsHeaderRow.bottom[\s\S]*?sourceComponent: diagnosticsPane.headerAccessory/);
+assert.match(pane,/liveReadyColor: Colors.omnitrix/);
+assert.match(pane,/objectName: "cpuplusScanFrequencySlider"[\s\S]*?valueFillColor: Colors.omnitrix/);
+assert.match(pane,/objectName: "cpuplusScanStop"[\s\S]*?selectedFillColor: Colors.red/);
+assert.match(cpuWindowM9,/cpuHeaderStatus==="PAUSED" \? Colors.yellow/);
+console.log("CPU++ M11h compact transport palette and pinned diagnostics header PASS");

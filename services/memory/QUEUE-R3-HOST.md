@@ -227,3 +227,22 @@ allocation; trusted fixed helper only, no arbitrary provider/command.
 Full shell kill, startup restore from nonempty storage, repeated-use
 retention, production launch paths and provider still unqualified.
 No startup unlock API or DOC 2 source edits. CI pending.
+
+## R3t // complete shell SIGKILL recovery candidate
+
+Direct merged baseline 55aa55d8 (#2719, 5/5 workflows, ten native trials,
+independent scoped PASS, operator authorized merge). Five additional
+native scenarios use the actual merged canonical host, checkpoint adapter,
+Python owner and pipe. Supervisor waits for explicit durable boundary
+marker, SIGKILLs only disposable Quickshell process, verifies old owner
+lock released and starts a fresh process with same private DB and
+checkpoint directory. No volatile identities carried over. BEFORE_PREPARE
+and ACK_BEFORE withhold frame after durable save; PREPARED withholds
+COMMIT; COMMITTED and ACK_SAVED withhold response before host feed. Fresh
+shell LOAD reconstructs unresolved evidence only, explicitly reads exact
+action and historical receipt; no missing evidence interpreted as
+noncommit. Read-only post-exit DB assertions exact action/request/receipt
+counts and checkpoint identities. Previous ten tests retained. No
+production code changes, no startup release, no kernel memory mutation.
+This tests process crash, not power loss, kernel failure or installed
+whole desktop lifecycle. CI pending.

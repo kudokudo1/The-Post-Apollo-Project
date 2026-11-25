@@ -47,5 +47,9 @@ def factory(queue):
 
 owner = Owner(Queue(root / "private" / "queue.db"), factory, durable_actions=True,
               staged_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_STAGED_TRIAL") else None)
+# Test supervisor uses this identity only to wait for the old owner to
+# release its pipe lifetime after the shell has been SIGKILLed.
+if os.environ.get("POST_APOLLO_QUEUE_CRASH_TRIAL"):
+    print("QUEUE_R3_OWNER_PID // "+str(os.getpid()),file=sys.stderr,flush=True)
 serve(owner, 0, 1, io_timeout_ms=3000,
       review_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_ACK_TRIAL") else None)

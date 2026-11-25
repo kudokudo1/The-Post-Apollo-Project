@@ -70,3 +70,16 @@ jobs:
           set -eu
           POST_APOLLO_QUEUE_GATE_TRIAL=PASS POST_APOLLO_QUEUE_ACK_TRIAL=ACK python3 -B tests/cpuplus_queue_recovery_native.py
           POST_APOLLO_QUEUE_GATE_TRIAL=FAIL python3 -B tests/cpuplus_queue_recovery_native.py
+      - name: Full disposable shell SIGKILL and persistent recovery
+        env:
+          POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
+          POST_APOLLO_QUEUE_GATE_TRIAL: "PASS"
+        run: |
+          set -eu
+          for trial in BEFORE_PREPARE PREPARED COMMITTED ACK_BEFORE ACK_SAVED; do
+            staged=EOF
+            ack=""
+            if [ "$trial" = COMMITTED ]; then staged=LOST; fi
+            case "$trial" in ACK_*) ack=ACK;; esac
+            POST_APOLLO_QUEUE_STAGED_TRIAL="$staged" POST_APOLLO_QUEUE_ACK_TRIAL="$ack" POST_APOLLO_QUEUE_CRASH_TRIAL="$trial" python3 -B tests/cpuplus_queue_recovery_native.py
+          done

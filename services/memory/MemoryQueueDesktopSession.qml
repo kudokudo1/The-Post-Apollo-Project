@@ -282,6 +282,7 @@ QtObject {
         generationMode: true
         pythonPath: ctl.paths ? ctl.paths[0] : ""
         helperPath: ctl.paths ? ctl.paths[2] : ""
+        custodyLauncherPath: ctl.paths ? ctl.paths[4] : ""
         directory: ctl.paths ? ctl.paths[3] : ""
         timeoutMs: 8000
         onCompleted: (epoch,ticket,operation,result)=>root.completeIo(epoch,ticket,operation,result)

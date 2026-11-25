@@ -144,6 +144,11 @@ Item {
     function receiveRuntimeUnit(unit) {
         operationStatus.receiveUnit(unit);
     }
+    // Connected disposable mode only. No transport or raw result decoding.
+    function recordRuntimeLocalAbort(ref, code, finalSequence) {
+        return connectedHistoryMode && visible
+            && operationStatus.recordLocalAbort(ref,code,finalSequence);
+    }
     function invalidateRuntimeLifetime(ref) {
         operationStatus.invalidateLifetime(ref);
     }

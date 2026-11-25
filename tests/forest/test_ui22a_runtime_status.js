@@ -44,4 +44,45 @@ check("duplicate generating transition closes",()=>{const c=opened();c.receive(u
 check("detach observed without callback",()=>{const c=opened();c.receive(unit(a,1,"REQUEST_PENDING"),a);empty(c.observe(null),"CLOSED");empty(c.receive(unit(a,2,"PREPARING"),a),"CLOSED");});
 check("owner invalidation after callback clears matching only",()=>{const c=opened();c.receive(unit(a,1,"REQUEST_PENDING"),a);empty(c.invalidate(a),"UNAVAILABLE");empty(c.receive(unit(a,2,"PREPARING"),a),"UNAVAILABLE");});
 check("copies and local token reuse fence",()=>{const c=opened(),u=unit(a,1,"REQUEST_PENDING");const o=c.receive(u,a);u.statusPacket.status="GENERATING";o.status="GENERATING";assert.equal(c.observe(a).status,"REQUEST_PENDING");c.close();empty(c.open({...b,viewKey:a.viewKey},{...b,viewKey:a.viewKey}),"UNAVAILABLE");});
+function stopped(c,ref=a) {
+    for(const [i,s] of ["REQUEST_PENDING","PREPARING","GENERATING","STOP_REQUESTED"].entries())
+        c.receive(unit(ref,i+1,s),ref);
+}
+check("typed owner abort distinct from STOP and legacy unknown",()=>{
+    for(const legacyUnknown of [false,true]){
+        const c=opened();stopped(c);
+        if(legacyUnknown)c.receive(unit(a,5,"UNKNOWN_HOLD"),a);
+        const o=c.recordLocalAbort(a,"ABORTED_LOCAL",legacyUnknown?5:4,a);
+        assert.equal(o.localOutcome,"ABORTED_LOCAL");
+        assert.equal(o.label,"LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED");checkFalse(o);
+        empty(c.receive(withdrawal(a,legacyUnknown?6:5),a),"CLOSED");
+    }
+});
+check("typed abort cannot arrive before STOP or replace commit",()=>{
+    for(const prior of ["REQUEST_PENDING","LOCAL_COMMIT_RECORDED","UNKNOWN_HOLD"]){
+        const c=opened();
+        if(prior==="LOCAL_COMMIT_RECORDED"){
+            for(const [i,s] of ["REQUEST_PENDING","PREPARING","GENERATING",prior].entries())
+                c.receive(unit(a,i+1,s),a);
+        }else c.receive(unit(a,1,prior),a);
+        empty(c.recordLocalAbort(a,"ABORTED_LOCAL",prior==="LOCAL_COMMIT_RECORDED"?4:1,a),"UNAVAILABLE");
+    }
+});
+check("typed abort wrong sequence or raw code refuses",()=>{
+    for(const [code,seq] of [["ABORTED_LOCAL",3],["ABORTED_LOCAL",5],["STOP_OBSERVED",4],["<b>abort</b>",4]]){
+        const c=opened();stopped(c);empty(c.recordLocalAbort(a,code,seq,a),"UNAVAILABLE");
+    }
+});
+check("stale typed abort cannot change replacement",()=>{
+    const c=opened();stopped(c);c.open(b,b);stopped(c,b);
+    assert.equal(c.recordLocalAbort(a,"ABORTED_LOCAL",4,b).label,"STOP REQUESTED // OUTCOME PENDING");
+    empty(c.recordLocalAbort(b,"ABORTED_LOCAL",4,null),"CLOSED");
+});
+check("duplicate or conflicting current terminal clears and no packet can fabricate abort",()=>{
+    let c=opened();stopped(c);c.recordLocalAbort(a,"ABORTED_LOCAL",4,a);
+    empty(c.recordLocalAbort(a,"ABORTED_LOCAL",4,a),"UNAVAILABLE");
+    c=opened();stopped(c);c.recordLocalAbort(a,"ABORTED_LOCAL",4,a);
+    empty(c.receive(unit(a,5,"LOCAL_COMMIT_RECORDED"),a),"UNAVAILABLE");
+    c=opened();stopped(c);empty(c.receive(unit(a,5,"ABORTED_LOCAL"),a),"UNAVAILABLE");
+});
 console.log(n+" checks passed (recorded public status presentation only)");

@@ -51,7 +51,9 @@ class Launch:
     pinned_ns: int
     limits_ns: int
     limits: Limits
-    first_active_ns: int
+    first_active_scope: Scope
+    first_active_start_ns: int
+    first_active_ns: int  # completed observation, not sample start
     release_ns: int
 
 
@@ -74,6 +76,15 @@ def _uint(v):
 def _scope(v):
     return type(v) is Scope and all(type(x) is int and x > 0
                                    for x in (v.mount_id, v.device, v.inode))
+
+
+def _pair(v):
+    return type(v) is tuple and len(v) == 2 and all(_uint(x) for x in v)
+
+
+def _limits(v):
+    return (type(v) is Limits and all(_uint(x) for x in (v.memory, v.swap, v.tasks))
+            and _pair(v.quota) and _pair(v.cpus))
 
 
 def _digest(v):
@@ -109,14 +120,18 @@ def check_sequence(plan, *, parent_preflight_end_ns, outer_baseline_end_ns,
             "INVALID_PRESELECTED_SCOPE")
     require(type(launch) is Launch and _process(launch.process)
             and launch.process.boot == plan.boot
-            and _scope(launch.inner) and launch.outer == plan.outer
+            and _scope(launch.inner) and _scope(launch.outer)
+            and launch.outer == plan.outer
+            and _scope(launch.first_active_scope)
+            and launch.first_active_scope == plan.outer
             and launch.inner not in (plan.parent, plan.outer)
             and launch.inner.mount_id == plan.outer.mount_id
             and launch.inner.device == plan.outer.device
-            and launch.image_digest == plan.image_digest,
+            and _digest(launch.image_digest) and launch.image_digest == plan.image_digest,
             "ORIGINAL_LAUNCH_MISMATCH")
     times = (parent_preflight_end_ns, outer_baseline_end_ns, launch.launch_ns,
-             launch.pinned_ns, launch.limits_ns, launch.first_active_ns,
+             launch.pinned_ns, launch.limits_ns, launch.first_active_start_ns,
+             launch.first_active_ns,
              launch.release_ns)
     require(all(_uint(t) for t in times), "INVALID_CLOCK")
     require(0 <= launch.launch_ns - parent_preflight_end_ns <= MAX_SAMPLE_NS
@@ -124,15 +139,17 @@ def check_sequence(plan, *, parent_preflight_end_ns, outer_baseline_end_ns,
             "STALE_PREFLIGHT_OR_BASELINE")
     require(launch.launch_ns <= launch.pinned_ns <= launch.limits_ns
             <= launch.release_ns
-            and launch.launch_ns <= launch.first_active_ns <= launch.release_ns
+            and launch.pinned_ns <= launch.first_active_start_ns
+            < launch.first_active_ns <= launch.release_ns
             and launch.first_active_ns - launch.launch_ns <= MAX_SAMPLE_NS
             and launch.release_ns - launch.launch_ns <= MAX_SAMPLE_NS,
             "EARLY_RELEASE_OR_LATE_OBSERVATION")
     expected = Limits(CAP, 0, QUOTA, plan.cpus, TASK_CAP)
-    require(type(launch.limits) is Limits and launch.limits == expected,
+    require(_limits(launch.limits) and launch.limits == expected,
             "INNER_LIMIT_MISMATCH")
     require(type(terminal) is Terminal and _process(terminal.process)
-            and terminal.process == launch.process and terminal.outer == plan.outer,
+            and terminal.process == launch.process and _scope(terminal.outer)
+            and terminal.outer == plan.outer,
             "ORIGINAL_TERMINAL_MISMATCH")
     require(type(terminal.exit_status) is int and terminal.exit_status == 0,
             "TERMINAL_NOT_SUCCESSFUL")

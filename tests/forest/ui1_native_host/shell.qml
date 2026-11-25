@@ -10,6 +10,17 @@ ShellRoot {
     property bool small: false
     property bool compact: false
     property var parts: ({})
+    property var joinedParent: null
+    property int joinedCommits: 0
+    property int joinedSteps: 0
+    property int joinedPages: 0
+    property var joinedRows: []
+    property string joinedAlias: ""
+    property string joinedLast: ""
+    property bool joinedReopened: false
+    property int joinedStart: 0
+    property int negativeCase: 0
+    property bool negativeTriggered: false
     function check(ok, reason) {
         if (!ok) {
             failed = true;
@@ -191,6 +202,174 @@ ShellRoot {
         Qt.quit();
     }
     Widgets.ForestW { id: forest }
+    Component { id: parentType; ParentProcess {} }
+    function startJoined() {
+        const item = parts.loader.item;
+        if (!item || !parts.loader.visible) { check(false,"joined loader"); finish(); return; }
+        const p = parentType.createObject(witness,{trial:"9".repeat(32),
+            fixtureDirectory:Quickshell.shellPath("privateJoined"),originalOwner:item,
+            originalLoader:parts.loader,joined:true,acceptOffer:true});
+        if (!p) { check(false,"joined create"); finish(); return; }
+        p.observedOwner = Qt.binding(function() { return parts.loader.item; });
+        p.eligible = Qt.binding(function() { return forest.menuOpen && forest.visible
+            && parts.loader.active && parts.loader.visible && forest.activeTree.sessionKey==="CHERRY"; });
+        joinedParent=p;
+        p.actionFinished.connect(function(code) {
+            joinedLast=code;
+            joinedDrive.restart();
+        });
+        p.finished.connect(function() {
+            check(p.reaped && !p.running && !p.failure && p.closeResult
+                && p.outcome==="ABORTED_LOCAL" && p.wire.snapshot().ended
+                && joinedCommits===2 && joinedPages===4 && joinedReopened
+                && !item.historyScopeActive && item.runtimeState==="CLOSED","joined terminal");
+            if (failed) { finish(); return; }
+            console.info("FOREST_HOST_JOINED_PASS");
+            joinedParent=null;
+            p.destroy();
+            startNegative(1);
+        });
+        if (!p.start()) { check(false,"joined start"); finish(); }
+    }
+    function driveJoined() {
+        const p=joinedParent, item=parts.loader.item;
+        if (!p || failed) return;
+        const feed=find(item,"publicFixtureFeed");
+        let ok=false;
+        if (joinedLast==="READY") ok=item.connectedHistoryMode && feed.messages.length===0 && p.request("NEXT");
+        else if (joinedLast==="TURN_STARTED") {
+            joinedSteps=1;
+            ok=feed.messages.length===0 && p.request("STEP");
+        } else if (joinedLast==="ACTIVE") {
+            if (p.turnsStarted===3 && joinedSteps===4)
+                ok=item.runtimeStatusText==="GENERATING" && p.request("STOP");
+            else { joinedSteps++; ok=joinedSteps<=5 && p.request("STEP"); }
+        } else if (joinedLast==="COMMITTED_LOCAL") {
+            joinedCommits++;
+            ok=item.runtimeStatusText==="LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED"
+                && feed.messages.length===0 && (joinedCommits===1?p.request("NEXT"):p.request("HISTORY_ATTACH"));
+        } else if (joinedLast==="HISTORY_ATTACHED") {
+            ok=item.historyScopeActive && feed.messages.length===0 && p.historyScope.revision===4
+                && p.request("HISTORY_PAGE",("0000000000000000000000000000000"+(joinedPages+1)),2);
+        } else if (joinedLast==="PAGE_READY") {
+            joinedPages++;
+            if (joinedPages%2===1) {
+                ok=item.fixtureState==="PARTIAL" && feed.messages.length===2
+                    && p.request("HISTORY_PAGE",("0000000000000000000000000000000"+(joinedPages+1)),2);
+            } else if (joinedPages===2) {
+                joinedAlias=p.sessionAlias;
+                joinedRows=feed.messages.map(x=>x.turnId);
+                ok=item.fixtureState==="COMPLETE" && feed.messages.length===4
+                    && p.request("REOPEN") && feed.messages.length===0;
+            } else {
+                ok=item.fixtureState==="COMPLETE" && feed.messages.length===4
+                    && p.sessionAlias===joinedAlias
+                    && feed.messages.every((x,i)=>x.turnId===joinedRows[i])
+                    && p.request("NEXT") && feed.messages.length===0;
+            }
+        } else if (joinedLast==="JOURNAL_REOPENED") {
+            joinedReopened=true;
+            ok=p.turnsStarted===2 && !p.request("REOPEN") && p.request("HISTORY_ATTACH");
+        } else if (joinedLast==="STOP_OBSERVED")
+            ok=item.runtimeStatusText==="STOP REQUESTED // OUTCOME PENDING"
+                && p.outcome!=="ABORTED_LOCAL" && feed.messages.length===0 && p.request("STEP");
+        else if (joinedLast==="ABORTED_LOCAL")
+            ok=p.phase==="BLOCKED" && p.outcome==="ABORTED_LOCAL"
+                && feed.messages.length===0 && !p.request("NEXT") && p.request("CLOSE");
+        else if (joinedLast==="CLOSED") return;
+        check(ok,"joined action "+joinedLast);
+        if (failed) p.hold("JOINED_HARNESS");
+    }
+    // Actual original Loader consumer, not an alternate parser or fixture.
+    // The independent harness changes scope or Tree synchronously on offer.
+    function startNegative(n) {
+        negativeCase=n;
+        negativeTriggered=false;
+        forest.menuOpen=false;
+        negativeMount.restart();
+    }
+    Timer {
+        id: negativeMount
+        interval: 350
+        onTriggered: {
+            forest.selectedTreeIndex=0;
+            forest.menuOpen=true;
+            negativeOpen.restart();
+        }
+    }
+    Timer {
+        id: negativeOpen
+        interval: 350
+        onTriggered: {
+            parts.preview.leftClicked(null);
+            negativeConnect.restart();
+        }
+    }
+    Timer {
+        id: negativeConnect
+        interval: 350
+        onTriggered: {
+            const item=parts.loader.item;
+            if (!item || !parts.loader.visible) { check(false,"negative loader"); finish(); return; }
+            const p=parentType.createObject(witness,{trial:String(negativeCase+6).repeat(32),
+                fixtureDirectory:Quickshell.shellPath("privateNegative"+negativeCase),
+                originalOwner:item,originalLoader:parts.loader,joined:true,acceptOffer:true});
+            if (!p) { check(false,"negative create"); finish(); return; }
+            p.observedOwner=Qt.binding(function(){return parts.loader.item;});
+            p.eligible=Qt.binding(function(){return forest.menuOpen && forest.visible
+                && parts.loader.active && parts.loader.visible && forest.activeTree.sessionKey==="CHERRY";});
+            joinedParent=p;
+            item.historyCurrentScopeChanged.connect(function(){
+                if (negativeTriggered || !item.historyCurrentScope) return;
+                negativeTriggered=true;
+                if (negativeCase===1) item.historyCurrentScope=null;
+                else forest.selectedTreeIndex=1;
+            });
+            p.actionFinished.connect(function(code){
+                if (code==="READY") negativeDrive.restart();
+                else if (code!=="REFUSED") { check(false,"unexpected negative result"); p.hold("NEGATIVE"); }
+            });
+            p.finished.connect(function(){
+                let ok=negativeTriggered && p.reaped && !p.running && p.action===2
+                    && p.positiveHistoryAcks===0 && p.historyScope===null && !p.historyConfirmed;
+                if (negativeCase===1)
+                    ok=ok && p.negativeHistoryAcks===1 && p.refusedResult && !p.failure
+                        && p.wire.snapshot().ended && !item.historyScopeActive;
+                else ok=ok && p.negativeHistoryAcks===0 && p.failure==="OWNER_LOST"
+                    && parts.loader.item===null;
+                check(ok,"negative history acceptance "+negativeCase);
+                if (failed) { finish(); return; }
+                console.info("FOREST_HOST_HISTORY_NEGATIVE_PASS "+negativeCase);
+                joinedParent=null;
+                p.destroy();
+                if (negativeCase===1) startNegative(2);
+                else finish();
+            });
+            if (!p.start()) { check(false,"negative start"); finish(); }
+        }
+    }
+    Timer {
+        id: negativeDrive
+        interval: 30
+        onTriggered: {
+            if (!joinedParent.request("HISTORY_ATTACH")) {
+                check(false,"negative attach");
+                joinedParent.hold("NEGATIVE");
+            }
+        }
+    }
+    Timer { id: joinedDrive; interval: 30; onTriggered: witness.driveJoined() }
+    Timer { id: joinedMount; interval: 350; repeat:true
+        onTriggered: {
+            if (witness.joinedStart===0) {
+                witness.joinedStart++;
+                witness.parts.preview.leftClicked(null);
+            } else {
+                stop();
+                witness.startJoined();
+            }
+        }
+    }
     Timer {
         id: timer
         interval: 350
@@ -203,7 +382,14 @@ ShellRoot {
             if (!witness.small && n >= runtimeStart) {
                 witness.runtimePhase(n - runtimeStart);
                 witness.completePhase(n);
-                if (n === runtimeStart + 7) witness.finish();
+                if (n === runtimeStart + 7) {
+                    if (witness.compact || witness.failed) witness.finish();
+                    else {
+                        stop();
+                        forest.menuOpen=true;
+                        joinedMount.start();
+                    }
+                }
                 return;
             }
             switch (n) {

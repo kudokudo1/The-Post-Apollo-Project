@@ -6,6 +6,8 @@ on:
       - 'widgets/forest/ui2/**'
       - 'components/**'
       - 'tests/forest/ui1_native_host/**'
+      - 'tests/forest/r6_parent/**'
+      - 'scripts/forest/**'
       - 'tests/forest/test_ui1_native_host.py'
       - '.github/workflows/forestw-native-public-preview.yml'
 permissions:

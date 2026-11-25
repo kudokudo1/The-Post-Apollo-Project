@@ -1,0 +1,33 @@
+name: Git map V2 compact host footprint
+on:
+  pull_request:
+    paths:
+      - "tests/git/test_git_map_v2_compact_footprint_native.py"
+      - "scripts/git_map_compact_holder.c"
+      - "tests/git/fixtures/GitMapFootprintNative.qml"
+      - "scripts/git_map_isolated_candidate.py"
+      - "scripts/git_map_v2_reader_candidate.py"
+      - ".github/workflows/git-map-v2-compact-footprint.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 coreutils gcc libc6-dev quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Native paired V2 two-host footprint
+        run: python3 -B tests/git/test_git_map_v2_compact_footprint_native.py
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY

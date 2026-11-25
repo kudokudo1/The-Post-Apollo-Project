@@ -7,6 +7,8 @@ on:
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
       - "widgets/cpuplus/CpuPlusProcessPane.qml"
       - "widgets/cpuplus/CpuPlusProcessPresentation.js"
+      - "widgets/cpuplus/CpuPlusProfilePane.qml"
+      - "widgets/cpuplus/CpuPlusProfilePreview.js"
       - "widgets/cpuplus/CpuPlusZramPolicyPane.qml"
       - "widgets/cpuplus/CpuPlusZramPolicy.js"
       - "widgets/cpuplus/CpuPlusAdvancedPolicyPane.qml"

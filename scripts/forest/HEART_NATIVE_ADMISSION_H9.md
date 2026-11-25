@@ -95,3 +95,107 @@ H9 is an owner coordination design, not approval to implement Runtime
 changes or alter host configuration. No R6 wire changes, no new worker,
 no second resource manager. CPU++ retains system-wide memory diagnosis
 and recovery ownership; Heart does not attempt desktop reclamation.
+
+## H14-B // Proposed isolated qualification evidence path (DOC1F)
+
+Post-merge baseline b57277b160ad0019567bfdb713c88e3d115abb30.
+Nurse2F #2161 comment 7170042098; H12-B 7169646369, H14-A
+7169680093 and upstream review 7170193404. Runtime isolation
+direction ACK 7170207581 is a proposal only.
+
+### Why the shared workstation remains HOLD
+
+Operator-reported Ollama 0.32.14 / Granite3.3:2b, nonresident,
+installed size 1545321637 bytes. Available host RAM moved from 5903
+to 2556 MiB in roughly a minute. DRM card1 reports 4294967296 bytes
+total and 2023731200 bytes headroom estimate, without runner mapping
+or allocatable capacity. The visible service hierarchy has no finite
+memory or CPU quota. H6 2048-token hypothetical dense FP16 cache is
+160 MiB, not total requirement. I6b does not authenticate artifact
+or runtime. No causal attribution or desktop resource guarantee.
+
+Upstream v0.32.14 api/types.go, envconfig/config.go, server/sched.go
+and llm/llama_server.go: explicit num_ctx/num_predict/num_thread/
+num_gpu/num_batch and residency settings are requests; scheduler
+parallelism and VRAM fit margins are not client exclusion or hard
+resource limits. PredictServerVRAM uses file size + approximate KV;
+conditional scheduler fit and batch estimates are not an independently
+supported upper bound. No guessed zero accelerator demand, no dummy
+positive requirement to evade H1, no retry/fallback or inferred token fit.
+
+### Evidence route proposal for review, not permission to execute
+
+Prefer independently supported exact-artifact/runtime/placement demand
+evidence if available. If absent, request a separately reviewed
+isolated qualification scope outside the operator workstation, NOT
+a waiver of H9 C or a normal Forest admission. A disposable CPU-only
+environment is the first candidate to evaluate; GPU qualification
+remains separate. No substitution of CPU-only for an admitted GPU
+attempt and no claim that CPU results qualify GPU placement.
+
+Existing tests/cpuplus_memory_native/README.md and
+run-silverblue-cycle.sh plus cpuplus-memory-native-cycle.yml demonstrate
+an offline KVM guest with finite guest RAM/vCPUs, no host disk/network
+passthrough and runner preflight. They do not contain an approved
+Ollama/model trial. The 6 GiB guest/3 vCPU values are precedent, NOT
+a proposed model requirement or authority to reuse CPU++'s workflow.
+Do not launch that guest on the observed low-headroom workstation.
+No edit of CPU++ files or CI workflow in this slice.
+
+Before any future external qualification request:
+1. Identify an authorized separate host/runner, exact boot/hardware/
+   runtime artifact and model digest, staged immutable inputs and
+   a single fixed-public workload; no private content or shared
+   operator-service access. No automatic download, external network
+   release or use of existing credentials.
+2. Establish independently reviewed host safety envelope: fresh
+   headroom after other charges and explicit host margin, finite
+   total containment including guest/hypervisor or runner overhead,
+   CPU-time/affinity and swap policy. Do not claim guest RAM caps
+   hypervisor RSS or that a cgroup cap guarantees successful inference.
+   No GPU passthrough/device exposure for CPU-only candidate; prove
+   absence of accelerator access independently, not merely num_gpu=0.
+   No guessed numeric limits. If a feasible envelope cannot be
+   established, HOLD before spawning anything.
+3. Runtime to specify exclusive provider lifetime and exact execution
+   path. Existing B2/B3/R3 is prospective integrated route; P2B is
+   separate timing-only path, not H11 integrated. No automatic
+   substitution, second attempt, retry, unload or service restart.
+   Exact effective token/template/placement/thread/batch/output and
+   immutable workload/settings commitment must be independently bound.
+4. If H9 C exact demand bound is still unavailable, Nurse and operator
+   must explicitly decide whether a separate containment-limited
+   qualification experiment is acceptable, including possible guest
+   OOM/refusal and the risk to its separate host. Until approved this
+   is design only. Containment limits are NOT model demand; no trial
+   as preflight for its own normal admission. No actual execution
+   authorized here, including CI.
+5. Agree bounded same-domain observation and exact terminal evidence
+   with Runtime/Security. Reuse I5/H3/H4 and I3/H8 where their semantics
+   apply; I5 short sampled maximum and historical kernel peak alone
+   are not complete trial coverage. Require independent baseline,
+   peak coverage, post-terminal accounting, pressure/limit events,
+   process lifetime and outcome. Incomplete coverage, OOM, identity
+   drift, ambiguous settlement or unproved no-accelerator access
+   produces HOLD; do not interpret failed capped run as a demand
+   upper bound. No model loading or sampling implementation in this
+   document.
+6. After separately approved qualification, independently review
+   observed data, runtime-specific static allocation evidence,
+   measurement coverage, conservative modeled requirement/margin and
+   applicability to the target environment. Never convert a single
+   observed peak into a guaranteed bound or credit swap/resident
+   bytes. CPU-only zero accelerator requirement needs separate
+   coordinated H1 revision with independently supported proof.
+   Native workstation admission remains H9 A-F plus fresh evidence
+   and operator consent; production remains HOLD.
+
+### Owner decision
+
+Heart owns demand/measurement and conservative admission arithmetic;
+Runtime owns isolation/enforcement/exclusive execution/terminal identity;
+Security owns authority and settlement; CPU++ owns desktop stability.
+Nurse2F to review this exact evidence route, including the separate
+qualification-vs-admission distinction and whether a suitable host exists.
+No executable implementation, new collector, CI job, service, host change,
+model download or trial in this proposal. No numerical safety claim.

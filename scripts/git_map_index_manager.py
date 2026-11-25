@@ -19,6 +19,8 @@ import git_map_history_index as index
 
 SCHEMA="post-apollo-git-map-cache-v1"
 MAX_GENERATIONS=8
+MAX_INVENTORY_ENTRIES=64
+CANDIDATE=re.compile(r"\.candidate-[0-9a-f]{32}")
 HEX=re.compile(r"[0-9a-f]{64}")
 
 
@@ -141,16 +143,107 @@ def build(repo,root):
         os.close(lock)
 
 
+
+def inventory(repo,root):
+    """Bounded observation of derived generation files; never authorize removal."""
+    ident=identity(repo)
+    repo_id,roots_digest,shallow,key=ident
+    folder=root/repo_id
+    result={"schema":"post-apollo-git-map-inventory-v1","repoId":repo_id,
+            "currentKey":key,"generationLimit":MAX_GENERATIONS,
+            "entries":[],"observedSlots":0,"truncated":False,
+            "observedDatabaseBytes":0,"readerProtection":"NOT ESTABLISHED",
+            "reclamationAllowed":False}
+    for path in (root,folder):
+        try:
+            private_dir(path)
+        except FileNotFoundError:
+            if identity(repo)!=ident:
+                raise ValueError("repository changed during inventory")
+            return result
+    # This observation does not acquire a lock, create files, or recurse.
+    # Concurrent builds may move entries; missing or unsafe metadata is
+    # reported conservatively, never interpreted as evidence of inactivity.
+    with os.scandir(folder) as items:
+        for item in items:
+            if item.name==".build.lock":
+                continue
+            if result["observedSlots"]>=MAX_INVENTORY_ENTRIES:
+                result["truncated"]=True
+                break
+            result["observedSlots"]+=1
+            name=item.name
+            published=HEX.fullmatch(name) is not None
+            staging=CANDIDATE.fullmatch(name) is not None
+            entry={"key":name if published or staging else None,
+                   "state":"UNKNOWN ENTRY","databaseBytes":None,
+                   "readerStatus":"UNKNOWN","reclamationAllowed":False}
+            result["entries"].append(entry)
+            if not (published or staging):
+                continue
+            path=folder/name
+            try:
+                private_dir(path)
+                db=path/index.NAME
+                if staging:
+                    # A staged file may be partial, including SQLite journal
+                    # state. Never open or count it as a published index.
+                    entry["state"]="STAGING"
+                    try:
+                        db.lstat()
+                    except FileNotFoundError:
+                        db=path/".building.sqlite3"
+                info=db.lstat()
+                if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid()
+                        or info.st_mode&0o077 or info.st_nlink!=1):
+                    raise ValueError("unsafe generation database")
+                entry["databaseBytes"]=info.st_size
+                result["observedDatabaseBytes"]+=info.st_size
+                if staging:
+                    continue
+                conn=index.open_index(path)
+                try:
+                    m=index.manifest_for(conn)
+                finally:
+                    conn.close()
+                if (m.get("repoId")!=repo_id or not isinstance(m.get("rootsDigest"),str)
+                        or not HEX.fullmatch(m["rootsDigest"])
+                        or type(m.get("shallow")) is not bool
+                        or type(m.get("maxLane")) is not int
+                        or not 0<=m["maxLane"]<index.MAX_LANES):
+                    raise ValueError("generation identity mismatch")
+                # For non-shallow generations the directory key can be
+                # independently reconstructed. Old shallow keys include a
+                # boundary digest not stored in v1 manifests.
+                if not m["shallow"]:
+                    expected=hashlib.sha256((m["rootsDigest"]+":False:").encode("ascii")).hexdigest()
+                    if expected!=name:
+                        raise ValueError("generation key mismatch")
+                if name==key and (m["rootsDigest"]!=roots_digest or m["shallow"] is not shallow):
+                    raise ValueError("current generation mismatch")
+                entry.update(state=("CURRENT" if name==key else
+                                    "HISTORICAL" if not m["shallow"] else "HISTORICAL SHALLOW UNVERIFIED"),
+                             snapshot=m["snapshot"],commits=m["total"])
+            except FileNotFoundError:
+                entry["state"]="INCOMPLETE OR MOVED"
+            except (OSError,ValueError,TypeError,KeyError,sqlite3.Error):
+                entry["state"]="UNSAFE OR INVALID"
+    if identity(repo)!=ident:
+        raise ValueError("repository changed during inventory")
+    result["entries"].sort(key=lambda entry:(entry["key"] is None,entry["key"] or ""))
+    return result
+
+
 def main(argv=None):
     os.umask(0o077)
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("action",choices=("lookup","build"))
+    p.add_argument("action",choices=("lookup","build","inventory"))
     p.add_argument("repo",type=Path)
     args=p.parse_args(argv)
     try:
         if not args.repo.is_absolute():
             raise ValueError("absolute repository required")
-        result=(lookup if args.action=="lookup" else build)(args.repo,cache_root())
+        result={"lookup":lookup,"build":build,"inventory":inventory}[args.action](args.repo,cache_root())
         print(json.dumps(result,ensure_ascii=True,separators=(",",":")))
         return 0
     except (OSError,ValueError,KeyError,TypeError,sqlite3.Error,subprocess.SubprocessError):

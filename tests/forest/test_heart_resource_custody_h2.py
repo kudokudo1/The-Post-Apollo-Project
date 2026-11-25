@@ -13,7 +13,8 @@ from resource_governor_p1 import ResourceAvailability
 
 def reference(s):
     scope = s.binding.recommendation.original.scope
-    return H.AttemptRef(scope.context, scope.turn_id, s.operation_id, s.attempt_id)
+    return H.AttemptRef(scope.context, scope.turn_id, s.operation_id, s.attempt_id,
+                        s.binding.binding, s.settings)
 
 
 def claim(c, s=None):
@@ -158,3 +159,84 @@ class CustodyTests(unittest.TestCase):
         self.assertEqual(status["safe_actions"], [])
         for value in ("example:latest", "owner", "operation", "attempt", "sha256:"):
             self.assertNotIn(value, str(status))
+
+
+class BindingCustodyTests(unittest.TestCase):
+    def setUp(self):
+        self.c = H.ResourceCustody()
+        self.s = fixture()
+        self.a = reference(self.s)
+        self.assertEqual(claim(self.c, self.s), "REFERENCE_HELD")
+
+    def terminal(self, attempt):
+        return self.c.observe_terminal_reference(attempt, outcome="COMMITTED",
+                                                 clock_domain="clock", observed_ns=400)
+
+    def alternatives(self):
+        for changes in ({"artifact_digest": "sha256:"+"d"*64},
+                        {"runtime_instance": "replacement"},
+                        {"runtime_version": "2.0"},
+                        {"runtime_release_digest": "sha256:"+"e"*64},
+                        {"adapter": "other"}):
+            yield replace(self.a, binding=replace(self.a.binding,
+                          identity=replace(self.a.binding.identity, **changes)))
+        yield replace(self.a, binding=replace(self.a.binding, binding_id="other-binding"))
+        yield replace(self.a, binding=replace(self.a.binding, form="big"))
+        for settings in (replace(self.a.settings, num_ctx=4096),
+                         replace(self.a.settings, max_predict=256),
+                         replace(self.a.settings, model="other:latest")):
+            yield replace(self.a, settings=settings,
+                          binding=replace(self.a.binding,
+                                          identity=replace(self.a.binding.identity, model_name=settings.model),
+                                          context_tokens=settings.num_ctx, output_tokens=settings.max_predict,
+                                          config_digest=settings.config_digest))
+
+    def test_wrong_binding_terminal_does_not_settle_original(self):
+        for other in self.alternatives():
+            with self.subTest(other=other), self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_MISMATCH"):
+                self.terminal(other)
+        self.assertEqual(self.c.status()["status"], "REFERENCE_HELD")
+        self.assertEqual(self.terminal(self.a), "TERMINAL_REFERENCE_HELD")
+
+    def test_wrong_binding_release_does_not_clear_original(self):
+        self.terminal(self.a)
+        for other in self.alternatives():
+            with self.subTest(other=other), self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_MISMATCH"):
+                self.c.account_release_reference(release(self.s, attempt=other), now_ns=600)
+            self.assertTrue(self.c.status()["fixture_slot_occupied"])
+        self.assertEqual(self.c.account_release_reference(release(self.s), now_ns=600),
+                         "REFERENCE_RELEASED")
+
+    def test_inconsistent_binding_settings_refused(self):
+        for settings in (replace(self.a.settings, num_ctx=4096),
+                         replace(self.a.settings, max_predict=256),
+                         replace(self.a.settings, model="other:latest")):
+            with self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_SETTINGS_MISMATCH"):
+                replace(self.a, settings=settings)
+        with self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_SETTINGS_MISMATCH"):
+            replace(self.a, binding=replace(self.a.binding, config_digest="sha256:"+"f"*64))
+
+    def test_untyped_or_missing_binding_refused(self):
+        for changes in ({"binding": None}, {"settings": None}, {"binding": {}}, {"settings": {}}):
+            with self.assertRaisesRegex(H.CustodyRefusal, "INVALID_ATTEMPT_BINDING"):
+                replace(self.a, **changes)
+
+    def test_unknown_retains_exact_binding_and_cannot_rebind(self):
+        self.assertEqual(self.c.observe_terminal_reference(self.a, outcome="UNKNOWN",
+                         clock_domain="clock", observed_ns=400), "UNKNOWN_HOLD")
+        for other in self.alternatives():
+            with self.assertRaisesRegex(H.CustodyRefusal, "ATTEMPT_MISMATCH"):
+                self.terminal(other)
+        self.assertEqual(self.terminal(self.a), "UNKNOWN_HOLD")
+        self.assertEqual(self.c.account_release_reference(release(self.s), now_ns=600),
+                         "TERMINAL_REQUIRED_HOLD")
+
+    def test_exact_value_reference_no_identity_disclosure(self):
+        equivalent = replace(self.a, binding=replace(self.a.binding),
+                             settings=replace(self.a.settings))
+        self.assertEqual(self.terminal(equivalent), "TERMINAL_REFERENCE_HELD")
+        self.assertEqual(self.c.account_release_reference(release(self.s, attempt=equivalent), now_ns=600),
+                         "REFERENCE_RELEASED")
+        self.assertFalse(self.c.status()["physical_resources_released"])
+        self.assertFalse(self.c.status()["safe_to_start_inference"])
+        self.assertNotIn(self.a.binding.identity.artifact_digest, str(self.c.status()))

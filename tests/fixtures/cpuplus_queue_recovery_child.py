@@ -47,4 +47,5 @@ def factory(queue):
 
 owner = Owner(Queue(root / "private" / "queue.db"), factory, durable_actions=True,
               staged_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_STAGED_TRIAL") else None)
-serve(owner, 0, 1, io_timeout_ms=3000)
+serve(owner, 0, 1, io_timeout_ms=3000,
+      review_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_ACK_TRIAL") else None)

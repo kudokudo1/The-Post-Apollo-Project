@@ -5,6 +5,7 @@ The shell host must explicitly supply an already constructed Owner and pipes.
 A protocol/transport failure terminates the session, never retries an action.
 """
 import json
+import re
 import os
 import select
 import stat
@@ -110,8 +111,79 @@ def detail_for_ui(packet):
     return result
 
 
+def _exact(obj, fields):
+    if type(obj) is not dict or set(obj) != set(fields.split()):
+        raise QueueError("INVALID_REVIEW_WIRE")
+    return obj
+
+
+def _review_digest(value):
+    if type(value) is not str or not re.fullmatch("[0-9a-f]{64}", value):
+        raise QueueError("INVALID_REVIEW_WIRE")
+    return value
+
+
+def _review_wire(review):
+    # Historical rows may be read after their queue state changes. Check
+    # exact safe fields, never transmit extra stored/raw source identities.
+    _exact(review, "version review_id owner_id action_id snapshot review_digest reviewed_at_ms can_execute startup_unlock")
+    _uuid(review["review_id"])
+    _uuid(review["owner_id"])
+    _uuid(review["action_id"])
+    _review_digest(review["review_digest"])
+    _int(review["reviewed_at_ms"], 0, MAX_SAFE)
+    snapshot = _exact(review["snapshot"], "version record pending_request_id pending_digest adjustment_outcome can_execute startup_unlock")
+    if snapshot["pending_request_id"] is not None:
+        _uuid(snapshot["pending_request_id"])
+    _review_digest(snapshot["pending_digest"])
+    row = _exact(snapshot["record"], "version ordinal message state prepared_at result_request_id committed_at adjustment_outcome can_execute")
+    m = validate_local_action(row["message"])
+    _int(row["ordinal"], 1, MAX_SAFE)
+    _int(row["prepared_at"], 0, MAX_SAFE)
+    if (m["action_id"] != review["action_id"] or m["owner_id"] == review["owner_id"]
+            or (m["expires_at"] is not None and m["expires_at"] <= row["prepared_at"])):
+        raise QueueError("INVALID_REVIEW_WIRE")
+    if row["state"] == "PREPARED":
+        if row["result_request_id"] is not None or row["committed_at"] is not None:
+            raise QueueError("INVALID_REVIEW_WIRE")
+    elif row["state"] == "COMMITTED":
+        _uuid(row["result_request_id"])
+        _int(row["committed_at"], row["prepared_at"], MAX_SAFE)
+        if ((m["kind"] in {"QUEUE","REPLACE"}) ==
+                (row["result_request_id"] == m["expected_request_id"])):
+            raise QueueError("INVALID_REVIEW_WIRE")
+    else:
+        raise QueueError("INVALID_REVIEW_WIRE")
+    for obj in (review, snapshot, row):
+        if type(obj["version"]) is not int or obj["version"] != 1 or obj["can_execute"] is not False:
+            raise QueueError("INVALID_REVIEW_WIRE")
+    if (review["startup_unlock"] is not False or snapshot["startup_unlock"] is not False
+            or snapshot["adjustment_outcome"] != "UNVERIFIED" or row["adjustment_outcome"] != "UNVERIFIED"):
+        raise QueueError("INVALID_REVIEW_WIRE")
+    return review
+
+
+def _receipt_wire(receipt):
+    _exact(receipt, "version review acknowledged_at_ms disposition adjustment_outcome can_execute startup_unlock")
+    review = _review_wire(receipt["review"])
+    _int(receipt["acknowledged_at_ms"], review["reviewed_at_ms"], MAX_SAFE)
+    if (type(receipt["version"]) is not int or receipt["version"] != 1
+            or receipt["disposition"] != "REVIEW_ACKNOWLEDGED_ONLY"
+            or receipt["adjustment_outcome"] != "UNVERIFIED"
+            or receipt["can_execute"] is not False or receipt["startup_unlock"] is not False):
+        raise QueueError("INVALID_REVIEW_WIRE")
+    return receipt
+
+
 class Session:
-    def __init__(self, owner, emit):
+    def __init__(self, owner, emit, *, review_max_age_ms=None):
+        if review_max_age_ms is not None:
+            if owner.staged_max_age_ms is None:
+                raise QueueError("STAGED_ACTION_MODE_REQUIRED")
+            _int(review_max_age_ms, 1, 60000)
+        self.review_max_age_ms = review_max_age_ms
+        self.review = None
+        self.review_deadline = None
         self.owner, self.emit = owner, emit
         self.deadline = None
         self.started = False
@@ -124,6 +196,8 @@ class Session:
         if self.closed:
             return
         self.prepared = None
+        self.review = None
+        self.review_deadline = None
         self.prepare_deadline = self.deadline = None
         self.owner.close()
         self.closed = True
@@ -164,17 +238,25 @@ class Session:
             raise QueueError("SESSION_CLOSED")
         if self.prepare_deadline is not None:
             return max(0, self.prepare_deadline - time.monotonic())
-        if self.deadline is None:
-            return None
-        _, mono = self.owner.runtime._now()
-        return max(0, self.deadline - mono) / 1000
+        waits = []
+        if self.review_deadline is not None:
+            waits.append(max(0, self.review_deadline - time.monotonic()))
+        if self.deadline is not None:
+            _, mono = self.owner.runtime._now()
+            waits.append(max(0, self.deadline - mono) / 1000)
+        return min(waits) if waits else None
 
     def due(self):
+        if self.review_deadline is not None and time.monotonic() >= self.review_deadline:
+            self.close()
+            raise QueueError("RECOVERY_PIPE_EXPIRED")
         if self.prepare_deadline is not None and self.wait_seconds() == 0:
             self.close()
             raise QueueError("STAGED_PIPE_EXPIRED")
-        if self.deadline is not None and self.wait_seconds() == 0:
-            self.publish()
+        if self.deadline is not None:
+            _, mono = self.owner.runtime._now()
+            if mono >= self.deadline:
+                self.publish()
 
     def receive(self, line):
         if not self.started or self.closed:
@@ -210,6 +292,47 @@ class Session:
             reply = self.owner.commit_action(message)
             self.emit(reply)
             self.publish()
+            return
+        if self.review is not None:
+            if time.monotonic() >= self.review_deadline:
+                raise QueueError("RECOVERY_PIPE_EXPIRED")
+            review_id, digest, sequence = self.review
+            if (set(obj) != {"version","kind","owner_id","review_id","review_digest","review_sequence"}
+                    or obj["kind"] != "RECOVERY_ACK"
+                    or obj["owner_id"] != self.owner.owner_id
+                    or obj["review_id"] != review_id or obj["review_digest"] != digest
+                    or type(obj["review_sequence"]) is not int or obj["review_sequence"] != sequence):
+                raise QueueError("RECOVERY_PIPE_MISMATCH")
+            self.review = None
+            self.review_deadline = None
+            packet = self.owner.acknowledge_recovery_review(review_id=review_id, review_digest=digest)
+            _receipt_wire(packet["receipt"])
+            self.emit(packet)
+            return
+        if obj.get("kind") == "RECOVERY_REVIEW":
+            if self.review_max_age_ms is None or set(obj) != {"version","kind","owner_id","action_id"}:
+                raise QueueError("RECOVERY_PIPE_MODE_REQUIRED")
+            if obj["owner_id"] != self.owner.owner_id:
+                raise QueueError("STALE_OR_INVALID_OWNER")
+            self.review_deadline = time.monotonic() + self.review_max_age_ms / 1000
+            packet = self.owner.begin_recovery_review(_uuid(obj["action_id"]), max_age_ms=self.review_max_age_ms)
+            review = _review_wire(packet["review"])
+            if time.monotonic() >= self.review_deadline:
+                raise QueueError("RECOVERY_PIPE_EXPIRED")
+            self.review = (review["review_id"],review["review_digest"],packet["sequence"])
+            self.emit(packet)
+            return
+        if obj.get("kind") == "RECOVERY_ACK":
+            raise QueueError("RECOVERY_PIPE_NOT_LIVE")
+        if obj.get("kind") == "RECOVERY_REVIEW_HISTORY":
+            if self.review_max_age_ms is None or set(obj) != {"version","kind","owner_id","review_id"}:
+                raise QueueError("RECOVERY_PIPE_MODE_REQUIRED")
+            if obj["owner_id"] != self.owner.owner_id:
+                raise QueueError("STALE_OR_INVALID_OWNER")
+            packet = self.owner.recovery_review_history(_uuid(obj["review_id"]))
+            if packet["receipt"] is not None:
+                _receipt_wire(packet["receipt"])
+            self.emit(packet)
             return
         if obj.get("kind") == "PREPARE_ACTION":
             if mode is None or set(obj) != {"version","kind","message"}:
@@ -254,7 +377,7 @@ class Session:
             raise QueueError("WIRE_COMMAND")
 
 
-def serve(owner, read_fd, write_fd, *, io_timeout_ms):
+def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None):
     """Single session loop; caller owns descriptors and must close them.
 
     Blocking sleep when idle; a pending request arms just one timeout.
@@ -281,7 +404,7 @@ def serve(owner, read_fd, write_fd, *, io_timeout_ms):
             if count <= 0:
                 raise QueueError("PIPE_WRITE_FAILED")
             data = data[count:]
-    session = Session(owner, emit)
+    session = Session(owner, emit, review_max_age_ms=review_max_age_ms)
     buffer = bytearray()
     partial_deadline = None
     try:

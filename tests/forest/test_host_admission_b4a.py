@@ -87,6 +87,70 @@ class AdmissionTests(unittest.TestCase):
             wire if wire is not None else self.intent("GENERATE"),
             peer=self.peer if peer is None else peer))
 
+    def _r7d_c_audit(self):
+        events = []
+        def audit(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and (table, column) in (
+                    ("forest_sessions", "title"), ("forest_turns", "body")):
+                events.append(column.upper())
+            if action == sqlite3.SQLITE_INSERT and table == "forest_attempts_b3":
+                events.append("RESERVE_SQL")
+            return sqlite3.SQLITE_OK
+        def spy(label, fn):
+            def call(*a, **kw):
+                events.append(label)
+                return fn(*a, **kw)
+            return call
+        self.admission._verify = spy("PEER", self.admission._verify)
+        self.admission._approve = spy("POLICY", self.admission._approve)
+        self.bridge.streamer = spy("FAKE_STREAM", self.bridge.streamer)
+        self.db.set_authorizer(audit)
+        return events
+
+    def _r7d_c_state(self):
+        self.db.set_authorizer(None)
+        return (self.db.execute("SELECT revision FROM forest_sessions").fetchone()[0],
+                self.db.execute("SELECT expected_revision,status FROM forest_attempts_b3").fetchall(),
+                self.db.execute("SELECT role FROM forest_turns ORDER BY ordinal").fetchall())
+
+    def test_r7d_c_authorization_read_reserve_stream_and_late_denial(self):
+        events = self._r7d_c_audit()
+        generator = self.admission.generate(self.intent("GENERATE"), peer=self.peer)
+        self.assertEqual(events, [])  # lazy generator construction
+        try:
+            self.assertEqual(next(generator)["event"], "RESERVED")
+            for a, b in (("PEER", "POLICY"), ("POLICY", "TITLE"),
+                         ("POLICY", "BODY"), ("TITLE", "RESERVE_SQL"),
+                         ("BODY", "RESERVE_SQL")):
+                self.assertLess(events.index(a), events.index(b))
+            self.assertNotIn("FAKE_STREAM", events)
+            self.assertEqual(self.db.execute(
+                "SELECT expected_revision,status FROM forest_attempts_b3").fetchall(), [(1, "RESERVED")])
+            self.assertEqual(next(generator)["event"], "STARTED")
+            self.assertLess(events.index("RESERVE_SQL"), events.index("FAKE_STREAM"))
+            self.allowed = {"READ_SESSION"}
+            self.assertEqual(next(generator)["event"], "DELTA")
+            with self.assertRaises(b4.AdmissionRefusal):
+                list(generator)
+            self.assertEqual(events.count("POLICY"), 2)
+            self.assertEqual(events.count("FAKE_STREAM"), 1)
+            self.assertLess(events.index("FAKE_STREAM"), len(events) - 1 - events[::-1].index("POLICY"))
+        finally:
+            generator.close()
+            self.db.set_authorizer(None)
+        self.assertEqual(self._r7d_c_state(), (1, [(1, "ABORTED")], [("user",)]))
+
+    def test_r7d_c_initial_denial_before_any_read_or_reservation(self):
+        events = self._r7d_c_audit()
+        self.allowed = {"READ_SESSION"}
+        try:
+            with self.assertRaisesRegex(b4.AdmissionRefusal, "NOT_AUTHORIZED"):
+                self.generate()
+            self.assertEqual(events, ["PEER", "POLICY"])
+        finally:
+            self.db.set_authorizer(None)
+        self.assertEqual(self._r7d_c_state(), (1, [], [("user",)]))
+
     def test_read_only_receipt_exposes_no_title_body_owner_or_token(self):
         reply = self.read()
         self.assertEqual(reply["status"], "READ_ONLY")

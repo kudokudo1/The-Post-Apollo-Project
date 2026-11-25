@@ -66,7 +66,7 @@ class KernelTimeWRecoveryDenyTests(unittest.TestCase):
                 packet_c5=None, packet_native=None,
                 plan=None, c5_kind=socket.SOCK_SEQPACKET,
                 native_kind=socket.SOCK_SEQPACKET, passcred_c5=True,
-                passcred_native=True, expect=""):
+                passcred_native=True, expect="", last_seen=None):
         c = self.c5 if c5 is None else c5
         n = self.native if native is None else native
         r1, w1 = self.pair(kind=c5_kind, passcred=passcred_c5)
@@ -78,7 +78,8 @@ class KernelTimeWRecoveryDenyTests(unittest.TestCase):
         out = inspect_dual_packet_returns_ci_only(
             c5_receiver=r1, native_receiver=r2,
             expected_c5_return=c, expected_native_return=n,
-            original_recovery_plan=self.plan if plan is None else plan)
+            original_recovery_plan=self.plan if plan is None else plan,
+            last_seen=last_seen)
         self.denied(out)
         if expect:
             self.assertEqual(out.status, expect)
@@ -181,6 +182,64 @@ class KernelTimeWRecoveryDenyTests(unittest.TestCase):
         self.assertEqual(self.native["resize_observation"], "READY_ONLY")
         self.assertEqual(out.comparison_diagnostic,
                          "CONTRADICTORY_RESIZE_UNKNOWN_HOLD")
+
+    def test_mutated_prior_c5_head_cannot_hide_rollback(self):
+        inspect = K.inspect_one_untrusted_packet
+        prior = {"c5": {"head_sha256": self.c5["head_sha256"],
+                        "sequence": self.c5["sequence"] + 1},
+                 "native": None}
+
+        def mutate_after_read(receiver):
+            result = inspect(receiver)
+            prior["c5"]["sequence"] = self.c5["sequence"]
+            return result
+
+        with patch.object(K, "inspect_one_untrusted_packet",
+                          side_effect=mutate_after_read):
+            out = self.compare(last_seen=prior)
+        self.assertEqual(prior["c5"]["sequence"], self.c5["sequence"])
+        self.assertEqual(out.comparison_diagnostic,
+                         "C5_PRIOR_HEAD_ROLLBACK_UNKNOWN_HOLD")
+
+    def test_replaced_prior_native_head_cannot_hide_fork(self):
+        inspect = K.inspect_one_untrusted_packet
+        other = "0" * 64 if self.native["head_sha256"] != "0" * 64 else "1" * 64
+        prior = {"c5": None,
+                 "native": {"head_sha256": other,
+                            "sequence": self.native["sequence"]}}
+
+        def replace_after_read(receiver):
+            result = inspect(receiver)
+            prior["native"] = None
+            return result
+
+        with patch.object(K, "inspect_one_untrusted_packet",
+                          side_effect=replace_after_read):
+            out = self.compare(last_seen=prior)
+        self.assertIsNone(prior["native"])
+        self.assertEqual(out.comparison_diagnostic,
+                         "NATIVE_PRIOR_HEAD_FORK_UNKNOWN_HOLD")
+
+    def test_malformed_prior_heads_refused_without_consuming_packets(self):
+        class DictSubclass(dict):
+            pass
+
+        valid = {"head_sha256": "a" * 64, "sequence": 1}
+        for prior in (
+            {"c5": valid},
+            {"c5": None, "native": [], "extra": None},
+            {"c5": {"head_sha256": "a" * 64, "sequence": True},
+             "native": None},
+            {"c5": None, "native": {"head_sha256": "bad", "sequence": 1}},
+            {"c5": DictSubclass(valid), "native": None},
+            DictSubclass(c5=valid, native=None),
+        ):
+            with self.subTest(prior=repr(prior)):
+                with patch.object(K, "inspect_one_untrusted_packet") as observe:
+                    out = self.compare(last_seen=prior)
+                    observe.assert_not_called()
+                self.assertEqual(out.status,
+                                 "INVALID_LOCAL_PRIOR_HEAD_UNKNOWN_HOLD")
 
     def test_duplicate_fd_alias_cannot_supply_two_role_packets(self):
         reader, writer = self.pair()

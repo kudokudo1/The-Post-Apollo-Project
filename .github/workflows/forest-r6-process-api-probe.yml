@@ -1,0 +1,50 @@
+name: Forest R6 Quickshell process API probe
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/r6_process_api_probe/**'
+      - '.github/workflows/forest-r6-process-api-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-api-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: fedora:44
+    steps:
+      - name: Install coherent native Quickshell stack
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qtbase-gui python3 git coreutils grep shadow-utils util-linux diffutils
+          quickshell --version
+          quickshell --version | grep '0.3.'
+          useradd --create-home --shell /bin/sh forest-api-ci
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Stage only fixed disposable API probe
+        run: |
+          set -eu
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir -p "$work/scene/private" "$work/home" "$work/run" "$work/config" "$work/cache" "$work/data"
+          cp tests/forest/r6_process_api_probe/child.py "$work/scene/"
+          cp tests/forest/r6_process_api_probe/shell.qml "$work/scene/"
+          cmp tests/forest/r6_process_api_probe/child.py "$work/scene/child.py"
+          cmp tests/forest/r6_process_api_probe/shell.qml "$work/scene/shell.qml"
+          chown -R forest-api-ci:forest-api-ci "$work"
+          chmod 700 "$work/run"
+          set +e
+          runuser -u forest-api-ci -- setpriv --no-new-privs env -i PATH=/usr/bin:/bin HOME="$work/home" XDG_RUNTIME_DIR="$work/run" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software FOREST_PROBE_PARENT_SENTINEL=not-a-secret LANG=C.UTF-8 timeout --signal=TERM --kill-after=3s 35s quickshell --path "$work/scene/shell.qml" --no-color --log-rules 'qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true' > "$work/log" 2>&1
+          code=$?
+          set -e
+          cat "$work/log"
+          test "$code" -eq 0
+          if grep -q R6_API_FAIL "$work/log"; then exit 1; fi
+          observed="$(grep -oE 'R6_API_CASE_PASS [0-7]' "$work/log" || true)"
+          expected="$(printf 'R6_API_CASE_PASS %s\n' 0 1 2 3 4 5 6 7)"
+          test "$observed" = "$expected"
+          test "$(grep -c R6_API_NATIVE_PASS "$work/log")" -eq 1

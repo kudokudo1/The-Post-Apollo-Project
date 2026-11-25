@@ -1,0 +1,17 @@
+name: CPU++ queue history presentation
+on:
+  pull_request:
+    paths:
+      - 'widgets/cpuplus/CpuPlusQueueHistory.js'
+      - 'widgets/cpuplus/CpuPlusQueueHistoryPane.qml'
+      - 'tests/cpuplus/test_queue_history_presentation.cjs'
+      - '.github/workflows/cpuplus-queue-history-presentation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_queue_history_presentation.cjs

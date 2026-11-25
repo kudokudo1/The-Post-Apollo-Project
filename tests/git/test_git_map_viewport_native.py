@@ -22,6 +22,12 @@ def build(directory,count,offset,snapshot,repo):
         for i in range(count):
             sha=format(offset+i+1,"040x")
             parents=[format(offset+i+2,"040x")] if i+1<count else []
+            if count==257:
+                # Branch opened at ordinal zero joins across a page boundary.
+                if i==0:
+                    parents.append(format(offset+131,"040x"))
+                elif i==129:
+                    parents=[format(offset+132,"040x")]
             yield sha,parents,i,"Fixture","Commit "+str(i)
     with sqlite3.connect(db) as conn:
         manifest=index.fill(conn,rows(),snapshot=snapshot,repo_id=repo,
@@ -67,12 +73,15 @@ with tempfile.TemporaryDirectory(prefix="git-map-native-") as temporary:
         d=base/key
         d.mkdir(mode=0o700)
         env[key]=str(d)
-    env.update(QT_QPA_PLATFORM="offscreen",QT_QUICK_BACKEND="software",
-               LIBGL_ALWAYS_SOFTWARE="1",QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",DISPLAY="",
+    input_test=os.environ.get("POST_APOLLO_GIT_MAP_INPUT")=="1"
+    env.update(QT_QPA_PLATFORM="xcb" if input_test else "offscreen",QT_QUICK_BACKEND="software",
+               LIBGL_ALWAYS_SOFTWARE="1",QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",
+               DISPLAY=os.environ.get("DISPLAY","") if input_test else "",
+               MAP_FIXTURE_INPUT="1" if input_test else "0",
                MAP_FIXTURE_A=json.dumps(a),MAP_FIXTURE_B=json.dumps(b),
                MAP_FIXTURE_DIR_A=str(base/"index-a"),MAP_FIXTURE_DIR_B=str(base/"index-b"))
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,
-                          text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=35)
+                          text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=45)
     print(result.stdout)
     bad_runtime = any(marker in result.stdout for marker in ("Binding loop detected", "TypeError:", "ReferenceError:"))
     if result.returncode or bad_runtime or "GIT_MAP_NATIVE_PASS" not in result.stdout or "GIT_MAP_NATIVE_FAIL" in result.stdout:

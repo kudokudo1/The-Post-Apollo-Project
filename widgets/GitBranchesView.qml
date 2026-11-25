@@ -15,6 +15,7 @@ Item {
     required property var stackSubmitService
     property var keyboardHost: null
     property bool mapOperatorActive: false
+    property var mapCustodyController: null
 
     property string selectedBranch: ""
     property string selectedSha: ""
@@ -1716,6 +1717,7 @@ Item {
                 border.color: Colors.cyan
 
                 FullHistoryMap.GitMapControlHost {
+                    custodyController: root.mapCustodyController
                     anchors {
                         top: parent.top
                         left: parent.left

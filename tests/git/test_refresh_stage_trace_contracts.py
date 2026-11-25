@@ -107,6 +107,8 @@ with tempfile.TemporaryDirectory(prefix="pa-git-refresh-stage-") as td:
         "diagnostic mode must not change the refresh data protocol\n"
         + repr(baseline[-700:]) + "\n" + repr(stripped[-700:])
     )
+    stages = [line.decode().strip().split("\t")[1] for line in baseline.splitlines() if line.startswith(b"DIAGSTAGE\t")]
+    assert stages == ["repo_check", "metadata", "status", "upstream", "merged_refs", "cherry", "local_branches", "remote_branches", "history"], stages
     assert baseline.count(b"DONE\t") == 1
     assert b"REMOTEBRANCH\torigin/feature" in baseline
     assert b"LOCALBRANCH\tmain" in baseline
@@ -117,3 +119,15 @@ with tempfile.TemporaryDirectory(prefix="pa-git-refresh-stage-") as td:
     print("Nine stage durations, synthetic origin branches/history: PASS")
 
 print("Git refresh stage diagnostics dormant by default: PASS")
+
+# Existing shared diagnostics presentation, fixed-size failure evidence.
+widget = (root / "widgets/GitW.qml").read_text()
+assert "SharedComponents.DiagnosticsDockButton" in widget
+assert "SharedComponents.DiagnosticsServicePopup" in widget
+assert 'rememberRefreshFailure("GIT READ TIMEOUT")' in service
+assert "refreshDiagOverlap=refreshProcess.running" in service
+assert "refreshDiagLastFailure={" in service
+assert "refreshDiagStderr++" in service
+assert "refreshDiagLastFailure=null" not in service.replace(" ", "")
+assert 'onCloseRequested: root.gitDiagnosticsOpen=false' in widget
+print("Git offline diagnostics source contracts PASS")

@@ -8,6 +8,7 @@ on:
       - "widgets/HospitalW.qml"
       - "shell.qml"
       - "tests/components/test_syntagma_git_startup_trace.py"
+      - "tests/git/test_refresh_stage_trace_contracts.py"
       - ".github/workflows/syntagma-git-startup-trace.yml"
   push:
     branches: [main]
@@ -26,4 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Assert trace opt-in and preserved Git/Hospital lifecycle
-        run: python3 tests/components/test_syntagma_git_startup_trace.py
+        run: |
+          python3 tests/components/test_syntagma_git_startup_trace.py
+          python3 tests/git/test_refresh_stage_trace_contracts.py

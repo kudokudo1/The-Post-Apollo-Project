@@ -102,6 +102,55 @@ Scope {
     property var snapshotService: null
 
     property bool available: false
+    // Fixed-size in-session evidence; no raw repository/remote/error text.
+    property int refreshDiagAttempt: 0
+    property double refreshDiagStarted: 0
+    property double refreshDiagStageAt: 0
+    property string refreshDiagStage: "WAITING"
+    property string refreshDiagOutcome: "WAITING"
+    property bool refreshDiagOverlap: false
+    property bool refreshDiagTimedOut: false
+    property int refreshDiagStderr: 0
+    property int refreshDiagLateDone: 0
+    property double refreshDiagLastSuccess: 0
+    property var refreshDiagLastFailure: null
+    readonly property bool refreshDiagChildRunning: refreshProcess.running
+    readonly property int refreshDiagDeadlineMs: refreshWatchdog.interval
+    function beginRefreshDiagnostic() {
+        refreshDiagAttempt++;
+        refreshDiagStarted=Date.now();
+        refreshDiagStageAt=refreshDiagStarted;
+        refreshDiagStage="START";
+        refreshDiagOutcome="READING";
+        refreshDiagOverlap=refreshProcess.running;
+        refreshDiagTimedOut=false;
+        refreshDiagStderr=0;
+    }
+    function rememberRefreshFailure(code) {
+        refreshDiagOutcome=code;
+        refreshDiagLastFailure={
+            attempt:refreshDiagAttempt, code:code, stage:refreshDiagStage,
+            elapsedMs:Math.max(0,Date.now()-refreshDiagStarted),
+            childRunning:refreshProcess.running, overlap:refreshDiagOverlap,
+            stderrCount:refreshDiagStderr, at:Date.now()
+        };
+    }
+    function refreshDiagnosticText() {
+        const f=refreshDiagLastFailure;
+        const elapsed=refreshDiagStarted ? Math.max(0,refreshDiagStageAt-refreshDiagStarted) : 0;
+        return "ATTEMPT // "+refreshDiagAttempt+" | LAST STAGE // "+refreshDiagStage
+            +" | STAGE ARRIVED AT // "+elapsed+" ms"
+            +" | OUTCOME // "+refreshDiagOutcome
+            +" | DEADLINE // "+refreshDiagDeadlineMs+" ms"
+            +" | STDERR LINES // "+refreshDiagStderr
+            +" | CHILD RUNNING AT START // "+(refreshDiagOverlap?"YES":"NO")
+            +" | DONE AFTER TIMEOUT // "+refreshDiagLateDone
+            +(f ? "\nLAST FAILURE // "+f.code+" | ATTEMPT "+f.attempt
+                +" | LAST STAGE "+f.stage+" | "+f.elapsedMs+" ms"
+                +" | CHILD RUNNING "+(f.childRunning?"YES":"NO")
+                +" | OVERLAP "+(f.overlap?"YES":"NO")
+                +" | STDERR LINES "+f.stderrCount : "\nLAST FAILURE // NONE RECORDED");
+    }
     property bool refreshing: false
     property bool refreshPending: false
     property string refreshRepoPath: ""
@@ -1279,6 +1328,7 @@ Scope {
         }
 
         if (!repoIsLocal || String(repoPath || "").indexOf("remote://") === 0) {
+            refreshDiagOutcome="REMOTE ONLY";
             available = false;
             refreshing = false;
             refreshPending = false;
@@ -1321,6 +1371,7 @@ Scope {
             return;
         }
 
+        beginRefreshDiagnostic();
         refreshing = true;
         refreshRepoPath = repoPath;
         lastError = "";
@@ -1364,11 +1415,13 @@ Scope {
                 '  local now="${EPOCHREALTIME/./}"',
                 '  printf "PROFILE\\ttotal\\t%s\\n" "$(( (now - refresh_stage_started) / 1000 ))"',
                 '}',
+                'printf "DIAGSTAGE\\trepo_check\\n"',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "ERROR\\tNOT A GIT REPOSITORY\\n"',
                 '  printf "DONE\\t\\n"',
                 '  exit 0',
                 'fi',
+                'printf "DIAGSTAGE\\tmetadata\\n"',
                 'root="$(git -C "$repo" rev-parse --show-toplevel)"',
                 'name="$(basename "$root")"',
                 'branch="$(git -C "$root" branch --show-current)"',
@@ -1376,9 +1429,11 @@ Scope {
                 'head="$(git -C "$root" rev-parse --short=10 HEAD)"',
                 'head_full="$(git -C "$root" rev-parse HEAD)"',
                 'trace_refresh_stage "metadata"',
+                'printf "DIAGSTAGE\\tstatus\\n"',
                 'count="$(git -C "$root" status --porcelain=v1 | wc -l | tr -d " ")"',
                 'if [ "$count" -eq 0 ]; then worktree="CLEAN"; else worktree="DIRTY • $count CHANGES"; fi',
                 'trace_refresh_stage "status"',
+                'printf "DIAGSTAGE\\tupstream\\n"',
                 'origin="$(git -C "$root" remote get-url origin 2>/dev/null || true)"',
                 'if [ -z "$origin" ]; then origin="NO ORIGIN"; fi',
                 'upstream="$(git -C "$root" rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)"',
@@ -1403,12 +1458,14 @@ Scope {
                 // A ref already reachable from HEAD cannot produce a '+'
                 // from git cherry. Compute merged tips in one Git invocation
                 // and retain the original patch-equivalence check elsewhere.
+                'printf "DIAGSTAGE\\tmerged_refs\\n"',
                 'merged_remote_refs="|"',
                 'while IFS= read -r ref; do',
                 '  [ -n "$ref" ] || continue',
                 '  merged_remote_refs="${merged_remote_refs}${ref}|"',
                 'done < <(git -C "$root" for-each-ref --merged=HEAD --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
                 'trace_refresh_stage "merged_refs"',
+                'printf "DIAGSTAGE\\tcherry\\n"',
                 'pending_refs="|"',
                 'pending_count=0',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
@@ -1427,6 +1484,7 @@ Scope {
                 // Collect full local ref names while reading the existing
                 // for-each-ref rows. The nonempty "u" prefix prevents Bash
                 // tab IFS from swallowing an empty upstream column.
+                'printf "DIAGSTAGE\\tlocal_branches\\n"',
                 'declare -A local_branch_refs=()',
                 'while IFS="$(printf "\\t")" read -r ref ref_head encoded_upstream local_ref; do',
                 '  [ -z "$ref" ] && continue',
@@ -1443,6 +1501,7 @@ Scope {
                 '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09u%(upstream:short)%09%(refname:lstrip=2)" refs/heads 2>/dev/null)',
                 'trace_refresh_stage "local_branches"',
+                'printf "DIAGSTAGE\\tremote_branches\\n"',
                 'while IFS="$(printf "\\t")" read -r ref changed; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',
@@ -1461,6 +1520,7 @@ Scope {
                 '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
                 'trace_refresh_stage "remote_branches"',
+                'printf "DIAGSTAGE\\thistory\\n"',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
                 'trace_refresh_stage "history"',
                 'trace_refresh_total',
@@ -1483,6 +1543,14 @@ Scope {
         const parts = raw.split("\t");
         const key = parts.length > 0 ? parts[0] : "";
 
+        if (key === "DIAGSTAGE") {
+            const stage=parts.length===2 ? parts[1] : "";
+            if (refreshing && /^(repo_check|metadata|status|upstream|merged_refs|cherry|local_branches|remote_branches|history)$/.test(stage)) {
+                refreshDiagStage=stage;
+                refreshDiagStageAt=Date.now();
+            }
+            return;
+        }
         if (key === "COMMIT") {
             appendCommit(
                 parts.length > 1 ? parts[1] : "",
@@ -1548,9 +1616,11 @@ Scope {
             );
         }
         else if (key === "ERROR") {
+            rememberRefreshFailure("REPOSITORY CHECK ERROR");
             available = false;
             lastError = value;
         } else if (key === "DONE") {
+            if (refreshDiagTimedOut) refreshDiagLateDone++;
             // Measure the individual synchronous stages of the DONE callback
             // only in the operator's opt-in diagnostic. Keep the ordering and
             // operations exactly the same in normal and traced modes.
@@ -1608,6 +1678,8 @@ Scope {
                     started = Date.now();
                 }
                 available = true;
+                refreshDiagOutcome="PUBLISHED";
+                refreshDiagLastSuccess=Date.now();
                 if (trace) {
                     availableMs = Date.now() - started;
                     started = Date.now();
@@ -1618,6 +1690,10 @@ Scope {
                 if (trace)
                     refreshedSignalMs = Date.now() - started;
             }
+
+            if (staleRead) rememberRefreshFailure("STALE REPOSITORY RESULT");
+            else if (lastError && !refreshDiagTimedOut && refreshDiagOutcome!=="REPOSITORY CHECK ERROR")
+                rememberRefreshFailure("READ ERROR");
 
             // End-to-end timing is emitted only after refreshing the UI
             // models; unlike the legacy REFRESHED line it includes their
@@ -2812,6 +2888,12 @@ Scope {
 
     Process {
         id: refreshProcess
+        onExited: function(code, exitStatus) {
+            // Exit and stdout ordering are not proof of missing DONE.
+            // Preserve this advisory observation without changing refresh state.
+            if (gitService.refreshing && code!==0)
+                gitService.rememberRefreshFailure("CHILD NONZERO EXIT");
+        }
 
         stdout: SplitParser {
             onRead: function(line) {
@@ -2867,8 +2949,10 @@ Scope {
             onRead: function(line) {
                 const splitReadTrace = gitService.beginSplitRead("refresh-stderr", line);
                 const message = String(line || "").trim();
-                if (message.length > 0)
+                if (message.length > 0) {
+                    gitService.refreshDiagStderr++;
                     gitService.lastError = message;
+                }
                 gitService.endSplitRead("refresh-stderr", splitReadTrace);
             }
         }
@@ -2915,6 +2999,8 @@ Scope {
         repeat: false
 
         onTriggered: {
+            gitService.refreshDiagTimedOut=true;
+            gitService.rememberRefreshFailure("GIT READ TIMEOUT");
             gitService.refreshing = false;
             gitService.available = false;
             gitService.lastError = "GIT READ TIMEOUT";

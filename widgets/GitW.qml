@@ -14,6 +14,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property bool gitDiagnosticsOpen: false
     // Rapid passive reopenings reuse the most recently published Git data.
     // Explicit refresh / repository selection / Git actions are unaffected.
     readonly property int passiveGitOpenFreshnessMs: 8000
@@ -380,7 +381,7 @@ PanelWindow {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.close()
+        onActivated: { if (root.gitDiagnosticsOpen) root.gitDiagnosticsOpen=false; else root.close(); }
     }
 
     Shortcut {
@@ -1146,6 +1147,7 @@ PanelWindow {
     }
 
     function close() {
+        root.gitDiagnosticsOpen=false;
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.menuOpen = false;
@@ -4113,6 +4115,35 @@ PanelWindow {
             }
         }
 
+        SharedComponents.DiagnosticsServicePopup {
+            id: gitDiagnosticsPane
+            z: 110
+            visible: root.menuOpen && root.activePage === "git" && root.gitDiagnosticsOpen
+            enabled: visible
+            width: Math.max(0,Math.min(520,parent.width-36))
+            height: Math.max(0,Math.min(460,parent.height-100))
+            anchors.right: parent.right
+            anchors.rightMargin: 18
+            anchors.top: parent.top
+            anchors.topMargin: 80
+            heading: "GIT HEALTH // DIAGNOSTICS"
+            displayedState: gitService.refreshing ? "READING" : gitService.available ? "LIVE" : "OFFLINE"
+            providerLabel: "LOCAL GIT // NOT INTERNET"
+            currentAge: gitService.refreshDiagLastSuccess ? new Date(gitService.refreshDiagLastSuccess).toLocaleTimeString() : "--"
+            showLocation: false
+            ageHeading: "DETAIL // "
+            serviceRows: [
+                {label:"LOCAL REFRESH",state:gitService.refreshing?"READING":gitService.available?"LIVE":"OFFLINE",age:gitService.refreshDiagOutcome},
+                {label:"REFRESH CHILD",state:gitService.refreshDiagChildRunning?"READING":"IDLE",age:gitService.refreshDiagChildRunning?"RUNNING":"NOT RUNNING"},
+                {label:"LAST FAILURE",state:gitService.refreshDiagLastFailure?"ERROR":"WAITING",age:gitService.refreshDiagLastFailure?gitService.refreshDiagLastFailure.code:"NONE RECORDED"},
+                {label:"GITHUB // SEPARATE SERVICE",state:githubService.refreshing?"READING":githubService.available?"LIVE":"OFFLINE",age:"INDEPENDENT FROM LOCAL GIT"}
+            ]
+            reasonHeading: "REFRESH EVIDENCE // CURRENT SESSION"
+            reason: gitService.refreshDiagnosticText()
+            footnote: "READ ONLY // NO EXTRA FETCH. STAGE IS LAST RECEIVED, NOT PROOF OF ROOT CAUSE. FAILURE RETAINED ACROSS RELOAD; LOST ON SHELL RESTART. NO RAW STDERR OR REPO CONTENT."
+            onCloseRequested: root.gitDiagnosticsOpen=false
+        }
+
         // Git selectors intentionally use the shared component's legacy
         // immediate-selection mode: the actual repository/branch context and
         // branch map update while dragging, without a release-to-commit gate.
@@ -4278,6 +4309,15 @@ PanelWindow {
                                 transparentBorder: true
                             }
                         }
+                    }
+
+                    SharedComponents.DiagnosticsDockButton {
+                        id: gitDiagnosticsButton
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: root.activePage === "git"
+                        available: root.menuOpen && visible
+                        diagnosticsOpen: root.gitDiagnosticsOpen
+                        onToggleRequested: root.gitDiagnosticsOpen = !root.gitDiagnosticsOpen
                     }
 
                     // Resync the current remote READ view or refresh local Git

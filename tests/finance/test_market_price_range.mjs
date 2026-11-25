@@ -244,3 +244,63 @@ await import("./test_market_m44_global_analysis.mjs");
 
 // M45: worldwide matched-date comparative research.
 await import("./test_market_m45_global_cross_stock.mjs");
+
+// M46a: proposed quota placement proof using an injected transport only.
+// Production reader/hub defaults are unchanged; no actual ledger or network.
+{
+  const {quotaFetcher}=await import("../../scripts/finance/market_shared_quota.mjs");
+  let reservations=0, requests=0, blocked=false;
+  let stamp=Date.parse(clock());
+  const guarded=quotaFetcher("eodhd",async(url)=>{
+    requests++;
+    assert.equal(new URL(url).hostname,"eodhd.com");
+    return {ok:true,headers:{get:()=>null},text:async()=>JSON.stringify(rows)};
+  },provider=>{
+    assert.equal(provider,"eodhd");
+    if(blocked)throw new Error("local-quota-exhausted");
+    reservations++;
+    return {provider,reserved:reservations};
+  });
+  const read=(company,start,end,token="FICTIONAL-TEST-TOKEN")=>
+    loadPriceRange(company,start,end,guarded.fetcher,async()=>token,today);
+  const proposedHub=createMarketDataHub({
+    now:()=>stamp,
+    adapters:{eodhd:async()=>{throw new Error("unexpected context adapter");}},
+    rangeAdapter:(company,start,end)=>read(company,start,end)
+  });
+  const selection={cik,from,to};
+  await assert.rejects(read(nvidia,from,to,null),/provider-key-required/);
+  await assert.rejects(read(cik,"2026-02-30",to),/invalid-range/);
+  assert.equal(reservations,0);
+  assert.equal(requests,0);
+  // Simulate an already-guarded global request sharing the same bucket.
+  await guarded.fetcher("https://eodhd.com/fixture");
+  const [first,shared]=await Promise.all([
+    proposedHub.getPriceRange(selection),proposedHub.getPriceRange(selection)
+  ]);
+  assert.equal(first.hub.state,"FETCHED");
+  assert.equal(shared.hub.state,"SHARED");
+  assert.equal(reservations,2);
+  assert.equal(requests,2);
+  assert.equal((await proposedHub.getPriceRange(selection)).hub.state,"CACHED");
+  assert.equal(reservations,2);
+  // A cached read remains available even if a new attempt would be refused.
+  blocked=true;
+  assert.equal((await proposedHub.getPriceRange(selection)).hub.state,"CACHED");
+  await assert.rejects(proposedHub.getPriceRange({cik:msft,from,to}));
+  assert.equal(reservations,2);
+  assert.equal(requests,2);
+  assert.equal(proposedHub.health().inFlight,0);
+  assert.equal(proposedHub.health().cacheEntries,1);
+  // Expired cache needs a new reservation, never a silent retry or bypass.
+  stamp+=2*86400000;
+  await assert.rejects(proposedHub.getPriceRange(selection));
+  assert.equal(requests,2);
+  assert.equal(proposedHub.health().cacheEntries,0);
+  blocked=false;
+  const fresh=await proposedHub.getPriceRange(selection);
+  assert.equal(fresh.hub.state,"FETCHED");
+  assert.equal(requests,3);
+  assert.equal(reservations,3);
+  console.log("Finance M46a injected quota boundary, cache and single-flight: PASS");
+}

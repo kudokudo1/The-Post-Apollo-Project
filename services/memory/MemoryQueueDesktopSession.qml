@@ -150,6 +150,10 @@ QtObject {
     }
     function completeIo(epoch,ticket,operation,result) {
         if (ctl.phase==="FAILED")return;
+        if (ctl.entered) { fail("CHECKPOINT_CALLBACK_REENTRY");return; }
+        guarded(()=>finishIo(epoch,ticket,operation,result));
+    }
+    function finishIo(epoch,ticket,operation,result) {
         const q=ctl.io;
         ctl.io=null;
         if (!q || q.epoch!==epoch || epoch!==ctl.epoch || q.ticket!==ticket
@@ -168,7 +172,7 @@ QtObject {
             && result.action_id===ctl.advance.receipt.review.action_id && result.startup_unlock===false) {
             ctl.phase="RELOADING";
             Qt.callLater(()=>{if (ctl.phase==="RELOADING" && ctl.epoch===epoch && !ctl.child)
-                beginIo("GEN_LOAD",null);});
+                guarded(()=>beginIo("GEN_LOAD",null));});
             return;
         }
         if (operation!=="GEN_LOAD" || !["LOADING","RELOADING"].includes(ctl.phase) || ctl.child) {
@@ -221,6 +225,11 @@ QtObject {
     }
     function exited(process,epoch,code,status) {
         if (process!==ctl.child || epoch!==ctl.epoch) return;
+        if (ctl.phase==="FAILED") { ctl.child=null; process.destroy();return; }
+        if (ctl.entered) { fail("OWNER_EXIT_REENTRY");return; }
+        guarded(()=>finishExit(process,epoch,code,status));
+    }
+    function finishExit(process,epoch,code,status) {
         ctl.child=null;
         retirement.stop();
         process.destroy();
@@ -239,7 +248,7 @@ QtObject {
             // flag, PID lookup or timeout alone can release this transition.
             ctl.phase="ADVANCING";
             Qt.callLater(()=>{if (ctl.phase==="ADVANCING" && ctl.epoch===epoch && !ctl.child)
-                beginIo("GEN_ADVANCE",ctl.advance);});
+                guarded(()=>beginIo("GEN_ADVANCE",ctl.advance));});
         }
     }
 
@@ -285,7 +294,8 @@ QtObject {
             stdinEnabled: true
             stdout: SplitParser { onRead: line=>root.receive(ownerProcess,ownerProcess.epoch,line) }
             // Do not print backend data or accept it as authority.
-            stderr: SplitParser { onRead: line=>{if (line.length) root.fail("OWNER_STDERR");} }
+            stderr: SplitParser { onRead: line=>{if (line.length && ctl.child===ownerProcess
+                && ownerProcess.epoch===ctl.epoch && ctl.phase!=="FAILED") root.fail("OWNER_STDERR");} }
             onExited: (code,status)=>root.exited(ownerProcess,ownerProcess.epoch,code,status)
         }
     }

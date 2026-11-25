@@ -1,0 +1,34 @@
+name: Finance Research M10a local-store failure-boundary native smoke
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/research_investigation_store.mjs"
+      - "scripts/finance/research_investigations.mjs"
+      - "tests/finance/test_research_investigation_store.mjs"
+      - "tests/finance/test_research_m10a_store_commit_uncertainty.mjs"
+      - ".github/workflows/finance-research-store-safety-m10a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-failure-boundary:
+    name: Fedora Linux filesystem fault injection and stale-lock custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    container:
+      image: fedora:44
+    steps:
+      - name: Install native Linux Node runtime
+        run: |
+          dnf install -y --setopt=install_weak_deps=False nodejs git
+          node --version
+      - uses: actions/checkout@v4
+      - name: Verify existing Research M2 store and M10a crash boundary
+        run: |
+          set -eu
+          node tests/finance/test_research_investigations.mjs
+          node tests/finance/test_research_investigation_store.mjs
+          node tests/finance/test_research_m10a_store_commit_uncertainty.mjs

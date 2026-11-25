@@ -8,6 +8,7 @@ Rectangle {
     property bool active: false
     property bool priceOptionsOpen: false
     signal exitRequested()
+    signal quotaRequested()
     signal historyChosen(var identity, var listing, var snapshot)
     onActiveChanged: {
         if (!active) priceOptionsOpen = false;
@@ -46,13 +47,25 @@ Rectangle {
         anchors.topMargin: 10
         anchors.left: parent.left
         anchors.leftMargin: 9
-        anchors.right: returnButton.left
+        anchors.right: quotaButton.left
         anchors.rightMargin: 6
-        text: "GLOBAL STOCK SEARCH // OPENFIGI"
+        text: "CONTROLS // GLOBAL STOCK SEARCH"
         font.pixelSize: 12
         font.bold: true
         color: Colors.cyan
         elide: Text.ElideRight
+    }
+    ActionButton {
+        id: quotaButton
+        anchors.top: returnButton.top
+        anchors.right: returnButton.left
+        anchors.rightMargin: 5
+        width: 74
+        height: 27
+        label: "QUOTA"
+        labelPixelSize: 9
+        accentColor: Colors.orange
+        onLeftClicked: discovery.quotaRequested()
     }
     ActionButton {
         id: returnButton

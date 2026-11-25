@@ -46,8 +46,8 @@ assert.equal(capture({...a,retrievedAt:"bad"},apple,"AAPL.US"),null);
 assert.equal(capture({...a,source:"unknown"},apple,"AAPL.US"),null);
 assert.equal(capture({...a,readOnly:false},apple,"AAPL.US"),null);
 assert.equal(capture({...a,first:{date:a.first.date,price:9}},apple,"AAPL.US"),null);
-for(const needle of ["property var stockReference: null","RangeAnalysisPolicy.captureStockReference(snapshot,",
-    "StockModePolicy.stockSymbol(stockFeed.selectedCik)","RangeAnalysisPolicy.compareStockReferences(stockReference, snapshot,",
+for(const needle of ["property var stockReference: null","RangeAnalysisPolicy.captureGlobalStockReference(snapshot)",
+    "RangeAnalysisPolicy.compareGlobalStockReferences(stockReference,snapshot)",
     'label: "SAVE STOCK REF"','label: "CLEAR REF"',"COMMON CLOSE DATES",
     "DATE WINDOW MISMATCH","PRICE BASIS MISMATCH","NEED TWO COMMON CLOSE DATES",
     "UNMATCHED CLOSES","HISTORICAL CLOSE MOVEMENT // NO FILL // NO NEW REQUEST"])assert.ok(qml.includes(needle),needle);

@@ -40,30 +40,25 @@ assert 'onMonitoringChanged:' in service and 'if (!monitoring) clear();' in serv
 assert '(displayMode==="day" && data.bars.length>1)' in service
 assert 'NO TRADING SESSION FOR THIS CALENDAR DAY' in service
 assert 'Quickshell.shellPath("scripts/finance/read_market_price_range_optional_hub.mjs")' in service
+# M46b: the visible stock universe is worldwide; the old backend remains tested above/below.
+assert 'label: "CONTROLS"' in pane and 'stocks.openControls()' in pane
+assert 'readonly property var snapshot: globalHistory' in pane
+assert 'StockModePolicy.stockItems()' not in pane and 'stocks.stockFeed.refresh()' not in pane
+assert 'RETURN TO LEGACY STOCKS' not in pane
+assert 'stocks.openLoadedDay(' in pane and 'stocks.returnToRange()' in pane
+assert 'StockModePolicy.loadedGlobalDay(snapshot, dayDate)' in pane
 assert 'reader.exec([' in service and 'reader.exec([' not in pane
 assert 'FINANCE_STOCK_RANGE ' in service
 
 assert 'import "FinanceStockModePolicy.js" as StockModePolicy' in pane
 assert 'label: "DAY"' in pane and 'label: "RANGE"' in pane
-assert 'stocks.stockFeed.selectMode("day")' in pane
-assert 'stocks.stockFeed.selectMode("range")' in pane
-assert 'stocks.dayMode ? 66 : (sideBySide ? 66 : 136)' in pane
-assert pane.count("FinanceDateInput {")==3
 assert 'visible: stocks.dayMode' in pane
 assert 'visible: !stocks.dayMode' in pane
-assert 'stocks.stockFeed.selectDayDate(value)' in pane
-assert 'stocks.stockFeed.selectStartDate(value)' in pane
-assert 'stocks.stockFeed.selectEndDate(value)' in pane
-assert 'StockModePolicy.daySession(snapshot, stockFeed.dayDate)' in pane
-assert 'REFRESH DAY' in pane and 'LOAD DAY' in pane
-assert 'REFRESH RANGE' in pane and 'LOAD RANGE' in pane
 assert 'NO TRADING SESSION' in pane
 assert 'stocks.dayResult.close.toFixed(2)' in pane
 assert 'visible: !stocks.dayMode && stocks.priceBars.length >= 2' in pane
 assert 'stocks.snapshot.first.price.toFixed(2)' in pane
 assert 'stocks.snapshot.last.price.toFixed(2)' in pane
-assert 'SOURCE EODHD EOD' in pane
-assert 'stocks.snapshot.delivery.cachedAt' in pane
 assert 'priceCanvas.requestPaint()' in pane
 
 assert 'function selectWindow(mode, dayDate, startDate, endDate, today)' in policy

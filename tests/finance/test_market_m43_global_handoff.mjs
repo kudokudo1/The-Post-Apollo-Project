@@ -33,8 +33,8 @@ assert.equal(capture(identity,{...listing,exchange:"XX"},eod),null);
 assert.equal(capture(identity,avListing,{...av,priceBasis:"ADJUSTED CLOSE"}),null);
 assert.equal(capture(identity,avListing,{...av,returnedBars:1}),null);
 assert.equal(capture(identity,avListing,{...av,compactMayBeTruncated:"true"}),null);
-const f=qml.slice(qml.indexOf("function acceptGlobalHistory("),qml.indexOf("readonly property string priceUnit"));
-const ctx={discoveryOpen:true,visible:true,stockFeed:{monitoring:true},RangeAnalysisPolicy:{captureGlobalHistory:capture},
+const f=qml.slice(qml.indexOf("function acceptGlobalHistory("),qml.indexOf("function openControls()"));
+const ctx={discoveryOpen:true,visible:true,dayDate:"",priceBars:[],globalHistoryActive:false,stockFeed:{monitoring:true},RangeAnalysisPolicy:{captureGlobalHistory:capture},
     stockReference:null,globalHistory:null,globalHandoffMessage:"",controlsExpanded:true,researchView:"compare",scroll:{contentY:90}};
 vm.createContext(ctx);vm.runInContext(f,ctx);
 assert.equal(ctx.acceptGlobalHistory(identity,listing,eod),true);
@@ -46,13 +46,13 @@ const saved=ctx.globalHistory;
 assert.equal(ctx.acceptGlobalHistory(identity,listing,eod),false);assert.equal(ctx.globalHistory,saved);
 ctx.discoveryOpen=true;assert.equal(ctx.acceptGlobalHistory(identity,listing,null),false);
 assert.equal(ctx.globalHistory,saved);assert.match(ctx.globalHandoffMessage,/REFUSED/);
-ctx.returnToLegacyHistory();assert.equal(ctx.globalHistory,null);
-for(const token of ["readonly property var snapshot: globalHistoryActive ? globalHistory",
+assert.equal(ctx.globalHistory,saved);assert.ok(!qml.includes("returnToLegacyHistory"));
+for(const token of ["readonly property var snapshot: globalHistory",
     "RangeAnalysisPolicy.retainedGlobalRange(snapshot)",
     "readonly property string priceUnit: globalHistoryActive ? globalHistory.currency",
-    "RETURN TO LEGACY STOCKS","FIGI MATCH NOT VERIFIED","COMPARE MATCHING PROVIDER, CURRENCY, BASIS AND WINDOW",
+    "CONTROLS","FIGI MATCH NOT VERIFIED","COMPARE MATCHING PROVIDER, CURRENCY, BASIS AND WINDOW",
     "onHistoryChosen: function(identity, listing, snapshot)","id: priceCanvas",
-    "if (!stocks.globalHistoryActive && stocks.stockFeed) stocks.stockFeed.refresh()"])
+    "stocks.openControls()"])
     assert.ok(qml.includes(token),token);
 for(const p of ["FinanceGlobalPricePane.qml","FinanceAlphaVantageFreePane.qml"]){
     const s=read(p);assert.ok(s.includes('label: "USE IN STOCKS"'));assert.ok(s.includes("signal historyChosen("));

@@ -19,17 +19,14 @@ assert 'FinanceServices.FinanceSecPriceReadService {' in app
 assert 'label: "POLYMARKET"' in market and 'label: "OSIRIS"' in market
 assert 'label: "STOCKS"' in market
 assert 'FinanceStockHistoryPane {' in market
-assert pane.count("FinanceDateInput {")==3
+# M46b: the visible stock universe is worldwide; the old backend remains tested above/below.
+assert 'label: "CONTROLS"' in pane and 'stocks.openControls()' in pane
+assert 'readonly property var snapshot: globalHistory' in pane
+assert 'StockModePolicy.stockItems()' not in pane and 'stocks.stockFeed.refresh()' not in pane
+assert 'RETURN TO LEGACY STOCKS' not in pane
 assert 'START DATE' in pane and 'END DATE' in pane
-assert 'dateControls.sideBySide' in pane
-assert 'HISTORICAL RANGE // INCLUSIVE // MAX 180 DAYS' in pane
-assert 'stocks.stockFeed.selectStartDate(value)' in pane
-assert 'stocks.stockFeed.selectEndDate(value)' in pane
-assert 'stocks.stockFeed.validSelection' in pane
-assert 'stocks.stockFeed.refresh()' in pane
 assert 'stocks.snapshot.first.price.toFixed(2)' in pane
 assert 'stocks.snapshot.last.price.toFixed(2)' in pane
-assert 'stocks.snapshot.delivery.cachedAt' in pane
 assert 'Canvas {' in pane and 'priceCanvas.requestPaint()' in pane
 assert 'onPriceBarsChanged: {' in pane
 assert 'REFERENCE DATE POSITION' not in pane
@@ -61,7 +58,6 @@ assert 'msftTrial' in reader
 assert '"provider-key-required"' in reader
 assert 'sort((a,b)=>a.date.localeCompare(b.date))' in reader
 assert '"ADJUSTED CLOSE":"CLOSE"' in reader
-assert 'normalized' not in pane.lower() or 'SOURCE EODHD EOD' in pane
 
 assert 'readOptionalRange' in adapter
 assert 'if(!refused(healthError))' in adapter

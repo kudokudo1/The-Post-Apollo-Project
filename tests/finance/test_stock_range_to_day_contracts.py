@@ -47,18 +47,17 @@ assert 'function selectDayDate(day)' in service
 assert 'reader.exec([' in service
 assert 'Quickshell.shellPath("scripts/finance/read_market_price_range_optional_hub.mjs")' in service
 
+# M46b: the visible stock universe is worldwide; the old backend remains tested above/below.
+assert 'label: "CONTROLS"' in pane and 'stocks.openControls()' in pane
+assert 'readonly property var snapshot: globalHistory' in pane
+assert 'StockModePolicy.stockItems()' not in pane and 'stocks.stockFeed.refresh()' not in pane
+assert 'RETURN TO LEGACY STOCKS' not in pane
+assert 'stocks.openLoadedDay(' in pane and 'stocks.returnToRange()' in pane
+assert 'StockModePolicy.loadedGlobalDay(snapshot, dayDate)' in pane
 assert 'label: "OPEN IN DAY"' in pane
 assert 'id: openSelectedInDay' in pane
 assert 'visible: !stocks.dayMode && stocks.inspectedPoint !== null' in pane
-assert 'stocks.stockFeed.openRangePointInDay(' in pane
-assert 'stocks.selectedPointIndex, stocks.inspectedPoint.date' in pane
-assert 'stocks.stockFeed.ready && !stocks.stockFeed.loading' in pane
 assert 'DAY SOURCE // PREVIOUSLY LOADED RANGE // NO NEW REQUEST' in pane
-assert 'stocks.snapshot.derivedFromRange' in pane
-assert 'stocks.stockFeed.selectStartDate(value)' in pane
-assert 'stocks.stockFeed.selectEndDate(value)' in pane
-assert 'stocks.stockFeed.selectDayDate(value)' in pane
-assert pane.count("FinanceDateInput {")==3
 assert 'label: "DAY"' in pane and 'label: "RANGE"' in pane
 assert 'function inspectChartPoint(x, y)' in pane
 assert 'ChartPointPolicy.selectedBar(priceBars, selectedPointIndex)' in pane

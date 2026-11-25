@@ -345,9 +345,7 @@ class TaskStickyContext:
         # version is handled below when explicitly selected on a newer input.
         if self._route is not None and old == dependencies and self._route != current:
             raise ContextRefusal("HOT_ROUTE_CHANGED")
-        if not install and (old != dependencies or self._route != current):
-            self._observe(dependencies)
-            raise ContextRefusal("HOT_ROUTE_CHANGED")
+        route_changed = old != dependencies or self._route != current
         self._observe(dependencies)
         route = current.route
         if self._policy_floor is not None and route.policy_generation <= self._policy_floor:
@@ -360,6 +358,11 @@ class TaskStickyContext:
             self._route = None
             self._policy_floor = route.policy_generation
             raise ContextRefusal("STICKY_VERSION_REVOKED")
+        # A current explicit revocation is a destructive observation, not
+        # permission to reuse a route. Process it before refusing a missing
+        # or retired installation. Ordinary lookups still require selection.
+        if not install and route_changed:
+            raise ContextRefusal("HOT_ROUTE_CHANGED")
         if any(floor is not None and value <= floor for floor, value in (
                 (self._user_floor, route.user_context_generation),
                 (self._operational_floor, route.operational_generation),

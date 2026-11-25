@@ -26,6 +26,8 @@ ARCHIVE_PENDING = EXT_DIRECTORY / "archive-pending.json"
 HISTORY_DIRECTORY = PARENT / "post-apollo-memory-history"
 # Reserved sibling fence: no writer, clearer or reclaim command in this slice.
 RECLAIM_FENCE = PARENT / "post-apollo-memory-reclaim"
+# An archive publication begins custody even before PREPARED exists.
+RECLAIM_ARCHIVE = PARENT / "post-apollo-memory-reclaim-archive.json"
 REDUCTION_VERSION = 1
 # Single-threaded helper; ownership remains with the open file description.
 _mutation_fd = None
@@ -322,6 +324,20 @@ def check_external_reclaim_fence():
     raise ReductionRecovery("RECLAIM_RECOVERY_REQUIRED")
 
 
+def check_reclaim_archive_admission():
+    """Presence-only admission fence for interrupted archive publication.
+    Called only at common lock admission, not by the already-locked writer.
+    No parsing, clearing, replay or authority.
+    """
+    try:
+        RECLAIM_ARCHIVE.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise ReductionRecovery("RECLAIM_ARCHIVE_UNVERIFIED") from error
+    raise ReductionRecovery("RECLAIM_RECOVERY_REQUIRED")
+
+
 @contextmanager
 def mutation_lock(*, inspection=False):
     # Shared by all helper mutations; this does not serialize external root tools.
@@ -350,6 +366,7 @@ def mutation_lock(*, inspection=False):
             # separately reviewed reader exists, protected inspection also
             # returns recovery-required rather than reporting path absence.
             check_external_reclaim_fence()
+            check_reclaim_archive_admission()
             if not inspection:
                 check_recovery_fence()
             yield

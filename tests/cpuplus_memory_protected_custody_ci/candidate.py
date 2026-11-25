@@ -10,8 +10,9 @@ import os
 from pathlib import Path
 import re
 import stat
+import types
 
-PIN = "8082bac43e3d8a0f506348e0ecee2e063d34935b"
+PIN = "9dfd8331445ecf60d3a37ea630d08b1f3f6789a2"
 PARENT = Path("/var/lib")
 BASE = PARENT / "post-apollo-memory-swap" / "swapfile"
 EXT = PARENT / "post-apollo-memory-extension"
@@ -94,16 +95,10 @@ def write_once(fd, name, data):
     os.fsync(fd)
     require(read(fd, name) == data, "PUBLICATION_READBACK")
 
-def verify_helper(helper):
-    # No arbitrary helper path or positive caller-supplied observations.
+def load_verified_helper():
+    # Fixed installed path, never accept a caller module or arbitrary source.
     require(os.geteuid() == 0, "ROOT_REQUIRED")
-    require((helper.PARENT, helper.SWAPFILE, helper.EXT_DIRECTORY, helper.EXT_FILE,
-             helper.RECLAIM_FENCE) == (PARENT, BASE, EXT, EXTRA, FENCE), "FIXED_PATH_MISMATCH")
-    # Verify loaded source path bytes before invoking its methods. A future
-    # trusted installer must additionally establish loaded-code provenance;
-    # reading a file alone does not establish that provenance.
-    path = Path(helper.__file__)
-    require(path == Path("/usr/local/sbin/post-apollo-memory-add-swap"), "HELPER_NOT_INSTALLED")
+    path = Path("/usr/local/sbin/post-apollo-memory-add-swap")
     # Resolve the fixed install path, then verify all canonical ancestors.
     # Installer custody must independently establish the canonical path
     # (including Silverblue's /usr/local mapping) before any real integration.
@@ -122,7 +117,17 @@ def verify_helper(helper):
         require(blob == PIN, "HELPER_BLOB_MISMATCH")
     finally:
         os.close(parent)
+    # Execute exactly the captured, hash-verified bytes, never reopen the
+    # source or trust a caller-provided module. Fixed trusted release/installer
+    # and candidate's own integrity remain separate prerequisites.
+    helper = types.ModuleType("postapollo_verified_memory_helper")
+    helper.__file__ = str(path)
+    exec(compile(raw,str(path),"exec",dont_inherit=True),helper.__dict__)
+    require((helper.PARENT,helper.SWAPFILE,helper.EXT_DIRECTORY,helper.EXT_FILE,
+             helper.RECLAIM_FENCE,helper.RECLAIM_ARCHIVE) ==
+            (PARENT,BASE,EXT,EXTRA,FENCE,ARCHIVE),"FIXED_PATH_MISMATCH")
     helper.secure_parent()
+    return helper
 
 def observe(helper, fd, extfd):
     require(helper._mutation_fd is not None, "HELPER_LOCK_REQUIRED")
@@ -164,14 +169,14 @@ def observe(helper, fd, extfd):
             "swap":{p:[v["kind"],v["sizeKiB"],v["priority"]] for p,v in snapshot["rows"].items()},
             "can_execute":False,"can_clear":False}
 
-def prepare_candidate(helper):
+def prepare_candidate():
     """Unrouted candidate. Do not install/invoke until separate review.
 
-    An archive-only crash blocks subsequent candidate publication but does not
-    create the existing helper's global fence. No effect has been authorized.
-    Never reuse or clear partial evidence.
+    Archive presence now fences all subsequent common-lock admissions, even
+    without PREPARED. The original writer retains its already-acquired lock
+    while reobserving and publishing the separate fence. Never reuse or clear.
     """
-    verify_helper(helper)
+    helper = load_verified_helper()
     with helper.mutation_lock(inspection=True):
         fd = directory(PARENT)
         try:

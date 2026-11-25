@@ -32,7 +32,7 @@ class CandidateTests(unittest.TestCase):
             self.events.append("observe")
             return dict(self.evidence)
         for p in (patch.multiple(c,PARENT=self.parent,EXT=self.ext,ARCHIVE=self.archive,FENCE=self.fence),
-                  patch.object(c,"verify_helper"),patch.object(c,"secure_dir",return_value=None),
+                  patch.object(c,"load_verified_helper",return_value=self.helper),patch.object(c,"secure_dir",return_value=None),
                   patch.object(c,"observe",side_effect=observe),
                   patch.object(c,"read",side_effect=self.read_private)):
             p.start(); self.addCleanup(p.stop)
@@ -57,7 +57,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(self.fence.exists())
             real(fd,name,data)
         with patch.object(c,"write_once",side_effect=record):
-            result=c.prepare_candidate(self.helper)
+            result=c.prepare_candidate()
         self.assertEqual(result,{"state":"PREPARED_REVIEW_REQUIRED","can_execute":False,"can_clear":False})
         marker=c.strict_object((self.fence/"prepared.json").read_bytes())
         self.assertEqual(marker["archive_sha256"],c.digest(self.archive.read_bytes()))
@@ -65,25 +65,25 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(self.events[-1],"unlock")
 
     def test_duplicate_refused_without_overwrite(self):
-        c.prepare_candidate(self.helper)
+        c.prepare_candidate()
         original=self.archive.read_bytes()
         with self.assertRaises(c.CustodyRefused):
-            c.prepare_candidate(self.helper)
+            c.prepare_candidate()
         self.assertEqual(self.archive.read_bytes(),original)
 
     def test_changed_observation_refuses_before_fence(self):
         with patch.object(c,"observe",side_effect=[self.evidence,dict(self.evidence,boot_id="changed")]):
             with self.assertRaises(c.CustodyRefused):
-                c.prepare_candidate(self.helper)
+                c.prepare_candidate()
         self.assertTrue(self.archive.exists())
         self.assertFalse(self.fence.exists())
         with self.assertRaises(c.CustodyRefused):
-            c.prepare_candidate(self.helper)
+            c.prepare_candidate()
 
     def test_archive_sync_failure_preserves_partial(self):
         with patch.object(c.os,"fsync",side_effect=OSError("fixture")):
             with self.assertRaises(OSError):
-                c.prepare_candidate(self.helper)
+                c.prepare_candidate()
         self.assertTrue(self.archive.exists())
         self.assertFalse(self.fence.exists())
 
@@ -94,17 +94,17 @@ class CandidateTests(unittest.TestCase):
             real(fd,name,data)
         with patch.object(c,"write_once",side_effect=fail):
             with self.assertRaises(OSError):
-                c.prepare_candidate(self.helper)
+                c.prepare_candidate()
         self.assertTrue(self.archive.exists())
         self.assertTrue(self.fence.is_dir())
         self.assertFalse((self.fence/"prepared.json").exists())
         with self.assertRaises(c.CustodyRefused):
-            c.prepare_candidate(self.helper)
+            c.prepare_candidate()
 
     def test_existing_symlink_or_fence_refused(self):
         self.archive.symlink_to(self.ext)
         with self.assertRaises(c.CustodyRefused):
-            c.prepare_candidate(self.helper)
+            c.prepare_candidate()
         self.assertTrue(self.archive.is_symlink())
 
     def test_duplicate_json_keys(self):

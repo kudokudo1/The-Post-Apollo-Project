@@ -101,12 +101,17 @@ Item {
 
     Flickable {
         id: scroll
+        objectName: "forestWorkshopViewport"
         anchors.fill: parent
+        // Stable right gutter: do not reflow on overflow visibility changes.
+        anchors.rightMargin: Math.min(pane.width,
+            workshopScrollBar.reservedExtent)
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentHeight: body.implicitHeight
         Column {
             id: body
+            objectName: "forestWorkshopBody"
             width: scroll.width
             spacing: 5
             GohuText {
@@ -231,5 +236,18 @@ Item {
                 }
             }
         }
+    }
+    // Sibling overlay, never a child of the scrolling Column.
+    NeonScrollBar {
+        id: workshopScrollBar
+        objectName: "forestWorkshopScrollBar"
+        flickable: scroll
+        geometryHost: pane
+        reserveGlowSpace: true
+        rightInset: effectiveGlowPadding + 2
+        boxTopInset: effectiveGlowPadding + 2
+        boxBottomInset: effectiveGlowPadding + 2
+        visible: pane.visible && scrollable
+            && pane.width >= reservedExtent && height > 0
     }
 }

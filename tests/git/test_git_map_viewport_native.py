@@ -74,5 +74,6 @@ with tempfile.TemporaryDirectory(prefix="git-map-native-") as temporary:
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,
                           text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=35)
     print(result.stdout)
-    if result.returncode or "GIT_MAP_NATIVE_PASS" not in result.stdout or "GIT_MAP_NATIVE_FAIL" in result.stdout:
+    bad_runtime = any(marker in result.stdout for marker in ("Binding loop detected", "TypeError:", "ReferenceError:"))
+    if result.returncode or bad_runtime or "GIT_MAP_NATIVE_PASS" not in result.stdout or "GIT_MAP_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native Git map fixture failed")

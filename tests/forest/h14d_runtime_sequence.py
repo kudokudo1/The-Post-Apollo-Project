@@ -219,6 +219,7 @@ class TerminalRef:
 
 @dataclass(frozen=True, slots=True)
 class _JoinedPrefix:
+    """Caller-owned in-process fixture continuity, not a capability or proof of begin_join."""
     plan: Plan
     parent_reader: ReaderRef
     outer_reader: ReaderRef
@@ -240,6 +241,16 @@ def _observation(obs, reader):
             and type(obs.sample) is Sample and type(obs.sample.levels) is tuple
             and bool(obs.sample.levels), "OBSERVATION_REFERENCE_MISMATCH")
     return obs.sample
+
+
+def _check_isolation(isolation, launch):
+    require(type(isolation) is IsolationRef and _process(isolation.process)
+            and isolation.process == launch.process and _scope(isolation.inner)
+            and isolation.inner == launch.inner and _uint(isolation.observed_ns)
+            and launch.pinned_ns <= isolation.observed_ns <= launch.release_ns
+            and type(isolation.checks) is tuple
+            and all(type(v) is str for v in isolation.checks)
+            and isolation.checks == ISOLATION_CHECKS, "ISOLATION_REFERENCE_MISMATCH")
 
 
 def begin_join(plan, *, parent_reader, outer_reader, parent, baseline, first,
@@ -269,21 +280,23 @@ def begin_join(plan, *, parent_reader, outer_reader, parent, baseline, first,
                      launch.limits, plan.outer, f.start_ns, f.end_ns, launch.release_ns)
     _check_launch(plan, parent_preflight_end_ns=p.end_ns,
                   outer_baseline_end_ns=b.end_ns, launch=derived)
-    require(type(isolation) is IsolationRef and _process(isolation.process)
-            and isolation.process == derived.process and _scope(isolation.inner)
-            and isolation.inner == derived.inner and _uint(isolation.observed_ns)
-            and derived.pinned_ns <= isolation.observed_ns <= derived.release_ns
-            and type(isolation.checks) is tuple
-            and all(type(v) is str for v in isolation.checks)
-            and isolation.checks == ISOLATION_CHECKS, "ISOLATION_REFERENCE_MISMATCH")
+    _check_isolation(isolation, derived)
     return _JoinedPrefix(plan, parent_reader, outer_reader, parent, baseline,
                          first, derived, isolation)
 
 
-def finish_join(prefix, *, parent, baseline, observations, terminal):
-    """Audit exactly the prefix's samples and original terminal; no effects."""
+def finish_join(prefix, *, parent, baseline, observations, terminal, isolation):
+    """Audit original caller-held fixture references; no effects or authority.
+
+    The caller must retain the actual begin_join result and original isolation
+    reference independently. Object identity checks cannot authenticate a
+    constructed or coherently replaced fixture, or prove kernel provenance.
+    """
     require(type(prefix) is _JoinedPrefix and type(terminal) is TerminalRef,
             "JOIN_OR_TERMINAL_MISSING")
+    require(type(prefix.launch) is Launch, "INVALID_JOIN_INPUT")
+    _check_isolation(prefix.isolation, prefix.launch)
+    require(isolation is prefix.isolation, "ISOLATION_REFERENCE_REPLACED")
     require(parent is prefix.parent and baseline is prefix.baseline
             and type(observations) is tuple and 2 <= len(observations) <= MAX_SAMPLES
             and observations[0] is prefix.first, "PREFIX_REPLACED")

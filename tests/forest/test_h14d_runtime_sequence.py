@@ -163,7 +163,7 @@ class JoinedTests(unittest.TestCase):
 
     def finish(self, prefix, **kw):
         args = dict(parent=self.parent, baseline=self.baseline,
-                    observations=(self.first, self.final), terminal=self.terminal)
+                    observations=(self.first, self.final), terminal=self.terminal, isolation=self.iso)
         args.update(kw)
         return finish_join(prefix, **args)
 
@@ -224,6 +224,28 @@ class JoinedTests(unittest.TestCase):
                 self.begin(isolation=isolation)
         with self.assertRaises(Hold):
             self.begin(launch=replace(self.launch, limits=replace(self.launch.limits, swap=False)))
+
+    def test_final_revalidates_isolation_reference(self):
+        prefix = self.begin()
+        for bad in (None, replace(self.iso, checks=ISOLATION_CHECKS[:-1]),
+                    replace(self.iso, observed_ns=411),
+                    replace(self.iso, observed_ns=False),
+                    replace(self.iso, inner=self.plan.outer),
+                    replace(self.iso, process=replace(self.iso.process, pid=51))):
+            with self.subTest(bad=bad), self.assertRaisesRegex(Hold, "ISOLATION_REFERENCE_MISMATCH"):
+                self.finish(replace(prefix, isolation=bad), isolation=bad)
+
+    def test_final_refuses_replaced_even_valid_isolation_reference(self):
+        prefix = self.begin()
+        for replacement in (replace(self.iso), replace(self.iso, observed_ns=281)):
+            with self.subTest(replacement=replacement), self.assertRaisesRegex(
+                    Hold, "ISOLATION_REFERENCE_REPLACED"):
+                self.finish(replace(prefix, isolation=replacement))
+            with self.subTest(replacement=replacement), self.assertRaisesRegex(
+                    Hold, "ISOLATION_REFERENCE_REPLACED"):
+                self.finish(prefix, isolation=replacement)
+        with self.assertRaisesRegex(Hold, "ISOLATION_REFERENCE_REPLACED"):
+            self.finish(prefix, isolation=None)
 
     def test_equal_value_prefix_replacement_refused(self):
         prefix = self.begin()

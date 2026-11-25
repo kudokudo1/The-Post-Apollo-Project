@@ -18,8 +18,22 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     for name in ("CpuPlusQueuePane.qml","CpuPlusQueueConsumer.js","CpuPlusQueuePresentation.js",
                  "CpuPlusQueueHistory.js","CpuPlusQueueRecovery.js","CpuPlusQueueRecoveryPane.qml"):
         shutil.copy2(ROOT/"widgets/cpuplus"/name,widgets/name)
-    # Both candidates are merged: use actual checkout only.
-    shutil.copytree(ROOT/"services/memory",config/"memory")
+    # Copy only the actual Python sources for the child. Import the actual
+    # watchdog and its JS dependency in a separate, narrow QML directory.
+    # Do not copy the production qmldir: its unrelated MemoryOperation
+    # singleton imports qs.services.time, outside this disposable fixture.
+    memory=ROOT/"services/memory"
+    backend=config/"memory"
+    backend.mkdir()
+    for source in memory.glob("*.py"):
+        shutil.copy2(source,backend/source.name)
+    watchdog=config/"watchdog"
+    watchdog.mkdir()
+    for name in ("MemoryQueueSessionWatchdog.qml","MemoryQueueSessionHost.js"):
+        shutil.copy2(memory/name,watchdog/name)
+        if (watchdog/name).read_bytes()!=(memory/name).read_bytes():
+            raise SystemExit("Watchdog fixture source mismatch")
+    print("QUEUE_R3_WATCHDOG_MODULE // actual watchdog and canonical host, isolated from production singleton",flush=True)
     shutil.copy2(ROOT/"tests/fixtures/CpuPlusQueueRecoveryNative.qml",config/"smoke.qml")
     child=config/"child.py"
     shutil.copy2(ROOT/"tests/fixtures/cpuplus_queue_recovery_child.py",child)

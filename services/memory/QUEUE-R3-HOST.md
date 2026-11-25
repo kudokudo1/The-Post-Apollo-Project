@@ -85,3 +85,19 @@ host invalidation before stop, one trip, explicit reconnect, durable local
 commit recovery, no replay, no idle deadlines. Does not prove full shell
 crash recovery, protected kernel action or physical durability. No DOC 2
 source edits. Startup reconciliation and Hub delivery still outstanding.
+
+## R3g revision 2 // isolate actual watchdog module
+
+Initial baba39bf: 4/5 workflows passed. Native job 139047832100 stopped
+before either acceptance scenario could execute: importing the production
+memory directory loaded its qmldir MemoryOperation singleton, whose
+qs.services.time dependency is intentionally absent in the isolated scene.
+Follow Nurse 2's REVISE/HOLD disposition. Copy actual Python sources only
+into the backend directory and byte-identical MemoryQueueSessionWatchdog.qml
+plus MemoryQueueSessionHost.js into a separate narrow QML directory; no
+production qmldir, singleton, fake time service, or dependency stub. Both
+fixture host and watchdog resolve the same actual JS copy. No changes to
+watchdog or host source, timeout durations, trial steps, or acceptance
+assertions. Both native trials must pass at the revised exact head before
+independent review. DOC 2 #2635 workspace qualification is separate;
+no shared fixture or presentation modifications.

@@ -7,8 +7,8 @@ import "widgets/cpuplus/CpuPlusQueueConsumer.js" as Consumer
 import "widgets/cpuplus/CpuPlusQueuePresentation.js" as Presentation
 import "widgets/cpuplus/CpuPlusQueueHistory.js" as History
 import "widgets/cpuplus/CpuPlusQueueRecovery.js" as Recovery
-import "memory/MemoryQueueSessionHost.js" as Host
-import "memory" as Memory
+import "watchdog/MemoryQueueSessionHost.js" as Host
+import "watchdog" as Memory
 
 // Disposable CI only. One canonical controller; no production unlock.
 ShellRoot {

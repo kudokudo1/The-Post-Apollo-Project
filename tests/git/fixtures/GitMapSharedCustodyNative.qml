@@ -113,12 +113,23 @@ ShellRoot {
                 secondLoader.active=false;
             } else if (root.phase===6 && !root.second && first.activeLease.owners===1) {
                 if (!root.check(pool.leaseCount===1 && first.fullVisible,"destroyed host releases only its owner")) return;
+                if (!first.canRequest) return;
+                first.searchQuery="commit 20";
+                if (!root.check(first.searchHistory(false),"start finite search before helper loss")) return;
                 root.phase=7;
                 root.probe("kill",first.activeLease,root.oldDirectory);
             } else if (root.phase===7 && root.witnessed && pool.leaseCount===0) {
                 if (!root.check(!first.fullVisible && !first.activeLease && !first.searchHistory(false)
                         && first.statusText==="CUSTODY LOST // REOPEN TO RECHECK",
                         "helper loss must refuse indexed use")) return;
+                if (!root.check(first.busy && first.job==="search" && first.custodyLost,
+                        "finite search remains in flight after helper loss")) return;
+                root.phase=70;
+                root.witnessed=false;
+                witness.exec(["/usr/bin/python3","-I","-B",Quickshell.shellPath("probe.py"),"release"]);
+            } else if (root.phase===70 && root.witnessed && !first.busy) {
+                if (!root.check(!first.lastMatch && first.custodyLost && !first.fullVisible
+                        && pool.leaseCount===0,"stale search discarded; no spontaneous retry")) return;
                 root.phase=8;
                 root.firstActive=false;
             } else if (root.phase===8) {

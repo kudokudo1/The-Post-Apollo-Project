@@ -27,6 +27,10 @@ Item {
     readonly property bool sendEnabled: false
     readonly property bool stopEnabled: false
 
+    // Explicit dismissal notification after local state is fully retired.
+    // Consumers must pin the original ref; derived state changes are not intent.
+    signal reviewDismissed(var ref)
+
     function token(value) {
         return typeof value === "string" && value.length === 32 && /^[0-9a-f]{32}$/.test(value);
     }
@@ -122,7 +126,9 @@ Item {
     }
     function dismissReview(ref) {
         if (!matching(ref)) return false;
+        const original = _acceptedScope;
         clear();
+        reviewDismissed(original);
         return true;
     }
     function stateColor(state) {

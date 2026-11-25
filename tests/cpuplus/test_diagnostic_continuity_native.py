@@ -26,11 +26,12 @@ with tempfile.TemporaryDirectory(prefix="cpu-diag-native-") as temporary:
                  "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js",
                  "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, destination / name)
-    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js"):
+    for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js", "CpuPlusAutoWorkspace.qml", "CpuPlusQueueHistoryPane.qml", "CpuPlusQueueHistory.js", "CpuPlusQueueRecoveryPane.qml", "CpuPlusQueueRecovery.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, destination / name)
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/DiagnosticContinuityNative.qml", config / "smoke.qml")
     memory = config / "services/memory"
     memory.mkdir(parents=True)
+    shutil.copy2(ROOT / "services/memory/MemoryQueueSessionHost.js", memory / "MemoryQueueSessionHost.js")
     (memory / "qmldir").write_text("module qs.services.memory\n\nsingleton MemoryOperation 1.0 MemoryOperation.qml\n")
     (memory / "MemoryOperation.qml").write_text("""pragma Singleton
 import QtQuick

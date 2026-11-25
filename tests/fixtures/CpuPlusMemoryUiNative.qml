@@ -6,6 +6,7 @@ import qs.services.diagnostics
 import "widgets/cpuplus"
 import "widgets/cpuplus/CpuPlusQueueConsumer.js" as Consumer
 import "widgets/cpuplus/CpuPlusQueuePresentation.js" as QueueView
+import "services/memory/MemoryQueueSessionHost.js" as Host
 
 // Unmounted, isolated native test only. Runner copies the actual UI and uses
 // a recording operation singleton instead of any privileged backend.
@@ -16,6 +17,7 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property int intentCount: 0
+    property int readCount: 0
     property var lastIntent: null
 
     function find(item, name) {
@@ -201,7 +203,7 @@ ShellRoot {
                         const refresh=smoke.find(pane,"cpuplusWorkRefresh");
                         const controls=smoke.find(pane,["cpuplusProcBottomControls","cpuplusAutoBottomControls","cpuplusDiagBottomControls"][smoke.phase-2]);
                         if (!top || !bottom || !refresh || !controls) return;
-                        if (!smoke.check(top.visible && bottom.visible && controls.parent===bottom
+                        if (!smoke.check(top.visible && bottom.visible && (smoke.phase===3 ? controls.parent===smoke.find(pane,"cpuplusAutoSectionFooter") : controls.parent===bottom)
                             && scroll.y>=top.y+top.height && scroll.y+scroll.height<=footer.y+1
                             && scroll.height>0,"fixed work rails and positive middle viewport")) return;
                         const y=controls.mapToItem(pane,0,0).y;
@@ -307,6 +309,28 @@ ShellRoot {
                             && smoke.intentCount === 1,"new host publication releases previous click latch")) return;
                         queue.cancelIntent();
                         queue.actionContext = null;
+                        const workspace=smoke.find(pane,"cpuplusAutoWorkspace");
+                        if (!workspace) return;
+                        // Use canonical host state from the disposable fixture;
+                        // startup remains locked. No child or frame dispatch.
+                        queue.actionContext=Qt.binding(()=>workspace.actionContext);
+                        workspace.hostState=Object.assign({},Host.initial(Consumer),{
+                            phase:"CONNECTED",generation:1,session:after,projection:report,sequence:4});
+                        workspace.historyReadRequested.connect(id => {
+                            smoke.readCount++;
+                            const req=Host.readHistory(workspace.hostState,id);
+                            if (req.frame) workspace.hostState=req.state;
+                        });
+                        workspace.recoveryReadRequested.connect((kind,value) => {
+                            smoke.readCount++;
+                            const req=Host.readRecovery(workspace.hostState,kind,value);
+                            if (req.frame) workspace.hostState=req.state;
+                        });
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.preparation===null,"canonical startup lock prevents cancel")) return;
+                        workspace.selectSection("HISTORY");
+                        smoke.phase=30;
+                        return;
                     }
                     if (smoke.phase === 5) {
                         const prof=smoke.find(pane,"cpuplusProfilePane");
@@ -327,6 +351,52 @@ ShellRoot {
                     if (smoke.phase < 5) pane.selectMenu(smoke.phase + 1);
                     else pane.selectMenu(0);
                     smoke.phase++;
+                    return;
+                }
+                if (smoke.phase===30 || smoke.phase===31 || smoke.phase===32) {
+                    const workspace=smoke.find(pane,"cpuplusAutoWorkspace");
+                    const nav=smoke.find(pane,"cpuplusAutoNavigation");
+                    const outer=smoke.find(pane,"cpuplusAutoWorkspaceFooter");
+                    if (!workspace || !nav || !outer) return;
+                    if (!smoke.check(nav.parent===outer && outer.parent===smoke.find(pane,"cpuplusWorkFooter")
+                        && scroll.height>0,"AUTO fixed navigation and positive viewport")) return;
+                    const y=nav.mapToItem(pane,0,0).y;
+                    scroll.contentY=Math.max(0,scroll.contentHeight-scroll.height);
+                    if (!smoke.check(nav.mapToItem(pane,0,0).y===y,"AUTO nav stays fixed")) return;
+                    if (smoke.phase===30) {
+                        const history=smoke.find(pane,"cpuplusQueueHistoryPane");
+                        if (!history) return;
+                        if (!smoke.check(!smoke.find(pane,"cpuplusQueuePane") && history.readAvailable && !history.detail,
+                            "HISTORY demand loaded, read allowed while locked")) return;
+                        history.lookupText=workspace.hostState.session.status.requestId;
+                        history.requestRead();
+                        history.requestRead();
+                        if (!smoke.check(smoke.readCount===1 && workspace.hostState.historyRead,
+                            "one explicit history read")) return;
+                        workspace.selectSection("RECOVERY");
+                        smoke.phase=31;
+                        return;
+                    }
+                    if (smoke.phase===31) {
+                        const recovery=smoke.find(pane,"cpuplusQueueRecoveryPane");
+                        if (!recovery) return;
+                        recovery.requestRead("INVENTORY",16);
+                        if (!smoke.check(!recovery.canRead && smoke.readCount===1
+                            && workspace.hostState.historyRead,"pending read survives submenu switch")) return;
+                        // Simulate owner loss through canonical host; no fake unlock.
+                        workspace.hostState=Host.stop(workspace.hostState,Consumer,"TEST_EOF",1);
+                        if (!smoke.check(!recovery.canRead && !recovery.view && !recovery.localView,
+                            "owner loss clears recovery")) return;
+                        workspace.selectSection("REQUESTS");
+                        smoke.phase=32;
+                        return;
+                    }
+                    const queue=smoke.find(pane,"cpuplusQueuePane");
+                    if (!queue) return;
+                    if (!smoke.check(!queue.preparation && !queue.sessionUsable && MemoryOperation.requests===0,
+                        "return to requests remains locked")) return;
+                    pane.selectMenu(4);
+                    smoke.phase=4;
                     return;
                 }
                 if (!smoke.check(pane.page === "CAP" && slider.visible

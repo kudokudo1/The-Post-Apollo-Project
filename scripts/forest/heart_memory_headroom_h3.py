@@ -9,6 +9,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 import json
 import os
+import re
 import sys
 import time
 
@@ -90,7 +91,78 @@ def _base():
     }
 
 
-def observe(path):
+# H10: optional leaf-scope pressure observation, using the existing held fd.
+_PSI_ROW = re.compile(rb"(some|full) avg10=([0-9]{1,3}\.[0-9]{2}) avg60=([0-9]{1,3}\.[0-9]{2}) avg300=([0-9]{1,3}\.[0-9]{2}) total=([0-9]{1,20})")
+_EVENT_ROW = re.compile(rb"([a-z][a-z0-9_]{0,63}) ([0-9]{1,20})")
+_EVENT_KEYS = ("low", "high", "max", "oom", "oom_kill")
+
+
+def _pressure(raw):
+    result = {}
+    for line in raw.splitlines():
+        match = _PSI_ROW.fullmatch(line)
+        if not match or match[1] in result:
+            raise I5.CgroupRefusal("INVALID_MEMORY_PRESSURE")
+        averages = tuple(int(v.replace(b".", b"")) for v in match.groups()[1:4])
+        if any(v > 10000 for v in averages):
+            raise I5.CgroupRefusal("INVALID_MEMORY_PRESSURE")
+        result[match[1]] = (*averages, I5._number(match[5]))
+    if set(result) != {b"some", b"full"}:
+        raise I5.CgroupRefusal("INVALID_MEMORY_PRESSURE")
+    return result
+
+
+def _events(raw):
+    result = {}
+    for line in raw.splitlines():
+        match = _EVENT_ROW.fullmatch(line)
+        if not match or match[1] in result:
+            raise I5.CgroupRefusal("INVALID_MEMORY_EVENTS")
+        result[match[1]] = I5._number(match[2])
+    if not all(k.encode("ascii") in result for k in _EVENT_KEYS):
+        raise I5.CgroupRefusal("INVALID_MEMORY_EVENTS")
+    return result
+
+
+def _read_pressure(fd):
+    values = []
+    for name in ("memory.pressure", "memory.events"):
+        counter = os.open(name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=fd)
+        try:
+            values.append(I5._read_fd(counter, 4096))
+        finally:
+            os.close(counter)
+    return _pressure(values[0]), _events(values[1])
+
+
+def _pressure_summary(first, second):
+    a, events_a = first
+    b, events_b = second
+    if (events_a.keys() != events_b.keys()
+            or any(events_b[k] < v for k, v in events_a.items())
+            or any(b[k][3] < a[k][3] for k in (b"some", b"full"))):
+        raise I5.CgroupRefusal("MEMORY_COUNTER_CONTINUITY_LOST")
+    keys = _EVENT_KEYS + ("oom_group_kill",)
+    return {
+        "scope": "SELECTED_CGROUP_LEAF_HIERARCHICAL_EVENTS",
+        "psi": {k.decode("ascii"): {
+            "avg10_hundredths_percent": b[k][0],
+            "avg60_hundredths_percent": b[k][1],
+            "avg300_hundredths_percent": b[k][2],
+            "total_us": b[k][3],
+            "observed_delta_us": b[k][3] - a[k][3],
+        } for k in (b"some", b"full")},
+        "events_total": {k: events_b.get(k.encode("ascii")) for k in keys},
+        "events_observed_delta": {
+            k: (events_b[k.encode("ascii")] - events_a[k.encode("ascii")]
+                if k.encode("ascii") in events_b else None) for k in keys},
+        "pressure_free_established": False,
+    }
+
+
+def observe(path, *, pressure=False):
+    if type(pressure) is not bool:
+        raise I5.CgroupRefusal("INVALID_PRESSURE_OPTION")
     parts = I5._parts(path)
     if sys.platform != "linux":
         raise I5.CgroupRefusal("LINUX_REQUIRED")
@@ -107,10 +179,12 @@ def observe(path):
                 stack.callback(os.close, fd)
                 fds.append(fd)
             identities = tuple(I5._identity(fd) for fd in fds)
+            pressure_first = _read_pressure(fds[-1]) if pressure else None
             host_first = _host_memory_available_mib()
             first = tuple(_read_level(fd) for fd in fds)
             second = tuple(_read_level(fd) for fd in reversed(fds))[::-1]
             host_second = _host_memory_available_mib()
+            pressure_second = _read_pressure(fds[-1]) if pressure else None
             for i, original in enumerate(identities, 1):
                 check = I5._open_group(parts[:i])
                 try:
@@ -124,6 +198,8 @@ def observe(path):
             if not 0 < elapsed <= MAX_WINDOW_NS:
                 raise I5.CgroupRefusal("OBSERVATION_WINDOW_EXCEEDED")
             result = _summarize(first, second, host_first, host_second)
+            if pressure:
+                result["selected_cgroup_pressure"] = _pressure_summary(pressure_first, pressure_second)
     except (OSError, OverflowError):
         raise I5.CgroupRefusal("HIERARCHY_OBSERVATION_UNAVAILABLE") from None
     return {**_base(), "status": "OBSERVED", "elapsed_ns": elapsed, **result}
@@ -133,9 +209,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Heart H3: read-only visible memory headroom")
     parser.add_argument("command", choices=("observe",))
     parser.add_argument("--cgroup", required=True)
+    parser.add_argument("--pressure", action="store_true", help="also read selected cgroup PSI and memory.events")
     args = parser.parse_args(argv)
     try:
-        result, code = observe(args.cgroup), 0
+        result, code = observe(args.cgroup, pressure=args.pressure), 0
     except I5.CgroupRefusal as exc:
         result, code = {**_base(), "status": "UNAVAILABLE", "reason": str(exc)}, 2
     except KeyboardInterrupt:

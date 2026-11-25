@@ -131,5 +131,41 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.store.load()["action"],ACTION)
         self.assertEqual(self.store.load()["acknowledgment"],acknowledgment())
 
+    def test_dismissal_checkpoint_separate_and_retained(self):
+        self.store.save(ACTION)
+        self.store.save(acknowledgment())
+        dismissal=dict(acknowledgment(),kind="REVIEW_DISMISS")
+        before={p.name:p.read_bytes() for p in self.path.iterdir()}
+        self.store.save(dismissal)
+        snapshot=self.store.load()
+        self.assertEqual(snapshot["version"],2)
+        self.assertEqual(snapshot["dismissal"],dismissal)
+        self.assertEqual(snapshot["acknowledgment"],acknowledgment())
+        self.assertFalse(snapshot["startup_unlock"])
+        for name,data in before.items():
+            self.assertEqual((self.path/name).read_bytes(),data)
+        with self.assertRaisesRegex(QueueError,"HOST_CHECKPOINT_OCCUPIED"):
+            self.store.save(dismissal)
+
+    def test_dismissal_checkpoint_only_and_mismatched_lineage(self):
+        dismissal=dict(acknowledgment(),kind="REVIEW_DISMISS")
+        self.store.save(dismissal)
+        self.assertEqual(self.store.load()["dismissal"],dismissal)
+        self.assertIsNone(self.store.load()["action"])
+        with self.assertRaisesRegex(QueueError,"HOST_CHECKPOINT_OCCUPIED"):
+            self.store.save(ACTION)
+        with self.assertRaisesRegex(QueueError,"HOST_CHECKPOINT_OCCUPIED"):
+            self.store.save(acknowledgment())
+
+    def test_dismissal_corrupt_or_conflicting_refuses(self):
+        self.store.save(dict(ACTION,message=dict(MESSAGE,target_gib=20)))
+        with self.assertRaisesRegex(QueueError,"HOST_CHECKPOINT_ACTION_MISMATCH"):
+            self.store.save(dict(acknowledgment(),kind="REVIEW_DISMISS"))
+        slot=self.path/SLOTS["REVIEW_DISMISS"]
+        slot.write_bytes(b"{")
+        slot.chmod(0o600)
+        with self.assertRaises(QueueError):
+            self.store.load()
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

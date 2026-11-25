@@ -410,3 +410,81 @@ console.log("R3q checkpoint host PASS: pre-send correlation, fresh-shell lookup 
  assert.match(rows[1].message,/No adjustment is verified/);
  console.log("R4 notification host PASS: actual Hub adapter, publication fence, duplicate/disabled/busy refusal");
 }
+
+ // R6b: explicit v2 host handshake and real pre-send dismissal checkpoint.
+{
+ const os=require("node:os"),cp=require("node:child_process"),crypto=require("node:crypto");
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),"queue-dismiss-host-"));
+ const helper=path.join(root,"services/memory/memory_queue_checkpoint_io.py");
+ const canonical=x=>x!==null&&typeof x==="object"
+     ? Array.isArray(x)?x.map(canonical):Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
+ const sha=x=>crypto.createHash("sha256").update(JSON.stringify(canonical(x))).digest("hex");
+ const io=(cmd,value)=>cp.spawnSync("python3",["-B",helper,cmd,folder],{
+    input:value===null?"":wire(value),encoding:"utf8",timeout:5000,maxBuffer:32768});
+ const result=x=>x.status===0&&!x.error?JSON.parse(x.stdout):null;
+ function connectV2(s,g,owner) {
+    s=h.start(s,c,g,"STAGED",true,true,false,true);
+    assert.equal(feed(s,control("HELLO",owner)).phase,"FAILED");
+    s=feed(s,control("HELLO_DISPOSITION",owner));
+    assert.equal(feed(s,control("INVALIDATE",owner)).phase,"FAILED");
+    const next=h.takeDispositionConnect(s,g);
+    assert.equal(JSON.parse(next.frame).kind,"CONNECT_DISPOSITION");
+    assert.equal(h.takeDispositionConnect(next.state,g).frame,null);
+    return feed(next.state,wire(control("INVALIDATE",owner))+wire(status(1,1,null,owner)));
+ }
+ try {
+    const live={...rv,snapshot:{...rv.snapshot,pending_digest:sha(null)}};
+    live.review_digest=sha(live.snapshot);
+    let active=connectV2(h.stop(prep.state,c,"LOST",1),2,B);
+    assert.equal(h.readRecovery(active,"INVENTORY",16).frame,null);
+    const read=h.readRecovery(active,"INVENTORY",4);
+    const inv={version:2,recent:[{record:receipt.record,disposition:null}],truncated:false,
+       prepared:receipt.record,pending_request_id:null,startup_unlock:false,adjustment_outcome:"UNVERIFIED",can_execute:false};
+    const packet={version:1,kind:"INVENTORY",owner_id:B,sequence:2,next_action_sequence:1,can_execute:false,inventory:inv};
+    active=feed(read.state,packet);
+    assert.equal(h.dispositionContext(active).inventory.version,2);
+    assert.equal(active.inventory,null);
+    const begin=h.beginReview(active,X);
+    const ready=feed(begin.state,{...rp,sequence:3,review:live});
+    assert.ok(h.dispositionContext(ready).canDismiss);
+    const select={reviewId:REVIEW,digest:live.review_digest,sequence:3};
+    assert.equal(h.dismissReview(ready,{...select,sequence:2},2,recovery.row).frame,null);
+    const gated=h.dismissReview(ready,select,2,recovery.row);
+    assert.equal(gated.frame,null);
+    assert.equal(gated.checkpoint.kind,"REVIEW_DISMISS");
+    assert.equal(h.dispositionContext(gated.state).phase,"WAIT_CHECKPOINT");
+    assert.ok(result(io("SAVE",actionCheckpoint)));
+    const saved=result(io("SAVE",gated.checkpoint));
+    assert.ok(saved);
+    const released=h.finishCheckpoint(gated.state,saved,2,c,recovery.row);
+    assert.equal(JSON.parse(released.frame).kind,"RECOVERY_DISMISS");
+    assert.equal(h.finishCheckpoint(released.state,saved,2,c,recovery.row).frame,null);
+    const value={version:2,review:live,dismissed_at_ms:100100,disposition:"LOCAL_PREPARATION_DISMISSED",
+       adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false};
+    const response={version:1,kind:"LOCAL_DISPOSITION",owner_id:B,sequence:4,next_action_sequence:1,can_execute:false,receipt:value};
+    assert.equal(feed(released.state,{...response,receipt:{...value,startup_unlock:true}}).phase,"FAILED");
+    let done=feed(released.state,response);
+    assert.equal(h.dispositionContext(done).receipt.disposition,"LOCAL_PREPARATION_DISMISSED");
+    assert.ok(done.startupLocked && done.session.unresolved && done.publicationRequired);
+    const loaded=result(io("LOAD",null));
+    assert.equal(loaded.snapshot.version,2);
+    let restored=h.restoreCheckpoint(c,loaded.snapshot,recovery.row);
+    assert.ok(restored.startupLocked && restored.session.unresolved && restored.dispositionLost);
+    assert.equal(h.start(restored,c,1,"STAGED",true,true).phase,"STOPPED");
+    restored=connectV2(restored,1,R);
+    assert.equal(h.beginReview(restored,X).frame,null);
+    const request=h.readDispositionReceipt(restored,X);
+    assert.equal(JSON.parse(request.frame).kind,"DISPOSITION_HISTORY");
+    const hist={version:1,kind:"LOCAL_DISPOSITION_HISTORY",owner_id:R,sequence:2,next_action_sequence:1,
+       can_execute:false,action_id:X,receipt:null};
+    let missing=feed(request.state,hist);
+    assert.equal(h.dispositionContext(missing).unknownActionId,X);
+    const again=h.readDispositionReceipt(missing,X);
+    const recovered=feed(again.state,{...hist,sequence:3,receipt:value});
+    assert.equal(h.dispositionContext(recovered).unknownActionId,null);
+    assert.ok(recovered.startupLocked && recovered.session.unresolved);
+    assert.equal(h.takeCommit(recovered,1).frame,null);
+    assert.equal(h.dismissReview(recovered,select,1,recovery.row).frame,null);
+    console.log("R6b disposition host PASS: handshake, durable dismissal, exact receipt and lost reply, no unlock");
+ } finally {fs.rmSync(folder,{recursive:true,force:true});}
+}

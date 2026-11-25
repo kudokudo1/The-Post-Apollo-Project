@@ -17,3 +17,4 @@ jobs:
         run: |
           test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 8082bac43e3d8a0f506348e0ecee2e063d34935b
           python3 -B tests/cpuplus_memory_reclaim_bound_ci/test_reclaim_custody.py
+          python3 -B tests/cpuplus_memory_reclaim_bound_ci/test_durable_fixture.py

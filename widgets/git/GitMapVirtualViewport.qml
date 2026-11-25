@@ -1,10 +1,11 @@
 import QtQuick
 import QtQuick.Controls
+import Qt5Compat.GraphicalEffects
 import "../../components"
 import "../../services/git" as GitMap
 import "../../services/git/GitMapViewportPolicy.js" as Policy
 
-// Disposable candidate, not a replacement for existing BranchMap.
+// One bounded viewport for recent data and indexed history.
 // The Flickable is the sole scroll position owner after explicit activation.
 Rectangle {
     id: root
@@ -13,7 +14,70 @@ Rectangle {
     border.width: 1
     readonly property int rowHeight: 24
     property alias requestsEnabled: bridge.requestsEnabled
-    readonly property var mapState: bridge.state
+    property bool indexedActive: true
+    property var recentTopology: null
+    property string recentRepo: ""
+    property string titleText: "BRANCH MAP"
+    property real recentY: 0
+    // Recent data is an explicitly bounded adapter, not a second renderer.
+    readonly property var recentPage: recentRows(recentTopology, recentRepo,
+        recentTopology ? recentTopology.topologyRevision : -1)
+    readonly property var recentState: ({
+        total: recentPage.rows.length, maxLane: recentPage.maxLane,
+        rowHeight: rowHeight, viewportHeight: Math.max(1,flick.height),
+        y: recentY, snapshot: "recent:" + recentRepo,
+        epoch: recentTopology ? recentTopology.topologyRevision : 0,
+        shallow: false, cache: {0: recentPage}, errors: {}
+    })
+    readonly property var mapState: indexedActive ? bridge.state : recentState
+    function recentRows(service, repo, revision) {
+        const result = {start:0, frontier:[], rows:[], maxLane:0};
+        if (!service || !repo || service.repoPath !== repo || service.refreshing) return result;
+        const ordinals = {};
+        for (let i=0; i<Math.min(48,service.commitCount); ++i) {
+            const row=service.commitAt(i);
+            if (!row || !Policy.sha(String(row.sha)) || !Policy.integer(row.lane,0,511)) break;
+            const entry={ordinal:i,sha:String(row.sha),lane:row.lane,
+                subject:String(row.subject || ""),refsText:String(row.refsText || ""),
+                isHead:row.isHead===true || String(row.sha)===String(service.headFull || ""),
+                parentText:String(row.parents || ""),parents:[]};
+            result.rows.push(entry);
+            ordinals[entry.sha]=entry;
+            result.maxLane=Math.max(result.maxLane,entry.lane);
+        }
+        for (const row of result.rows) {
+            for (const sha of row.parentText.trim().split(/\s+/)) {
+                const parent=ordinals[sha];
+                if (parent && parent.ordinal>row.ordinal)
+                    row.parents.push({sha:sha,ordinal:parent.ordinal,lane:parent.lane});
+            }
+        }
+        return result;
+    }
+    function decoration(record) {
+        if (!record) return {isHead:false,refsText:""};
+        if (!indexedActive) return record;
+        // Match by exact SHA only. Historical index does not store refs.
+        const found=recentPage.rows.find(r=>r.sha===record.sha);
+        return found || {isHead:false,refsText:""};
+    }
+    onRecentRepoChanged: {
+        recentY=0;
+        if (!indexedActive) flick.contentY=0;
+    }
+    onIndexedActiveChanged: {
+        applyingGeometry=true;
+        flick.cancelFlick();
+        flick.contentY=mapState ? Policy.clamp(mapState,mapState.y) : 0;
+        applyingGeometry=false;
+    }
+    onRecentPageChanged: {
+        if (!indexedActive) {
+            recentY=Policy.clamp(recentState,recentY);
+            flick.contentY=recentY;
+            graph.requestPaint();
+        }
+    }
     readonly property real scrollPosition: flick.contentY
     readonly property real scrollExtent: flick.contentHeight
     readonly property int renderedRows: rows.count
@@ -22,7 +86,7 @@ Rectangle {
     property alias scrollRail: rail
     property alias scrollViewport: flick
     readonly property string bottomStatus: mapState ? Policy.bottomState(mapState) : "NO INDEX"
-    readonly property bool bridgeFaulted: bridge.faulted
+    readonly property bool bridgeFaulted: indexedActive && bridge.faulted
     readonly property int activePageStart: bridge.activeRequest ? bridge.activeRequest.start : -1
     property bool applyingGeometry: false
     property string selectedSha: ""
@@ -33,7 +97,7 @@ Rectangle {
         const ok = bridge.activate(directory,manifest,rowHeight,Math.max(1,flick.height),anchor);
         if (ok) {
             flick.cancelFlick();
-            flick.contentY = bridge.state.y;
+            if (indexedActive) flick.contentY = bridge.state.y;
             selectedSha = "";
         }
         applyingGeometry = false;
@@ -50,7 +114,7 @@ Rectangle {
         const status = Policy.rowState(mapState,ordinal);
         return bridgeFaulted && status === "LOADING" ? "UNAVAILABLE" : status;
     }
-    function retry(ordinal) { bridge.retry(ordinal); }
+    function retry(ordinal) { if (indexedActive) bridge.retry(ordinal); }
     function choose(ordinal) {
         const row = rowAt(ordinal);
         if (!row) return false;
@@ -61,14 +125,19 @@ Rectangle {
 
     GitMap.GitMapPageBridge { id: bridge }
 
-    Text {
+    function nodeGlyph(record) {
+        const d=decoration(record);
+        return d.isHead || d.refsText ? "★" : "✧";
+    }
+
+    GohuText {
         id: header
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 8
         height: 24
-        text: root.mapState ? "BRANCH MAP // " + root.mapState.total + " LOCAL COMMITS" + (graph.laneX(root.mapState.maxLane) >= graph.width ? " // LANES CLIPPED" : "") : "BRANCH MAP // NO INDEX"
+        text: root.mapState ? root.titleText + " // " + root.mapState.total + (root.indexedActive ? " LOCAL COMMITS" : " AVAILABLE COMMITS") + (graph.laneX(root.mapState.maxLane) >= graph.width-10 ? " // LANES CLIPPED" : "") : root.titleText + " // NO INDEX"
         color: Colors.magenta
         font.pixelSize: 12
         textFormat: Text.PlainText
@@ -87,12 +156,16 @@ Rectangle {
         flickableDirection: Flickable.VerticalFlick
         contentWidth: width
         contentHeight: root.mapState ? Policy.extent(root.mapState) : height
-        onContentYChanged: if (!root.applyingGeometry && root.mapState) bridge.scroll(contentY)
+        onContentYChanged: {
+            if (root.applyingGeometry || !root.mapState) return;
+            if (root.indexedActive) bridge.scroll(contentY);
+            else root.recentY=Policy.clamp(root.mapState,contentY);
+        }
         onHeightChanged: {
             if (!root.mapState || height < 1) return;
             root.applyingGeometry = true;
-            bridge.resize(height);
-            contentY = bridge.state.y;
+            if (root.indexedActive) { bridge.resize(height); contentY = bridge.state.y; }
+            else { root.recentY=Policy.clamp(root.recentState,root.recentY); contentY=root.recentY; }
             root.applyingGeometry = false;
         }
 
@@ -101,7 +174,7 @@ Rectangle {
             id: graph
             x: 0
             y: flick.contentY
-            width: Math.min(170, Math.max(0,flick.width/3))
+            width: Math.min(190, Math.max(0,flick.width/3), 34+22*Math.min(7,root.mapState ? root.mapState.maxLane+1 : 1))
             height: flick.height
             onYChanged: requestPaint()
             onWidthChanged: requestPaint()
@@ -110,7 +183,7 @@ Rectangle {
                 target: bridge
                 function onStateChanged() { graph.requestPaint(); }
             }
-            function laneX(lane) { return 10 + lane * 20; }
+            function laneX(lane) { return 14 + lane * 22; }
             function laneColor(lane) {
                 return [Colors.orange,Colors.cyan,Colors.magenta,Colors.blue,Colors.green,Colors.red][lane%6];
             }
@@ -134,7 +207,10 @@ Rectangle {
                         const y = row.ordinal*root.rowHeight-flick.contentY;
                         const middle = y+root.rowHeight/2;
                         if (visible) {
-                            ctx.lineWidth=1.3;
+                            ctx.lineWidth=1.35;
+                            ctx.lineJoin="miter";
+                            ctx.lineCap="butt";
+                            ctx.globalAlpha=0.72;
                             for (const key of Object.keys(frontier)) {
                                 const lane=frontier[key], x=laneX(lane);
                                 if (x>=width) continue;
@@ -148,16 +224,18 @@ Rectangle {
                             if (visible) {
                                 ctx.strokeStyle=laneColor(edge.lane);
                                 ctx.beginPath();ctx.moveTo(laneX(row.lane),middle);
+                                // Strict orthogonal routing: no diagonal or rounded corner.
+                                const elbow=y+root.rowHeight*0.75;
+                                ctx.lineTo(laneX(row.lane),elbow);
+                                ctx.lineTo(laneX(edge.lane),elbow);
                                 ctx.lineTo(laneX(edge.lane),y+root.rowHeight);ctx.stroke();
                             }
                             frontier[edge.sha]=edge.lane;
                         }
-                        if (visible && laneX(row.lane)<width) {
-                            ctx.fillStyle=laneColor(row.lane);
-                            ctx.beginPath();ctx.arc(laneX(row.lane),middle,3.5,0,Math.PI*2);ctx.fill();
-                        }
+
                     }
                 }
+                ctx.globalAlpha=1.0;
             }
         }
 
@@ -173,19 +251,83 @@ Rectangle {
                 readonly property var record: root.rowAt(ordinal)
                 readonly property string status: root.rowStatus(ordinal)
                 visible: root.mapState !== null && ordinal<root.mapState.total
-                x: graph.width
+                x: 0
                 y: ordinal*root.rowHeight
-                width: Math.max(0,flick.width-x)
+                width: flick.width
                 height: root.rowHeight
-                Text {
-                    anchors.fill: parent
-                    verticalAlignment: Text.AlignVCenter
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    font.pixelSize: 11
-                    color: rowItem.record ? (root.selectedSha===rowItem.record.sha ? Colors.yellow : Colors.cyan) : Colors.orange
-                    text: rowItem.record ? rowItem.record.sha.slice(0,8)+" // "+rowItem.record.subject
-                        : rowItem.status==="UNAVAILABLE" ? (root.bridgeFaulted ? "READER UNAVAILABLE" : "UNAVAILABLE // TAP TO RETRY") : "LOADING COMMIT "+(rowItem.ordinal+1)
+                readonly property var decoration: root.decoration(record)
+                readonly property bool selected: record && root.selectedSha===record.sha
+                Item {
+                    width: graph.width
+                    height: parent.height
+                    clip: true
+                    visible: rowItem.record !== null && graph.laneX(rowItem.record.lane)<width-10
+                    Rectangle {
+                        width: rowItem.decoration.isHead || rowItem.decoration.refsText ? 10 : 8
+                        height: width
+                        radius: width/2
+                        x: graph.laneX(rowItem.record ? rowItem.record.lane : 0)-width/2
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Colors.dark
+                    }
+                    NotoText {
+                        width: 20; height: parent.height
+                        x: graph.laneX(rowItem.record ? rowItem.record.lane : 0)-width/2
+                        text: root.nodeGlyph(rowItem.record)
+                        font.pixelSize: rowItem.decoration.isHead ? 15 : 13
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: Colors.orange
+                        visible: rowItem.selected
+                        layer.enabled: visible
+                        layer.effect: DropShadow {
+                            radius: 15; samples: 25; opacity: 1.0
+                            color: Colors.orange; transparentBorder: true
+                        }
+                    }
+                    NotoText {
+                        id: star
+                        objectName: "gitMapCommitStar"
+                        width: 20; height: parent.height
+                        x: graph.laneX(rowItem.record ? rowItem.record.lane : 0)-width/2
+                        text: root.nodeGlyph(rowItem.record)
+                        font.pixelSize: rowItem.decoration.isHead ? 15 : 13
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: rowItem.decoration.isHead ? Colors.yellow : graph.laneColor(rowItem.record ? rowItem.record.lane : 0)
+                        layer.enabled: visible && parent.visible
+                        layer.effect: DropShadow {
+                            radius: rowItem.decoration.isHead ? 7 : 5
+                            samples: rowItem.decoration.isHead ? 9 : 7
+                            opacity: rowItem.decoration.isHead ? 0.78 : rowItem.decoration.refsText ? 0.48 : 0.38
+                            color: star.color
+                            transparentBorder: true
+                        }
+                    }
+                }
+                Row {
+                    x: graph.width
+                    width: Math.max(0,parent.width-x)
+                    height: parent.height
+                    spacing: 4
+                    GohuText {
+                        id: hash
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: !!rowItem.record
+                        text: rowItem.record ? rowItem.record.sha.slice(0,8) : ""
+                        font.pixelSize: 9
+                        color: Colors.orange
+                    }
+                    GohuText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0,parent.width-(hash.visible ? hash.implicitWidth+parent.spacing : 0))
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                        color: rowItem.record ? (rowItem.selected || rowItem.decoration.isHead ? Colors.yellow : Colors.cyan) : Colors.orange
+                        text: rowItem.record ? (rowItem.decoration.refsText ? rowItem.decoration.refsText+" // " : "// ")+rowItem.record.subject
+                            : rowItem.status==="UNAVAILABLE" ? (root.bridgeFaulted ? "READER UNAVAILABLE" : "UNAVAILABLE // TAP TO RETRY") : "LOADING COMMIT "+(rowItem.ordinal+1)
+                    }
                 }
                 TapHandler {
                     property int pressedOrdinal: -1
@@ -219,7 +361,7 @@ Rectangle {
         visible: scrollable
         protectHandleDragFromAncestor: true
     }
-    Text {
+    GohuText {
         id: footer
         anchors.bottom: parent.bottom
         anchors.left: parent.left
@@ -227,7 +369,7 @@ Rectangle {
         anchors.margins: 8
         height: 24
         text: root.bridgeFaulted ? "PAGE READER UNAVAILABLE // REOPEN REQUIRED" :
-            root.mapState ? (root.mapState.total ? Policy.visibleRange(root.mapState).first+1 : 0)+" / "+root.mapState.total+" // "+root.bottomStatus : "NO INDEX"
+            root.mapState ? (root.mapState.total ? Policy.visibleRange(root.mapState).first+1 : 0)+" / "+root.mapState.total+" // "+(root.indexedActive ? root.bottomStatus : "AVAILABLE HISTORY // CHECK OR BUILD INDEX") : "NO INDEX"
         textFormat: Text.PlainText
         color: Colors.orange
         font.pixelSize: 10

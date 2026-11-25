@@ -102,3 +102,144 @@ and no inferred authority. Native provider/host changes need separate approval.
 
 R6b remains at its independently reviewable head. No code, database,
 native runner, existing provider, shared UI, production or host change here.
+
+
+## R7e proposed Colony/member/Assignment projection contract (design only)
+
+Nurse #2161 comment 7177803007 authorizes this documentation only.
+Runtime intake 7177600928, historical audits 7177636155/7177768156;
+UI1 7177627698/7177728110, UI2 7177633595, Mind 7177630040,
+Heart 7177638539 and Spirit 7177633979 are the agreed design inputs.
+No executable source, registry, schema, wire, permission, UI mount or live
+operation follows from this document. Production and native execution HOLD.
+
+### Canonical identities and ownership
+
+The frozen original Forest commit 28895aafdddb07cf402f1e75574eea1ee79a516d
+member checkpoint (58408002) and colony/identity.py (849a4378) define
+one Tree/Colony containing individually addressable execution contexts.
+Ortet/Ramet is lineage; Main or another operational responsibility is a
+separate property. Neither determines season, residency or permission.
+Preserve the historical canonical member address (Tree plus execution
+context); distinguish durable member identity from the current execution
+lifetime/generation. Do not introduce another identifier merely as an alias.
+
+| Concept | Candidate owner-side reference (not a wire field) |
+| --- | --- |
+| Tree/Colony | Independently resolved principal and canonical Tree; no separate duplicate Colony identity. |
+| Member | Exact canonical Tree, execution_context_id, independently resolved current lifetime/generation; lineage and role separately disclosed. |
+| Assignment | Independently resolved member and exact TaskContext task_id, execution_context_id, generation, origin; separate original operation/attempt and task revision where relevant. |
+| Runtime binding/session | Separate execution context + binding, adapter/runtime session and residency identities. Not a membership count. |
+| Conversation | B1 session_id and tree_key; independent history/current revision. Not an Assignment or member. |
+| Presentation | Independently resolved recipient, purpose, source revision and local view incarnation; Bark attachment is not identity or authority. |
+
+Current B6r1 TaskContext (b7fdcfc5) already separates tree_key, optional
+clone_key, task_id, execution_context_id, generation and origin. This is
+a caller-owned reference, not a member registry; do not reinterpret
+clone_key as an authoritative alias or change its contract. M2
+(1085bc56) refuses Clone binding. B1 (d1533f15) has no member lineage.
+Multiple Barks for the same Assignment must not multiply its identity.
+An authorized background Assignment can have no Bark; detach does not
+retire a task, change season or clear durable memory.
+
+### Source recovery and hard gap
+
+Original runtime/session_identity.py (64e97968) and session_store.py
+(fff28521) describe execution-context/binding slots, including empty
+runtime session stores. A dormant member may have no live binding and a
+member may have several. Original task_session.py (a2458c4e), start_task
+at 2656 and Winter record/list at 4627/4724, stores one active slot and
+durable dormant YAML records. The list can return empty when the
+directory is absent or silently skip malformed/nonmatching records.
+Neither this historical list nor the runtime session store establishes
+current independently authorized membership or completeness. Do not
+migrate historical data, enumerate private files, reinterpret missing
+storage as empty or reuse this behavior as a modern authority source.
+
+Actual durable membership/Assignment registry, persistence and issuer
+ownership, generation/revision issuance, source currentness, and
+independent Connections custody remain unestablished. Candidate owner
+interfaces below are semantic responsibilities, not API names or a
+decision to introduce storage:
+
+- Runtime resolves canonical parent/member/Assignment and owns an immutable
+  versioned snapshot of its exact independently current source. It must
+  demonstrate atomicity or equivalent consistency across membership and
+  lifecycle changes, explicit unavailable/partial/refused outcomes, and
+  stable lifetime/currentness across replacement. A data source and
+  persistence owner must be agreed before any executable proposal.
+- Spirit independently resolves requester/recipient and current permission
+  for the exact parent, intent, enumeration and disclosure. Source
+  completeness is a separate permission; no implicit global roster.
+  Actual authorization, delivery fencing and custody remain separate.
+- Mind retains history/context ownership and independent retrieval/use
+  checks; a view cannot admit a cache or alter B1/H11/H2. Heart retains
+  resource/attempt custody; listing, absence and season confer no resource
+  credit, admission or release. UI1/2 own layout and contextual interaction,
+  not source or authorization. Nurse reviews exact bounded evidence.
+
+### Trusted projection and delivery sequence
+
+1. Independently authenticate requester/recipient and resolve the exact
+   principal, Tree, selected member (if required), purpose/intent and view
+   incarnation. Do not accept Bark or UI-supplied aliases as authoritative
+   identity. Establish current enumeration permission BEFORE querying.
+2. Obtain the owner-pinned immutable source snapshot, scope and revision
+   under that permission. A partial, failed, refused or lost source is not
+   an empty roster. Do not invent an issuer or fall back to fixtures.
+3. Inside the trusted owner/Spirit boundary, derive only currently
+   authorized rows and independently allowed bounded public aliases,
+   lineage/role, season, completeness/count and action metadata BEFORE
+   assembly or transmission. No raw source IDs, hidden counts, ordinal
+   gaps, private diagnostic detail or full-roster QML filtering. Season
+   unavailable/denied on an otherwise authorized row is UNKNOWN. Other
+   unavailable fields are omitted; no default lineage/role/season.
+4. Recheck independently current policy, recipient, source revision and
+   exact view incarnation at serialization/delivery. Changed or unknown
+   evidence refuses new payload and retires only the affected original
+   visible projection. No stale fallback. Actual protected effect fencing
+   and delivery receipts are not established by this design.
+5. Stale response/withdrawal/dismissal for another view cannot alter the
+   current replacement. Retire old list, selection and review before
+   rendering a new scope; no automatic selection on arrival. Preserve
+   unrelated chat history/draft, durable records and current memory.
+
+Explicit authorized complete-empty describes only the permitted
+projection, not global membership. If completeness is not independently
+allowed, return unavailable rather than an empty/global count signal.
+Partial/unavailable/refused states stay distinct inside trusted custody;
+public exposure of their distinctions must itself be permitted. A
+selection reference, if later approved, is scoped/opaque, not a grant.
+Subsequent member selection and contextual Cleaning re-resolve exact
+identity/currentness and independently authorize the action. Viewing
+does not read bodies, claim a Task, enter Spring, activate or restore.
+
+UI1/2 retain CHATS default, explicit Colony rail selection, existing
+184/148/hidden compact rail and accepted neutral Tree glyph. Member
+lineage/role can occupy an independently disclosed lower line only after
+approved source/placement; no Ortet=Main assumption. Contextual Cleaning
+needs independently pinned plan and separately approved existing workspace
+(minimum 300x160), not a squeezed rail or new window. S1 syntheticOwner
+and receive fixture interface cannot become the shipped lifecycle source.
+No new rendering or physical hit-target acceptance claimed.
+
+### Negative acceptance matrix for future separate implementation scope
+
+| Case | Required outcome |
+| --- | --- |
+| Foreign principal/Tree/member/recipient or invalid view | Refuse before source query; no row/body/count disclosure. |
+| Same alias, different member lifetime or task generation | Never transfer selection or permission; original identity must match. |
+| Duplicate Bark, detached chat, background without Bark | One canonical Assignment; no retirement or exclusion inferred from attachment. |
+| Missing store, partial/invalid snapshot, refused enumeration | No invented empty list, fallback or global count. |
+| Authorized complete-empty; forbidden completeness | Explicit permitted empty only in first case; unavailable in second. |
+| Hidden member/alias/season/action | No hidden row/count/order signal; authorized row with undisclosed season UNKNOWN. |
+| Revocation after snapshot, before delivery | Refuse new payload, withdraw exact original projection; no stale metadata. |
+| Old revision/new view or stale callback | No repopulation or deletion of replacement; preserve unrelated chat/draft. |
+| Selected row or dormant indication | No body read, resource credit, activation or restoration; exact separate action authorization. |
+| Unknown/pending lifecycle or missing terminal | No Winter/retirement inference, cache close or settlement. |
+
+The matrix is design acceptance criteria only; no tests, producer,
+registry, schema, signer, native source, new UI action or production
+authority are introduced here. Request exact Heart/Mind/Spirit/UI1/UI2
+compatibility and Nurse independent document review; any implementation
+requires new explicitly bounded authorization and actual source evidence.

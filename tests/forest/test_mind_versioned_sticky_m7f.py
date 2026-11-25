@@ -228,5 +228,72 @@ class VersionedTests(unittest.TestCase):
         self.assertEqual(sum(self.cache.counts()),32)
         self.assertTrue(self.lookup(fresh).complete)
 
+
+    def test_final_use_revocation_on_partial_miss_fences_both_domains(self):
+        for clocks, missing, retained in (
+                (dict(user_context_generation=4), self.u, (0,1)),
+                (dict(operational_generation=3), self.o, (1,0))):
+            with self.subTest(clocks=clocks):
+                self.setUp()
+                fresh=self.fresh(input_generation=2,**clocks)
+                self.install(fresh)
+                result=self.lookup(fresh)
+                self.assertEqual(result.missing,(missing,))
+                self.assertEqual(result.entries,())
+                self.assertEqual(self.cache.counts(),retained)
+                with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+                    self.cache.assemble_versioned(fresh,**self.args(fresh),
+                        final_use=PublicUse(fresh,(),(missing,)))
+                self.assertEqual(self.cache.counts(),(0,0))
+                with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+                    self.install(replace(fresh,route=replace(fresh.route,input_generation=3)))
+                allowed=replace(fresh,route=replace(fresh.route,input_generation=4,
+                                                    policy_generation=3))
+                self.install(allowed)
+                self.assertEqual(self.lookup(allowed).missing,allowed.versions)
+
+    def test_partial_miss_stale_or_mismatched_final_use_preserves_replacement(self):
+        fresh=self.fresh(input_generation=2,user_context_generation=4)
+        self.install(fresh)
+        for wrong in (self.sel,replace(fresh,recipient="other")):
+            with self.subTest(selection=wrong):
+                with self.assertRaisesRegex(ContextRefusal,"SCOPE"):
+                    self.cache.assemble_versioned(fresh,**self.args(fresh),
+                        final_use=PublicUse(wrong,(),(self.u,)))
+                self.assertEqual(self.cache.counts(),(0,1))
+                self.assertEqual(self.lookup(fresh).missing,(self.u,))
+                self.assertEqual(self.lookup(fresh).entries,())
+        self.remember(fresh,(entry(self.u,BODIES[1][2],4),))
+        self.assertEqual(self.lookup(fresh).entries,
+                         (entry(self.u,BODIES[1][2],4),self.op))
+
+    def test_partial_miss_nonrevoked_final_use_returns_no_body(self):
+        fresh=self.fresh(input_generation=2,user_context_generation=4)
+        self.install(fresh)
+        with self.assertRaisesRegex(ContextRefusal,"STICKY_RECORDS_MISSING"):
+            self.cache.assemble_versioned(fresh,**self.args(fresh),
+                final_use=PublicUse(fresh,fresh.versions))
+        self.assertEqual(self.cache.counts(),(0,1))
+        self.assertEqual(self.lookup(fresh).entries,())
+        self.remember(fresh,(entry(self.u,BODIES[1][2],4),))
+        self.assertTrue(self.lookup(fresh).complete)
+
+    def test_partial_miss_revocation_clears_two_nonempty_pools(self):
+        extra=PublicVersion(SOURCE,"extra","current-context",1,1,
+                            sha256(b"Public extra").digest(),True)
+        fresh=replace(self.fresh(input_generation=2),versions=(self.u,extra,self.o),
+                      route=replace(self.route,input_generation=2,
+                                    user_record_ids=("preference","extra")))
+        self.install(fresh)
+        self.assertEqual(self.cache.counts(),(1,1))
+        self.assertEqual(self.lookup(fresh).missing,(extra,))
+        self.assertEqual(self.lookup(fresh).entries,())
+        with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+            self.cache.assemble_versioned(fresh,**self.args(fresh),
+                final_use=PublicUse(fresh,(),(extra,)))
+        self.assertEqual(self.cache.counts(),(0,0))
+        with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+            self.install(replace(fresh,route=replace(fresh.route,input_generation=3)))
+
 if __name__ == "__main__":
     unittest.main()

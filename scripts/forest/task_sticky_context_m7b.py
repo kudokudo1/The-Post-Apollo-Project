@@ -455,9 +455,11 @@ class TaskStickyContext:
         with self._lock:
             result = self.lookup_versioned(requested, current=current,
                                             dependencies=dependencies, use=use)
+            # Final-use revocation is independent of cache completeness.
+            # Validate under the same lock before refusing a partial miss.
+            self._versioned(requested, current, dependencies, final_use)
             if not result.complete:
                 raise ContextRefusal("STICKY_RECORDS_MISSING")
-            self._versioned(requested, current, dependencies, final_use)
             split = len(current.route.user_record_ids)
             records = tuple(e.record for e in result.entries)
             # Preserve the exact selected versions alongside assembly.

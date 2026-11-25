@@ -341,3 +341,92 @@ custody, Heart owns admission. Later selective restoration decision
 recording and application require their own contracts. No proposed
 H1 entry, selection, review, dismiss or expiry creates a durable
 retirement, Spring transition, claim, grant or resource action.
+
+
+## S1 // Distributed seasonal indicators — operator direction supersedes menu priority
+
+Operator clarification and confirmation (Hospital #2161 comment
+7171079179): put each entity's own season at its normal location, not
+one central dormant destination. This supersedes R2-H1 dedicated global
+DORMANT entry as the primary presentation proposal. Preserve accepted
+R1/R2 contextual review/selection code and existing native coverage;
+do not implement a competing global entry while UI1/Nurse reconcile
+the revised direction. This is design only, not a new state machine.
+
+Use the existing Body recovery doctrine (4ceb4f5c): Spring Cleaning
+first, Summer Growing, Fall Shedding, Winter Dormant (not deletion).
+Use fixed icons and short labels/tooltips in addition to color:
+spring sprout/green, summer sun/yellow, fall leaf/orange, winter
+snowflake/ice blue. UNKNOWN is neutral and distinguishable from Winter.
+A season is not an activity indicator, permission, connection state,
+resource claim, wall-clock season or model residency observation.
+
+### Existing surfaces and gaps verified at main f4518d5c
+
+| Entity surface | Actual source | Proposed placement / boundary |
+| --- | --- | --- |
+| Tree | ForestW.qml a17ab91a treeSlots, treeSelectorRepeater/DockButton, selected Tree chat heading | Small trailing or corner indicator within each existing Tree row; mirror exact selected Tree status in heading only if space permits. Preserve 59px row, identity ink, artwork, hover/selected glow and hit target. |
+| Colony/chat | ForestChatList.qml c43db1d6 delegates and selected chat workspace | Small trailing per-row indicator and optional same-status selected heading. Chat is a potential Colony presentation, not proof of canonical Colony identity. Runtime must define mapping. |
+| Clone/worker | No verified canonical worker-instance list in the inspected ForestW/ForestChatList surfaces | Place on existing instance row when owner identifies/recovers that surface; do not repurpose resource observation, Tree slot or equipment slot as worker. |
+| Assignment/task | Existing isolated PublicDormantTaskSelector and PublicRestorationReview | Contextual task rows under their verified owner when available; indicator per assignment. Existing fixed-public Winter list is a fixture, not evidence that actual tasks are dormant. |
+
+ForestW currently declares chatHostTrusted=false and activeChatSessions
+empty; treeSlots are five static presentation identities. ForestChatList
+uses ForestChatSessionPolicy.openSessions with strict seven-field B1
+metadata, and admits OPEN only. PAUSED/ARCHIVED are excluded; do not
+rewrite its authorization/filter semantics, attach arbitrary seasonal
+fields to B1 records, synthesize missing Colony/worker rows, or present
+fake counts. Showing retained dormant entities in their normal lists
+needs a separately owner-approved metadata projection, not relaxing
+the current filter. No actual entity enumeration is authorized here.
+
+### Proposed bounded UI2 presentation scope
+
+Request a single reusable read-only indicator, initially tested in
+isolated fixed-public examples, no host mount, service, database or wire
+change. Use fixed local enum/labels/icons, no arbitrary text from input.
+Expose UNKNOWN when no independently current supported season is known;
+distinguish stale/unavailable internally without implying another
+season. Exact entity identity, parent scope where applicable, and
+independent lifecycle revision/currentness must be provided by the
+responsible owner before any live projection. No inherited season:
+Tree and Colony can differ from their descendants; no aggregate season
+derived from any number of child states. A selected item and an inactive
+item are not necessarily Summer and Winter respectively. Invalid or
+lost current evidence clears its indicator to UNKNOWN; stale other
+entity updates cannot alter replacement. No click-to-transition, hover
+query, automatic restoration or change of permissions. Any future
+contextual Cleaning action is separate explicit scoped intent, not
+an indicator state mutation.
+
+Proposed isolated visual/native tests: four canonical seasons plus
+UNKNOWN; same Tree and two distinct child examples with intentionally
+different season; independent worker/task examples; no cross-entity
+propagation, wrong type/unknown enum/stale scope/loss, accessible
+season label, color-independent glyph, normal/compact fit without
+changing identity colors or row height. Preserve 65 composed phases,
+28 R2 placement phases, 22 R1 placement and joined typed abort/DB
+witnesses. Do not count fixture as actual status or operator acceptance.
+
+### Owner decisions before code
+
+- DOC2F: define which entity kinds actually own seasons, exact canonical
+  identity and parent/child relationships, current revision and evidence
+  source. Existing R7c-b task retirement transaction fixture is not Tree,
+  Colony or worker state. Determine whether Clone and worker are aliases
+  or distinct identities, and Colony vs chat/session mapping.
+- DOC4F: define retained continuity/knowledge scope per supported entity;
+  absence of context or history is not dormancy.
+- DOC3F: agree read-only minimal metadata, currentness/refusal and
+  protected disclosure boundary; no new positive authority.
+- UI1: confirm real normal-row locations and exact nonoverlapping
+  geometry; no new global dormant panel; do not alter existing palette
+  or chat host/Loader ownership. Reconcile #2810 pending host entry
+  scope with operator direction before code.
+- Nurse2F: authorize precise isolated visual fixture and independent
+  review. Live metadata wiring and installed placement require separate
+  scoped integration and operator acceptance.
+
+User has approved the design direction, not guessed entity definitions,
+new data producers or real lifecycle transitions. No real status is
+displayed until independently verified owner evidence exists.

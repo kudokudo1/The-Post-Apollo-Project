@@ -1,0 +1,37 @@
+name: FinanceW Banking M4t3 integrated disposable native recovery
+on:
+  pull_request:
+    paths:
+      - 'tests/finance/test_banking_integrated_recovery_m4t3.py'
+      - 'tests/finance/fixtures/M4t3BankingRecoveryNative.qml'
+      - 'tests/finance/fixtures/m4t3_recovery_driver.py'
+      - 'tests/finance/test_banking_client_bridge_m4t2.py'
+      - 'scripts/finance/banking_*.py'
+      - 'scripts/finance/banking_portable_crypto.mjs'
+      - 'services/finance/FinanceBankingRevisionBridgeCandidate.qml'
+      - 'widgets/FinanceBankingAccountsPolicy.js'
+      - '.github/workflows/finance-banking-m4t3-integrated-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integrated-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    env:
+      POST_APOLLO_BANKING_NATIVE_CI: '1'
+    steps:
+      - name: Install pinned real Quickshell and Node crypto runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 nodejs quickshell=0.3.2-1 \
+            qt6-qpa-plugins xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtqml
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify native client recovery and fresh generation using actual backups and encrypted copies
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 -B tests/finance/test_banking_integrated_recovery_m4t3.py

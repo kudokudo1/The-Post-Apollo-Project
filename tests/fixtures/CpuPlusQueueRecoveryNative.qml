@@ -16,6 +16,14 @@ ShellRoot {
     readonly property bool armed: Quickshell.env("POST_APOLLO_QUEUE_PIPE_SMOKE") === "CI_DISPOSABLE_ONLY"
     readonly property bool timeoutTrial: Quickshell.env("POST_APOLLO_QUEUE_WATCHDOG_TRIAL") === "1"
     readonly property string stagedTrial: (Quickshell.env("POST_APOLLO_QUEUE_STAGED_TRIAL") || "")
+    readonly property string ackTrial: (Quickshell.env("POST_APOLLO_QUEUE_ACK_TRIAL") || "")
+    readonly property var reviewView: Host.reviewContext(host)
+    property int reviewWrites: 0
+    property int ackWrites: 0
+    property int receiptReads: 0
+    property string reviewId: ""
+    property var reviewedEvidence: null
+    property var savedReceipt: null
     property int commits: 0
     property int watchdogTrips: 0
     property var host: Host.initial(Consumer)
@@ -40,7 +48,7 @@ ShellRoot {
         return ok;
     }
     function launch(generation) {
-        host = Host.start(host, Consumer, generation, stagedTrial ? "STAGED" : "LEGACY");
+        host = Host.start(host, Consumer, generation, stagedTrial ? "STAGED" : "LEGACY", !!ackTrial);
         exited = false;
         dropping = false;
         child.stdinEnabled = true;
@@ -56,6 +64,17 @@ ShellRoot {
             if (!check(packet.disposition === "REPORTED" && packet.result.request.id
                 && !line.includes("inode"),"committed reply")) return;
             resultId = packet.result.request.id;
+            dropping = true;
+            child.running = false;
+            return;
+        }
+        if (phase === 10 && ackTrial === "LOST" && packet.kind === "RECOVERY_ACK") {
+            // The harness witnesses the durable receipt but deliberately
+            // never gives this response to the canonical host.
+            if (!check(packet.receipt.review.review_id === reviewId
+                && packet.receipt.disposition === "REVIEW_ACKNOWLEDGED_ONLY"
+                && packet.receipt.startup_unlock === false,"lost ack persisted")) return;
+            savedReceipt = packet.receipt;
             dropping = true;
             child.running = false;
             return;
@@ -230,9 +249,105 @@ ShellRoot {
             } else if (smoke.phase === 6 && recoveryPane.localView) {
                 if (!smoke.check(recoveryPane.localView.missing && recoveryPane.localView.record === null
                     && smoke.host.startupLocked && smoke.host.session.unresolved,"missing record is not noncommit")) return;
-                smoke.phase = 7;
+                if (smoke.ackTrial) {
+                    if (!smoke.check(smoke.stagedTrial === "EOF" && smoke.commits === 0
+                        && smoke.host.startupLocked && smoke.host.session.unresolved,"review requires unresolved preparation")) return;
+                    const request = Host.beginReview(smoke.host,smoke.actionId);
+                    if (!smoke.check(!!request.frame && smoke.reviewWrites === 0,"explicit review request")) return;
+                    smoke.phase = 9;
+                    smoke.host = request.state;
+                    ++smoke.reviewWrites;
+                    child.write(request.frame);
+                } else {
+                    smoke.phase = 7;
+                    smoke.dropping = true;
+                    child.stdinEnabled = false;
+                }
+            } else if (smoke.phase === 9 && smoke.reviewView.phase === "REVIEW_READY") {
+                const v = smoke.reviewView;
+                if (!smoke.check(v.canAcknowledge && v.review.snapshot.record.state === "PREPARED"
+                    && v.review.snapshot.record.message.action_id === smoke.actionId
+                    && v.review.snapshot.pending_request_id === null
+                    && v.startupLocked && !v.canExecute && smoke.ackWrites === 0
+                    && smoke.host.session.unresolved && watchdog.activeCount === 1,
+                    "exact review visible before acknowledgment")) return;
+                smoke.reviewId = v.review.review_id;
+                smoke.reviewedEvidence = v.review;
+                const selection = {reviewId:v.review.review_id,digest:v.review.review_digest,sequence:v.reviewSequence};
+                if (!smoke.check(!Host.acknowledgeReview(smoke.host,
+                    Object.assign({},selection,{digest:"0".repeat(64)}),smoke.host.generation).frame,
+                    "wrong selection refused")) return;
+                smoke.phase = 10;
+                if (smoke.ackTrial === "EOF") {
+                    smoke.dropping = true;
+                    child.stdinEnabled = false;
+                } else {
+                    // Fixture simulates explicit operator confirmation.
+                    const next = Host.acknowledgeReview(smoke.host,selection,smoke.host.generation);
+                    if (!smoke.check(!!next.frame,"explicit ack frame")) return;
+                    smoke.host = next.state;
+                    ++smoke.ackWrites;
+                    if (!smoke.check(!Host.acknowledgeReview(smoke.host,selection,smoke.host.generation).frame,
+                        "duplicate ack refused before write")) return;
+                    child.write(next.frame);
+                }
+            } else if (smoke.phase === 10 && smoke.ackTrial === "ACK" && smoke.reviewView.receipt && !smoke.dropping) {
+                const receipt = smoke.reviewView.receipt;
+                if (!smoke.check(receipt.disposition === "REVIEW_ACKNOWLEDGED_ONLY"
+                    && receipt.review.review_id === smoke.reviewId && !receipt.startup_unlock
+                    && !receipt.can_execute && smoke.host.startupLocked && smoke.host.session.unresolved,
+                    "explicit acknowledgment saved without unlock")) return;
+                smoke.savedReceipt = receipt;
                 smoke.dropping = true;
                 child.stdinEnabled = false;
+            } else if (smoke.phase === 10 && smoke.exited) {
+                if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
+                    && smoke.reviewView.unknownReviewId === (smoke.ackTrial === "LOST" ? smoke.reviewId : null)
+                    && smoke.reviewView.review === null && smoke.reviewView.receipt === null
+                    && smoke.ackWrites === (smoke.ackTrial === "EOF" ? 0 : 1),
+                    "terminal review continuation retired")) return;
+                smoke.phase = 11;
+                smoke.launch(3);
+            } else if (smoke.phase === 11 && smoke.host.session.status) {
+                if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
+                    && smoke.host.session.status.requestId === null
+                    && !smoke.reviewView.canAcknowledge && !Host.takeCommit(smoke.host,smoke.host.generation).frame,
+                    "restart cannot acknowledge or commit recovered review")) return;
+                const request = Host.readReviewReceipt(smoke.host,smoke.reviewId);
+                if (!smoke.check(!!request.frame && smoke.receiptReads === 0,"explicit historical receipt lookup")) return;
+                smoke.phase = 12;
+                smoke.host = request.state;
+                ++smoke.receiptReads;
+                child.write(request.frame);
+            } else if (smoke.phase === 12 && !smoke.host.reviewFlow) {
+                const receipt = smoke.reviewView.receipt;
+                if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
+                    && smoke.reviewView.unknownReviewId === null && !smoke.reviewView.canAcknowledge
+                    && (smoke.ackTrial === "EOF" ? receipt === null
+                        : !!receipt && Host.equal(receipt,smoke.savedReceipt)
+                            && Host.equal(receipt.review,smoke.reviewedEvidence)),
+                    "exact historical acknowledgment or missing receipt")) return;
+                smoke.phase = 13;
+                recoveryPane.requestRead("LOCAL_ACTION",smoke.actionId);
+                if (!smoke.check(smoke.reads === 5,"final exact preparation lookup")) return;
+            } else if (smoke.phase === 13 && recoveryPane.localView) {
+                if (!smoke.check(recoveryPane.localView.record.state === "PREPARED"
+                    && recoveryPane.localView.record.resultId === null && smoke.host.startupLocked
+                    && smoke.host.session.unresolved && smoke.commits === 0
+                    && smoke.writes === 1 && smoke.reviewWrites === 1 && smoke.receiptReads === 1,
+                    "persistent preparation unchanged")) return;
+                smoke.phase = 14;
+                smoke.dropping = true;
+                child.stdinEnabled = false;
+            } else if (smoke.phase === 14 && smoke.exited) {
+                if (!smoke.check(watchdog.activeCount === 0 && smoke.host.startupLocked
+                    && smoke.host.session.unresolved && smoke.reviewView.receipt === null,
+                    "final disconnect clears live review view")) return;
+                console.log("QUEUE_R3_ACK_PASS // "+smoke.ackTrial);
+                console.log("QUEUE_R3_STAGED_PASS // EOF");
+                console.log("QUEUE_R3_RECOVERY_PASS // native explicit acknowledgment trial");
+                smoke.done = true;
+                Qt.quit();
             } else if (smoke.phase === 7 && smoke.exited) {
                 recoveryPane.requestRead("INVENTORY",16);
                 if (!smoke.check(smoke.reads === 4 && !recoveryPane.canRead && recoveryPane.view === null

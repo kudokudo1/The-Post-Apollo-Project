@@ -10,7 +10,7 @@ import time
 from syntagma_quickshell_thread_sampler import find_quickshell, parse_stat_line
 
 FIELDS = ("Rss", "Pss", "Pss_Anon", "Pss_File", "Pss_Shmem",
-          "Private_Dirty", "Swap", "SwapPss")
+          "Private_Clean", "Private_Dirty", "Swap", "SwapPss")
 
 
 def parse_rollup(text):
@@ -26,6 +26,8 @@ def parse_rollup(text):
         values[key] = int(parts[0])
     if any(key not in values for key in FIELDS):
         raise ValueError("incomplete rollup")
+    if values["Private_Clean"] + values["Private_Dirty"] > values["Rss"]:
+        raise ValueError("private resident exceeds RSS")
     return values
 
 
@@ -50,6 +52,8 @@ def observe(path, uid, start):
         "event": "memory", "tsMs": round(time.time() * 1000),
         "pid": int(path.name), "startTicks": start,
         "memoryKiB": memory,
+        # Ordinary private resident pages; excludes separately accounted hugetlb.
+        "privateResidentKiB": memory["Private_Clean"] + memory["Private_Dirty"],
         "pssPlusSwapPssKiB": memory["Pss"] + memory["SwapPss"],
         "cpuTicks": after["ticks"],
     }

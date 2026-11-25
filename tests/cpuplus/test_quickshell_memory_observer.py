@@ -21,7 +21,7 @@ def stat(start=100, name="quickshell"):
 def rollup():
     values = dict.fromkeys(observer.FIELDS, 0)
     values.update(Rss=200, Pss=150, Pss_Anon=100, Pss_File=50,
-                  Private_Dirty=90, Swap=40, SwapPss=30)
+                  Private_Clean=20, Private_Dirty=90, Swap=40, SwapPss=30)
     return "\n".join(f"{k}: {v} kB" for k, v in values.items())
 
 
@@ -30,6 +30,8 @@ class ObserverTests(unittest.TestCase):
         parsed = observer.parse_rollup(rollup())
         self.assertEqual(parsed["Pss"], 150)
         self.assertEqual(parsed["Pss_Shmem"], 0)
+        self.assertEqual(parsed["Private_Clean"], 20)
+        self.assertEqual(parsed["Private_Dirty"], 90)
 
     def test_missing_duplicate_malformed(self):
         for text in (rollup().replace("SwapPss: 30 kB", ""),
@@ -40,6 +42,22 @@ class ObserverTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     observer.parse_rollup(text)
 
+    def test_private_clean_missing_malformed_or_impossible(self):
+        for text in (rollup().replace("Private_Clean: 20 kB", ""),
+                     rollup() + "\nPrivate_Clean: 20 kB",
+                     rollup().replace("Private_Clean: 20 kB", "Private_Clean: -1 kB"),
+                     rollup().replace("Private_Clean: 20 kB", "Private_Clean: 20 MB"),
+                     rollup().replace("Private_Clean: 20 kB", "Private_Clean: 111 kB")):
+            with self.subTest(text=text):
+                with self.assertRaises(ValueError):
+                    observer.parse_rollup(text)
+
+    def test_private_zero_and_exact_rss_boundary(self):
+        zero = rollup().replace("Private_Clean: 20 kB", "Private_Clean: 0 kB")
+        self.assertEqual(observer.parse_rollup(zero)["Private_Clean"], 0)
+        edge = rollup().replace("Private_Clean: 20 kB", "Private_Clean: 110 kB")
+        self.assertEqual(observer.parse_rollup(edge)["Private_Clean"], 110)
+
     def test_observe(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "123"
@@ -48,6 +66,8 @@ class ObserverTests(unittest.TestCase):
             (path / "smaps_rollup").write_text(rollup())
             row = observer.observe(path, os.getuid(), 100)
             self.assertEqual(row["pssPlusSwapPssKiB"], 180)
+            self.assertEqual(row["privateResidentKiB"], 110)
+            self.assertEqual(row["memoryKiB"]["Private_Clean"], 20)
             self.assertEqual(row["cpuTicks"], 25)
             self.assertEqual(row["startTicks"], 100)
             with self.assertRaises(ValueError):

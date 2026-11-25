@@ -34,5 +34,24 @@ class Evidence(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "confounds"):
                     m.occupied_evidence(r)
 
+class PageoutABI(unittest.TestCase):
+    def advice(self, **overrides):
+        args = dict(platform_name="linux", machine="x86_64", exported=None,
+                    supports_madvise=True)
+        args.update(overrides)
+        return m.pageout_advice(**args)
+    def test_missing_named_constant_uses_linux_uapi(self):
+        self.assertEqual(self.advice(), 21)
+    def test_named_constant_must_agree(self):
+        self.assertEqual(self.advice(exported=21), 21)
+        for value in (4, True, "21"):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                self.advice(exported=value)
+    def test_unsupported_abi_refuses(self):
+        for overrides in ({"platform_name": "win32"}, {"machine": "aarch64"},
+                          {"supports_madvise": False}):
+            with self.subTest(overrides=overrides), self.assertRaises(RuntimeError):
+                self.advice(**overrides)
+
 if __name__ == "__main__":
     unittest.main()

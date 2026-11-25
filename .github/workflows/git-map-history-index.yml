@@ -1,0 +1,20 @@
+name: Git map history index foundation
+on:
+  pull_request:
+    paths:
+      - "scripts/git_map_history_index.py"
+      - "services/git/GitMapViewportPolicy.js"
+      - "tests/git/test_git_map_history_index.py"
+      - "tests/git/test_git_map_viewport.cjs"
+      - ".github/workflows/git-map-history-index.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  index-and-viewport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -B tests/git/test_git_map_history_index.py
+      - run: node tests/git/test_git_map_viewport.cjs

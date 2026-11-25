@@ -68,7 +68,23 @@ Item {
     Connections {
         target: root.activeLease
         function onHeldChanged() {
-            if (root.activeLease && !root.activeLease.held) root.statusText="CUSTODY LOST // AVAILABLE HISTORY";
+            const lost=root.activeLease;
+            if (lost && !lost.held) {
+                // Invalidate live replies and refuse to use the frozen
+                // viewport after its continuous protection disappears.
+                root.repoEpoch++;
+                root.searchEpoch++;
+                root.activeRepo="";
+                root.activeDirectory="";
+                root.searchRequest=null;
+                root.lastMatch=null;
+                root.lookupQueued=false;
+                root.buildQueued=false;
+                root.clearPending();
+                root.activeLease=null;
+                if (root.custodyController) root.custodyController.release(lost);
+                root.statusText="CUSTODY LOST // REOPEN TO RECHECK";
+            }
         }
     }
     Component.onDestruction: {

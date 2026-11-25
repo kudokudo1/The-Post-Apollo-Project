@@ -252,6 +252,7 @@ probe_rc=0
 POST_APOLLO_C4B_TEST_GUEST=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
 python3 -I -B - "$socket" "$signer" "$pid" "$uid" "$gid" "$cgroup" "$selinux" >"$probe_log" 2>&1 <<'PY' || probe_rc="$?"
 import base64,hashlib,os,re,secrets,socket,stat,struct,subprocess,sys
+import ctypes,errno,select
 from pathlib import Path
 sys.path.insert(0,"/usr/libexec/post-apollo/identity")
 sys.path.insert(0,"/usr/local/libexec")
@@ -332,6 +333,55 @@ def read_kernel_lsm(path):
         raise RuntimeError("malformed kernel SELinux context bytes")
     return raw.decode("ascii")
 
+# Native read-only systemd process-handle observation. The installed test
+# gateway is a system service, not the human desktop session. ENODATA is
+# the exact documented absence of a login session, not a transport error.
+systemd_login=ctypes.CDLL("libsystemd.so.0")
+libc=ctypes.CDLL("libc.so.6")
+libc.free.argtypes=[ctypes.c_void_p]
+libc.free.restype=None
+for api in (systemd_login.sd_pidfd_get_unit, systemd_login.sd_pidfd_get_session):
+    api.argtypes=[ctypes.c_int,ctypes.POINTER(ctypes.c_void_p)]
+    api.restype=ctypes.c_int
+
+def sd_query(api, fd):
+    result=ctypes.c_void_p()
+    try:
+        rc=api(fd,ctypes.byref(result))
+        # Do not export the returned unit/session string to serial evidence.
+        if rc<0:
+            if result.value is not None:
+                raise RuntimeError("C4B_SD_LOGIN_INVALID_ERROR_RESULT")
+            return rc,None
+        if result.value is None:
+            raise RuntimeError("C4B_SD_LOGIN_MISSING_RESULT")
+        return rc,ctypes.cast(result,ctypes.c_char_p).value
+    finally:
+        if result.value is not None:
+            libc.free(result)
+
+def require_detached_service():
+    # Pin a live handle for this sample; original start/boot pins remain
+    # checked independently. No environment/session-ID fallback.
+    fd=os.pidfd_open(pid)
+    try:
+        poller=select.poll()
+        poller.register(fd,select.POLLIN)
+        if poller.poll(0) or start_ticks()!=pinned_start:
+            raise RuntimeError("C4B_SD_LOGIN_ORIGINAL_PROCESS_LOST")
+        rc,unit=sd_query(systemd_login.sd_pidfd_get_unit,fd)
+        if rc<0 or unit!=b"post-apollo-identity-silverblue-ci.service":
+            raise RuntimeError("C4B_SD_LOGIN_ORIGINAL_UNIT_UNVERIFIED")
+        rc,session=sd_query(systemd_login.sd_pidfd_get_session,fd)
+        if rc!=-errno.ENODATA or session is not None:
+            # Other lookup errors are unavailable evidence, never proof of
+            # no session. An actual session would require a new test design.
+            raise RuntimeError("C4B_SD_LOGIN_EXPECTED_DETACHED_SERVICE_UNVERIFIED")
+        if poller.poll(0) or start_ticks()!=pinned_start:
+            raise RuntimeError("C4B_SD_LOGIN_ORIGINAL_PROCESS_LOST")
+    finally:
+        os.close(fd)
+
 def check_origin(stage):
     require_same_kernel_boot(stage,pinned_boot_id)
     current=subprocess.check_output([
@@ -354,6 +404,7 @@ def check_origin(stage):
     groups=[line.split(":",2) for line in raw.splitlines()]
     if len(groups)!=1 or len(groups[0])!=3 or groups[0][2]!=expected_cgroup:
         raise RuntimeError(f"{stage}: kernel service cgroup changed")
+    require_detached_service()
 
 for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
     check_origin(f"before {action}")
@@ -393,6 +444,7 @@ for action in ("BEGIN","STATUS","CANCEL","RECOVER"):
         print("C4B_ID_CHALLENGE_PROOF // pub="+b64(public)+" frame="+b64(out))
     print(f"C4B_ID_PASS // INSTALLED_SIGNED_UNAVAILABLE_{action}")
 print("C4B_ID_PASS // KERNEL_PEER_PID_START_AND_SUPERVISOR_RECHECKED_FOR_FOUR_SIGNED_DENIALS")
+print("C4B_ID_PASS // REAL_SYSTEM_SERVICE_NO_LOGIN_SESSION_CI_ONLY")
 # A deliberately altered *expected* boot UUID must be rejected by the same
 # guard that reads the actual guest kernel. Never forge a changed kernel value.
 tampered_boot=(b"1" if pinned_boot_id[:1]==b"0" else b"0")+pinned_boot_id[1:]

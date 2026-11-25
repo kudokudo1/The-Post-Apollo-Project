@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-memory-ui-") as tmp:
     config.mkdir()
     shutil.copytree(ROOT / "components", config / "components")
     (config / "widgets/cpuplus").mkdir(parents=True)
-    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js", "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js", "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js", "CpuPlusDiagnosticsPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js"):
+    for name in ("CpuPlusMemoryActuatorPane.qml", "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js", "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js", "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js", "CpuPlusDiagnosticsPane.qml", "CpuPlusMemoryCapacitySlider.qml", "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml", "CpuPlusMemorySnapshot.js", "CpuPlusMemoryReadout.qml", "CpuPlusMemoryReadout.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
     for name in ("CpuPlusProcessPane.qml", "CpuPlusProcessPresentation.js", "CpuPlusProfilePane.qml", "CpuPlusProfilePreview.js", "CpuPlusProfileCatalog.js", "CpuPlusProfileCatalogStore.qml", "CpuPlusProfileComparison.js", "CpuPlusProfileComparison.qml", "CpuPlusAutoWorkspace.qml", "CpuPlusQueueHistoryPane.qml", "CpuPlusQueueHistory.js", "CpuPlusQueueRecoveryPane.qml", "CpuPlusQueueRecovery.js"):
         shutil.copy2(ROOT / "widgets/cpuplus" / name, config / "widgets/cpuplus" / name)
@@ -50,7 +50,7 @@ Scope {
                           cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, timeout=25, check=False)
     print(proc.stdout)
-    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_M11B_PINNED_PALETTE_PASS" not in proc.stdout or "CPU_M11C_COMPACT_CARDS_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
+    if proc.returncode or "CPU_MEMORY_UI_NATIVE_PASS" not in proc.stdout or "CPU_M11B_PINNED_PALETTE_PASS" not in proc.stdout or "CPU_M11C_COMPACT_CARDS_PASS" not in proc.stdout or "CPU_M11D_INSTRUMENT_PASS" not in proc.stdout or "CPU_PROFILE_NATIVE_PASS" not in proc.stdout or "CPU_MEMORY_UI_NATIVE_FAIL" in proc.stdout:
         raise SystemExit("Native UI fixture failed")
 
     # Separate fixture preserves the M4h memory navigation test's ownership.

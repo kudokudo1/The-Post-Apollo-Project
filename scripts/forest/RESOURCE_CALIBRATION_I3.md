@@ -74,3 +74,35 @@ Independent review I1/I2/I3; next evidence-producer and trial measurement
 design with ForestW, then separately approved native sampling scope.
 No duplicate governor, scheduler or new service. No workstation changes.
 C5 native private integration remains separately HOLD.
+
+
+## H8 // Original Forest residency-aware accounting recovery
+
+Original [resources/live_providers.py](https://github.com/kudokudo1/The-Post-Apollo-Forest-Project/blob/28895aafdddb07cf402f1e75574eea1ee79a516d/raw-import/2026-09-22-transfer/The-Forest/bristlecone/resources/live_providers.py)
+(blob 02bb29e3da4df54c5977b3fa277da71936d4d8b6) recognizes
+additional demand may differ when weights already reside in memory.
+Its 6144 MiB historical floor, CPU-only assumption, and subtraction
+of aggregate Ollama resident bytes are NOT recovered as live policy.
+
+H8 adds residency_budget_reference(binding_result, current_profile,
+cold=..., warm=...) to I3. The existing exact profile, trial and
+summary are reused; no parallel governor, store or provider.
+Optional separate cold/warm summaries must match exact model/runtime/
+configuration, hardware/boot, measurement scope, accelerator, workload,
+reasoning, prompt tokens and thread setting. Distinct baseline and
+residency are allowed across campaigns, but not within a campaign.
+Reject reused trial IDs and same baseline fingerprint across cold/warm.
+The selected increment comes only from the exact current profile,
+including baseline fingerprint and residency; no cross-residency
+fallback. Other campaign numbers are comparison-only; incomplete or
+unknown values remain null. A zero observed increment is not zero
+requirement. No assumption warm is always cheaper. Report rounded-up
+per-trial observed incremental maxima, never subtract model size,
+never construct ResourceRequirement, and never add residency to free RAM.
+
+Caller-supplied current profile does not prove actual residency,
+currentness or authenticated source. All outputs stay UNKNOWN_HOLD.
+Real baseline attribution, native workload bounds, measured coverage,
+independent headroom and operator-approved trial still required.
+No R6 source or runtime changes. H7 independently reviewed/merged
+on its own path; H8 does not depend on its new function.

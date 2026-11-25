@@ -14,7 +14,7 @@ oldpolicy=(r/"widgets/FinanceStockModePolicy.js").read_text()
 
 assert app.count("PanelWindow {") == 1
 assert app.count("FinanceToolHost {") == 1
-assert app.count("FinanceServices.FinanceStockHistoryReadService {") == 1
+assert "FinanceServices.FinanceStockHistoryReadService {" not in app
 assert 'label: "POLYMARKET"' in market and 'label: "OSIRIS"' in market
 assert 'label: "STOCKS"' in market
 
@@ -43,11 +43,14 @@ assert 'stocks.inspectedPoint.price.toFixed(2)' in pane
 assert 'stocks.snapshot.symbol' in pane
 assert 'stocks.snapshot.priceBasis' in pane
 assert 'CLICK A DATA POINT TO INSPECT' in pane
-assert pane.count("FinanceDateInput {") == 3
+dates=(r/"widgets/FinanceMarketDateControls.qml").read_text()
+assert dates.count("FinanceDateInput {") == 2
+for name in ("FinanceGlobalPricePane.qml","FinanceAlphaVantageFreePane.qml"):
+    assert "FinanceMarketDateControls {" in (r/"widgets"/name).read_text()
 assert 'label: "DAY"' in pane and 'label: "RANGE"' in pane
-assert 'stocks.stockFeed.refresh()' in pane
-assert 'stocks.stockFeed.selectMode("day")' in pane
-assert 'stocks.stockFeed.selectMode("range")' in pane
+assert 'stocks.openLoadedDay(' in pane and 'stocks.returnToRange()' in pane
+assert 'stocks.stockFeed.refresh()' not in pane
+assert 'stocks.stockFeed.selectMode(' not in pane
 
 assert 'function pointAt(bars, width, height, index)' in policy
 assert 'function nearestPoint(bars, width, height, x, y, radius)' in policy

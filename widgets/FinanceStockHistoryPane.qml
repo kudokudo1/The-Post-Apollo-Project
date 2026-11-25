@@ -7,7 +7,8 @@ import "FinanceStockRangeAnalysisPolicy.js" as RangeAnalysisPolicy
 // Market STOCKS M14: one-step BACK TO RANGE restores previously loaded chart.
 Item {
     id: stocks
-    property var stockFeed: null
+    property bool sessionEnabled: false
+    readonly property bool stocksSessionActive: visible && sessionEnabled
     property bool discoveryOpen: true
     property bool quotaOpen: false
     // M41: presentation only. Both research views retain the same data and
@@ -32,14 +33,13 @@ Item {
             discoveryOpen = true;
         }
     }
-    // M46b: one worldwide stock universe. Legacy service is retained only
-    // as the existing Finance monitoring/lifecycle witness, not a price source.
+    // M46e1: the parent supplies a lifecycle gate, not a legacy price feed.
     property var globalHistory: null
     property string globalHandoffMessage: ""
     readonly property bool globalHistoryActive: globalHistory !== null
     readonly property var snapshot: globalHistory
     function acceptGlobalHistory(identity, listing, data) {
-        if (!discoveryOpen || !visible || !stockFeed || !stockFeed.monitoring) return false;
+        if (!discoveryOpen || !stocksSessionActive) return false;
         const captured=RangeAnalysisPolicy.captureGlobalHistory(identity,listing,data);
         if (!captured) {
             globalHandoffMessage="GLOBAL HISTORY REFUSED // INVALID DATA OR LISTING";
@@ -58,14 +58,14 @@ Item {
         return true;
     }
     function openControls() {
-        if (!visible || !stockFeed || !stockFeed.monitoring) return;
+        if (!stocksSessionActive) return;
         stocks.quotaOpen = false;
         globalHandoffMessage = "";
         discoveryOpen = !discoveryOpen;
         if (discoveryOpen) scroll.contentY = 0;
     }
     function openQuotaStatus() {
-        if (!visible || !stockFeed || !stockFeed.monitoring) return;
+        if (!stocksSessionActive) return;
         stocks.discoveryOpen = false;
         quotaOpen = true;
     }
@@ -81,7 +81,7 @@ Item {
     function returnToRange() { dayDate=""; }
     readonly property string priceUnit: globalHistoryActive ? globalHistory.currency+" " : ""
     readonly property string historySource: globalHistoryActive
-        ? (globalHistory.source === "eodhd-eod" ? "EODHD" : "ALPHA VANTAGE")
+        ? (globalHistory.source === "eodhd-eod" ? (globalHistory.currencySource==="eodhd-demo-catalog"?"EODHD DEMO":"EODHD") : "ALPHA VANTAGE")
         : ""
     readonly property var priceBars: snapshot && Array.isArray(snapshot.bars)
         ? snapshot.bars : []
@@ -252,7 +252,7 @@ Item {
             labelPixelSize: 9
             selected: stocks.discoveryOpen
             accentColor: Colors.magenta
-            available: stocks.stockFeed && stocks.stockFeed.monitoring
+            available: stocks.stocksSessionActive
             onLeftClicked: stocks.openControls()
         }
         ActionButton {
@@ -271,7 +271,7 @@ Item {
             label: "QUOTA STATUS"
             labelPixelSize: 9
             accentColor: Colors.orange
-            available: stocks.stockFeed && stocks.stockFeed.monitoring
+            available: stocks.stocksSessionActive
             onLeftClicked: stocks.openQuotaStatus()
         }
     }
@@ -365,7 +365,7 @@ Item {
                 visible: stocks.discoveryOpen
                 // Disclosure is not the lifetime of an authorized read session.
                 // Closing controls retains their validated, in-memory selections.
-                sessionActive: stocks.visible && !!stocks.stockFeed && stocks.stockFeed.monitoring
+                sessionActive: stocks.stocksSessionActive
                 active: stocks.discoveryOpen && sessionActive
                 onExitRequested: stocks.discoveryOpen = false
                 onQuotaRequested: stocks.openQuotaStatus()
@@ -1578,7 +1578,7 @@ Item {
         anchors.fill: parent
         visible: stocks.quotaOpen
         active: stocks.quotaOpen && stocks.visible
-            && stocks.stockFeed && stocks.stockFeed.monitoring
+            && stocks.stocksSessionActive
         z: 25
         onExitRequested: stocks.quotaOpen = false
     }

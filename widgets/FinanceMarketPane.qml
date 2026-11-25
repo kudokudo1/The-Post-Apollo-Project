@@ -6,7 +6,7 @@ import "../components"
 Item {
     id: pane
     property var marketFeed: null
-    property var stockFeed: null
+    property bool stocksSessionEnabled: false
     property string displayLevel: "compact"
     property int selectedIndex: 0
     readonly property bool wide: width >= 660
@@ -430,7 +430,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         visible: pane.activeTool === "stocks"
-        stockFeed: pane.stockFeed
+        sessionEnabled: pane.stocksSessionEnabled
     }
 
     FinanceOsirisPane {

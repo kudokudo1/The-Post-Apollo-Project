@@ -15,9 +15,10 @@ assert root.count("PanelWindow {")==1
 assert root.count("FinanceToolHost {")==1
 assert root.count("FinanceServices.FinanceMarketReadService {")==1
 assert root.count("FinanceServices.FinanceSecPriceReadService {")==1
-assert root.count("FinanceServices.FinanceStockHistoryReadService {")==1
+assert "FinanceServices.FinanceStockHistoryReadService {" not in root
 assert 'monitoring: root.menuOpen && root.selectedMainMode === "market"' in root
-assert "stockFeed: stockHistoryService" in root
+assert 'stocksSessionEnabled: root.menuOpen && root.selectedMainMode === "market"' in root
+assert "stockFeed: stockHistoryService" not in root
 assert "marketFeed: marketService" in root
 assert 'Quickshell.shellPath("scripts/finance/read_sec_price_optional_hub.mjs")' in existing
 assert 'Quickshell.shellPath("scripts/finance/read_market_price_range_optional_hub.mjs")' in service
@@ -49,15 +50,17 @@ assert 'label: "OSIRIS"' in market
 assert 'label: "STOCKS"' in market
 assert 'pane.activeTool === "stocks"' in market
 assert 'FinanceStockHistoryPane {' in market
-assert 'stockFeed: pane.stockFeed' in market
+assert 'sessionEnabled: pane.stocksSessionEnabled' in market
 assert 'FinanceOsirisPane {' in market
 
 assert 'Canvas {' in pane
 assert 'onPriceBarsChanged: {' in pane
 assert 'selectedPointIndex = -1;' in pane
 assert 'Math.min.apply(null,nums)' in pane
-assert 'property var stockFeed: null' in market
-assert 'property var stockFeed: null' in pane
+assert 'property bool stocksSessionEnabled: false' in market
+assert 'property bool sessionEnabled: false' in pane
+assert 'readonly property bool stocksSessionActive: visible && sessionEnabled' in pane
+assert 'stockFeed' not in pane and 'stockFeed' not in market
 
 assert 'createMarketDataHub' in hub
 assert 'getPriceContext' in hub

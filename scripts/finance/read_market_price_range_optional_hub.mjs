@@ -10,7 +10,8 @@ const ERRORS=new Set(["invalid-range","invalid-selection","unknown-provider",
   "provider-busy","provider-key-required","demo-not-authorized",
   "provider-unavailable","provider-response-too-large","provider-invalid",
   "invalid-price-data","invalid-provider-snapshot","token-unreadable",
-  "token-permissions","token-invalid","provider-failed"]);
+  "token-permissions","token-invalid","provider-failed",
+  "local-quota-exhausted","local-quota-unavailable"]);
 function fail(code){const error=new Error(code);error.code=code;return error;}
 function refused(error){
   return error?.cause?.code==="ECONNREFUSED" || error?.code==="ECONNREFUSED";

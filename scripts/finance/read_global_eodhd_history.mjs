@@ -159,6 +159,24 @@ export async function readHistory(symbol,currency,from,to,fetcher=fetch,
   const raw=await responseJson(response,MAX_HISTORY_BYTES);
   return normalizeHistory(raw,symbol,currency,from,to,now());
 }
+// M46e2: deliberately small intersection of the EOD endpoint and plans docs.
+// No automatic fallback to demo, no reading the operator's private key.
+export async function readDemoHistory(symbol,currency,from,to,fetcher=fetch,
+    today=new Date().toISOString().slice(0,10),now=()=>new Date().toISOString()) {
+  if(!["AAPL.US","TSLA.US"].includes(symbol) || currency!=="USD")
+    fail("demo-listing-not-supported");
+  let result;
+  try {
+    result=await readHistory(symbol,currency,from,to,fetcher,async()=>"demo",today,now);
+  } catch(error) {
+    if(["provider-key-invalid","provider-not-entitled"].includes(error?.message))
+      fail("demo-not-authorized");
+    throw error;
+  }
+  result.currencySource="eodhd-demo-catalog";
+  result.scope="Explicit documented demo listing; not an OpenFIGI identity match";
+  return result;
+}
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
     const args=process.argv.slice(2);
@@ -167,6 +185,8 @@ if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
       ? await findCandidates(args[1],local.fetcher)
       : args[0]==="history" && args.length===5
       ? await readHistory(args[1],args[2],args[3],args[4],local.fetcher)
+      : args[0]==="demo-history" && args.length===5
+      ? await readDemoHistory(args[1],args[2],args[3],args[4],local.fetcher)
       : fail("invalid-command");
     if(local.latest())result.localQuota=local.latest();
     process.stdout.write("FINANCE_GLOBAL_EODHD "+JSON.stringify(result)+"\n");
@@ -176,7 +196,7 @@ if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
       "provider-key-invalid","provider-not-entitled","rate-limited",
       "provider-unavailable","provider-response-too-large","provider-invalid",
       "invalid-price-data","token-unreadable","token-permissions","token-invalid",
-      "local-quota-exhausted","local-quota-unavailable"]);
+      "local-quota-exhausted","local-quota-unavailable","demo-listing-not-supported","demo-not-authorized"]);
     const reason=known.has(error?.message)?error.message:"provider-failed";
     process.stdout.write("FINANCE_GLOBAL_EODHD_ERROR "+reason+"\n");
     process.exitCode=1;

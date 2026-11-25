@@ -210,6 +210,10 @@ export function createMarketDataHub({
             || (result.bars.length<2 && result.changePct!==null))
           throw fail("invalid-provider-snapshot");
       } catch(error){
+        // Range-specific contract; SEC context adapter remains unchanged.
+        const code=error?.code || error?.message;
+        if (code==="local-quota-exhausted" || code==="local-quota-unavailable")
+          throw fail(code);
         throw sanitizeError(error);
       }
       const captured=now();

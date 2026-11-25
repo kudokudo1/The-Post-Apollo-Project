@@ -22,7 +22,8 @@ class SequenceTest(unittest.TestCase):
                              Limits(CAP, 0, QUOTA, (2, 3), TASK_CAP),
                              2_300_000_000, 2_400_000_000)
         self.terminal = Terminal(self.process, self.outer, 0,
-                                 3_000_000_000, 3_100_000_000, 3_200_000_000)
+                                 3_000_000_000, 3_100_000_000,
+                                 populated=0, tasks=0, disposed_ns=3_200_000_000)
 
     def check(self, **overrides):
         kw = dict(plan=self.plan, parent_preflight_end_ns=1_900_000_000,

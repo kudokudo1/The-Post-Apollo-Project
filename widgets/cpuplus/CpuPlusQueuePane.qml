@@ -17,13 +17,17 @@ Column {
     readonly property var session: actionContext ? actionContext.state : null
     readonly property var display: QueueView.project(actionContext
         ? (session && session.status ? actionContext.projection : null) : runtimeProjection)
-    readonly property bool sessionUsable: session !== null && session !== undefined
-        && session.status && !session.pending && !session.unresolved
-        && session.status.state === display.state && session.status.requestId === display.requestId
-        && session.status.targetGiB === display.targetGiB && session.status.canExecute === false
-        && display.canExecute === false && display.outcome === "UNVERIFIED"
-        && actionContext.projection && actionContext.projection.status
-        && session.status.code === actionContext.projection.status.code
+    readonly property bool sessionUsable: usableContext(actionContext)
+    function usableContext(context) {
+        if (!context || !context.state || !context.projection) return false;
+        const current = context.state;
+        const view = QueueView.project(context.projection);
+        return !!(current.status && !current.pending && !current.unresolved
+            && current.status.state === view.state && current.status.requestId === view.requestId
+            && current.status.targetGiB === view.targetGiB && current.status.canExecute === false
+            && view.canExecute === false && view.outcome === "UNVERIFIED"
+            && context.projection.status && current.status.code === context.projection.status.code);
+    }
     property var preparation: null
     property var submitted: null
     property string expiryText: ""
@@ -32,8 +36,11 @@ Column {
         preparation = null;
         // A new, correlated host snapshot or pending/uncertain state can
         // supersede the local click latch; a same-revision echo cannot.
-        if (submitted && session && (session.ownerId !== submitted.ownerId
-                || session.sequence > submitted.statusSequence || session.pending || session.unresolved))
+        // Use the new input directly: the derived session binding may not
+        // have re-evaluated when this QML change signal fires.
+        const current = actionContext ? actionContext.state : null;
+        if (submitted && current && (current.ownerId !== submitted.ownerId
+                || current.sequence > submitted.statusSequence || current.pending || current.unresolved))
             submitted = null;
     }
     onVisibleChanged: if (!visible) preparation = null
@@ -49,15 +56,17 @@ Column {
         return ms / 1000;
     }
     function candidate(kind) {
-        if (!visible || !sessionUsable || submitted || !session) return null;
+        const context = actionContext;
+        if (!visible || submitted || !usableContext(context)) return null;
+        const current = context.state;
         const hasTarget = kind === "QUEUE" || kind === "REPLACE";
         // This is only a UI bound. DOC 4 must validate exact current base target,
         // independent identities, expiry and supported withdrawal scope.
         if (hasTarget && (!Number.isSafeInteger(observedDiskKiB)
                 || capacityTargetGiB * 1048576 >= observedDiskKiB)) return null;
-        const result = Consumer.prepare(session,kind,
+        const result = Consumer.prepare(current,kind,
             hasTarget ? capacityTargetGiB : null, hasTarget ? expirySeconds(expiryText) : null);
-        return result !== session ? result.prepared : null;
+        return result !== current ? result.prepared : null;
     }
     function prepareIntent(kind) {
         if (preparation) return;

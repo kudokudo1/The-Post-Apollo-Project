@@ -247,10 +247,26 @@ ShellRoot {
                             && smoke.lastIntent.expectedId === report.status.request_id
                             && smoke.lastIntent.statusSequence === 2 && queue.preparation === null
                             && MemoryOperation.requests === 0,"only one explicit intent signal")) return;
+                        // Same revision echo must not release the latch.
+                        queue.actionContext = {state:newer,projection:report};
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.submitted && queue.preparation === null,
+                            "same revision cannot rearm")) return;
+                        // Host clears the context during pending/reply, then publishes
+                        // a newer status. The pane must not retain the old click latch.
                         queue.actionContext = null;
                         queue.prepareIntent("CANCEL");
                         if (!smoke.check(queue.preparation === null && queue.display.state === "NOT CONNECTED",
                             "owner loss disables controls")) return;
+                        const after = Consumer.acceptStatus(newer,Object.assign({},envelope,{
+                            sequence:4,next_action_sequence:2}),QueueView.project);
+                        queue.actionContext = {state:after,projection:report};
+                        queue.prepareIntent("CANCEL");
+                        if (!smoke.check(queue.submitted === null && queue.preparation
+                            && queue.preparation.statusSequence === 4 && queue.preparation.actionSequence === 2
+                            && smoke.intentCount === 1,"new host publication releases previous click latch")) return;
+                        queue.cancelIntent();
+                        queue.actionContext = null;
                     }
                     if (smoke.phase < 5) pane.selectMenu(smoke.phase + 1);
                     else pane.selectMenu(0);

@@ -133,7 +133,10 @@ assert.equal(queueCtx.project({...packet,status:{...packet.status,code:"UNKNOWN_
 assert.match(pane,/active: root.page === "AUTO"[\s\S]*?sourceComponent: CpuPlusQueuePane[\s\S]*?runtimeProjection: null/);
 const queuePane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusQueuePane.qml"),"utf8");
 assert.doesNotMatch(queuePane,/\b(?:Process|Timer|MemoryOperation|pkexec|sudo|execDetached)\b/);
-assert.match(queuePane,/Consumer.prepare\(session,kind/);
+assert.match(queuePane,/Consumer.prepare\(current,kind/);
+assert.match(queuePane,/onActionContextChanged:[\s\S]*?const current = actionContext \? actionContext.state : null/);
+assert.match(queuePane,/current.sequence > submitted.statusSequence/);
+assert.match(queuePane,/if \(!visible \|\| submitted \|\| !usableContext\(context\)\) return null/);
 assert.match(queuePane,/intentConfirmed\(Object.assign\(\{\},frozen\)\)/);
 assert.match(queuePane,/onVisibleChanged: if \(!visible\) preparation = null/);
 assert.match(pane,/sourceComponent: CpuPlusQueuePane[\s\S]*?actionContext: null/);

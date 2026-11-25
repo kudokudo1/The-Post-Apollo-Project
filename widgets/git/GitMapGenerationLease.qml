@@ -10,6 +10,7 @@ Item {
     property int owners: 0
     property string custodyState: "NEW"
     property bool reaped: false
+    readonly property int helperPid: keeper.running ? keeper.processId : 0
     readonly property bool held: custodyState==="HELD" && keeper.running
     readonly property bool terminal: custodyState==="FAILED" || custodyState==="CLOSED"
     signal ended()

@@ -19,7 +19,16 @@ ShellRoot {
     readonly property string ackTrial: (Quickshell.env("POST_APOLLO_QUEUE_ACK_TRIAL") || "")
     readonly property var reviewView: Host.reviewContext(host)
     readonly property string gateTrial: (Quickshell.env("POST_APOLLO_QUEUE_GATE_TRIAL") || "")
+    readonly property string crashTrial: (Quickshell.env("POST_APOLLO_QUEUE_CRASH_TRIAL") || "")
+    readonly property bool restoreTrial: Quickshell.env("POST_APOLLO_QUEUE_CRASH_RESTORE") === "1"
     property int gateTicket: 0
+    function crashPoint(name) {
+        // Hold at an exact evidence boundary until the external supervisor
+        // kills this shell. Never send the withheld frame or feed the reply.
+        dropping=true;
+        phase=90;
+        console.log("QUEUE_R3_CRASH_POINT // "+name);
+    }
     property int durableSaves: 0
     property bool gateLoadDone: false
     property int reviewWrites: 0
@@ -62,6 +71,19 @@ ShellRoot {
         if (done || dropping) return;
         let packet;
         try { packet = JSON.parse(line); } catch (_) { check(false,"parse"); return; }
+        if (crashTrial==="COMMITTED" && !restoreTrial && phase===2 && packet.kind==="ACTION") {
+            if (!check(packet.disposition==="REPORTED" && !!packet.result.request.id
+                && host.session.pending && commits===1,"committed before lost response")) return;
+            crashPoint("COMMITTED");
+            return;
+        }
+        if (crashTrial==="ACK_SAVED" && !restoreTrial && phase===10 && packet.kind==="RECOVERY_ACK") {
+            if (!check(packet.receipt.review.review_id===reviewId
+                && packet.receipt.disposition==="REVIEW_ACKNOWLEDGED_ONLY"
+                && host.reviewFlow.phase==="WAIT_ACK","ack durable before lost response")) return;
+            crashPoint("ACK_SAVED");
+            return;
+        }
         if (phase === 2 && packet.kind === "ACTION" && stagedTrial !== "ROUNDTRIP") {
             if (!check(!timeoutTrial,"delayed child replied before watchdog")) return;
             // Observe the reply only in the harness, never deliver to Host.
@@ -89,6 +111,10 @@ ShellRoot {
         if (packet.kind === "PREPARED_ACTION") {
             if (!check(!!stagedTrial && host.stage.phase === "RECEIPT_READY"
                 && host.session.pending && commits === 0,"validated live receipt")) return;
+            if (crashTrial==="PREPARED" && !restoreTrial) {
+                crashPoint("PREPARED");
+                return;
+            }
             if (stagedTrial === "EOF") {
                 dropping = true;
                 child.stdinEnabled = false;
@@ -136,7 +162,19 @@ ShellRoot {
             if (operation==="LOAD") {
                 if (!smoke.check(generation===1 && !!result,"startup load succeeded")) return;
                 const restored=Host.restoreCheckpoint(Consumer,result.snapshot,Recovery.row);
-                if (!smoke.check(!!restored && restored.startupLocked && !restored.session.unresolved,"empty locked startup")) return;
+                if (!smoke.check(!!restored && restored.startupLocked
+                    && (smoke.restoreTrial ? !!restored.session.unresolved : !restored.session.unresolved),
+                    "locked startup evidence")) return;
+                if (smoke.restoreTrial) {
+                    if (!smoke.check(restored.session.unresolved.action_id===smoke.actionId
+                        && !restored.session.pending && !restored.stage && !restored.reviewFlow
+                        && !restored.checkpointWait && !Host.takeCommit(restored,1).frame,
+                        "restored evidence not live continuation")) return;
+                    const wantsAck=smoke.crashTrial==="ACK_BEFORE" || smoke.crashTrial==="ACK_SAVED";
+                    if (!smoke.check(!!restored.reviewLost===wantsAck,"restored exact acknowledgment presence")) return;
+                    smoke.reviewId=restored.reviewLost?.review_id || "";
+                    smoke.phase=91;
+                }
                 smoke.host=restored;
                 smoke.gateLoadDone=true;
                 smoke.launch(1);
@@ -157,6 +195,11 @@ ShellRoot {
             ++smoke.durableSaves;
             if (!smoke.check(!Host.finishCheckpoint(smoke.host,result,generation,Consumer,Recovery.row).frame,
                 "duplicate completion refused")) return;
+            if (!smoke.restoreTrial && ((smoke.crashTrial==="BEFORE_PREPARE" && result.record.kind==="ACTION")
+                || (smoke.crashTrial==="ACK_BEFORE" && result.record.kind==="REVIEW_ACK"))) {
+                smoke.crashPoint(smoke.crashTrial);
+                return;
+            }
             child.write(sent.frame);
         }
     }
@@ -166,6 +209,7 @@ ShellRoot {
         timeouts: ({HELLO:5000,PUBLICATION:5000,ACTION:smoke.gateTrial?5000:1200,HISTORY:3000,RECOVERY:smoke.gateTrial?5000:3000,PARTIAL_FRAME:2000})
         onPolicyRejected: generation => smoke.check(false,"watchdog policy rejected")
         onDeadlineExpired: (generation,category,ticket) => {
+            if (smoke.phase===90) return; // supervisor owns the crash boundary
             if (!smoke.check(smoke.timeoutTrial && smoke.phase===2 && category==="ACTION"
                 && generation===smoke.host.generation && smoke.watchdogTrips===0,"exact action watchdog")) return;
             ++smoke.watchdogTrips;
@@ -218,8 +262,61 @@ ShellRoot {
         repeat: true
         running: smoke.armed && !smoke.done
         onTriggered: {
+            if (smoke.phase===90) return;
             if (++smoke.ticks > 280) { smoke.check(false,"timeout " + smoke.phase); return; }
-            if (smoke.phase === 0 && smoke.host.session.status) {
+            if (smoke.phase===91 && smoke.host.session.status) {
+                if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
+                    && !smoke.host.session.pending && !smoke.host.stage
+                    && !smoke.host.reviewFlow && !Host.takeCommit(smoke.host,smoke.host.generation).frame
+                    && !smoke.reviewView.canAcknowledge && smoke.writes===0 && smoke.ackWrites===0,
+                    "fresh process no live continuation")) return;
+                pane.prepareIntent("QUEUE");
+                if (!smoke.check(!pane.preparation,"fresh shell cannot mutate")) return;
+                smoke.phase=92;
+                recoveryPane.requestRead("LOCAL_ACTION",smoke.actionId);
+                if (!smoke.check(smoke.reads===1,"explicit exact action lookup")) return;
+            } else if (smoke.phase===92 && recoveryPane.localView) {
+                const v=recoveryPane.localView;
+                const missing=smoke.crashTrial==="BEFORE_PREPARE";
+                const committed=smoke.crashTrial==="COMMITTED";
+                if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
+                    && (missing ? v.missing && v.record===null
+                        : !!v.record && v.record.actionId===smoke.actionId
+                          && v.record.state===(committed?"COMMITTED":"PREPARED")
+                          && (committed ? v.record.resultId===smoke.host.session.status.requestId && !!v.record.resultId
+                            : v.record.resultId===null)),
+                    "restored exact action state")) return;
+                if (smoke.reviewId) {
+                    const next=Host.readReviewReceipt(smoke.host,smoke.reviewId);
+                    if (!smoke.check(!!next.frame,"explicit restored receipt lookup")) return;
+                    smoke.phase=93;
+                    smoke.host=next.state;
+                    ++smoke.receiptReads;
+                    child.write(next.frame);
+                } else {
+                    smoke.phase=94;
+                    smoke.dropping=true;
+                    child.stdinEnabled=false;
+                }
+            } else if (smoke.phase===93 && !smoke.host.reviewFlow) {
+                const v=smoke.reviewView;
+                const found=smoke.crashTrial==="ACK_SAVED";
+                if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
+                    && !v.canAcknowledge && (found
+                        ? !!v.receipt && v.receipt.review.review_id===smoke.reviewId && v.unknownReviewId===null
+                        : v.receipt===null && v.unknownReviewId===smoke.reviewId),
+                    "restored exact historical receipt or unknown")) return;
+                smoke.phase=94;
+                smoke.dropping=true;
+                child.stdinEnabled=false;
+            } else if (smoke.phase===94 && smoke.exited) {
+                if (!smoke.check(smoke.writes===0 && smoke.ackWrites===0 && smoke.commits===0
+                    && smoke.durableSaves===0 && smoke.host.startupLocked && smoke.host.session.unresolved,
+                    "no replay or unlock after full crash")) return;
+                console.log("QUEUE_R3_CRASH_RESTORE_PASS // "+smoke.crashTrial);
+                smoke.done=true;
+                Qt.quit();
+            } else if (smoke.phase === 0 && smoke.host.session.status) {
                 if (!smoke.check(smoke.host.startupLocked && smoke.host.session.status.state === "IDLE REPORTED","initial locked")) return;
                 if (!smoke.check(watchdog.activeCount===0,"idle no active deadlines")) return;
                 smoke.oldOwner = smoke.host.session.ownerId;

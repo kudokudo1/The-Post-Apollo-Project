@@ -5,6 +5,8 @@ on:
       - 'scripts/forest/history_public_fixture_m4.py'
       - 'scripts/forest/layered_hot_context_m7a.py'
       - 'scripts/forest/task_sticky_context_m7b.py'
+      - 'scripts/forest/TASK_STICKY_CONTEXT_M7C.md'
+      - 'tests/forest/test_task_sticky_context_m7c.py'
       - 'scripts/forest/TASK_STICKY_CONTEXT_M7B.md'
       - 'tests/forest/test_task_sticky_context_m7b.py'
       - 'scripts/forest/MIND_ORIGINAL_RECOVERY_M7.md'
@@ -52,3 +54,6 @@ jobs:
         run: python3 -B -m unittest discover -s tests/forest -p 'test_layered_hot_context_m7a.py' -v
       - name: M7b recovered task-sticky context
         run: python3 -B -m unittest discover -s tests/forest -p 'test_task_sticky_context_m7b.py' -v
+
+      - name: M7c selective derived shedding
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_task_sticky_context_m7c.py' -v

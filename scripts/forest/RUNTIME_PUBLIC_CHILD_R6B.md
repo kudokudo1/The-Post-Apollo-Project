@@ -28,12 +28,28 @@ fresh page ID and pinned cursor/revision; no fake runtime operation.
 Retire old presentation before NEXT/REOPEN/CLOSE. Third fixture is
 STOP-only (no sixth row). After aborted/unknown only CLOSE allowed.
 
+REOPEN custody correction (DOC3F #7161343262, Nurse2F #7162318447):
+before retirement or R5's pathname reopen, validate exact current idle
+journal in a read transaction against original path, directory and
+file device/inode, private owner directory and regular single-link file.
+Repeat path identity immediately after retirement, before the opener,
+then retain full post-reopen snapshot verification. Missing, replaced
+or symlink path before the opener refuses without opening an alternate
+journal. This is disposable owner-controlled pathname evidence, not
+descriptor-pinned SQLite custody or protection against concurrent same-UID
+substitution between checks and open. No real protected reopen approved.
+REFUSED concerns the current pre-effect action; it does not negate earlier
+committed work. A post-effect failure is UNKNOWN_HOLD, never retry.
+
 Tests: isolated subprocess happy path, independent SQLite row/attempt
 evidence, same-session alias continuity across reopen, stale/false ACK,
 lost result with actual durable append, stale request, replay, malformed
 raw input/EOF/timeout and bounded canonical codec. Direct owner tests inspect
 missing/wrong/false ACK before cleanup, plus blocked pipe write deadline
-and conservative reserve refusal. Actual Quickshell parent parser/drain/
+and conservative reserve refusal. REOPEN regressions cover missing,
+replacement, symlink and nonprivate directory before opener (with direct
+opener/retirement spies), real child refusal and post-open path mismatch.
+Actual Quickshell parent parser/drain/
 currentness, native joined panel, full cumulative budget-exhaustion matrix
 and security review remain separate.
 No live SEND/STOP, native Ollama, protected disclosure or production.

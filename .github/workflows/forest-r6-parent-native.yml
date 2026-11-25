@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'tests/forest/r6_parent/**'
+      - 'scripts/forest/**'
+      - 'widgets/forest/ui2/PublicRuntimeStatusDisplay.js'
       - '.github/workflows/forest-r6-parent-native.yml'
   workflow_dispatch:
 permissions:
@@ -25,20 +27,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Checkout pinned Runtime counterpart (draft dependency)
-        uses: actions/checkout@v4
-        with:
-          ref: ec9ca309b1836a35ae3e5506236bb36cf86f887a
-          path: r6-counterpart
-          persist-credentials: false
       - name: Stage fixed sources and run nonroot disposable trials
         run: |
           set -eu
-          test "$(git -C r6-counterpart rev-parse HEAD)" = "ec9ca309b1836a35ae3e5506236bb36cf86f887a"
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           mkdir -p "$work/scene/runtime" "$work/home" "$work/run" "$work/config" "$work/cache" "$work/data"
-          for n in 0 1 2; do mkdir -m 700 "$work/scene/private$n"; done
+          for n in 0 1 2 3; do mkdir -m 700 "$work/scene/private$n"; done
           for f in ParentWire.js ParentProcess.qml shell.qml; do
             cp "tests/forest/r6_parent/$f" "$work/scene/$f"
             cmp "tests/forest/r6_parent/$f" "$work/scene/$f"
@@ -46,8 +41,8 @@ jobs:
           cp widgets/forest/ui2/PublicRuntimeStatusDisplay.js "$work/scene/"
           cmp widgets/forest/ui2/PublicRuntimeStatusDisplay.js "$work/scene/PublicRuntimeStatusDisplay.js"
           for f in runtime_public_child_r6b.py runtime_public_conversation_r5.py session_journal_v0.py turn_bridge_b3.py shared_context_b6r1.py context_first_tree_m2.py runtime_events_r3.py runtime_public_status_r4.py runtime_public_delivery_r4b.py history_public_fixture_m4.py recovery_inspect_b4d.py ollama_chat_transport.py ollama_inventory.py capability_registry_b6r2.py runtime_stop_control_r2.py local_terminal_outbox_b4f.py; do
-            cp "r6-counterpart/scripts/forest/$f" "$work/scene/runtime/$f"
-            cmp "r6-counterpart/scripts/forest/$f" "$work/scene/runtime/$f"
+            cp "scripts/forest/$f" "$work/scene/runtime/$f"
+            cmp "scripts/forest/$f" "$work/scene/runtime/$f"
           done
           chown -R forest-r6-ci:forest-r6-ci "$work"
           chmod 700 "$work/run"
@@ -58,7 +53,7 @@ jobs:
           cat "$work/log"
           test "$code" -eq 0
           if grep -q R6_PARENT_FAIL "$work/log"; then exit 1; fi
-          observed="$(grep -oE 'R6_PARENT_CASE_PASS [0-2]' "$work/log" || true)"
-          expected="$(printf 'R6_PARENT_CASE_PASS %s\n' 0 1 2)"
+          observed="$(grep -oE 'R6_PARENT_CASE_PASS [0-3]' "$work/log" || true)"
+          expected="$(printf 'R6_PARENT_CASE_PASS %s\n' 0 1 2 3)"
           test "$observed" = "$expected"
           test "$(grep -c R6_PARENT_NATIVE_PASS "$work/log")" -eq 1

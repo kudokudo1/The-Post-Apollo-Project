@@ -167,5 +167,29 @@ class RealSilverblueC3eAGOwnerIntegration(unittest.TestCase):
         self.assertIn("NO_INDEPENDENT_RELEASE_ROOT_SEAT_OR_C5_CONSENT",HARNESS)
 
 
+
+    def test_17_actual_service_session_observation_is_handle_bound(self):
+        start = PROBE.index("def require_detached_service():")
+        end = PROBE.index("def check_origin(stage):", start)
+        body = PROBE[start:end]
+        for required in ("os.pidfd_open(pid)", "poller.poll(0)",
+                         "start_ticks()!=pinned_start", "sd_pidfd_get_unit",
+                         "sd_pidfd_get_session", "rc!=-errno.ENODATA",
+                         "session is not None", "os.close(fd)"):
+            self.assertIn(required, body)
+        self.assertEqual(body.count("poller.poll(0)"), 2)
+        self.assertNotIn("XDG_SESSION_ID", body)
+        self.assertIn("    require_detached_service()\n\nfor action", PROBE)
+        self.assertIn("libc.free(result)", PROBE)
+
+    def test_18_actual_detached_service_marker_required_without_seat_grant(self):
+        marker = "REAL_SYSTEM_SERVICE_NO_LOGIN_SESSION_CI_ONLY"
+        self.assertEqual(PROBE.count('print("C4B_ID_PASS // ' + marker + '")'), 1)
+        self.assertEqual(HARNESS.count("'C4B_ID_PASS // " + marker + "'"), 1)
+        self.assertLess(PROBE.index('check_origin(f"after {action}")'),
+                        PROBE.index('print("C4B_ID_PASS // ' + marker + '")'))
+        self.assertIn("NO_INDEPENDENT_RELEASE_ROOT_SEAT_OR_C5_CONSENT", HARNESS)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

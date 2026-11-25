@@ -185,6 +185,36 @@ class SignedIdentityCommandClient:
         finally:
             self._command_lock.release()
 
+    def _send_prepared(self, conn: socket.socket, *, action: str,
+                       request_id: str | None, nonce: str, wire: bytes,
+                       remaining: Callable[[], float]) -> None:
+        """Private, synchronous transmission boundary, under transaction lock.
+
+        The frame is prepared by this client, not accepted from a public
+        caller. Future protected reservation needs owner-approved integration
+        before this point; this extraction adds NO reservation authority,
+        callback injection API, external input or alternate send route.
+        """
+        conn.settimeout(remaining())
+        # Retain the exact attempted command identity BEFORE
+        # sendall, including when a partial send or lost ACK faults
+        # this client. Only bounded SHA-256 digests are exposed.
+        # A digest from this process is NOT protected custody or
+        # evidence of actual delivery / human consent.
+        self._last_attempted_wire = AttemptedWireFingerprint(
+            action=action,
+            request_id_sha256=(
+                sha256(request_id.encode("ascii")).hexdigest()
+                if request_id is not None else None
+            ),
+            client_nonce_sha256=sha256(nonce.encode("ascii")).hexdigest(),
+            frame_sha256=sha256(wire).hexdigest(),
+        )
+        # Once a send is attempted, even a send failure cannot prove
+        # the native host did not receive enough bytes to act.
+        self._last_wire_outcome = "UNKNOWN_HOLD"
+        conn.sendall(wire)
+
     def _transact_serial(self, action: str) -> HostCommandObservation:
         if self._faulted:
             # Preserve the outcome of the last actual transport attempt,
@@ -229,25 +259,8 @@ class SignedIdentityCommandClient:
                 peer = _peer(conn)
                 if not self._trusted(peer):
                     raise ReceiptRejected("Untrusted installed native host or desktop seat")
-                conn.settimeout(remaining())
-                # Retain the exact attempted command identity BEFORE
-                # sendall, including when a partial send or lost ACK faults
-                # this client. Only bounded SHA-256 digests are exposed.
-                # A digest from this process is NOT protected custody or
-                # evidence of actual delivery / human consent.
-                self._last_attempted_wire = AttemptedWireFingerprint(
-                    action=action,
-                    request_id_sha256=(
-                        sha256(request_id.encode("ascii")).hexdigest()
-                        if request_id is not None else None
-                    ),
-                    client_nonce_sha256=sha256(nonce.encode("ascii")).hexdigest(),
-                    frame_sha256=sha256(wire).hexdigest(),
-                )
-                # Once a send is attempted, even a send failure cannot prove
-                # the native host did not receive enough bytes to act.
-                self._last_wire_outcome = "UNKNOWN_HOLD"
-                conn.sendall(wire)
+                self._send_prepared(conn, action=action, request_id=request_id,
+                                    nonce=nonce, wire=wire, remaining=remaining)
                 raw = bytearray()
                 while len(raw) <= 1024 and b"\n" not in raw:
                     conn.settimeout(remaining())

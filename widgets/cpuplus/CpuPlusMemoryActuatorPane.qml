@@ -213,8 +213,8 @@ Item {
     readonly property var ramDetailRows: Snapshot.ramDetailRows(sample)
     // Operator-approved RAM dataset identities. Component identity remains
     // magenta; do not change the shared theme for a local dataset.
-    // Purple is the approved preview swatch until a canonical token exists.
-    readonly property color ramAnonymousPurple: "#ac69ff"
+    // Match the established resize-arrow purple locally; shared theme is unchanged.
+    readonly property color ramAnonymousPurple: "#a46aff"
     function ramDatasetColor(label) {
         switch(label) {
         case "AVAILABLE": return Colors.omnitrix;
@@ -736,48 +736,65 @@ Item {
                         font.pixelSize: 12
                         wrapMode: Text.Wrap
                     }
-                    Repeater {
-                        model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
-                        delegate: Column {
-                            required property var modelData
-                            width: parent.width
-                            spacing: 2
-                            Item {
-                                width: parent.width
-                                height: ramMetricText.implicitHeight
-                                GohuText {
-                                    id: ramMetricText
-                                    objectName: "cpuplusRamMetricText"
-                                    width: parent.width
-                                    text: root.ramDetailText(modelData)
-                                    textFormat: Text.RichText
-                                    color: Colors.white
-                                    font.pixelSize: 11
-                                    wrapMode: Text.Wrap
-                                }
-                                // One existing safe sampled effect per visible dataset,
-                                // not one effect per punctuation mark or number token.
-                                TextHashGlow {
-                                    objectName: "cpuplusRamMetricGlow"
-                                    safeSource: ramMetricText.visible ? ramMetricText : null
-                                    requestedVisible: ramMetricText.visible
-                                    foregroundColor: Colors.white
-                                    preferredGlowColor: root.ramDatasetGlow(modelData.label)
-                                }
-                            }
-                            Rectangle {
-                                width: parent.width
-                                height: 9
-                                visible: modelData.fraction!==null
+                    Grid {
+                        id: ramCardGrid
+                        objectName: "cpuplusRamCardGrid"
+                        width: parent.width
+                        columns: width >= 440 ? 2 : 1
+                        spacing: 4
+                        Repeater {
+                            model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
+                            delegate: Rectangle {
+                                required property var modelData
+                                objectName: "cpuplusRamMetricCard"
+                                width: Math.max(0,(ramCardGrid.width-(ramCardGrid.columns-1)*ramCardGrid.spacing)/ramCardGrid.columns)
+                                height: ramCardContent.implicitHeight+10
                                 color: Colors.black
                                 border.color: root.ramDatasetColor(modelData.label)
-                                Rectangle {
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 1
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: Math.max(0,parent.width-2)*(modelData.fraction===null?0:modelData.fraction)
-                                    height: parent.height-2
-                                    color: root.ramDatasetColor(modelData.label)
+                                Column {
+                                    id: ramCardContent
+                                    x: 5
+                                    y: 5
+                                    width: Math.max(0,parent.width-10)
+                                    spacing: 3
+                                    Item {
+                                        width: parent.width
+                                        height: ramMetricText.implicitHeight
+                                        GohuText {
+                                            id: ramMetricText
+                                            objectName: "cpuplusRamMetricText"
+                                            width: parent.width
+                                            text: root.ramDetailText(modelData)
+                                            textFormat: Text.RichText
+                                            color: Colors.white
+                                            font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                        }
+                                        // One existing safe effect per visible dataset.
+                                        TextHashGlow {
+                                            objectName: "cpuplusRamMetricGlow"
+                                            safeSource: ramMetricText.visible ? ramMetricText : null
+                                            requestedVisible: ramMetricText.visible
+                                            foregroundColor: Colors.white
+                                            preferredGlowColor: root.ramDatasetGlow(modelData.label)
+                                        }
+                                    }
+                                    Rectangle {
+                                        objectName: "cpuplusRamMetricBar"
+                                        width: parent.width
+                                        height: 5
+                                        visible: modelData.fraction!==null
+                                        color: Colors.black
+                                        border.color: root.ramDatasetColor(modelData.label)
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 1
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: Math.max(0,parent.width-2)*(modelData.fraction===null?0:modelData.fraction)
+                                            height: parent.height-2
+                                            color: root.ramDatasetColor(modelData.label)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -799,16 +816,37 @@ Item {
                 }
                 Repeater {
                     model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.sample ? root.sample.rows : []
-                    delegate: GohuText {
+                    delegate: Rectangle {
                         required property var modelData
+                        objectName: "cpuplusSwapDetailCard"
                         width: parent.width
-                        textFormat: Text.PlainText
-                        text: modelData.kind + " // " + modelData.name + "\n"
-                            + root.gib(modelData.used) + " / " + root.gib(modelData.size)
-                            + " // PRIORITY " + modelData.priority
-                        color: Colors.cyan
-                        font.pixelSize: 11
-                        wrapMode: Text.Wrap
+                        height: swapCardContent.implicitHeight+10
+                        color: Colors.black
+                        border.color: Colors.yellow
+                        Column {
+                            id: swapCardContent
+                            x: 5
+                            y: 5
+                            width: Math.max(0,parent.width-10)
+                            spacing: 3
+                            GohuText {
+                                width: parent.width
+                                textFormat: Text.PlainText
+                                text: modelData.kind + " // " + modelData.name
+                                color: Colors.yellow
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            GohuText {
+                                width: parent.width
+                                textFormat: Text.PlainText
+                                text: root.gib(modelData.used) + " / " + root.gib(modelData.size)
+                                    + " // PRIORITY " + modelData.priority
+                                color: Colors.white
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                        }
                     }
                 }
                 GohuText {

@@ -143,7 +143,18 @@ ShellRoot {
                         &&String(glow.preferredGlowColor).toLowerCase()==="#00f782"
                         &&String(pane.ramDatasetGlow("UNRECLAIMABLE SLAB")).toLowerCase()==="#55cfca",
                         "semantic text and contextual white glow"))return;
+                    const grid=smoke.find(ramView,"cpuplusRamCardGrid");
+                    const card=smoke.find(ramView,"cpuplusRamMetricCard");
+                    const bar=smoke.find(ramView,"cpuplusRamMetricBar");
+                    if(!smoke.check(grid&&card&&bar&&grid.columns===(grid.width>=440?2:1)
+                        &&card.width<=grid.width&&card.height>textItem.implicitHeight
+                        &&bar.height===5&&String(pane.ramDatasetColor("ANONYMOUS")).toLowerCase()==="#a46aff",
+                        "compact RAM card geometry and local purple"))return;
                     swap.leftClicked(null);
+                    const swapCard=smoke.find(pane,"cpuplusSwapDetailCard");
+                    if(!smoke.check(swapCard&&swapCard.visible&&swapCard.width>0&&swapCard.height>0,
+                        "SWAP detail card visible"))return;
+                    console.log("CPU_M11C_COMPACT_CARDS_PASS // card geometry, local purple, no mutation");
                     if(!smoke.check(!ramView.visible&&pane.capDetailSubject==="SWAP"
                         &&detailRail.mapToItem(pane,0,0).y===railY&&scroll.contentY===0,
                         "return to swap details resets only body"))return;

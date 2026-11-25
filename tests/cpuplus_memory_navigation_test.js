@@ -425,3 +425,10 @@ assert.match(pane,/token\("\.",white\)/);
 assert.match(pane,/token\(" GiB",white\)/);
 assert.match(pane,/preferredGlowColor: root.ramDatasetGlow\(modelData.label\)/);
 console.log("CPU++ M11b pinned RAM/SWAP and semantic palette contract PASS");
+
+assert.match(pane,/ramAnonymousPurple: "#a46aff"/);
+assert.match(pane,/objectName: "cpuplusRamCardGrid"[\s\S]*?columns: width >= 440 \? 2 : 1/);
+assert.match(pane,/objectName: "cpuplusRamMetricCard"/);
+assert.match(pane,/objectName: "cpuplusRamMetricBar"[\s\S]*?visible: modelData\.fraction!==null/);
+assert.match(pane,/objectName: "cpuplusSwapDetailCard"/);
+console.log("CPU++ M11c compact detail card contract PASS");

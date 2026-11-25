@@ -412,3 +412,16 @@ assert.equal(ramCtxM11.ramDetailRows(null).length,0);
 assert.match(pane,/objectName: "cpuplusCapRamDetails"/);
 assert.match(pane,/OVERLAP; DO NOT ADD/);
 console.log("CPU++ M11a independent live RAM details PASS");
+
+const capHeaderM11b=pane.slice(pane.indexOf("id: capInstrument"),pane.indexOf("id: scroll"));
+assert.match(capHeaderM11b,/objectName: "cpuplusCapDetailRail"/);
+assert.match(capHeaderM11b,/visible: root\.capSection===2/);
+assert.doesNotMatch(pane.slice(pane.indexOf("id: scroll")),/objectName: "cpuplusCapDetailRail"/);
+for(const [name,color] of [["AVAILABLE","omnitrix"],["FREE","green"],["FILE CACHE","blue"],["SHARED / TMPFS","magenta"],["RECLAIMABLE SLAB","yellow"],["UNRECLAIMABLE SLAB","white"]])
+    assert.ok(pane.includes('case "'+name+'": return Colors.'+color+';'));
+assert.match(pane,/case "ANONYMOUS": return ramAnonymousPurple/);
+assert.match(pane,/ink===Colors.white\?Colors.cyan:ink/);
+assert.match(pane,/token\("\.",white\)/);
+assert.match(pane,/token\(" GiB",white\)/);
+assert.match(pane,/preferredGlowColor: root.ramDatasetGlow\(modelData.label\)/);
+console.log("CPU++ M11b pinned RAM/SWAP and semantic palette contract PASS");

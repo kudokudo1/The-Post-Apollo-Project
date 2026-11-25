@@ -26,7 +26,8 @@ def trial(name):
             (root/folder).mkdir(mode=0o700,parents=True)
         for source in (ROOT/"services/memory").glob("*.py"):
             shutil.copy2(source,root/"memory"/source.name)
-        shutil.copy2(ROOT/"services/memory/MemoryQueueSessionHost.js",root/"host")
+        for filename in ("MemoryQueueSessionHost.js","MemoryQueueCheckpointAdapter.qml"):
+            shutil.copy2(ROOT/"services/memory"/filename,root/"host")
         for filename in ("CpuPlusQueueConsumer.js","CpuPlusQueuePresentation.js","CpuPlusQueueHistory.js","CpuPlusQueueRecovery.js"):
             shutil.copy2(ROOT/"widgets/cpuplus"/filename,root/"widgets/cpuplus")
         for filename,target in (("CpuPlusQueueRetentionNative.qml","smoke.qml"),

@@ -355,6 +355,9 @@ def evaluate(parent, samples, *, selected, launch_ns, expected_leaf,
                 "WITNESS_WINDOW")
         require(0 <= sample.start_ns - (launch_ns if index == 0 else previous.end_ns)
                 <= MAX_GAP_NS, "SAMPLE_GAP")
+        if index == 0:
+            require(sample.end_ns - launch_ns <= MAX_SAMPLE_NS,
+                    "FIRST_OBSERVATION_LATE")
         if previous is not None:
             require(sample.peak >= previous.peak and sample.cpu_usec >= previous.cpu_usec
                     and child.high == previous.levels[-1].high, "COUNTER_REGRESSION")

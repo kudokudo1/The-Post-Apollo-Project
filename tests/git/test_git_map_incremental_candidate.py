@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
+import os
+import statistics
 from pathlib import Path
 import subprocess
 import sys
@@ -83,6 +85,59 @@ class PrefixReuseTests(unittest.TestCase):
         self.assertEqual(self.git("rev-parse","HEAD"),head)
         self.assertEqual(self.git("status","--porcelain"),state)
         print(f"Prefix reuse/full rebuild exact page parity; fixture ms {reuse_ms}/{full_ms}")
+
+    @unittest.skipUnless(os.environ.get("POST_APOLLO_INCREMENTAL_BENCH")=="1",
+                         "scaled disposable benchmark opt-in")
+    def test_scaled_paired_benchmark(self):
+        count=20000
+        lines=[]
+        for i in range(1,count+1):
+            lines.extend(["commit refs/heads/main",f"mark :{i}",
+                f"committer Fixture <fixture@example.invalid> {1700000000+i} +0000",
+                "data 1","x"])
+            if i>1: lines.append(f"from :{i-1}")
+            lines.append("")
+        subprocess.run(["/usr/bin/git","-C",str(self.repo),"fast-import","--quiet"],
+                       input=("\n".join(lines)+"\n").encode(),
+                       check=True,capture_output=True,timeout=60)
+        self.git("reset","--hard","HEAD")
+        # A merge near the tip exercises the actual lane/boundary algorithm.
+        self.git("branch","side")
+        self.commit("main")
+        self.git("checkout","side")
+        self.commit("side")
+        self.git("checkout","main")
+        self.git("merge","--no-ff","side","-m","merge")
+        self.git("gc","--quiet")
+        old=self.base/"old"
+        old_m=index.build(self.repo,old)
+        before=hashlib.sha256((old/index.NAME).read_bytes()).hexdigest()
+        for i in range(3): self.commit("new "+str(i))
+        state=self.git("status","--porcelain")
+        head=self.git("rev-parse","HEAD")
+        samples={"full":[],"reuse":[]}
+        for i,order in enumerate((("full","reuse"),("reuse","full"),("full","reuse"),("reuse","full"))):
+            results={}
+            for label in order:
+                dest=self.base/f"{label}-{i}"
+                started=time.monotonic()
+                if label=="reuse":
+                    proof=candidate.build(self.repo,old,dest)
+                    self.assertEqual(proof["prefixRows"],3)
+                    self.assertEqual(proof["reusedRows"],old_m["total"])
+                else:
+                    index.build(self.repo,dest)
+                elapsed=round((time.monotonic()-started)*1000)
+                results[label]=dest
+                if i: samples[label].append(elapsed)
+            self.compare(results["reuse"],results["full"])
+        self.assertEqual(hashlib.sha256((old/index.NAME).read_bytes()).hexdigest(),before)
+        self.assertEqual(self.git("status","--porcelain"),state)
+        self.assertEqual(self.git("rev-parse","HEAD"),head)
+        print("G4c scaled fixture:",old_m["total"],"prior commits, 3 new rows; all four paired builds exact page parity")
+        print("G4c raw measured ms:",samples)
+        print("G4c median ms:",{k:statistics.median(v) for k,v in samples.items()})
+        print("Warm disposable fixture only; no speedup or host acceptance inferred from correctness.")
 
     def test_rewrite_and_no_new_rows_refused(self):
         base=self.commit("base")

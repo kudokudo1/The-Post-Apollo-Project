@@ -18,4 +18,4 @@ jobs:
       - name: Compare immutable candidate to full Git rebuild
         run: |
           python3 -B tests/git/test_git_map_history_index.py
-          python3 -B tests/git/test_git_map_incremental_candidate.py
+          POST_APOLLO_INCREMENTAL_BENCH=1 python3 -B tests/git/test_git_map_incremental_candidate.py

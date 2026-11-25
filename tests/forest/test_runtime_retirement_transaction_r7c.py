@@ -13,8 +13,10 @@ from shared_context_b6r1 import TaskContext
 from context_first_tree_m2 import SessionContextRef
 from runtime_events_r3 import OperationRef
 from heart_resource_custody_h2 import AttemptRef, ResourceCustody
-from heart_dispatch_reference_h1 import TransportSettings, MAX_AGE_NS
-from model_binding_i2 import ModelBinding, ModelIdentity
+from heart_dispatch_reference_h1 import TransportSettings, MAX_AGE_NS, DispatchSnapshot
+from model_form_routing_i1 import TurnScope, ReasoningReference, RoutingInput, recommend
+from resource_governor_p1 import ResourceRequest, ResourceRequirement, ResourceBudget, ResourceAvailability
+from model_binding_i2 import ModelBinding, ModelIdentity, BindingRegistry, BindingEvidence, resolve_reference
 from runtime_retirement_eligibility_r7b import RetirementRef, FixtureObservation
 from runtime_retirement_transaction_r7c_fixture import (
     FIXTURE, TABLE, bootstrap_fixture, begin_pending, finish_winter, recover_original,
@@ -54,6 +56,25 @@ class RetirementTransactionTests(unittest.TestCase):
                 ("QUIESCENCE","QUIESCENT"),("ACCOUNTING","ACCOUNTED"),
                 ("SETTLEMENT","SETTLED"))))
         self.custody = ResourceCustody()
+        # Hold the exact original H11 resource reference, not an unrelated
+        # empty custody object. R7c must not release or mutate this fixture.
+        turn_scope = TurnScope(self.ctx, user["turn_id"])
+        recommendation = recommend(RoutingInput(turn_scope, "small",
+            ReasoningReference(turn_scope, "normal", "explicit")))
+        registry = BindingRegistry(self.ctx.principal_key, self.ctx.tree_key, 1, (binding,))
+        evidence = BindingEvidence(turn_scope, binding, "fixture-producer",
+                                   "fixture-observation", True, ("chat",), 2048)
+        resolved = resolve_reference(recommendation, registry,
+                                     required_features=("chat",), evidence=evidence)
+        request = ResourceRequest(self.ctx.task_id, self.ctx.execution_context_id,
+                                  "small", "normal", "interactive", "heart")
+        dispatch = DispatchSnapshot(resolved, settings, op.operation_id,
+            self.scope.attempt.attempt_id, "fixture-clock", 1, request,
+            ResourceRequirement(request, "requirements", 512, 256, 2),
+            ResourceBudget("budget", 1024, 512, 4),
+            ResourceAvailability("available", 1024, 512, 4))
+        self.assertEqual(self.custody.claim_reference(dispatch,
+            replace(dispatch, captured_ns=2), now_ns=3), "REFERENCE_HELD")
         self.custody_before = self.custody.status()
         self.original_rows = self.snapshot()
         self.denied = []

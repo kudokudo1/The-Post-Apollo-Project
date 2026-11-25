@@ -164,6 +164,9 @@ def bootstrap_fixture(journal, *, fixture, original, current):
             _continuity(journal, original)
             _require(db.execute("SELECT COUNT(*) FROM forest_sessions").fetchone() == (1,))
             _require(db.execute("SELECT COUNT(*) FROM forest_attempts_b3").fetchone() == (1,))
+            _require(db.execute(
+                "SELECT 1 FROM sqlite_master WHERE name=?",
+                (TABLE,)).fetchone() is None)
             db.execute(DDL)
             db.execute("INSERT INTO forest_retirement_r7c_fixture "
                        "(slot,task_key,session_id,scope,state,lifecycle_revision) "
@@ -208,6 +211,8 @@ def finish_winter(journal, *, fixture, original, current, effect_id,
                       retained_residency_accounted)
         db = _db(journal, fixture, read_only=False)
         with _write(db):
+            _observations(original, observations, clock_domain, now_ns,
+                          retained_residency_accounted)
             _require(_row(db, original, encoded) == ("PENDING", 2, effect, None))
             _continuity(journal, original)
             # Same statement records the original effect outcome and releases

@@ -24,6 +24,15 @@ ShellRoot {
         }
     }
 
+    function findItem(item, name) {
+        if (!item) return null;
+        if (item.objectName === name) return item;
+        for (const child of item.children || []) {
+            const found = findItem(child,name);
+            if (found) return found;
+        }
+        return null;
+    }
     function check(ok, message) {
         if (!ok) {
             console.error("CPU_DIAG_NATIVE_FAIL // " + message);
@@ -111,6 +120,40 @@ ShellRoot {
                 if (!root.check(CpuPlusDiagnostics.reports.inventory.status === "COMPLETE",
                                 "completed report lost")) return;
                 if (!root.check(CpuPlusDiagnostics.selectedReport === "inventory", "wrong report after reopen")) return;
+                const ui = root.findItem(pane.item,"cpuplusDiagnosticControls");
+                if (!ui) return;
+                const one = {event:"memory",pid:12,startTicks:99,tsMs:1000,cpuTicks:100,cpuPct:null,sampleIntervalMs:null,
+                    memoryKiB:{Rss:2097152,Pss:1048576,Pss_Anon:524288,Pss_File:262144,Pss_Shmem:262144,
+                        Private_Dirty:524288,Swap:131072,SwapPss:65536},pssPlusSwapPssKiB:1114112};
+                const two = Object.assign({},one,{tsMs:11000,cpuTicks:110,cpuPct:1,sampleIntervalMs:10000,
+                    memoryKiB:Object.assign({},one.memoryKiB,{Rss:3145728,Pss:1572864,Private_Dirty:1048576}),
+                    pssPlusSwapPssKiB:1638400});
+                const terminal = {event:"complete",pid:12,startTicks:99};
+                // Isolated presentation fixture only; do not request another observer or archive a fabricated report.
+                const report = {id:"synthetic-memory",status:"COMPLETE",summary:"TEST ONLY",
+                    text:[one,two,terminal].map(row=>JSON.stringify(row)).join("\n"),finishedAt:"2026-11-24T12:00:00.000Z"};
+                CpuPlusDiagnostics.reports = Object.assign({},CpuPlusDiagnostics.reports,{memory:report});
+                CpuPlusDiagnostics.selectLatest("memory");
+                root.phase = 6;
+                return;
+            }
+            if (root.phase === 6 && pane.item) {
+                const ui = root.findItem(pane.item,"cpuplusDiagnosticControls");
+                const breakdown = root.findItem(pane.item,"cpuplusMemoryBreakdown");
+                if (!ui || !breakdown) return;
+                if (!root.check(breakdown.visible && ui.memoryDetails
+                    && ui.memoryDetails.rows.length === 5 && ui.memoryDetails.rows[1].change === 524288
+                    && !CpuPlusDiagnostics.busy && root.completions === 1,
+                    "historical memory presentation without new capture")) return;
+                CpuPlusDiagnostics.selectLatest("inventory");
+                root.phase = 7;
+                return;
+            }
+            if (root.phase === 7 && pane.item) {
+                const ui = root.findItem(pane.item,"cpuplusDiagnosticControls");
+                const breakdown = root.findItem(pane.item,"cpuplusMemoryBreakdown");
+                if (!root.check(ui && breakdown && !breakdown.visible && ui.memoryDetails === null,
+                    "no stale memory presentation after report change")) return;
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

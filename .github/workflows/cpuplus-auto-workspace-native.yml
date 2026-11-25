@@ -10,6 +10,7 @@ on:
       - 'services/memory/memory_adjustment_queue.py'
       - 'tests/fixtures/cpuplus_queue_recovery_child.py'
       - 'tests/fixtures/CpuPlusAutoWorkspaceNative.qml'
+      - 'tests/fixtures/CpuPlusRecoveryReviewNative.qml'
       - 'tests/cpuplus_auto_workspace_native.py'
       - '.github/workflows/cpuplus-auto-workspace-native.yml'
   workflow_dispatch:

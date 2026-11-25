@@ -163,3 +163,7 @@ Universal identities remain separate from local dataset identities: RAM magenta,
 | UNRECLAIMABLE SLAB | White |
 
 Data labels, values, and units are distinct text roles. White unit suffixes, decimal points, hashes and structural separators carry the contextual dataset glow; ambiguous white uses cyan. Use existing named safe text-glow recipe, no new background processes. For this local implementation purple uses the approved preview swatch #ac69ff because shared Colors.qml has no purple token; do not silently alter global palette. White dataset uses cyan fallback. These are approved dataset identities, not new status meanings, thresholds, or permission. Global color governance and condensed/expandable cards remain separate operator discussion.
+
+## M11c // TEMPORARY DOC 2 SUCCESSION — COMPACT DETAILS
+
+Keep M11b pinned subjects and content-only scrolling. Match established resize-arrow purple `#A46AFF` in the local ANONYMOUS dataset; shared palette unchanged. Compact bordered RAM cards retain independently measured values, segmented rich text, contextual glow, and individual meters; one column at narrow widths and two at wide widths. Unknown values remain explicit and have no meter. SWAP observations use compact read-only cards with plain device identity, usage and priority. Layout breakpoint and spacing are implementation choices pending operator desktop acceptance. No new probes, protected operations, recovery protocol or global theme changes. DOC 4 owns canonical recovery backend; installed session integration remains subject to Connections.

@@ -59,6 +59,8 @@ def trial(width, height, count):
         # Only the reviewed fixed public child and its existing imports.
         (scene / "runtime").mkdir()
         (scene / "privateJoined").mkdir(mode=0o700)
+        for n in (1, 2):
+            (scene / f"privateNegative{n}").mkdir(mode=0o700)
         for name in ("ParentWire.js", "ParentProcess.qml"):
             shutil.copyfile(ROOT / "tests/forest/r6_parent" / name, scene / name)
         for name in ("PublicRuntimeStatusDisplay.js", "PublicHistoryDisplay.js"):
@@ -119,7 +121,10 @@ def trial(width, height, count):
             output = qs_log.read_text(errors="replace")
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
-            if (code != 0 or "FOREST_HOST_FAIL" in output or
+            negative = [line.split("FOREST_HOST_HISTORY_NEGATIVE_PASS ", 1)[1].strip()
+                        for line in output.splitlines() if "FOREST_HOST_HISTORY_NEGATIVE_PASS " in line]
+            if (negative != (["1", "2"] if width == 1366 else []) or
+                    code != 0 or "FOREST_HOST_FAIL" in output or
                     phases != [str(i) for i in range(count)] or
                     output.count("FOREST_HOST_NATIVE_PASS") != 1 or
                     output.count("FOREST_HOST_JOINED_PASS") != (1 if width == 1366 else 0)):

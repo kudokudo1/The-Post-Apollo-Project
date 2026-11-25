@@ -17,7 +17,7 @@ from context_first_tree_m2 import ContextRefusal, SessionContextRef
 from runtime_stop_control_r2 import RuntimeStopControl
 from runtime_events_r3 import OperationRef, RuntimeExchange, RuntimeEventRefusal
 from runtime_public_status_r4 import FixtureTreeBinding, Observation, PublicRuntimeStatus
-from runtime_public_conversation_r5 import PublicConversationHost
+from runtime_public_conversation_r5 import PublicConversationHost, FixtureHostRefusal
 from runtime_public_delivery_r4b import PresentationCorrelation
 from history_public_fixture_m4 import (
     PublicViewRef, HistoryPageRef, history_public_fixture_in_transaction,
@@ -482,7 +482,7 @@ process.stdout.write(JSON.stringify(snapshots));
 class ConnectedHistoryRevision(unittest.TestCase):
     """Actual R5 owner fixture + actual UI2 history controller; no UI sender."""
 
-    def test_r5_commit_between_pages_requires_explicit_fresh_snapshot(self):
+    def test_r5b_reopen_and_commit_between_pages_requires_explicit_fresh_snapshot(self):
         current = None
         units = []
 
@@ -512,7 +512,24 @@ class ConnectedHistoryRevision(unittest.TestCase):
 
             host.start_next()
             finish()
+            old_view = current
+            original_db = host._db
+            original_task = host._binding.operation.context_ref.context
+            original_first = host.history_page(limit=1)
+            original_second = host.history_page(after=1, limit=1,
+                expected_revision=original_first["revision"], expected_view=old_view)
+            self.assertEqual(original_first["revision"], 2)
+            self.assertTrue(original_second["complete"])
+            self.assertEqual(host.reopen_journal(), "JOURNAL_REOPENED")
+            with self.assertRaises(sqlite3.ProgrammingError):
+                original_db.execute("SELECT 1")
+            self.assertIsNot(host._db, original_db)
+            self.assertIsNone(current)
+            with self.assertRaises(FixtureHostRefusal):
+                host.history_page()
             host.start_next()
+            self.assertNotEqual(current, old_view)
+            self.assertNotEqual(host._binding.operation.context_ref.context, original_task)
             # REQUESTED, RESERVED, STARTED, DELTA: second answer is provisional.
             for _ in range(4):
                 self.assertEqual(host.advance(), "ACTIVE")
@@ -521,9 +538,19 @@ class ConnectedHistoryRevision(unittest.TestCase):
             self.assertFalse(first["complete"])
             view_key = current.view_key
             self.assertEqual(first["generation"], current.generation)
+            self.assertEqual(first["sessionId"], original_first["sessionId"])
+            self.assertEqual(first["messages"],
+                             original_first["messages"] + original_second["messages"])
             self.assertEqual(len(first["messages"]), 2)
+            with self.assertRaisesRegex(FixtureHostRefusal, "HISTORY_CONTINUATION_UNAVAILABLE"):
+                host.history_page(after=2, limit=2, expected_revision=first["revision"],
+                                  expected_view=old_view)
             finish()
             self.assertEqual(current.view_key, view_key)
+            # The actual merged host refuses the old revision and missing pins.
+            for pins in ({}, {"expected_revision":first["revision"], "expected_view":current}):
+                with self.assertRaisesRegex(FixtureHostRefusal, "HISTORY_CONTINUATION_UNAVAILABLE"):
+                    host.history_page(after=2, limit=2, **pins)
             # An independent receiver-defense fixture, NOT an alternate R5
             # history API or an automatic fallback after a refused request.
             # R5b rejects stale/unpinned continuations at its host boundary.
@@ -557,8 +584,8 @@ class ConnectedHistoryRevision(unittest.TestCase):
             self.assertEqual(continuation["revision"], 4)
             self.assertEqual(continuation["generation"], first["generation"])
             self.assertEqual(continuation["sessionId"], first["sessionId"])
-            fresh_next = independently_project(
-                fresh["revision"], "receiver_fixture_fresh_revision_0002")
+            fresh_next = host.history_page(after=2, limit=2,
+                expected_revision=fresh["revision"], expected_view=current)
             self.assertEqual(fresh["revision"], fresh_next["revision"])
             self.assertEqual(len({f["requestId"] for f in
                 (first, continuation, fresh, fresh_next)}), 4)

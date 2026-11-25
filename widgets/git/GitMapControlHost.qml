@@ -26,6 +26,7 @@ Item {
     property string activeDirectory: ""
     property var custodyController: null
     property var activeLease: null
+    property bool custodyLost: false
     property var pendingLease: null
     readonly property bool custodyEnabled: custodyController!==null
     readonly property bool pendingCustodyReady: !custodyEnabled || (pendingLease!==null && pendingLease.held)
@@ -49,14 +50,17 @@ Item {
     readonly property bool busy: job !== ""
     readonly property bool canRequest: operatorActive && !busy && !faulted && !worker.running
         && repoRoot.startsWith("/") && repoRoot.length > 1
+        && (!custodyEnabled || (!custodyLost && (!activeLease || activeLease.held)))
     readonly property bool fullVisible: activeRepo === repoRoot && activeRepo !== ""
         && (!custodyEnabled || (activeLease!==null && activeLease.held))
     readonly property bool canAdopt: operatorActive && pendingResult !== null
-        && pendingRepo === repoRoot && !busy && !faulted && pendingCustodyReady && (!custodyEnabled || !candidate.readerBusy)
+        && pendingRepo === repoRoot && !busy && !faulted && !custodyLost && pendingCustodyReady
+        && (!custodyEnabled || !activeLease || activeLease.held) && (!custodyEnabled || !candidate.readerBusy)
 
     function clearPending() {
-        if (pendingLease && custodyController) custodyController.release(pendingLease);
+        const previous=pendingLease;
         pendingLease=null;
+        if (previous && custodyController) custodyController.release(previous);
         pendingResult=null;
         pendingRepo="";
     }
@@ -67,25 +71,27 @@ Item {
     }
     Connections {
         target: root.activeLease
-        function onHeldChanged() {
-            const lost=root.activeLease;
-            if (lost && !lost.held) {
-                // Invalidate live replies and refuse to use the frozen
-                // viewport after its continuous protection disappears.
-                root.repoEpoch++;
-                root.searchEpoch++;
-                root.activeRepo="";
-                root.activeDirectory="";
-                root.searchRequest=null;
-                root.lastMatch=null;
-                root.lookupQueued=false;
-                root.buildQueued=false;
-                root.clearPending();
-                root.activeLease=null;
-                if (root.custodyController) root.custodyController.release(lost);
-                root.statusText="CUSTODY LOST // REOPEN TO RECHECK";
-            }
-        }
+        // Do not release the lease from inside its held binding evaluation.
+        // fullVisible/canRequest/canAdopt already fail closed immediately.
+        function onHeldChanged() { Qt.callLater(root.handleCustodyLoss); }
+    }
+    function handleCustodyLoss() {
+        const lost=activeLease;
+        if (!lost || lost.held) return;
+        custodyLost=true;
+        repoEpoch++;
+        searchEpoch++;
+        activeRepo="";
+        activeDirectory="";
+        searchRequest=null;
+        lastMatch=null;
+        searchStatus="SEARCH DISCARDED // CUSTODY LOST";
+        lookupQueued=false;
+        buildQueued=false;
+        clearPending();
+        activeLease=null;
+        if (custodyController) custodyController.release(lost);
+        statusText="CUSTODY LOST // REOPEN TO RECHECK";
     }
     Component.onDestruction: {
         clearPending();
@@ -93,6 +99,7 @@ Item {
     }
     onRepoRootChanged: {
         repoEpoch += 1;
+        custodyLost=false;
         activeRepo = "";
         activeDirectory = "";
         searchRequest=null;
@@ -110,6 +117,7 @@ Item {
     onOperatorActiveChanged: {
         if (!operatorActive) searchEpoch++;
         if (operatorActive) {
+            custodyLost=false;
             if (!pendingResult && !busy && !buildQueued) lookupQueued = true;
             schedule();
         }
@@ -124,7 +132,7 @@ Item {
             if (!service || service.repoPath!==root.repoRoot || service.repoRoot!==root.repoRoot
                     || !Policy.sha(String(service.headFull))) return;
             const head=String(service.headFull);
-            if (root.observedHead && root.observedHead!==head && root.operatorActive) {
+            if (root.observedHead && root.observedHead!==head && root.operatorActive && !root.custodyLost) {
                 root.lookupQueued=true;
                 root.schedule();
             }

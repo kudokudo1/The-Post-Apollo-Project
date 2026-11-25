@@ -191,3 +191,20 @@ no deletion, no checkpoint rotation or startup unlock. Current host wire
 and DOC 2 controls still require coordinated v2 disposition integration,
 including retained host checkpoints and fresh local session gate. No
 automatic dismissal, expiry, retry or protected execution.
+
+## R6a // explicit disposition transport
+
+R5 #2757 merged 451916ca; reconciled eight workflows PASS, raw six
+v2 tests verified job 139346155693. Independent review not returned.
+R6a extends the existing bounded pipe, explicit matching v2 owner and
+server-only disposition_wire opt-in. Distinct HELLO_DISPOSITION then
+exact CONNECT_DISPOSITION required before any status or commands; legacy
+client cannot accidentally interpret v2 inventory. Existing v1 unchanged.
+RECOVERY_DISMISS is separate from ACK, exact live review sequence/digest/
+owner, one use, receipt then fresh status. DISPOSITION_HISTORY reads exact
+action UUID with no mutation or replay. Limit v2 inventory to four entries
+for retained receipt frame size. New tests exercise handshake refusal,
+exact dismissal/history, wrong sequence, lost reply/new owner. Also recheck
+dual admission clocks after retained evidence validation immediately before
+SQL dismissal update. No production launcher or host/UI v2 integration,
+checkpoint rotation, startup unlock or protected authority. CI pending.

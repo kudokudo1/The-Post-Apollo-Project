@@ -49,7 +49,7 @@ def generation_path(base,repo_id,key):
     return manager.private_dir(folder/key)
 
 @contextmanager
-def read(base,repo_id,key,snapshot=None,*,expected_identity=None,evidence=None):
+def read(base,repo_id,key,snapshot=None,*,expected_identity=None,evidence=None,lease_fd=None):
     if snapshot is not None and (not isinstance(snapshot,str) or not index.SNAPSHOT.fullmatch(snapshot)):
         raise ValueError("invalid snapshot")
     path=generation_path(base,repo_id,key)
@@ -81,6 +81,8 @@ def read(base,repo_id,key,snapshot=None,*,expected_identity=None,evidence=None):
                 raise ValueError("candidate directory moved")
             if evidence is not None:
                 evidence.update(device=identity[0],inode=identity[1])
+            if lease_fd is not None:
+                lease_fd.append(fd)
             yield conn,m
         finally: conn.close()
     finally: os.close(fd)

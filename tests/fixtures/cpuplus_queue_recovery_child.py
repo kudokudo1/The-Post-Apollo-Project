@@ -55,4 +55,5 @@ if os.environ.get("POST_APOLLO_QUEUE_CRASH_TRIAL"):
     start_ticks=Path("/proc/self/stat").read_text().rsplit(")",1)[1].split()[19]
     print("QUEUE_R3_OWNER_PID // "+str(os.getpid())+" "+start_ticks,file=sys.stderr,flush=True)
 serve(owner, 0, 1, io_timeout_ms=3000,
-      review_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_ACK_TRIAL") else None)
+      review_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_ACK_TRIAL") else None,
+      notification_max_age_ms=5000 if os.environ.get("POST_APOLLO_QUEUE_HUB_TRIAL") else None)

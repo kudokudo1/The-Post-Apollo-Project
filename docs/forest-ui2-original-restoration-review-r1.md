@@ -150,3 +150,103 @@ explicit open, exact rows, stale/replacement, malformed/duplicate plans,
 dismiss, independent owner and viewport loss, no fallback, unload.
 Actual keyboard/focus and panel placement remain UI1 joined review; local
 Dismiss is nonexecuting. No ForestW or shared controller change. CI pending.
+
+
+## R2 proposed dormant task selection // separate from restoration
+
+Census #7168544466 and Nurse reconciliation #7168860879 identify dormant
+task selection as an outstanding UI2 recovery gap. Rechecked target
+main dcf22ace4872fab3e408051650980483dbe52e7c; R7a #2703 is a merged
+Runtime proposal, not a dormant catalog implementation. Its R7b
+retirement eligibility witness is a separate pending scope decision.
+Original task_session.py a2458c4e, list_winter_tasks and
+begin_spring_cleaning, re-read at frozen original 28895aaf.
+Historical listing ordered summaries by retirement order without loading
+full content on selection. It also exposed raw task IDs, path, adapter,
+reasoning and model metadata, silently skipped damaged files, and
+used legacy timestamps as a fallback. Recover the discovery/selection
+separation, not those fields, storage conventions or ambiguity handling.
+
+### Interaction sequence (proposal, not a transport or storage schema)
+
+| User intent | Local presentation effect | Explicitly not performed |
+| --- | --- | --- |
+| Open dormant-task browser | Request a separately scoped metadata view, initially empty/pending | Enumerate private files, read journal bodies, start a task |
+| Receive current list | Display a bounded, owner-ordered safe summary or distinguish empty/refused | Infer Winter from PAUSED, hidden UI or timestamps |
+| Select one listed row | Highlight one current opaque selection; retire old review scope | Query history, wake task, allocate model or apply old permissions |
+| Open Cleaning review | Ask for separately current plan for selected identity | Claim active slot, enter Spring, restore context |
+| Dismiss, change Tree or lose view | Clear selection and affected review; no automatic fallback | Retire or delete a durable task |
+
+Real dormant metadata and task/plan identity remain Runtime-owned.
+Actual lifecycle/custody proof precedes publication; history OPEN
+scope, B1 conversation revision and REOPEN are not dormant-list evidence.
+Mind owns context truth, Security disclosure policy and Heart admission.
+A list is neither a lease nor a claim; selection is not a decision to restore.
+
+### Smallest proposed isolated fixture scope
+
+Subject to owner and Nurse acceptance, implement a native, nonmounted,
+read-only synthetic selector in UI2. Reuse the existing review component
+and shared local shape validation; no extra service, database, parser,
+sender, or alternative history controller. One explicit local list
+lifetime, one local selection, at most one review scope. Proposed fixed
+fixture inputs: CHERRY, fresh independent list-view token, positive
+catalog revision, up to three owner-ordered rows with distinct opaque
+32-hex task aliases; labels constructed locally as PUBLIC TASK 1/2/3.
+No arbitrary titles, private content, raw IDs, paths, model or adapter
+names, timestamps or resource estimates. Label the entire surface
+SYNTHETIC // NO LIVE DORMANCY. Catalog revision is synthetic correlation,
+not a durable lifecycle revision or grant. A complete empty list is
+distinct from unavailable, stale or pending; refuse over-limit or
+malformed lists instead of silently truncating. Do not imply a complete
+real catalog from this fixed example. The proposal establishes no
+production fields or new frozen wire contract.
+
+Parent sets whole independent list scope before explicit open; a response
+cannot open the browser or establish owner currentness. Stale response,
+selection and dismiss intent cannot mutate a replacement scope. Current
+malformed/duplicate receipt clears the list and selection. Selection
+requires a displayed current row, never an index alone. Selection change
+or list invalidation retires only its associated original review before
+a new review is possible. Opening review is a separate explicit action;
+require independently owner-supplied R1 taskAlias/viewKey/planRevision
+matching selected alias, no reuse of list revision as plan revision.
+Review uses existing PublicRestorationReview exactly; no auto-populate
+sample rows on selection, no automatic activation or positive action.
+No list refresh on model status/history events. No auto-select after
+reorder/reopen. Preserve no authority and SEND/STOP/restore locked.
+Local lifetime cap and exact values require final scope agreement.
+
+### Acceptance matrix
+
+- Default closed, explicit open, pending vs empty vs refused vs displayed.
+- Distinct aliases and owner order; duplicate/malformed/over-limit input
+  refuses entire current list; no data display from stale owner scope.
+- Explicit selection only, no select by stale row/index or unknown alias.
+- Selecting a different row retires old review without creating a new one.
+- Review opens only on independent current R1 plan scope and explicit
+  action, distinct from list request and selection; no grant inferred.
+- Replacement catalog/view, Tree change, viewport or owner loss clears
+  local selection/review; old list/plan/click cannot clear or populate new.
+- Dismiss and unload cannot reopen; no implicit history, execution,
+  restoration, selection of first row, automatic query or durable writes.
+- Native normal/compact fixture acceptance; actual ForestW placement and
+  keyboard/focus integration require UI1 agreement; keep existing 41-phase
+  R6 replay and independent history/status behavior intact.
+
+### Required owner decisions before implementation
+
+DOC2F: ACCEPT/REVISE the fixed synthetic catalog scope and separate list,
+selection, plan and real lifecycle identity. No claim that R7b is approved,
+that actual retired tasks exist, or that R7a is a real catalog.
+DOC4F: ACCEPT/REVISE distinction between list summary and independently
+versioned context review; no content read or automatic rehydration.
+DOC3F: ACCEPT/REVISE fixed synthetic metadata allowlist, currentness/refusal
+and no protected disclosure or rights. Real list/title access remains
+separate protected operation.
+UI1: ACCEPT/REVISE isolated fixture and eventual existing-panel placement,
+focus and lifecycle; no second production menu or controller.
+Nurse2F: exact scope disposition before executable R2 fixture.
+R6 pending #2761/#2764/#2765 continue independently. No actual dormant
+list, Spring entry, plan decision, protected action or production mount
+authorized by this documentation.

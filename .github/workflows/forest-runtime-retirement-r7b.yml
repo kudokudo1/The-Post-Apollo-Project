@@ -1,0 +1,27 @@
+name: Forest Runtime R7b retirement eligibility
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/runtime_retirement_eligibility_r7b.py'
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'scripts/forest/heart_resource_custody_h2.py'
+      - 'scripts/forest/heart_dispatch_reference_h1.py'
+      - 'scripts/forest/model_binding_i2.py'
+      - 'tests/forest/test_runtime_retirement_eligibility_r7b.py'
+      - '.github/workflows/forest-runtime-retirement-r7b.yml'
+permissions:
+  contents: read
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -B tests/forest/test_runtime_retirement_eligibility_r7b.py

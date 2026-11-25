@@ -56,7 +56,22 @@ def trial(width, height, count):
         helper = "scripts/forest/ui_model_preferences.py"
         (scene / helper).parent.mkdir(parents=True)
         shutil.copy2(ROOT / helper, scene / helper)
-        # Do not stage Ollama, model inference or host dispatch helpers.
+        # Only the reviewed fixed public child and its existing imports.
+        (scene / "runtime").mkdir()
+        (scene / "privateJoined").mkdir(mode=0o700)
+        for n in (1, 2):
+            (scene / f"privateNegative{n}").mkdir(mode=0o700)
+        for name in ("ParentWire.js", "ParentProcess.qml"):
+            shutil.copyfile(ROOT / "tests/forest/r6_parent" / name, scene / name)
+        for name in ("PublicRuntimeStatusDisplay.js", "PublicHistoryDisplay.js"):
+            shutil.copyfile(ROOT / "widgets/forest/ui2" / name, scene / name)
+        for name in ("runtime_public_child_r6b.py", "runtime_public_conversation_r5.py",
+                     "session_journal_v0.py", "turn_bridge_b3.py", "shared_context_b6r1.py",
+                     "context_first_tree_m2.py", "runtime_events_r3.py", "runtime_public_status_r4.py",
+                     "runtime_public_delivery_r4b.py", "history_public_fixture_m4.py",
+                     "recovery_inspect_b4d.py", "ollama_chat_transport.py", "ollama_inventory.py",
+                     "capability_registry_b6r2.py", "runtime_stop_control_r2.py", "local_terminal_outbox_b4f.py"):
+            shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
         for relative in ("widgets/ForestW.qml", "widgets/forest/ui2/PublicConversationFixture.qml",
                          "widgets/forest/ui2/PublicPreviewGate.qml",
@@ -106,9 +121,13 @@ def trial(width, height, count):
             output = qs_log.read_text(errors="replace")
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
-            if (code != 0 or "FOREST_HOST_FAIL" in output or
+            negative = [line.split("FOREST_HOST_HISTORY_NEGATIVE_PASS ", 1)[1].strip()
+                        for line in output.splitlines() if "FOREST_HOST_HISTORY_NEGATIVE_PASS " in line]
+            if (negative != (["1", "2"] if width == 1366 else []) or
+                    code != 0 or "FOREST_HOST_FAIL" in output or
                     phases != [str(i) for i in range(count)] or
-                    output.count("FOREST_HOST_NATIVE_PASS") != 1):
+                    output.count("FOREST_HOST_NATIVE_PASS") != 1 or
+                    output.count("FOREST_HOST_JOINED_PASS") != (1 if width == 1366 else 0)):
                 raise AssertionError("FOREST_HOST_INCOMPLETE")
             print(f"FOREST_HOST_OUTPUT_PASS {width}x{height} phases={count}", flush=True)
         finally:

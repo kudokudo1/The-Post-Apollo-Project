@@ -94,6 +94,20 @@ class HotContextTests(unittest.TestCase):
             with self.assertRaises(ContextRefusal):
                 replace(self.user[0], text=bad)
 
+    def test_unicode_refusal_has_no_nested_encoding_error(self):
+        for surrogate in ("\ud800", "\udbff", "\udc00", "\udfff", "\ud800\udc00"):
+            with self.subTest(surrogate=ascii(surrogate)):
+                with self.assertRaises(ContextRefusal) as caught:
+                    replace(self.user[0], text="PUBLIC_FIXTURE_MARKER" + surrogate)
+                self.assertEqual(str(caught.exception), "INVALID_HOT_TEXT")
+                self.assertIsNone(caught.exception.__cause__)
+                self.assertIsNone(caught.exception.__context__)
+        # Real supplementary-plane scalar is valid; byte cap is unchanged.
+        self.assertEqual(replace(self.user[0], text="\U0001f333"*1024).text,
+                         "\U0001f333"*1024)
+        with self.assertRaisesRegex(ContextRefusal, "INVALID_HOT_TEXT"):
+            replace(self.user[0], text="\U0001f333"*1025)
+
     def test_empty_and_bounded_selection(self):
         empty = replace(self.route, user_record_ids=(), operational_record_ids=())
         self.assertEqual(assemble_hot_context(empty,current=empty).reference_text, "")

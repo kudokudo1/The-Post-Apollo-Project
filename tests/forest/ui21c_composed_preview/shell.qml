@@ -198,6 +198,11 @@ ShellRoot {
         if (!item) return;
         const body=child(item,"restorationReviewBody");
         check(body && body.visible===(state!=="CLOSED"),"review body visibility");
+        const dismiss=body && child(body.children[0],"restorationReviewDismiss");
+        check(dismiss && dismiss.activeFocusOnTab===(state!=="CLOSED"),
+            "review tab eligibility");
+        if (dismiss && state==="CLOSED")
+            check(!dismiss.focus && !dismiss.activeFocus,"closed review retained focus");
         check(!item.sourceAuthenticated && !item.permissionGranted && !item.productionAuthority
             && !item.modelExecutionPermitted && !item.restorationEnabled && !item.sendEnabled
             && !item.stopEnabled, "review authority changed");
@@ -474,12 +479,20 @@ ShellRoot {
                 const item=review.item, ref=reviewScope(10,10);
                 item.ownerScope=ref;
                 check(item.openReview(ref)&&item.receiveReview(ref,fixedReviewRows()),"dismiss setup");
+                const dismiss=child(child(item,"restorationReviewBody").children[0],
+                    "restorationReviewDismiss");
+                check(dismiss && dismiss.activeFocusOnTab,"dismiss focus setup");
+                if (!dismiss) break;
+                dismiss.forceActiveFocus();
+                check(dismiss.focus,"dismiss focus request");
                 check(item.dismissReview(ref),"explicit dismiss");
                 verifyReview("CLOSED",0);
                 check(!item.openReview(ref)&&!item.receiveReview(ref,fixedReviewRows()),"dismiss replay");
                 const next=reviewScope(11,11);
                 item.ownerScope=next;
                 check(item.openReview(next)&&item.receiveReview(next,fixedReviewRows()),"scope loss setup");
+                dismiss.forceActiveFocus();
+                check(dismiss.focus,"scope loss focus request");
                 item.syntheticOwner=false;
                 verifyReview("CLOSED",0);
                 item.syntheticOwner=true;
@@ -587,14 +600,22 @@ ShellRoot {
                 verifyConnectedStatus("STOP REQUESTED // OUTCOME PENDING");
                 break;
             }
-            case 37:
-                actualUnits(Actual.replay.abort);
+            case 37: {
+                const d=Actual.replay;
+                actualUnits(d.abort);
                 verifyConnected(0,"CLOSED");
                 check(preview.item.runtimeStatusText!=="LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED",
                     "aborted third turn painted as commit");
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(!preview.item.recordRuntimeLocalAbort(d.b,d.abortCode,seq),
+                    "stale abort accepted");
+                check(preview.item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),
+                    "actual typed abort refused");
+                verifyConnectedStatus("LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED");
                 check(actualFeed().messages.length===0,"provisional reply");
                 preview.active=false;
                 break;
+            }
             case 38:
                 check(preview.item===null,"actual old Loader survived");
                 preview.active=true;
@@ -604,6 +625,7 @@ ShellRoot {
                 verifyLoaded();
                 check(preview.item.beginConnectedHistory(),"new Loader connected mode");
                 preview.item.receiveRuntimeUnit(d.unitsC[0]);
+                check(!preview.item.recordRuntimeLocalAbort(d.c,d.abortCode,4),"old abort opened replacement");
                 check(!preview.item.receiveHistoryPage(d.h3,d.reopened[0].frame),"old page opened replacement");
                 verifyConnected(0,"CLOSED");
                 verifyConnectedStatus("");

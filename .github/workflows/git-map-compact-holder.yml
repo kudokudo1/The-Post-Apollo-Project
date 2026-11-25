@@ -1,0 +1,25 @@
+name: Git map compact V2 holder
+on:
+  pull_request:
+    paths:
+      - "scripts/git_map_compact_holder.c"
+      - "scripts/git_map_isolated_candidate.py"
+      - "scripts/git_map_v2_reader_candidate.py"
+      - "tests/git/test_git_map_compact_holder.py"
+      - ".github/workflows/git-map-compact-holder.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare retained native holder PSS and verify custody
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY
+        run: |
+          python3 -B tests/git/test_git_map_compact_holder.py
+          python3 -B tests/git/test_git_map_v2_reader_candidate.py
+          python3 -B tests/git/test_git_map_isolated_candidate.py

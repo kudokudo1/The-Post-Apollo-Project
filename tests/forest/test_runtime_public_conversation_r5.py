@@ -1,0 +1,178 @@
+"""R5 host uses real UI2 reactive QML and real B1/B3/M4 disposable journal."""
+import json
+import os
+from pathlib import Path
+import sqlite3
+import sys
+import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("QT_QUICK_BACKEND", "software")
+from PySide6.QtCore import QMetaObject, QUrl
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlComponent, QQmlEngine
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[1] / "scripts/forest"))
+from runtime_public_conversation_r5 import PublicConversationHost, FixtureHostRefusal
+from runtime_public_delivery_r4b import PresentationCorrelation
+
+APP = QGuiApplication.instance() or QGuiApplication([])
+
+
+class ConnectedPublicConversation(unittest.TestCase):
+    def setUp(self):
+        self.engine = QQmlEngine()
+        self.component = QQmlComponent(self.engine, QUrl.fromLocalFile(
+            str(HERE / "ui22b_runtime_status_harness.qml")))
+        self.assertTrue(self.component.isReady(), self.component.errorString())
+        self.view = self.component.create()
+        self.assertIsNotNone(self.view, self.component.errorString())
+        self.current = None
+        self.units = []
+        self.mode = "normal"
+        self.call("openView")
+        self.host = PublicConversationHost(open_lifetime=self.open_lifetime,
+            current_view=lambda: self.current, receive_unit=self.receive,
+            invalidate_lifetime=self.invalidate)
+        self.addCleanup(self.host.close)
+
+    def tearDown(self):
+        self.host.close()
+        self.view.deleteLater()
+        self.component.deleteLater()
+        self.engine.deleteLater()
+        APP.processEvents()
+
+    def call(self, method, value=None):
+        if value is not None:
+            self.assertTrue(self.view.setProperty("inputJson", json.dumps(value)))
+        self.assertTrue(QMetaObject.invokeMethod(self.view, method))
+        self.assertFalse(self.view.property("authority"))
+
+    def open_lifetime(self, ref):
+        self.current = PresentationCorrelation(ref["requestId"], ref["viewKey"],
+                                               ref["generation"])
+        self.call("setCurrent", ref)
+        self.call("openLifetime", ref)
+        return self.view.property("viewState") == "ATTACHED"
+
+    def invalidate(self, ref):
+        self.call("invalidateLifetime", ref)
+
+    def receive(self, unit):
+        self.units.append(unit)
+        if self.mode == "switch":
+            self.mode = "normal"
+            self.replacement = PresentationCorrelation.fresh(10)
+            self.open_lifetime(dict(requestId=self.replacement.request_id,
+                viewKey=self.replacement.view_key, generation=10))
+        self.call("receiveUnit", unit)
+        if self.mode == "throw":
+            self.mode = "normal"
+            raise RuntimeError("fixture failure after painting")
+        # A refusal on the still-current consumer fails locally, not a receipt.
+        if self.current and unit["viewKey"] == self.current.view_key:
+            expected = "DISPLAYING" if unit["kind"] == "STATUS" else "CLOSED"
+            if self.view.property("viewState") != expected:
+                raise RuntimeError("fixture consumer refused")
+
+    def finish_turn(self):
+        for _ in range(8):
+            outcome = self.host.advance()
+            if outcome != "ACTIVE":
+                self.assertEqual(outcome, "TERMINAL")
+                return
+        self.fail("bounded fake turn did not terminate")
+
+    def history_text(self):
+        return [m["text"] for m in self.host.history_page()["messages"]]
+
+    def render_history(self, limit):
+        first = self.host.history_page(limit=limit)
+        second = self.host.history_page(after=limit, limit=limit)
+        def page(frame):
+            return {"ref": dict(requestId=frame["requestId"], treeKey=frame["treeKey"],
+                generation=frame["generation"], sessionId=frame["sessionId"],
+                revision=frame["revision"], limit=limit), "frame": frame}
+        self.assertTrue(self.view.setProperty("historyJson",
+            json.dumps([page(first), page(second)])))
+        self.call("setupHistory")
+        self.assertEqual(self.view.property("historyLabel"), "HISTORY SNAPSHOT COMPLETE")
+        return self.view.property("historyCount")
+
+    def test_two_explicit_turns_actual_status_history_and_stop(self):
+        self.host.start_next()
+        self.finish_turn()
+        self.assertEqual(self.view.property("labelText"),
+                         "LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED")
+        self.assertEqual(self.view.property("historyCount"), 0)
+        self.assertEqual(self.render_history(1), 2)
+        old = self.units[-1]
+        old_ref = self.current
+        self.host.start_next()
+        with self.assertRaises(FixtureHostRefusal):
+            self.host.stop(old_ref)
+        self.call("receiveUnit", old)
+        self.assertEqual(self.view.property("viewState"), "ATTACHED")
+        self.finish_turn()
+        self.assertEqual(self.view.property("historyCount"), 2)
+        self.assertEqual(self.render_history(2), 4)
+        self.assertEqual(self.history_text(), [
+            "What is a Tree?", "Public fixture: a Tree is a Forest agent identity.",
+            "What does its journal preserve?", "Public fixture: committed conversation turns."])
+        self.host.start_next()
+        for _ in range(4):
+            self.assertEqual(self.host.advance(), "ACTIVE")
+        self.assertEqual(self.view.property("labelText"), "GENERATING")
+        self.host.stop(self.current)
+        self.assertEqual(self.view.property("labelText"), "STOP REQUESTED // OUTCOME PENDING")
+        self.finish_turn()
+        self.assertEqual(self.view.property("labelText"), "UNKNOWN HOLD // NO AUTOMATIC RETRY")
+        self.assertEqual(self.view.property("historyCount"), 4)
+        self.assertEqual(self.history_text()[-1], "Public STOP demonstration")
+        self.assertEqual(len(self.history_text()), 5)
+        # Verify committed SQLite bytes independently of status display.
+        with sqlite3.connect(self.host._path) as db:
+            self.assertEqual(db.execute("SELECT status FROM forest_attempts_b3 "
+                "ORDER BY created_at_ms").fetchall(),
+                [("COMMITTED",), ("COMMITTED",), ("ABORTED",)])
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM forest_turns "
+                "WHERE role='assistant'").fetchone()[0], 2)
+
+    def test_callback_failure_after_paint_does_not_retry_or_cancel_execution(self):
+        self.host.start_next()
+        self.mode = "throw"
+        self.assertEqual(self.host.advance(), "ACTIVE")
+        self.assertEqual(self.view.property("viewState"), "UNAVAILABLE")
+        self.finish_turn()
+        self.assertEqual(len(self.units), 1)
+        with self.assertRaises(FixtureHostRefusal):
+            self.host.history_page()
+        with sqlite3.connect(self.host._path) as db:
+            self.assertEqual(db.execute("SELECT status FROM forest_attempts_b3").fetchone(),
+                             ("COMMITTED",))
+
+    def test_callback_switch_without_throw_keeps_new_view_and_stops_old_delivery(self):
+        self.host.start_next()
+        self.mode = "switch"
+        self.assertEqual(self.host.advance(), "ACTIVE")
+        self.assertEqual(self.view.property("viewState"), "ATTACHED")
+        self.finish_turn()
+        self.assertEqual(len(self.units), 1)
+        self.assertEqual(self.view.property("viewState"), "ATTACHED")
+
+    def test_detach_independent_of_execution_and_no_stale_status(self):
+        self.host.start_next()
+        self.host.advance()
+        self.current = None
+        self.call("detach")
+        self.host.observe_view()
+        self.assertEqual(self.view.property("viewState"), "CLOSED")
+        self.finish_turn()
+        self.assertEqual(len(self.units), 1)
+        self.assertEqual(self.view.property("labelText"), "")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -1,0 +1,27 @@
+name: FinanceW Banking M4s3 recovery lifetime lease candidate
+on:
+  pull_request:
+    paths:
+      - 'scripts/finance/banking_recovery_handoff_candidate.py'
+      - 'scripts/finance/banking_manual_*.py'
+      - 'scripts/finance/banking_portable_crypto.mjs'
+      - 'tests/finance/test_banking_recovery_handoff_m4s3.py'
+      - '.github/workflows/finance-banking-m4s3-recovery-lease.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/finance/banking_recovery_handoff_candidate.py'
+      - 'scripts/finance/banking_manual_*.py'
+      - 'scripts/finance/banking_portable_crypto.mjs'
+      - 'tests/finance/test_banking_recovery_handoff_m4s3.py'
+      - '.github/workflows/finance-banking-m4s3-recovery-lease.yml'
+permissions:
+  contents: read
+jobs:
+  disposable-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify process-lifetime exclusion and disposable recovery
+        run: python3 -B tests/finance/test_banking_recovery_handoff_m4s3.py

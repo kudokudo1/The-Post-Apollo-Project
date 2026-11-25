@@ -1,0 +1,39 @@
+name: Forest UI2.3d Public History Status
+on:
+  pull_request:
+    paths:
+      - 'widgets/forest/ui2/PublicHistoryStatus.qml'
+      - 'widgets/forest/ui2/PublicHistoryViewState.qml'
+      - 'widgets/forest/ui2/PublicHistoryDisplay.js'
+      - 'scripts/forest/history_public_fixture_m4.py'
+      - 'scripts/forest/session_journal_v0.py'
+      - 'scripts/forest/context_first_tree_m2.py'
+      - 'scripts/forest/shared_context_b6r1.py'
+      - 'tests/forest/ui2_m4_public_fixture.py'
+      - 'tests/forest/ui23d_status_harness.qml'
+      - 'tests/forest/test_ui23d_public_status_qt.py'
+      - '.github/workflows/forest-ui2-public-status-qt.yml'
+permissions:
+  contents: read
+jobs:
+  qt-public-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install headless Qt prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install Qt bindings
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Actual QtQuick status item and M4 history state
+        run: python tests/forest/test_ui23d_public_status_qt.py

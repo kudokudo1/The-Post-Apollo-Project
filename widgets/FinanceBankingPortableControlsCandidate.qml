@@ -13,6 +13,8 @@ Item {
     property bool localSaved: false
     property int savedRevision: 0
     readonly property bool available: reviewEnabled&&active&&visible
+    readonly property bool requestBusy: bridge.busy
+    readonly property bool requestRetired: bridge.retired
     property var armed: null
     property var receipt: null
     property string notice: "PORTABLE EXPORT / PREVIEW ONLY"
@@ -25,6 +27,7 @@ Item {
     onLocalSavedChanged: clearSensitive()
 
     function clearSensitive() {
+        if(bridge)bridge.discardContext();
         armed=null;
         receipt=null;
         if(secret)secret.text="";
@@ -60,6 +63,7 @@ Item {
             // to the currently displayed file; export identifies saved R.
             if(!panel.available)return;
             if(result.action==="preview"&&result.portableId!==fileId.text)return;
+            if(result.action==="export"&&result.sourceRevision!==panel.savedRevision)return;
             panel.receipt=result;
             panel.notice=result.action==="export"?"ENCRYPTED COPY CREATED":
                 "CIPHERTEXT AUTHENTICATED // ORIGIN NOT VERIFIED";
@@ -68,7 +72,8 @@ Item {
             panel.receipt=null;
             panel.armed=null;
             secret.text="";
-            panel.notice="RESULT NOT CONFIRMED // INSPECT FILES BEFORE RETRY";
+            panel.notice=bridge.retired?"REQUEST TIMED OUT // REOPEN CONTROLS AND INSPECT FILES // NO RETRY":
+                "RESULT NOT CONFIRMED // INSPECT FILES BEFORE RETRY";
         }
     }
     Column {
@@ -97,11 +102,7 @@ Item {
             clip: true
             enabled: panel.available&&!bridge.busy
             selectByMouse: true
-            onTextChanged: {
-                panel.armed=null;
-                panel.receipt=null;
-                if(secret)secret.text="";
-            }
+            onTextChanged: panel.clearSensitive()
         }
         GohuText { text: "PASSPHRASE // AT LEAST 12 CHARACTERS"; color: Colors.magenta }
         TextInput {

@@ -12,12 +12,12 @@ Rectangle {
     border.color: Colors.cyan
     border.width: 1
     readonly property int rowHeight: 24
-    readonly property var state: bridge.state
+    readonly property var mapState: bridge.state
     readonly property real scrollPosition: flick.contentY
     readonly property real scrollExtent: flick.contentHeight
     readonly property int renderedRows: rows.count
     readonly property int graphSurfaceHeight: graph.height
-    readonly property string bottomStatus: state ? Policy.bottomState(state) : "NO INDEX"
+    readonly property string bottomStatus: mapState ? Policy.bottomState(mapState) : "NO INDEX"
     readonly property bool bridgeFaulted: bridge.faulted
     property bool applyingGeometry: false
     property string selectedSha: ""
@@ -35,12 +35,12 @@ Rectangle {
         return ok;
     }
     function scrollTo(y) {
-        if (!state || !Number.isFinite(y)) return;
+        if (!mapState || !Number.isFinite(y)) return;
         flick.cancelFlick();
-        flick.contentY = Policy.clamp(state,y);
+        flick.contentY = Policy.clamp(mapState,y);
     }
-    function rowAt(ordinal) { return state ? Policy.rowAt(state,ordinal) : null; }
-    function rowStatus(ordinal) { return state ? Policy.rowState(state,ordinal) : "NO INDEX"; }
+    function rowAt(ordinal) { return mapState ? Policy.rowAt(mapState,ordinal) : null; }
+    function rowStatus(ordinal) { return mapState ? Policy.rowState(mapState,ordinal) : "NO INDEX"; }
     function retry(ordinal) { bridge.retry(ordinal); }
     function choose(ordinal) {
         const row = rowAt(ordinal);
@@ -59,7 +59,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.margins: 8
         height: 24
-        text: root.state ? "BRANCH MAP // " + root.state.total + " LOCAL COMMITS" : "BRANCH MAP // NO INDEX"
+        text: root.mapState ? "BRANCH MAP // " + root.mapState.total + " LOCAL COMMITS" + (graph.laneX(root.mapState.maxLane) >= graph.width ? " // LANES CLIPPED" : "") : "BRANCH MAP // NO INDEX"
         color: Colors.magenta
         font.pixelSize: 12
         textFormat: Text.PlainText
@@ -77,10 +77,10 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.VerticalFlick
         contentWidth: width
-        contentHeight: root.state ? Policy.extent(root.state) : height
-        onContentYChanged: if (!root.applyingGeometry && root.state) bridge.scroll(contentY)
+        contentHeight: root.mapState ? Policy.extent(root.mapState) : height
+        onContentYChanged: if (!root.applyingGeometry && root.mapState) bridge.scroll(contentY)
         onHeightChanged: {
-            if (!root.state || height < 1) return;
+            if (!root.mapState || height < 1) return;
             root.applyingGeometry = true;
             bridge.resize(height);
             contentY = bridge.state.y;
@@ -108,7 +108,7 @@ Rectangle {
             onPaint: {
                 const ctx = getContext("2d");
                 ctx.clearRect(0,0,width,height);
-                const s = root.state;
+                const s = root.mapState;
                 if (!s) return;
                 const range = Policy.visibleRange(s);
                 // Reconstruct active frontier from each loaded page's exact
@@ -156,14 +156,14 @@ Rectangle {
         // allocate one delegate per commit or use variable row heights.
         Repeater {
             id: rows
-            model: root.state ? Math.min(root.state.total,Math.ceil(flick.height/root.rowHeight)+1) : 0
+            model: root.mapState ? Math.min(root.mapState.total,Math.ceil(flick.height/root.rowHeight)+1) : 0
             delegate: Item {
                 id: rowItem
                 required property int index
-                readonly property int ordinal: root.state ? Policy.visibleRange(root.state).first+index : -1
+                readonly property int ordinal: root.mapState ? Policy.visibleRange(root.mapState).first+index : -1
                 readonly property var record: root.rowAt(ordinal)
                 readonly property string status: root.rowStatus(ordinal)
-                visible: root.state !== null && ordinal<root.state.total
+                visible: root.mapState !== null && ordinal<root.mapState.total
                 x: graph.width
                 y: ordinal*root.rowHeight
                 width: Math.max(0,flick.width-x)
@@ -186,12 +186,12 @@ Rectangle {
                     onPressedChanged: if (pressed) {
                         pressedOrdinal = rowItem.ordinal;
                         pressedSha = rowItem.record ? rowItem.record.sha : "";
-                        pressedSnapshot = root.state ? root.state.snapshot : "";
-                        pressedEpoch = root.state ? root.state.epoch : -1;
+                        pressedSnapshot = root.mapState ? root.mapState.snapshot : "";
+                        pressedEpoch = root.mapState ? root.mapState.epoch : -1;
                     }
                     onTapped: {
-                        if (!root.state || pressedSnapshot !== root.state.snapshot
-                                || pressedEpoch !== root.state.epoch
+                        if (!root.mapState || pressedSnapshot !== root.mapState.snapshot
+                                || pressedEpoch !== root.mapState.epoch
                                 || pressedOrdinal !== rowItem.ordinal) return;
                         if (rowItem.record && pressedSha === rowItem.record.sha)
                             root.choose(rowItem.ordinal);
@@ -217,7 +217,7 @@ Rectangle {
         anchors.margins: 8
         height: 24
         text: root.bridgeFaulted ? "PAGE READER UNAVAILABLE // REOPEN REQUIRED" :
-            root.state ? (root.state.total ? Policy.visibleRange(root.state).first+1 : 0)+" / "+root.state.total+" // "+root.bottomStatus : "NO INDEX"
+            root.mapState ? (root.mapState.total ? Policy.visibleRange(root.mapState).first+1 : 0)+" / "+root.mapState.total+" // "+root.bottomStatus : "NO INDEX"
         textFormat: Text.PlainText
         color: Colors.orange
         font.pixelSize: 10

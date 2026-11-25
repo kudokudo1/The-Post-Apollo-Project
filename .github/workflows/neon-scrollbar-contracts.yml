@@ -136,6 +136,6 @@ jobs:
           timeout --signal=TERM --kill-after=3s 30s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
           if grep -q WORKSHOP_SCROLL_FAIL "$work/output"; then exit 1; fi
           observed="$(grep -oE 'WORKSHOP_SCROLL_PHASE_PASS [0-5]' "$work/output" || true)"
-          expected="$(printf 'WORKSHOP_SCROLL_PHASE_PASS %s\\n' 0 1 2 3 4 5)"
+          expected="$(printf 'WORKSHOP_SCROLL_PHASE_PASS %s\n' 0 1 2 3 4 5)"
           test "$observed" = "$expected"
           grep -q WORKSHOP_SCROLL_NATIVE_PASS "$work/output"

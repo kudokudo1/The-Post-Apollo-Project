@@ -104,5 +104,5 @@ Caller-supplied current profile does not prove actual residency,
 currentness or authenticated source. All outputs stay UNKNOWN_HOLD.
 Real baseline attribution, native workload bounds, measured coverage,
 independent headroom and operator-approved trial still required.
-No R6 source or runtime changes. H7 independently reviewed/merged
-on its own path; H8 does not depend on its new function.
+No R6 source or runtime changes. H7 requires its own independent review
+and merge decision; H8 does not depend on its new function.

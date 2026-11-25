@@ -1,0 +1,23 @@
+name: CPU++ R6d retained checkpoint generations
+on:
+  pull_request:
+    paths:
+      - 'services/memory/memory_queue_checkpoint_generations.py'
+      - 'services/memory/memory_queue_host_checkpoint.py'
+      - 'tests/cpuplus_memory_queue_checkpoint_generations_test.py'
+      - 'tests/cpuplus_memory_queue_host_checkpoint_test.py'
+      - '.github/workflows/cpuplus-queue-checkpoint-generations.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Original write-once checkpoint contract
+        run: python3 -B tests/cpuplus_memory_queue_host_checkpoint_test.py
+      - name: Retained generations (disposable files only)
+        run: python3 -B tests/cpuplus_memory_queue_checkpoint_generations_test.py

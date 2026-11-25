@@ -8,6 +8,7 @@ Scope {
     id: service
     property bool allowed: false
     readonly property bool busy: pending!==null || retired
+    readonly property bool drained: pending===null && !worker.running
     property bool retired: false // deadline failure requires a new instance
     property bool refusalReported: false
     property var pending: null // non-secret intent only

@@ -1,0 +1,30 @@
+name: Git map retained custody footprint
+on:
+  pull_request:
+    paths:
+      - "tests/git/fixtures/GitMapFootprintNative.qml"
+      - "tests/git/test_git_map_custody_footprint_native.py"
+      - ".github/workflows/git-map-custody-footprint.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-footprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Paired hidden retained map memory and legacy bypass witness
+        run: python3 -B tests/git/test_git_map_custody_footprint_native.py
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY

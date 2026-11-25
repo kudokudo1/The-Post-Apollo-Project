@@ -478,12 +478,15 @@ ShellRoot {
             const dismiss=find(item,"restorationReviewDismiss");
             const body=find(item,"restorationReviewBody");
             check(item && item.reviewState==="CLOSED" && item.reviewRows.length===0
-                && dismiss && body && !body.visible && !dismiss.activeFocusOnTab,
+                && dismiss && body && !body.visible && !dismiss.activeFocusOnTab
+                && !dismiss.activeFocus && !dismiss.focus,
                 "review dismissed tab eligibility");
             if (failed) return;
             a.preview.leftClicked(null);
+            a.input.forceActiveFocus(); // local host focus restoration request, not physical keyboard input
         } else if (n===5) {
             check(!a.loader.active && a.loader.item===null && a.empty.visible,"review unloaded");
+            check(a.input.focus && a.input.text==="review-local draft","review return focus request/draft");
             a.preview.leftClicked(null);
         } else if (n===6) {
             const item=a.loader.item;

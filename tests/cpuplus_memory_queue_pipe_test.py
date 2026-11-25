@@ -7,6 +7,7 @@ import select
 import sys
 import tempfile
 import threading
+from unittest import mock
 import unittest
 import uuid
 
@@ -248,6 +249,170 @@ class PipeTests(unittest.TestCase):
         with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
             self.lookup(str(uuid.uuid4()))
 
+    def staged(self, *, start=True, max_age=10000):
+        self.owner.close()
+        self.queue=Queue(self.queue.path)
+        self.owner=Owner(self.queue,self.factory,durable_actions=True,
+                         staged_max_age_ms=max_age)
+        self.addCleanup(self.owner.close)
+        self.sent=[]
+        self.session=Session(self.owner,self.sent.append)
+        if start:
+            self.session.start()
+
+    def prepare_frame(self, message=None):
+        return dict(self.message() if message is None else message,kind="PREPARE_ACTION")
+
+    def commit_frame(self, receipt):
+        return {"version":1,"kind":"COMMIT_ACTION","message":receipt["record"]["message"],
+                "prepared_sequence":receipt["sequence"],"challenge":receipt["challenge"]}
+
+    def test_staged_pipe_prepare_exact_receipt_then_commit(self):
+        self.staged()
+        prepare=self.prepare_frame()
+        self.send(prepare)
+        receipt=self.sent[-1]
+        self.assertEqual(receipt["kind"],"PREPARED_ACTION")
+        self.assertEqual(receipt["record"]["message"],prepare["message"])
+        self.assertEqual(receipt["record"]["state"],"PREPARED")
+        self.assertFalse(receipt["can_execute"])
+        self.assertEqual(receipt["next_action_sequence"],2)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual((self.captures,self.samples),(0,0))
+        self.assertIsNotNone(self.session.wait_seconds())
+        self.send(self.commit_frame(receipt))
+        self.assertEqual([p["kind"] for p in self.sent[-3:]],["ACTION","INVALIDATE","STATUS"])
+        self.assertEqual(self.sent[-3]["disposition"],"REPORTED")
+        self.assertEqual(self.captures,1)
+        self.assertEqual(self.lookup(prepare["message"]["action_id"])["record"]["state"],"COMMITTED")
+        with self.assertRaisesRegex(QueueError,"STAGED_PIPE_NOT_PREPARED"):
+            self.send(self.commit_frame(receipt))
+        self.assertTrue(self.session.closed)
+        self.assertEqual(self.captures,1)
+
+    def test_staged_pipe_wrong_challenge_is_terminal(self):
+        self.staged()
+        self.send(self.prepare_frame())
+        receipt=self.sent[-1]
+        with self.assertRaisesRegex(QueueError,"STAGED_PIPE_MISMATCH"):
+            self.send(dict(self.commit_frame(receipt),challenge=str(uuid.uuid4())))
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.owner.runtime._staged)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.captures,0)
+        with self.assertRaises(QueueError):
+            self.send(self.commit_frame(receipt))
+
+    def test_staged_pipe_bool_message_is_not_exact(self):
+        self.staged()
+        self.send(self.prepare_frame())
+        receipt=self.sent[-1]
+        frame=self.commit_frame(receipt)
+        frame["message"]=dict(frame["message"],version=True)
+        with self.assertRaises(QueueError):
+            self.send(frame)
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_staged_pipe_direct_action_and_legacy_prepare_refused(self):
+        self.session.start()
+        with self.assertRaisesRegex(QueueError,"STAGED_PIPE_MODE_REQUIRED"):
+            self.send(self.prepare_frame())
+        self.staged()
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_REQUIRED"):
+            self.send(self.message())
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_staged_pipe_unrelated_read_consumes_continuation(self):
+        self.staged()
+        self.send(self.prepare_frame())
+        receipt=self.sent[-1]
+        with self.assertRaisesRegex(QueueError,"STAGED_PIPE_MISMATCH"):
+            self.inventory()
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.owner.runtime._staged)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.captures,0)
+        self.staged()
+        self.assertEqual(self.lookup(receipt["record"]["message"]["action_id"])["record"]["state"],"PREPARED")
+
+    def test_staged_pipe_deadline_closes_without_commit(self):
+        self.staged()
+        self.send(self.prepare_frame())
+        with mock.patch("memory_queue_pipe.time.monotonic",
+                        return_value=self.session.prepare_deadline):
+            self.assertEqual(self.session.wait_seconds(),0)
+            with self.assertRaisesRegex(QueueError,"STAGED_PIPE_EXPIRED"):
+                self.session.due()
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.owner.runtime._staged)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_staged_pipe_prepare_emit_failure_retires_continuation(self):
+        self.staged()
+        prepare=self.prepare_frame()
+        def failed(_):
+            raise OSError("lost preparation receipt")
+        self.session.emit=failed
+        with self.assertRaises(OSError):
+            self.send(prepare)
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.owner.runtime._staged)
+        self.assertIsNone(self.queue.pending())
+        self.staged()
+        self.assertEqual(self.lookup(prepare["message"]["action_id"])["record"]["state"],"PREPARED")
+        self.assertEqual(self.captures,0)
+
+    def test_staged_pipe_actual_eof_after_prepare(self):
+        self.staged(start=False)
+        r,w=os.pipe()
+        out_r,out_w=os.pipe()
+        errors=[]
+        def target():
+            try:
+                serve(self.owner,r,out_w,io_timeout_ms=1000)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                os.close(r)
+                os.close(out_w)
+        worker=threading.Thread(target=target,daemon=True)
+        worker.start()
+        prepare=self.prepare_frame()
+        try:
+            data=b""
+            while data.count(b"\n")<3:
+                self.assertTrue(select.select([out_r],[],[],3)[0])
+                chunk=os.read(out_r,4096)
+                self.assertTrue(chunk)
+                data+=chunk
+            os.write(w,encode(prepare))
+            while data.count(b"\n")<4:
+                self.assertTrue(select.select([out_r],[],[],3)[0])
+                chunk=os.read(out_r,4096)
+                self.assertTrue(chunk)
+                data+=chunk
+            packets=[json.loads(line) for line in data.splitlines()]
+            self.assertEqual([p["kind"] for p in packets],
+                             ["HELLO","INVALIDATE","STATUS","PREPARED_ACTION"])
+            self.assertIsNone(self.queue.pending())
+        finally:
+            os.close(w)
+            worker.join(4)
+            os.close(out_r)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(errors,[])
+        self.assertIsNone(self.owner.runtime._staged)
+        self.assertEqual(self.captures,0)
+        self.staged()
+        self.assertEqual(self.lookup(prepare["message"]["action_id"])["record"]["state"],"PREPARED")
+        with self.assertRaisesRegex(QueueError,"STAGED_PIPE_NOT_PREPARED"):
+            self.send(self.commit_frame(packets[-1]))
+        self.assertIsNone(self.queue.pending())
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

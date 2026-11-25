@@ -59,3 +59,26 @@ action sequence consumption, scheduler change, acknowledgment or unlock.
 A null lookup is not proof of noncommit. Existing frame size bound applies.
 Four additional Python fixture cases exercise dispatch, 50 repeated reads,
 new owner recovery, invalid fields and legacy refusal. No production launch.
+
+## R3l // staged pipe candidate
+
+On merged #2675/#2677 combined main 52fb321a, add explicit staged
+owner configuration only. Legacy wire unchanged; no mode selected by
+client. PREPARE_ACTION {version:1,kind,message} returns existing
+PREPARED_ACTION envelope plus random UUID challenge. No capture, queue
+mutation or publication while waiting. COMMIT_ACTION {version:1,kind,
+message,prepared_sequence,challenge} must match exact preparation in
+same live session. Consume receipt before dispatch. Existing ACTION reply
+then INVALIDATE/STATUS. Challenge is correlation, not a security grant.
+Unexpected command, mismatched receipt, failed emit, timeout or EOF
+terminates staged session, retires live state, preserves durable evidence.
+Server monotonic wait bound starts before PREPARE; existing owner admission
+clock independently checks wall/monotonic under lock. No autonomous retry,
+startup unlock or recovery acknowledgment wire. A transaction already
+admitted is not undone by EOF. Seven added tests including actual OS pipe
+EOF after durable PREPARE, new owner lookup and old commit refusal.
+Canonical JS host integration is a separate reviewed next step; it must
+validate PREPARED_ACTION exact schema/owner/sequence/message, retain pending
+through receipt, send exactly one matching commit after receipt, retain
+unresolved on loss, never commit recovered evidence. No installed launcher
+or production timeout default. No DOC 2 source changes.

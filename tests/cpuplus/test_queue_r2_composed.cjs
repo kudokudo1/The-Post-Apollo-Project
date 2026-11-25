@@ -137,6 +137,26 @@ async function action(kind,target=null,expiry=null,lose=false) {
         assert.equal(await call("passive"),null);
         s=c.timeout(s); assert.equal(s.status,null);
         console.log("PASS cancellation returns to idle and host invalidation");
+        await publish();
+        const expiring=await action("QUEUE",16,106);
+        const expiryId=expiring.reply.result.request.id;
+        await publish();
+        await call("advance",{ms:1000});
+        assert.equal(await call("passive"),null);
+        s=c.timeout(s);
+        const expired=await publish();
+        assert.equal(s.status.requestId,expiryId);
+        assert.equal(s.status.code,"EXPIRY_RECONCILIATION_REQUIRED");
+        assert.equal(expired.projection.status.next_check_monotonic_ms,null);
+        assert.deepEqual(await call("passive"),expired);
+        const beforeExpire=await call("counts");
+        for(let i=0;i<50;i++) assert.deepEqual(await call("passive"),expired);
+        assert.deepEqual(await call("counts"),beforeExpire);
+        const finished=await action("EXPIRE");
+        assert.equal(finished.reply.result.request.state,"EXPIRED");
+        await publish();
+        assert.equal(s.status.state,"IDLE REPORTED");
+        console.log("PASS expired intent remains visible until explicit reconciliation, no polling");
         console.log("R2 composed fixture PASS (no native observation, no real Hub, no deployment)");
     } finally {
         child.stdin.end();

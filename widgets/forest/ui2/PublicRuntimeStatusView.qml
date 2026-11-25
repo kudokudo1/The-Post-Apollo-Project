@@ -37,6 +37,7 @@ Item {
     onCurrentCorrelationChanged: observeCurrent()
     onViewOpenChanged: observeCurrent()
     onTreeKeyChanged: observeCurrent()
+    onEligibleChanged: observeCurrent()
     Component.onCompleted: {
         _snapshot = _consumer.close();
         _initialized = true;

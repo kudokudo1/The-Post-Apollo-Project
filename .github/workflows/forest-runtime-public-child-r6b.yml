@@ -1,0 +1,28 @@
+name: Forest R6b disposable Runtime child
+on:
+  pull_request:
+    paths:
+      - 'scripts/forest/runtime_public_child_r6b.py'
+      - 'scripts/forest/runtime_public_conversation_r5.py'
+      - 'scripts/forest/history_public_fixture_m4.py'
+      - 'scripts/forest/recovery_inspect_b4d.py'
+      - 'scripts/forest/RUNTIME_PUBLIC_CHILD_R6B.md'
+      - 'tests/forest/test_runtime_public_child_r6b.py'
+      - '.github/workflows/forest-runtime-public-child-r6b.yml'
+permissions:
+  contents: read
+jobs:
+  disposable-child:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          test "$(id -u)" != 0
+          python -B tests/forest/test_runtime_public_child_r6b.py
+      - run: python -B -m unittest discover -s tests/forest -p 'test_history_public_fixture_m4.py' -v

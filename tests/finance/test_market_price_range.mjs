@@ -306,3 +306,5 @@ await import("./test_market_m45_global_cross_stock.mjs");
 }
 
 await import("./test_market_m46b_unified_controls.mjs");
+
+await import("./test_market_m46b_inline_controls.mjs");

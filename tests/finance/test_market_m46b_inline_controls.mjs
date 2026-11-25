@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import vm from "node:vm";
+const read=p=>readFileSync(new URL("../../widgets/"+p,import.meta.url),"utf8");
+const q=read("FinanceStockHistoryPane.qml"),d=read("FinanceStockDiscoveryPane.qml"),e=read("FinanceGlobalPricePane.qml"),a=read("FinanceAlphaVantageFreePane.qml");
+const control=q.slice(q.indexOf("id: worldwideSearch"),q.indexOf('objectName: "marketCompactSelection"'));
+assert.ok(control.includes("width: parent.width"));
+assert.ok(control.includes("height: visible ? implicitHeight : 0"));
+assert.ok(q.indexOf("id: body")<q.indexOf("id: worldwideSearch"));
+assert.ok(q.indexOf("id: worldwideSearch")<q.indexOf('objectName: "marketCompactSelection"'));
+assert.ok(!control.includes("anchors.fill: parent"));
+assert.ok(!/\bz:\s*\d+/.test(control));
+assert.equal((q.match(/\bFlickable\s*\{/g)||[]).length,1);
+for(const s of [d,e,a]){
+ assert.ok(!/\b(?:Flickable|NeonScrollBar)\s*\{/.test(s),"nested viewport");
+ assert.ok(!/\bz:\s*\d+/.test(s),"overlay stacking");
+ assert.ok(s.includes("implicitHeight:"));
+ assert.ok(!s.includes("reader.exec("));
+}
+assert.ok(d.includes("anchors.top: discovery.priceOptionsOpen ? globalPrices.bottom : resultScroll.bottom"));
+assert.ok(d.includes("visible: !discovery.priceOptionsOpen"));
+assert.ok(e.includes("visible: !priceView.alphaOpen"));
+assert.ok(e.includes('height: visible ? implicitHeight : 0'));
+const f=q.slice(q.indexOf("function openControls()"),q.indexOf("function openQuotaStatus()"));
+const ctx={visible:true,stockFeed:{monitoring:true},quotaOpen:false,globalHandoffMessage:"",discoveryOpen:false,scroll:{contentY:100}};
+ctx.stocks=ctx;vm.createContext(ctx);vm.runInContext(f,ctx);
+ctx.openControls();assert.equal(ctx.discoveryOpen,true);assert.equal(ctx.scroll.contentY,0);
+ctx.openControls();assert.equal(ctx.discoveryOpen,false);
+ctx.stockFeed.monitoring=false;ctx.openControls();assert.equal(ctx.discoveryOpen,false);
+console.log("M46b single Stocks viewport, inline discovery/provider sections and toggle: PASS");

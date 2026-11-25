@@ -60,7 +60,8 @@ Item {
         if (!visible || !stockFeed || !stockFeed.monitoring) return;
         stocks.quotaOpen = false;
         globalHandoffMessage = "";
-        discoveryOpen = true;
+        discoveryOpen = !discoveryOpen;
+        if (discoveryOpen) scroll.contentY = 0;
     }
     function openQuotaStatus() {
         if (!visible || !stockFeed || !stockFeed.monitoring) return;
@@ -248,6 +249,7 @@ Item {
             height: 28
             label: "CONTROLS"
             labelPixelSize: 9
+            selected: stocks.discoveryOpen
             accentColor: Colors.magenta
             available: stocks.stockFeed && stocks.stockFeed.monitoring
             onLeftClicked: stocks.openControls()
@@ -352,6 +354,22 @@ Item {
             // Reserve an unobstructed right gutter for the proportional rail.
             width: Math.max(0, scroll.width - 24)
             spacing: 8
+            // M46b correction: controls participate in the same scroll layout
+            // as the loaded charts; no covering layer or second viewport.
+            FinanceStockDiscoveryPane {
+                id: worldwideSearch
+                objectName: "marketInlineStockControls"
+                width: parent.width
+                height: visible ? implicitHeight : 0
+                visible: stocks.discoveryOpen
+                active: stocks.discoveryOpen && stocks.visible
+                    && stocks.stockFeed && stocks.stockFeed.monitoring
+                onExitRequested: stocks.discoveryOpen = false
+                onQuotaRequested: stocks.openQuotaStatus()
+                onHistoryChosen: function(identity, listing, snapshot) {
+                    stocks.acceptGlobalHistory(identity,listing,snapshot);
+                }
+            }
             GohuText {
                 objectName: "marketCompactSelection"
                 width: parent.width
@@ -1546,20 +1564,6 @@ Item {
                 font.pixelSize: 9
                 color: Colors.orange
             }
-        }
-    }
-
-    FinanceStockDiscoveryPane {
-        id: worldwideSearch
-        anchors.fill: parent
-        visible: stocks.discoveryOpen
-        active: stocks.discoveryOpen && stocks.visible
-            && stocks.stockFeed && stocks.stockFeed.monitoring
-        z: 20
-        onExitRequested: stocks.discoveryOpen = false
-        onQuotaRequested: stocks.openQuotaStatus()
-        onHistoryChosen: function(identity, listing, snapshot) {
-            stocks.acceptGlobalHistory(identity,listing,snapshot);
         }
     }
 

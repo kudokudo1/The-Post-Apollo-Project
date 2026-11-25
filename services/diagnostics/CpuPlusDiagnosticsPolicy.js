@@ -87,6 +87,45 @@ function numeric(value) {
     return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+// Optional host context. Never turn missing data into zero, sum overlapping
+// memory counters, or infer a causal relation from a coincident PSS change.
+function hostMemorySummary(rows) {
+    if (!rows.some(row=>Object.prototype.hasOwnProperty.call(row,"hostObservation"))) return "";
+    const keys=["MemTotal","MemAvailable","MemFree","AnonPages","Cached","Shmem",
+        "SReclaimable","SUnreclaim","SwapTotal","SwapFree"];
+    const count=value=>Number.isSafeInteger(value) && value>=0;
+    const valid=value=>value && keys.every(key=>count(value[key]))
+        && value.MemTotal>0 && value.MemAvailable<=value.MemTotal
+        && value.MemFree<=value.MemTotal && value.SwapFree<=value.SwapTotal;
+    const pairs=rows.map(row=>{
+        const h=row.hostObservation;
+        return h && numeric(h.spanMs) && valid(h.beforeKiB) && valid(h.afterKiB)
+            && h.beforeKiB.MemTotal===h.afterKiB.MemTotal
+            ? h : null;
+    });
+    const available=pairs.filter(Boolean);
+    const mib=value=>(value/1024).toFixed(1);
+    const signed=value=>(value>0?"+":"")+mib(value);
+    let summary="\nHOST CONTEXT // "+available.length+"/"+rows.length+" paired samples";
+    if (!available.length) return summary+" // UNAVAILABLE";
+    const samples=available.flatMap(pair=>[pair.beforeKiB,pair.afterKiB]);
+    const minimum=Math.min(...samples.map(value=>value.MemAvailable));
+    const span=Math.max(...available.map(pair=>pair.spanMs));
+    summary+="\nHOST AVAILABLE MIN (OBSERVED) // "+mib(minimum)+" MiB";
+    summary+="\nHOST SAMPLE BRACKET MAX // "+span.toFixed(1)+" ms";
+    const first=pairs[0], last=pairs[pairs.length-1];
+    const complete=available.length===rows.length
+        && samples.every(value=>value.MemTotal===samples[0].MemTotal);
+    if (!complete) return summary+"\nHOST TREND // INCOMPLETE OR CHANGED CAPACITY";
+    summary+="\nHOST AVAILABLE START / FINAL // "+mib(first.beforeKiB.MemAvailable)
+        +" / "+mib(last.afterKiB.MemAvailable)+" MiB";
+    if (rows.length>1) {
+        summary+="\nHOST AVAILABLE CHANGE // "+signed(last.afterKiB.MemAvailable-first.beforeKiB.MemAvailable)+" MiB";
+        summary+="\nQS PSS CHANGE // "+signed(rows[rows.length-1].memoryKiB.Pss-rows[0].memoryKiB.Pss)+" MiB";
+    }
+    return summary+"\nCORRELATION ONLY // CAUSE NOT ESTABLISHED";
+}
+
 function summarize(kind, text) {
     try {
         if (kind === "inventory") {
@@ -206,7 +245,7 @@ function summarize(kind, text) {
                 + "\nPSS START / PEAK / FINAL // " + gib(rows[0].memoryKiB.Pss)
                 + " / " + gib(peak) + " / " + gib(rows[rows.length - 1].memoryKiB.Pss)
                 + " GiB\nSWAP PSS PEAK // " + gib(swap)
-                + " GiB   CPU PEAK // " + cpu.toFixed(1) + "%";
+                + " GiB   CPU PEAK // " + cpu.toFixed(1) + "%" + hostMemorySummary(rows);
         }
         if (rows.some(row => !numeric(row.totalCpuPct))) return null;
         const peak = Math.max(...rows.map(row => row.totalCpuPct));

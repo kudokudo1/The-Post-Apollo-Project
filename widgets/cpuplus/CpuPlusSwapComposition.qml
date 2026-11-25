@@ -9,7 +9,7 @@ Column {
     required property var capacity
     property bool compact: false
     readonly property var composition: Snapshot.swapComposition(sample)
-    readonly property var segments: composition ? composition.groups.filter(g => g.size > 0) : []
+    readonly property var segments: composition ? composition.groups : []
     spacing: compact ? 3 : 6
 
     function accent(id) {
@@ -52,10 +52,11 @@ Column {
             anchors.margins: 3
             spacing: 0
             Repeater {
-                model: root.segments
+                model: 4
                 delegate: Item {
                     id: segment
-                    required property var modelData
+                    required property int index
+                    readonly property var modelData: root.segments[index] || {id:"other",size:0,used:0}
                     width: root.composition && root.composition.total > 0
                         ? track.width * modelData.size / root.composition.total : 0
                     height: track.height
@@ -67,7 +68,7 @@ Column {
                     }
                     Rectangle {
                         height: parent.height
-                        width: parent.width * segment.modelData.used / segment.modelData.size
+                        width: segment.modelData.size>0 ? parent.width * segment.modelData.used / segment.modelData.size : 0
                         color: root.accent(segment.modelData.id)
                         opacity: 0.85
                     }
@@ -90,15 +91,17 @@ Column {
         wrapMode: Text.WordWrap
     }
     Repeater {
-        model: root.compact ? [] : root.segments
+        model: root.compact ? 0 : 4
         delegate: Column {
             id: legend
-            required property var modelData
+            required property int index
+            readonly property var modelData: root.segments[index] || {id:"other",label:"",size:0,used:0}
+            visible: modelData.size>0
             width: root.width
             spacing: 2
             CpuPlusMemoryReadout {
                 width: parent.width
-                text: legend.modelData.label + " // " + (100 * legend.modelData.used / legend.modelData.size).toFixed(1) + "%"
+                text: legend.modelData.label + " // " + (legend.modelData.size>0?100 * legend.modelData.used / legend.modelData.size:0).toFixed(1) + "%"
                 color: root.accent(legend.modelData.id)
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -117,9 +120,11 @@ Column {
         spacing: 5
         visible: root.compact
         Repeater {
-            model: root.compact ? root.segments : []
+            model: root.compact ? 4 : 0
             delegate: CpuPlusMemoryReadout {
-                required property var modelData
+                required property int index
+                readonly property var modelData: root.segments[index] || {id:"other",label:"",size:0,used:0}
+                visible: modelData.size>0
                 text: modelData.label + " " + root.amount(modelData.size)
                 color: root.accent(modelData.id)
                 font.pixelSize: 10

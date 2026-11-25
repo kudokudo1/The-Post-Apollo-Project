@@ -114,6 +114,7 @@ ShellRoot {
                     shared.requestStepDelta(1);
                     shared.requestStepDelta(1);
                     if (!smoke.check(pane.stagedGiB === 24 && pane.capacity.actualKiB === 16777212, "target versus actual")) return;
+                    pinned.forceLayout();
                     const targetMountY=slider.mapToItem(pane,0,0).y;
                     pane.selectCapSection(1);
                     if (!smoke.check(!slider.visible && scroll.visible, "actions section")) return;
@@ -129,6 +130,7 @@ ShellRoot {
                     if(!smoke.check(ramView.visible&&pane.ramDetailRows[0].fraction===0.25
                         &&pane.ramDetailRows[1].value===null&&pane.stagedGiB===24&&MemoryOperation.requests===0,
                         "RAM details selection and unavailable optional fields"))return;
+                    pinned.forceLayout();
                     const detailRail=smoke.find(pane,"cpuplusCapDetailRail");
                     if(!smoke.check(detailRail&&detailRail.parent===pinned
                         &&Math.abs(detailRail.mapToItem(pane,0,0).y-targetMountY)<1
@@ -163,6 +165,16 @@ ShellRoot {
                     info.leftClicked(null);
                     if(!smoke.check(!popup.visible,"info closes"))return;
                     console.log("CPU_M11D_INSTRUMENT_PASS // inset gauge and info popup");
+                    const savedSample=pane.sample;
+                    const originalCard=card;
+                    pane.setScanMode("STOPPED");
+                    if(!smoke.check(pane.sample===null&&pane.displaySample===savedSample&&pane.scanBadge==="MANUAL"
+                        &&smoke.find(ramView,"cpuplusRamMetricCard")===originalCard,"stop preserves display, invalidates operation input"))return;
+                    pane.setScanInterval(15);
+                    if(!smoke.check(pane.scanIntervalSeconds===15&&pane.scanNextMs===0,"manual interval does not start polling"))return;
+                    pane.sample=Object.assign({},savedSample,{available:4194304});
+                    if(!smoke.check(smoke.find(ramView,"cpuplusRamMetricCard")===originalCard,"metric delegate survives publication"))return;
+                    pane.scanMode="LIVE"; pane.sample=savedSample;
                     swap.leftClicked(null);
                     const swapCard=smoke.find(pane,"cpuplusSwapDetailCard");
                     if(!smoke.check(swapCard&&swapCard.visible&&swapCard.width>0&&swapCard.height>0,

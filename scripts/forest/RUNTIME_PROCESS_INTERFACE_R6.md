@@ -3,7 +3,7 @@
 PATIENT: The-Post-Apollo-Project  
 ROOM: Forest Integration  
 OWNER: DOC 2F Runtime; UI1 process lifetime, UI2 presentation, DOC4F history, DOC3F security.  
-STATE: PROPOSED, CI-only. No implementation, installation or production authority.
+STATE: REVISED PROPOSAL, CI-only. No implementation, installation or production authority. Read the owner-revision requirements below as part of the contract.
 
 ## Baseline and scope
 
@@ -113,7 +113,7 @@ No generic error text, raw trace, or separate unsolicited status stream.
 | --- | --- | --- |
 | HELLO {} | RESULT {code:"READY",units:[]} | New child only, no user append |
 | NEXT {} | OPEN_OFFER {ref}; after matching OPEN_ACK {ref,accepted:bool}, RESULT {code:"TURN_STARTED",units:[]} | Only idle, next fixed R5 turn; no append before true ACK |
-| STEP {ref} | RESULT {code:"ACTIVE" or "TERMINAL" or "UNKNOWN_HOLD",units:[0..2 R4b units]} | Exactly one existing R5 advance, matching active scope |
+| STEP {ref} | RESULT {code:"ACTIVE" or "COMMITTED_LOCAL" or "ABORTED_LOCAL" or "UNKNOWN_HOLD",units:[0..2 R4b units]} | Exactly one existing R5 advance, matching active scope |
 | STOP {ref} | RESULT {code:"STOP_OBSERVED",units:[0..2 R4b units]} | Exact active scope; no cancellation receipt |
 | REOPEN {} | RESULT {code:"JOURNAL_REOPENED",units:[]} | Verified committed idle only, existing R5b connection reopen |
 | HISTORY_ATTACH {} | HISTORY_OFFER {scope}; after matching HISTORY_ACK {scope,accepted:bool}, RESULT {code:"HISTORY_ATTACHED",units:[]} | Explicit read-only idle attachment, no execution |
@@ -132,8 +132,8 @@ uncertainty retain HOLD, never claim rollback. Child must not exit before
 cleanup on normal CLOSE. Parent teardown is independent of status STOP.
 
 One stateful owner at each end. HELLO -> idle -> NEXT waiting ACK ->
-active -> STEP/STOP -> terminal idle on known commit, or blocked on
-unknown/abort -> CLOSE. REOPEN is allowed only after exact R5b verified
+active -> STEP/STOP -> terminal idle on COMMITTED_LOCAL, or blocked on
+UNKNOWN_HOLD/ABORTED_LOCAL -> CLOSE. REOPEN is allowed only after exact R5b verified
 commit and no stream. HISTORY_ATTACH and PAGE are permitted only idle
 with independently verified durable fixture state (initial empty/known
 committed; known ABORTED read-only after STOP requires explicit Mind
@@ -236,3 +236,147 @@ first trial vs detached continuation, child startup/cleanup mechanics,
 single action/result batching, history-only attachment/alias ownership,
 and actual native parser limits. UI1/UI2/DOC3F/DOC4F ACCEPT/REVISE
 required before wire freeze. No installed transport code in this proposal.
+
+
+## R6a revision 1 // Owner requirements (supersede earlier conflicting wording)
+
+Basis: UI2 #7159917469, UI1 #7159921183, Mind #7159925055,
+Security #7159931749. The following are candidate normative refinements
+for exact owner ACK and Nurse2F review, not approval to implement yet.
+
+### 1. Parent process lifetime and clock
+
+One distinct Process QObject outside the disposable Loader, retained
+through verified exit/drain. Never exec while running or start another
+trial before the previous child is reaped. Set clearEnvironment, fixed
+environment/cwd and stdinEnabled before exec; HELLO only on matching
+started. Stderr uses empty-marker parser, retaining only error bit;
+any nonempty stderr closes trial. No StdioCollector/raw logging.
+On failure clear only the original scope, TERM that exact Process,
+then signal(9) after candidate 2s grace if still running; wait at most
+2s more for verified exit. Unreaped means HOLD, not permission to
+spawn another child. No generic PID kill, nested GUI wait or restart.
+
+Use Quickshell ElapsedTimer as parent monotonic deadline candidate:
+v0.3.0 documents elapsedMs/restartMs, upstream implementation uses
+Qt QElapsedTimer, monotonic steady clock on Qt >=6.6. Verify actual
+installed version in native CI. One trial clock never restarted during
+trial, plus phase clock/absolute offsets. Check before writes, chunks,
+offers/ACK, every consume and exit decision; QML Timer only wakes
+the check, not a time source; never use Date.now or reset deadline on
+fragments. Parent scheduling is not a real-time guarantee. Child
+uses time.monotonic and nonblocking bounded reads/writes with remaining
+time polling, including partial writes, ACK and no unbounded flush.
+Startup/action/ACK <=5s, capped by trial 120s; ACK cannot extend the
+overall action deadline. Separate finite cleanup grace is not execution
+time. Links:
+- https://quickshell.org/docs/v0.3.0/types/Quickshell/ElapsedTimer/
+- https://doc.qt.io/qt-6/qelapsedtimer.html
+- https://git.outfoxxed.me/quickshell/quickshell/src/commit/4b77936c8019e0f51e0e62414c6de3556d5f8870/src/core/elapsedtimer.cpp
+
+### 2. Framing, preparse and reserved capacity
+
+Before retaining any chunk check accepted ASCII/control characters and
+remaining total budget, then scan bounded segments up to LF; partial
+response line <=16383 bytes. Stop on first failure; no resynchronization,
+whole-chunk split or unbounded logs. This bounds retained JS text, not
+Qt/native read allocation. No documented independent EOF callback:
+native CI must prove stdout drain/exit ordering, including CLOSE with
+trailing bytes or partial line. If not established, HOLD.
+
+Before recursive parse/canonical validation, bounded lexical scan of
+JSON respecting strings and escapes: maximum depth 8 (outer object 1),
+256 nodes including keys, scalar values and containers; maximum 512
+lexical tokens including punctuation. Reject malformed structure,
+prototype-sensitive keys __proto__, constructor, prototype anywhere,
+duplicate keys, non-ASCII decoded strings, alternate escapes and
+noncanonical number spellings (fraction, exponent, negative zero,
+leading zero) before consumer dispatch. Canonical quote/backslash
+escaping only, no Unicode/control escape. Do not recurse over
+unvalidated arbitrary objects. Validate exact schemas and round trip.
+
+Reserve full worst-case exchange capacity before admitting new action:
+ordinary = 512+16384 bytes and two frames; offer/ACK = 2*512+2*16384
+bytes and four frames. Capacity check only; count actual input bytes
+read and attempted output bytes before submission, including failed
+partial writes, and attempted frames conservatively. Malformed input
+terminates. Do not double count reserved capacity. Check remaining
+budget again before ACK and any effect. Before possible effect refuse
+or close; after possible effect exhausted/failed IO is UNKNOWN_HOLD
+locally even if no response fits. No extra diagnostics beyond caps.
+No reset on reattach or reopen, no retry. Maximum-size proposed
+HISTORY_PAGE control calculated at 491 bytes including LF, within
+512; parser/native memory behavior is separate.
+
+### 3. Outcome and old delivery retirement
+
+The STEP code table uses ACTIVE, COMMITTED_LOCAL, ABORTED_LOCAL,
+UNKNOWN_HOLD. R5.advance currently returns TERMINAL for both committed
+and unknown outcomes. Runtime must provide a narrow typed owner-side
+outcome backed by independently checked exact existing B3 attempt,
+canonical session, original user/revision and reply linkage. No public
+status, bare TERMINAL, local terminal flag or callback result can prove
+a durable outcome. COMMITTED_LOCAL requires no live stream and exact
+committed attempt/reply/revision. ABORTED_LOCAL requires no live
+stream/reservation, exact ABORTED attempt, null reply, unchanged expected
+revision/latest user; otherwise UNKNOWN_HOLD. Only known commit can
+enable next turn/reopen. First R6 witness permits CLOSE only after
+ABORTED_LOCAL or UNKNOWN_HOLD. Mind permits later read-only history of
+independently proved abort in principle, but defer that path; inspect
+isolated CI journal before disposal when available. No post-close PAGE.
+No claim of delivery, protected revoke or rollback. STOP_OBSERVED is
+not cancellation. Pre-effect refusal is REFUSED; possible effect or
+uncertain delivery is UNKNOWN_HOLD. False/missing ACK before acceptance
+must prove no append; once true ACK may have been delivered, loss or
+detach may race append: never claim no append, no replay.
+
+NEXT/REOPEN/CLOSE clear the original parent views and retire the exact
+old child-side delivery using existing R5 lifecycle before transition.
+Suppress only the obsolete original WITHDRAW from that retired ref if
+R5 attempts it; never forward old units into new action or interpret
+expected retirement as failure of new open. Success RESULT units:[].
+Test second NEXT, REOPEN and CLOSE with prior terminal status. Validate
+all response codes, units, phase and contiguous sequences as one batch
+before paint; check actual original Process/Loader/gate/ref immediately
+before each consume. If scope changes or callback refuses after first
+paint, abandon remainder, invalidate only original, close trial.
+NO_UPDATE is zero units with one explicit result; no implicit refresh.
+Old process output/exit cannot mutate replacement. Closed-on-loss is
+the first trial policy, not same-process detach-and-continue.
+
+### 4. History-only ownership
+
+Runtime owns child/currentness; Mind owns projection using existing M4.
+Use fresh host-issued B6 TaskContext/BarkAttachment for nonexecuting
+read task; execution_context_id is mandatory reference metadata, not
+execution evidence. No SessionContextRef/OperationRef fabricated.
+Explicit metadata offer pins canonical owner/tree/session OPEN/revision
+and fresh independent history view. Accept only exact pending ACK
+and recheck durable state. Stable random 32-hex public session/turn
+aliases distinct and bijective, bounded to <=5 verified durable rows
+within the same host-owned journal; preserve across SQLite connection
+reopen, never child death. No external alias creation, incoming DB
+path/ID, raw IDs or new store. Translate accepted session alias only
+after full scope check, pin revision/view/cursor in M4 transaction,
+substitute aliases before serialization. Parent selects fresh page
+requestId, exact accepted scope, cursor, limit<=2. Existing controller
+must have pending request before delivery; independently check original
+incarnation and scope before calling it. Stale other-incarnation frame
+discarded, current mismatch clears only affected history. No sample
+fallback, status-triggered history, automatic reopen or replay.
+Whole ASCII outer frame cap including LF; refuse rather than truncate.
+
+### 5. Verification gates
+
+Required native witness: actual version and elapsed clock, process
+identity/lifetime, fragmented/coalesced lines, boundary size, overflow
+without LF, malformed/deep/non-ASCII, stderr, truncated EOF, trailing
+output after CLOSE, missing/false/late/duplicate ACK, accepted ACK then
+loss (possible durable effect), budget exhaustion before/after effect,
+read/write timeout, exact-child TERM/KILL/reap, scope change within
+multi-unit batch, stale old withdrawal/exit. Verify no private data,
+native model or positive permission. No installed transport or execution
+until exact owner ACK and independent review. Native parser and drain
+evidence remain gates. The revised limits, durable codes, cleanup grace
+and post-abort CLOSE-only are proposed engineering choices, not
+operator-approved production behavior.

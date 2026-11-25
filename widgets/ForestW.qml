@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../components"
+import "forest/ui2" as PublicPreview
 import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
@@ -808,14 +809,29 @@ PanelWindow {
                     z: -1
                 }
             }
-            GohuText {
+            // Explicit local public preview, never a host/session request.
+            ActionButton {
+                id: publicPreviewButton
+                objectName: "forestPublicPreviewButton"
                 anchors.right: parent.right
                 anchors.rightMargin: 13
                 anchors.top: parent.top
-                anchors.topMargin: 18
-                text: "PREVIEW"
-                color: Colors.orange
-                font.pixelSize: 10
+                anchors.topMargin: 10
+                width: 66
+                height: 24
+                radius: 0
+                label: "PREVIEW"
+                labelPixelSize: 10
+                accentColor: Colors.orange
+                selected: publicPreviewGate.active
+                available: publicPreviewGate.eligible
+                interactive: publicPreviewGate.eligible
+                acceptedButtons: Qt.LeftButton
+                Accessible.name: publicPreviewGate.active
+                    ? "Close public conversation preview"
+                    : "Open public conversation preview"
+                Accessible.description: "Fixed public CHERRY example; no model or session execution."
+                onLeftClicked: publicPreviewGate.togglePreview()
             }
             Rectangle {
                 id: chatDivider
@@ -1534,7 +1550,40 @@ PanelWindow {
                 anchors.rightMargin: 8
                 clip: true
 
+                // Measured viewport, not chassis size or a claimed host grant.
+                PublicPreview.PublicPreviewGate {
+                    id: publicPreviewGate
+                    menuOpen: root.menuOpen && root.visible
+                    treeKey: root.activeTree ? root.activeTree.sessionKey : ""
+                    chatHostTrusted: root.chatHostTrusted
+                    activeSessionCount: Array.isArray(root.activeChatSessions)
+                        ? root.activeChatSessions.length : -1
+                    viewportUsable: sessionPreview.width >= 300
+                        && sessionPreview.height >= 160
+                }
+
+                Loader {
+                    id: publicPreviewLoader
+                    objectName: "forestPublicPreviewLoader"
+                    anchors.fill: parent
+                    active: publicPreviewGate.active
+                    visible: active && status === Loader.Ready
+                    enabled: visible
+                    sourceComponent: publicPreviewComponent
+                    onStatusChanged: {
+                        if (status === Loader.Error)
+                            publicPreviewGate.dismissPreview();
+                    }
+                }
+
+                Component {
+                    id: publicPreviewComponent
+                    PublicPreview.PublicConversationFixture {}
+                }
+
                 Column {
+                    objectName: "forestEmptySessionPlaceholder"
+                    visible: !publicPreviewLoader.visible
                     anchors.centerIn: parent
                     width: Math.max(120, parent.width - 30)
                     spacing: root.frameHeight >= 540 ? 8 : 4

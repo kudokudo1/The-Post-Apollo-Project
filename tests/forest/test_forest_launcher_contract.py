@@ -1285,6 +1285,57 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("gitWidth", policy)
         self.assertIn("gitHeight", policy)
 
+    def test_public_preview_is_local_opt_in_and_bounded(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        fixture = (ROOT / "widgets/forest/ui2/PublicConversationFixture.qml").read_text()
+        gate = (ROOT / "widgets/forest/ui2/PublicPreviewGate.qml").read_text()
+        toggle = view.split("id: publicPreviewButton", 1)[1].split("id: chatDivider", 1)[0]
+        pane = view.split("id: sessionPreview", 1)[1].split("id: reasoningRailHost", 1)[0]
+        for contract in (
+            "anchors.top: chatDivider.bottom",
+            "anchors.topMargin: 12",
+            "anchors.bottom: promptRow.top",
+            "anchors.bottomMargin: 8",
+            "anchors.left: parent.left",
+            "anchors.right: reasoningRailHost.left",
+            "anchors.rightMargin: 8",
+            "clip: true",
+            "menuOpen: root.menuOpen && root.visible",
+            'treeKey: root.activeTree ? root.activeTree.sessionKey : ""',
+            "chatHostTrusted: root.chatHostTrusted",
+            "Array.isArray(root.activeChatSessions)",
+            "? root.activeChatSessions.length : -1",
+            "viewportUsable: sessionPreview.width >= 300",
+            "&& sessionPreview.height >= 160",
+            "anchors.fill: parent",
+            "active: publicPreviewGate.active",
+            "visible: active && status === Loader.Ready",
+            "enabled: visible",
+            "sourceComponent: publicPreviewComponent",
+            "if (status === Loader.Error)",
+            "publicPreviewGate.dismissPreview()",
+            "PublicPreview.PublicConversationFixture {}",
+            "visible: !publicPreviewLoader.visible",
+            '"NO ACTIVE SESSION"',
+        ):
+            self.assertIn(contract, pane)
+        self.assertIn("available: publicPreviewGate.eligible", toggle)
+        self.assertIn("interactive: publicPreviewGate.eligible", toggle)
+        self.assertIn("onLeftClicked: publicPreviewGate.togglePreview()", toggle)
+        self.assertEqual(view.count("publicPreviewGate.togglePreview()"), 1)
+        self.assertIn('property bool _requested: false', gate)
+        self.assertIn('treeKey === "CHERRY"', gate)
+        self.assertIn("!chatHostTrusted && activeSessionCount === 0 && viewportUsable", gate)
+        self.assertIn("onEligibleChanged: if (!eligible) dismissPreview()", gate)
+        self.assertIn("showHeader: false", fixture)
+        self.assertIn("showComposer: false", fixture)
+        self.assertIn("sendEnabled: false", fixture)
+        self.assertIn("readonly property bool chatHostTrusted: false", view)
+        self.assertIn("readonly property bool voiceHostTrusted: false", view)
+        self.assertIn("readonly property var activeChatSessions: []", view)
+        self.assertNotIn("PublicRuntimeStatus", pane)
+        self.assertNotIn("onSendRequested:", pane)
+
     def test_geometry_script(self):
         script = ROOT / "tests/forest/forest_geometry_test.cjs"
         result = subprocess.run(["node", str(script)], text=True,

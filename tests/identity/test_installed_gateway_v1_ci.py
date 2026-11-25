@@ -574,40 +574,59 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         self.assertTrue(self.witness.consistent(self.peer))
 
     def _exercise_prepared_delivery(self, *, lose_seat):
-        # CI-only orchestration, not a native pre-send hook or admission gate.
-        # Reserve before calling the actual installed adapter. Control only
-        # its generated nonce to make the original bytes comparable.
+        # CI-only interception of the actual private transmission boundary.
+        # The client generates its own nonce and exact bytes normally. No
+        # shipped service imports or calls the disposable SQLite reference.
         with tempfile.TemporaryDirectory(prefix="identity-prepared-ci-") as tmp:
             path = Path(tmp) / "prepared.sqlite"
             with sqlite3.connect(path) as db:
                 db.executescript(_FIXTURE_V2)
             store = local_hold.TestOnlyLocalOutcomeFence(path)
-            nonce = secrets.token_urlsafe(32)
             attempt = secrets.token_hex(16)
-            original = store.reserve_prepared_command(
-                attempt_id=attempt, action="BEGIN", request_id=None,
-                client_nonce=nonce)
-            self.assertEqual(original.state, "UNKNOWN_HOLD")
             checks = []
+            reservations = []
+            observed_nonces = []
+            send = SignedIdentityCommandClient._send_prepared
 
             def seat():
-                # The production client calls this before send and after
-                # signature verification. Independently reopen the row.
                 checks.append(local_hold.TestOnlyLocalOutcomeFence(path).inspect())
                 return not lose_seat or len(checks) == 1
 
+            def reserve_then_send(client, conn, **prepared):
+                self.assertEqual(len(checks), 1)
+                self.assertEqual(checks[0].reason,
+                                 "EMPTY_OR_ROLLED_BACK_LOCAL_HISTORY")
+                self.assertIsNone(client.delivery_snapshot())
+                self.assertIsNone(client.last_attempted_wire)
+                self.assertEqual(client.last_wire_outcome, "NO_SEND_ATTEMPT")
+                self.assertEqual(prepared["wire"], build_request(
+                    prepared["action"], prepared["request_id"], prepared["nonce"]))
+                observed_nonces.append(prepared["nonce"])
+                original = store.reserve_prepared_command(
+                    attempt_id=attempt, action=prepared["action"],
+                    request_id=prepared["request_id"],
+                    client_nonce=prepared["nonce"])
+                self.assertEqual(original.state, "UNKNOWN_HOLD")
+                self.assertEqual(store.inspect(), original)
+                reservations.append(original)
+                # Only this disposable fixture delegates to the original
+                # transmission method. The store is not authorization.
+                return send(client, conn, **prepared)
+
             adapter = self._strict_adapter(seat=seat)
             self.assertEqual(adapter.delivery_snapshot().wire_outcome, "UNOBSERVED")
-            with patch("desktop_signed_command_client_v0.secrets.token_urlsafe",
-                       return_value=nonce) as generated:
+            with patch.object(SignedIdentityCommandClient, "_send_prepared",
+                              new=reserve_then_send):
                 if lose_seat:
                     with self.assertRaises(ReceiptRejected):
                         adapter.begin()
                 else:
                     observed = adapter.begin()
                     self.assertEqual(observed.phase, "UNAVAILABLE")
-                generated.assert_called_once_with(32)
-            self.assertEqual(checks, [original, original])
+            self.assertEqual(len(reservations), 1)
+            self.assertEqual(len(observed_nonces), 1)
+            original, nonce = reservations[0], observed_nonces[0]
+            self.assertEqual(checks, [checks[0], original])
             delivery = adapter.delivery_snapshot()
             self.assertEqual(delivery.wire_outcome,
                              "UNKNOWN_HOLD" if lose_seat else "SIGNED_FRAME_SEEN")
@@ -691,6 +710,47 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         self.assertEqual(calls, [True, True])
         self.assertEqual(adapter.delivery_snapshot(), snapshot)
         self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+
+    def test_k_failed_presend_reservation_never_transmits_native_command(self):
+        # Real installed service sequence brackets the refused attempt.
+        # No sequence increment from the intervening connection proves
+        # there was no signed command dispatch in this disposable fixture.
+        with tempfile.TemporaryDirectory(prefix="identity-reservation-ci-") as tmp:
+            path = Path(tmp) / "prepared.sqlite"
+            with sqlite3.connect(path) as db:
+                db.executescript(_FIXTURE_V2)
+            store = local_hold.TestOnlyLocalOutcomeFence(path)
+            original = store.reserve_prepared_command(
+                attempt_id=secrets.token_hex(16), action="BEGIN",
+                request_id=None, client_nonce=secrets.token_urlsafe(32))
+            before = self._signed_denial("BEGIN")
+            calls = []
+            send = SignedIdentityCommandClient._send_prepared
+
+            def reserve_then_send(client, conn, **prepared):
+                calls.append(prepared["action"])
+                store.reserve_prepared_command(
+                    attempt_id=secrets.token_hex(16), action=prepared["action"],
+                    request_id=prepared["request_id"],
+                    client_nonce=prepared["nonce"])
+                self.fail("Unresolved original reservation unexpectedly succeeded")
+                return send(client, conn, **prepared)
+
+            adapter = self._strict_adapter()
+            with patch.object(SignedIdentityCommandClient, "_send_prepared",
+                              new=reserve_then_send):
+                with self.assertRaises(ReceiptRejected):
+                    adapter.begin()
+            self.assertEqual(calls, ["BEGIN"])
+            snapshot = adapter.delivery_snapshot()
+            self.assertTrue(snapshot.faulted)
+            self.assertEqual(snapshot.wire_outcome, "NO_SEND_ATTEMPT")
+            self.assertIsNone(snapshot.last_attempted_wire)
+            self.assertEqual(store.inspect(), original)
+            after = self._signed_denial("BEGIN")
+            self.assertEqual(after["hostInstance"], before["hostInstance"])
+            self.assertEqual(after["sequence"], before["sequence"] + 1)
+            self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
 
     def test_z_restart_and_receipt_key_rotation_require_new_enrollment(self):
         previous_pid = self.pid

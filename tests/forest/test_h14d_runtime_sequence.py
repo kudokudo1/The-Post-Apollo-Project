@@ -20,7 +20,7 @@ class SequenceTest(unittest.TestCase):
                              self.plan.image_digest, 2_000_000_000,
                              2_100_000_000, 2_200_000_000,
                              Limits(CAP, 0, QUOTA, (2, 3), TASK_CAP),
-                             2_300_000_000, 2_400_000_000)
+                             self.outer, 2_250_000_000, 2_300_000_000, 2_400_000_000)
         self.terminal = Terminal(self.process, self.outer, 0,
                                  3_000_000_000, 3_100_000_000,
                                  populated=0, tasks=0, disposed_ns=3_200_000_000)
@@ -72,6 +72,30 @@ class SequenceTest(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(Hold):
                 self.check(launch=replace(self.launch,
                                           limits=replace(self.launch.limits, **{key: val})))
+
+    def test_numeric_coercion_refused(self):
+        for key, val in (("memory", float(CAP)), ("swap", False),
+                         ("quota", (float(QUOTA[0]), QUOTA[1])),
+                         ("cpus", (2.0, 3)), ("tasks", float(TASK_CAP)),
+                         ("quota", [QUOTA[0], QUOTA[1]]), ("cpus", (2, 3, 4))):
+            with self.subTest(key=key, val=val), self.assertRaises(Hold):
+                self.check(launch=replace(self.launch,
+                                          limits=replace(self.launch.limits, **{key: val})))
+        for scope in (replace(self.outer, mount_id=True),
+                      replace(self.outer, device=2.0),
+                      replace(self.outer, inode=4.0)):
+            with self.subTest(scope=scope), self.assertRaises(Hold):
+                self.check(launch=replace(self.launch, outer=scope))
+            with self.subTest(scope=scope), self.assertRaises(Hold):
+                self.check(terminal=replace(self.terminal, outer=scope))
+
+    def test_first_active_observation_bound_to_pinned_outer(self):
+        for launch in (replace(self.launch, first_active_scope=self.inner),
+                       replace(self.launch, first_active_scope=replace(self.outer, inode=4.0)),
+                       replace(self.launch, first_active_start_ns=self.launch.pinned_ns - 1),
+                       replace(self.launch, first_active_start_ns=self.launch.first_active_ns)):
+            with self.subTest(launch=launch), self.assertRaises(Hold):
+                self.check(launch=launch)
 
     def test_terminal_replacement_not_original(self):
         for key, val in (("pid", 51), ("start_ticks", 101),

@@ -242,6 +242,22 @@ ShellRoot {
                             && proc.ranked[0].change===2097152 && proc.ranked[1].change===null
                             && !CpuPlusDiagnostics.busy && MemoryOperation.requests===0,
                             "PROC historical rows and PID reuse refusal")) return;
+                        const groups=smoke.find(pane,"cpuplusProcGroups");
+                        const processes=smoke.find(pane,"cpuplusProcProcesses");
+                        const groupView=smoke.find(proc,"cpuplusProcGroupWorkspace");
+                        const protect=smoke.find(proc,"cpuplusProcGroupProtectionLocked");
+                        const limit=smoke.find(proc,"cpuplusProcGroupLimitLocked");
+                        const start=smoke.find(pane,"cpuplusProcStart");
+                        if(!smoke.check(groups&&processes&&groupView&&protect&&limit&&start,"PROC group controls exist"))return;
+                        groups.leftClicked(null);
+                        if(!smoke.check(proc.section==="GROUPS"&&groupView.visible&&!proc.groupIdentityAvailable
+                            &&!protect.available&&!limit.available&&!start.available,"group controls fail closed"))return;
+                        start.leftClicked(null);protect.leftClicked(null);limit.leftClicked(null);
+                        if(!smoke.check(!CpuPlusDiagnostics.busy&&MemoryOperation.requests===0,"group controls no scan or mutation"))return;
+                        processes.leftClicked(null);
+                        if(!smoke.check(proc.section==="PROCESSES"&&!groupView.visible&&proc.ranked[0].pid===12
+                            &&MemoryOperation.requests===0,"return preserves historical census"))return;
+                        console.log("CPU_PROC_GROUP_BOUNDARY_NATIVE_PASS");
                     }
                     if (smoke.phase === 3) {
                         const queue = smoke.find(pane,"cpuplusQueuePane");

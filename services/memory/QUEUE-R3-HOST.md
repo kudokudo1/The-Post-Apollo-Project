@@ -267,3 +267,33 @@ restart, then independently verifies DB flock release. Prior native
 scenarios preserved. Linux pidfd support required, no weak fallback.
 No production implementation, authorization, retention, raw-byte bounds,
 or power-loss claim. New CI pending.
+
+## R4 // queue notification transport and completion boundary
+
+Direct merged baseline 3a8a2126; #2750 merged e0a78567 and 6/6 CI PASS,
+all five strengthened crash identity/owner-exit/DB markers independently
+verified. Explicit notification_max_age_ms (no default, bounded by
+runtime max_age) enables live Session reservation using the existing
+Delivery ledger, after actual STATUS publication. New candidates only,
+plus exact terminal action result, one advisory frame per publication;
+no extra observations, polling, pending backlog scan or retry. Frame
+carries owner and status sequence, no raw Linux identity or authority.
+Canonical host opt-in notificationEnabled and synchronous offerNotice
+callback consumes at most one offer per publication, drops while busy or
+mismatched, and uses existing Hub adapter for freshness, blocking and
+deduplication. No stored client outbox. Failed transport remains reserved;
+no delivery success assertion. Default wire unchanged. Tests cover actual
+reservation, terminal event, dropped response/restart, disabled/freshness
+bounds and actual JS Hub adapter. Production wrapper must connect callback
+to existing NotificationsService; no Hub service ownership transfer.
+No production notification cadence or launcher selected.
+
+Remaining release/retention policy (operator decision required): retain
+original journal and review evidence, distinguish known committed local
+intent from unresolved PREPARED and missing evidence; explicit local-only
+disposition with exact evidence revalidation under owner lock, never
+replay/authorize kernel operation. Permanent old UUID refusal, no automatic
+deletion or retention expiry. A future versioned migration must make old
+readers fail closed and permit bounded repeat use only after disposition;
+current one-shot checkpoints and PREPARED fence intentionally remain.
+No production unlock, protected consent or host mutation in this slice.

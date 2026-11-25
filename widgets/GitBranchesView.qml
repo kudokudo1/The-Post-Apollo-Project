@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import qs.components
+import "git" as FullHistoryMap
 
 Item {
     id: root
@@ -13,6 +14,7 @@ Item {
     required property var stackExecutor
     required property var stackSubmitService
     property var keyboardHost: null
+    property bool mapOperatorActive: false
 
     property string selectedBranch: ""
     property string selectedSha: ""
@@ -1713,11 +1715,16 @@ Item {
                 border.width: 1
                 border.color: Colors.cyan
 
-                BranchMap {
+                FullHistoryMap.GitMapControlHost {
                     anchors {
-                        fill: parent
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        bottom: branchSelectorStrip.top
                         margins: 1
                     }
+                    repoRoot: root.gitService && root.gitService.repoIsLocal ? root.gitService.repoPath : ""
+                    operatorActive: root.mapOperatorActive
 
                     topologyService: root.gitService
                     titleText:

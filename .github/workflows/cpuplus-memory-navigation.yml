@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'widgets/cpuplus/CpuPlusMemoryActuatorPane.qml'
+      - 'widgets/cpuplus/CpuPlusProcessPane.qml'
+      - 'widgets/cpuplus/CpuPlusProcessPresentation.js'
       - 'widgets/cpuplus/CpuPlusZramPolicyPane.qml'
       - 'widgets/cpuplus/CpuPlusZramPolicy.js'
       - 'widgets/cpuplus/CpuPlusAdvancedPolicyPane.qml'

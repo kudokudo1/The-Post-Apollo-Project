@@ -5,6 +5,8 @@ on:
       - "services/diagnostics/**"
       - "widgets/cpuplus/CpuPlusDiagnosticsPane.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
+      - "widgets/cpuplus/CpuPlusProcessPane.qml"
+      - "widgets/cpuplus/CpuPlusProcessPresentation.js"
       - "widgets/cpuplus/CpuPlusZramPolicyPane.qml"
       - "widgets/cpuplus/CpuPlusZramPolicy.js"
       - "widgets/cpuplus/CpuPlusAdvancedPolicyPane.qml"

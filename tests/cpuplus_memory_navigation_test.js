@@ -146,3 +146,31 @@ vm.runInContext(queuePane.slice(queuePane.indexOf("    function expirySeconds(")
 assert.equal(expiryCtx.expirySeconds("2026-11-25 12:30"),Date.parse("2026-11-25T12:30:00Z")/1000);
 for (const value of ["","2026-02-30 12:00","2026-11-25 25:00","2026-11-25T12:30","2026-11-25 12:30 UTC"]) assert.equal(expiryCtx.expirySeconds(value),null);
 console.log("CPU++ memory navigation source contract PASS (not a native QML test)");
+
+const procCtx=vm.createContext({});
+const procPolicy=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusProcessPresentation.js"),"utf8"),procCtx);
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../services/diagnostics/CpuPlusDiagnosticsPolicy.js"),"utf8"),procPolicy);
+const cov={examinedPidEntries:4,unreadableOrExited:0,truncated:false};
+const procOne={schema:"post-apollo-process-census-v1",event:"census",sequence:1,tsMs:1000,scope:"same-user",observed:2,cpuMeasured:1,ioMeasured:1,
+    coverage:cov,previousCoverage:cov,focusMatches:1,rows:[
+    {pid:12,name:"quickshell",startTicks:99,rssKiB:1048576,threads:4,cpuPct:10,readBps:0,writeBps:0},
+    {pid:13,name:"brave",startTicks:100,rssKiB:2097152,threads:8,cpuPct:null,readBps:null,writeBps:null}]};
+const procTwo={...procOne,sequence:2,tsMs:11000,rows:[{...procOne.rows[0],rssKiB:3145728},{...procOne.rows[1],startTicks:101}]};
+const procEnd={schema:procOne.schema,event:"complete",samples:2};
+const procReport=rows=>({kind:"census",status:"COMPLETE",text:rows.map(x=>JSON.stringify(x)).join("\n")});
+const projectProc=rows=>procCtx.project(procReport(rows),procPolicy.summarize);
+const procView=projectProc([procOne,procTwo,procEnd]);
+assert.equal(procCtx.rank(procView,"RSS")[0].pid,12);
+assert.equal(procView.rows[0].change,2097152);
+assert.equal(procView.rows[1].change,null);
+assert.equal(procView.rows[1].cpuPct,null);
+assert.equal(projectProc([procOne,procTwo]),null);
+assert.equal(projectProc([procOne,{...procTwo,rows:[procTwo.rows[0],procTwo.rows[0]]},procEnd]),null);
+assert.equal(projectProc([procOne,{...procTwo,rows:[{...procTwo.rows[0],startTicks:-1}]},procEnd]),null);
+assert.match(pane,/active: root.page === "PROC"[\s\S]*?sourceComponent: CpuPlusProcessPane/);
+const procPane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusProcessPane.qml"),"utf8");
+assert.doesNotMatch(procPane,/\b(?:Process|Timer|MemoryOperation|execDetached)\s*\{/);
+assert.match(procPane,/CpuPlusDiagnostics.request\("census"\)/);
+assert.match(procPane,/Object.assign\(\{kind:"census"\},report\)/);
+console.log("CPU++ process census presentation PASS");

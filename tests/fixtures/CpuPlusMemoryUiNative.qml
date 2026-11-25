@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import qs.services.memory
+import qs.services.diagnostics
 import "widgets/cpuplus"
 import "widgets/cpuplus/CpuPlusQueueConsumer.js" as Consumer
 import "widgets/cpuplus/CpuPlusQueuePresentation.js" as QueueView
@@ -194,6 +195,29 @@ ShellRoot {
                     if (!smoke.check(rail.columns === 3 && pane.menuIndex === smoke.phase
                             && !slider.visible && !smoke.find(pane, "cpuplusSwappinessDial"),
                             "narrow menu layout/hidden controls")) return;
+                    if (smoke.phase === 2) {
+                        const proc = smoke.find(pane,"cpuplusProcessPane");
+                        if (!proc) return;
+                        if (!smoke.check(!proc.view && !CpuPlusDiagnostics.busy,
+                            "PROC demand loaded without census")) return;
+                        const coverage={examinedPidEntries:4,unreadableOrExited:0,truncated:false};
+                        const one={schema:"post-apollo-process-census-v1",event:"census",sequence:1,
+                            tsMs:1000,scope:"same-user",observed:2,cpuMeasured:1,ioMeasured:1,
+                            coverage:coverage,previousCoverage:coverage,focusMatches:1,
+                            rows:[{pid:12,name:"quickshell",startTicks:99,rssKiB:1048576,threads:4,cpuPct:10,readBps:0,writeBps:0},
+                                {pid:13,name:"brave",startTicks:100,rssKiB:2097152,threads:8,cpuPct:null,readBps:null,writeBps:null}]};
+                        const two=Object.assign({},one,{sequence:2,tsMs:11000,rows:[
+                            Object.assign({},one.rows[0],{rssKiB:3145728}),
+                            Object.assign({},one.rows[1],{startTicks:101})]});
+                        const end={schema:one.schema,event:"complete",samples:2};
+                        CpuPlusDiagnostics.reports=Object.assign({},CpuPlusDiagnostics.reports,{census:{
+                            status:"COMPLETE",finishedAt:"2026-11-24T12:00:00.000Z",
+                            text:[one,two,end].map(row=>JSON.stringify(row)).join("\n")}});
+                        if (!smoke.check(proc.view && proc.ranked[0].pid===12
+                            && proc.ranked[0].change===2097152 && proc.ranked[1].change===null
+                            && !CpuPlusDiagnostics.busy && MemoryOperation.requests===0,
+                            "PROC historical rows and PID reuse refusal")) return;
+                    }
                     if (smoke.phase === 3) {
                         const queue = smoke.find(pane,"cpuplusQueuePane");
                         if (!queue) return;

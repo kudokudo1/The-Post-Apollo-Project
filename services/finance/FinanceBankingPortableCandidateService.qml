@@ -7,7 +7,10 @@ import "../../widgets/FinanceBankingPortableControlsPolicy.js" as Policy
 Scope {
     id: service
     property bool allowed: false
-    readonly property bool busy: pending!==null
+    readonly property bool busy: pending!==null || retired
+    readonly property bool drained: pending===null && !worker.running
+    property bool retired: false // deadline failure requires a new instance
+    property bool refusalReported: false
     property var pending: null // non-secret intent only
     property string frame: ""
     property string output: ""
@@ -15,20 +18,40 @@ Scope {
     signal completed(var receipt)
     signal refused()
 
-    onAllowedChanged: {
-        if (!allowed && busy) {
-            discarded=true;
-            frame="";
-        }
+    // Context changes are sticky for this request, even if the same context returns.
+    onAllowedChanged: { if(!allowed)discardContext(); }
+    function discardContext() {
+        if(pending===null)return;
+        discarded=true;
+        frame="";
+    }
+    function expire() {
+        if(pending===null||retired)return;
+        discarded=true;
+        retired=true;
+        frame="";
+        output="";
+        refusalReported=true;
+        // An already submitted write may have committed. Never retry.
+        if(worker.running)worker.running=false;
+        refused();
+    }
+    Timer {
+        id: deadline
+        interval: 35000
+        repeat: false
+        onTriggered: service.expire()
     }
     function invoke(intent,password) {
         if(!allowed||busy||worker.running)return false;
         var requestFrame=Policy.frame(intent,password);
         if(requestFrame===null)return false;
         pending=JSON.parse(JSON.stringify(intent));
-        discarded=false;
         frame=requestFrame;
         output="";
+        discarded=false;
+        refusalReported=false;
+        deadline.restart();
         worker.exec({
             command:["/usr/bin/python3","-B",
                 Quickshell.shellPath("scripts/finance/banking_manual_portable.py")],
@@ -46,18 +69,19 @@ Scope {
             service.frame="";
         }
         stdout: StdioCollector {
-            onStreamFinished: service.output=String(text||"")
+            onStreamFinished: { if(!service.discarded)service.output=String(text||""); }
         }
         stderr: StdioCollector {}
         onExited: function(code,status) {
             Qt.callLater(function(){
                 const receipt=service.discarded||!service.allowed?null:
                     Policy.accept(service.output,code,service.pending);
+                deadline.stop();
                 service.output="";
                 service.frame="";
                 service.pending=null;
                 if(receipt!==null)service.completed(receipt);
-                else service.refused();
+                else if(!service.refusalReported)service.refused();
             });
         }
     }

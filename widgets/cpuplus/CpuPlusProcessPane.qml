@@ -8,33 +8,65 @@ import "CpuPlusProcessPresentation.js" as Census
 Column {
     id: root
     objectName: "cpuplusProcessPane"
+    property Item headerTarget: null
+    property Item footerTarget: null
     property string order: "RSS"
+    readonly property bool censusRunning: CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind === "census"
+    function cancelCensus() {
+        if (censusRunning && !CpuPlusDiagnostics.cancelled) CpuPlusDiagnostics.cancel();
+    }
     readonly property var report: CpuPlusDiagnostics.reports.census || null
     // The session owner stores kind by map key; only archived records carry kind.
     readonly property var view: Census.project(report ? Object.assign({kind:"census"},report) : null,Policy.summarize)
     readonly property var ranked: Census.rank(view,order)
     spacing: 5
-    GohuText {
+    Column {
+        parent: root.headerTarget || root
+        objectName: "cpuplusProcTopControls"
         width: parent.width
-        text: "PROC // PROCESS OBSERVATION"
-        color: Colors.magenta
-        font.pixelSize: 12
-    }
-    ActionButton {
-        width: parent.width
-        height: 30
-        label: "PROCESS CENSUS // 30s"
-        available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy && !CpuPlusDiagnostics.faulted
-        acceptedButtons: Qt.LeftButton
-        keyboardActivationSignal: "leftClicked"
-        onLeftClicked: CpuPlusDiagnostics.request("census")
-    }
-    GohuText {
-        width: parent.width
-        text: CpuPlusDiagnostics.feedback
-        color: Colors.orange
-        font.pixelSize: 10
-        wrapMode: Text.Wrap
+        spacing: 3
+        GohuText {
+            width: parent.width
+            text: "PROC // PROCESS OBSERVATION"
+            color: Colors.magenta
+            font.pixelSize: 12
+        }
+        Row {
+            width: parent.width
+            spacing: 4
+            ActionButton {
+                objectName: "cpuplusProcStart"
+                width: Math.max(0,parent.width-72-parent.spacing)
+                height: 28
+                label: "PROCESS CENSUS // 30s"
+                labelFontSizeMode: Text.HorizontalFit
+                labelMinimumPixelSize: 8
+                contentPadding: 2
+                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy && !CpuPlusDiagnostics.faulted
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: CpuPlusDiagnostics.request("census")
+            }
+            ActionButton {
+                objectName: "cpuplusProcCancel"
+                width: 72
+                height: 28
+                label: root.censusRunning && CpuPlusDiagnostics.cancelled ? "STOPPING" : "CANCEL"
+                contentPadding: 2
+                accentColor: Colors.red
+                available: root.censusRunning && !CpuPlusDiagnostics.cancelled
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: root.cancelCensus()
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: CpuPlusDiagnostics.feedback
+            color: Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
     }
     GohuText {
         width: parent.width
@@ -49,13 +81,16 @@ Column {
         wrapMode: Text.Wrap
     }
     Row {
+        id: sortRail
+        parent: root.footerTarget || root
+        objectName: "cpuplusProcBottomControls"
         width: parent.width
         spacing: 4
         Repeater {
             model: ["RSS","CPU","WRITE"]
             delegate: ActionButton {
                 required property string modelData
-                width: Math.max(0,(root.width-8)/3)
+                width: Math.max(0,(sortRail.width-8)/3)
                 height: 28
                 contentPadding: 2
                 label: modelData

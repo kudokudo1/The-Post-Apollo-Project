@@ -215,6 +215,53 @@ Item {
             }
         }
     }
+    readonly property bool fixedWorkPage: ["PROC","AUTO","DIAG"].includes(root.page)
+    Column {
+        id: workHeader
+        objectName: "cpuplusWorkHeader"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: menuRail.bottom
+        anchors.leftMargin: 5
+        anchors.rightMargin: 5
+        anchors.topMargin: 4
+        spacing: 3
+        visible: root.fixedWorkPage
+        height: visible ? implicitHeight : 0
+        GohuText {
+            width: parent.width
+            text: "MEMORY // " + root.menuTitles[root.menuIndex]
+            color: Colors.magenta
+            font.pixelSize: 11
+            wrapMode: Text.WordWrap
+        }
+        Row {
+            width: parent.width
+            spacing: 4
+            GohuText {
+                width: Math.max(0,parent.width-72-parent.spacing)
+                height: Math.max(26,implicitHeight)
+                text: "SOURCE // " + root.status
+                color: root.sample ? Colors.cyan : Colors.orange
+                font.pixelSize: 10
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.Wrap
+            }
+            ActionButton {
+                objectName: "cpuplusWorkRefresh"
+                width: 72
+                height: 26
+                label: "REFRESH"
+                contentPadding: 2
+                accentColor: Colors.yellow
+                idleFillColor: Colors.yellow
+                idleForegroundColor: Colors.magenta
+                idleBorderColor: Colors.orange
+                available: !probe.running && root.status !== "READING"
+                onLeftClicked: root.refresh()
+            }
+        }
+    }
     Column {
         id: footer
         objectName: "cpuplusMemoryFooter"
@@ -237,6 +284,14 @@ Item {
             color: Colors.orange
             font.pixelSize: 10
             wrapMode: Text.WordWrap
+        }
+        Column {
+            id: workFooter
+            objectName: "cpuplusWorkFooter"
+            width: parent.width
+            spacing: 3
+            visible: root.fixedWorkPage
+            height: visible ? implicitHeight : 0
         }
         Row {
             id: capBottomRail
@@ -449,7 +504,7 @@ Item {
         objectName: "cpuplusMemoryScroll"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: root.page === "CAP" ? capInstrument.bottom : menuRail.bottom
+        anchors.top: root.page === "CAP" ? capInstrument.bottom : root.fixedWorkPage ? workHeader.bottom : menuRail.bottom
         anchors.bottom: footer.top
         visible: root.page !== "CAP" || root.capSection !== 0
         anchors.topMargin: 4
@@ -465,7 +520,7 @@ Item {
             width: Math.max(0, scroll.width - 17)
             spacing: 10
             GohuText {
-                visible: root.page !== "CAP"
+                visible: root.page !== "CAP" && !root.fixedWorkPage
                 text: "MEMORY // " + root.menuTitles[root.menuIndex]
                 color: Colors.magenta
                 font.pixelSize: 12
@@ -473,7 +528,7 @@ Item {
                 wrapMode: Text.WordWrap
             }
             GohuText {
-                visible: root.page !== "CAP"
+                visible: root.page !== "CAP" && !root.fixedWorkPage
                 text: "SOURCE // " + root.status
                 color: root.sample ? Colors.cyan : Colors.orange
                 font.pixelSize: 10
@@ -481,7 +536,7 @@ Item {
             ActionButton {
                 width: parent.width
                 height: 30
-                visible: root.page !== "CAP" && root.page !== "POL"
+                visible: root.page !== "CAP" && root.page !== "POL" && !root.fixedWorkPage
                 label: "REFRESH"
                 accentColor: Colors.yellow
                 idleFillColor: Colors.yellow
@@ -529,14 +584,14 @@ Item {
                 height: active && item ? item.implicitHeight : 0
                 active: root.page === "PROC"
                 visible: active
-                sourceComponent: CpuPlusProcessPane {}
+                sourceComponent: CpuPlusProcessPane { headerTarget: workHeader; footerTarget: workFooter }
             }
             Loader {
                 width: parent.width
                 height: active && item ? item.implicitHeight : 0
                 active: root.page === "DIAG"
                 visible: active
-                sourceComponent: CpuPlusDiagnosticsPane {}
+                sourceComponent: CpuPlusDiagnosticsPane { headerTarget: workHeader; footerTarget: workFooter }
             }
             Column {
                 width: parent.width
@@ -895,6 +950,8 @@ Item {
                 active: root.page === "AUTO"
                 visible: active
                 sourceComponent: CpuPlusQueuePane {
+                    headerTarget: workHeader
+                    footerTarget: workFooter
                     observedDiskKiB: root.capacity ? root.capacity.actualKiB : null
                     capacityTargetGiB: root.stagedGiB
                     runtimeProjection: null

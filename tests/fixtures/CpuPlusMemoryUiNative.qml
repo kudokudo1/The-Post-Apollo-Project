@@ -195,6 +195,22 @@ ShellRoot {
                     if (!smoke.check(rail.columns === 3 && pane.menuIndex === smoke.phase
                             && !slider.visible && !smoke.find(pane, "cpuplusSwappinessDial"),
                             "narrow menu layout/hidden controls")) return;
+                    if (smoke.phase >= 2 && smoke.phase <= 4) {
+                        const top=smoke.find(pane,"cpuplusWorkHeader");
+                        const bottom=smoke.find(pane,"cpuplusWorkFooter");
+                        const refresh=smoke.find(pane,"cpuplusWorkRefresh");
+                        const controls=smoke.find(pane,["cpuplusProcBottomControls","cpuplusAutoBottomControls","cpuplusDiagBottomControls"][smoke.phase-2]);
+                        if (!top || !bottom || !refresh || !controls) return;
+                        if (!smoke.check(top.visible && bottom.visible && controls.parent===bottom
+                            && scroll.y>=top.y+top.height && scroll.y+scroll.height<=footer.y+1
+                            && scroll.height>0,"fixed work rails and positive middle viewport")) return;
+                        const y=controls.mapToItem(pane,0,0).y;
+                        const topY=refresh.mapToItem(pane,0,0).y;
+                        scroll.contentY=Math.max(0,scroll.contentHeight-scroll.height);
+                        if (!smoke.check(controls.mapToItem(pane,0,0).y===y
+                            && refresh.mapToItem(pane,0,0).y===topY,"work controls moved with scroll")) return;
+                        scroll.contentY=0;
+                    }
                     if (smoke.phase === 2) {
                         const proc = smoke.find(pane,"cpuplusProcessPane");
                         if (!proc) return;

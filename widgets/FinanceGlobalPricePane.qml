@@ -4,16 +4,13 @@ import "../services/finance" as FinanceServices
 
 // M18: scoped, manual EODHD free-tier price candidate and daily close viewer.
 // Never substitutes EODHD's symbol/currency for OpenFIGI's FIGI/exchange.
-Rectangle {
+Item {
     id: priceView
+    implicitHeight: (alphaOpen ? alphaPane.y + alphaPane.height : footer.y + footer.height) + 8
     property bool active: false
     property bool alphaOpen: false
     signal exitRequested()
     signal historyChosen(var identity, var listing, var snapshot)
-    color: Colors.black
-    border.color: Colors.cyan
-    border.width: 1
-    clip: true
 
     FinanceServices.FinanceGlobalPriceService {
         id: priceFeed
@@ -24,7 +21,6 @@ Rectangle {
         const ok=priceFeed.chooseIdentity(item);
         if (ok) {
             alphaOpen=false;
-            viewport.contentY=0;
         }
         return ok;
     }
@@ -57,8 +53,9 @@ Rectangle {
     }
     GohuText {
         id: footer
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 8
+        anchors.top: viewport.bottom
+        anchors.topMargin: 8
+        visible: !priceView.alphaOpen
         anchors.left: parent.left
         anchors.leftMargin: 9
         anchors.right: parent.right
@@ -74,7 +71,7 @@ Rectangle {
         wrapMode: Text.WordWrap
         textFormat: Text.PlainText
     }
-    Flickable {
+    Item {
         id: viewport
         anchors.top: heading.bottom
         anchors.topMargin: 12
@@ -82,16 +79,12 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        anchors.bottom: footer.top
-        anchors.bottomMargin: 8
-        contentWidth: width
-        contentHeight: body.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
+        visible: !priceView.alphaOpen
+        height: visible ? body.implicitHeight : 0
 
         Column {
             id: body
-            width: Math.max(0,viewport.width-23)
+            width: viewport.width
             spacing: 10
             GohuText {
                 width: parent.width
@@ -386,22 +379,18 @@ Rectangle {
     }
     FinanceAlphaVantageFreePane {
         id: alphaPane
-        anchors.fill: parent
+        objectName: "marketInlineAlphaControls"
+        anchors.top: heading.bottom
+        anchors.topMargin: 12
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: visible ? implicitHeight : 0
         visible: priceView.alphaOpen
         active: priceView.active && priceView.alphaOpen
-        z: 30
         onExitRequested: priceView.alphaOpen=false
         onHistoryChosen: function(identity, listing, snapshot) {
             if (priceView.active && priceView.alphaOpen)
                 priceView.historyChosen(identity,listing,snapshot);
         }
-    }
-    NeonScrollBar {
-        id: priceScrollBar
-        flickable: viewport
-        mountingParent: priceView
-        geometryMode: "viewport"
-        handleStyle: "bar"
-        rightInset: 2
     }
 }

@@ -4,15 +4,12 @@ import "../services/finance" as FinanceServices
 
 // M19: explicitly selected Alpha Vantage free-tier raw daily closes.
 // This is a different price feed, not a fallback/match from EODHD or OpenFIGI.
-Rectangle {
+Item {
     id: avPane
+    implicitHeight: footer.y + footer.height + 8
     property bool active: false
     signal exitRequested()
     signal historyChosen(var identity, var listing, var snapshot)
-    color: Colors.black
-    border.color: Colors.magenta
-    border.width: 1
-    clip: true
 
     FinanceServices.FinanceAlphaVantageFreeService {
         id: av
@@ -21,7 +18,6 @@ Rectangle {
     }
     function inspectInstrument(item) {
         const chosen=av.chooseIdentity(item);
-        if(chosen)avScroll.contentY=0;
         return chosen;
     }
     GohuText {
@@ -53,8 +49,8 @@ Rectangle {
     }
     GohuText {
         id: footer
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 8
+        anchors.top: avScroll.bottom
+        anchors.topMargin: 9
         anchors.left: parent.left
         anchors.leftMargin: 9
         anchors.right: parent.right
@@ -70,7 +66,7 @@ Rectangle {
         font.pixelSize: 9
         wrapMode: Text.WordWrap
     }
-    Flickable {
+    Item {
         id: avScroll
         anchors.top: heading.bottom
         anchors.topMargin: 12
@@ -78,15 +74,10 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        anchors.bottom: footer.top
-        anchors.bottomMargin: 9
-        contentWidth: width
-        contentHeight: content.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
+        height: content.implicitHeight
         Column {
             id: content
-            width: Math.max(0,avScroll.width-23)
+            width: avScroll.width
             spacing: 11
             GohuText {
                 width: parent.width
@@ -339,13 +330,5 @@ Rectangle {
     }
     onActiveChanged: {
         if(active && av.ready)avChart.requestPaint();
-    }
-    NeonScrollBar {
-        id: avScrollBar
-        flickable: avScroll
-        mountingParent: avPane
-        geometryMode: "viewport"
-        handleStyle: "bar"
-        rightInset: 2
     }
 }

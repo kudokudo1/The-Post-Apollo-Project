@@ -3,8 +3,9 @@ import "../components"
 import "../services/finance" as FinanceServices
 
 // M17: no-account worldwide equity identity search. No prices or orders.
-Rectangle {
+Item {
     id: discovery
+    implicitHeight: footer.y + footer.height + 8
     property bool active: false
     property bool priceOptionsOpen: false
     signal exitRequested()
@@ -28,17 +29,13 @@ Rectangle {
         }
         return true;
     }
-    color: Colors.black
-    border.color: Colors.cyan
-    border.width: 1
-    clip: true
 
     FinanceServices.FinanceStockDiscoveryService {
         id: finder
         monitoring: discovery.active
     }
     function searchNow() {
-        if (finder.search(queryInput.text)) resultScroll.contentY=0;
+        if (finder.search(queryInput.text)) priceOptionsOpen=false;
     }
 
     GohuText {
@@ -75,7 +72,7 @@ Rectangle {
         anchors.rightMargin: 9
         width: 94
         height: 27
-        label: "HISTORY"
+        label: "HIDE"
         labelPixelSize: 9
         accentColor: Colors.magenta
         onLeftClicked: discovery.exitRequested()
@@ -156,7 +153,7 @@ Rectangle {
             accentColor: Colors.magenta
             available: discovery.active && finder.canNext && !finder.loading
             onLeftClicked: {
-                if (finder.nextPage()) resultScroll.contentY=0;
+                if (finder.nextPage()) discovery.priceOptionsOpen=false;
             }
         }
     }
@@ -192,7 +189,7 @@ Rectangle {
         color: Colors.cyan
         elide: Text.ElideRight
     }
-    Flickable {
+    Item {
         id: resultScroll
         anchors.top: summary.bottom
         anchors.topMargin: 9
@@ -200,15 +197,11 @@ Rectangle {
         anchors.leftMargin: 9
         anchors.right: parent.right
         anchors.rightMargin: 9
-        anchors.bottom: footer.top
-        anchors.bottomMargin: 7
-        contentWidth: width
-        contentHeight: results.implicitHeight
-        boundsBehavior: Flickable.StopAtBounds
-        clip: true
+        visible: !discovery.priceOptionsOpen
+        height: visible ? results.implicitHeight : 0
         Column {
             id: results
-            width: Math.max(0,resultScroll.width-22)
+            width: resultScroll.width
             spacing: 6
             Repeater {
                 model: finder.ready ? finder.snapshot.items : []
@@ -277,28 +270,24 @@ Rectangle {
     }
     FinanceGlobalPricePane {
         id: globalPrices
-        anchors.fill: parent
+        objectName: "marketInlineEodhdControls"
+        anchors.top: summary.bottom
+        anchors.topMargin: 9
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: visible ? implicitHeight : 0
         visible: discovery.priceOptionsOpen
         active: discovery.active && discovery.priceOptionsOpen
-        z: 30
         onExitRequested: discovery.priceOptionsOpen = false
         onHistoryChosen: function(identity, listing, snapshot) {
             if (discovery.active && discovery.priceOptionsOpen)
                 discovery.historyChosen(identity,listing,snapshot);
         }
     }
-    NeonScrollBar {
-        id: discoveryScrollBar
-        flickable: resultScroll
-        mountingParent: discovery
-        geometryMode: "viewport"
-        handleStyle: "bar"
-        rightInset: 2
-    }
     GohuText {
         id: footer
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 8
+        anchors.top: discovery.priceOptionsOpen ? globalPrices.bottom : resultScroll.bottom
+        anchors.topMargin: 7
         anchors.left: parent.left
         anchors.leftMargin: 9
         anchors.right: parent.right

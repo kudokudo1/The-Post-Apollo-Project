@@ -182,7 +182,9 @@ ShellRoot {
                 const cancel = root.findItem(pane.item,"cpuplusProcCancel");
                 if (!start || !cancel) return;
                 if (!root.check(start.available && !cancel.available,"idle PROC cancel unavailable")) return;
-                start.leftClicked();
+                // ActionButton.leftClicked(var mouseEvent) requires an argument.
+                // No real pointer event is needed in this signal-level fixture.
+                start.leftClicked(null);
                 if (!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="census"
                     && cancel.available,"census started; cancel enabled")) return;
                 // Give the disposable child a turn to start before cancellation.
@@ -193,7 +195,7 @@ ShellRoot {
                 const cancel=root.findItem(pane.item,"cpuplusProcCancel");
                 if (!root.check(cancel && cancel.available && CpuPlusDiagnostics.busy,
                     "running census can be cancelled")) return;
-                cancel.leftClicked();
+                cancel.leftClicked(null);
                 root.phase=11;
                 return;
             }

@@ -40,7 +40,25 @@ Item {
             && a.taskAlias === b.taskAlias && a.viewKey === b.viewKey
             && a.planRevision === b.planRevision;
     }
+    // Qt refuses to turn off activeFocusOnTab while the item holds active
+    // focus. Retire local focus before removing tab eligibility; host focus
+    // restoration remains the existing panel owner's responsibility.
+    function releaseDismissFocus() {
+        if (!dismiss) return;
+        dismiss.focus = false;
+        dismiss.activeFocusOnTab = false;
+    }
+    function syncDismissFocus() {
+        if (!dismiss) return;
+        if (eligible && reviewState !== "CLOSED")
+            dismiss.activeFocusOnTab = true;
+        else
+            releaseDismissFocus();
+    }
+    onReviewStateChanged: syncDismissFocus()
+    Component.onCompleted: syncDismissFocus()
     function clear() {
+        releaseDismissFocus();
         _rows = [];
         _acceptedScope = null;
         _state = "CLOSED";
@@ -142,7 +160,7 @@ Item {
                 height: 20
                 color: "transparent"
                 border.color: activeFocus ? "#55CFCA" : "#ED981A"
-                activeFocusOnTab: body.visible
+                activeFocusOnTab: false
                 Accessible.role: Accessible.Button
                 Accessible.name: "Dismiss review"
                 Accessible.onPressAction: root.dismissReview(root._acceptedScope)

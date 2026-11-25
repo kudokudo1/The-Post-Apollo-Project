@@ -198,6 +198,11 @@ ShellRoot {
         if (!item) return;
         const body=child(item,"restorationReviewBody");
         check(body && body.visible===(state!=="CLOSED"),"review body visibility");
+        const dismiss=body && child(body.children[0],"restorationReviewDismiss");
+        check(dismiss && dismiss.activeFocusOnTab===(state!=="CLOSED"),
+            "review tab eligibility");
+        if (dismiss && state==="CLOSED")
+            check(!dismiss.focus && !dismiss.activeFocus,"closed review retained focus");
         check(!item.sourceAuthenticated && !item.permissionGranted && !item.productionAuthority
             && !item.modelExecutionPermitted && !item.restorationEnabled && !item.sendEnabled
             && !item.stopEnabled, "review authority changed");
@@ -474,12 +479,20 @@ ShellRoot {
                 const item=review.item, ref=reviewScope(10,10);
                 item.ownerScope=ref;
                 check(item.openReview(ref)&&item.receiveReview(ref,fixedReviewRows()),"dismiss setup");
+                const dismiss=child(child(item,"restorationReviewBody").children[0],
+                    "restorationReviewDismiss");
+                check(dismiss && dismiss.activeFocusOnTab,"dismiss focus setup");
+                if (!dismiss) break;
+                dismiss.forceActiveFocus();
+                check(dismiss.focus,"dismiss focus request");
                 check(item.dismissReview(ref),"explicit dismiss");
                 verifyReview("CLOSED",0);
                 check(!item.openReview(ref)&&!item.receiveReview(ref,fixedReviewRows()),"dismiss replay");
                 const next=reviewScope(11,11);
                 item.ownerScope=next;
                 check(item.openReview(next)&&item.receiveReview(next,fixedReviewRows()),"scope loss setup");
+                dismiss.forceActiveFocus();
+                check(dismiss.focus,"scope loss focus request");
                 item.syntheticOwner=false;
                 verifyReview("CLOSED",0);
                 item.syntheticOwner=true;

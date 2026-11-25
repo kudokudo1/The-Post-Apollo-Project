@@ -680,8 +680,8 @@ function captureGlobalHistory(identity, listing, data) {
         listing:{symbol:listing.symbol,name:listing.name,currency:listing.currency,
             venue:eod?listing.exchange:listing.region},
         compactMayBeTruncated:alpha && data.compactMayBeTruncated,
-        bars:bars,first:bars.length?{...bars[0]}:null,
-        last:bars.length?{...bars[bars.length-1]}:null,changePct:changePct,
+        bars:bars,first:bars.length?{date:bars[0].date,price:bars[0].price}:null,
+        last:bars.length?{date:bars[bars.length-1].date,price:bars[bars.length-1].price}:null,changePct:changePct,
         noProviderCalls:true
     };
 }

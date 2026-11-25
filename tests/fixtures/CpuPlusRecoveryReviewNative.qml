@@ -97,7 +97,8 @@ ShellRoot {
             const prepare=smoke.find(p,"cpuplusRecoveryAckPrepare");
             const confirm=smoke.find(p,"cpuplusRecoveryAckConfirm");
             const lookup=smoke.find(p,"cpuplusRecoveryReceiptLookup");
-            if(!request||!prepare||!confirm||!lookup)return;
+            const cancel=smoke.find(p,"cpuplusRecoveryAckCancel");
+            if(!request||!prepare||!confirm||!lookup||!cancel)return;
             if(smoke.phase===1){
                 p.lookupText=smoke.actionId;
                 if(!smoke.check(request.available&&!prepare.available,"review available before evidence"))return;
@@ -109,6 +110,39 @@ ShellRoot {
                 if(!smoke.check(prepare.available&&!w.readAvailable&&p.reviewEvidence.action.target===24,"ready evidence blocks other reads"))return;
                 prepare.leftClicked(null);
                 if(!smoke.check(!!p.confirmation&&smoke.ackCount===0,"first click freezes only"))return;
+                cancel.leftClicked(null);confirm.leftClicked(null);
+                if(!smoke.check(!p.confirmation&&smoke.ackCount===0,"explicit cancel emits no ACK"))return;
+                prepare.leftClicked(null);
+                smoke.host=Object.assign({},smoke.host,{reviewFlow:Object.assign({},smoke.host.reviewFlow,{review:Object.assign({},smoke.host.reviewFlow.review,{review_digest:"c".repeat(64)})})});
+                smoke.phase=21;return;
+            }
+            if(smoke.phase===21){
+                confirm.leftClicked(null);
+                if(!smoke.check(!p.confirmation&&smoke.ackCount===0,"changed digest cancels confirmation"))return;
+                prepare.leftClicked(null);
+                smoke.host=Object.assign({},smoke.host,{generation:4294967298});
+                smoke.phase=22;return;
+            }
+            if(smoke.phase===22){
+                confirm.leftClicked(null);
+                if(!smoke.check(!p.confirmation&&smoke.ackCount===0,"changed generation cancels confirmation"))return;
+                smoke.host=Object.assign({},smoke.host,{generation:4294967297});
+                smoke.phase=23;return;
+            }
+            if(smoke.phase===23){
+                prepare.leftClicked(null);
+                smoke.host=Object.assign({},smoke.host,{checkpointWait:{record:{kind:"REVIEW_ACK"}}});
+                smoke.phase=24;return;
+            }
+            if(smoke.phase===24){
+                confirm.leftClicked(null);prepare.leftClicked(null);request.leftClicked(null);lookup.leftClicked(null);
+                if(!smoke.check(!p.confirmation&&!prepare.available&&!lookup.available&&!request.available&&smoke.ackCount===0
+                    &&p.reviewContext.phase==="WAIT_CHECKPOINT","checkpoint wait blocks controls"))return;
+                smoke.host=Object.assign({},smoke.host,{checkpointWait:null});
+                smoke.phase=25;return;
+            }
+            if(smoke.phase===25){
+                prepare.leftClicked(null);
                 smoke.host=Object.assign({},smoke.host,{reviewFlow:Object.assign({},smoke.host.reviewFlow,{sequence:10})});
                 smoke.phase=3;return;
             }
@@ -139,7 +173,15 @@ ShellRoot {
                 if(!smoke.check(!request.available&&lookup.available&&p.effectiveReceiptId===smoke.reviewId,"unknown review forces exact receipt ID"))return;
                 lookup.leftClicked(null);lookup.leftClicked(null);
                 if(!smoke.check(smoke.receiptCount===1&&smoke.ackCount===1&&smoke.otherCount===0&&smoke.host.startupLocked&&smoke.host.reviewFlow.phase==="WAIT_RECEIPT","one receipt lookup, no retry or unlock"))return;
-                console.log("CPU_RECOVERY_REVIEW_NATIVE_PASS // explicit review, stale selection, reopen, single ACK, lost receipt correlation");
+                const receipt={version:1,review:smoke.host.reviewLost,acknowledged_at_ms:100001,disposition:"REVIEW_ACKNOWLEDGED_ONLY",adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false};
+                smoke.host=Object.assign({},smoke.host,{reviewFlow:null,reviewLost:null,reviewReceipt:receipt});
+                smoke.phase=8;return;
+            }
+            if(smoke.phase===8){
+                if(!smoke.check(p.reviewReceipt&&p.reviewReceipt.reviewId===smoke.reviewId
+                    &&p.reviewReceipt.action.actionId===smoke.actionId&&!p.unknownReviewId
+                    &&!prepare.available&&smoke.ackCount===1&&smoke.host.startupLocked,"historical receipt displayed without authority"))return;
+                console.log("CPU_RECOVERY_REVIEW_NATIVE_PASS // explicit review, cancel, digest/generation/sequence invalidation, checkpoint wait, reopen, single ACK, lost receipt correlation and historical receipt");
                 Qt.quit();
             }
         }

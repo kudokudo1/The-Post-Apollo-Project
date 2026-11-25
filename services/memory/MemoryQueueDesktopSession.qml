@@ -24,7 +24,10 @@ QtObject {
     readonly property var reviewContext: copy(Host.reviewContext(hub.hostState))
     readonly property var dispositionContext: copy(Host.dispositionContext(hub.hostState))
     readonly property var retentionSelection: ctl.phase==="ACTIVE" && hub.hostState.retentionProof
-        && ctl.loaded?.snapshot?.checkpoint?.dismissal
+        && (hub.hostState.retentionProof.receipt.version===1
+            ? ctl.loaded?.snapshot?.checkpoint?.acknowledgment?.review?.snapshot?.record?.state==="COMMITTED"
+                && !ctl.loaded?.snapshot?.checkpoint?.dismissal
+            : !!ctl.loaded?.snapshot?.checkpoint?.dismissal)
         ? copy({storageGeneration:ctl.loaded.snapshot.generation,
             actionId:hub.hostState.retentionProof.receipt.review.action_id,
             reviewDigest:hub.hostState.retentionProof.receipt.review.review_digest,
@@ -186,9 +189,12 @@ QtObject {
         const snapshot=result.snapshot;
         const restored=Host.restoreCheckpoint(Consumer,snapshot.checkpoint,Recovery.row);
         if (!restored || !restored.startupLocked || snapshot.startup_unlock!==false || snapshot.can_execute!==false
-            || (snapshot.sealed && (!restored.dispositionLost
-                || !Host.dispositionValue(snapshot.receipt,Recovery.row)
-                || !Host.equal(snapshot.receipt.review,restored.dispositionLost)))) {
+            || (snapshot.sealed && (snapshot.receipt?.version===1
+                ? (!!restored.dispositionLost || !restored.reviewLost || !Host.receiptValue(snapshot.receipt,Recovery.row)
+                    || snapshot.receipt.review.snapshot.record.state!=="COMMITTED"
+                    || !Host.equal(snapshot.receipt.review,restored.reviewLost))
+                : (!restored.dispositionLost || !Host.dispositionValue(snapshot.receipt,Recovery.row)
+                    || !Host.equal(snapshot.receipt.review,restored.dispositionLost))))) {
             fail("CHECKPOINT_RESTORE_REFUSED");return;
         }
         if (ctl.phase==="RELOADING") {

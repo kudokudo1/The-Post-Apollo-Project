@@ -18,7 +18,7 @@ if os.environ.get("POST_APOLLO_QUEUE_PIPE_SMOKE")!="CI_DISPOSABLE_ONLY":
 sys.path.insert(0,str(ROOT/"services/memory"))
 from memory_adjustment_queue import Queue
 from memory_queue_owner import Owner
-from memory_queue_runtime import Runtime
+from memory_queue_runtime import Runtime, system_clock_ms
 from memory_queue_checkpoint_generations import CheckpointGenerations
 
 ACTION="c23683a9-b2ab-4a2c-87ce-000000000062"
@@ -26,8 +26,15 @@ ACTION="c23683a9-b2ab-4a2c-87ce-000000000062"
 def seed(root,trial):
     queue=Queue(root/"private"/"queue.db")
     store=CheckpointGenerations(root/"checkpoint")
+    committed=trial.startswith("COMMITTED")
+    def capture():
+        wall,mono=system_clock_ms()
+        return {"version":1,"source":{"boot_id":"c23683a9-b2ab-4a2c-87ce-31bdf27a3012",
+            "base":{"device":42,"inode":100,"size_kib":16777212},
+            "extension":{"device":42,"inode":101,"size_kib":8388604}},
+            "wall_ms":wall,"monotonic_ms":mono}
     def owner():
-        return Owner(queue,lambda q:Runtime(q,lambda:None,lambda *_:None,
+        return Owner(queue,lambda q:Runtime(q,capture,lambda *_:None,
             interval_ms=10000,max_age_ms=20000,max_gap_ms=20000,stable_ms=20000,
             local_disposition_enabled=True),durable_actions=True,staged_max_age_ms=10000,
             local_disposition_enabled=True)
@@ -36,11 +43,16 @@ def seed(root,trial):
                  "kind":"QUEUE","expected_request_id":None,"target_gib":16,"expires_at":int(time.time())+180}
         store.save(0,{"version":1,"kind":"ACTION","message":message})
         first.prepare_action(message)
+        if committed:
+            result=first.commit_action(message)
+            assert result["disposition"]=="REPORTED"
     if trial!="LIVE":
         with owner() as second:
             review=second.begin_recovery_review(ACTION,max_age_ms=10000)["review"]
-            store.save(0,{"version":1,"kind":"REVIEW_DISMISS","review":review})
-            if trial=="RECOVERED":
+            store.save(0,{"version":1,"kind":"REVIEW_ACK" if committed else "REVIEW_DISMISS","review":review})
+            if trial=="COMMITTED":
+                second.acknowledge_recovery_review(review_id=review["review_id"],review_digest=review["review_digest"])
+            elif trial=="RECOVERED":
                 second.dismiss_recovery_preparation(review_id=review["review_id"],review_digest=review["review_digest"])
 
 def start_ticks(pid):
@@ -78,6 +90,9 @@ def run(trial):
         handles={}
         exits=set()
         final=2 if trial=="LIVE" else 1
+        committed=trial.startswith("COMMITTED")
+        missing=trial.endswith("MISSING")
+        slot="review-ack-v1.json" if committed else "review-dismiss-v1.json"
         originals=None
         def witness():
             nonlocal originals
@@ -99,9 +114,9 @@ def run(trial):
                     if poll.poll(0):
                         exits.add(generation)
                         print("R6H_PIDFD_EXIT_PASS // %s %d"%(trial,generation),flush=True)
-                        if generation==final and trial!="MISSING":
+                        if generation==final and not missing:
                             originals={p.name:p.read_bytes() for p in (root/"checkpoint").iterdir()}
-                            if set(originals)!={"action-v1.json","review-dismiss-v1.json"}:
+                            if set(originals)!={"action-v1.json",slot}:
                                 raise AssertionError("Missing original evidence")
                             (root/"advance.ready").touch(mode=0o600,exist_ok=False)
         try:
@@ -129,15 +144,27 @@ def run(trial):
                 assert (cp/key).read_bytes()==value
             with sqlite3.connect((root/"private"/"queue.db").as_uri()+"?mode=ro",uri=True) as db:
                 rows=db.execute("SELECT action_id,state,result_id,dismissal FROM memory_queue_local_actions_v1").fetchall()
-                assert len(rows)==1 and rows[0][:3]==(ACTION,"PREPARED",None)
-                assert db.execute("SELECT count(*) FROM requests").fetchone()[0]==0
-                assert (rows[0][3] is None)==(trial=="MISSING")
-            if trial=="MISSING":
+                assert len(rows)==1 and rows[0][0]==ACTION
+                if committed:
+                    assert rows[0][1]=="COMMITTED" and rows[0][2] is not None and rows[0][3] is None
+                    assert db.execute("SELECT count(*) FROM requests").fetchone()[0]==1
+                    assert db.execute("SELECT id FROM requests").fetchone()[0]==rows[0][2]
+                    receipts=db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='memory_queue_recovery_reviews_v1'").fetchone()
+                    saved=[] if receipts is None else db.execute("SELECT payload FROM memory_queue_recovery_reviews_v1").fetchall()
+                    assert len(saved)==(0 if missing else 1)
+                    proof=None if missing else json.loads(saved[0][0])
+                else:
+                    assert rows[0][:3]==(ACTION,"PREPARED",None)
+                    assert db.execute("SELECT count(*) FROM requests").fetchone()[0]==0
+                    assert (rows[0][3] is None)==missing
+                    proof=None if missing else json.loads(rows[0][3])
+            if missing:
                 assert set(p.name for p in cp.iterdir())==set(before)
             else:
                 assert originals is not None
                 for key,value in originals.items(): assert (cp/key).read_bytes()==value
-                assert json.loads((cp/"dismissed-v2.json").read_text())["receipt"]==json.loads(rows[0][3])
+                seal="committed-v1.json" if committed else "dismissed-v2.json"
+                assert json.loads((cp/seal).read_text())["receipt"]==proof
                 assert not list((cp/"generation-0001").iterdir())
             print("R6H_DB_STORAGE_PASS // "+trial,flush=True)
         finally:
@@ -148,5 +175,5 @@ def run(trial):
             proc.wait(timeout=5)
             proc.stdout.close()
 
-for trial in ("LIVE","RECOVERED","MISSING"):
+for trial in ("LIVE","RECOVERED","MISSING","COMMITTED","COMMITTED_MISSING"):
     run(trial)

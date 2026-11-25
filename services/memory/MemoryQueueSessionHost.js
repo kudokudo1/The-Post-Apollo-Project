@@ -275,7 +275,10 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
         if (state.reviewLost && p.receipt!==null && !equal(p.receipt.review,state.reviewLost))
             return fail("REVIEW_HISTORY_MISMATCH");
         return Object.assign({},state,advanced,{reviewFlow:null,reviewReceipt:p.receipt,
-            reviewLost:p.receipt!==null ? null:state.reviewLost});
+            reviewLost:p.receipt!==null ? null:state.reviewLost,
+            retentionProof:p.receipt?.review?.snapshot?.record?.state==="COMMITTED"
+                ? {generation:state.generation,ownerId:p.owner_id,sequence:p.sequence,
+                    receipt:JSON.parse(JSON.stringify(p.receipt))} : null});
     }
     if (p.kind==="LOCAL_DISPOSITION" || p.kind==="LOCAL_DISPOSITION_HISTORY") {
         const f=state.reviewFlow;
@@ -502,7 +505,7 @@ function readReviewReceipt(state,reviewId) {
     const no={state,frame:null};
     if (!reviewAvailable(state) || !uuid(reviewId)
         || (state.reviewLost && state.reviewLost.review_id!==reviewId)) return no;
-    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null}),
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null,retentionProof:null}),
         frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW_HISTORY",owner_id:state.session.ownerId,review_id:reviewId})+"\n"};
 }
 function canDismiss(state) {
@@ -544,11 +547,14 @@ function readDispositionReceipt(state,actionId) {
 function takeRetentionAdvance(state,selection,loaded,generation,consumer,recoveryRow) {
     const no={state,request:null,frame:null};
     const proof=state.retentionProof;
+    const committed=proof?.receipt?.version===1;
     if (generation!==state.generation || !reviewAvailable(state) || !state.dispositionEnabled
         || !state.checkpointRequired || state.reviewLost || state.dispositionLost
         || state.checkpointWait || !proof || proof.generation!==generation
         || proof.ownerId!==state.session.ownerId || proof.sequence!==state.sequence
-        || !equal(proof.receipt,state.dispositionReceipt) || !dispositionValue(proof.receipt,recoveryRow)
+        || (committed ? (!equal(proof.receipt,state.reviewReceipt) || !receiptValue(proof.receipt,recoveryRow)
+            || proof.receipt.review.snapshot.record.state!=="COMMITTED")
+            : (!equal(proof.receipt,state.dispositionReceipt) || !dispositionValue(proof.receipt,recoveryRow)))
         || !safe(selection) || !exact(selection,["storageGeneration","actionId","reviewDigest","sequence"])
         || selection.sequence!==proof.sequence || selection.actionId!==proof.receipt.review.action_id
         || selection.reviewDigest!==proof.receipt.review.review_digest
@@ -563,7 +569,9 @@ function takeRetentionAdvance(state,selection,loaded,generation,consumer,recover
         || (snapshot.sealed?!equal(snapshot.receipt,proof.receipt):snapshot.receipt!==null))
         return no;
     const restored=restoreCheckpoint(consumer,snapshot.checkpoint,recoveryRow);
-    if (!restored || !restored.dispositionLost || !equal(restored.dispositionLost,proof.receipt.review)
+    if (!restored || (committed ? (!!restored.dispositionLost || !restored.reviewLost
+            || !equal(restored.reviewLost,proof.receipt.review))
+            : (!restored.dispositionLost || !equal(restored.dispositionLost,proof.receipt.review)))
         || !equal(restored.session.unresolved,state.session.unresolved)) return no;
     const request={version:1,generation:snapshot.generation,receipt:JSON.parse(JSON.stringify(proof.receipt))};
     // Retire this controller instance before storage. Only a fresh verified

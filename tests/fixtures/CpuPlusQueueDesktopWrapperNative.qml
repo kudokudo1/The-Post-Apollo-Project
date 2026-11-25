@@ -7,6 +7,8 @@ ShellRoot {
     readonly property string trial: Quickshell.env("POST_APOLLO_WRAPPER_TRIAL") || ""
     readonly property string rootPath: Quickshell.env("POST_APOLLO_WRAPPER_ROOT") || ""
     readonly property string actionId: "c23683a9-b2ab-4a2c-87ce-000000000062"
+    readonly property bool committed: trial==="COMMITTED" || trial==="COMMITTED_MISSING"
+    readonly property bool missing: trial==="MISSING" || trial==="COMMITTED_MISSING"
     property int step: 0
     property int ticks: 0
     property bool done: false
@@ -41,6 +43,8 @@ ShellRoot {
                 // transition moves the fixture to the next stage.
                 if (smoke.trial==="LIVE") {
                     if (session.beginReview(smoke.actionId)) smoke.step=2;
+                } else if (smoke.committed) {
+                    if (session.readAcknowledgment(session.reviewContext.unknownReviewId)) smoke.step=5;
                 } else if (session.readDisposition(smoke.actionId)) smoke.step=5;
             } else if (smoke.step===2 && session.dispositionContext.canDismiss) {
                 const v=session.dispositionContext;
@@ -58,12 +62,13 @@ ShellRoot {
                 if (session.readDisposition(smoke.actionId)) smoke.step=5;
             } else if (smoke.step===5 && session.retentionSelection) {
                 const s=session.retentionSelection;
-                if (!smoke.check(smoke.trial!=="MISSING"
+                if (!smoke.check(!smoke.missing
                     && !session.advance(Object.assign({},s,{storageGeneration:s.storageGeneration+1}))
                     && session.advance(s) && !session.advance(s),"one exact retention advance"))return;
                 smoke.step=7;
-            } else if (smoke.step===5 && smoke.trial==="MISSING"
-                && session.dispositionContext.phase==="DISMISS_UNKNOWN" && !session.retentionSelection) {
+            } else if (smoke.step===5 && smoke.missing
+                && (smoke.committed?session.reviewContext.phase==="ACK_UNKNOWN":session.dispositionContext.phase==="DISMISS_UNKNOWN")
+                && !session.retentionSelection) {
                 if (!smoke.check(!session.advance({}) && session.close(),"missing receipt remains locked"))return;
                 smoke.step=8;
             } else if (smoke.step===7 && session.phase==="IDLE") {
@@ -77,7 +82,7 @@ ShellRoot {
     }
     Component.onCompleted: {
         if (Quickshell.env("POST_APOLLO_QUEUE_PIPE_SMOKE")!=="CI_DISPOSABLE_ONLY"
-            || !["LIVE","RECOVERED","MISSING"].includes(trial) || !rootPath.startsWith("/tmp/")) {
+            || !["LIVE","RECOVERED","MISSING","COMMITTED","COMMITTED_MISSING"].includes(trial) || !rootPath.startsWith("/tmp/")) {
             done=true;Qt.quit();
         }
     }

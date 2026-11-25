@@ -472,14 +472,20 @@ ShellRoot {
         } else if (n===3) {
             const item=a.loader.item;
             check(item && item.dismissReview(firstReviewScope) && item.reviewRows.length===0
-                && item.reviewState==="CLOSED" && !find(item,"restorationReviewDismiss").activeFocusOnTab,
-                "review dismiss and tab eligibility");
+                && item.reviewState==="CLOSED","review dismiss state");
+        } else if (n===4) {
+            const item=a.loader.item;
+            const dismiss=find(item,"restorationReviewDismiss");
+            const body=find(item,"restorationReviewBody");
+            check(item && item.reviewState==="CLOSED" && item.reviewRows.length===0
+                && dismiss && body && !body.visible && !dismiss.activeFocusOnTab,
+                "review dismissed tab eligibility");
             if (failed) return;
             a.preview.leftClicked(null);
-        } else if (n===4) {
+        } else if (n===5) {
             check(!a.loader.active && a.loader.item===null && a.empty.visible,"review unloaded");
             a.preview.leftClicked(null);
-        } else if (n===5) {
+        } else if (n===6) {
             const item=a.loader.item;
             check(item && item.reviewState==="CLOSED" && item.reviewRows.length===0,
                 "review replacement empty");
@@ -492,19 +498,19 @@ ShellRoot {
                 && !item.dismissReview(firstReviewScope) && reviewGeometry(item),
                 "review stale scope isolated");
             forest.selectedTreeIndex=1;
-        } else if (n===6) {
+        } else if (n===7) {
             check(!a.loader.active && a.loader.item===null,"review tree loss unload");
             a.loader.sourceComponent=originalPreviewComponent;
             forest.selectedTreeIndex=0;
-        } else if (n===7) {
+        } else if (n===8) {
             check(a.preview.interactive && !a.loader.active && a.input.text==="review-local draft",
                 "review return to original preview");
             a.preview.leftClicked(null);
-        } else if (n===8) {
+        } else if (n===9) {
             geometry(true);
             check(a.input.text==="review-local draft","original preview/draft restored");
             forest.menuOpen=false;
-        } else if (n===9) {
+        } else if (n===10) {
             check(!a.loader.active && a.loader.item===null && a.input.text==="","review close");
         }
     }
@@ -517,7 +523,7 @@ ShellRoot {
             reviewStep(n);
             if (failed) { stop(); finish(); return; }
             console.info("FOREST_HOST_REVIEW_PHASE_PASS "+n);
-            if (n===9) {
+            if (n===10) {
                 stop();
                 console.info("FOREST_HOST_REVIEW_PLACEMENT_PASS");
                 finish();

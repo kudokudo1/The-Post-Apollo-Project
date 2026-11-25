@@ -77,6 +77,78 @@ class SignedNativeCommandTests(unittest.TestCase):
             enrolled_origin_consistent=origin,
         )
 
+    def test_unexpected_verifier_exception_after_real_status_faults_client(self):
+        self.assertEqual(self.client.begin().phase, "REQUESTED")
+
+        def interrupted_verification(*args, **kwargs):
+            # Verify the actual signed reply before raising a non-ValueError.
+            self.assertEqual(verify_receipt(*args, **kwargs)["state"], "PENDING")
+            raise RuntimeError("disposable verification interruption")
+
+        with patch("desktop_signed_command_client_v0.verify_receipt",
+                   side_effect=interrupted_verification):
+            with self.assertRaisesRegex(RuntimeError, "disposable verification"):
+                self.client.status()
+        snapshot = self.client.delivery_snapshot()
+        self.assertTrue(snapshot.faulted)
+        self.assertEqual(snapshot.wire_outcome, "UNKNOWN_HOLD")
+        self.assertEqual(snapshot.last_attempted_wire.action, "STATUS")
+        # A later call must refuse before any socket/nonce/guard access.
+        with patch("desktop_signed_command_client_v0.socket.socket",
+                   side_effect=AssertionError("attempted another socket")):
+            for action in (self.client.begin, self.client.status,
+                           self.client.cancel, self.client.recover):
+                with self.assertRaisesRegex(ReceiptRejected, "faulted"):
+                    action()
+        self.assertEqual(self.client.delivery_snapshot(), snapshot)
+        self.assertEqual(self.base.factory_calls, 1)
+
+    def test_interrupt_after_real_cancel_receipt_preserves_original_attempt(self):
+        client = None
+        interrupted = []
+
+        def guard(peer):
+            if (client.last_wire_outcome == "UNKNOWN_HOLD"
+                    and client.last_attempted_wire.action == "CANCEL"):
+                interrupted.append(client.last_attempted_wire)
+                raise KeyboardInterrupt("disposable post-reply interruption")
+            return peer.uid == os.geteuid() and peer.pid == os.getpid()
+
+        client = self._client(guard=guard)
+        self.assertEqual(client.begin().phase, "REQUESTED")
+        self.assertEqual(client.status().phase, "PENDING")
+        with self.assertRaises(KeyboardInterrupt):
+            client.cancel()
+        snapshot = client.delivery_snapshot()
+        self.assertEqual(len(interrupted), 1)
+        self.assertIs(snapshot.last_attempted_wire, interrupted[0])
+        self.assertTrue(snapshot.faulted)
+        self.assertEqual(snapshot.wire_outcome, "UNKNOWN_HOLD")
+        with patch("desktop_signed_command_client_v0.socket.socket",
+                   side_effect=AssertionError("attempted another socket")):
+            with self.assertRaisesRegex(ReceiptRejected, "faulted"):
+                client.status()
+            with self.assertRaisesRegex(ReceiptRejected, "faulted"):
+                client.cancel()
+        self.assertEqual(client.delivery_snapshot(), snapshot)
+        self.assertEqual(self.base.factory_calls, 1)
+
+    def test_unexpected_pre_send_interruption_does_not_invent_attempt(self):
+        client = self._client(guard=lambda peer: peer.uid == os.geteuid())
+        self.assertEqual(client.begin().phase, "REQUESTED")
+        before = client.delivery_snapshot().last_attempted_wire
+        with patch.object(client, "_socket_safety",
+                          side_effect=KeyboardInterrupt("pre-send")):
+            with self.assertRaises(KeyboardInterrupt):
+                client.status()
+        snapshot = client.delivery_snapshot()
+        self.assertEqual(snapshot.wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertIs(snapshot.last_attempted_wire, before)
+        self.assertFalse(snapshot.faulted)
+        # No effect was attempted by the interrupted status. A subsequent
+        # explicit status still goes through the normal existing checks.
+        self.assertEqual(client.status().phase, "PENDING")
+
     def test_delivery_snapshot_tracks_real_command_without_authority(self):
         fresh = self.client.delivery_snapshot()
         self.assertEqual(fresh.wire_outcome, "UNOBSERVED")

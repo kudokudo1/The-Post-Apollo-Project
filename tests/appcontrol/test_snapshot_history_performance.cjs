@@ -184,6 +184,72 @@ test('hidden CPU sampling preserves PID and FAVORITES identity histories', () =>
         'previous visible snapshot remains immutable');
 });
 
+test('Hunter display short circuits preserve thresholds and protection classes', () => {
+    const start=app.indexOf('    function hunterTaskActive(entry) {');
+    const end=app.indexOf('    function hunterMetricAccent()',start);
+    assert.ok(start>=0&&end>start);
+    const create=new Function('counts',app.slice(start,end)+`
+        const hunterMetricCombined=0,hunterMetricCpu=1,hunterMetricMemory=2,
+              hunterMetricIo=3,hunterMetricAge=4;
+        const hunterVisibilityProtected=1,hunterVisibilityAll=2;
+        let hunterMetricMode=0,hunterVisibilityMode=0;
+        function hunterTaskPeak(e){counts.peak++;return e.peak;}
+        function hunterTaskAverage(e){counts.avg++;return e.avg;}
+        function hunterTaskMemoryMiB(e){counts.mem++;return e.mem;}
+        function hunterTaskIoRate(e){return e.io;}
+        function taskElapsedSeconds(v){return Number(v);}
+        function taskRequiresDangerUnlock(e){counts.protected++;return e.protected;}
+        return {active:hunterTaskActive,visible:hunterTaskClassVisible,
+            metric(v){hunterMetricMode=v;},visibility(v){hunterVisibilityMode=v;}};
+    `);
+    const counts={peak:0,avg:0,mem:0,protected:0};
+    const model=create(counts);
+    const rows=[null,{},...Array.from({length:600},(_,i)=>({
+        _taskRecord:i%13!==0,peak:[0,.34,.35,NaN][i%4],
+        avg:[0,.14,.15,NaN][Math.floor(i/4)%4],mem:[0,15,16,127,128,NaN][Math.floor(i/16)%6],
+        io:i%2?1023:1024,elapsed:i%3?'0':'1',protected:i%4===0
+    }))];
+    function oldActive(e,mode) {
+        if(!e||!e._taskRecord)return false;
+        if(mode===2)return e.mem>=16;
+        if(mode===3)return e.io>=1024;
+        if(mode===4)return Number(e.elapsed)>0;
+        return e.peak>=.35||e.avg>=.15||(mode===0&&e.mem>=128);
+    }
+    function oldVisible(e,mode) {
+        if(!e||!e._taskRecord)return false;
+        if(mode===1)return e.protected;
+        if(mode===2)return true;
+        return !e.protected;
+    }
+    for(let mode=0;mode<5;mode++){
+        model.metric(mode);
+        for(const row of rows)assert.equal(model.active(row),oldActive(row,mode));
+    }
+    for(let mode=0;mode<3;mode++){
+        model.visibility(mode);
+        for(const row of rows)assert.equal(model.visible(row),oldVisible(row,mode));
+    }
+    model.metric(0);
+    model.visibility(2);
+    Object.keys(counts).forEach(k=>counts[k]=0);
+    const sufficient={_taskRecord:true,mem:128,peak:0,avg:0,protected:true};
+    assert.equal(model.active(sufficient),true);
+    assert.equal(model.visible(sufficient),true);
+    assert.equal(counts.peak,0);
+    assert.equal(counts.avg,0);
+    assert.equal(counts.protected,0);
+    model.metric(1);
+    model.visibility(1);
+    assert.equal(model.active(sufficient),false);
+    assert.equal(model.visible(sufficient),true);
+    assert.equal(counts.peak,1);
+    assert.equal(counts.avg,1);
+    assert.equal(counts.protected,1);
+    const gate=app.slice(app.indexOf('function taskEligibleForKillAll(entry)'),app.indexOf('function killAllEligibleTasks()'));
+    assert.match(gate,/return !taskProtectedFromKillAll\(entry\)/);
+});
+
 test('menu visibility binds immutable graph presentation policy', () => {
     assert.match(app, /taskMiniHistoryKeepImmutable:\s*appControlWindow\.menuOpen/);
     assert.match(graph, /if \(immutable\) \{/);

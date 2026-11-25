@@ -120,6 +120,17 @@ ShellRoot {
                     if (!smoke.check(pane.stagedGiB === 24, "hidden slider refusal")) return;
                     pane.selectCapSection(2);
                     if (!smoke.check(scroll.visible, "details section")) return;
+                    const ram=smoke.find(pane,"cpuplusCapDetailRam");
+                    const swap=smoke.find(pane,"cpuplusCapDetailSwap");
+                    const ramView=smoke.find(pane,"cpuplusCapRamDetails");
+                    if(!smoke.check(ram&&swap&&ramView&&!ramView.visible,"default swap details"))return;
+                    ram.leftClicked(null);
+                    if(!smoke.check(ramView.visible&&pane.ramDetailRows[0].fraction===0.25
+                        &&pane.ramDetailRows[1].value===null&&pane.stagedGiB===24&&MemoryOperation.requests===0,
+                        "RAM details selection and unavailable optional fields"))return;
+                    swap.leftClicked(null);
+                    if(!smoke.check(!ramView.visible&&pane.capDetailSubject==="SWAP","return to swap details"))return;
+                    console.log("CPU_M11A_RAM_DETAILS_PASS // native RAM/SWAP selection, no mutation");
                     pane.selectCapSection(0);
                     if (!smoke.check(!scroll.visible && slider.visible, "target section scroll-free")) return;
                     MemoryOperation.busy = true;

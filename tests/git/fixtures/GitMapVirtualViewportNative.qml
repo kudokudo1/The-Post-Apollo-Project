@@ -205,6 +205,23 @@ ShellRoot {
                 map.setLaneOffset(-99);
                 if (!root.check(map.laneOffset===0 && map.graphLaneVisible(0),"first lane reachable")) return;
                 console.log("GIT_MAP_DENSE_LANES_PASS");
+                map.scrollTo(99999999);
+                root.expectedY=map.scrollPosition;
+                root.phase=14;
+                return;
+            }
+            if (root.phase===14) {
+                if (!map.rowAt(63)) return;
+                if (!root.check(map.visibleLaneCount===1 && map.graphSurfaceWidth===2*map.laneMargin && map.laneOffset===map.laneMinOffset,"graph contracts in narrow tail")) return;
+                if (!root.check(map.scrollPosition===root.expectedY,"contraction preserves vertical position")) return;
+                map.scrollTo(0);
+                root.phase=15;
+                return;
+            }
+            if (root.phase===15) {
+                if (!map.rowAt(0)) return;
+                if (!root.check(map.visibleLaneCount>=32 && map.graphSurfaceWidth>190 && map.laneMaxOffset>map.laneMinOffset && map.scrollPosition===0,"graph re-expands on wide ancestry")) return;
+                console.log("GIT_MAP_REACTIVE_LANES_PASS");
                 root.pass();
             }
         }

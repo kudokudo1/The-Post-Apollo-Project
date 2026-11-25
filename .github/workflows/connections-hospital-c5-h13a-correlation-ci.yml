@@ -1,0 +1,36 @@
+name: Connections DOC4 C5-H13a original correlation gap witness
+
+on:
+  pull_request:
+    paths:
+      - 'services/connections/hospital/HospitalNativeIssuerCore.py'
+      - 'services/connections/hospital/HospitalNativeIssuerService.py'
+      - 'tests/connections/hospital_c5/**'
+      - '.github/workflows/connections-hospital-c5-h13a-correlation-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  correlation-gap-witness:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned disposable test dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.4
+      - name: Original correlation gap and inherited deny-only tests
+        run: |
+          set -euo pipefail
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h13a_correlation_gap.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h11_commit_unknown_hold.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5h12_client_receipt_unknown.py
+          python3 -B -I tests/connections/hospital_c5/test_hospital_c5_native_consent_hard_hold.py
+          echo "C5H13A_CORRELATION_GAP_WITNESS_ONLY // PASS"

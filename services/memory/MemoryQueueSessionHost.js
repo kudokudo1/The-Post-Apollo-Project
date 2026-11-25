@@ -21,24 +21,59 @@ function safe(v,depth=0) {
     return typeof v==="object" && Object.keys(v).length<=64
         && Object.keys(v).every(k=>k.length<=128 && /^[\x20-\x7e]*$/.test(k) && safe(v[k],depth+1));
 }
+function digest(v) { return typeof v==="string" && /^[0-9a-f]{64}$/.test(v); }
+function equal(a,b) {
+    if (a===b) return true;
+    if (!a || !b || typeof a!=="object" || typeof b!=="object"
+        || Array.isArray(a)!==Array.isArray(b)) return false;
+    return exact(a,Object.keys(b)) && Object.keys(b).every(k=>equal(a[k],b[k]));
+}
+function reviewValue(r,recoveryRow) {
+    if (!exact(r,["version","review_id","owner_id","action_id","snapshot","review_digest",
+        "reviewed_at_ms","can_execute","startup_unlock"]) || r.version!==1
+        || !uuid(r.review_id) || !uuid(r.owner_id) || !uuid(r.action_id)
+        || !digest(r.review_digest) || !Number.isSafeInteger(r.reviewed_at_ms) || r.reviewed_at_ms<0
+        || r.can_execute!==false || r.startup_unlock!==false) return false;
+    const s=r.snapshot;
+    if (!exact(s,["version","record","pending_request_id","pending_digest","adjustment_outcome","can_execute","startup_unlock"])
+        || s.version!==1 || (s.pending_request_id!==null && !uuid(s.pending_request_id))
+        || !digest(s.pending_digest) || s.adjustment_outcome!=="UNVERIFIED"
+        || s.can_execute!==false || s.startup_unlock!==false) return false;
+    let view;
+    try { view=recoveryRow(s.record); } catch (_) { return false; }
+    return !!view && view.actionId===r.action_id && s.record.message.owner_id!==r.owner_id;
+}
+function receiptValue(r,recoveryRow) {
+    return exact(r,["version","review","acknowledged_at_ms","disposition","adjustment_outcome","can_execute","startup_unlock"])
+        && r.version===1 && reviewValue(r.review,recoveryRow)
+        && Number.isSafeInteger(r.acknowledged_at_ms)
+        && r.acknowledged_at_ms>=r.review.reviewed_at_ms
+        && r.acknowledged_at_ms-r.review.reviewed_at_ms<60000
+        && r.disposition==="REVIEW_ACKNOWLEDGED_ONLY" && r.adjustment_outcome==="UNVERIFIED"
+        && r.can_execute===false && r.startup_unlock===false;
+}
 function initial(consumer) {
     return {session:consumer.initial(),projection:null,history:null,historyRead:null,
         recoveryRead:null,inventory:null,localAction:null,
         buffer:"",phase:"STOPPED",sequence:0,generation:0,startupLocked:true,
-        mode:"LEGACY",stage:null,
+        mode:"LEGACY",stage:null,reviewEnabled:false,reviewFlow:null,reviewReceipt:null,reviewLost:null,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
-function start(state,consumer,generation,mode="LEGACY") {
+function start(state,consumer,generation,mode="LEGACY",reviewEnabled=false) {
     if ((state.phase!=="STOPPED" && state.phase!=="FAILED")
         || !positive(generation) || generation<=state.generation
-        || !["LEGACY","STAGED"].includes(mode)) return state;
+        || !["LEGACY","STAGED"].includes(mode) || typeof reviewEnabled!=="boolean"
+        || (reviewEnabled && mode!=="STAGED")) return state;
     return Object.assign({},initial(consumer),{
-        generation,mode,session:consumer.disconnect(state.session),phase:"HELLO"});
+        generation,mode,reviewEnabled,reviewLost:state.reviewLost,
+        session:consumer.disconnect(state.session),phase:"HELLO"});
 }
 function stop(state,consumer,reason,generation) {
     if (generation!==state.generation || !["HELLO","CONNECTED"].includes(state.phase)) return state;
     return Object.assign({},initial(consumer),{
-        generation,session:consumer.disconnect(state.session),phase:reason?"FAILED":"STOPPED",
+        generation,reviewLost:state.reviewFlow?.phase==="WAIT_ACK"
+            ? state.reviewFlow.review : state.reviewLost,
+        session:consumer.disconnect(state.session),phase:reason?"FAILED":"STOPPED",
         failure:reason||null});
 }
 // Independent caller-owned deadlines, not a timer or a polling interval.
@@ -51,7 +86,7 @@ function waiting(state) {
     if (state.awaitingStatus || state.publicationRequired) waits.push("PUBLICATION");
     if (state.session.pending) waits.push("ACTION");
     if (state.historyRead) waits.push("HISTORY");
-    if (state.recoveryRead) waits.push("RECOVERY");
+    if (state.recoveryRead || state.reviewFlow) waits.push("RECOVERY");
     if (state.buffer) waits.push("PARTIAL_FRAME");
     return waits;
 }
@@ -59,22 +94,39 @@ function context(state) {
     if (!state.session.ownerId && !state.session.pending && !state.session.unresolved) return null;
     // Startup inventory is a separate lock, not a fabricated unresolved action.
     // Keep pending/unknown state even when the projection is invalid.
-    const session=state.startupLocked || state.historyRead || state.recoveryRead
+    const session=state.startupLocked || state.historyRead || state.recoveryRead || state.reviewFlow || state.reviewLost
         ? Object.assign({},state.session,{nextActionSequence:null,prepared:null})
         : state.session;
     return {state:session,projection:state.projection,startupLocked:state.startupLocked,
         historyPending:!!state.historyRead,phase:state.phase,waiting:waiting(state),failure:state.failure,
-        recoveryPending:!!state.recoveryRead,
+        recoveryPending:!!(state.recoveryRead || state.reviewFlow),
         actionStage:state.stage?state.stage.phase:null};
 }
 function recoveryContext(state) {
     // Atomic snapshot for DOC 2's read-only pane. This metadata is not
     // authority, and a missing response is never evidence of noncommit.
     return {hostStatus:{phase:state.phase,startupLocked:state.startupLocked,
-        historyPending:!!(state.historyRead || state.recoveryRead),
+        historyPending:!!(state.historyRead || state.recoveryRead || state.reviewFlow),
         actionPending:!!state.session.pending,unresolved:!!state.session.unresolved},
         inventory:state.inventory,localAction:state.localAction,
-        recoveryPending:!!state.recoveryRead};
+        recoveryPending:!!(state.recoveryRead || state.reviewFlow)};
+}
+// Separate additive interface; existing DOC 2 recoveryContext stays stable.
+function reviewContext(state) {
+    const flow=state.reviewFlow;
+    return {phase:flow?flow.phase:state.reviewLost?"ACK_UNKNOWN":"IDLE",
+        review:flow?.phase==="REVIEW_READY" && !state.awaitingStatus && !state.publicationRequired
+            ? flow.review:null,
+        reviewSequence:flow?.phase==="REVIEW_READY"?flow.sequence:null,
+        receipt:state.reviewReceipt,unknownReviewId:state.reviewLost?.review_id||null,
+        canAcknowledge:canAck(state),startupLocked:state.startupLocked,canExecute:false};
+}
+function canAck(state) {
+    const f=state.reviewFlow, status=state.session.status;
+    return state.phase==="CONNECTED" && state.reviewEnabled && state.startupLocked
+        && f?.phase==="REVIEW_READY" && !state.buffer && !state.awaitingStatus && !state.publicationRequired
+        && !!status && (status.requestId!==null || status.state==="IDLE REPORTED")
+        && status.requestId===f.review.snapshot.pending_request_id;
 }
 function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow) {
     const fail=reason=>stop(state,consumer,reason,state.generation);
@@ -112,6 +164,33 @@ function packet(state,p,consumer,project,historyProject,recoveryProject,recovery
             return fail("INVALID_STATUS");
         return Object.assign({},state,{session:next,sequence:p.sequence,
             projection:next.status?p.projection:null,awaitingStatus:false,publicationRequired:false,history:null});
+    }
+    if (p.kind==="RECOVERY_REVIEW" || p.kind==="RECOVERY_ACK" || p.kind==="RECOVERY_REVIEW_HISTORY") {
+        const f=state.reviewFlow;
+        const fields=["version","kind","owner_id","sequence","next_action_sequence","can_execute"];
+        if (!state.reviewEnabled || !state.startupLocked || !f || state.session.pending
+            || state.awaitingStatus || state.publicationRequired || !state.session.status
+            || p.next_action_sequence!==state.session.nextActionSequence) return fail("UNEXPECTED_REVIEW");
+        const advanced={sequence:p.sequence,session:Object.assign({},state.session,{sequence:p.sequence,prepared:null})};
+        if (p.kind==="RECOVERY_REVIEW") {
+            if (f.phase!=="WAIT_REVIEW" || !exact(p,fields.concat(["review"]))
+                || !reviewValue(p.review,recoveryRow) || p.review.owner_id!==state.session.ownerId
+                || p.review.action_id!==f.actionId) return fail("INVALID_REVIEW");
+            return Object.assign({},state,advanced,{reviewFlow:{phase:"REVIEW_READY",review:p.review,sequence:p.sequence}});
+        }
+        if (p.kind==="RECOVERY_ACK") {
+            if (f.phase!=="WAIT_ACK" || !exact(p,fields.concat(["receipt"]))
+                || !receiptValue(p.receipt,recoveryRow) || !equal(p.receipt.review,f.review))
+                return fail("INVALID_REVIEW_ACK");
+            return Object.assign({},state,advanced,{reviewFlow:null,reviewReceipt:p.receipt});
+        }
+        if (f.phase!=="WAIT_RECEIPT" || !exact(p,fields.concat(["review_id","receipt"]))
+            || p.review_id!==f.reviewId || (p.receipt!==null && (!receiptValue(p.receipt,recoveryRow)
+                || p.receipt.review.review_id!==f.reviewId))) return fail("INVALID_REVIEW_HISTORY");
+        if (state.reviewLost && p.receipt!==null && !equal(p.receipt.review,state.reviewLost))
+            return fail("REVIEW_HISTORY_MISMATCH");
+        return Object.assign({},state,advanced,{reviewFlow:null,reviewReceipt:p.receipt,
+            reviewLost:p.receipt!==null ? null:state.reviewLost});
     }
     if (p.kind==="PREPARED_ACTION") {
         const pending=state.session.pending;
@@ -221,7 +300,7 @@ function feed(state,chunk,consumer,project,historyProject,generation,recoveryPro
 function confirm(state,intent,actionId,consumer) {
     const no={state:state,frame:null};
     if (state.phase!=="CONNECTED" || state.startupLocked || state.historyRead || state.recoveryRead
-        || state.awaitingStatus || state.publicationRequired || !state.projection || !uuid(actionId)
+        || state.reviewFlow || state.reviewLost || state.awaitingStatus || state.publicationRequired || !state.projection || !uuid(actionId)
         || !exact(intent,["ownerId","statusSequence","actionSequence","kind","expectedId","targetGiB","expiresAt"])) return no;
     const prepared=consumer.prepare(state.session,intent.kind,intent.targetGiB,intent.expiresAt);
     if (!prepared.prepared || !Object.keys(intent).every(k=>intent[k]===prepared.prepared[k])) return no;
@@ -247,14 +326,14 @@ function takeCommit(state,generation) {
 }
 function readHistory(state,requestId) {
     const no={state:state,frame:null};
-    if (state.phase!=="CONNECTED" || state.historyRead || state.recoveryRead || state.session.pending
+    if (state.phase!=="CONNECTED" || state.historyRead || state.recoveryRead || state.reviewFlow || state.session.pending
         || state.awaitingStatus || state.publicationRequired || !uuid(requestId) || !state.session.status) return no;
     return {state:Object.assign({},state,{history:null,historyRead:{requestId}}),
         frame:JSON.stringify({version:1,kind:"HISTORY",owner_id:state.session.ownerId,request_id:requestId})+"\n"};
 }
 function readRecovery(state,kind,value) {
     const no={state:state,frame:null};
-    if (state.phase!=="CONNECTED" || state.historyRead || state.recoveryRead
+    if (state.phase!=="CONNECTED" || state.historyRead || state.recoveryRead || state.reviewFlow
         || state.session.pending || state.awaitingStatus || state.publicationRequired
         || !state.session.status) return no;
     let request;
@@ -267,7 +346,36 @@ function readRecovery(state,kind,value) {
     return {state:Object.assign({},state,{recoveryRead:request,inventory:null,localAction:null,history:null,
         session:Object.assign({},state.session,{prepared:null})}),frame:JSON.stringify(message)+"\n"};
 }
-// Deliberately no public startup unlock or reconciliation acknowledgment.
+function reviewAvailable(state) {
+    return state.phase==="CONNECTED" && state.mode==="STAGED" && state.reviewEnabled
+        && state.startupLocked && !state.reviewFlow && !state.historyRead && !state.recoveryRead
+        && !state.session.pending && !state.awaitingStatus && !state.publicationRequired
+        && !state.buffer && !!state.session.status;
+}
+function beginReview(state,actionId) {
+    const no={state,frame:null};
+    if (!reviewAvailable(state) || state.reviewLost || !uuid(actionId)) return no;
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_REVIEW",actionId},reviewReceipt:null}),
+        frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW",owner_id:state.session.ownerId,action_id:actionId})+"\n"};
+}
+function acknowledgeReview(state,selection,generation) {
+    const no={state,frame:null};
+    if (generation!==state.generation || !canAck(state)
+        || !exact(selection,["reviewId","digest","sequence"])) return no;
+    const f=state.reviewFlow,r=f.review;
+    if (selection.reviewId!==r.review_id || selection.digest!==r.review_digest || selection.sequence!==f.sequence) return no;
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_ACK",review:r},reviewReceipt:null}),
+        frame:JSON.stringify({version:1,kind:"RECOVERY_ACK",owner_id:state.session.ownerId,
+            review_id:r.review_id,review_digest:r.review_digest,review_sequence:f.sequence})+"\n"};
+}
+function readReviewReceipt(state,reviewId) {
+    const no={state,frame:null};
+    if (!reviewAvailable(state) || !uuid(reviewId)
+        || (state.reviewLost && state.reviewLost.review_id!==reviewId)) return no;
+    return {state:Object.assign({},state,{reviewFlow:{phase:"WAIT_RECEIPT",reviewId},reviewReceipt:null}),
+        frame:JSON.stringify({version:1,kind:"RECOVERY_REVIEW_HISTORY",owner_id:state.session.ownerId,review_id:reviewId})+"\n"};
+}
+// Deliberately no public startup unlock or action-reconciliation release.
 // Complete durable inventory / lost action correlation is a prerequisite for
 // those transitions. In this slice a trusted fixture can inject reviewed
 // startup state; production stays locked even if the Python child is healthy.

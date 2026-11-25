@@ -195,7 +195,8 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
             "authorize_read_session", "authorize_list_sessions",
             "authorize_disclose_session_titles", "authorize_disclose_provisional",
             "authorize_release_committed_reply", "authorize_tool_execution",
-            "production_admission",
+            "authorize_disclose_tool_input", "authorize_delegate_capability",
+            "authorize_prune_knowledge", "production_admission",
         )
         for obj in (self.local, self.protected):
             for name in methods:
@@ -434,12 +435,79 @@ class ForestC5StorageIndependentBoundaryTests(unittest.TestCase):
 
         for authority in (self.local, self.protected):
             for method in ("authorize_disclose_provisional",
-                           "authorize_release_committed_reply"):
+                           "authorize_release_committed_reply",
+                           "authorize_disclose_tool_input",
+                           "authorize_delegate_capability",
+                           "authorize_prune_knowledge"):
                 with self.subTest(method=method):
                     with self.assertRaises(C.ForestC5Hold):
                         getattr(authority, method)(
                             Untouchable(), evidence=Untouchable(),
                             serialized_output=Untouchable())
+                    self.assert_denied(authority.status())
+
+
+    def test_32_spirit_selection_and_availability_do_not_grant_egress_or_delegation(self):
+        sys.path.insert(0, str(ROOT / "scripts/forest"))
+        try:
+            from shared_context_b6r1 import TaskContext
+            from capability_registry_b6r2 import (
+                bristlecone_reference_profile, plan_selection,
+            )
+        finally:
+            sys.path.pop(0)
+        original = TaskContext("alice", "bristlecone", None,
+                               "taskA", "contextA", 1, "INTERACTIVE")
+        recipient = TaskContext("alice", "bristlecone", "cloneA",
+                                "taskB", "contextB", 2, "INTERACTIVE")
+        selected = plan_selection(bristlecone_reference_profile(original),
+                                  original, "research")
+        target = plan_selection(bristlecone_reference_profile(recipient),
+                                recipient, "research")
+        self.assertIn("web", selected.selected)
+        self.assertIn("web", target.selected)
+        self.assertFalse(selected.permission_granted)
+        marker = "SYNTHETIC_PRIVATE_TOOL_INPUT"
+        cases = (
+            ("authorize_tool_execution", "FOREST_TOOL_EXECUTION_DISABLED"),
+            ("authorize_disclose_tool_input",
+             "TOOL_INPUT_SEPARATE_PROTECTED_DISCLOSURE_REQUIRED"),
+            ("authorize_delegate_capability",
+             "DELEGATED_CAPABILITY_SEPARATE_PROTECTED_PERMISSION_REQUIRED"),
+        )
+        for authority in (self.local, self.protected):
+            for method, reason in cases:
+                with self.subTest(method=method):
+                    with self.assertRaises(C.ForestC5Hold) as caught:
+                        getattr(authority, method)(
+                            selected, target, payload=marker, available=True,
+                            historical_mapping="web", spiritApproved=True,
+                            permissionGranted=True, currentConsent=True)
+                    self.assertEqual(str(caught.exception),
+                                     "FOREST_C5_AUTHORITY_HOLD // " + reason)
+                    self.assertNotIn(marker, str(caught.exception))
+                    self.assertIsNone(caught.exception.__cause__)
+                    self.assertIsNone(caught.exception.__context__)
+                    self.assert_denied(authority.status())
+
+    def test_33_historical_pruning_policy_and_shedding_are_not_mutation_authority(self):
+        marker = "SYNTHETIC_PROTECTED_LEAF"
+        for origin in ("TREE_RECOMMENDATION", "SPIRIT_AUTOMATIC_POLICY",
+                       "USER_MANUAL_PRUNING", "SHEDDING"):
+            forged = {"origin": origin, "leaf": marker, "season": "Fall",
+                      "protected": True, "budgetExceeded": True,
+                      "approved": True, "permissionGranted": True}
+            for authority in (self.local, self.protected):
+                with self.subTest(origin=origin):
+                    with self.assertRaises(C.ForestC5Hold) as caught:
+                        authority.authorize_prune_knowledge(
+                            forged, self.intentwire, currentConsent=True)
+                    self.assertEqual(str(caught.exception),
+                        "FOREST_C5_AUTHORITY_HOLD // "
+                        "PRUNING_SEPARATE_PROTECTED_POLICY_REQUIRED")
+                    self.assertNotIn(marker, str(caught.exception))
+                    self.assertIsNone(caught.exception.__cause__)
+                    self.assertIsNone(caught.exception.__context__)
                     self.assert_denied(authority.status())
 
 

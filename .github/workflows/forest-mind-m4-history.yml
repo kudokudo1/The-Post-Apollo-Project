@@ -3,6 +3,12 @@ on:
   pull_request:
     paths:
       - 'scripts/forest/history_public_fixture_m4.py'
+      - 'scripts/forest/layered_hot_context_m7a.py'
+      - 'scripts/forest/task_sticky_context_m7b.py'
+      - 'scripts/forest/TASK_STICKY_CONTEXT_M7B.md'
+      - 'tests/forest/test_task_sticky_context_m7b.py'
+      - 'scripts/forest/MIND_ORIGINAL_RECOVERY_M7.md'
+      - 'tests/forest/test_layered_hot_context_m7a.py'
       - 'scripts/forest/HISTORY_PUBLIC_FIXTURE_M4.md'
       - 'scripts/forest/context_first_tree_m2.py'
       - 'scripts/forest/session_journal_v0.py'
@@ -42,3 +48,7 @@ jobs:
         run: python3 -B -m unittest discover -s tests/forest -p 'test_mind_integrated_continuity_m6.py' -v
       - name: UI2 history controller regression
         run: node tests/forest/test_ui23b_history_controller.js
+      - name: M7a recovered layered Hot Context
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_layered_hot_context_m7a.py' -v
+      - name: M7b recovered task-sticky context
+        run: python3 -B -m unittest discover -s tests/forest -p 'test_task_sticky_context_m7b.py' -v

@@ -239,16 +239,19 @@ class ReductionTests(unittest.TestCase):
         before = self.sample()
         after = self.sample()
         del after["rows"][str(m.EXT_FILE)]
-        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,before,after]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "current_boot_id", return_value="12345678-1234-1234-1234-123456789abc"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,before,after]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
             m.withdraw_authorized(16)
             run.assert_called_once_with("/usr/sbin/swapoff", "--", str(m.EXT_FILE))
             self.assertEqual(record.call_args_list[0].args[0]["state"], "PREPARED")
             self.assertEqual(record.call_args_list[1].args[0]["state"], "VERIFIED")
             self.assertTrue(record.call_args_list[1].args[0]["fileRetained"])
+            intent, outcome = [call.args[0] for call in record.call_args_list]
+            self.assertEqual(intent["bootBinding"]["bootId"], "12345678-1234-1234-1234-123456789abc")
+            self.assertTrue(m.valid_outcome_boot_binding(intent, outcome))
 
     def test_final_spike_blocks_without_swapoff(self):
         before = self.sample()
-        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,self.sample(used=1)]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "current_boot_id", return_value="12345678-1234-1234-1234-123456789abc"), patch.object(m, "read_reduction_snapshot", side_effect=[before,before,self.sample(used=1)]), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run") as run:
             with self.assertRaises(m.ReductionRecovery) as error:
                 m.withdraw_authorized(16)
             self.assertEqual(str(error.exception), "NOT_STARTED_EXTENSION_OCCUPIED")
@@ -257,7 +260,7 @@ class ReductionTests(unittest.TestCase):
 
     def test_failed_kernel_command_preserves_prepared_record(self):
         before = self.sample()
-        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "read_reduction_snapshot", return_value=before), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run", side_effect=m.subprocess.CalledProcessError(1,"swapoff")):
+        with patch.object(m.os, "geteuid", return_value=0), patch.object(m, "extension_identity", return_value=[(1,2,3)]), patch.object(m.os.path, "lexists", return_value=False), patch.object(m, "check_extension_boot_policy"), patch.object(m.time, "sleep"), patch.object(m, "current_boot_id", return_value="12345678-1234-1234-1234-123456789abc"), patch.object(m, "read_reduction_snapshot", return_value=before), patch.object(m, "durable_withdrawal_record") as record, patch.object(m, "run", side_effect=m.subprocess.CalledProcessError(1,"swapoff")):
             with self.assertRaises(m.ReductionRecovery) as error:
                 m.withdraw_authorized(16)
             self.assertEqual(str(error.exception), "WITHDRAWAL_OUTCOME_UNKNOWN")
@@ -801,6 +804,88 @@ class ExternalReclaimFenceTests(unittest.TestCase):
                 existing.assert_called_once_with()
                 self.assertIsNone(m._mutation_fd)
                 self.assertFalse(os.path.lexists(fence))
+
+class WithdrawalBootBindingTests(unittest.TestCase):
+    BOOT = "12345678-1234-1234-1234-123456789abc"
+    OTHER = "87654321-1234-1234-1234-123456789abc"
+
+    def fixture(self):
+        identity,intent,outcome,before,after = RecoveryInspectionTests().fixture()
+        intent["bootBinding"] = {"version":1,"bootId":self.BOOT}
+        outcome["bootBinding"] = dict(intent["bootBinding"],intentDigest=m.intent_digest(intent))
+        return identity,intent,outcome,before,after
+
+    def test_fixed_kernel_read(self):
+        with patch("builtins.open",mock_open(read_data=self.BOOT+"\n")) as opened:
+            self.assertEqual(m.current_boot_id(),self.BOOT)
+            opened.assert_called_once_with("/proc/sys/kernel/random/boot_id",encoding="ascii")
+        for raw in ("",self.BOOT,self.BOOT+"\n\n",self.BOOT.upper()+"\n",
+                    "00000000-0000-0000-0000-000000000000\n"):
+            with patch("builtins.open",mock_open(read_data=raw)),self.assertRaises(ValueError):
+                m.current_boot_id()
+
+    def test_bound_witness_same_boot_and_inactive(self):
+        identity,intent,outcome,before,after=self.fixture()
+        self.assertEqual(m.withdrawal_boot_witness(intent,outcome,identity,after,self.BOOT),
+                         {"version":1,"boot_id":self.BOOT,"withdrawal_digest":m.withdrawal_digest(intent,outcome)})
+        self.assertIsNone(m.withdrawal_boot_witness(intent,outcome,identity,after,self.OTHER))
+        self.assertIsNone(m.withdrawal_boot_witness(intent,outcome,identity,before,self.BOOT))
+
+    def test_legacy_observation_no_witness(self):
+        identity,intent,outcome,before,after=RecoveryInspectionTests().fixture()
+        self.assertEqual(m.classify_recovery(intent,outcome,identity,after)["code"],"RECORDED_VERIFIED_INACTIVE")
+        self.assertIsNone(m.withdrawal_boot_witness(intent,outcome,identity,after,self.BOOT))
+        self.assertEqual(m.reactivation_plan(24,intent,outcome,identity,after)["targetGiB"],24)
+
+    def test_invalid_partial_or_changed_binding(self):
+        identity,intent,outcome,before,after=self.fixture()
+        for value in (None,{},{"version":True,"bootId":self.BOOT},{"version":1,"bootId":self.BOOT,"extra":0}):
+            bad=dict(intent,bootBinding=value)
+            self.assertEqual(m.classify_recovery(bad,outcome,identity,after)["code"],"INVALID_INTENT")
+            self.assertIsNone(m.withdrawal_boot_witness(bad,outcome,identity,after,self.BOOT))
+        for value in (None,{},dict(outcome["bootBinding"],intentDigest="0"*64),
+                      dict(outcome["bootBinding"],bootId=self.OTHER)):
+            bad=dict(outcome,bootBinding=value)
+            self.assertEqual(m.classify_recovery(intent,bad,identity,after)["code"],"INVALID_RESULT")
+            self.assertIsNone(m.withdrawal_boot_witness(intent,bad,identity,after,self.BOOT))
+        old=dict(outcome)
+        del old["bootBinding"]
+        self.assertEqual(m.classify_recovery(intent,old,identity,after)["code"],"INVALID_RESULT")
+        self.assertEqual(m.classify_recovery(dict(intent,timeNs=99),outcome,identity,after)["code"],"INVALID_RESULT")
+
+    def test_bound_cycle_archive(self):
+        identity,intent,outcome,before,after=self.fixture()
+        prepared=dict(m.reactivation_plan(24,intent,outcome,identity,after),timeNs=102)
+        receipt=dict(prepared,state="VERIFIED",timeNs=103,sizeKiB=25165816,
+                     basePriority=10,extensionPriority=9,extensionActive=True,fileRetained=True,temporary=True)
+        records=[intent,outcome,prepared,receipt]
+        bundle=m.cycle_archive_plan(records,identity,before)
+        self.assertEqual(bundle["records"],records)
+        self.assertEqual(bundle["digest"],m.cycle_digest(records))
+
+    def test_boot_change_before_intent_before_effect_and_after_effect(self):
+        before=ReductionTests().sample()
+        after=ReductionTests().sample()
+        del after["rows"][str(m.EXT_FILE)]
+        for reads,exception,code,writes,effects in (
+            ([self.BOOT,self.OTHER],RuntimeError,"Kernel boot identity changed",0,0),
+            ([self.BOOT,self.BOOT,self.OTHER],m.ReductionRecovery,"FINAL_CHECK_UNKNOWN",1,0),
+            ([self.BOOT,self.BOOT,self.BOOT,self.OTHER],m.ReductionRecovery,"WITHDRAWAL_OUTCOME_UNKNOWN",1,1)):
+            with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"extension_identity",return_value=[(1,2,3)]),patch.object(m.os.path,"lexists",return_value=False),patch.object(m,"check_extension_boot_policy"),patch.object(m.time,"sleep"),patch.object(m,"current_boot_id",side_effect=reads),patch.object(m,"read_reduction_snapshot",side_effect=[before,before,before,after]),patch.object(m,"durable_withdrawal_record") as record,patch.object(m,"run") as run:
+                with self.assertRaisesRegex(exception,code):
+                    m.withdraw_authorized(16)
+                self.assertEqual(record.call_count,writes)
+                self.assertEqual(run.call_count,effects)
+                if writes:
+                    self.assertEqual(record.call_args.args[0]["state"],"PREPARED")
+
+    def test_missing_boot_refuses_before_intent(self):
+        with patch.object(m.os,"geteuid",return_value=0),patch.object(m,"extension_identity",return_value=[(1,2,3)]),patch.object(m.os.path,"lexists",return_value=False),patch.object(m,"current_boot_id",side_effect=OSError("missing")),patch.object(m,"durable_withdrawal_record") as record,patch.object(m,"run") as run:
+            with self.assertRaises(OSError):
+                m.withdraw_authorized(16)
+            record.assert_not_called()
+            run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

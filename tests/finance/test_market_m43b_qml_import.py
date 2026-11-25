@@ -35,8 +35,16 @@ Item {
         var av = Policy.captureGlobalHistory(identity,avListing,data);
         var avStats = Policy.summarizeRange(av);
         var avChart = Policy.normalizedIntervalChart(av,0,1,0,1);
+        var otherIdentity={figi:"BBG000000002",ticker:"ADYEN",name:"ADYEN",exchCode:"NA"};
+        var otherListing={symbol:"ADYEN.AMS",region:"Netherlands",name:"ADYEN",currency:"EUR"};
+        data.symbol="ADYEN.AMS";
+        var other=Policy.captureGlobalHistory(otherIdentity,otherListing,data);
+        var compared=Policy.compareGlobalStockReferences(Policy.captureGlobalStockReference(av),other);
+        var detail=Policy.inspectCrossStockDate(compared,1);
         rows[0].price=1;
-        return summary && summary.sessions===2 && chart && chart.first[0].value===100
+        return compared.state==="ready" && detail && detail.current.currency==="EUR"
+            && Policy.crossStockGapChart(compared).points[1].value===0
+            && summary && summary.sessions===2 && chart && chart.first[0].value===100
             && avStats && avStats.source==="loaded-alpha-vantage-range-only"
             && avChart && Policy.inspectNormalizedStep(avChart,0).first.value===100
             && copied.first.price===100 && copied.bars[0].price===100

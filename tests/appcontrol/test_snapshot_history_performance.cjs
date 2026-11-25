@@ -658,3 +658,16 @@ test('preferred detail selection reuses action snapshots without changing favori
     assert.match(app,/function resetDetailActionSelection\(\) \{[\s\S]*?favoriteDetailActionIndex\(count\)[\s\S]*?detailActionAvailable\(favoriteIndex\)/);
     assert.match(app,/function activateFavoriteDetailActionFromSelector\(\) \{[\s\S]*?favoriteIndex < 0[\s\S]*?!detailActionAvailable\(favoriteIndex\)/);
 });
+
+test('opening substages and runtime KILL work remain opt-in and keep existing operations',()=>{
+    const opening=app.slice(app.indexOf('    onMenuOpenChanged: {'),app.indexOf('        } else {\n            recentModeIndex',app.indexOf('    onMenuOpenChanged: {')));
+    let last=-1;
+    for(const marker of ['const selectionStart = openStage','traceAppControlOpen("selection-state"','restoreRememberedAppSelection()','traceAppControlOpen("selection-row"','resetDetailActionSelection()','traceAppControlOpen("selection-detail"','traceAppControlOpen("selection", openTrace, selectionStart)']){
+        const next=opening.indexOf(marker);assert.ok(next>last,marker);last=next;
+    }
+    assert.match(app,/return diagnosticCaptureActive && menuOpen && selectedModeIndex === killModeIndex/);
+    assert.match(app,/if \(!startMs \|\| !killDiagnosticActive\(\)\)\s*return/);
+    assert.match(app,/traceKillWork\("snapshot-selection", selectionStart\)/);
+    const mini=app.slice(app.indexOf('    function applyTaskMiniProbeRows('),app.indexOf('    Timer {',app.indexOf('    function applyTaskMiniProbeRows(')));
+    assert.match(mini,/updateTaskMiniCpuHistories\(samples\);[\s\S]*?traceKillWork\("mini-cpu-history"[\s\S]*?updateTaskMiniHunterMetricHistories\(samples\);[\s\S]*?traceKillWork\("mini-hunter-history"[\s\S]*?taskMiniDisplayRevision \+= 1;[\s\S]*?traceKillWork\("mini-history-revisions"/);
+});

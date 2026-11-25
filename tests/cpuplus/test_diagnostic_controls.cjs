@@ -207,3 +207,31 @@ const acReport={kind:"appcontrol",id:"session-abc-def-1",status:"COMPLETE",text:
 const acComp=comparePolicy.compare(acReport,{...acReport,id:"session-abc-def-2",finishedAt:"2026-11-24T12:01:00.000Z"},policy.summarize,policy.appControlMetrics);
 assert.equal(acComp.error,"");
 assert.equal(acComp.rows.find(row=>row.label==="KILL TOTAL CPU").delta,0);
+
+const detailedOpen = [
+    {stage:"graph-invalidation",sequence:1,tsMs:2101,elapsedMs:1},
+    {stage:"mode-restore",sequence:1,tsMs:2102,elapsedMs:1},
+    {stage:"selection-state",sequence:1,tsMs:2103,elapsedMs:1},
+    {stage:"selection-row",sequence:1,tsMs:2203,elapsedMs:100},
+    {stage:"selection-detail",sequence:1,tsMs:2204,elapsedMs:1},
+    {stage:"selection",sequence:1,tsMs:2204,elapsedMs:102},
+    {stage:"probe-schedule",sequence:1,tsMs:2205,elapsedMs:1},
+    {stage:"refresh-dispatch",sequence:1,tsMs:2206,elapsedMs:1},
+    {stage:"focus",sequence:1,tsMs:2207,elapsedMs:1},
+    {stage:"handler-total",sequence:1,tsMs:2207,elapsedMs:107}
+];
+const work=[{stage:"task-rows",tsMs:3900,elapsedMs:35},{stage:"task-rows",tsMs:4400,elapsedMs:15},
+    {stage:"mini-history-revisions",tsMs:4500,elapsedMs:7},{stage:"task-rows",tsMs:5001,elapsedMs:1}];
+const detailed=policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,work);
+assert.ok(detailed);
+const dm=policy.appControlMetrics(detailed);
+assert.equal(dm.openings,1);
+assert.equal(dm.selection["selection-row"][0],100);
+assert.equal(dm.killWork["task-rows"].count,2);
+assert.equal(dm.killWork["task-rows"].totalMs,50);
+assert.equal(dm.killWork["task-rows"].maxMs,35);
+assert.match(policy.summarize("appcontrol",detailed),/SELECTION-ROW \/\/ mean 100.0 ms/);
+assert.equal(policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,[{stage:"unknown",tsMs:3900,elapsedMs:1}]),null);
+assert.equal(policy.combineAppControl(jsonl(acRows),acModes,[...detailedOpen].reverse(),false,work),null);
+assert.equal(policy.appControlMetrics(ac).openings,1);
+assert.deepEqual(JSON.parse(JSON.stringify(policy.appControlMetrics(ac).killWork)),{});

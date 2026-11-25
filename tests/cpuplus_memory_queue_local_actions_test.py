@@ -10,6 +10,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"services/memory"))
 from memory_adjustment_queue import Queue, QueueError
 from memory_queue_local_actions import LocalActions
 from memory_queue_runtime import Runtime
+from memory_queue_owner import Owner
 
 SOURCE={"boot_id":"c23683a9-b2ab-4a2c-87ce-31bdf27a3012",
         "base":{"device":42,"inode":9007199254740993,"size_kib":16777212},
@@ -150,6 +151,84 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.captures,0)
         with self.assertRaises(QueueError):
             j.inventory(limit=17)
+
+    def make_owner(self, *, durable=True):
+        owner=Owner(self.q,lambda q:self.make_runtime(),durable_actions=durable)
+        self.addCleanup(owner.close)
+        self.owner=owner.owner_id
+        self.seq=0
+        return owner
+
+    def test_owner_dispatch_correlated_no_legacy_fallback(self):
+        owner=self.make_owner()
+        def fail(**_):
+            self.fail("legacy enqueue invoked in durable mode")
+        owner.runtime.enqueue=fail
+        m=self.message()
+        reply=owner.action(m)
+        self.assertEqual(reply["disposition"],"REPORTED")
+        rid=reply["result"]["request"]["id"]
+        packet=owner.inventory(limit=16)
+        self.assertEqual(packet["kind"],"INVENTORY")
+        self.assertEqual(packet["owner_id"],owner.owner_id)
+        self.assertGreater(packet["sequence"],reply["sequence"])
+        self.assertEqual(packet["inventory"]["pending_request_id"],rid)
+        self.assertFalse(packet["inventory"]["startup_unlock"])
+        self.assertNotIn("inode",str(packet))
+        saved=owner.lookup_action(m["action_id"])
+        self.assertEqual(saved["record"]["result_request_id"],rid)
+        self.assertEqual(saved["record"]["message"],m)
+        self.assertEqual(self.captures,1)
+        with self.assertRaisesRegex(QueueError,"STALE_ACTION_SEQUENCE"):
+            owner.action(m)
+        self.assertIsNone(owner.lookup_action(str(uuid.uuid4()))["record"])
+
+    def test_owner_restart_recovery_no_legacy_downgrade(self):
+        owner=self.make_owner()
+        m=self.message()
+        reply=owner.action(m)
+        rid=reply["result"]["request"]["id"]
+        owner.close()
+        self.q=Queue(self.path)
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            Owner(self.q,lambda q:self.make_runtime())
+        next_owner=self.make_owner()
+        self.assertNotEqual(next_owner.owner_id,m["owner_id"])
+        self.assertEqual(next_owner.lookup_action(m["action_id"])["record"]["result_request_id"],rid)
+        with self.assertRaisesRegex(QueueError,"STALE_OR_INVALID_OWNER"):
+            next_owner.action(m)
+        self.assertEqual(self.captures,1)
+        self.assertEqual(next_owner.action(self.message("CANCEL",rid))["result"]["request"]["state"],"CANCELLED")
+        self.assertIsNone(self.q.pending())
+
+    def test_owner_capture_failure_blocks_mutation_after_restart(self):
+        owner=self.make_owner()
+        owner.runtime.capture_source=lambda:None
+        m=self.message()
+        self.assertEqual(owner.action(m)["disposition"],"UNKNOWN")
+        owner.close()
+        self.q=Queue(self.path)
+        next_owner=self.make_owner()
+        packet=next_owner.inventory(limit=1)
+        self.assertEqual(packet["inventory"]["prepared"]["message"],m)
+        self.assertEqual(next_owner.action(self.message())["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(self.captures,0)
+
+    def test_legacy_owner_detects_journal_created_after_open(self):
+        owner=self.make_owner(durable=False)
+        LocalActions(self.q)
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            owner.action(self.message())
+        self.assertEqual(self.captures,0)
+        self.assertIsNone(self.q.pending())
+
+    def test_owner_legacy_inventory_refused(self):
+        owner=self.make_owner(durable=False)
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            owner.inventory(limit=1)
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            owner.lookup_action(str(uuid.uuid4()))
 
 
 if __name__=="__main__":

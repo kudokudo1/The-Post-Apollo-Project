@@ -303,6 +303,18 @@ class PipeTests(unittest.TestCase):
         with self.assertRaises(QueueError):
             self.send(self.commit_frame(receipt))
 
+    def test_staged_pipe_bool_message_is_not_exact(self):
+        self.staged()
+        self.send(self.prepare_frame())
+        receipt=self.sent[-1]
+        frame=self.commit_frame(receipt)
+        frame["message"]=dict(frame["message"],version=True)
+        with self.assertRaises(QueueError):
+            self.send(frame)
+        self.assertTrue(self.session.closed)
+        self.assertIsNone(self.queue.pending())
+        self.assertEqual(self.captures,0)
+
     def test_staged_pipe_direct_action_and_legacy_prepare_refused(self):
         self.session.start()
         with self.assertRaisesRegex(QueueError,"STAGED_PIPE_MODE_REQUIRED"):

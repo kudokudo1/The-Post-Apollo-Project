@@ -13,6 +13,7 @@ import uuid
 
 from memory_adjustment_queue import QueueError, _int, _uuid
 from memory_queue_owner import MAX_SAFE
+from memory_queue_local_actions import validate as validate_local_action
 
 MAX_FRAME = 16384
 INPUT_CHUNK = 4096
@@ -199,7 +200,8 @@ class Session:
                     or obj["kind"] != "COMMIT_ACTION"
                     or type(obj["prepared_sequence"]) is not int
                     or obj["prepared_sequence"] != sequence
-                    or obj["challenge"] != challenge or obj["message"] != message):
+                    or obj["challenge"] != challenge
+                    or validate_local_action(obj["message"]) != message):
                 raise QueueError("STAGED_PIPE_MISMATCH")
             # Consume the receipt before the synchronous owner dispatch. A
             # lost commit reply cannot be retried, even in this generation.

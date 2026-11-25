@@ -132,6 +132,26 @@ try {
   assert.equal(run({action:"list"},race).revision,1);
   console.log("M10A_CHECK // PREOPEN_INODE_SWAP_REFUSED");
 
+  // Once fstat accepts a small regular file, another process may
+  // extend that inode before read. The reader must stop at MAX_BYTES+1.
+  const grow=path.join(root,"grow-on-read");
+  run(cmd(0,"small"),grow);
+  const grownFile=path.join(grow,"investigations.json");
+  const originalBytes=fs.readFileSync(grownFile);
+  let didGrow=false;
+  assert.throws(()=>withPatched("readSync",(real,args)=>{
+    if (!didGrow && args[2]===0 && args[3] >= 500001
+        && fs.fstatSync(args[0]).isFile()) {
+      didGrow=true;
+      fs.appendFileSync(grownFile,"x".repeat(550000));
+    }
+    return real.apply(fs,args);
+  },()=>run({action:"list"},grow)),when("STORE_LIMIT"));
+  assert.equal(didGrow,true);
+  fs.writeFileSync(grownFile,originalBytes);
+  assert.equal(run({action:"list"},grow).revision,1);
+  console.log("M10A_CHECK // GROWING_STORE_READ_BOUNDED");
+
   // A child must finish on one newline-terminated frame even when its
   // parent leaves stdin open. Unlike old readFileSync(0), this does not
   // wait for Quickshell to close the transport.

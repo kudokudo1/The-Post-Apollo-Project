@@ -209,6 +209,13 @@ Item {
         "AUTOMATION & SAFETY", "DIAGNOSTICS", "PROFILES"
     ]
     property int capSection: 0 // TARGET / ACTIONS / DETAILS
+    property string capDetailSubject: "SWAP"
+    readonly property var ramDetailRows: Snapshot.ramDetailRows(sample)
+    function selectCapDetailSubject(subject) {
+        if(page!=="CAP"||capSection!==2||!["RAM","SWAP"].includes(subject))return;
+        capDetailSubject=subject;
+        scroll.contentY=0;
+    }
     readonly property int menuIndex: CpuPlusDiagnostics.memoryMenuIndex
     readonly property string page: menus[menuIndex]
     function clearCapConfirmation() {
@@ -659,13 +666,89 @@ Item {
                 visible: root.page === "CAP" && root.capSection === 2
                 GohuText {
                     width: parent.width
-                    text: "DETAILS // LIVE SWAP DEVICES"
+                    text: "DETAILS // LIVE "+root.capDetailSubject
                     color: Colors.magenta
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
+                Row {
+                    width: parent.width
+                    spacing: 4
+                    Repeater {
+                        model: ["RAM","SWAP"]
+                        delegate: ActionButton {
+                            required property string modelData
+                            objectName: modelData==="RAM"?"cpuplusCapDetailRam":"cpuplusCapDetailSwap"
+                            width: Math.max(0,(parent.width-parent.spacing)/2)
+                            height: 28
+                            label: modelData
+                            selected: root.capDetailSubject===modelData
+                            available: root.page==="CAP"&&root.capSection===2
+                            acceptedButtons: Qt.LeftButton
+                            keyboardActivationSignal: "leftClicked"
+                            onLeftClicked: root.selectCapDetailSubject(modelData)
+                        }
+                    }
+                }
+                Column {
+                    objectName: "cpuplusCapRamDetails"
+                    width: parent.width
+                    spacing: 4
+                    visible: root.capDetailSubject==="RAM"
+                    GohuText {
+                        width: parent.width
+                        text: root.sample?"KERNEL USABLE RAM // "+root.gib(root.sample.total):"RAM SNAPSHOT UNAVAILABLE"
+                        color: Colors.cyan
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                    }
+                    Repeater {
+                        model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
+                        delegate: Column {
+                            required property var modelData
+                            width: parent.width
+                            spacing: 2
+                            GohuText {
+                                width: parent.width
+                                text: modelData.label+" // "+(modelData.value===null?"UNAVAILABLE":root.gib(modelData.value))
+                                color: modelData.value===null?Colors.orange:Colors.cyan
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            Rectangle {
+                                width: parent.width
+                                height: 9
+                                visible: modelData.fraction!==null
+                                color: Colors.black
+                                border.color: Colors.cyan
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 1
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: Math.max(0,parent.width-2)*(modelData.fraction===null?0:modelData.fraction)
+                                    height: parent.height-2
+                                    color: Colors.cyan
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: root.sample?"PSI AVG10 // SOME "+root.sample.some+"% / FULL "+root.sample.full+"%":"PSI UNAVAILABLE"
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "INDEPENDENT KERNEL COUNTERS // OVERLAP; DO NOT ADD. AVAILABLE IS AN ESTIMATE, NOT FREE RAM. NO DIMM ATTRIBUTION."
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                }
                 Repeater {
-                    model: root.page === "CAP" && root.capSection === 2 && root.sample ? root.sample.rows : []
+                    model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.sample ? root.sample.rows : []
                     delegate: GohuText {
                         required property var modelData
                         width: parent.width

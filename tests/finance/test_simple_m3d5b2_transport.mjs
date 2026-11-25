@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {spawnSync} from "node:child_process";
+import {spawn,spawnSync} from "node:child_process";
 import {mkdtemp,rm,readFile,readdir,writeFile,chmod,mkdir,symlink,stat}
   from "node:fs/promises";
 import {tmpdir} from "node:os";
@@ -65,6 +65,7 @@ test("fixed stdout grammar never infers a successful write from exit status",()=
     {state:"uncertain",canRetry:false});
   assert.deepEqual(parse({stdout:"FINANCEW_CATEGORIZED_EXPENSE_RESULT blocked:recovery-needed\n",exitCode:1}),
     {state:"blocked",canRetry:false,reason:"recovery-needed"});
+  assert.equal(parse({stdout:"FINANCEW_CATEGORIZED_EXPENSE_RESULT blocked:recovery-needed\n",exitCode:0}).state,"uncertain");
   for(const stdout of [
     "FINANCEW_CATEGORIZED_EXPENSE_RESULT committed\n".repeat(2),
     "error: sync-id=test\n",
@@ -93,6 +94,8 @@ test("durable intent survives process exit; same ID or same transaction refused 
     assert.equal(same.reason,"replay-or-duplicate-intent");
     const newIdSameIntent=childAttempt(root,cmd("c".repeat(32)));
     assert.equal(newIdSameIntent.reason,"replay-or-duplicate-intent");
+    const sameIdOtherAmount=childAttempt(root,cmd("a".repeat(32),-1550));
+    assert.equal(sameIdOtherAmount.reason,"replay-or-duplicate-intent");
     const newExpense=childAttempt(root,cmd("d".repeat(32),-1550));
     assert.equal(newExpense.ok,true);
     names=await readdir(directory);
@@ -143,4 +146,54 @@ test("existing reservation lock prevents concurrent or restarted admission",asyn
       "reservation-locked-recovery-required");
     assert.deepEqual((await readdir(dir)),[".reservation-lock"]);
   });
+});
+
+function childAttemptAsync(root,command){
+  return new Promise((resolve,reject)=>{
+    const env={...process.env,HOME:root,FINANCEW_DISPOSABLE_TEST:"yes"};
+    const proc=spawn(process.execPath,[child],{env,stdio:["pipe","pipe","pipe"]});
+    let stdout="",stderr="";
+    proc.stdout.on("data",chunk=>stdout+=chunk);
+    proc.stderr.on("data",chunk=>stderr+=chunk);
+    proc.on("error",reject);
+    proc.on("close",code=>{
+      if(code!==0 || stderr)return reject(Error(stderr||"child exit "+code));
+      try{resolve(JSON.parse(stdout));}catch(e){reject(e);}
+    });
+    proc.stdin.end(JSON.stringify({sandboxRoot:root,command})+"\n");
+  });
+}
+test("two truly concurrent separate processes admit at most one identical intent",async()=>{
+  await fixture(async root=>{
+    const [a,b]=await Promise.all([
+      childAttemptAsync(root,cmd()),
+      childAttemptAsync(root,cmd())
+    ]);
+    assert.equal([a,b].filter(x=>x.ok).length,1,JSON.stringify([a,b]));
+    assert.equal([a,b].filter(x=>!x.ok).length,1);
+    assert.ok([a,b].some(x=>[
+      "reservation-locked-recovery-required",
+      "replay-or-duplicate-intent"
+    ].includes(x.reason)));
+    assert.equal((await readdir(join(root,"reservations"))).length,1);
+  });
+});
+test("symlinked and world-readable sealed receipts never count as trusted",async()=>{
+  for(const kind of ["symlink","world-readable"]){
+    await fixture(async root=>{
+      const first=childAttempt(root,cmd());
+      assert.equal(first.ok,true);
+      const receipt=join(root,"reservations","intent-"+first.fingerprint+".json");
+      if(kind==="symlink"){
+        const original=await readFile(receipt,"utf8");
+        await rm(receipt);
+        await writeFile(join(root,"outside"),original,{mode:0o600});
+        await symlink(join(root,"outside"),receipt);
+      }else await chmod(receipt,0o644);
+      const second=childAttempt(root,cmd("c".repeat(32),-1550));
+      assert.equal(second.reason,"untrusted-reservation-entry");
+      assert.ok((await readdir(join(root,"reservations"))).includes(
+        ".reservation-lock"));
+    });
+  }
 });

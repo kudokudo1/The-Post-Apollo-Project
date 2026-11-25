@@ -16,6 +16,41 @@ Column {
     property Item footerTarget: null
     property string lookupText: ""
     signal recoveryReadRequested(string kind, var value)
+    property var reviewContext: null
+    property var reviewGeneration: null
+    property bool reviewAvailable: false
+    property string receiptLookup: ""
+    property var confirmation: null
+    signal reviewRequested(string actionId)
+    signal acknowledgmentRequested(var selection, var generation)
+    signal reviewReceiptRequested(string reviewId)
+    readonly property var reviewEvidence: reviewContext ? Recovery.reviewEvidence(reviewContext.review) : null
+    readonly property var reviewReceipt: reviewContext ? Recovery.reviewReceipt(reviewContext.receipt) : null
+    readonly property var currentSelection: Recovery.reviewSelection(reviewContext,reviewGeneration)
+    readonly property string unknownReviewId: reviewContext && Recovery.uuid(reviewContext.unknownReviewId) ? reviewContext.unknownReviewId : ""
+    readonly property string effectiveReceiptId: unknownReviewId || receiptLookup
+    function beginReview() {
+        if(visible && atomicMode && reviewAvailable && !unknownReviewId && Recovery.uuid(lookupText))
+            reviewRequested(lookupText);
+    }
+    function prepareAcknowledgment() {
+        if(visible && atomicMode && currentSelection && !confirmation)
+            confirmation=Object.assign({},currentSelection);
+    }
+    function confirmAcknowledgment() {
+        const frozen=confirmation;
+        confirmation=null;
+        if(visible && atomicMode && Recovery.sameSelection(currentSelection,frozen))
+            acknowledgmentRequested(frozen,frozen.generation);
+    }
+    function lookupReceipt() {
+        if(visible && atomicMode && reviewAvailable && Recovery.uuid(effectiveReceiptId))
+            reviewReceiptRequested(effectiveReceiptId);
+    }
+    onCurrentSelectionChanged: if(!Recovery.sameSelection(currentSelection,confirmation)) confirmation=null
+    onVisibleChanged: if(!visible) confirmation=null
+    onAtomicModeChanged: if(!atomicMode) confirmation=null
+
     readonly property var snapshot: atomicMode ? Recovery.context(recoveryContext) : null
     readonly property var effectiveHost: atomicMode ? (snapshot ? snapshot.host : null) : hostStatus
     readonly property var view: atomicMode ? (snapshot ? snapshot.inventory : null) : Recovery.project(inventory)
@@ -173,9 +208,140 @@ Column {
             }
         }
     }
+    Column {
+        width: parent.width
+        spacing: 4
+        visible: root.atomicMode
+        GohuText {
+            width: parent.width
+            text: "RECOVERY REVIEW // "+(root.reviewContext ? root.reviewContext.phase : "UNAVAILABLE")
+                +(root.unknownReviewId?"\nACK OUTCOME UNKNOWN // "+root.unknownReviewId+"\nLOOK UP RECEIPT; DO NOT REPEAT ACK":"")
+            color: Colors.orange
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WrapAnywhere
+        }
+        ActionButton {
+            objectName: "cpuplusRecoveryReviewRequest"
+            width: parent.width
+            height: 28
+            label: "REVIEW ACTION UUID"
+            available: root.reviewAvailable && !root.unknownReviewId && Recovery.uuid(root.lookupText)
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            onLeftClicked: root.beginReview()
+        }
+        GohuText {
+            width: parent.width
+            visible: root.reviewEvidence!==null
+            text: root.reviewEvidence ? "REVIEW // "+root.reviewEvidence.reviewId
+                +"\nACTION // "+root.reviewEvidence.action.actionId
+                +"\n"+root.reviewEvidence.action.kind+" // "+root.reviewEvidence.action.state
+                +"\nTARGET // "+(root.reviewEvidence.action.target===null?"N/A":root.reviewEvidence.action.target+" GiB")
+                +"\nEXPECTED // "+(root.reviewEvidence.action.expectedId||"NEW REQUEST")
+                +"\nRESULT // "+(root.reviewEvidence.action.resultId||"NOT RECORDED")
+                +"\nPREPARED // "+Recovery.utc(root.reviewEvidence.action.preparedAt)
+                +"\nCOMMITTED // "+(root.reviewEvidence.action.committedAt===null?"NOT RECORDED":Recovery.utc(root.reviewEvidence.action.committedAt))
+                +"\nPENDING // "+(root.reviewEvidence.pendingId||"NONE REPORTED")
+                +"\nDIGEST // "+root.reviewEvidence.digest
+                +"\nHOST MAY EXPIRE OR REFUSE REVIEW; NO EXECUTION AUTHORITY":""
+            color: Colors.cyan
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WrapAnywhere
+        }
+        ActionButton {
+            objectName: "cpuplusRecoveryAckPrepare"
+            width: parent.width
+            height: 28
+            label: "ACKNOWLEDGE REVIEW"
+            visible: root.confirmation===null
+            available: root.currentSelection!==null
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            onLeftClicked: root.prepareAcknowledgment()
+        }
+        GohuText {
+            width: parent.width
+            visible: root.confirmation!==null
+            text: "CONFIRM REVIEW ONLY // DOES NOT CLEAR UNRESOLVED STATE, RELEASE PREPARED OR UNLOCK EXECUTION"
+            color: Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        Row {
+            width: parent.width
+            spacing: 3
+            visible: root.confirmation!==null
+            ActionButton {
+                objectName: "cpuplusRecoveryAckConfirm"
+                width: Math.max(0,(parent.width-parent.spacing)/2)
+                height: 28
+                label: "CONFIRM"
+                available: Recovery.sameSelection(root.currentSelection,root.confirmation)
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: root.confirmAcknowledgment()
+            }
+            ActionButton {
+                width: Math.max(0,(parent.width-parent.spacing)/2)
+                height: 28
+                objectName: "cpuplusRecoveryAckCancel"
+                label: "CANCEL"
+                acceptedButtons: Qt.LeftButton
+                keyboardActivationSignal: "leftClicked"
+                onLeftClicked: root.confirmation=null
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: "REVIEW UUID // HISTORICAL RECEIPT LOOKUP"
+            color: Colors.cyan
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        Rectangle {
+            width: parent.width
+            height: 27
+            color: Colors.black
+            border.width: 1
+            border.color: Colors.cyan
+            TextInput {
+                anchors.fill: parent
+                anchors.margins: 4
+                color: Colors.white
+                font.pixelSize: 10
+                maximumLength: 36
+                clip: true
+                readOnly: !!root.unknownReviewId
+                text: root.effectiveReceiptId
+                onTextEdited: root.receiptLookup=text
+            }
+        }
+        ActionButton {
+            objectName: "cpuplusRecoveryReceiptLookup"
+            width: parent.width
+            height: 28
+            label: "LOOK UP RECEIPT"
+            available: root.reviewAvailable && Recovery.uuid(root.effectiveReceiptId)
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            onLeftClicked: root.lookupReceipt()
+        }
+        GohuText {
+            width: parent.width
+            text: root.reviewReceipt ? "HISTORICAL RECEIPT // REVIEW ACKNOWLEDGED ONLY\nREVIEW // "+root.reviewReceipt.reviewId
+                +"\nACTION // "+root.reviewReceipt.action.actionId+"\nADJUSTMENT OUTCOME UNVERIFIED"
+                : "NO RECEIPT DISPLAYED // NOT PROOF OF NONCOMMIT"
+            color: Colors.orange
+            font.pixelSize: 10
+            textFormat: Text.PlainText
+            wrapMode: Text.WrapAnywhere
+        }
+    }
     GohuText {
         width: parent.width
-        text: "ADJUSTMENT OUTCOME // UNVERIFIED\nLocal commit records queue intent only. Missing records do not establish noncommit. No retry, unlock or acknowledgment is available."
+        text: "ADJUSTMENT OUTCOME // UNVERIFIED\nLocal commit records queue intent only. Missing records do not establish noncommit. No retry or unlock is available."
         color: Colors.orange
         font.pixelSize: 10
         wrapMode: Text.Wrap

@@ -115,3 +115,101 @@ Nurse2F: independent scope review of M7e-a and exact M7e-b public-only
 fixture proposal; #2777 exact-head independent review remains separate.
 No schema/wire/API freeze, permission, store, cache change, execution,
 merge or host mutation. Production HOLD.
+
+## M7e-a1 // Exact public fixture framing proposal
+
+Current main b57277b1; #2760/#2777/#2782 merged. Nurse2F #7169708460
+conditionally accepts M7e-b subject to Heart compatibility and agreed
+commitment framing. DOC2F #7169557223 and DOC3F #7169645854 accepted
+the composition architecture. This section proposes an exact encoding
+for review, not an implemented protocol or an authorization.
+
+### Candidate and limits
+
+One fixed-public base-Tree task, no Clone and no capability plan.
+Construct the M2 selection using literal public HistoryTurn values and
+the actual select_history function, never query a journal/body in this
+slice. Independently held current owner reference must match the entire
+SessionContextRef, route and version selection including intended
+recipient. Retain exact ordered history and M7a reference separately;
+no fabricated roles, no body loader, no cache admission. The M7d-b
+public fixture provenance model can be reused as metadata; never
+treat a caller-supplied assembled fragment alone as verified provenance.
+Recompute the M7a reference from already supplied selected fixed-public
+records only, verifying their exact ordered version commitments first.
+Check currentness again before returning the candidate.
+
+Validate existing B2 message roles, 1–16 messages, each <=4096 UTF-8
+content bytes and final user turn. Require the existing M7a limits
+(32 records, 4096 bytes/record, 16384 bytes with reference framing).
+Combined ceiling is 16384 bytes for sum of original history content
+plus exact reference fragment UTF-8 bytes. Do not count transport JSON
+escaping as content bytes or claim it is a rendered prompt. No automatic
+history reduction within this slice, no truncation, no partial output.
+Empty reference: exact M2 role/content passthrough is only shape
+compatibility, not permission to send. Nonempty reference: transport
+projection absent, fixed RELEASE_HOLD, even if it fits.
+
+### Proposed domain-separated commitment v1
+
+Owner-local fixed-public fixture only. SHA-256 of the ASCII bytes
+"FOREST-M7E-PUBLIC-WORKLOAD-V1" followed by a single zero byte, then
+the encoding below. No normalization, trimming, map iteration order,
+implicit defaults, floating point or arbitrary objects. Every string
+is strict UTF-8 preceded by its unsigned 32-bit big-endian byte length.
+Every integer is unsigned 64-bit big-endian; exact bool is one byte
+0 or 1, never an integer substitute. Every tuple is prefixed by an
+unsigned 32-bit big-endian element count. Optional clone field is
+a one-byte presence marker, then string if present (must be absent
+in this fixture). Hash raw 32-byte digest fields after strict
+lowercase 64-hex validation; no hex text ambiguity. Reject invalid
+values before encoding; do not emit the encoded data or digest
+outside the isolated fixture.
+
+Encode in this exact order:
+1. TaskContext: principal_key, tree_key, optional clone_key, task_id,
+   execution_context_id, generation, origin.
+2. SessionContextRef: session_id, expected_revision, user_turn_id.
+3. Route: input_generation, policy_generation, user_context_generation,
+   operational_generation, user_record_ids tuple, operational_record_ids
+   tuple. TaskContext already bound once; require route context equality.
+4. Source, purpose, recipient strings; exact selected Version tuple in
+   user-then-operational route order. Each version: source, record_id,
+   kind, revision, record_generation, commitment, active. Version source
+   must equal pinned source. Exact version, not domain snapshot clock.
+5. M2 omitted_prefix_count; ordered history tuple. Each HistoryTurn:
+   turn_id, ordinal, role, content, provider, model, recorded_at_ms.
+   This includes internal provenance, not B2 transport fields.
+6. Exact M7a reference_text string (empty only with empty selection),
+   declared combined byte ceiling, actual history content byte count,
+   actual reference byte count, actual combined content byte count.
+
+Fixed public string/ID bounds use existing M2/M7a and M7d-b fixture
+validation; refuse noncanonical or inconsistent values. Counts computed
+from verified immutable candidate, not user assertions. No digest is
+used for authorization; no private-data digest disclosure. Require
+deterministic exact repeat, changes to any one field alter the
+commitment, ambiguous concatenation pairs differ, Unicode content
+counts bytes not characters, stale independently held scope refuses
+before composition, all selected commitments checked, and no mutation
+of source objects or cache. A fixture golden vector is required on
+implementation after scope approval, plus independently constructed
+framing cross-check. This is intentionally not a B2 JSON serializer.
+
+### Heart and Runtime compatibility decision requested
+
+History bytes, reference bytes, combined bytes and owner-local workload
+digest describe only this candidate. Runtime separately owns final
+serialized HTTP bytes/length/digest at the actual request seam,
+including any approved future representation and settings. Heart
+separately owns exact model/tokenizer/template/version, rendered prompt
+tokens including framing/special tokens, reserved output, overhead,
+independent incremental demand and admission. No inferred token fit,
+native eligibility or released memory; H13 initial trial remains
+empty-reference fixed public prompt, independent operator approval.
+
+DOC1F: explicit ACCEPT/REVISE candidate byte/token/overhead distinction
+and above framing. DOC2F/DOC3F: ACCEPT/REVISE exact framing and scope;
+Nurse2F: confirm conditional scope closed on exact owner agreement.
+No executable change before agreement, no new cache/serializer/store,
+real source, provider request, or positive authority.

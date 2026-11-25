@@ -5,6 +5,8 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
+import stat
 from pathlib import Path
 import sys
 
@@ -13,6 +15,8 @@ MARKER = Path("/etc/postapollo-memory-native-extfence-ci-only")
 GUARD = Path("/usr/local/libexec/postapollo-memory-ci-fault.py")
 FENCE = Path("/var/lib/post-apollo-memory-reclaim")
 WITNESS = Path("/var/lib/postapollo-memory-native-extfence-witness.json")
+ARCHIVE = Path("/var/lib/postapollo-memory-native-reclaim-archive.json")
+PREPARED = FENCE / "prepared.json"
 COMMANDS = (("add","4"),("add-authorized","4"),("persist-authorized",),
             ("expand-authorized","8"),("withdraw-authorized","4"),
             ("reactivate-authorized","8"),("archive-cycle-authorized",),
@@ -58,16 +62,20 @@ def sync_parent():
 def signature(guard):
     return {p: [k,s,pr] for p,(k,s,u,pr) in guard.rows().items()}
 
-def fence_identity():
+def fence_identity(guard, prepared=None):
     info = FENCE.lstat()
     require(info.st_uid == 0 and info.st_mode & 0o777 == 0o700
-            and FENCE.is_dir() and not FENCE.is_symlink() and not list(FENCE.iterdir()),
-            "fixture fence identity mismatch")
+            and stat.S_ISDIR(info.st_mode), "fixture fence identity mismatch")
+    names = {p.name for p in FENCE.iterdir()}
+    require(names == (set() if prepared is None else {PREPARED.name}),
+            "fixture fence contents mismatch")
+    if prepared is not None:
+        require(guard.protected_bytes(PREPARED) == prepared, "prepared record changed")
     return [info.st_dev,info.st_ino]
 
-def verify_refusal(guard):
+def verify_refusal(guard, prepared=None):
     before = signature(guard)
-    original = fence_identity()
+    original = fence_identity(guard, prepared)
     for args in COMMANDS:
         result = guard.helper(*args)
         prefix = "REDUCTION RECOVERY: "
@@ -75,22 +83,22 @@ def verify_refusal(guard):
         require(result.returncode == 3 and len(records) == 1
                 and json.loads(records[0][len(prefix):])["code"] == "RECLAIM_RECOVERY_REQUIRED",
                 "entrypoint not fenced: " + args[0])
-        require(signature(guard) == before and fence_identity() == original,
+        require(signature(guard) == before and fence_identity(guard, prepared) == original,
                 "fenced invocation changed kernel or fence")
     print("CPU_MEM_EXTFENCE_STAGE // EIGHT_PROTECTED_ENTRYPOINTS_REFUSED", flush=True)
 
 def fresh(guard):
-    require(not any(os.path.lexists(p) for p in (FENCE,WITNESS,guard.BASE.parent,guard.EXT,guard.HISTORY)),
+    require(not any(os.path.lexists(p) for p in (FENCE,WITNESS,ARCHIVE,guard.BASE.parent,guard.EXT,guard.HISTORY)),
             "not fresh guest")
     FENCE.mkdir(mode=0o700)
     sync_parent()
-    original = fence_identity()
+    original = fence_identity(guard)
     verify_refusal(guard)
     require(not any(os.path.lexists(p) for p in (guard.BASE.parent,guard.EXT,guard.HISTORY)),
             "managed path created despite fence")
     # Only fixture-created empty marker is removed, before managed swap
     # exists. This is NOT an authorized production clearance path.
-    require(fence_identity() == original, "fixture marker replaced")
+    require(fence_identity(guard) == original, "fixture marker replaced")
     FENCE.rmdir()
     sync_parent()
     print("CPU_MEM_EXTFENCE_PASS // ABSENT_EXTENSION_ALL_ENTRYPOINTS_BLOCKED", flush=True)
@@ -115,11 +123,107 @@ def check_pair(intent, outcome, boot):
                                           "intentDigest": canonical_digest(intent)},
             "independent boot or full intent digest mismatch")
 
+def canonical_bytes(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("ascii") + b"\n"
+
+def sync_dir(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+def write_once(guard, path, data):
+    require(type(data) is bytes and 0 < len(data) <= 131072, "fixture record size")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        require(stream.write(data) == len(data), "fixture short write")
+        stream.flush()
+        os.fsync(stream.fileno())
+    sync_dir(path.parent)
+    require(guard.protected_bytes(path) == data, "fixture record readback mismatch")
+
+def observe_archive(guard, module):
+    # Called only by the guarded offline guest under the actual helper lock.
+    # Never accepts a user path or caller-supplied positive precondition.
+    require(module._mutation_fd is not None, "helper lock absent")
+    module.check_external_reclaim_fence()
+    module.check_extension_boot_policy()
+    boot = module.current_boot_id()
+    require(boot == guard.boot_id(), "boot disagreement")
+    identity = module.extension_identity()
+    require({p.name for p in guard.EXT.iterdir()} ==
+            {"swapfile", "withdrawal.json", "withdrawal-result.json"}, "unexpected extension contents")
+    mount, fs = module.mount_info()
+    require(fs == "btrfs", "not Btrfs")
+    devices = module.run("/usr/bin/btrfs", "filesystem", "show", "--raw", mount)
+    require(re.findall(r"Total devices\s+(\d+)\b", devices) == ["1"], "not single-device Btrfs")
+    def rootid(path):
+        value = module.run("/usr/bin/btrfs", "inspect-internal", "rootid", str(path)).strip()
+        require(re.fullmatch(r"[1-9][0-9]*", value) is not None, "subvolume identity unavailable")
+        return int(value)
+    extroot = rootid(guard.EXT)
+    require(guard.EXT.lstat().st_ino == 256 and rootid(guard.EXTRA) == extroot
+            and rootid(guard.BASE) != extroot, "extension subvolume mismatch")
+    snapshot = module.read_reduction_snapshot()
+    for path, row in snapshot["rows"].items():
+        if row["kind"] == "file":
+            info = os.stat(path)
+            require(stat.S_ISREG(info.st_mode)
+                    and (info.st_dev, info.st_ino) != tuple(identity[3][:2]), "active file alias")
+    paths = [guard.EXT / name for name in guard.RECORD_NAMES[:2]]
+    raw = [guard.protected_bytes(path) for path in paths]
+    require(all(len(item) <= 16384 for item in raw), "oversized withdrawal record")
+    intent, outcome = [module.read_protected_record(path) for path in paths]
+    require([json.loads(item) for item in raw] == [intent, outcome], "record read mismatch")
+    check_pair(intent, outcome, boot)
+    expected = {"version": 1, "boot_id": boot,
+                "withdrawal_digest": canonical_digest([intent, outcome])}
+    require(module.withdrawal_boot_witness(intent, outcome, identity, snapshot, boot) == expected,
+            "actual inactive witness unavailable")
+    require(module.current_boot_id() == boot and module.extension_identity() == identity
+            and [guard.protected_bytes(path) for path in paths] == raw, "observation changed")
+    return {"version": 1, "state": "DISPOSABLE_ARCHIVE", "candidate_blob": PIN,
+            "boot_id": boot, "identity": [list(row) for row in identity], "subvolume_id": extroot,
+            "withdrawal_witness": expected, "records_hex": [item.hex() for item in raw],
+            "swap": {p:[row["kind"],row["sizeKiB"],row["priority"]]
+                     for p,row in snapshot["rows"].items()}, "can_execute": False}
+
+def publish_archive_and_fence(guard, module):
+    # Test fixture only. The archive is a fixed sibling outside the extension.
+    # Publish it before the actual helper's external fence, under its real lock.
+    with module.mutation_lock(inspection=True):
+        observed = observe_archive(guard, module)
+        archive = canonical_bytes(observed)
+        write_once(guard, ARCHIVE, archive)
+        fd = os.open(ARCHIVE, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        sync_dir(ARCHIVE.parent)
+        require(guard.protected_bytes(ARCHIVE) == archive
+                and observe_archive(guard, module) == observed, "archive or live evidence changed")
+        print("CPU_MEM_EXTFENCE_PASS // REAL_ARCHIVE_BEFORE_FENCE", flush=True)
+        FENCE.mkdir(mode=0o700)
+        sync_parent()
+        prepared = canonical_bytes({"version":1, "state":"PREPARED_FIXTURE",
+                                    "archive_sha256":hashlib.sha256(archive).hexdigest(),
+                                    "boot_id":observed["boot_id"],
+                                    "can_execute":False, "can_clear":False})
+        write_once(guard, PREPARED, prepared)
+        require(guard.protected_bytes(ARCHIVE) == archive, "archive changed after fence")
+        fence_identity(guard, prepared)
+        print("CPU_MEM_EXTFENCE_PASS // REAL_PREPARED_UNDER_HELPER_LOCK", flush=True)
+    return hashlib.sha256(archive).hexdigest(), prepared
+
 def prepare(guard):
     guard.verify_swap(True)
     history = guard.history()
     require(len(history) == 2 and not os.path.lexists(FENCE)
-            and not os.path.lexists(WITNESS), "normal-cycle evidence missing")
+            and not os.path.lexists(WITNESS) and not os.path.lexists(ARCHIVE),
+            "normal-cycle evidence missing")
     module = load_candidate(guard)
     boot = guard.boot_id()
     # Both real normal cycles have already completed and archived.
@@ -168,13 +272,13 @@ def prepare(guard):
     print("CPU_MEM_EXTFENCE_PASS // LEGACY_AND_MALFORMED_WITNESS_REFUSED", flush=True)
     records = [guard.digest_file(p) for p in paths]
     identities = [guard.identity(guard.BASE),guard.identity(guard.EXTRA)]
-    FENCE.mkdir(mode=0o700)
-    sync_parent()
-    verify_refusal(guard)
-    require(guard.history() == history and [guard.digest_file(p) for p in paths] == records,
-            "fenced invocation altered records")
-    witness = {"boot":guard.boot_id(),"identity":identities,"fence":fence_identity(),
-               "history":history,"records":records,"swap":signature(guard)}
+    archive_sha, prepared = publish_archive_and_fence(guard, module)
+    verify_refusal(guard, prepared)
+    require(guard.history() == history and [guard.digest_file(p) for p in paths] == records
+            and guard.digest_file(ARCHIVE) == archive_sha, "fenced invocation altered records")
+    witness = {"boot":guard.boot_id(),"identity":identities,"fence":fence_identity(guard, prepared),
+               "history":history,"records":records,"swap":signature(guard),
+               "archive":archive_sha,"prepared":prepared.decode("ascii")}
     fd = os.open(WITNESS,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,"w") as stream:
         json.dump(witness,stream,sort_keys=True)
@@ -199,8 +303,19 @@ def after_reboot(guard):
             module.read_reduction_snapshot(), current_boot) is None,
             "prior boot witness accepted")
     print("CPU_MEM_EXTFENCE_PASS // PRIOR_BOOT_WITNESS_REFUSED", flush=True)
+    prepared = witness["prepared"].encode("ascii")
+    archive = guard.protected_bytes(ARCHIVE)
+    require(hashlib.sha256(archive).hexdigest() == witness["archive"], "archive changed across reboot")
+    bundle = json.loads(archive)
+    require(bundle["boot_id"] == witness["boot"] and bundle["candidate_blob"] == PIN
+            and bundle["can_execute"] is False and bundle["records_hex"] ==
+            [guard.protected_bytes(guard.EXT / name).hex() for name in guard.RECORD_NAMES[:2]],
+            "archived original record mismatch")
+    require(prepared == canonical_bytes({"version":1,"state":"PREPARED_FIXTURE",
+            "archive_sha256":witness["archive"],"boot_id":witness["boot"],
+            "can_execute":False,"can_clear":False}), "prepared binding mismatch")
     actual = {"identity":[guard.identity(guard.BASE)[1:],guard.identity(guard.EXTRA)[1:]],
-              "fence_inode":fence_identity()[1],"swap":signature(guard)}
+              "fence_inode":fence_identity(guard, prepared)[1],"swap":signature(guard)}
     expected = {"identity":[row[1:] for row in witness["identity"]],
                 "fence_inode":witness["fence"][1],"swap":witness["swap"]}
     # Dedicated offline guest only. Report fixed fixture metadata, not swap
@@ -212,7 +327,9 @@ def after_reboot(guard):
     require(actual["identity"]==expected["identity"],"managed file inode or size changed after reboot")
     require(actual["fence_inode"]==expected["fence_inode"],"external fence inode changed after reboot")
     require(actual["swap"]==expected["swap"],"active swap composition changed after reboot")
-    verify_refusal(guard)
+    verify_refusal(guard, prepared)
+    require(guard.digest_file(ARCHIVE) == witness["archive"], "archive changed during refusals")
+    print("CPU_MEM_EXTFENCE_PASS // REAL_ARCHIVE_AND_PREPARED_RETAINED", flush=True)
     require(guard.history()==witness["history"]
             and [guard.digest_file(guard.EXT / name) for name in guard.RECORD_NAMES[:2]]
             == witness["records"] and signature(guard)==witness["swap"],

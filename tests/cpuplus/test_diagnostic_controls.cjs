@@ -180,3 +180,30 @@ assert.equal(hostView([pairedFirst]).hostContext.delta,null);
 assert.match(ui,/objectName: "cpuplusDiagHostInstrument"/);
 assert.match(ui,/OBSERVED SAMPLES ONLY \/\/ CORRELATION, NOT CAUSE/);
 console.log("CPU++ M10 host RAM instrument projection PASS");
+
+// Runtime capture, fixed parent sampler and stable mode interval projection.
+assert.deepEqual(args("appcontrol").slice(-7),["--parent-quickshell","--duration","30","--interval","1","--top","4"]);
+const acModes=[{tsMs:1000,mode:"closed"},{tsMs:2000,mode:"app"},{tsMs:3500,mode:"kill"}];
+const acStages=["graph-invalidation","mode-restore","selection","probe-schedule","refresh-dispatch","focus","handler-total"];
+const acOpen=acStages.map((stage,i)=>({stage,sequence:1,tsMs:2100+i,elapsedMs:i===6?6:1}));
+const acRows=[{event:"start",pid:123,tsMs:1000,durationSeconds:30},
+    ...[2000,3000,4000,5000].map((tsMs,i)=>({event:"threads",pid:123,tsMs,sampleIntervalMs:1000,totalCpuPct:50+i*10,main:{tid:123,cpuPct:25+i*5}})),
+    {event:"complete",pid:123,tsMs:5000}];
+const ac=policy.combineAppControl(jsonl(acRows),acModes,acOpen,false);
+assert.ok(ac);
+const acMetrics=policy.appControlMetrics(ac);
+assert.equal(acMetrics.all.count,4);
+assert.equal(acMetrics.app.count,1);
+assert.equal(acMetrics.kill.count,1);
+assert.equal(acMetrics.openings,1);
+assert.match(policy.summarize("appcontrol",ac),/OPENINGS \/\/ 1/);
+assert.equal(policy.combineAppControl(jsonl(acRows),acModes,acOpen,true),null);
+assert.equal(policy.combineAppControl(jsonl(acRows.slice(0,-1)),acModes,acOpen,false),null);
+assert.equal(policy.combineAppControl(jsonl(acRows.map((row,i)=>i===1?{...row,pid:124}:row)),acModes,acOpen,false),null);
+assert.match(ui,/APPCONTROL \/\/ TEST 30s/);
+assert.match(owner,/appControlCaptureActive: busy && kind === "appcontrol"/);
+assert.match(read("shell.qml"),/diagnosticCaptureActive: CpuPlusDiagnostics.appControlCaptureActive/);
+const acReport={kind:"appcontrol",id:"session-abc-def-1",status:"COMPLETE",text:ac,finishedAt:"2026-11-24T12:00:00.000Z"};
+const acComp=comparePolicy.compare(acReport,{...acReport,id:"session-abc-def-2",finishedAt:"2026-11-24T12:01:00.000Z"},policy.summarize,policy.appControlMetrics);
+assert.equal(acComp.error,"");
+assert.equal(acComp.rows.find(row=>row.label==="KILL TOTAL CPU").delta,0);

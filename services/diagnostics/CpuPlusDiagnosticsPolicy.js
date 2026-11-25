@@ -20,7 +20,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol"].indexOf(kind) >= 0;
 }
 
 function validReportId(id) {
@@ -33,7 +33,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -77,6 +77,9 @@ function argumentsFor(kind, resolvePath, dataDir) {
     if (kind === "census")
         return prefix.concat([resolvePath("scripts/cpuplus_process_census.py"),
                              "--duration", "30", "--interval", "10"]);
+    if (kind === "appcontrol")
+        return prefix.concat([resolvePath("scripts/syntagma_quickshell_thread_sampler.py"),
+                             "--parent-quickshell", "--duration", "30", "--interval", "1", "--top", "4"]);
     if (kind === "threads")
         return prefix.concat([resolvePath("scripts/syntagma_quickshell_thread_sampler.py"),
                              "--duration", "30", "--interval", "1", "--top", "4"]);
@@ -126,8 +129,91 @@ function hostMemorySummary(rows) {
     return summary+"\nCORRELATION ONLY // CAUSE NOT ESTABLISHED";
 }
 
+// Bounded numeric opening markers plus the existing external thread sampler.
+function combineAppControl(raw, modes, openings, overflow) {
+    if (overflow || typeof raw !== "string" || raw.length > 65536) return null;
+    try {
+        const rows = raw.trim().split("\n").map(line => JSON.parse(line));
+        const start = rows.shift(), end = rows.pop();
+        if (!start || !end || start.event !== "start" || end.event !== "complete"
+                || start.pid !== end.pid || start.durationSeconds !== 30
+                || rows.some(row => row.event !== "threads" || row.pid !== start.pid
+                    || !row.main || row.main.tid !== start.pid)) return null;
+        const doc = {schema:"post-apollo-appcontrol-diagnostic-v1",pid:start.pid,
+            startMs:start.tsMs,endMs:end.tsMs,modes:modes,openings:openings,
+            samples:rows.map(row=>({tsMs:row.tsMs,intervalMs:row.sampleIntervalMs,
+                total:row.totalCpuPct,main:row.main.cpuPct}))};
+        const text = JSON.stringify(doc);
+        return appControlMetrics(text) ? text : null;
+    } catch (error) { return null; }
+}
+function appControlMetrics(text) {
+    try {
+        const d = JSON.parse(text);
+        const stamp = n => Number.isSafeInteger(n) && n >= 0;
+        const stages = ["graph-invalidation","mode-restore","selection","probe-schedule",
+            "refresh-dispatch","focus","handler-total"];
+        if (!d || d.schema !== "post-apollo-appcontrol-diagnostic-v1"
+                || !Number.isSafeInteger(d.pid) || d.pid <= 1
+                || !stamp(d.startMs) || !stamp(d.endMs) || d.endMs < d.startMs
+                || !Array.isArray(d.samples) || d.samples.length < 1 || d.samples.length > 32
+                || !Array.isArray(d.modes) || !d.modes.length || d.modes.length > 128
+                || !Array.isArray(d.openings) || d.openings.length > 140
+                || d.modes.some((m,i)=>!m || !stamp(m.tsMs)
+                    || ["closed","app","kill","other","unavailable"].indexOf(m.mode)<0
+                    || (i>0 && m.tsMs<d.modes[i-1].tsMs))
+                || d.modes[0].tsMs > d.startMs
+                || d.samples.some((s,i)=>!s || !stamp(s.tsMs) || !stamp(s.intervalMs)
+                    || s.intervalMs<=0 || s.tsMs<d.startMs || s.tsMs>d.endMs
+                    || (i>0 && s.tsMs<=d.samples[i-1].tsMs)
+                    || !numeric(s.total) || !numeric(s.main) || s.main>s.total+0.1)
+                || d.openings.some(o=>!o || stages.indexOf(o.stage)<0
+                    || !Number.isSafeInteger(o.sequence) || o.sequence<1
+                    || !stamp(o.tsMs) || !numeric(o.elapsedMs))) return null;
+        const groups = {};
+        for (const o of d.openings) {
+            if (!groups[o.sequence]) groups[o.sequence]=[];
+            groups[o.sequence].push(o);
+        }
+        const totals = [];
+        for (const group of Object.values(groups)) {
+            if (group.length !== stages.length) continue;
+            if (group.some((o,i)=>o.stage!==stages[i] || (i && o.tsMs<group[i-1].tsMs))) return null;
+            const total=group[group.length-1];
+            if (total.tsMs-total.elapsedMs>=d.startMs && total.tsMs<=d.endMs)
+                totals.push(total.elapsedMs);
+        }
+        const weighted = rows => {
+            const ms=rows.reduce((n,s)=>n+s.intervalMs,0);
+            return {count:rows.length,ms:ms,
+                total:ms?rows.reduce((n,s)=>n+s.total*s.intervalMs,0)/ms:null,
+                main:ms?rows.reduce((n,s)=>n+s.main*s.intervalMs,0)/ms:null};
+        };
+        const buckets={app:[],kill:[]};
+        for (const s of d.samples) {
+            const from=s.tsMs-s.intervalMs;
+            if (from<d.startMs) continue;
+            const previous=d.modes.filter(m=>m.tsMs<=from).pop();
+            if (!previous || !buckets[previous.mode]
+                    || d.modes.some(m=>m.tsMs>from && m.tsMs<=s.tsMs)) continue;
+            buckets[previous.mode].push(s);
+        }
+        return {pid:d.pid,durationMs:d.endMs-d.startMs,all:weighted(d.samples),
+            app:weighted(buckets.app),kill:weighted(buckets.kill),
+            openings:totals.length,openingMean:totals.length?totals.reduce((a,b)=>a+b,0)/totals.length:null,
+            openingMax:totals.length?Math.max(...totals):null};
+    } catch (error) { return null; }
+}
 function summarize(kind, text) {
     try {
+        if (kind === "appcontrol") {
+            const d=appControlMetrics(text);
+            if (!d) return null;
+            const line=(name,x)=>name+" // "+(x.count?x.total.toFixed(1)+"% total / "+x.main.toFixed(1)+"% main ("+x.count+" samples)":"N/A");
+            return "PID // "+d.pid+"\n"+line("MIXED / WHOLE CAPTURE",d.all)+"\n"+line("APP",d.app)+"\n"+line("KILL",d.kill)
+                +"\nOPENINGS // "+d.openings+(d.openings?" / mean "+d.openingMean.toFixed(1)+" ms / max "+d.openingMax+" ms":" / N/A")
+                +"\nStable-mode intervals only; whole capture includes closed/other. Synchronous openings, not first paint. 100% = one core.";
+        }
         if (kind === "inventory") {
             const data = JSON.parse(text);
             if (data.schema !== "post-apollo-qml-workload-inventory-v1"

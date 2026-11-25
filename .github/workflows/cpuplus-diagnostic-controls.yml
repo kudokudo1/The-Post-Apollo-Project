@@ -35,6 +35,8 @@ on:
       - "scripts/cpuplus_storage_observer.py"
       - "tests/cpuplus/test_storage_observer.py"
       - "scripts/cpuplus_diagnostic_archive.py"
+      - "scripts/syntagma_quickshell_thread_sampler.py"
+      - "tests/components/test_syntagma_quickshell_thread_sampler.py"
       - "tests/cpuplus/test_diagnostic_archive.py"
       - "tests/cpuplus/test_process_census.py"
       - "tests/cpuplus/test_diagnostic_continuity_native.py"
@@ -55,6 +57,7 @@ jobs:
       - run: python3 -B tests/cpuplus/test_process_census.py
       - run: python3 -B tests/cpuplus/test_storage_observer.py
       - run: python3 -B tests/cpuplus/test_diagnostic_archive.py
+      - run: python3 -B tests/components/test_syntagma_quickshell_thread_sampler.py
   native-continuity:
     runs-on: ubuntu-latest
     timeout-minutes: 12

@@ -23,7 +23,7 @@ Column {
     readonly property var beforeRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareBeforeId) || null
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
     readonly property bool canChooseComparison: report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
-    readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize) : null
+    readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize, Policy.appControlMetrics) : null
     readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true, true)
     readonly property var hostDetails: memoryDetails ? memoryDetails.hostContext : null
     property bool showHostDetails: true
@@ -193,7 +193,8 @@ Column {
                 {kind: "inventory", label: "SOURCE WORKLOAD SCAN"},
                 {kind: "threads", label: "THREAD SAMPLE // 30s"},
                 {kind: "census", label: "PROCESS CENSUS // 30s"},
-                {kind: "storage", label: "STORAGE OBSERVE // 30s"}
+                {kind: "storage", label: "STORAGE OBSERVE // 30s"},
+                {kind: "appcontrol", label: "APPCONTROL // TEST 30s"}
             ]
             delegate: ActionButton {
                 required property var modelData
@@ -226,7 +227,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "Captures run outside Quickshell. Close this menu and reproduce the issue, then return here. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
+        text: "Close this menu and reproduce the issue, then return here. APPCONTROL TEST: open AppControl, spend time in APP and KILL, then close it; no process actions needed. CPU sampling runs outside Quickshell; opening markers run inside it. CANCEL stops early without a verified comparison. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
@@ -511,12 +512,12 @@ Column {
             width: parent.width
             spacing: 3
             Repeater {
-                model: ["memory", "inventory", "threads", "census", "storage"]
+                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol"]
                 delegate: ActionButton {
                     required property string modelData
-                    width: Math.max(0, Math.floor((reportRail.width - 12) / 5))
+                    width: Math.max(0, Math.floor((reportRail.width - 15) / 6))
                     height: 27
-                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : "STORE"
+                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : "STORE"
                     labelPixelSize: 9
                     labelFontSizeMode: Text.HorizontalFit
                     labelMinimumPixelSize: 8

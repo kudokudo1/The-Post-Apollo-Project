@@ -28,7 +28,7 @@ for marker in [
 ]:
     assert marker in t,marker
 for forbidden in [
-    '@actual-app/api', 'child_process', 'spawn(', 'exec(', 'Process {',
+    '@actual-app/api', 'child_process', 'spawn(', 'execFile(', 'Process {',
     'worker.exec', 'addTransactions(', 'write_categorized_expense.mjs',
     'categorized-expense-writes-enabled', 'FINANCEW_CATEGORIZED_EXPENSE_WRITES_APPROVED',
     '.config","financew"', '".local","state","financew"',

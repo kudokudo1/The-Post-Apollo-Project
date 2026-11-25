@@ -18,7 +18,10 @@ MAX_SAFE = 2**53 - 1
 
 class Owner:
     def __init__(self, queue, runtime_factory, *, durable_actions=False,
-                 staged_max_age_ms=None):
+                 staged_max_age_ms=None, local_disposition_enabled=False):
+        if type(local_disposition_enabled) is not bool or (local_disposition_enabled and staged_max_age_ms is None):
+            raise QueueError("LOCAL_DISPOSITION_REQUIRES_STAGED_OWNER")
+        self.local_disposition_enabled=local_disposition_enabled
         if type(durable_actions) is not bool:
             raise QueueError("INVALID_ACTION_MODE")
         if staged_max_age_ms is not None:
@@ -51,17 +54,22 @@ class Owner:
             self._check()
             # Select one action path under the existing owner flock. Do not
             # downgrade a journal-enabled database to legacy owner dispatch.
-            if self._durable_actions:
+            if self._durable_actions and not local_disposition_enabled:
                 from memory_queue_local_actions import LocalActions
                 self._journal = LocalActions(queue)
-                if self._staged_max_age_ms is not None:
-                    from memory_queue_recovery_review import RecoveryReview
-                    self._recovery_review = RecoveryReview(self._journal,self.owner_id)
-            else:
+            elif not self._durable_actions:
                 self._legacy_fence()
             self.runtime = runtime_factory(queue)
             if self.runtime.queue is not queue:
                 raise QueueError("OWNER_QUEUE_MISMATCH")
+            if getattr(self.runtime,"local_disposition_enabled",False) is not local_disposition_enabled:
+                raise QueueError("LOCAL_DISPOSITION_MODE_MISMATCH")
+            if local_disposition_enabled:
+                from memory_queue_local_disposition import LocalActionsV2
+                self._journal=LocalActionsV2(queue,migrate=True)
+            if self._staged_max_age_ms is not None:
+                from memory_queue_recovery_review import RecoveryReview
+                self._recovery_review = RecoveryReview(self._journal,self.owner_id)
             self._check()
         except BaseException:
             if self._fd is not None:
@@ -376,6 +384,26 @@ class Owner:
                 self._recovery_review.invalidate()
                 raise
             return self._envelope("RECOVERY_ACK",receipt=receipt)
+
+    def dismiss_recovery_preparation(self, *, review_id, review_digest):
+        """Explicit local-only disposition in v2 mode, not a wire command."""
+        with self._call():
+            if not self.local_disposition_enabled or self._recovery_review is None:
+                raise QueueError("LOCAL_DISPOSITION_MODE_REQUIRED")
+            if self._staged_message is not None:
+                self._recovery_review.invalidate()
+                raise QueueError("STAGED_ACTION_PENDING")
+            receipt=self._recovery_review.dismiss(review_id=review_id,
+                        review_digest=review_digest,clock=self.runtime._now)
+            self._published=None
+            return self._envelope("LOCAL_DISPOSITION",receipt=receipt)
+
+    def disposition_history(self, action_id):
+        with self._call():
+            if not self.local_disposition_enabled:
+                raise QueueError("LOCAL_DISPOSITION_MODE_REQUIRED")
+            return self._envelope("LOCAL_DISPOSITION_HISTORY",action_id=_uuid(action_id),
+                                  receipt=self._journal.disposition(action_id))
 
     def recovery_review_history(self, review_id):
         with self._call():

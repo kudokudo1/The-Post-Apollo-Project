@@ -163,3 +163,31 @@ protocol or production policy. An already admitted synchronous transaction
 is not undone by disconnect; full shell crash and actual staged wire still
 require native qualification. Direct callers outside cooperating owner fence
 remain outside protected trust boundary.
+
+## R5 // operator-approved explicit local disposition and retention
+
+Operator policy approval recorded #2433 comment 7167564838: dismiss only
+after exact evidence review, retain original records indefinitely pending
+separate retention deletion policy, no auto resume, fresh protected
+authorization required for subsequent protected operations. Explicit v2
+staged Owner and Runtime configuration only. Atomic journal migration
+adds nullable dismissal evidence column and replaces v1 PREPARED unique
+index with v2 unresolved-only index. Original seven fields never changed
+by disposition; original UUID remains globally unique. V1 journal schema
+rejects migration rather than misreading dismissal; v1 pipe explicitly
+refuses v2 owner. Raw Queue APIs and old unjournaled direct callers remain
+outside cooperating owner contract. No deployment migration selected.
+Separate Owner.dismiss_recovery_preparation consumes the current live
+review, exact digest/current pending snapshot and both admission clocks
+under writer lock. Existing ACK does not dismiss. Only exact PREPARED row
+may be dismissed; missing or committed evidence cannot be relabeled.
+Disposition receipt preserved in original row, validates exact snapshot/
+digest/record, UNVERIFIED, startup_unlock:false, can_execute:false.
+Inventory v2 separates original record and historical disposition and
+reports only actually unresolved preparation; exact disposition lookup.
+New UUID may enter ordinary local queue after explicit dismissal in v2
+direct owner tests; old UUID forever refused. No raw operation authority,
+no deletion, no checkpoint rotation or startup unlock. Current host wire
+and DOC 2 controls still require coordinated v2 disposition integration,
+including retained host checkpoints and fresh local session gate. No
+automatic dismissal, expiry, retry or protected execution.

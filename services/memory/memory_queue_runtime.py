@@ -21,7 +21,11 @@ def system_clock_ms():
 
 class Runtime:
     def __init__(self, queue, capture_source, observe, *, interval_ms,
-                 max_age_ms, max_gap_ms, stable_ms, clock=system_clock_ms):
+                 max_age_ms, max_gap_ms, stable_ms, clock=system_clock_ms,
+                 local_disposition_enabled=False):
+        if type(local_disposition_enabled) is not bool:
+            raise QueueError("INVALID_LOCAL_DISPOSITION_MODE")
+        self.local_disposition_enabled=local_disposition_enabled
         self.queue = queue
         self.capture_source = capture_source
         self.clock = clock
@@ -183,6 +187,13 @@ class Runtime:
         except QueueError:
             return self._action_result(record, error="EVENT_STAGE_UNAVAILABLE")
 
+    def _local_journal(self):
+        if self.local_disposition_enabled:
+            from memory_queue_local_disposition import LocalActionsV2
+            return LocalActionsV2(self.queue)
+        from memory_queue_local_actions import LocalActions
+        return LocalActions(self.queue)
+
     def local_action(self, message):
         """Existing one-call durable local action; never startup recovery."""
         from memory_queue_local_actions import LocalActions, validate
@@ -191,7 +202,7 @@ class Runtime:
                 raise QueueError("STAGED_ACTION_PENDING")
             m = validate(message)
             wall, _ = self._now()
-            journal = LocalActions(self.queue)
+            journal = self._local_journal()
             journal.prepare(m, now=wall // 1000)
             return self._complete_local_action(journal, m)
 
@@ -204,7 +215,7 @@ class Runtime:
                 raise QueueError("STAGED_ACTION_PENDING")
             m = validate(message)
             wall, mono = self._now()
-            journal = LocalActions(self.queue)
+            journal = self._local_journal()
             record = journal.prepare(m, now=wall // 1000)
             self._staged = (journal, m, (wall + max_age_ms, mono + max_age_ms))
             return record

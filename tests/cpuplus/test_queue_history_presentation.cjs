@@ -34,6 +34,24 @@ assert.equal(read(mutate(d=>{d.notification_events[0].attempt_reserved_at_ms=nul
 assert.equal(read(mutate(d=>{d.notification_events=[];d.withdrawal_evidence=null;})).evidenceAt,null);
 assert.equal(read(mutate(d=>{d.request.state="EXPIRED";d.request.changed_at=199;d.request.replaced_by=null;})),null);
 const ui=fs.readFileSync(path.join(dir,"CpuPlusQueueHistoryPane.qml"),"utf8");
-assert.doesNotMatch(ui,/\b(?:Process|Timer|ActionButton|MemoryOperation|execDetached|Consumer)\b/);
+assert.doesNotMatch(ui,/\b(?:Process|Timer|MemoryOperation|execDetached|Consumer)\b/);
 assert.match(ui,/ADJUSTMENT OUTCOME \/\/ UNVERIFIED/);
 console.log("CPU++ R3c reduced DETAIL presentation contract PASS");
+
+assert.equal(c.hostView(v,R,true),v);
+assert.equal(c.hostView(v,N,true),null);
+assert.equal(c.hostView(v,R,false),null);
+assert.equal(c.hostView(v,"",true),null);
+assert.equal(c.hostView(null,R,true),null);
+for(const invalid of [
+    {...v,outcome:"VERIFIED"},{...v,canExecute:true},{...v,ownerId:O},
+    {...v,changedAt:99},{...v,replacedBy:R},{...v,evidenceAt:99},
+    {...v,events:[{...v.events[0],delivery:"DELIVERED"}]},
+    {...v,events:[{...v.events[0],code:"INVALID"}]},
+    {...v,events:[{...v.events[0],kind:"READY_ADVISORY"}]},
+    {...v,events:[v.events[0],v.events[0]]}
+]) assert.equal(c.hostView(invalid,R,true),null);
+assert.match(ui,/History.hostView\(hostHistory,selectedRequest,historyAvailable && !readPending\)/);
+assert.match(ui,/historyReadRequested\(selectedRequest\)/);
+assert.match(ui,/onLookupTextChanged: selectedRequest = ""/);
+console.log("CPU++ canonical host history presentation PASS");

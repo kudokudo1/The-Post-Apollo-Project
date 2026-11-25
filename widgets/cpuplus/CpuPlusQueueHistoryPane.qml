@@ -11,7 +11,28 @@ Column {
     property string expectedOwner: ""
     property string expectedRequest: ""
     property var sequenceFloor: null
-    readonly property var detail: History.project(envelope,expectedOwner,expectedRequest,sequenceFloor)
+    // Canonical host mode: caller publishes its current validated history
+    // and read/display gates from one session snapshot, clearing on loss.
+    // Legacy envelope fixture stays separate; no fallback in host mode.
+    property bool hostMode: false
+    property var hostHistory: null
+    property bool historyAvailable: false
+    property bool readAvailable: false
+    property bool readPending: false
+    property Item footerTarget: null
+    property string lookupText: ""
+    property string selectedRequest: ""
+    signal historyReadRequested(string requestId)
+    readonly property var detail: hostMode
+        ? History.hostView(hostHistory,selectedRequest,historyAvailable && !readPending)
+        : History.project(envelope,expectedOwner,expectedRequest,sequenceFloor)
+    function requestRead() {
+        if(!visible||!hostMode||!readAvailable||readPending||!History.uuid(lookupText))return;
+        selectedRequest=lookupText;
+        historyReadRequested(selectedRequest);
+    }
+    onLookupTextChanged: selectedRequest = ""
+    onVisibleChanged: if (!visible) selectedRequest = ""
     spacing: 5
     GohuText {
         width: parent.width
@@ -22,6 +43,7 @@ Column {
     GohuText {
         width: parent.width
         text: root.detail ? "INTENT // " + root.detail.state + "\nADJUSTMENT OUTCOME // UNVERIFIED"
+            : root.hostMode && root.readPending ? "HISTORY READ PENDING"
             : "HISTORY UNAVAILABLE // SELECT EXACT REQUEST"
         color: Colors.orange
         font.pixelSize: 11
@@ -92,6 +114,49 @@ Column {
         color: Colors.orange
         font.pixelSize: 10
         wrapMode: Text.Wrap
+    }
+    Column {
+        parent: root.footerTarget || root
+        objectName: "cpuplusHistoryReadControls"
+        visible: root.hostMode
+        width: parent.width
+        spacing: 3
+        GohuText {
+            width: parent.width
+            text: "REQUEST UUID // EXACT HISTORY"
+            color: Colors.cyan
+            font.pixelSize: 10
+        }
+        Rectangle {
+            width: parent.width
+            height: 27
+            color: Colors.black
+            border.width: 1
+            border.color: Colors.cyan
+            TextInput {
+                anchors.fill: parent
+                anchors.margins: 4
+                text: root.lookupText
+                color: Colors.white
+                font.pixelSize: 10
+                maximumLength: 36
+                selectByMouse: true
+                clip: true
+                readOnly: root.readPending
+                onTextEdited: root.lookupText=text
+            }
+        }
+        ActionButton {
+            objectName: "cpuplusHistoryRead"
+            width: parent.width
+            height: 26
+            label: root.readPending ? "READING" : "READ HISTORY"
+            contentPadding: 2
+            available: root.hostMode && root.readAvailable && !root.readPending && History.uuid(root.lookupText)
+            acceptedButtons: Qt.LeftButton
+            keyboardActivationSignal: "leftClicked"
+            onLeftClicked: root.requestRead()
+        }
     }
     GohuText {
         width: parent.width

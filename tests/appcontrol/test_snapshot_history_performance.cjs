@@ -418,3 +418,50 @@ test('explicit Kill ranking snapshots score once per eligible task and retains l
     assert.match(model,/hunterTaskActive\(entry\)\s*&& appControlWindow.hunterTaskClassVisible\(entry\)/);
     assert.match(model,/objectProp: "id"/);
 });
+
+test('visible Kill model resolves each stable slot once without changing display order', () => {
+    const start = app.indexOf('    function buildKillTaskOrderPositions(');
+    const end = app.indexOf('    function killTaskVisibleForView(', start);
+    assert.ok(start >= 0 && end > start);
+    const make = new Function(app.slice(start,end) +
+        '\nreturn {build:buildKillTaskOrderPositions,order:orderVisibleKillRows};');
+    const actual = make();
+    const order = Array.from({length:600}, (_,i) => 'task:'+(601-i));
+    order.push('task:20'); // last duplicate slot wins as before
+    const rows = Array.from({length:600}, (_,i) => ({pid:i+2,
+        ...(i%3===0?{id:'task:'+(i+2)}:{})}));
+    rows.push({pid:20,label:'duplicate known'}, {pid:9999}, {pid:9998},
+        {pid:9999,label:'duplicate unknown'});
+    const id = e => String(e.id || ('task:'+String(e.pid||0)));
+    const positions = {};
+    order.forEach((v,i)=>positions[String(v)]=i);
+    function legacy(source) {
+        return source.slice().sort((a,b)=>{
+            const x=positions[id(a)],y=positions[id(b)];
+            if(x!==undefined&&y!==undefined)return x-y;
+            if(x!==undefined)return -1;
+            if(y!==undefined)return 1;
+            return Number(a.pid||0)-Number(b.pid||0);
+        });
+    }
+    const cached = actual.build(order);
+    let reads = 0;
+    const observed = new Proxy(cached,{get(target,key){reads++;return target[key];}});
+    for (const source of [rows,rows.filter(e=>e.pid%3===0),rows.slice().reverse(),[]]) {
+        reads=0;
+        const result=actual.order(source,observed);
+        const expected=legacy(source);
+        assert.deepStrictEqual(result,expected);
+        result.forEach((entry,i)=>assert.equal(entry,expected[i],'same row object'));
+        assert.equal(reads,source.length,'one slot lookup per filtered row');
+    }
+    assert.equal(cached['task:20'],order.length-1);
+    const changed=actual.build(['task:9999','task:20']);
+    assert.equal(actual.order(rows,changed)[0].pid,9999);
+    assert.equal(cached['task:20'],order.length-1,'old index not mutated');
+    const model=app.slice(app.indexOf('id: killTaskResults'),app.indexOf('id: thermalResults'));
+    assert.match(app,/readonly property var killTaskOrderPositions:\s*buildKillTaskOrderPositions\(killTaskOrderIds\)/);
+    assert.match(model,/orderVisibleKillRows\(\s*rows, appControlWindow.killTaskOrderPositions/);
+    assert.match(model,/hunterTaskActive\(entry\)\s*&& appControlWindow.hunterTaskClassVisible\(entry\)/);
+    assert.match(model,/if \(appControlWindow.killTaskModelBlank\)/);
+});

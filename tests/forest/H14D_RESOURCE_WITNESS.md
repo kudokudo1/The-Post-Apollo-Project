@@ -89,3 +89,29 @@ invocation or model. Offline tests exercise both paths and baseline
 refusals. Runtime's #2845 offline sequence reference is separate
 ownership; integrate against reviewed Heart API without parallel
 resource measurement.
+
+## Shared preventive resource reference (Nurse #7175419175)
+
+Call validate_prefix(parent, first, selected=..., launch_ns=...,
+expected_leaf=..., scope=..., baseline=...) on the exact first active
+Sample before simulated payload progression. The existing parent/outer
+preflight, scope/sample limits, pressure/margin, first-completion and
+baseline counter checks are shared with evaluate; populated=1 and
+positive tasks required. No final empty sample is needed for this
+prefix check. Its RESOURCE_PREFIX_REFERENCE result expressly grants
+no progression, permission, terminal, isolation, resource reservation
+or admission authority. It is not an independent evidence producer.
+The final evaluate calls this same function on the original first
+Sample and continues the existing full observation sequence.
+
+Runtime owns the separate joined reference: independently bind the
+original plan, identity, same Reader provenance, inner limits, and
+Spirit isolation before simulated progression; pin<=first.start,
+first.end<=release<=launch+1s. Preserve exact parent, baseline and first
+Sample objects for final audit; reject substituted objects; terminal
+observed before final sample start, disposal after final read completes.
+Actual provenance, original process/descendant/terminal, effective
+isolation and any native invocation remain HOLD. No duplicate observer
+or launcher; no new OS adapter. Offline tests cover both modes, exact
+shared refusal reasons, retained baseline continuity, authority flags
+and final evaluator forwarding the original prefix objects.

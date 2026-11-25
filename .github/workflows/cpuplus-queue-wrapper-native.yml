@@ -6,6 +6,7 @@ on:
       - 'services/memory/MemoryQueueSessionHost.js'
       - 'services/memory/memory_queue_*.py'
       - 'tests/cpuplus_queue_wrapper_native.py'
+      - 'tests/cpuplus_queue_custody_test.py'
       - 'tests/fixtures/CpuPlusQueueDesktopWrapperNative.qml'
       - 'tests/fixtures/cpuplus_queue_wrapper_child.py'
       - 'tests/fixtures/cpuplus_queue_retention_helper.py'
@@ -32,4 +33,6 @@ jobs:
       - name: Actual unmounted desktop recovery wrapper
         env:
           POST_APOLLO_QUEUE_PIPE_SMOKE: CI_DISPOSABLE_ONLY
-        run: python3 -B tests/cpuplus_queue_wrapper_native.py
+        run: |
+          python3 -B tests/cpuplus_queue_custody_test.py
+          python3 -B tests/cpuplus_queue_wrapper_native.py

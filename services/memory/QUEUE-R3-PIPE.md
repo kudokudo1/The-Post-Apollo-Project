@@ -82,3 +82,24 @@ validate PREPARED_ACTION exact schema/owner/sequence/message, retain pending
 through receipt, send exactly one matching commit after receipt, retain
 unresolved on loss, never commit recovered evidence. No installed launcher
 or production timeout default. No DOC 2 source changes.
+
+## R3n // explicit review acknowledgment server transport
+
+Stack on #2692 exact abe274b8 (8/8 workflows, all five native trials
+passed; independent review pending) to preserve both reviewed/candidate
+heads. Explicit trusted review_max_age_ms configuration, absent by
+default, requires staged owner. RECOVERY_REVIEW {version,kind,owner_id,
+action_id} returns existing owner RECOVERY_REVIEW envelope. User must
+explicitly acknowledge exact live review via RECOVERY_ACK {version,kind,
+owner_id,review_id,review_digest,review_sequence}; consume one-use ticket
+before dispatch. RECOVERY_REVIEW_HISTORY {version,kind,owner_id,review_id}
+reads saved historical receipt only, null is not proof of noncommit.
+No action sequence consumption, queue mutation, startup unlock, or replay.
+No additional polling; existing scheduled publication remains independent,
+review expiry bounds wait. Unrelated input, wrong receipt, expiry, EOF or
+emission failure closes staged session. Exact safe receipt shape prevents
+extra source fields crossing wire. Seven disposable regression cases,
+including lost ACK and actual OS pipe EOF after review. No canonical host
+review UI/ack command yet; future host must never auto-ack review and keep
+startup locked, handle scheduled publication independently, retain unknown
+on loss and lookup old receipt explicitly. No production duration selected.

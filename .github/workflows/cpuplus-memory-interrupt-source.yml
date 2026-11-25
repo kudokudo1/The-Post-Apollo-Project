@@ -1,0 +1,19 @@
+name: CPU++ in-kernel interruption evidence source gate
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_interrupt_ci/**'
+      - '.github/workflows/cpuplus-memory-interrupt-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test conservative trace evidence classification
+        run: |
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 6bac8be7b1de6883f480a95944d6ba1130852270
+          python3 -B tests/cpuplus_memory_interrupt_ci/test_kernel_evidence.py

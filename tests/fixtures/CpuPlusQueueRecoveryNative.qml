@@ -41,7 +41,16 @@ ShellRoot {
     property int watchdogTrips: 0
     property var host: Host.initial(Consumer)
     readonly property var recovery: Host.recoveryContext(host)
-    readonly property string actionId: "c23683a9-b2ab-4a2c-87ce-000000000001"
+    // Full-shell trials begin without any predetermined action identity.
+    // Only the first session runs the UUID generator. Recovery gets its
+    // identity from the actual LOAD -> restoreCheckpoint result.
+    property string actionId: crashTrial ? "" : "c23683a9-b2ab-4a2c-87ce-000000000001"
+    property string generatedId: ""
+    property bool uuidInvalid: false
+    function validCrashId(value) {
+        return typeof value==="string"
+            && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)
+    }
     property string oldOwner: ""
     property string resultId: ""
     property int phase: 0
@@ -166,10 +175,14 @@ ShellRoot {
                     && (smoke.restoreTrial ? !!restored.session.unresolved : !restored.session.unresolved),
                     "locked startup evidence")) return;
                 if (smoke.restoreTrial) {
-                    if (!smoke.check(restored.session.unresolved.action_id===smoke.actionId
+                    if (!smoke.check(smoke.actionId==="" && smoke.generatedId==="" && !uuidSource.running
+                        && smoke.validCrashId(restored.session.unresolved.action_id)
+                        && Host.equal(restored.session.unresolved,result.snapshot.action.message)
                         && !restored.session.pending && !restored.stage && !restored.reviewFlow
                         && !restored.checkpointWait && !Host.takeCommit(restored,1).frame,
                         "restored evidence not live continuation")) return;
+                    smoke.actionId=restored.session.unresolved.action_id;
+                    console.log("QUEUE_R3_CRASH_ID_RESTORED // "+smoke.actionId);
                     const wantsAck=smoke.crashTrial==="ACK_BEFORE" || smoke.crashTrial==="ACK_SAVED";
                     if (!smoke.check(!!restored.reviewLost===wantsAck,"restored exact acknowledgment presence")) return;
                     smoke.reviewId=restored.reviewLost?.review_id || "";
@@ -282,6 +295,8 @@ ShellRoot {
                 if (!smoke.check(smoke.host.startupLocked && smoke.host.session.unresolved
                     && (missing ? v.missing && v.record===null
                         : !!v.record && v.record.actionId===smoke.actionId
+                          && !!smoke.recovery.localAction.record
+                          && Host.equal(smoke.recovery.localAction.record.message,smoke.host.session.unresolved)
                           && v.record.state===(committed?"COMMITTED":"PREPARED")
                           && (committed ? v.record.resultId===smoke.host.session.status.requestId && !!v.record.resultId
                             : v.record.resultId===null)),
@@ -523,8 +538,31 @@ ShellRoot {
             }
         }
     }
+    // Disposable entropy source; not an installed UUID service. No
+    // arguments contain an action identity and the restore shell never runs it.
+    Process {
+        id: uuidSource
+        command: ["/usr/bin/python3","-B","-c","import uuid; print(uuid.uuid4(), flush=True)"]
+        stdout: SplitParser {
+            onRead: data => {
+                if (smoke.generatedId!=="" || !smoke.validCrashId(data)) smoke.uuidInvalid=true;
+                else smoke.generatedId=data;
+            }
+        }
+        stderr: SplitParser { onRead: data => smoke.uuidInvalid=true }
+        onExited: (code,status) => {
+            if (!smoke.check(!smoke.restoreTrial && !!smoke.crashTrial && smoke.actionId===""
+                && !smoke.uuidInvalid && code===0 && status===0 && smoke.validCrashId(smoke.generatedId),
+                "fresh original-session UUID")) return;
+            smoke.actionId=smoke.generatedId;
+            console.log("QUEUE_R3_CRASH_ID_GENERATED // "+smoke.actionId);
+            smoke.gateTicket=checkpoint.begin("LOAD",1,null);
+            smoke.check(smoke.gateTicket>0,"initial load after UUID generation");
+        }
+    }
     Component.onCompleted: {
         if (!armed) Qt.quit();
+        else if (crashTrial && !restoreTrial) uuidSource.running=true;
         else if (gateTrial==="PASS") {
             gateTicket=checkpoint.begin("LOAD",1,null);
             check(gateTicket>0,"initial load started");

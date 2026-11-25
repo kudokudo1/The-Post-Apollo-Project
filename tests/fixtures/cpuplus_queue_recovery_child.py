@@ -50,6 +50,9 @@ owner = Owner(Queue(root / "private" / "queue.db"), factory, durable_actions=Tru
 # Test supervisor uses this identity only to wait for the old owner to
 # release its pipe lifetime after the shell has been SIGKILLed.
 if os.environ.get("POST_APOLLO_QUEUE_CRASH_TRIAL"):
-    print("QUEUE_R3_OWNER_PID // "+str(os.getpid()),file=sys.stderr,flush=True)
+    # /proc stat field 22 (starttime), parsed after the final ')' to
+    # tolerate process names containing spaces or parentheses.
+    start_ticks=Path("/proc/self/stat").read_text().rsplit(")",1)[1].split()[19]
+    print("QUEUE_R3_OWNER_PID // "+str(os.getpid())+" "+start_ticks,file=sys.stderr,flush=True)
 serve(owner, 0, 1, io_timeout_ms=3000,
       review_max_age_ms=10000 if os.environ.get("POST_APOLLO_QUEUE_ACK_TRIAL") else None)

@@ -1,5 +1,8 @@
 """Offscreen actual-checkout recovery fixture; no host changes."""
 import os
+import re
+import select
+import uuid
 from pathlib import Path
 import shutil
 import sqlite3
@@ -12,13 +15,39 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 
 
+def process_start_ticks(pid):
+    return Path("/proc",str(pid),"stat").read_text().rsplit(")",1)[1].split()[19]
+
+
+def owner_pidfd(pid,start_ticks,config):
+    # Bind a stable kernel process handle before killing Quickshell.
+    # PID reuse must not be mistaken for retirement of the actual owner.
+    if process_start_ticks(pid)!=start_ticks:
+        raise AssertionError("Owner PID identity changed before pidfd")
+    fd=os.pidfd_open(pid,0)
+    try:
+        if process_start_ticks(pid)!=start_ticks:
+            raise AssertionError("Owner PID identity changed during pidfd open")
+        argv=Path("/proc",str(pid),"cmdline").read_bytes().split(b"\0")
+        if os.fsencode(config/"child.py") not in argv:
+            raise AssertionError("Reported PID is not the disposable owner")
+        poller=select.poll()
+        poller.register(fd,select.POLLIN)
+        if poller.poll(0):
+            raise AssertionError("Original owner already dead at boundary")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def kill_at_boundary(command,config,env,trial):
     # Binary reads avoid text-reader buffering hiding an already received
     # marker. Bound total output and deadline; own process group only.
     proc=subprocess.Popen(command,cwd=config,env=env,stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT,start_new_session=True)
     output=bytearray()
-    owner_pid=None
+    owner_fd=None
     try:
         with selectors.DefaultSelector() as sel:
             sel.register(proc.stdout,selectors.EVENT_READ)
@@ -34,16 +63,27 @@ def kill_at_boundary(command,config,env,trial):
                 output.extend(part)
                 if len(output)>1048576 or b"QUEUE_R3_RECOVERY_FAIL" in output:
                     raise AssertionError("Unexpected crash fixture output")
-            import re
-            pids=re.findall(rb"QUEUE_R3_OWNER_PID // (\d+)",output)
-            if not pids:
-                raise AssertionError("Missing exact child owner identity")
-            owner_pid=int(pids[-1])
+            pids=re.findall(rb"QUEUE_R3_OWNER_PID // (\d+) (\d+)\b",output)
+            ids=re.findall(rb"QUEUE_R3_CRASH_ID_GENERATED // ([0-9a-f-]{36})\b",output)
+            if not pids or len(ids)!=1:
+                raise AssertionError("Missing exact child owner or generated action identity")
+            generated_id=ids[0].decode("ascii")
+            if str(uuid.UUID(generated_id,version=4))!=generated_id:
+                raise AssertionError("Invalid original action UUID")
+            owner_pid=int(pids[-1][0])
+            owner_start=pids[-1][1].decode("ascii")
+            owner_fd=owner_pidfd(owner_pid,owner_start,config)
             # Kill only the disposable shell, not a named process or user's
             # desktop. The child must retire via parent pipe EOF.
             proc.send_signal(signal.SIGKILL)
             if proc.wait(timeout=5)!=-signal.SIGKILL:
                 raise AssertionError("Shell not terminated by SIGKILL")
+            poller=select.poll()
+            poller.register(owner_fd,select.POLLIN)
+            events=poller.poll(5000)
+            if not any(fd==owner_fd and mask & select.POLLIN for fd,mask in events):
+                raise AssertionError("Exact original owner did not exit after shell death")
+            print("QUEUE_R3_OWNER_EXIT_PASS // "+trial+" pidfd readable before cleanup",flush=True)
         # Check ownership released using the actual cooperative queue lock.
         # This waits for retirement, not a new owner or operation retry.
         import fcntl
@@ -58,8 +98,11 @@ def kill_at_boundary(command,config,env,trial):
                     if time.monotonic()>=until:
                         raise AssertionError("Old owner retained custody")
                     time.sleep(0.02)
-        print("QUEUE_R3_SHELL_SIGKILL // "+trial+" old owner custody released",flush=True)
+        print("QUEUE_R3_SHELL_SIGKILL // "+trial+" old owner exited and custody released",flush=True)
+        return generated_id
     finally:
+        if owner_fd is not None:
+            os.close(owner_fd)
         print(output.decode("utf-8",errors="replace"))
         # Cleanup only processes inside this disposable process group.
         try:
@@ -123,7 +166,10 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     if crash:
         if crash not in {"BEFORE_PREPARE","PREPARED","COMMITTED","ACK_BEFORE","ACK_SAVED"}:
             raise SystemExit("Unknown crash trial")
-        kill_at_boundary(command,config,env,crash)
+        generated_id=kill_at_boundary(command,config,env,crash)
+        # Witness the durable checkpoint before starting recovery. No
+        # generated identity or old PID is injected into the new shell.
+        before={path.name:path.read_bytes() for path in checkpoint_dir.iterdir()}
         # New process, same durable files. Never pass volatile action or
         # review identities from supervisor to shell.
         env["POST_APOLLO_QUEUE_CRASH_RESTORE"]="1"
@@ -132,11 +178,19 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
         print(proc.stdout)
         if proc.returncode or "QUEUE_R3_CRASH_RESTORE_PASS // "+crash not in proc.stdout or "QUEUE_R3_RECOVERY_FAIL" in proc.stdout:
             raise SystemExit("Fresh shell recovery failed")
+        restored_ids=re.findall(r"QUEUE_R3_CRASH_ID_RESTORED // ([0-9a-f-]{36})\b",proc.stdout)
+        if restored_ids!=[generated_id] or "QUEUE_R3_CRASH_ID_GENERATED //" in proc.stdout:
+            raise SystemExit("Fresh shell did not discover original identity solely from LOAD")
+        if before!={path.name:path.read_bytes() for path in checkpoint_dir.iterdir()}:
+            raise SystemExit("Recovery altered durable checkpoint evidence")
         import sys
         sys.path.insert(0,str(backend))
         from memory_queue_host_checkpoint import HostCheckpoint
         snapshot=HostCheckpoint(checkpoint_dir).load()
         action=snapshot["action"]["message"]
+        if action["action_id"]!=generated_id:
+            raise SystemExit("Generated identity differs from persistent evidence")
+        print("QUEUE_R3_CRASH_ID_PASS // "+crash+" generated, restored, persisted match",flush=True)
         ack=snapshot["acknowledgment"]
         with sqlite3.connect((config/"private"/"queue.db").as_uri()+"?mode=ro",uri=True) as db:
             rows=db.execute("SELECT action_id,state,result_id FROM memory_queue_local_actions_v1").fetchall()

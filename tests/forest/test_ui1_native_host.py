@@ -144,6 +144,7 @@ def trial(width, height, count):
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
         for relative in ("widgets/ForestW.qml", "widgets/forest/ui2/PublicConversationFixture.qml",
                          "widgets/forest/ui2/PublicPreviewGate.qml",
+                         "widgets/forest/ui2/PublicRestorationReview.qml",
                          "widgets/forest/ui2/PublicRuntimeStatusView.qml",
                          "widgets/forest/ui2/PublicRuntimeStatusDisplay.js",
                          "components/ConversationFeed.qml", helper):
@@ -194,7 +195,11 @@ def trial(width, height, count):
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
             negative = [line.split("FOREST_HOST_HISTORY_NEGATIVE_PASS ", 1)[1].strip()
                         for line in output.splitlines() if "FOREST_HOST_HISTORY_NEGATIVE_PASS " in line]
-            if (negative != (["1", "2"] if width == 1366 else []) or
+            review = [line.split("FOREST_HOST_REVIEW_PHASE_PASS ", 1)[1].strip()
+                      for line in output.splitlines() if "FOREST_HOST_REVIEW_PHASE_PASS " in line]
+            if (review != ([str(i) for i in range(10)] if width >= 770 else []) or
+                    output.count("FOREST_HOST_REVIEW_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
+                    negative != (["1", "2"] if width == 1366 else []) or
                     code != 0 or "FOREST_HOST_FAIL" in output or
                     phases != [str(i) for i in range(count)] or
                     output.count("FOREST_HOST_NATIVE_PASS") != 1 or

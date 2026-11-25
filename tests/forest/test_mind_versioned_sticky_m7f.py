@@ -119,6 +119,22 @@ class VersionedTests(unittest.TestCase):
         self.install(next_s)
         self.assertEqual(self.lookup(next_s).missing,(self.u,))
 
+    def test_domain_floor_does_not_mask_current_revocation(self):
+        alternate=version(CATALOG[0])
+        conflict=replace(self.fresh(input_generation=2),versions=(alternate,self.o))
+        with self.assertRaisesRegex(ContextRefusal,"CONFLICT"):
+            self.install(conflict)
+        self.assertEqual(self.cache.counts(),(0,1))
+        blocked=self.fresh(input_generation=3)
+        with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+            self.install(blocked,PublicUse(blocked,(),(self.o,)))
+        self.assertEqual(self.cache.counts(),(0,0))
+        with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+            self.install(self.fresh(input_generation=4,user_context_generation=4))
+        fresh=self.fresh(input_generation=5,user_context_generation=4,policy_generation=3)
+        self.install(fresh)
+        self.assertEqual(self.lookup(fresh).entries,())
+
     def test_epoch_exhaustion(self):
         fresh=self.fresh(input_generation=2,policy_generation=MAX_GENERATION)
         self.install(fresh)

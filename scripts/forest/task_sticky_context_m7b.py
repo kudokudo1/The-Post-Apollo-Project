@@ -350,18 +350,21 @@ class TaskStickyContext:
             raise ContextRefusal("HOT_ROUTE_CHANGED")
         self._observe(dependencies)
         route = current.route
-        if any(floor is not None and value <= floor for floor, value in (
-                (self._policy_floor, route.policy_generation),
-                (self._user_floor, route.user_context_generation),
-                (self._operational_floor, route.operational_generation),
-                (self._shed_input_floor, route.input_generation))):
+        if self._policy_floor is not None and route.policy_generation <= self._policy_floor:
             raise ContextRefusal("STICKY_VERSION_FLOOR")
+        # A valid current revocation must fence both pools even if a
+        # separate domain or shedding floor already blocks selection.
         if use.revoked:
             self._user.clear()
             self._operational.clear()
             self._route = None
             self._policy_floor = route.policy_generation
             raise ContextRefusal("STICKY_VERSION_REVOKED")
+        if any(floor is not None and value <= floor for floor, value in (
+                (self._user_floor, route.user_context_generation),
+                (self._operational_floor, route.operational_generation),
+                (self._shed_input_floor, route.input_generation))):
+            raise ContextRefusal("STICKY_VERSION_FLOOR")
         if use.eligible != current.versions:
             # Missing/unknown is not a revocation. No selected body leaves
             # this call; no policy floor is invented.

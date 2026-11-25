@@ -18,19 +18,23 @@ const sample = JSON.parse(execFileSync("python3", ["-B", "-c", [
     "from pathlib import Path",
     "sys.path[:0] = ['scripts', 'tests/cpuplus']",
     "import cpuplus_quickshell_memory_observer as observer",
-    "from test_quickshell_memory_observer import stat, rollup",
+    "from test_quickshell_memory_observer import stat, rollup, host_info",
     "with tempfile.TemporaryDirectory() as tmp:",
     "    p = Path(tmp) / '123'",
     "    p.mkdir()",
     "    (p / 'stat').write_text(stat())",
     "    (p / 'smaps_rollup').write_text(rollup())",
+    "    (p.parent / 'meminfo').write_text(host_info())",
     "    print(json.dumps(observer.observe(p, os.getuid(), 100)))"
 ].join("\n")], {cwd:root, encoding:"utf8"}));
 assert.equal(sample.privateResidentKiB, 110);
+assert.equal(sample.hostObservation.beforeKiB.MemAvailable, 6000);
+assert.equal(sample.hostObservation.afterKiB.MemAvailable, 6000);
 const current = {...sample, cpuPct:null, sampleIntervalMs:null};
 const legacy = JSON.parse(JSON.stringify(current));
 delete legacy.memoryKiB.Private_Clean;
 delete legacy.privateResidentKiB;
+delete legacy.hostObservation;
 const terminal = {event:"complete",pid:sample.pid,startTicks:sample.startTicks};
 // Explicit map callback avoids Array.map passing an index as JSON replacer.
 const jsonl = row => [row, terminal].map(x => JSON.stringify(x)).join("\n");

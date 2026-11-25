@@ -66,6 +66,43 @@ class Custody(unittest.TestCase):
         self.assertNotEqual(subprocess.run(cmd,timeout=5).returncode,0)
         self.assertFalse(marker.exists())
 
+    def test_bounded_raw_output(self):
+        cases = [
+            ("import os; os.write(1,b'x'*16383+b'\\n')", True, b"x"*16383+b"\n"),
+            ("import os; os.write(1,b'x'*16384+b'\\n')", False, b""),
+            ("import os; os.write(1,b'x'*1048576)", False, b""),
+            ("import os; os.write(1,b'incomplete')", False, b""),
+            ("import os; os.write(1,b'bad\\x00\\n')", False, b""),
+            ("import os; os.write(1,b'\\n')", False, b""),
+            ("import os; os.write(2,b'x'*1048576)", False, b""),
+            ("import os,time; os.write(1,b'abc'); time.sleep(.02); os.write(1,b'def\\nsecond\\n')",
+             True, b"abcdef\nsecond\n"),
+            ("import os,time; os.write(1,b'partial'); time.sleep(10)", False, b""),
+        ]
+        for source, success, expected in cases:
+            with self.subTest(source=source):
+                self.owner.write_text(source+"\n")
+                result=subprocess.run(self.command(),capture_output=True,timeout=7)
+                self.assertEqual(result.returncode==0,success,result.stderr)
+                self.assertEqual(result.stdout,expected)
+                self.assertLess(len(result.stderr),128)
+        self.owner.write_text("import os\nwhile True: os.write(1,b'x'*1023+b'\\n')\n")
+        flood=subprocess.run(self.command(),capture_output=True,timeout=7)
+        self.assertNotEqual(flood.returncode,0)
+        self.assertLessEqual(len(flood.stdout),512*1024)
+        self.assertTrue(not flood.stdout or flood.stdout.endswith(b"\n"))
+
+    def test_checkpoint_single_reply(self):
+        directory=self.root/"checkpoint"
+        directory.mkdir(mode=0o700)
+        helper=self.root/"helper.py"
+        cmd=[sys.executable,"-I","-B",str(LAUNCHER),"--checkpoint",str(helper),"GEN_LOAD",str(directory)]
+        for source,expected in (("pass",b""),("print('first');print('second')",b"first\n")):
+            helper.write_text(source+"\n")
+            result=subprocess.run(cmd,capture_output=True,timeout=5)
+            self.assertNotEqual(result.returncode,0)
+            self.assertEqual(result.stdout,expected)
+
     def test_supervisor_death_terminates_exact_child(self):
         identity = self.root / "pid"
         self.owner.write_text("import os,time\nfrom pathlib import Path\nPath("+repr(str(identity))+").write_text(str(os.getpid()))\nwhile True: time.sleep(.1)\n")

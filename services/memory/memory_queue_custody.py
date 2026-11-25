@@ -9,9 +9,20 @@ from pathlib import Path
 import signal
 import stat
 import sys
+import select
+import selectors
+import time
 
 PR_SET_PDEATHSIG = 1
 FAILED = 125
+# Development transport limits; do not reinterpret as installed policy.
+MAX_FRAME = 16384  # includes newline, matches canonical Python encoder
+READ_CHUNK = 4096
+MAX_SESSION_BYTES = 16 * 1024 * 1024
+MAX_WINDOW_BYTES = 256 * 1024
+PARTIAL_SECONDS = 3
+WRITE_SECONDS = 3
+EXIT_DRAIN_SECONDS = 2
 
 
 def arm_parent_death(parent):
@@ -67,6 +78,111 @@ def checkpoint(helper, operation, directory):
     return supervise(checked_path(helper), [operation, directory], checkpoint=True)
 
 
+def forward_frame(frame):
+    # Parent output is nonblocking: backpressure cannot retain arbitrary
+    # messages or silently release custody. Never forward a partial frame
+    # from the child; a downstream broken pipe is terminal.
+    deadline = time.monotonic() + WRITE_SECONDS
+    view = memoryview(frame)
+    while view:
+        left = deadline - time.monotonic()
+        if left <= 0 or not select.select([], [1], [], left)[1]:
+            raise RuntimeError("output blocked")
+        try:
+            count = os.write(1, view)
+        except BlockingIOError:
+            continue
+        if count <= 0:
+            raise RuntimeError("output unavailable")
+        view = view[count:]
+
+
+def relay_output(stdout_fd, stderr_fd, pidfd, *, checkpoint):
+    """Bound raw child output before Qt's SplitParser sees any bytes.
+
+    At most one partial frame plus a fixed read chunk is held. Only
+    newline-terminated printable ASCII records pass; semantic validation
+    still belongs to the canonical host/adapter. No child stderr is relayed.
+    """
+    frame = bytearray()
+    total = 0
+    window_bytes = 0
+    window = time.monotonic()
+    partial = None
+    retired = None
+    frames = 0
+    before = os.get_blocking(1)
+    os.set_blocking(1, False)
+    try:
+        with selectors.DefaultSelector() as sel:
+            for fd, name in ((stdout_fd,"stdout"),(stderr_fd,"stderr"),(pidfd,"exit")):
+                if name != "exit":
+                    os.set_blocking(fd, False)
+                sel.register(fd, selectors.EVENT_READ, name)
+            open_streams = 2
+            while open_streams:
+                now = time.monotonic()
+                deadlines = [d for d in (partial, retired) if d is not None]
+                if deadlines and min(deadlines) <= now:
+                    raise RuntimeError("output deadline")
+                ready = sel.select(min(deadlines)-now if deadlines else None)
+                # Reject stderr and witness child exit before processing
+                # stdout from the same poll cycle.
+                for key, _ in sorted(ready, key=lambda item: {"stderr":0,"exit":1,"stdout":2}[item[0].data]):
+                    if key.data == "exit":
+                        sel.unregister(key.fd)
+                        retired = time.monotonic() + EXIT_DRAIN_SECONDS
+                        continue
+                    try:
+                        chunk = os.read(key.fd, READ_CHUNK)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        sel.unregister(key.fd)
+                        open_streams -= 1
+                        if key.data == "stdout" and frame:
+                            raise RuntimeError("unterminated output")
+                        continue
+                    if key.data == "stderr":
+                        raise RuntimeError("child stderr")
+                    now = time.monotonic()
+                    if partial is not None and now >= partial:
+                        raise RuntimeError("partial output deadline")
+                    if retired is not None and now >= retired:
+                        raise RuntimeError("exit drain deadline")
+                    total += len(chunk)
+                    if now - window >= 1:
+                        window = now
+                        window_bytes = 0
+                    window_bytes += len(chunk)
+                    if total > MAX_SESSION_BYTES or window_bytes > MAX_WINDOW_BYTES:
+                        raise RuntimeError("output budget")
+                    # Reject non-ASCII/control bytes, including CR, prior
+                    # to any forwarding of this chunk. LF is the only delimiter.
+                    if any(b != 10 and not 32 <= b <= 126 for b in chunk):
+                        raise RuntimeError("invalid output bytes")
+                    for piece_index, piece in enumerate(chunk.split(b"\n")):
+                        if piece_index:
+                            if not frame:
+                                raise RuntimeError("empty output")
+                            frames += 1
+                            if checkpoint and frames != 1:
+                                raise RuntimeError("multiple checkpoint replies")
+                            forward_frame(bytes(frame) + b"\n")
+                            frame.clear()
+                            partial = None
+                        if piece:
+                            if partial is None:
+                                partial = time.monotonic() + PARTIAL_SECONDS
+                            if len(frame) + len(piece) >= MAX_FRAME:
+                                raise RuntimeError("oversized output")
+                            frame.extend(piece)
+            if checkpoint and frames != 1:
+                raise RuntimeError("missing checkpoint reply")
+    finally:
+        os.set_blocking(1, before)
+
+
 def supervise(script, arguments, *, checkpoint):
     python = checked_path(sys.executable, interpreter=True)
     # Isolated Python permits sibling imports only from the checked helper
@@ -86,10 +202,18 @@ def supervise(script, arguments, *, checkpoint):
     arm_parent_death(os.getppid())
     supervisor = os.getpid()
     read_fd, write_fd = os.pipe2(os.O_CLOEXEC)
+    stdout_fd, child_stdout = os.pipe2(os.O_CLOEXEC)
+    stderr_fd, child_stderr = os.pipe2(os.O_CLOEXEC)
     pid = os.fork()
     if pid == 0:
         try:
             os.close(write_fd)
+            os.close(stdout_fd)
+            os.close(stderr_fd)
+            os.dup2(child_stdout, 1)
+            os.dup2(child_stderr, 2)
+            os.close(child_stdout)
+            os.close(child_stderr)
             arm_parent_death(supervisor)
             if os.read(read_fd, 1) != b"1":
                 os._exit(FAILED)
@@ -98,6 +222,8 @@ def supervise(script, arguments, *, checkpoint):
         except BaseException:
             os._exit(FAILED)
     os.close(read_fd)
+    os.close(child_stdout)
+    os.close(child_stderr)
     pidfd = None
     reaped = False
     try:
@@ -108,6 +234,7 @@ def supervise(script, arguments, *, checkpoint):
             raise RuntimeError("child gate")
         os.close(write_fd)
         write_fd = None
+        relay_output(stdout_fd, stderr_fd, pidfd, checkpoint=checkpoint)
         witness = os.waitid(os.P_PIDFD, pidfd, os.WEXITED | os.WNOWAIT)
         waited, status = os.waitpid(pid, 0)
         reaped = True
@@ -131,6 +258,8 @@ def supervise(script, arguments, *, checkpoint):
             os.waitpid(pid, 0)
         if pidfd is not None:
             os.close(pidfd)
+        os.close(stdout_fd)
+        os.close(stderr_fd)
 
 
 def main():

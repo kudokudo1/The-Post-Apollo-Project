@@ -167,7 +167,21 @@ class SignedIdentityCommandClient:
         if not self._command_lock.acquire(blocking=False):
             raise ReceiptRejected("Native command already in flight")
         try:
-            return self._transact_serial(action)
+            previous_attempt = self._last_attempted_wire
+            try:
+                return self._transact_serial(action)
+            except BaseException:
+                # Unexpected exceptions (including KeyboardInterrupt or
+                # cancellation) must not release a reusable client after a
+                # possibly effective send. Compare pointer identity as well:
+                # interruption between recording the new fingerprint and
+                # marking UNKNOWN_HOLD is conservatively ambiguous.
+                # Preserve the original exception; do not swallow interrupts.
+                if (self._last_wire_outcome == "UNKNOWN_HOLD"
+                        or self._last_attempted_wire is not previous_attempt):
+                    self._last_wire_outcome = "UNKNOWN_HOLD"
+                    self._fault()
+                raise
         finally:
             self._command_lock.release()
 

@@ -669,6 +669,29 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
     def test_i_prepared_record_survives_real_installed_post_reply_seat_loss(self):
         self._exercise_prepared_delivery(lose_seat=True)
 
+    def test_j_native_adapter_interrupt_after_signed_reply_stays_faulted(self):
+        calls = []
+        def seat():
+            calls.append(True)
+            if len(calls) == 2:
+                raise KeyboardInterrupt("CI-only post-reply interruption")
+            return True
+
+        adapter = self._strict_adapter(seat=seat)
+        with self.assertRaises(KeyboardInterrupt):
+            adapter.begin()
+        snapshot = adapter.delivery_snapshot()
+        self.assertEqual(calls, [True, True])
+        self.assertEqual(snapshot.wire_outcome, "UNKNOWN_HOLD")
+        self.assertTrue(snapshot.faulted)
+        self.assertEqual(snapshot.last_attempted_wire.action, "BEGIN")
+        for action in (adapter.begin, adapter.status, adapter.cancel, adapter.recover):
+            with self.assertRaisesRegex(ReceiptRejected, "faulted"):
+                action()
+        self.assertEqual(calls, [True, True])
+        self.assertEqual(adapter.delivery_snapshot(), snapshot)
+        self.assertFalse((self.runtime / "identity-display-v0.sock").exists())
+
     def test_z_restart_and_receipt_key_rotation_require_new_enrollment(self):
         previous_pid = self.pid
         old_witness = self.witness

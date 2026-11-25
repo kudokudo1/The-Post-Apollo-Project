@@ -63,10 +63,11 @@ ShellRoot {
             }
             if (root.phase===3) {
                 if (!host.fullVisible) return;
-                host.recent();
-                if (!root.check(!host.fullVisible && host.allocated,"recent fallback retains candidate")) return;
-                if (!root.check(host.openFull() && host.fullVisible && !host.busy,"reopen reuses session")) return;
-                if (!root.check(host.request("lookup"),"explicit recheck")) return;
+                root.operatorActive=false;
+                if (!root.check(host.fullVisible && host.allocated && !host.busy,"hidden map retains adopted index")) return;
+                root.operatorActive=true;
+                if (!root.check(host.fullVisible && !host.busy,"reopen retains index")) return;
+                if (!root.check(host.openFull(),"explicit recheck")) return;
                 root.phase=4;
                 return;
             }

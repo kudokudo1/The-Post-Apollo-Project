@@ -117,6 +117,31 @@ class RetirementTests(unittest.TestCase):
         self.assert_hold(fixture="unknown")
         self.assertEqual(self.reads, [])
 
+    def test_coherent_alternative_settings_refuse_before_sql(self):
+        self.begin()
+        a = self.scope.attempt
+        for settings in (replace(a.settings, num_ctx=4096),
+                         replace(a.settings, max_predict=64)):
+            binding = replace(a.binding, config_digest=settings.config_digest,
+                              context_tokens=settings.num_ctx,
+                              output_tokens=settings.max_predict)
+            alternative = replace(self.scope, attempt=replace(
+                a, binding=binding, settings=settings))
+            self.assert_hold(current=alternative)
+            values = list(self.observations)
+            values[3] = replace(values[3], scope=alternative)
+            self.assert_hold(observations=tuple(values))
+        self.assertEqual(self.reads, [])
+
+    def test_retained_residency_requires_exact_accounting_before_sql(self):
+        self.begin()
+        values = list(self.observations)
+        self.assert_hold(observations=tuple(values[:3]+values[4:]))
+        for state in ("RETAINED_UNACCOUNTED", "UNKNOWN", "RELEASED", None):
+            values[3] = replace(self.observations[3], state=state)
+            self.assert_hold(observations=tuple(values))
+        self.assertEqual(self.reads, [])
+
     def test_observation_states_order_freshness_and_identity(self):
         self.begin()
         for i, state in enumerate(("UNKNOWN","STOP","ACTIVE","UNACCOUNTED","UNKNOWN_HOLD")):

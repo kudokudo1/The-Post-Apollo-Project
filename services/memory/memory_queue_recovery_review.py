@@ -85,24 +85,35 @@ class RecoveryReview:
     def invalidate(self):
         self._live = None
 
-    def acknowledge(self, *, review_id, review_digest, wall_ms, mono_ms):
+    def acknowledge(self, *, review_id, review_digest, clock):
         live,self._live=self._live,None
         if live is None:
             raise QueueError("RECOVERY_REVIEW_NOT_LIVE")
         serialized,start_wall,start_mono,max_age=live
         review=json.loads(serialized)
         _uuid(review_id)
-        _int(wall_ms,0,MAX_SAFE)
-        _int(mono_ms,0,MAX_SAFE)
         if review_id!=review["review_id"] or review_digest!=review["review_digest"]:
             raise QueueError("RECOVERY_REVIEW_MISMATCH")
-        if not (0<=wall_ms-start_wall<max_age and 0<=mono_ms-start_mono<max_age):
-            raise QueueError("RECOVERY_REVIEW_EXPIRED")
+
+        def admit():
+            wall_ms,mono_ms=clock()
+            _int(wall_ms,0,MAX_SAFE)
+            _int(mono_ms,0,MAX_SAFE)
+            if not (0<=wall_ms-start_wall<max_age and 0<=mono_ms-start_mono<max_age):
+                raise QueueError("RECOVERY_REVIEW_EXPIRED")
+            return wall_ms
+
+        admit()
         with self.journal.queue._transaction(write=True) as db:
             current=_snapshot(db,self.journal,review["action_id"],self.owner_id)
             if _digest(current)!=review_digest or current!=review["snapshot"]:
                 raise QueueError("RECOVERY_EVIDENCE_CHANGED")
+            # Check after lock acquisition and evidence validation. If
+            # schema creation takes time, recheck before inserting as well;
+            # expiration rolls back the entire transaction (including DDL).
+            admit()
             _schema(db,create=True)
+            wall_ms=admit()
             receipt={"version":1,"review":review,"acknowledged_at_ms":wall_ms,
                      "disposition":"REVIEW_ACKNOWLEDGED_ONLY",
                      "adjustment_outcome":"UNVERIFIED","can_execute":False,

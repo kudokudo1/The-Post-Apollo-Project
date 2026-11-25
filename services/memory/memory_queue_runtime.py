@@ -59,7 +59,7 @@ class Runtime:
         wall, mono = self._now()
         return wall // 1000, mono
 
-    def _capture(self, target, expires_at):
+    def _capture(self, target, expires_at, *, with_stamp=False):
         # Only explicit bounded withdrawal requests enter this integration
         # slice. Missing identity is NOT absence of an allocation.
         _int(target, 4, 64)
@@ -98,6 +98,8 @@ class Runtime:
         now = wall // 1000
         if expires_at <= now:
             raise QueueError("INVALID_EXPIRY")
+        if with_stamp:
+            return source, now, (before_wall, before_mono, stamp_wall, stamp_mono)
         return source, now
 
     @staticmethod
@@ -145,13 +147,34 @@ class Runtime:
             return self._finish(expected_id, expire=True)
 
     def _complete_local_action(self, journal, m, *, deadline=None):
-        source = None
+        source, stamp = None, None
         if m["kind"] in {"QUEUE", "REPLACE"}:
-            source, _ = self._capture(m["target_gib"], m["expires_at"])
-        wall, mono = self._now()
-        if deadline is not None and (wall >= deadline[0] or mono >= deadline[1]):
-            raise QueueError("STAGED_ACTION_EXPIRED")
-        record = journal.commit(m, now=wall // 1000, source=source)
+            if deadline is None:
+                source, _ = self._capture(m["target_gib"], m["expires_at"])
+            else:
+                source, _, stamp = self._capture(m["target_gib"], m["expires_at"],
+                                                 with_stamp=True)
+
+        def admit():
+            # Called again INSIDE the acquired write transaction, after
+            # validating the original journal row and before its mutation.
+            wall, mono = self._now()
+            if deadline is not None and (wall >= deadline[0] or mono >= deadline[1]):
+                raise QueueError("STAGED_ACTION_EXPIRED")
+            if stamp is not None:
+                before_wall, before_mono, stamp_wall, stamp_mono = stamp
+                if (not 0 <= wall - stamp_wall <= self.max_age
+                        or not 0 <= mono - stamp_mono <= self.max_age
+                        or not 0 <= wall - before_wall <= self.max_age
+                        or not 0 <= mono - before_mono <= self.max_age):
+                    raise QueueError("STALE_SOURCE")
+                if wall // 1000 >= m["expires_at"]:
+                    raise QueueError("INVALID_EXPIRY")
+            return wall // 1000
+
+        now = admit()
+        record = journal.commit(m, now=now, source=source,
+                                admission_clock=admit if deadline is not None else None)
         if m["kind"] in {"QUEUE", "REPLACE"}:
             return self._action_result(record)
         try:

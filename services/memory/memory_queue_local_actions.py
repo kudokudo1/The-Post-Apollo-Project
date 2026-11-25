@@ -160,8 +160,13 @@ class LocalActions:
         self._fresh = canonical(m)
         return result
 
-    def commit(self, message, *, now, source=None):
-        """Only explicit caller after fresh runtime capture; never recovery."""
+    def commit(self, message, *, now, source=None, admission_clock=None):
+        """Explicit continuation, never recovery.
+
+        Staged Runtime supplies a synchronous admission clock: evaluate
+        after BEGIN IMMEDIATE and validation, not before SQLite lock wait.
+        Legacy direct callers retain their explicit timestamp contract.
+        """
         m = validate(message)
         _int(now,0,MAX_SAFE)
         if self._fresh != canonical(m):
@@ -175,22 +180,27 @@ class LocalActions:
             saved = self._decode(db,row)
             if saved["state"] != "PREPARED" or saved["message"] != m:
                 raise QueueError("ACTION_NOT_PREPARED")
+            kind = m["kind"]
+            old = None
+            if kind == "QUEUE":
+                if self.queue._pending(db) is not None:
+                    raise QueueError("PENDING_EXISTS")
+            else:
+                old = self.queue._expected(db,m["expected_request_id"])
+            if kind not in {"QUEUE","REPLACE"} and source is not None:
+                raise QueueError("INVALID_ACTION_FIELDS")
+            # Mutation admission is here, with the SQLite writer lock held.
+            # A later fsync/commit completion time is not a deadline promise.
+            if admission_clock is not None:
+                now = _int(admission_clock(), now, MAX_SAFE)
             if now < saved["prepared_at"]:
                 raise QueueError("CLOCK_ROLLBACK")
-            kind = m["kind"]
             if kind in {"QUEUE","REPLACE"}:
                 record = _new(m["target_gib"],source,now,m["expires_at"])
-                if kind == "QUEUE":
-                    if self.queue._pending(db) is not None:
-                        raise QueueError("PENDING_EXISTS")
-                else:
-                    old = self.queue._expected(db,m["expected_request_id"])
+                if old is not None:
                     self.queue._finish(db,old,"REPLACED",now,record["id"])
                 self.queue._insert(db,record)
             else:
-                if source is not None:
-                    raise QueueError("INVALID_ACTION_FIELDS")
-                old = self.queue._expected(db,m["expected_request_id"])
                 if kind == "EXPIRE" and now < old["expires_at"]:
                     raise QueueError("NOT_EXPIRED")
                 record = self.queue._finish(db,old,"CANCELLED" if kind=="CANCEL" else "EXPIRED",now)

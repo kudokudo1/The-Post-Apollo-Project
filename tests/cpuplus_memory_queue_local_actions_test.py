@@ -1,5 +1,10 @@
 """R3d durable local correlation, disposable private DB only."""
 import copy
+import contextlib
+import sqlite3
+import threading
+import time
+from unittest import mock
 from pathlib import Path
 import sys
 import tempfile
@@ -440,6 +445,154 @@ class Tests(unittest.TestCase):
         self.assertFalse(receipt["can_execute"])
         self.assertNotIn("inode",str(receipt))
         self.assertEqual(self.q.pending()["id"],result["id"])
+
+    @contextlib.contextmanager
+    def contended_write(self, *, wall_delta, mono_delta):
+        """A real separate SQLite writer holds BEGIN IMMEDIATE until the
+        tested connection attempts its own BEGIN IMMEDIATE. Advance only
+        the injected clocks during that wait, not via a pre-lock fixture.
+        The original code would wrongly accept the old timestamp.
+        """
+        real_connect=sqlite3.connect
+        held,attempted,released,abort=(threading.Event() for _ in range(4))
+        errors=[]
+
+        def hold():
+            try:
+                with contextlib.closing(real_connect(self.path,timeout=1,
+                                                     isolation_level=None)) as db:
+                    db.execute("BEGIN IMMEDIATE")
+                    held.set()
+                    if not attempted.wait(3) or abort.is_set():
+                        return
+                    # The tested connection is entering SQLite while our
+                    # writer lock is held. Keep it briefly to exercise wait.
+                    time.sleep(0.05)
+                    self.wall+=wall_delta
+                    self.mono+=mono_delta
+                    db.rollback()
+                    released.set()
+            except BaseException as exc:
+                errors.append(exc)
+                held.set()
+
+        class Contended(sqlite3.Connection):
+            def execute(self, sql, *args, **kwargs):
+                if sql=="BEGIN IMMEDIATE" and not attempted.is_set():
+                    attempted.set()
+                    cursor=super().execute(sql,*args,**kwargs)
+                    if not released.wait(1):
+                        raise AssertionError("contention fixture did not release")
+                    return cursor
+                return super().execute(sql,*args,**kwargs)
+
+        def connect(*args,**kwargs):
+            return real_connect(*args,factory=Contended,**kwargs)
+
+        worker=threading.Thread(target=hold,daemon=True)
+        worker.start()
+        try:
+            self.assertTrue(held.wait(3))
+            self.assertFalse(errors)
+            with mock.patch("memory_adjustment_queue.sqlite3.connect",side_effect=connect):
+                yield
+            self.assertTrue(attempted.is_set())
+            self.assertTrue(released.is_set())
+        finally:
+            abort.set()
+            attempted.set()
+            worker.join(4)
+            self.assertFalse(worker.is_alive())
+            self.assertFalse(errors)
+
+    def test_staged_write_lock_wait_expires_wall(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=1000,mono_delta=0):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            owner.commit_action(m)
+        self.assertEqual(self.captures,1)
+
+    def test_staged_write_lock_wait_expires_monotonic(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=0,mono_delta=1000):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_staged_write_lock_wait_stales_source(self):
+        owner=self.staged_owner(max_age=10000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=3001,mono_delta=3001):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertEqual(self.captures,1)
+
+    def test_staged_write_lock_wait_expires_request(self):
+        self.wall=199999
+        owner=self.staged_owner(max_age=10000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=1,mono_delta=1):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"UNKNOWN")
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_staged_write_lock_admission_timestamp(self):
+        owner=self.staged_owner(max_age=3000)
+        m=self.message()
+        owner.prepare_action(m)
+        with self.contended_write(wall_delta=1000,mono_delta=1000):
+            reply=owner.commit_action(m)
+        self.assertEqual(reply["disposition"],"REPORTED")
+        self.assertEqual(self.q.pending()["requested_at"],101)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["committed_at"],101)
+
+    def test_recovery_ack_write_lock_wait_expires_wall(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.contended_write(wall_delta=1000,mono_delta=0):
+            with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_EXPIRED"):
+                owner.acknowledge_recovery_review(review_id=review["review_id"],
+                            review_digest=review["review_digest"])
+        self.assertIsNone(owner.recovery_review_history(review["review_id"])["receipt"])
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_NOT_LIVE"):
+            owner.acknowledge_recovery_review(review_id=review["review_id"],
+                        review_digest=review["review_digest"])
+
+    def test_recovery_ack_write_lock_wait_expires_monotonic(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.contended_write(wall_delta=0,mono_delta=1000):
+            with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_EXPIRED"):
+                owner.acknowledge_recovery_review(review_id=review["review_id"],
+                            review_digest=review["review_digest"])
+        self.assertIsNone(owner.recovery_review_history(review["review_id"])["receipt"])
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+
+    def test_recovery_ack_write_lock_admission_timestamp(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        with self.contended_write(wall_delta=200,mono_delta=200):
+            receipt=owner.acknowledge_recovery_review(review_id=review["review_id"],
+                            review_digest=review["review_digest"])["receipt"]
+        self.assertEqual(receipt["acknowledged_at_ms"],100200)
+        self.assertEqual(owner.recovery_review_history(review["review_id"])["receipt"],receipt)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

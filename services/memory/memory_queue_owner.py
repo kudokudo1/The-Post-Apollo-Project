@@ -338,9 +338,8 @@ class Owner:
                 self._recovery_review.invalidate()
                 raise QueueError("STAGED_ACTION_PENDING")
             try:
-                wall, mono = self.runtime._now()
                 receipt = self._recovery_review.acknowledge(review_id=review_id,
-                            review_digest=review_digest,wall_ms=wall,mono_ms=mono)
+                            review_digest=review_digest,clock=self.runtime._now)
             except BaseException:
                 self._recovery_review.invalidate()
                 raise

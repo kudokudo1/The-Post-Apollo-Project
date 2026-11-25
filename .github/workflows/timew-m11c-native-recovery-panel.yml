@@ -1,0 +1,54 @@
+name: TimeW M11c disposable native Quickshell recovery panel
+on:
+  pull_request:
+    paths:
+      - 'tests/timew/fixtures/M11cRecoveryNative.qml'
+      - 'tests/timew/native_recovery_panel_m11c.py'
+      - 'widgets/MachineSaveRecoveryPanel.qml'
+      - 'services/time/MachineV3LocalSaveRecoveryUiRead.py'
+      - 'services/time/MachineV3LocalSaveRecoveryPolicy.js'
+      - 'docs/timew-m11c-native-recovery-panel.md'
+      - '.github/workflows/timew-m11c-native-recovery-panel.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-native-panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    env:
+      POST_APOLLO_M11C_DISPOSABLE_CI: '1'
+    steps:
+      - name: Install same Debian Quickshell 0.3.2 runtime as existing native smoke
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 \
+            qt6-qpa-plugins xvfb xauth libxcb-cursor0 libxkbcommon-x11-0 \
+            qml6-module-qtquick qml6-module-qtquick-window \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Real panel, real Process and 45s deadline in disposable X11
+        run: xvfb-run -a -s "-screen 0 1024x768x24 -nolisten tcp" python3 -B tests/timew/native_recovery_panel_m11c.py
+  existing-boundaries:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preserve actual existing handler and local data regressions
+        run: |
+          node tests/timew/test_machine_v11b_recovery_panel.cjs
+          python3 -B -I tests/timew/test_machine_v11_recovery_ui_read.py
+          node tests/timew/test_machine_v11_recovery_display_policy.cjs
+          python3 -B -I tests/timew/test_machine_v10_coordinated_local_save.py
+          python3 -B -I tests/timew/test_machine_save_ui_contract.py
+          python3 -B -I tests/timew/test_machine_persistent_mark_ui.py
+          ! grep -q 'M11cRecoveryNative' shell.qml
+          ! grep -q 'M11cRecoveryNative' widgets/TimeW.qml

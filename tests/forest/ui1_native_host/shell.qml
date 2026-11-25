@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "./widgets" as Widgets
+import "./widgets/forest/ui2" as Review
 
 // Actual ForestW PanelWindow, never an operator desktop or native model host.
 ShellRoot {
@@ -22,6 +23,13 @@ ShellRoot {
     property int joinedStart: 0
     property int negativeCase: 0
     property bool negativeTriggered: false
+    property int reviewPhase: 0
+    property var originalPreviewComponent: null
+    property var firstReviewScope: null
+    property var secondReviewScope: null
+    readonly property var reviewPlan: [{category:"CONTINUITY",state:"PRESERVED"},
+        {category:"CONTEXT",state:"REVIEW"},{category:"WORKSHOP",state:"AVAILABLE"},
+        {category:"MODEL_FORM",state:"DORMANT"},{category:"REASONING",state:"UNKNOWN"}]
     property string dbStage: ""
     property int dbChecks: 0
     function check(ok, reason) {
@@ -387,7 +395,7 @@ ShellRoot {
                 joinedParent=null;
                 p.destroy();
                 if (negativeCase===1) startNegative(2);
-                else finish();
+                else startReviewPlacement();
             });
             if (!p.start()) { check(false,"negative start"); finish(); }
         }
@@ -399,6 +407,129 @@ ShellRoot {
             if (!joinedParent.request("HISTORY_ATTACH")) {
                 check(false,"negative attach");
                 joinedParent.hold("NEGATIVE");
+            }
+        }
+    }
+    // CI-only placement rehearsal: borrow the actual existing preview Loader
+    // while it is inactive. No installed button, second panel, or host query.
+    Component { id: reviewType; Review.PublicRestorationReview {} }
+    function startReviewPlacement() {
+        forest.menuOpen=false;
+        reviewPhase=0;
+        reviewTimer.start();
+    }
+    function reviewScope(n) {
+        return {treeKey:"CHERRY",taskAlias:"a".repeat(32),viewKey:String(n).repeat(32),planRevision:1};
+    }
+    function reviewGeometry(item) {
+        const a=parts;
+        const body=find(item,"restorationReviewBody");
+        const dismiss=find(item,"restorationReviewDismiss");
+        const label=find(item,"restorationReviewSynthetic");
+        const locked=find(item,"restorationReviewLocked");
+        check(a.loader.active && a.loader.visible && a.loader.item===item
+            && item.width===a.pane.width && item.height===a.pane.height
+            && item.width>=300 && item.height>=160 && !a.empty.visible
+            && a.pane.y>=a.heading.y+a.heading.height
+            && a.pane.y+a.pane.height<=a.prompt.y
+            && a.pane.x+a.pane.width<=a.rail.x,"review viewport");
+        check(body && dismiss && label && locked && body.visible
+            && dismiss.activeFocusOnTab && label.text==="SYNTHETIC // NO LIVE SEASON OR AVAILABILITY"
+            && locked.text==="READ ONLY // RESTORATION LOCKED"
+            && locked.y+locked.height<=body.height,"review layout/focus eligibility");
+        check(!item.restorationEnabled && !item.sendEnabled && !item.stopEnabled
+            && !item.sourceAuthenticated && !item.permissionGranted
+            && !item.productionAuthority && !item.modelExecutionPermitted
+            && !forest.chatHostTrusted && !a.send.enabledAction && !a.voice.backendReady,
+            "review authority unchanged");
+        return !failed;
+    }
+    function reviewStep(n) {
+        const a=parts;
+        if (n===0) {
+            check(!a.loader.active && a.loader.item===null,"review default closed");
+            originalPreviewComponent=a.loader.sourceComponent;
+            a.loader.sourceComponent=reviewType;
+            forest.selectedTreeIndex=0;
+            forest.menuOpen=true;
+        } else if (n===1) {
+            check(a.preview.interactive && !a.loader.active,"review explicit entry");
+            a.input.text="review-local draft";
+            a.preview.leftClicked(null);
+        } else if (n===2) {
+            const item=a.loader.item;
+            check(item && item.reviewState==="CLOSED" && item.reviewRows.length===0,
+                "review initial state");
+            if (failed) return;
+            firstReviewScope=reviewScope(1);
+            item.syntheticOwner=true;
+            item.ownerScope=firstReviewScope;
+            check(item.openReview(firstReviewScope) && item.receiveReview(firstReviewScope,reviewPlan)
+                && item.reviewRows.length===5 && reviewGeometry(item),"review explicit scoped rows");
+            const dismiss=find(item,"restorationReviewDismiss");
+            if (dismiss) dismiss.forceActiveFocus();
+            check(a.input.text==="review-local draft","review draft preserved");
+        } else if (n===3) {
+            const item=a.loader.item;
+            check(item && item.dismissReview(firstReviewScope) && item.reviewRows.length===0
+                && item.reviewState==="CLOSED","review dismiss state");
+        } else if (n===4) {
+            const item=a.loader.item;
+            const dismiss=find(item,"restorationReviewDismiss");
+            const body=find(item,"restorationReviewBody");
+            check(item && item.reviewState==="CLOSED" && item.reviewRows.length===0
+                && dismiss && body && !body.visible && !dismiss.activeFocusOnTab
+                && !dismiss.activeFocus && !dismiss.focus,
+                "review dismissed tab eligibility");
+            if (failed) return;
+            a.preview.leftClicked(null);
+            a.input.forceActiveFocus(); // local host focus restoration request, not physical keyboard input
+        } else if (n===5) {
+            check(!a.loader.active && a.loader.item===null && a.empty.visible,"review unloaded");
+            check(a.input.focus && a.input.text==="review-local draft","review return focus request/draft");
+            a.preview.leftClicked(null);
+        } else if (n===6) {
+            const item=a.loader.item;
+            check(item && item.reviewState==="CLOSED" && item.reviewRows.length===0,
+                "review replacement empty");
+            if (failed) return;
+            secondReviewScope=reviewScope(2);
+            item.syntheticOwner=true;
+            item.ownerScope=secondReviewScope;
+            check(item.openReview(secondReviewScope) && item.receiveReview(secondReviewScope,reviewPlan)
+                && !item.receiveReview(firstReviewScope,reviewPlan)
+                && !item.dismissReview(firstReviewScope) && reviewGeometry(item),
+                "review stale scope isolated");
+            forest.selectedTreeIndex=1;
+        } else if (n===7) {
+            check(!a.loader.active && a.loader.item===null,"review tree loss unload");
+            a.loader.sourceComponent=originalPreviewComponent;
+            forest.selectedTreeIndex=0;
+        } else if (n===8) {
+            check(a.preview.interactive && !a.loader.active && a.input.text==="review-local draft",
+                "review return to original preview");
+            a.preview.leftClicked(null);
+        } else if (n===9) {
+            geometry(true);
+            check(a.input.text==="review-local draft","original preview/draft restored");
+            forest.menuOpen=false;
+        } else if (n===10) {
+            check(!a.loader.active && a.loader.item===null && a.input.text==="","review close");
+        }
+    }
+    Timer {
+        id: reviewTimer
+        interval: 350
+        repeat: true
+        onTriggered: {
+            const n=reviewPhase++;
+            reviewStep(n);
+            if (failed) { stop(); finish(); return; }
+            console.info("FOREST_HOST_REVIEW_PHASE_PASS "+n);
+            if (n===10) {
+                stop();
+                console.info("FOREST_HOST_REVIEW_PLACEMENT_PASS");
+                finish();
             }
         }
     }
@@ -427,7 +558,8 @@ ShellRoot {
                 witness.runtimePhase(n - runtimeStart);
                 witness.completePhase(n);
                 if (n === runtimeStart + 7) {
-                    if (witness.compact || witness.failed) witness.finish();
+                    if (witness.failed) witness.finish();
+                    else if (witness.compact) { stop(); witness.startReviewPlacement(); }
                     else {
                         stop();
                         forest.menuOpen=true;

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
+import Quickshell.Io
 import "widgets/git"
 
 ShellRoot {
@@ -14,6 +15,39 @@ ShellRoot {
     readonly property string dirB: Quickshell.env("MAP_FIXTURE_DIR_B")
     property real expectedY: 0
     property string chosen: ""
+    readonly property bool inputTest: Quickshell.env("MAP_FIXTURE_INPUT")==="1"
+    property bool inputDone: false
+    function runInput(args) {
+        inputDone=false;
+        input.exec(["/usr/bin/xdotool"].concat(args));
+    }
+    function move(point) {
+        return ["mousemove", String(Math.round(point.x)), String(Math.round(point.y))];
+    }
+    function dragRail(toBottom) {
+        const rail=map.scrollRail;
+        const handle=rail.handleItem;
+        const start=handle.mapToGlobal(handle.width/2,handle.height/2);
+        const end=rail.mapToGlobal(rail.width/2,toBottom?rail.height-1:1);
+        runInput(move(start).concat(["mousedown","1","sleep","0.15"],move(end),["sleep","0.15","mouseup","1"]));
+    }
+    function wheel(button) {
+        const viewport=map.scrollViewport;
+        const point=viewport.mapToGlobal(viewport.width/2,viewport.height/2);
+        runInput(move(point).concat(["click","--repeat","4",String(button)]));
+    }
+    function pass() {
+        console.log("GIT_MAP_NATIVE_PASS");
+        done=true;
+        Qt.quit();
+    }
+    Process {
+        id: input
+        onExited: function(code,exitStatus) {
+            if (!root.check(code===0 && exitStatus===0,"synthetic pointer input failed")) return;
+            root.inputDone=true;
+        }
+    }
     function check(ok,message) {
         if (!ok) {
             console.error("GIT_MAP_NATIVE_FAIL // "+message);
@@ -24,6 +58,8 @@ ShellRoot {
     }
     function sha(n) { return (n+1).toString(16).padStart(40,"0"); }
     Window {
+        title: "Disposable Git Map fixture"
+        x: 0; y: 0
         width: 720
         height: 480
         visible: true
@@ -38,7 +74,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks>500) {
+            if (++root.ticks>700) {
                 root.check(false,"timeout phase "+root.phase+" // "+map.bottomStatus);
                 return;
             }
@@ -48,6 +84,7 @@ ShellRoot {
                 return;
             }
             if (root.phase===1) {
+                if (map.activePageStart!==0) return;
                 if (!root.check(map.scrollExtent===2400000,"full extent")) return;
                 if (!root.check(map.renderedRows<=24 && map.graphSurfaceHeight<480,"bounded renderer")) return;
                 // Jump while the first page is still artificially delayed.
@@ -75,7 +112,8 @@ ShellRoot {
                 return;
             }
             if (root.phase===4) {
-                // Old repository may still have an in-flight page.
+                // Require actual outstanding old-repository work, not a race.
+                if (map.activePageStart!==49920) return;
                 if (!root.check(map.activate(root.dirB,root.manifestB,{top:true}),"switch B")) return;
                 root.phase=5;
                 return;
@@ -85,9 +123,66 @@ ShellRoot {
                 if (!map.rowAt(0)) return;
                 if (!root.check(map.rowAt(0).sha===root.sha(200000),"old repo response contaminated B")) return;
                 if (!root.check(map.renderedRows<=24 && map.graphSurfaceHeight<480,"renderer bound after switch")) return;
-                console.log("GIT_MAP_NATIVE_PASS");
-                root.done=true;
-                Qt.quit();
+                map.scrollTo(124*24+5);
+                root.expectedY=map.scrollPosition;
+                root.phase=6;
+                return;
+            }
+            if (root.phase===6) {
+                if (!root.check(map.scrollPosition===root.expectedY,"merge page moved viewport")) return;
+                const a=map.mapState.cache[0], b=map.mapState.cache[128];
+                if (!a || !b || !map.rowAt(130)) return;
+                const edge=a.rows[0].parents[1];
+                if (!root.check(edge.ordinal===130 && edge.sha===map.rowAt(130).sha
+                        && edge.lane===map.rowAt(130).lane
+                        && b.frontier.some(f=>f.sha===edge.sha && f.lane===edge.lane),
+                        "cross-page branch continuity")) return;
+                map.visible=false;
+                root.phase=7;
+                return;
+            }
+            if (root.phase===7) {
+                map.visible=true;
+                if (!root.check(map.scrollPosition===root.expectedY,"hidden candidate lost position")) return;
+                if (!root.inputTest) {root.pass();return;}
+                root.dragRail(true);
+                root.phase=8;
+                return;
+            }
+            if (root.phase===8) {
+                if (!root.inputDone) return;
+                const bottom=map.scrollExtent-map.scrollViewport.height;
+                if (!root.check(Math.abs(map.scrollPosition-bottom)<0.5,"star drag did not reach true bottom")) return;
+                root.expectedY=map.scrollPosition;
+                root.wheel(5);
+                root.phase=9;
+                return;
+            }
+            if (root.phase===9) {
+                if (!root.inputDone) return;
+                if (!root.check(Math.abs(map.scrollPosition-root.expectedY)<0.5,"wheel at bottom wrapped or moved")) return;
+                root.wheel(4);
+                root.phase=10;
+                return;
+            }
+            if (root.phase===10) {
+                if (!root.inputDone || map.scrollViewport.moving) return;
+                if (!root.check(map.scrollPosition<root.expectedY,"reverse wheel did not move upward")) return;
+                root.dragRail(false);
+                root.phase=11;
+                return;
+            }
+            if (root.phase===11) {
+                if (!root.inputDone) return;
+                if (!root.check(Math.abs(map.scrollPosition)<0.5,"star drag did not return to top")) return;
+                root.wheel(4);
+                root.phase=12;
+                return;
+            }
+            if (root.phase===12) {
+                if (!root.inputDone) return;
+                if (!root.check(Math.abs(map.scrollPosition)<0.5,"wheel at top wrapped")) return;
+                root.pass();
             }
         }
     }

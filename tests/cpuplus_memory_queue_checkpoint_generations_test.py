@@ -1,5 +1,7 @@
 """R6d disposable retention tests, no installed host or protected operations."""
 import copy
+import hashlib
+import json
 import os
 import tempfile
 import unittest
@@ -52,6 +54,29 @@ class Tests(unittest.TestCase):
         next_action["message"]["action_id"] = "c23683a9-b2ab-4a2c-87ce-31bdf27a3099"
         self.store.save(1, next_action)
         self.assertEqual(self.store.load()["checkpoint"]["action"], next_action)
+
+    def test_two_complete_generations_retained(self):
+        self.prepare()
+        self.store.advance(0, receipt())
+        next_action = copy.deepcopy(ACTION)
+        next_id = "c23683a9-b2ab-4a2c-87ce-31bdf27a3098"
+        next_action["message"]["action_id"] = next_id
+        dismiss = dismissal()
+        review = dismiss["review"]
+        review["action_id"] = next_id
+        review["review_id"] = "c23683a9-b2ab-4a2c-87ce-31bdf27a3097"
+        review["snapshot"]["record"]["message"] = next_action["message"]
+        review["review_digest"] = hashlib.sha256(json.dumps(
+            review["snapshot"],sort_keys=True,separators=(",",":")).encode("ascii")).hexdigest()
+        self.store.save(1, next_action)
+        self.store.save(1, dismiss)
+        second = dict(receipt(), review=review)
+        self.assertEqual(self.store.advance(1, second), 2)
+        self.assertTrue((self.path/SEAL).is_file())
+        self.assertTrue((self.path/"generation-0001"/SEAL).is_file())
+        self.assertEqual(self.store.load()["generation"], 2)
+        with self.assertRaisesRegex(QueueError,"CHECKPOINT_ACTION_ALREADY_RETAINED"):
+            self.store.save(2, next_action)
 
     def test_intent_without_receipt_or_wrong_receipt_cannot_advance(self):
         self.prepare()

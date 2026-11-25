@@ -319,6 +319,9 @@ Item {
             statusText = "CACHE LIMIT // EXISTING HISTORY PRESERVED";
             return;
         }
+        if (custodyV2 && activeLease && activeLease.generation.directory===result.directory && !sameCustody(activeLease.generation,result)) {
+            invalidateCustodyV2(); return;
+        }
         if (fullVisible && candidate.mapState
                 && candidate.mapState.snapshot === result.manifest.snapshot && (!custodyV2 || (activeLease && sameCustody(activeLease.generation,result)))) {
             statusText = "INDEX CURRENT // POSITION RETAINED";

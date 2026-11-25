@@ -712,5 +712,95 @@ class CycleArchiveTests(unittest.TestCase):
             archive.assert_called_once()
 
 
+
+class ExternalReclaimFenceTests(unittest.TestCase):
+    def test_absence_is_read_only_and_missing_parent_is_not_absence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fence = Path(tmp) / "reclaim"
+            with patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "secure_parent"):
+                m.check_external_reclaim_fence()
+                self.assertFalse(os.path.lexists(fence))
+            with patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "secure_parent", side_effect=FileNotFoundError):
+                with self.assertRaisesRegex(m.ReductionRecovery, "RECLAIM_FENCE_UNVERIFIED"):
+                    m.check_external_reclaim_fence()
+
+    def test_all_leaf_types_block_without_reading_or_clearing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fence = Path(tmp) / "reclaim"
+            with patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "secure_parent"):
+                fence.mkdir()
+                with self.assertRaisesRegex(m.ReductionRecovery, "RECLAIM_RECOVERY_REQUIRED"):
+                    m.check_external_reclaim_fence()
+                self.assertTrue(fence.is_dir())
+                fence.rmdir()
+                fence.write_bytes(b"partial")
+                with self.assertRaisesRegex(m.ReductionRecovery, "RECLAIM_RECOVERY_REQUIRED"):
+                    m.check_external_reclaim_fence()
+                self.assertEqual(fence.read_bytes(), b"partial")
+                fence.unlink()
+                fence.symlink_to(Path(tmp) / "absent")
+                with self.assertRaisesRegex(m.ReductionRecovery, "RECLAIM_RECOVERY_REQUIRED"):
+                    m.check_external_reclaim_fence()
+                self.assertTrue(fence.is_symlink())
+
+    def test_unreadable_leaf_fails_closed(self):
+        with patch.object(m, "secure_parent"), patch.object(Path, "lstat", side_effect=PermissionError):
+            with self.assertRaisesRegex(m.ReductionRecovery, "RECLAIM_FENCE_UNVERIFIED"):
+                m.check_external_reclaim_fence()
+
+    def test_all_entrypoints_block_under_actual_lock_even_without_extension(self):
+        commands = (["add","16"], ["add-authorized","16"], ["persist-authorized"],
+                    ["expand-authorized","24"], ["withdraw-authorized","16"],
+                    ["reactivate-authorized","24"], ["archive-cycle-authorized"],
+                    ["inspect-recovery-authorized"])
+        # Real unprivileged flock and fixed temp leaf; only owner metadata is
+        # simulated. No kernel swap, systemd or Btrfs command can be invoked.
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lock, fence, extension = (folder / name for name in ("lock", "reclaim", "extension"))
+            fence.mkdir()
+            old_lstat, old_fstat = Path.lstat, os.fstat
+            def root_parent(path):
+                result = old_lstat(path)
+                if path == folder:
+                    return SimpleNamespace(st_mode=result.st_mode, st_uid=0)
+                return result
+            def root_file(fd):
+                result = old_fstat(fd)
+                return SimpleNamespace(st_mode=result.st_mode, st_uid=0, st_nlink=result.st_nlink)
+            with patch.object(m, "LOCK", lock), patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "EXT_DIRECTORY", extension), patch.object(m, "secure_parent"), patch.object(m.os, "geteuid", return_value=0), patch.object(Path, "lstat", root_parent), patch.object(m.os, "fstat", root_file), patch.object(m, "run") as run, patch.object(m, "allocate") as allocate, patch.object(m, "persist_authorized") as persist, patch.object(m, "expand_authorized") as expand, patch.object(m, "withdraw_authorized") as withdraw, patch.object(m, "extension_identity") as identity, patch.object(m, "read_protected_record") as read, patch("builtins.print") as output:
+                for args in commands:
+                    with self.subTest(args=args):
+                        self.assertEqual(m.main(args),3)
+                        self.assertIn("RECLAIM_RECOVERY_REQUIRED", output.call_args.args[1])
+                        self.assertIsNone(m._mutation_fd)
+                for effect in (run, allocate, persist, expand, withdraw, identity, read):
+                    effect.assert_not_called()
+                self.assertFalse(extension.exists())
+                self.assertTrue(fence.is_dir())
+                fd = os.open(lock, os.O_RDWR)
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally:
+                    os.close(fd)
+
+    def test_absent_leaf_allows_existing_lock_path_without_creating_fence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lock, fence = folder / "lock", folder / "reclaim"
+            old_lstat, old_fstat = Path.lstat, os.fstat
+            def root_parent(path):
+                result = old_lstat(path)
+                return SimpleNamespace(st_mode=result.st_mode, st_uid=0) if path == folder else result
+            def root_file(fd):
+                result = old_fstat(fd)
+                return SimpleNamespace(st_mode=result.st_mode, st_uid=0, st_nlink=result.st_nlink)
+            with patch.object(m, "LOCK", lock), patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "secure_parent"), patch.object(m.os, "geteuid", return_value=0), patch.object(Path, "lstat", root_parent), patch.object(m.os, "fstat", root_file), patch.object(m, "check_recovery_fence") as existing:
+                with m.mutation_lock():
+                    self.assertIsNotNone(m._mutation_fd)
+                existing.assert_called_once_with()
+                self.assertIsNone(m._mutation_fd)
+                self.assertFalse(os.path.lexists(fence))
+
 if __name__ == "__main__":
     unittest.main()

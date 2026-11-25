@@ -17,7 +17,11 @@ PanelWindow {
     property bool gitDiagnosticsOpen: false
     // Candidate gate remains OFF pending combined native qualification.
     readonly property bool gitMapCustodyEnabled: false
-    FullHistoryMap.GitMapCustodyController { id: sharedMapCustody }
+    FullHistoryMap.GitMapCustodyController {
+        id: sharedMapCustody
+        v2Mode: true
+        v2Base: Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME")+"/.cache")
+    }
     // Rapid passive reopenings reuse the most recently published Git data.
     // Explicit refresh / repository selection / Git actions are unaffected.
     readonly property int passiveGitOpenFreshnessMs: 8000

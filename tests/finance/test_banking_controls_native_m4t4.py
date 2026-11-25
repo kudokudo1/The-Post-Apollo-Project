@@ -19,12 +19,12 @@ def timeout_witness(qs,work,env):
     # Deliberately hang only copied disposable helpers. No financial command
     # executes in this second launch; first launch uses the actual helpers.
     for name in ("banking_manual_archive.py","banking_manual_portable.py"):
-        (work/"scripts/finance"/name).write_text(
-            "import os,sys,time\\n"
-            "from pathlib import Path\\n"
-            "Path(os.environ['XDG_DATA_HOME'],Path(__file__).stem+'.pid').write_text(str(os.getpid()))\\n"
-            "sys.stdin.buffer.readline()\\n"
-            "time.sleep(120)\\n")
+        (work/"scripts/finance"/name).write_text("""import os, sys, time
+from pathlib import Path
+Path(os.environ["XDG_DATA_HOME"], Path(__file__).stem + ".pid").write_text(str(os.getpid()))
+sys.stdin.buffer.readline()
+time.sleep(120)
+""")
     env={**env,"BANKING_M4T5_TIMEOUT_FIXTURE":"1"}
     p=subprocess.Popen([qs,"-p",str(work/"shell.qml"),"--no-color"],
         cwd=work,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,

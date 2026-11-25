@@ -83,19 +83,19 @@ ShellRoot {
         Item {
             anchors.fill: parent
             Column {
-                id: top
+                id: fixtureHeaderRail
                 anchors.top: parent.top
                 width: parent.width
             }
             Column {
-                id: bottom
+                id: fixtureFooterRail
                 anchors.bottom: parent.bottom
                 width: parent.width
             }
             Flickable {
                 id: middle
-                anchors.top: top.bottom
-                anchors.bottom: bottom.top
+                anchors.top: fixtureHeaderRail.bottom
+                anchors.bottom: fixtureFooterRail.top
                 width: parent.width
                 clip: true
                 contentWidth: width
@@ -105,8 +105,8 @@ ShellRoot {
                     width: middle.width
                     active: smoke.mounted
                     sourceComponent: CpuPlusAutoWorkspace {
-                        headerTarget: top
-                        footerTarget: bottom
+                        headerTarget: fixtureHeaderRail
+                        footerTarget: fixtureFooterRail
                         observedDiskKiB: 25165816
                         capacityTargetGiB: 16
                         hostState: smoke.host
@@ -124,13 +124,13 @@ ShellRoot {
         repeat: true
         running: smoke.armed&&!smoke.done
         onTriggered: {
-            if(++smoke.ticks>280){smoke.check(false,"timeout "+smoke.phase);return;}
+            if(++smoke.ticks>280){smoke.check(false,"timeout phase="+smoke.phase+" host="+smoke.host.phase+" status="+(smoke.host.session.status ? smoke.host.session.status.state : "NONE")+" mounted="+smoke.mounted+" reads="+smoke.reads+" writes="+smoke.writes+" footerChildren="+fixtureFooterRail.children.length);return;}
             const w=workspace.item;
             const requests=smoke.find(w,"cpuplusQueuePane");
             const history=smoke.find(w,"cpuplusQueueHistoryPane");
             const recovery=smoke.find(w,"cpuplusQueueRecoveryPane");
             if(w) {
-                const nav=smoke.find(bottom,"cpuplusAutoNavigation");
+                const nav=smoke.find(fixtureFooterRail,"cpuplusAutoNavigation");
                 if(!nav)return;
                 if(!smoke.check(middle.height>0&&nav.visible,"fixed rails and positive viewport"))return;
             }

@@ -1,0 +1,60 @@
+name: FinanceW Simple M3d5a read-only guarded Save review staging
+
+on:
+  pull_request:
+    paths:
+      - "widgets/FinanceExpenseCategoryPreviewPane.qml"
+      - "services/finance/FinanceCategorizedSaveReview.js"
+      - "tests/finance/test_finance_simple_m3d5_qml_review.mjs"
+      - "tests/finance/test_finance_simple_m3d5_source_hold.py"
+      - "tests/finance/finance_simple_m3c_ui_runtime_harness.qml"
+      - "tests/finance/test_finance_simple_m3c_qt_runtime.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5A_REVIEW_UI_README.md"
+      - ".github/workflows/financew-simple-m3d5-guarded-review.yml"
+  push:
+    paths:
+      - "widgets/FinanceExpenseCategoryPreviewPane.qml"
+      - "services/finance/FinanceCategorizedSaveReview.js"
+      - "tests/finance/test_finance_simple_m3d5_qml_review.mjs"
+      - "tests/finance/test_finance_simple_m3d5_source_hold.py"
+      - "tests/finance/finance_simple_m3c_ui_runtime_harness.qml"
+      - "tests/finance/test_finance_simple_m3c_qt_runtime.py"
+      - "scripts/finance/SIMPLE_MODE_M3D5A_REVIEW_UI_README.md"
+      - ".github/workflows/financew-simple-m3d5-guarded-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: No production write activation
+        run: python3 -B tests/finance/test_finance_simple_m3d5_source_hold.py
+      - name: QML mirror matches merged M3d2 review for valid, tampered and stale data
+        run: node --test tests/finance/test_finance_simple_m3d5_qml_review.mjs
+
+  actual-qml-read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Qt runtime prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+          python -m pip install "PySide6>=6.10,<6.12"
+      - name: Actual FinanceW draft and preview QML, fictional data only
+        run: python tests/finance/test_finance_simple_m3c_qt_runtime.py

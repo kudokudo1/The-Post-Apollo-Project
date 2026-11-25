@@ -17,6 +17,21 @@ function memoryMetrics(rows, final) {
                 || !nonnegative(r.memoryKiB.Pss) || !nonnegative(r.memoryKiB.SwapPss)))
         return null;
     if (rows[0].sampleIntervalMs !== null || rows[0].cpuPct !== null) return null;
+    // Legacy captures have neither additive field. Never substitute zero.
+    const privateValues = rows.map(r => {
+        const m = r.memoryKiB;
+        const hasClean = Object.prototype.hasOwnProperty.call(m, "Private_Clean");
+        const hasTotal = Object.prototype.hasOwnProperty.call(r, "privateResidentKiB");
+        if (!hasClean && !hasTotal) return null;
+        const count = v => Number.isSafeInteger(v) && v >= 0;
+        if (!hasClean || !hasTotal || !count(m.Private_Clean) || !count(m.Private_Dirty)
+                || !count(m.Rss) || !count(r.privateResidentKiB)
+                || r.privateResidentKiB !== m.Private_Clean + m.Private_Dirty
+                || r.privateResidentKiB > m.Rss) throw Error("private resident evidence");
+        return r.privateResidentKiB;
+    });
+    const hasPrivate = privateValues.every(v => v !== null);
+    const footprint = rows.map(r => r.memoryKiB.Pss + r.memoryKiB.SwapPss);
     let duration = 0, cpu = 0, memory = 0, cpuPeak = 0;
     for (let i = 1; i < rows.length; ++i) {
         const r = rows[i], previous = rows[i - 1], ms = r.sampleIntervalMs;
@@ -37,6 +52,12 @@ function memoryMetrics(rows, final) {
         metric("PSS FINAL", gib(last.memoryKiB.Pss), "GiB", 3),
         metric("PSS NET CHANGE", (last.memoryKiB.Pss - rows[0].memoryKiB.Pss) / 1024, "MiB", 1),
         metric("SWAP PSS PEAK", Math.max(...rows.map(r => r.memoryKiB.SwapPss)) / 1024, "MiB", 1),
+        metric("PSS + SWAP PSS START", gib(footprint[0]), "GiB", 3),
+        metric("PSS + SWAP PSS FINAL", gib(footprint[footprint.length-1]), "GiB", 3),
+        metric("PSS + SWAP PSS NET CHANGE", (footprint[footprint.length-1]-footprint[0])/1024, "MiB", 1),
+        metric("PRIVATE RESIDENT START", hasPrivate ? gib(privateValues[0]) : null, "GiB", 3),
+        metric("PRIVATE RESIDENT FINAL", hasPrivate ? gib(privateValues[privateValues.length-1]) : null, "GiB", 3),
+        metric("PRIVATE RESIDENT NET CHANGE", hasPrivate ? (privateValues[privateValues.length-1]-privateValues[0])/1024 : null, "MiB", 1),
         metric("CPU MEAN", cpu / duration, "%", 1),
         metric("CPU PEAK", cpuPeak, "%", 1)
     ];
@@ -137,7 +158,14 @@ function compare(before, after, validate) {
         });
         let note = "Observed differences only. Match hardware, workload, duration and deployed revision manually; archive does not attest those conditions.";
         if (before.kind === "inventory") note = "Source declaration counts only; not running objects or performance. " + note;
-        if (before.kind === "memory") note = "PSS mean is a time-weighted trapezoid estimate; CPU mean is interval-weighted. " + note;
+        if (before.kind === "memory") {
+            const first = JSON.parse(before.text.trim().split("\n", 1)[0]);
+            const second = JSON.parse(after.text.trim().split("\n", 1)[0]);
+            const changed = first.pid !== second.pid || first.startTicks !== second.startTicks;
+            note = (changed ? "PROCESS IDENTITY CHANGED // separate process observations, not continuous growth. "
+                : "PID/start ticks match; boot identity and continuity between captures are unverified. ")
+                + "PSS + SwapPss is a proportional footprint estimate, not physical swap cost. Private resident excludes separately accounted hugetlb; legacy or partial private readings are N/A. No component attribution. PSS mean is a time-weighted trapezoid estimate; CPU mean is interval-weighted. " + note;
+        }
         if (before.kind === "threads") note = "Thread sums may omit exiting threads. " + note;
         if (before.kind === "storage") note = "Sampled metadata changes only; not writes, transactions or writer identity. Missing/unavailable endpoints are N/A. " + note;
         if (before.kind === "census") note = "Final intervals only; RSS is not PSS. Top-N rows are not totals. QS requires one returned exact-name match; identity and absence of omitted matches are not proven. " + note;

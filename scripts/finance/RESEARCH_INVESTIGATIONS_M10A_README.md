@@ -35,6 +35,7 @@ A later authorized recovery process must first compare the durable revision and 
 - New \`tests/finance/test_research_m10a_store_commit_uncertainty.mjs\` creates only isolated disposable temp stores and fault-injects failures before rename, during rename, after rename on directory fsync and during lock inode replacement.
 - Tests assert an ambiguous save preserves the exclusive lock and blocks further writes, while read-only access remains possible for recovery; precommit failure cleans up safely; replaced lock isn't deleted. Extra disposable tests reject ancestor symlink creation, hardlinks, swapped read inodes and a file growing after fstat.
 - Subprocess tests require a writer that finishes from a single frame without stdin EOF and refuses oversized/multi-frame input.
+- Real Linux child-process `SIGKILL` immediately before and immediately after rename verifies retained locks and blocked subsequent writes across process death. This is not a power-failure durability certificate.
 - Exact-head GitHub CI and Fedora 44 Linux test are required before describing this revision as validated. An independent reviewer must inspect the source, race behavior and tests.
 
 ## WATCH OUT FOR / UNSOLVED SECURITY ITEMS

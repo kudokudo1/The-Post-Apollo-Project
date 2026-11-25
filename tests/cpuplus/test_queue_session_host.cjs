@@ -395,7 +395,7 @@ console.log("R3q checkpoint host PASS: pre-send correlation, fresh-shell lookup 
  assert.equal(received.lastNoticeSequence,1);
  assert.equal(rows.length,1);
  assert.equal(results[0],"HISTORY_OBSERVED");
- assert.equal(deliver(received,packet),received);
+ assert.ok(h.equal(deliver(received,packet),received));
  assert.equal(rows.length,1);
  assert.equal(deliver(active,{...packet,status_sequence:2}).phase,"FAILED");
  assert.equal(deliver(active,{...packet,notice:{...notice,can_execute:true}}).phase,"FAILED");

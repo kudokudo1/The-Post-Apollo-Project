@@ -59,7 +59,10 @@ def trial(width, height, count):
         # Do not stage Ollama, model inference or host dispatch helpers.
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
         for relative in ("widgets/ForestW.qml", "widgets/forest/ui2/PublicConversationFixture.qml",
-                         "widgets/forest/ui2/PublicPreviewGate.qml", "components/ConversationFeed.qml", helper):
+                         "widgets/forest/ui2/PublicPreviewGate.qml",
+                         "widgets/forest/ui2/PublicRuntimeStatusView.qml",
+                         "widgets/forest/ui2/PublicRuntimeStatusDisplay.js",
+                         "components/ConversationFeed.qml", helper):
             if (ROOT / relative).read_bytes() != (scene / relative).read_bytes():
                 raise AssertionError("SOURCE_MISMATCH " + relative)
         config = work / "sway.conf"
@@ -118,5 +121,6 @@ def trial(width, height, count):
 
 
 if __name__ == "__main__":
-    trial(1366, 900, 10)
+    trial(1366, 900, 18)
+    trial(770, 450, 10)
     trial(420, 340, 3)

@@ -160,4 +160,5 @@ assert.match(pane,/active: root.page === "PROC"[\s\S]*?sourceComponent: CpuPlusP
 const procPane=fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusProcessPane.qml"),"utf8");
 assert.doesNotMatch(procPane,/\b(?:Process|Timer|MemoryOperation|execDetached)\s*\{/);
 assert.match(procPane,/CpuPlusDiagnostics.request\("census"\)/);
+assert.match(procPane,/Object.assign\(\{kind:"census"\},report\)/);
 console.log("CPU++ process census presentation PASS");

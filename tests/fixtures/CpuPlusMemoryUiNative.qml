@@ -207,7 +207,7 @@ ShellRoot {
                             Object.assign({},one.rows[1],{startTicks:101})]});
                         const end={schema:one.schema,event:"complete",samples:2};
                         CpuPlusDiagnostics.reports=Object.assign({},CpuPlusDiagnostics.reports,{census:{
-                            kind:"census",status:"COMPLETE",finishedAt:"2026-11-24T12:00:00.000Z",
+                            status:"COMPLETE",finishedAt:"2026-11-24T12:00:00.000Z",
                             text:[one,two,end].map(row=>JSON.stringify(row)).join("\n")}});
                         if (!smoke.check(proc.view && proc.ranked[0].pid===12
                             && proc.ranked[0].change===2097152 && proc.ranked[1].change===null

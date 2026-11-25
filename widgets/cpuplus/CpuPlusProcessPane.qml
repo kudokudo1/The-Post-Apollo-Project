@@ -10,7 +10,8 @@ Column {
     objectName: "cpuplusProcessPane"
     property string order: "RSS"
     readonly property var report: CpuPlusDiagnostics.reports.census || null
-    readonly property var view: Census.project(report,Policy.summarize)
+    // The session owner stores kind by map key; only archived records carry kind.
+    readonly property var view: Census.project(report ? Object.assign({kind:"census"},report) : null,Policy.summarize)
     readonly property var ranked: Census.rank(view,order)
     spacing: 5
     GohuText {

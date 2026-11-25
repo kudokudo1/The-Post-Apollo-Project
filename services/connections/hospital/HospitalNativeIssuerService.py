@@ -447,6 +447,29 @@ def _commit_with_terminal_receipt_or_unknown(policy, request, prepared,
             "HOSPITAL_NATIVE_HOLD // PX_COMMIT_OUTCOME_UNKNOWN_HOLD_NO_AUTO_RETRY"
         ) from exc
 
+def _send_committed_client_receipt_or_unknown(client, response):
+    """Send one minimal COMMITTED reply; loss never means PX rolled back.
+
+    The protected PX writer's exact terminal COMMITTED receipt has already
+    been validated by _native_step. This second, client-facing Unix packet
+    cannot prove whether the desktop received or displayed the result if
+    delivery fails. No new PX request, grant, recovery or retry is attempted.
+    A successful send is only kernel transport success, NOT client ACK.
+    """
+    try:
+        answer = C.canonical(response)
+        if client.send(answer) != len(answer):
+            raise OSError("partial committed client receipt")
+    except (C.Refused, OSError, TimeoutError, TypeError, ValueError,
+            UnicodeError, OverflowError) as exc:
+        # The original PX operation is already COMMITTED. Never turn
+        # a lost desktop packet into a claim of Room mutation failure.
+        raise C.Refused(
+            "HOSPITAL_NATIVE_HOLD // "
+            "PX_COMMITTED_CLIENT_RECEIPT_UNKNOWN_HOLD_NO_AUTO_RETRY"
+        ) from exc
+
+
 def main():
     """Never runnable from UI or CLI: only systemd LISTEN_FDS socket path."""
     if (os.name != "posix" or not sys.platform.startswith("linux")
@@ -480,9 +503,9 @@ def main():
                 if client.send(ready) != len(ready):
                     C.deny("NATIVE_CLIENT_HANDSHAKE_FAILED")
                 response = _native_step(client, policy)
-                answer = C.canonical(response)
-                if client.send(answer) != len(answer):
-                    C.deny("PARTIAL_CLIENT_RECEIPT_REFUSED")
+                # A completed PX mutation can outlive this client. Its
+                # terminal receipt delivery is separate from PX COMMIT.
+                _send_committed_client_receipt_or_unknown(client, response)
         finally:
             listen.close()
         return 0

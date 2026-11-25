@@ -26,6 +26,11 @@ Scope {
         const request=Catalog.create(document,name,targets);
         return request!==null&&invoke(request,document);
     }
+    function changeExisting(request) {
+        if(!ready || !request || !["edit","rename","delete"].includes(request.action)
+            || Catalog.expectedDocument(document,request)===null)return false;
+        return invoke(request,document);
+    }
     function invoke(request,base) {
         if(busy||faulted||worker.running)return false;
         baseline=base; submitted=request;
@@ -44,7 +49,7 @@ Scope {
         const next=exitOk?Catalog.accepted(output,submitted,baseline):null;
         document=next;
         status=next===null?"NOT CONFIRMED // LOAD LIST BEFORE RETRY"
-            : submitted.action==="list"?"READY":"SAVED // LOCAL CATALOG ONLY";
+            : submitted.action==="list"?"READY":submitted.action.toUpperCase()+" CONFIRMED // LOCAL CATALOG ONLY";
         submitted=null; baseline=null; frame=""; output=""; busy=false;
     }
     Timer {

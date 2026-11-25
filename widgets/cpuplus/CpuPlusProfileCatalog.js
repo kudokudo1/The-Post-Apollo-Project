@@ -24,6 +24,41 @@ function create(base,n,v){
         ||b.profiles.some(x=>x.name.toUpperCase()===n.toUpperCase()))return null;
     return {action:"create",expectedRevision:b.revision,name:n,targets:copyTargets(v)};
 }
+function change(base,action,n,value){
+    const b=document(base);
+    if(!b||b.revision===Number.MAX_SAFE_INTEGER||!name(n)||!["edit","rename","delete"].includes(action))return null;
+    const row=b.profiles.find(x=>x.name===n);
+    if(!row)return null;
+    const request={action:action,expectedRevision:b.revision,name:n};
+    if(action==="edit"){
+        if(!targets(value))return null;
+        request.targets=copyTargets(value);
+    }else if(action==="rename"){
+        if(!name(value)||value===n||b.profiles.some(x=>x.name!==n&&x.name.toUpperCase()===value.toUpperCase()))return null;
+        request.newName=value;
+    }else if(value!==null)return null;
+    return request;
+}
+function expectedDocument(base,request){
+    const b=document(base);
+    if(!b||!request)return null;
+    let expected;
+    if(request.action==="create")expected=create(b,request.name,request.targets);
+    else if(request.action==="edit")expected=change(b,"edit",request.name,request.targets);
+    else if(request.action==="rename")expected=change(b,"rename",request.name,request.newName);
+    else if(request.action==="delete")expected=change(b,"delete",request.name,null);
+    else return null;
+    if(!expected||!exact(request,Object.keys(expected))
+        ||!Object.keys(expected).every(k=>k==="targets"
+            ? targets(request.targets)&&request.targets.capacityGiB===expected.targets.capacityGiB&&request.targets.swappiness===expected.targets.swappiness
+            :request[k]===expected[k]))return null;
+    let rows=b.profiles;
+    if(request.action==="create")rows=rows.concat([{name:expected.name,targets:expected.targets}]);
+    else if(request.action==="edit")rows=rows.map(x=>x.name===expected.name?{name:x.name,targets:expected.targets}:x);
+    else if(request.action==="rename")rows=rows.map(x=>x.name===expected.name?{name:expected.newName,targets:x.targets}:x);
+    else rows=rows.filter(x=>x.name!==expected.name);
+    return {schema:SCHEMA,revision:b.revision+1,profiles:rows};
+}
 function accepted(raw,request,base){
     if(typeof raw!=="string"||raw.length>16385||!raw.endsWith("\n"))return null;
     let parsed;
@@ -33,10 +68,6 @@ function accepted(raw,request,base){
     // field order. Reject duplicate keys, extra frames and malformed output.
     if(!result||JSON.stringify(result)+"\n"!==raw)return null;
     if(exact(request,["action"])&&request.action==="list")return result;
-    const b=document(base);
-    if(!b||!request||request.action!=="create"||!exact(request,["action","expectedRevision","name","targets"]))return null;
-    const expected=create(b,request.name,request.targets);
-    if(!expected||expected.expectedRevision!==request.expectedRevision)return null;
-    const next={schema:SCHEMA,revision:b.revision+1,profiles:b.profiles.concat([{name:expected.name,targets:expected.targets}])};
-    return JSON.stringify(next)===JSON.stringify(result)?result:null;
+    const next=expectedDocument(base,request);
+    return next!==null&&JSON.stringify(next)===JSON.stringify(result)?result:null;
 }

@@ -1012,6 +1012,13 @@ Item {
                         if(root.page==="PROF" && root.selectedProfile==="CUSTOM") profileCatalog.saveNew(name,root.customProfileDraft);
                     }
                     onSavedDraftRequested: name => root.loadProfileDraft(name)
+                    onCatalogChangeRequested: request => {
+                        if(root.page!=="PROF" || !request)return;
+                        if(request.action==="edit" && (root.selectedProfile!=="CUSTOM" || !Profiles.valid(request.targets)
+                            || request.targets.capacityGiB!==root.customProfileDraft.capacityGiB
+                            || request.targets.swappiness!==root.customProfileDraft.swappiness))return;
+                        profileCatalog.changeExisting(request);
+                    }
                 }
             }
         }

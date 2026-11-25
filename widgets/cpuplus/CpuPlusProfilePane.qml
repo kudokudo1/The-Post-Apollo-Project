@@ -29,7 +29,34 @@ Column {
     signal catalogLoadRequested()
     signal catalogSaveRequested(string name)
     signal savedDraftRequested(string name)
-    onCatalogChanged: if(!catalog || !catalog.profiles.some(x=>x.name===selectedSaved)) selectedSaved=""
+    signal catalogChangeRequested(var request)
+    property var confirmation: null
+    function candidate(action) {
+        if(!visible||!catalogReady||!selectedSaved)return null;
+        if(action==="edit"&&selectedProfile!=="CUSTOM")return null;
+        return Catalog.change(catalog,action,selectedSaved,
+            action==="edit"?customDraft:action==="rename"?saveName:null);
+    }
+    function prepareChange(action) {
+        if(confirmation)return;
+        confirmation=candidate(action);
+    }
+    function confirmChange() {
+        const frozen=confirmation;
+        confirmation=null;
+        if(!frozen)return;
+        const current=candidate(frozen.action);
+        if(current&&JSON.stringify(current)===JSON.stringify(frozen))
+            catalogChangeRequested(frozen);
+    }
+    function cancelChange(){confirmation=null;}
+    onSelectedSavedChanged: confirmation=null
+    onSaveNameChanged: confirmation=null
+    onCustomDraftChanged: confirmation=null
+    onSelectedProfileChanged: confirmation=null
+    onCatalogBusyChanged: confirmation=null
+    onVisibleChanged: if(!visible)confirmation=null
+    onCatalogChanged: { confirmation=null; if(!catalog || !catalog.profiles.some(x=>x.name===selectedSaved)) selectedSaved=""; }
     readonly property var view: Profile.preview(selectedProfile,customDraft,actualKiB,actualSwappiness)
     spacing: 6
     GohuText {
@@ -117,7 +144,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: "NEW PROFILE NAME // MAX 32 CHARACTERS"
+        text: "NEW / RENAME PROFILE NAME // MAX 32 CHARACTERS"
         color: Colors.cyan
         font.pixelSize: 10
         wrapMode: Text.Wrap
@@ -193,6 +220,71 @@ Column {
                         else if(modelData==="SAVE NEW")root.catalogSaveRequested(root.saveName);
                         else root.savedDraftRequested(root.selectedSaved);
                     }
+                }
+            }
+        }
+        Row {
+            id: managementRail
+            width: parent.width
+            spacing: 3
+            visible: root.confirmation===null
+            Repeater {
+                model: ["EDIT","RENAME","DELETE"]
+                delegate: ActionButton {
+                    required property string modelData
+                    objectName: "cpuplusProfile"+modelData
+                    width: Math.max(0,(managementRail.width-2*managementRail.spacing)/3)
+                    height: 26
+                    label: modelData
+                    contentPadding: 2
+                    available: root.candidate(modelData.toLowerCase())!==null
+                    accentColor: modelData==="DELETE"?Colors.red:Colors.cyan
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.prepareChange(modelData.toLowerCase())
+                }
+            }
+        }
+        Column {
+            width: parent.width
+            spacing: 3
+            visible: root.confirmation!==null
+            GohuText {
+                width: parent.width
+                text: root.confirmation ? root.confirmation.action.toUpperCase()+" // "+root.confirmation.name
+                    +(root.confirmation.action==="rename"?" → "+root.confirmation.newName:
+                        root.confirmation.action==="edit"?" // REPLACE SAVED TARGETS WITH CUSTOM":" // REMOVE SAVED PROFILE")
+                    +" // LOCAL DATA ONLY":""
+                color: Colors.orange
+                font.pixelSize: 10
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+            }
+            Row {
+                width: parent.width
+                spacing: 3
+                ActionButton {
+                    objectName: "cpuplusProfileConfirm"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 26
+                    label: "CONFIRM"
+                    accentColor: Colors.red
+                    contentPadding: 2
+                    available: root.confirmation!==null&&root.catalogReady
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.confirmChange()
+                }
+                ActionButton {
+                    objectName: "cpuplusProfileCancel"
+                    width: Math.max(0,(parent.width-parent.spacing)/2)
+                    height: 26
+                    label: "CANCEL"
+                    contentPadding: 2
+                    available: root.confirmation!==null
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.cancelChange()
                 }
             }
         }

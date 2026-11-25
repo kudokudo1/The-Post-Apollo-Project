@@ -407,7 +407,7 @@ ShellRoot {
                     smoke.phase=4;
                     return;
                 }
-                if (smoke.phase>=50 && smoke.phase<=54) {
+                if (smoke.phase>=50 && smoke.phase<=58) {
                     const prof=smoke.find(pane,"cpuplusProfilePane");
                     if(smoke.phase===52) {
                         if (!smoke.check(!prof && pane.page==="CAP","profile page unloaded"))return;
@@ -439,6 +439,39 @@ ShellRoot {
                             "reopened PROF with cleared draft"))return;
                         load.leftClicked(null);smoke.phase=54;return;
                     }
+                    if(smoke.phase===55) {
+                        if(prof.catalogBusy)return;
+                        if(!smoke.check(prof.catalogReady&&prof.catalog.revision===2
+                            &&prof.savedRows[0].targets.swappiness===null,"explicit edit persisted"))return;
+                        prof.selectedSaved="Native Work";prof.saveName="Native Office";
+                        prof.prepareChange("rename");prof.confirmChange();
+                        smoke.phase=56;return;
+                    }
+                    if(smoke.phase===56) {
+                        if(prof.catalogBusy)return;
+                        if(!smoke.check(prof.catalogReady&&prof.catalog.revision===3
+                            &&prof.savedRows[0].name==="Native Office","exact rename persisted"))return;
+                        prof.selectedSaved="Native Office";
+                        prof.prepareChange("delete");prof.cancelChange();prof.confirmChange();
+                        if(!smoke.check(prof.catalog.revision===3&&!prof.catalogBusy,"cancelled deletion no write"))return;
+                        prof.prepareChange("delete");prof.confirmChange();prof.confirmChange();
+                        smoke.phase=57;return;
+                    }
+                    if(smoke.phase===57) {
+                        if(prof.catalogBusy)return;
+                        if(!smoke.check(prof.catalogReady&&prof.catalog.revision===4&&prof.savedRows.length===0,
+                            "one confirmed delete persisted"))return;
+                        const load=smoke.find(pane,"cpuplusProfileLoadList");
+                        load.leftClicked(null);smoke.phase=58;return;
+                    }
+                    if(smoke.phase===58) {
+                        if(prof.catalogBusy)return;
+                        if(!smoke.check(prof.catalogReady&&prof.catalog.revision===4&&prof.savedRows.length===0
+                            &&MemoryOperation.requests===0,"deleted catalog reload and zero memory operations"))return;
+                        pane.clearProfileDraft();pane.captureProfileTarget("capacityGiB");pane.captureProfileTarget("swappiness");
+                        console.log("CPU_PROFILE_NATIVE_PASS // persisted save, unload/reopen, reload, edit, rename, delete and draft only");
+                        pane.selectMenu(0);smoke.phase=6;return;
+                    }
                     if(prof.catalogBusy)return;
                     if(!smoke.check(prof.catalogReady && prof.catalog.revision===1
                         && prof.savedRows.length===1,"disk re-read after reopen"))return;
@@ -449,8 +482,15 @@ ShellRoot {
                     if(!smoke.check(prof.view.capacity.target===24 && prof.view.swappiness.target===150
                         && pane.stagedGiB===24 && pane.stagedSwappiness===150 && MemoryOperation.requests===0,
                         "loaded draft only, no setting changes"))return;
-                    console.log("CPU_PROFILE_NATIVE_PASS // persisted save, unload/reopen, reload and draft only");
-                    pane.selectMenu(0);smoke.phase=6;return;
+                    pane.clearProfileDraft();pane.captureProfileTarget("capacityGiB");
+                    prof.selectedSaved="Native Work";
+                    prof.prepareChange("edit");
+                    if(!smoke.check(!!prof.confirmation&&!prof.catalogBusy,"edit preparation does not write"))return;
+                    prof.selectedSaved="";
+                    prof.confirmChange();
+                    if(!smoke.check(!prof.catalogBusy&&prof.catalog.revision===1,"selection change invalidates confirmation"))return;
+                    prof.selectedSaved="Native Work";prof.prepareChange("edit");prof.confirmChange();
+                    smoke.phase=55;return;
                 }
                 if (!smoke.check(pane.page === "CAP" && slider.visible
                         && pane.stagedGiB === 24 && pane.stagedSwappiness === 150

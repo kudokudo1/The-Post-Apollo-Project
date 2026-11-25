@@ -1,4 +1,6 @@
 """DOC 2 disposable combined workspace/pipe/checkpoint qualification."""
+import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -104,3 +106,56 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
             if snapshot["action"] is None or snapshot["acknowledgment"] is None:
                 raise SystemExit("Native checkpoints missing")
         print("QUEUE_R3_GATE_DB_PASS // "+gate,flush=True)
+
+    # Independent persistent lineage audit. Do not trust the QML markers
+    # or reconstruct identity from the fixture's hardcoded action UUID.
+    # The checkpoint reader validates its files; independently recompute
+    # the review digest and compare the raw SQLite evidence across stores.
+    def digest(value):
+        encoded=json.dumps(value,sort_keys=True,separators=(",",":"),ensure_ascii=True,allow_nan=False)
+        return hashlib.sha256(encoded.encode("ascii")).hexdigest()
+
+    def require(condition, label):
+        if not condition:
+            raise SystemExit("M7C persistent lineage mismatch: "+label)
+
+    require(snapshot["startup_unlock"] is False and snapshot["can_execute"] is False,"checkpoint gate")
+    action_message=snapshot["action"]["message"]
+    checkpoint_review=snapshot["acknowledgment"]["review"]
+    with sqlite3.connect((config/"private"/"queue.db").as_uri()+"?mode=ro",uri=True) as db:
+        db.execute("PRAGMA query_only=ON")
+        actions=db.execute("SELECT ordinal,action_id,payload,state,prepared_at,result_id,committed_at FROM memory_queue_local_actions_v1").fetchall()
+        reviews=db.execute("SELECT review_id,action_id,reviewer_owner_id,payload,acknowledged_at FROM memory_queue_recovery_reviews_v1").fetchall()
+        requests=db.execute("SELECT id,state,payload FROM requests").fetchall()
+        require(db.execute("PRAGMA quick_check").fetchall()==[("ok",)],"database integrity")
+    require(len(actions)==1 and len(reviews)==1,"exact journal and receipt cardinality")
+    require(requests==[],"no committed request in any state")
+    ordinal,action_id,payload,state,prepared_at,result_id,committed_at=actions[0]
+    message=json.loads(payload)
+    require(message==action_message and action_id==message["action_id"],"action checkpoint and journal identity")
+    require(message["kind"]=="QUEUE" and message["expected_request_id"] is None,"original action shape")
+    require(state=="PREPARED" and result_id is None and committed_at is None,"uncommitted preparation")
+    row={"version":1,"ordinal":ordinal,"message":message,"state":state,
+         "prepared_at":prepared_at,"result_request_id":result_id,"committed_at":committed_at,
+         "adjustment_outcome":"UNVERIFIED","can_execute":False}
+    review_id,review_action_id,reviewer_owner_id,payload,acknowledged_at=reviews[0]
+    receipt=json.loads(payload)
+    review=receipt["review"]
+    require(review==checkpoint_review,"full durable review equality")
+    require(review_id==review["review_id"] and review_action_id==review["action_id"]==action_id,
+            "receipt key and action identity")
+    require(reviewer_owner_id==review["owner_id"] and reviewer_owner_id!=message["owner_id"],
+            "distinct original and recovery owners")
+    expected_snapshot={"version":1,"record":row,"pending_request_id":None,
+                       "pending_digest":digest(None),"adjustment_outcome":"UNVERIFIED",
+                       "can_execute":False,"startup_unlock":False}
+    require(review["snapshot"]==expected_snapshot,"independent reconstructed snapshot")
+    require(review["review_digest"]==digest(expected_snapshot),"independently recomputed digest")
+    require(review["can_execute"] is False and review["startup_unlock"] is False,"review nonauthority")
+    require(receipt["acknowledged_at_ms"]==acknowledged_at and
+            0<=acknowledged_at-review["reviewed_at_ms"]<60000,"receipt time lineage")
+    require(receipt["disposition"]=="REVIEW_ACKNOWLEDGED_ONLY" and
+            receipt["adjustment_outcome"]=="UNVERIFIED" and receipt["can_execute"] is False and
+            receipt["startup_unlock"] is False,"receipt nonauthority")
+    print("CPU_M7C_PERSISTENT_LINEAGE_PASS // action + receipt + checkpoint + recomputed digest; zero requests",flush=True)
+

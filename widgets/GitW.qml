@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import qs.components
 import qs.components as SharedComponents
 import "../services/git"
+import "git" as FullHistoryMap
 import "../services/github"
 import qs.services.notifications
 import QtQuick.Effects
@@ -5503,9 +5504,11 @@ PanelWindow {
 
                         // ===== BRANCH MAP ==============================
 
-                        BranchMap {
+                        FullHistoryMap.GitMapControlHost {
                             width: parent.width
                             height: gitControlCamera.branchMapHeight
+                            repoRoot: gitService.available ? gitService.repoRoot : ""
+                            operatorActive: root.menuOpen && root.activePage === "git" && root.gitView === "control"
 
                             topologyService: gitService
                             titleText: "REPOSITORY BRANCH MAP"

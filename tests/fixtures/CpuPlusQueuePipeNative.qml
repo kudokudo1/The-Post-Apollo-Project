@@ -36,7 +36,12 @@ ShellRoot {
     }
     function setSession(next, projection) {
         session = next;
-        context = next.status ? {state:next,projection:projection} : null;
+        // Preserve atomic host state even while an action is pending, a
+        // publication is invalidated, or a lost action needs reconciliation.
+        // The projection is cleared independently; the pane must see the
+        // pending/unresolved transition so its local click latch can retire.
+        context = next.ownerId || next.pending || next.unresolved
+            ? {state:next,projection:next.status ? projection : null} : null;
     }
     function receive(line) {
         if (done || dropping) return;
@@ -96,11 +101,17 @@ ShellRoot {
         const submitted = Consumer.submit(prepared,id);
         if (!check(submitted.message && submitted.state.pending,"pending before write")) return;
         setSession(submitted.state,null);
+        if (!check(context && context.state.pending && context.projection === null,
+            "pending context retained with no projection")) return;
         child.write(JSON.stringify({version:1,kind:"ACTION",message:submitted.message}) + "\n");
     }
     function confirm(kind) {
         pane.prepareIntent(kind);
-        if (!check(pane.preparation && pane.preparation.kind === kind,"prepare " + kind)) return;
+        if (!check(pane.preparation && pane.preparation.kind === kind,
+            "prepare " + kind + " // usable=" + pane.sessionUsable
+            + " visible=" + pane.visible + " latch=" + JSON.stringify(pane.submitted)
+            + " session=" + JSON.stringify(pane.session)
+            + " expiry=" + pane.expiryText + " display=" + pane.display.state)) return;
         pane.confirmIntent();
         pane.confirmIntent(); // second activation cannot emit a second action
     }
@@ -146,12 +157,17 @@ ShellRoot {
             } else if (smoke.phase === 1 && smoke.session.status && smoke.session.status.requestId) {
                 if (!smoke.check(smoke.sends === 1 && smoke.session.status.state === "UNKNOWN"
                     && smoke.session.status.code === "OBSERVATION_UNAVAILABLE","queued without fake readiness")) return;
+                if (!smoke.check(!pane.submitted && pane.sessionUsable,
+                    "queue reply retired click latch // latch=" + JSON.stringify(pane.submitted)
+                    + " session=" + JSON.stringify(pane.session))) return;
+                console.log("QUEUE_R3_NATIVE_STEP // queue committed, latch retired");
                 smoke.firstId = smoke.session.status.requestId;
                 pane.expiryText = "2099-01-02 00:00";
                 smoke.phase = 2;
                 smoke.confirm("REPLACE");
             } else if (smoke.phase === 2 && smoke.exited) {
-                if (!smoke.check(smoke.session.unresolved && !smoke.context && smoke.sends === 2
+                if (!smoke.check(smoke.session.unresolved && smoke.context && smoke.context.state.unresolved
+                    && smoke.context.projection === null && smoke.sends === 2
                     && smoke.replacementId !== smoke.firstId,"lost replace reply locks out UI")) return;
                 pane.prepareIntent("CANCEL");
                 if (!smoke.check(!pane.preparation,"disconnected refusal")) return;
@@ -166,6 +182,7 @@ ShellRoot {
                     && smoke.session.unresolved && smoke.sends === 2,"durable replacement / new epoch")) return;
                 pane.prepareIntent("CANCEL");
                 if (!smoke.check(!pane.preparation,"unresolved refusal")) return;
+                console.log("QUEUE_R3_NATIVE_STEP // new epoch, unresolved preserved");
                 smoke.phase = 4;
                 child.write(JSON.stringify({version:1,kind:"HISTORY",owner_id:smoke.session.ownerId,
                     request_id:smoke.firstId}) + "\n");
@@ -173,6 +190,7 @@ ShellRoot {
                 if (!smoke.check(smoke.detail.request.id === smoke.firstId
                     && smoke.detail.request.state === "REPLACED"
                     && smoke.detail.request.replaced_by === smoke.replacementId,"historical reconciliation")) return;
+                console.log("QUEUE_R3_NATIVE_STEP // replacement history reconciled");
                 smoke.setSession(Consumer.acknowledgeReconciliation(smoke.session),smoke.context.projection);
                 smoke.phase = 5;
                 smoke.confirm("CANCEL");

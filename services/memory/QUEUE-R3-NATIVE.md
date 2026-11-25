@@ -32,3 +32,15 @@ restart, explicit history reconciliation, configuration/installer review
 and native resource acceptance. The fixture host is not that host.
 Protected reader transport remains unresolved #2412; no production
 provider, daemon or privilege. Notification Hub delivery remains separate.
+
+## R3b revision 2 // native failure correction
+
+Initial native run 45544515128/job 138970769932 reached actual QUEUE but
+failed at prepare REPLACE. The fixture host incorrectly replaced the whole
+actionContext with null while awaiting a reply, hiding pending state from
+the pane's submitted-latch lifecycle. Keep atomic {state,projection} when
+owner/pending/unresolved exists, with null projection during invalidation;
+retain unresolved context on disconnect. Add explicit pending-context,
+latch-retirement and preparation diagnostics. This is a host-fixture fix,
+not a DOC 2 source change or relaxation of confirmation guards. The exact
+cause of the native refusal remains a hypothesis until revised CI passes.

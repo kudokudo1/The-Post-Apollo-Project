@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import "./widgets/forest/ui2" as UI2
+import "ActualReplay.js" as Actual
 
 ShellRoot {
     id: witness
@@ -63,6 +64,32 @@ ShellRoot {
                 role:ordinal===1?"user":"assistant",text:ordinal===1?"Public first question":"Public committed reply"}],
             complete:complete};
     }
+    // Actual child records, captured and independently correlated before this
+    // native replay. This is not a live Process-to-Loader connection.
+    property var actualRows: null
+    function actualUnits(units) {
+        for (const u of units) preview.item.receiveRuntimeUnit(u);
+    }
+    function actualPage(scope, entry, next=false) {
+        const item=preview.item;
+        check(next ? item.nextHistoryPage(scope,entry.requestId,2)
+            : item.openHistoryPage(scope,entry.requestId,2), "actual explicit page");
+        const req=item.historyPendingRequest;
+        check(req && req.requestId===entry.requestId && req.after===entry.after,
+            "actual independent request pin");
+        check(item.receiveHistoryPage(scope,entry.frame), "actual page delivery");
+        check(item.historyPendingRequest===null,"actual request remains pending");
+    }
+    function actualAttach(scope) {
+        preview.item.historyCurrentScope=scope;
+        check(preview.item.attachHistoryScope(scope),"actual attach");
+    }
+    function actualRetire() {
+        preview.item.historyCurrentScope=null;
+        preview.item.runtimeCurrentCorrelation=null;
+        preview.item.runtimeViewOpen=false;
+    }
+    function actualFeed() { return child(preview.item,"publicFixtureFeed"); }
     function verifyConnected(count,state) {
         const item=preview.item, feed=child(item,"publicFixtureFeed");
         check(item && feed && item.connectedHistoryMode && feed.messages.length===count,
@@ -471,6 +498,103 @@ ShellRoot {
             case 30:
                 check(review.item===null && preview.item===null, "review survived unload");
                 break;
+            case 31:
+                preview.active=true;
+                break;
+            case 32: {
+                const d=Actual.replay;
+                verifyLoaded();
+                check(preview.item.beginConnectedHistory(),"actual connected mode");
+                openRuntime(d.a);
+                actualUnits(d.unitsA);
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                actualAttach(d.h1);
+                actualPage(d.h1,d.first);
+                verifyConnected(2,"COMPLETE");
+                break;
+            }
+            case 33: {
+                const d=Actual.replay;
+                actualRetire();
+                verifyConnected(0,"CLOSED");
+                openRuntime(d.b);
+                actualUnits(d.unitsB);
+                verifyConnectedStatus("LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED");
+                verifyConnected(0,"CLOSED");
+                actualAttach(d.h2);
+                actualPage(d.h2,d.second[0]);
+                verifyConnected(2,"PARTIAL");
+                check(preview.item.historyNextAfter===2,"actual next cursor");
+                break;
+            }
+            case 34: {
+                const d=Actual.replay;
+                actualPage(d.h2,d.second[1],true);
+                verifyConnected(4,"COMPLETE");
+                actualRows=JSON.stringify(actualFeed().messages);
+                check(actualFeed().messages.filter(r=>r.direction==="incoming").length===2,
+                    "actual two replies");
+                actualRetire();
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("");
+                break;
+            }
+            case 35: {
+                const d=Actual.replay;
+                check(d.h3.sessionId===d.h2.sessionId && d.h3.viewKey!==d.h2.viewKey,
+                    "actual reopen scope");
+                actualAttach(d.h3);
+                actualPage(d.h3,d.reopened[0]);
+                verifyConnected(2,"PARTIAL");
+                check(!preview.item.receiveHistoryPage(d.h2,d.second[1].frame),"old page accepted");
+                preview.item.refuseHistoryScope(d.h2);
+                verifyConnected(2,"PARTIAL");
+                actualPage(d.h3,d.reopened[1],true);
+                verifyConnected(4,"COMPLETE");
+                check(JSON.stringify(actualFeed().messages)===actualRows,"reopen rows changed");
+                break;
+            }
+            case 36: {
+                const d=Actual.replay;
+                actualRetire();
+                openRuntime(d.c);
+                actualUnits(d.unitsC);
+                verifyConnectedStatus("GENERATING");
+                preview.item.receiveRuntimeUnit(d.unitsB[0]);
+                preview.item.invalidateRuntimeLifetime(d.b);
+                verifyConnectedStatus("GENERATING");
+                verifyConnected(0,"CLOSED");
+                actualUnits(d.stop);
+                verifyConnectedStatus("STOP REQUESTED // OUTCOME PENDING");
+                break;
+            }
+            case 37:
+                actualUnits(Actual.replay.abort);
+                verifyConnected(0,"CLOSED");
+                check(preview.item.runtimeStatusText!=="LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED",
+                    "aborted third turn painted as commit");
+                check(actualFeed().messages.length===0,"provisional reply");
+                preview.active=false;
+                break;
+            case 38:
+                check(preview.item===null,"actual old Loader survived");
+                preview.active=true;
+                break;
+            case 39: {
+                const d=Actual.replay;
+                verifyLoaded();
+                check(preview.item.beginConnectedHistory(),"new Loader connected mode");
+                preview.item.receiveRuntimeUnit(d.unitsC[0]);
+                check(!preview.item.receiveHistoryPage(d.h3,d.reopened[0].frame),"old page opened replacement");
+                verifyConnected(0,"CLOSED");
+                verifyConnectedStatus("");
+                preview.active=false;
+                break;
+            }
+            case 40:
+                check(preview.item===null,"actual replay Loader survived");
+                break;
             default:
                 check(false, "unexpected phase");
             }
@@ -478,7 +602,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 30) {
+            if (p === 40) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

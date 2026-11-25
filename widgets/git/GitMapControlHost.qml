@@ -24,6 +24,11 @@ Item {
     property string observedHead: ""
     property string activeRepo: ""
     property string activeDirectory: ""
+    property var custodyController: null
+    property var activeLease: null
+    property var pendingLease: null
+    readonly property bool custodyEnabled: custodyController!==null
+    readonly property bool pendingCustodyReady: !custodyEnabled || (pendingLease!==null && pendingLease.held)
     property alias searchQuery: searchInput.text
     property string searchStatus: ""
     property var searchRequest: null
@@ -45,9 +50,31 @@ Item {
     readonly property bool canRequest: operatorActive && !busy && !faulted && !worker.running
         && repoRoot.startsWith("/") && repoRoot.length > 1
     readonly property bool fullVisible: activeRepo === repoRoot && activeRepo !== ""
+        && (!custodyEnabled || (activeLease!==null && activeLease.held))
     readonly property bool canAdopt: operatorActive && pendingResult !== null
-        && pendingRepo === repoRoot && !busy && !faulted
+        && pendingRepo === repoRoot && !busy && !faulted && pendingCustodyReady && (!custodyEnabled || !candidate.readerBusy)
 
+    function clearPending() {
+        if (pendingLease && custodyController) custodyController.release(pendingLease);
+        pendingLease=null;
+        pendingResult=null;
+        pendingRepo="";
+    }
+    Connections {
+        target: root.pendingLease
+        function onHeldChanged() { root.schedule(); }
+        function onCustodyStateChanged() { root.schedule(); }
+    }
+    Connections {
+        target: root.activeLease
+        function onHeldChanged() {
+            if (root.activeLease && !root.activeLease.held) root.statusText="CUSTODY LOST // AVAILABLE HISTORY";
+        }
+    }
+    Component.onDestruction: {
+        clearPending();
+        if (activeLease && custodyController) custodyController.release(activeLease);
+    }
     onRepoRootChanged: {
         repoEpoch += 1;
         activeRepo = "";
@@ -55,8 +82,7 @@ Item {
         searchRequest=null;
         lastMatch=null;
         searchStatus="";
-        pendingResult = null;
-        pendingRepo = "";
+        clearPending();
         statusText = "AVAILABLE HISTORY // REPOSITORY CHANGED";
         lookupQueued = true;
         buildQueued = false;
@@ -93,6 +119,11 @@ Item {
     function pump() {
         if (!canRequest) return;
         if (pendingResult) {
+            if (custodyEnabled && (!pendingLease || pendingLease.terminal)) {
+                clearPending();
+                statusText="CUSTODY UNAVAILABLE // CURRENT MAP RETAINED";
+                return;
+            }
             adoptPending();
             return;
         }
@@ -110,8 +141,7 @@ Item {
         jobRepo = repoRoot;
         jobEpoch = repoEpoch;
         jobsStarted++;
-        pendingResult = null;
-        pendingRepo = "";
+        clearPending();
         received = false;
         exited = false;
         exitOk = false;
@@ -226,8 +256,7 @@ Item {
                 adopt(Object.assign({},result,{offset:anchor.offset}));
             } else {
                 // Never jump or repeatedly retry if the anchor vanished/moved.
-                pendingResult=null;
-                pendingRepo="";
+                clearPending();
                 statusText="NEW HISTORY NOT ADOPTED // POSITION RETAINED";
             }
             return;
@@ -255,6 +284,14 @@ Item {
         }
         pendingResult = result;
         pendingRepo = repo;
+        if (custodyEnabled) {
+            pendingLease=custodyController.acquire(result);
+            if (!pendingLease) {
+                clearPending();
+                statusText="CUSTODY UNAVAILABLE // CURRENT MAP RETAINED";
+                return;
+            }
+        }
         statusText = "NEW HISTORY READY";
         schedule();
     }
@@ -274,12 +311,15 @@ Item {
         const result=pendingResult;
         if (!candidate.activate(result.directory,result.manifest,anchor)) {
             statusText="INDEX OPEN FAILED // CURRENT MAP SAFE";
-            pendingResult=null;
-            pendingRepo="";
+            clearPending();
             return false;
         }
+        const previousLease=activeLease;
+        activeLease=pendingLease;
+        pendingLease=null;
         activeRepo=pendingRepo;
         activeDirectory=result.directory;
+        if (previousLease && custodyController) custodyController.release(previousLease);
         lastMatch=null;
         searchStatus="";
         pendingResult=null;
@@ -300,7 +340,7 @@ Item {
             root.job = "";
             root.jobRepo = "";
             root.output = "";
-            root.pendingResult=null;
+            root.clearPending();
             root.searchRequest=null;
             root.searchStatus="SEARCH / INDEX WORKER FAULT";
             root.pendingRepo="";
@@ -418,6 +458,7 @@ Item {
         recentRepo: root.repoRoot
         titleText: root.titleText
         requestsEnabled: root.operatorActive && root.fullVisible
+        onReaderBusyChanged: if (!readerBusy && root.pendingResult) root.schedule()
         onScrollPositionChanged: if (root.pendingResult && scrollPosition===0) root.schedule()
         onCommitSelected: function(sha) {
             if (root.operatorActive) root.commitSelected(sha);

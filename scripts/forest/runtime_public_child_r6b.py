@@ -307,12 +307,19 @@ class Child:
     def _db_identity(self):
         h = self.host
         path = h._path
+        directory = path.parent.stat(follow_symlinks=False)
+        require(stat.S_ISDIR(directory.st_mode)
+                and directory.st_uid == os.getuid()
+                and not directory.st_mode & 0o077)
         info = path.stat(follow_symlinks=False)
-        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid())
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and info.st_nlink == 1)
         dbs = h._db.execute("PRAGMA database_list").fetchall()
         require(len(dbs) == 1 and dbs[0][1] == "main"
                 and Path(dbs[0][2]) == path)
-        return (path, info.st_dev, info.st_ino)
+        # Pathname evidence only; SQLite does not expose its actual FD here.
+        return (path, directory.st_dev, directory.st_ino,
+                info.st_dev, info.st_ino)
 
     def _verify(self, revision, aborted=False):
         """Owner-local transaction check; no raw identifiers returned to wire."""
@@ -507,7 +514,18 @@ class Child:
                     self.result(code)
         elif kind == "REOPEN":
             require(self.phase == "IDLE" and data == {} and self.reopen_ready)
+            # Check original path custody and exact idle durable evidence
+            # before retiring presentation or calling R5's pathname opener.
+            db = self.host._db
+            db.execute("BEGIN")
+            try:
+                self._idle_snapshot()
+            finally:
+                db.rollback()
             self._retire()
+            # Recheck after retirement and immediately before the opener.
+            # This narrows but does not close a concurrent same-UID swap race.
+            require(self._db_identity() == self.identity)
             self.effect_possible = True
             self.host.reopen_journal()
             self.host._db.execute("BEGIN")

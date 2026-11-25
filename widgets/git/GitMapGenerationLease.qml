@@ -7,6 +7,8 @@ Item {
     id: root
     visible: false
     property var generation: null
+    property bool v2Mode: false
+    property string v2Base: ""
     property int owners: 0
     property string custodyState: "NEW"
     property bool reaped: false
@@ -18,7 +20,8 @@ Item {
         if (custodyState!=="NEW" || !generation) return false;
         custodyState="STARTING";
         deadline.restart();
-        keeper.exec(["/usr/bin/python3","-I","-B",
+        if (v2Mode) keeper.exec(["/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),"--base",v2Base,"--device",generation.device,"--inode",generation.inode,"hold",generation.repoId,generation.key,generation.manifest.snapshot]);
+        else keeper.exec(["/usr/bin/python3","-I","-B",
             Quickshell.shellPath("scripts/git_map_reader_candidate.py"),
             generation.repoId,generation.key,generation.manifest.snapshot]);
         return true;
@@ -51,7 +54,7 @@ Item {
                 try { if (data.length<=2048) m=JSON.parse(data); } catch (error) {}
                 const g=root.generation;
                 if (root.custodyState!=="STARTING" || !m || !g
-                    || m.schema!=="post-apollo-git-map-reader-candidate-v1"
+                    || (root.v2Mode ? m.schema!=="post-apollo-git-map-reader-v2-candidate" || m.device!==g.device || m.inode!==g.inode : m.schema!=="post-apollo-git-map-reader-candidate-v1")
                     || m.status!=="HELD" || m.repoId!==g.repoId || m.key!==g.key
                     || m.snapshot!==g.manifest.snapshot || m.reclamationAllowed!==false) {
                     root.fail(); return;

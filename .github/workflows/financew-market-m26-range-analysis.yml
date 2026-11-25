@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceMarketDateControls.qml"
+      - "widgets/FinanceStockModePolicy.js"
+      - "services/finance/FinanceGlobalPriceService.qml"
+      - "services/finance/FinanceAlphaVantageFreeService.qml"
+      - "tests/finance/test_market_m46c_global_dates.mjs"
       - "widgets/FinanceStockDiscoveryPane.qml"
       - "widgets/FinanceGlobalPricePane.qml"
       - "widgets/FinanceAlphaVantageFreePane.qml"
@@ -42,6 +47,11 @@ on:
     branches: [main]
     paths:
       - "widgets/FinanceStockHistoryPane.qml"
+      - "widgets/FinanceMarketDateControls.qml"
+      - "widgets/FinanceStockModePolicy.js"
+      - "services/finance/FinanceGlobalPriceService.qml"
+      - "services/finance/FinanceAlphaVantageFreeService.qml"
+      - "tests/finance/test_market_m46c_global_dates.mjs"
       - "widgets/FinanceStockDiscoveryPane.qml"
       - "widgets/FinanceGlobalPricePane.qml"
       - "widgets/FinanceAlphaVantageFreePane.qml"

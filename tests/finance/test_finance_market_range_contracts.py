@@ -24,7 +24,14 @@ assert 'label: "CONTROLS"' in pane and 'stocks.openControls()' in pane
 assert 'readonly property var snapshot: globalHistory' in pane
 assert 'StockModePolicy.stockItems()' not in pane and 'stocks.stockFeed.refresh()' not in pane
 assert 'RETURN TO LEGACY STOCKS' not in pane
-assert 'START DATE' in pane and 'END DATE' in pane
+dates=(r/"widgets/FinanceMarketDateControls.qml").read_text()
+assert 'START DATE' in dates and 'END DATE' in dates
+for name in ("FinanceGlobalPricePane.qml","FinanceAlphaVantageFreePane.qml"):
+    assert "FinanceMarketDateControls {" in (r/"widgets"/name).read_text()
+for name in ("FinanceGlobalPriceService.qml","FinanceAlphaVantageFreeService.qml"):
+    global_service=(r/"services/finance"/name).read_text()
+    assert 'StockModePolicy.selectWindow("range","",startDate,endDate,' in global_service
+    assert "requestedFrom=window.from" in global_service and "requestedTo=window.to" in global_service
 assert 'stocks.snapshot.first.price.toFixed(2)' in pane
 assert 'stocks.snapshot.last.price.toFixed(2)' in pane
 assert 'Canvas {' in pane and 'priceCanvas.requestPaint()' in pane

@@ -231,6 +231,13 @@ Item {
                     }
                 }
             }
+            FinanceMarketDateControls {
+                width: content.width
+                visible: !!av.selectedListing
+                height: visible ? implicitHeight : 0
+                feed: av
+                active: avPane.active
+            }
             ActionButton {
                 width: content.width
                 height: 30
@@ -239,7 +246,7 @@ Item {
                 labelPixelSize: 9
                 accentColor: Colors.magenta
                 available: avPane.active && !!av.selectedListing
-                    && !av.loading
+                    && av.validWindow && !av.loading
                 onLeftClicked: av.loadHistory()
             }
             GohuText {

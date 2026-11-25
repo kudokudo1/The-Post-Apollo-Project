@@ -278,6 +278,13 @@ Item {
                     }
                 }
             }
+            FinanceMarketDateControls {
+                width: body.width
+                visible: !!priceFeed.selectedListing
+                height: visible ? implicitHeight : 0
+                feed: priceFeed
+                active: priceView.active
+            }
             ActionButton {
                 width: body.width
                 height: 31
@@ -285,8 +292,8 @@ Item {
                     : "LOAD SELECTED DAILY HISTORY"
                 labelPixelSize: 10
                 accentColor: Colors.magenta
-                available: priceView.active && priceFeed.selectedListing
-                    && !priceFeed.loading
+                available: priceView.active && !!priceFeed.selectedListing
+                    && priceFeed.validWindow && !priceFeed.loading
                 onLeftClicked: priceFeed.loadHistory()
             }
             GohuText {

@@ -136,6 +136,12 @@ class LocalActions:
         return db.execute("SELECT " + self.COLUMNS + " FROM " + self.TABLE +
                           " WHERE action_id=?", (_uuid(action_id),)).fetchone()
 
+    def _blocking_clause(self):
+        return "state='PREPARED'"
+
+    def _is_dismissed(self, db, action_id):
+        return False
+
     def prepare(self, message, *, now):
         m = validate(message)
         _int(now, 0, MAX_SAFE)
@@ -146,7 +152,7 @@ class LocalActions:
             if self._row(db,m["action_id"]) is not None:
                 raise QueueError("ACTION_ALREADY_RECORDED")
             if db.execute("SELECT 1 FROM " + self.TABLE +
-                          " WHERE state='PREPARED' LIMIT 1").fetchone():
+                          " WHERE " + self._blocking_clause() + " LIMIT 1").fetchone():
                 raise QueueError("ACTION_RECONCILIATION_REQUIRED")
             if m["kind"] == "QUEUE":
                 if self.queue._pending(db) is not None:
@@ -182,7 +188,8 @@ class LocalActions:
             if row is None:
                 raise QueueError("ACTION_NOT_PREPARED")
             saved = self._decode(db,row)
-            if saved["state"] != "PREPARED" or saved["message"] != m:
+            if (saved["state"] != "PREPARED" or saved["message"] != m
+                    or self._is_dismissed(db,m["action_id"])):
                 raise QueueError("ACTION_NOT_PREPARED")
             kind = m["kind"]
             old = None

@@ -79,6 +79,17 @@ ShellRoot {
             "actual independent request pin");
         check(item.receiveHistoryPage(scope,entry.frame), "actual page delivery");
         check(item.historyPendingRequest===null,"actual request remains pending");
+        // Compare every delivered row to the actual independently pinned PAGE.
+        // The public fixture prompt may have the same text as the literal sample.
+        const rows=actualFeed().messages;
+        check(rows.length===entry.after+entry.frame.messages.length,"actual accumulated row count");
+        for (let i=0;i<entry.frame.messages.length;i++) {
+            const expected=entry.frame.messages[i], actual=rows[entry.after+i];
+            check(actual && /^[0-9a-f]{32}$/.test(expected.turn_id)
+                && actual.turnId===expected.turn_id && actual.ordinal===expected.ordinal
+                && actual.direction===(expected.role==="user"?"outgoing":"incoming")
+                && actual.body===expected.text, "actual projected row identity/content");
+        }
     }
     function actualAttach(scope) {
         preview.item.historyCurrentScope=scope;
@@ -97,7 +108,11 @@ ShellRoot {
         check(item.fixtureState===state, "connected history state "+item.fixtureState);
         check(!feed.sendEnabled && !feed.showComposer && !feed.richMessageActions,
             "connected execution gate");
-        check(!feed.messages.some(row=>row.body==="What is a Tree?"), "literal history leaked");
+        // Literal sample identity, not its question wording, identifies fallback.
+        check(!feed.messages.some(row=>row.turnId==="public-turn-1"
+            || row.turnId==="public-turn-2"
+            || row.body==="Public sample: a Tree is a Forest agent identity."),
+            "literal history leaked");
     }
     function verifyConnectedStatus(label) {
         const item=preview.item, runtime=child(item,"publicFixtureRuntimeStatus");
@@ -512,6 +527,9 @@ ShellRoot {
                 actualAttach(d.h1);
                 actualPage(d.h1,d.first);
                 verifyConnected(2,"COMPLETE");
+                check(actualFeed().messages[0].body==="What is a Tree?"
+                    && actualFeed().messages[0].turnId!== "public-turn-1",
+                    "shared prompt must retain actual public alias");
                 break;
             }
             case 33: {

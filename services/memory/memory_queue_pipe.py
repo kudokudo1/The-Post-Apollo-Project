@@ -178,6 +178,8 @@ def _receipt_wire(receipt):
 
 class Session:
     def __init__(self, owner, emit, *, review_max_age_ms=None, notification_max_age_ms=None):
+        if getattr(owner,"local_disposition_enabled",False):
+            raise QueueError("LOCAL_DISPOSITION_WIRE_V2_REQUIRED")
         if review_max_age_ms is not None:
             if owner.staged_max_age_ms is None:
                 raise QueueError("STAGED_ACTION_MODE_REQUIRED")

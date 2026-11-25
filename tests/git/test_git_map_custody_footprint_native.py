@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import signal
 import statistics
@@ -106,6 +105,7 @@ with tempfile.TemporaryDirectory(prefix="git-map-footprint-") as tmp:
     worktree=git("status","--porcelain").stdout
     cache=base/"cache"/"post-apollo-git-map-v1"
     receipt=manager.build(repo,cache)
+    assert receipt["manifest"]["total"]==1000,receipt
     directory=Path(receipt["directory"])
     db=directory/index.NAME
     digest=hashlib.sha256(db.read_bytes()).hexdigest()
@@ -133,14 +133,21 @@ with tempfile.TemporaryDirectory(prefix="git-map-footprint-") as tmp:
                        QT_QUICK_BACKEND="software",LIBGL_ALWAYS_SOFTWARE="1",
                        QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",DISPLAY="",
                        MAP_FOOTPRINT_REPO=str(repo),MAP_FOOTPRINT_MODE=mode)
+            # Verify the exact prebuilt snapshot is visible through the same
+            # executable and environment as the host, before launching QML.
+            lookup=subprocess.run([sys.executable,"-I","-B",
+                str(scene/"scripts/git_map_index_manager.py"),"lookup",str(repo)],
+                env=env,text=True,capture_output=True,timeout=5,check=True)
+            assert json.loads(lookup.stdout)==receipt,(lookup.stdout,receipt)
             logfile=base/f"{pair}-{mode}.log"
             with logfile.open("w") as log:
                 p=subprocess.Popen(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,
                                    env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
                 try:
-                    deadline=time.monotonic()+20
+                    deadline=time.monotonic()+25
                     expected="GIT_MAP_FOOTPRINT_READY "+receipt["manifest"]["snapshot"]
                     while expected not in logfile.read_text():
+                        assert "GIT_MAP_FOOTPRINT_FAIL" not in logfile.read_text(),logfile.read_text()
                         assert p.poll() is None,logfile.read_text()
                         assert time.monotonic()<deadline,logfile.read_text()
                         time.sleep(.05)

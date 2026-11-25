@@ -287,7 +287,7 @@ test('mini graph lookup preserves old scan results and rebuilds on snapshot repl
     assert.match(app, /taskRows = snapshotRows;/);
 });
 
-test('mini COMBI histories copy only on demand and preserve snapshot isolation', () => {
+test('mini COMBI histories align once on demand and preserve snapshot isolation', () => {
     const start = app.indexOf('                            function snapshotCombiHistory(live) {');
     const end = app.indexOf('                            function refreshHistory(animateScroll) {', start);
     assert.ok(start >= 0 && end > start, 'locate exact mini canvas helper');
@@ -297,27 +297,47 @@ test('mini COMBI histories copy only on demand and preserve snapshot isolation',
     const source = {cpu: [1, 2, 3], mem: [4, 5], io: [0], age: [9, 10]};
     const entry = {pid: 99};
     let calls = [];
+    let copies = 0;
     const controller = {
         miniHunterHistoryForMetric: (live, metric) => {
             assert.equal(live, entry);
             calls.push(metric);
-            return source[metric];
+            return new Proxy(source[metric], {
+                get(target, key, receiver) {
+                    if (key === 'slice') copies++;
+                    return Reflect.get(target, key, receiver);
+                }
+            });
         }
     };
+    function legacyVisible() {
+        const length = Math.min(...Object.values(source).map(v => v.length));
+        return Object.fromEntries(Object.entries(source).map(([key,value]) =>
+            [key,value.slice(value.length-length)]));
+    }
     const off = create(false, empty, controller);
     for (let n = 0; n < 100; n++)
         assert.equal(off(entry), empty, 'stable inactive history object');
     assert.deepStrictEqual(calls, [], 'no metric retrieval or copying outside COMBI');
     const on = create(true, empty, controller);
+    const expected = legacyVisible();
     const active = on(entry);
     assert.deepStrictEqual(calls, ['cpu', 'mem', 'io', 'age']);
-    assert.deepStrictEqual(active, source, 'all four histories preserved');
+    assert.equal(copies,4,'one isolated copy per series');
+    assert.deepStrictEqual(active, expected, 'same common tail as previous renderer');
     for (const metric of Object.keys(source))
         assert.notEqual(active[metric], source[metric], 'local copy ' + metric);
     source.cpu.push(4);
-    assert.deepStrictEqual(active.cpu, [1, 2, 3], 'active readers keep snapshot');
+    assert.deepStrictEqual(active,expected,'active readers keep snapshot');
     assert.equal(off(entry), empty, 'exit drops local copies');
-    assert.deepStrictEqual(on(entry).cpu, [1, 2, 3, 4], 're-entry sees latest samples');
+    assert.deepStrictEqual(on(entry), legacyVisible(), 're-entry sees latest samples');
+    for (const length of [0,1,2,47,48]) {
+        for (const [i,key] of Object.keys(source).entries())
+            source[key]=Array.from({length:length===0&&i===0?0:length+i},(_,n)=>n+i);
+        copies=0;
+        assert.deepStrictEqual(on(entry),legacyVisible(),'aligned length '+length);
+        assert.equal(copies,length===0?0:4);
+    }
     const refresh = app.slice(end, app.indexOf('// Keep the same three-quarter grid', end));
     assert.match(refresh, /const nextCombi = snapshotCombiHistory\(live\);/);
     assert.match(refresh, /if \(combiHistories !== nextCombi\)\s+combiHistories = nextCombi;/);
@@ -326,6 +346,10 @@ test('mini COMBI histories copy only on demand and preserve snapshot isolation',
     assert.match(refresh, /onHistoryRevisionChanged: refreshHistory\(true\)/);
     assert.match(refresh, /onTaskIdentityChanged\(\)/);
     assert.match(refresh, /onRowItemChanged\(\)/);
+    const traceStart=app.indexOf('readonly property var metricHistory:',app.indexOf('id: miniCombiTrace'));
+    const trace=app.slice(traceStart,app.indexOf('readonly property var metricPoints:',traceStart));
+    assert.match(trace,/combiHistories\[modelData.metric\]/);
+    assert.doesNotMatch(trace,/\.slice\(|commonLength|for\s*\(/);
 });
 
 test('mini graph scroll moves one trace layer, not every rectangle', () => {

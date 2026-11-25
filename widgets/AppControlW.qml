@@ -14575,24 +14575,24 @@ PanelWindow {
                                 { metric: "age", label: "AGE", accent: Colors.white }
                             ]
 
-                            // Local copies remain mandatory for active COMBI
-                            // readers, but other modes do not consume these series.
+                            // Preserve delegate-local snapshots, but align
+                            // the four series once, before publication. The
+                            // renderer no longer copies these same tails again.
                             function snapshotCombiHistory(live) {
                                 if (!combiView)
                                     return emptyCombiHistories;
+                                const cpu = taskGraphController.miniHunterHistoryForMetric(live, "cpu");
+                                const mem = taskGraphController.miniHunterHistoryForMetric(live, "mem");
+                                const io = taskGraphController.miniHunterHistoryForMetric(live, "io");
+                                const age = taskGraphController.miniHunterHistoryForMetric(live, "age");
+                                const commonLength = Math.min(cpu.length, mem.length, io.length, age.length);
+                                if (commonLength <= 0)
+                                    return emptyCombiHistories;
                                 return ({
-                                    cpu: taskGraphController.miniHunterHistoryForMetric(
-                                             live, "cpu"
-                                         ).slice(),
-                                    mem: taskGraphController.miniHunterHistoryForMetric(
-                                             live, "mem"
-                                         ).slice(),
-                                    io: taskGraphController.miniHunterHistoryForMetric(
-                                            live, "io"
-                                        ).slice(),
-                                    age: taskGraphController.miniHunterHistoryForMetric(
-                                             live, "age"
-                                         ).slice()
+                                    cpu: cpu.slice(cpu.length - commonLength),
+                                    mem: mem.slice(mem.length - commonLength),
+                                    io: io.slice(io.length - commonLength),
+                                    age: age.slice(age.length - commonLength)
                                 });
                             }
 
@@ -14754,34 +14754,10 @@ PanelWindow {
 
                                         readonly property var metricHistory: {
                                             const epoch = killMiniCpuCanvas.graphEpoch;
-                                            const metrics = ["cpu", "mem", "io", "age"];
-                                            const histories = [];
-                                            let commonLength = Number.MAX_SAFE_INTEGER;
-
-                                            for (let i = 0; i < metrics.length; i++) {
-                                                const values =
-                                                    killMiniCpuCanvas.combiHistories[
-                                                        metrics[i]
-                                                    ];
-                                                const history = Array.isArray(values)
-                                                                ? values : [];
-                                                histories.push(history);
-                                                commonLength = Math.min(
-                                                    commonLength,
-                                                    history.length
-                                                );
-                                            }
-
-                                            if (!Number.isFinite(commonLength)
-                                                    || commonLength <= 0)
-                                                return [];
-
-                                            const ownIndex = metrics.indexOf(modelData.metric);
-                                            const own = ownIndex >= 0
-                                                        ? histories[ownIndex] : [];
-                                            return own.slice(
-                                                Math.max(0, own.length - commonLength)
-                                            );
+                                            // The controller has already aligned and
+                                            // isolated all four local series.
+                                            const values = killMiniCpuCanvas.combiHistories[modelData.metric];
+                                            return Array.isArray(values) ? values : [];
                                         }
                                         readonly property var metricPoints:
                                             graphHistory.linePoints(

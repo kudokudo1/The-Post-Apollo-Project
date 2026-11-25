@@ -37,6 +37,34 @@ function visibleRange(s) {
     return {first:Math.min(s.total-1,Math.floor(s.y/s.rowHeight)),
         stop:Math.min(s.total,Math.ceil((s.y+s.viewportHeight)/s.rowHeight))};
 }
+// Exact span of nodes, connectors and passing lanes in the visible rows.
+// Replay from the loaded page boundaries, never scan the whole history.
+// A missing visible page is unknown, not evidence that the graph shrank.
+function visibleLaneSpan(s) {
+    if (!s || !s.total) return {first:0,last:0};
+    const range=visibleRange(s);
+    let first=MAX_LANES, last=-1;
+    const include=lane=>{first=Math.min(first,lane);last=Math.max(last,lane);};
+    for (let start=Math.floor(range.first/PAGE)*PAGE; start<range.stop; start+=PAGE) {
+        const page=s.cache[start];
+        if (!page) return null;
+        const frontier=new Map(page.frontier.map(f=>[f.sha,f.lane]));
+        for (const row of page.rows) {
+            if (row.ordinal>=range.stop) break;
+            const visible=row.ordinal>=range.first;
+            if (visible) {
+                include(row.lane);
+                for (const lane of frontier.values()) include(lane);
+            }
+            frontier.delete(row.sha);
+            for (const edge of row.parents) {
+                if (visible) include(edge.lane);
+                frontier.set(edge.sha,edge.lane);
+            }
+        }
+    }
+    return last<0 ? {first:0,last:0} : {first,last};
+}
 function wantedPages(s) {
     const range = visibleRange(s);
     if (!range.stop) return [];

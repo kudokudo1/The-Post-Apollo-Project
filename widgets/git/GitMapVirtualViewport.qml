@@ -13,18 +13,39 @@ Rectangle {
     border.color: Colors.cyan
     border.width: 1
     readonly property int rowHeight: 24
-    readonly property int lanePitch: 22
-    readonly property int laneMargin: 16
+    readonly property int lanePitch: 18
+    readonly property int laneMargin: 12
     readonly property int laneTotal: mapState ? mapState.maxLane+1 : 1
-    // A lane window, not an unbounded canvas. Keep room for commit labels.
+    property var laneSpan: ({first:0,last:0})
+    property string laneSpanIdentity: ""
+    readonly property int visibleLaneCount: laneSpan.last-laneSpan.first+1
+    // The graph follows the visible ancestry, not the repository-wide maximum.
+    // Missing pages retain the last known width in this snapshot.
     readonly property real graphSurfaceWidth: graph.width
     readonly property int laneWindowCount: Math.max(1,Math.floor((graph.width-2*laneMargin)/lanePitch)+1)
-    readonly property int laneMaxOffset: Math.max(0,laneTotal-laneWindowCount)
+    readonly property int laneMinOffset: laneSpan.first
+    readonly property int laneMaxOffset: Math.max(laneMinOffset,laneSpan.last-laneWindowCount+1)
     property int laneOffset: 0
+    onLaneMinOffsetChanged: setLaneOffset(laneOffset)
     onLaneMaxOffsetChanged: setLaneOffset(laneOffset)
-    onLaneOffsetChanged: graph.requestPaint()
+    onLaneOffsetChanged: if (graph) graph.requestPaint()
     function setLaneOffset(value) {
-        laneOffset=Math.max(0,Math.min(laneMaxOffset,Math.floor(value)));
+        if (!Number.isFinite(value)) return;
+        laneOffset=Math.max(laneMinOffset,Math.min(laneMaxOffset,Math.floor(value)));
+    }
+    function refreshVisibleLanes() {
+        const state=mapState;
+        const identity=state ? String(state.repoId || recentRepo)+":"+state.snapshot : "";
+        if (laneSpanIdentity!==identity) {
+            laneSpanIdentity=identity;
+            laneSpan={first:0,last:0};
+            laneOffset=0;
+        }
+        const next=Policy.visibleLaneSpan(state);
+        if (next && (next.first!==laneSpan.first || next.last!==laneSpan.last)) {
+            laneSpan=next;
+            setLaneOffset(laneOffset);
+        }
     }
     function graphLaneVisible(lane) {
         return lane>=laneOffset && lane<laneOffset+laneWindowCount
@@ -55,6 +76,8 @@ Rectangle {
         shallow: false, cache: {0: recentPage}, errors: {}
     })
     readonly property var mapState: indexedActive ? bridge.state : recentState
+    onMapStateChanged: refreshVisibleLanes()
+    Component.onCompleted: refreshVisibleLanes()
     function recentRows(service, repo, revision) {
         const result = {start:0, frontier:[], rows:[], maxLane:0};
         if (!service || !repo || service.repoPath !== repo || service.repoRoot !== repo || service.refreshing) return result;
@@ -88,7 +111,7 @@ Rectangle {
     }
     onRecentRepoChanged: {
         recentY=0;
-        laneOffset=0;
+        setLaneOffset(laneMinOffset);
         if (!indexedActive && flick) flick.contentY=0;
         if (!externalSelection) selectedSha="";
     }
@@ -124,10 +147,8 @@ Rectangle {
 
     function activate(directory, manifest, anchor, generation) {
         applyingGeometry = true;
-        const previousRepo=bridge.state ? bridge.state.repoId : "";
         const ok = bridge.activate(directory,manifest,rowHeight,Math.max(1,flick.height),anchor,generation);
         if (ok) {
-            if (previousRepo!==manifest.repoId) laneOffset=0;
             flick.cancelFlick();
             if (indexedActive) flick.contentY = bridge.state.y;
             if (!externalSelection) selectedSha = "";
@@ -185,16 +206,16 @@ Rectangle {
         anchors.rightMargin: 8
         height: header.height
         spacing: 4
-        visible: root.laneMaxOffset>0
+        visible: root.laneMaxOffset>root.laneMinOffset
         ActionButton {
             width: 32; height: parent.height
             label: "◀"
-            available: root.laneOffset>0
+            available: root.laneOffset>root.laneMinOffset
             onLeftClicked: root.setLaneOffset(root.laneOffset-root.laneWindowCount)
         }
         GohuText {
             width: 112; height: parent.height
-            text: "LANES "+(root.laneOffset+1)+"-"+Math.min(root.laneTotal,root.laneOffset+root.laneWindowCount)+"/"+root.laneTotal
+            text: "LANES "+(root.laneOffset+1)+"-"+Math.min(root.laneSpan.last+1,root.laneOffset+root.laneWindowCount)+"/"+(root.laneSpan.last+1)
             color: Colors.cyan
             font.pixelSize: 10
             horizontalAlignment: Text.AlignHCenter
@@ -239,7 +260,7 @@ Rectangle {
             id: graph
             x: 0
             y: flick.contentY
-            width: Math.min(2*root.laneMargin+root.lanePitch*(root.laneTotal-1), Math.max(0,Math.min(flick.width*0.60,flick.width-144)))
+            width: Math.min(2*root.laneMargin+root.lanePitch*(root.visibleLaneCount-1), Math.max(0,Math.min(flick.width*0.60,flick.width-144)))
             height: flick.height
             onYChanged: requestPaint()
             onWidthChanged: requestPaint()
@@ -398,7 +419,7 @@ Rectangle {
                     elide: Text.ElideRight
                 }
                 Row {
-                    x: graph.width+8
+                    x: graph.width+4
                     clip: true
                     width: Math.max(0,parent.width-x)
                     height: parent.height

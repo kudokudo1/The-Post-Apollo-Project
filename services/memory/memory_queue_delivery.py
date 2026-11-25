@@ -53,14 +53,23 @@ class Delivery:
         else:
             if request["state"] != "QUEUED" or now >= request["expires_at"]:
                 raise QueueError("STALE_EVENT")
-            if (type(status) is not dict or type(status.get("version")) is not int
+            # R1 UI projection names captured capacity explicitly. The raw
+            # Monitor v1 field remains supported for existing callers, but
+            # an ambiguous dual-field projection must never be accepted.
+            if type(status) is not dict:
+                raise QueueError("STALE_EVENT")
+            fields = {"original_actual_kib", "actual_kib"} & status.keys()
+            if len(fields) != 1:
+                raise QueueError("STALE_EVENT")
+            original_capacity = status[next(iter(fields))]
+            if (type(status.get("version")) is not int
                     or status["version"] != 1 or status.get("can_execute") is not False
                     or status.get("request_id") != request["id"]
                     or status.get("code") != event["code"]
                     or type(status.get("target_gib")) is not int
                     or status["target_gib"] != request["target_gib"]
-                    or type(status.get("actual_kib")) is not int
-                    or status["actual_kib"] != request["actual_kib"]
+                    or type(original_capacity) is not int
+                    or original_capacity != request["actual_kib"]
                     or type(status.get("expires_at")) is not int
                     or status["expires_at"] != request["expires_at"]):
                 raise QueueError("STALE_EVENT")

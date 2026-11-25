@@ -211,3 +211,21 @@ One caller lock is not a cross-process lock; DB compare/rechecks reduce but
 do not eliminate races. Independent native observation and UI/Hub transport
 still need DOC 1/2/3 and Notification Hub coordination. Protected correlation,
 completion and automatic execution remain HOLD.
+
+## R1.1 // runtime to notification capacity reconciliation
+
+Nurse 2 found that R1 renamed the presentation field original_actual_kib
+while Delivery._current still required raw Monitor actual_kib. Accept
+exactly one of those fields in Delivery, validate strict integer equality
+to the stored request's original capacity, and reject missing or ambiguous
+dual fields (even if equal). Legacy raw Monitor callers remain supported.
+No live capacity inferred, no authority or packet format change.
+
+Composed fixtures use Runtime.tick()["status"] directly as the live
+Delivery.attempt reader and validate READY/DEFERRED, wrong and ambiguous
+capacity, regression, restart and duplicate reservation. They exercise
+a synchronous fake offer, not actual Hub delivery or an IPC bridge.
+The eventual owner must serialize runtime/offer, check Hub readiness
+before reservation and ensure no asynchronous packet replay. Native source
+and recovery witness, stage-failure reconciliation and exclusive
+cross-process ownership remain separate blockers.

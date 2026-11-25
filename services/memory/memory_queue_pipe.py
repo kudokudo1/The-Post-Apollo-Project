@@ -176,10 +176,32 @@ def _receipt_wire(receipt):
     return receipt
 
 
+def _disposition_wire(receipt):
+    _exact(receipt, "version review dismissed_at_ms disposition adjustment_outcome can_execute startup_unlock")
+    review = _review_wire(receipt["review"])
+    stamp = _int(receipt["dismissed_at_ms"], review["reviewed_at_ms"], MAX_SAFE)
+    if (type(receipt["version"]) is not int or receipt["version"] != 2
+            or review["snapshot"]["record"]["state"] != "PREPARED"
+            or stamp-review["reviewed_at_ms"]>=60000
+            or receipt["disposition"]!="LOCAL_PREPARATION_DISMISSED"
+            or receipt["adjustment_outcome"]!="UNVERIFIED"
+            or receipt["can_execute"] is not False or receipt["startup_unlock"] is not False):
+        raise QueueError("INVALID_DISPOSITION_WIRE")
+    _safe(receipt)
+    return receipt
+
+
 class Session:
-    def __init__(self, owner, emit, *, review_max_age_ms=None, notification_max_age_ms=None):
-        if getattr(owner,"local_disposition_enabled",False):
+    def __init__(self, owner, emit, *, review_max_age_ms=None, notification_max_age_ms=None,
+                 disposition_wire=False):
+        if (type(disposition_wire) is not bool
+                or getattr(owner,"local_disposition_enabled",False) is not disposition_wire):
             raise QueueError("LOCAL_DISPOSITION_WIRE_V2_REQUIRED")
+        if disposition_wire and review_max_age_ms is None:
+            raise QueueError("RECOVERY_PIPE_MODE_REQUIRED")
+        self.disposition_wire=disposition_wire
+        # Distinct opt-in handshake, never a client-selected upgrade.
+        self.disposition_connected=not disposition_wire
         if review_max_age_ms is not None:
             if owner.staged_max_age_ms is None:
                 raise QueueError("STAGED_ACTION_MODE_REQUIRED")
@@ -285,8 +307,9 @@ class Session:
         if self.closed or self.started:
             raise QueueError("SESSION_ALREADY_STARTED")
         self.started = True
-        self.emit(self._control("HELLO"))
-        self.publish()
+        self.emit(self._control("HELLO_DISPOSITION" if self.disposition_wire else "HELLO"))
+        if self.disposition_connected:
+            self.publish()
 
     def wait_seconds(self):
         if self.closed:
@@ -328,6 +351,13 @@ class Session:
 
     def _receive(self, line):
         obj = decode(line)
+        if not self.disposition_connected:
+            if (set(obj)!={"version","kind","owner_id"} or obj["kind"]!="CONNECT_DISPOSITION"
+                    or obj["owner_id"]!=self.owner.owner_id):
+                raise QueueError("LOCAL_DISPOSITION_HANDSHAKE_REQUIRED")
+            self.disposition_connected=True
+            self.publish()
+            return
         mode = self.owner.staged_max_age_ms
         if self.prepared is not None:
             if time.monotonic() >= self.prepare_deadline:
@@ -353,16 +383,22 @@ class Session:
                 raise QueueError("RECOVERY_PIPE_EXPIRED")
             review_id, digest, sequence = self.review
             if (set(obj) != {"version","kind","owner_id","review_id","review_digest","review_sequence"}
-                    or obj["kind"] != "RECOVERY_ACK"
+                    or obj["kind"] not in ({"RECOVERY_ACK","RECOVERY_DISMISS"} if self.disposition_wire else {"RECOVERY_ACK"})
                     or obj["owner_id"] != self.owner.owner_id
                     or obj["review_id"] != review_id or obj["review_digest"] != digest
                     or type(obj["review_sequence"]) is not int or obj["review_sequence"] != sequence):
                 raise QueueError("RECOVERY_PIPE_MISMATCH")
             self.review = None
             self.review_deadline = None
-            packet = self.owner.acknowledge_recovery_review(review_id=review_id, review_digest=digest)
-            _receipt_wire(packet["receipt"])
-            self.emit(packet)
+            if obj["kind"]=="RECOVERY_DISMISS":
+                packet=self.owner.dismiss_recovery_preparation(review_id=review_id,review_digest=digest)
+                _disposition_wire(packet["receipt"])
+                self.emit(packet)
+                self.publish()
+            else:
+                packet = self.owner.acknowledge_recovery_review(review_id=review_id, review_digest=digest)
+                _receipt_wire(packet["receipt"])
+                self.emit(packet)
             return
         if obj.get("kind") == "RECOVERY_REVIEW":
             if self.review_max_age_ms is None or set(obj) != {"version","kind","owner_id","action_id"}:
@@ -377,8 +413,19 @@ class Session:
             self.review = (review["review_id"],review["review_digest"],packet["sequence"])
             self.emit(packet)
             return
-        if obj.get("kind") == "RECOVERY_ACK":
+        if obj.get("kind") in {"RECOVERY_ACK","RECOVERY_DISMISS"}:
             raise QueueError("RECOVERY_PIPE_NOT_LIVE")
+        if obj.get("kind")=="DISPOSITION_HISTORY":
+            if (not self.disposition_wire or set(obj)!={"version","kind","owner_id","action_id"}
+                    or obj["owner_id"]!=self.owner.owner_id):
+                raise QueueError("LOCAL_DISPOSITION_WIRE_V2_REQUIRED")
+            packet=self.owner.disposition_history(_uuid(obj["action_id"]))
+            if packet["receipt"] is not None:
+                _disposition_wire(packet["receipt"])
+                if packet["receipt"]["review"]["action_id"]!=packet["action_id"]:
+                    raise QueueError("INVALID_DISPOSITION_WIRE")
+            self.emit(packet)
+            return
         if obj.get("kind") == "RECOVERY_REVIEW_HISTORY":
             if self.review_max_age_ms is None or set(obj) != {"version","kind","owner_id","review_id"}:
                 raise QueueError("RECOVERY_PIPE_MODE_REQUIRED")
@@ -421,7 +468,8 @@ class Session:
                 "version", "kind", "owner_id", "limit"}:
             if obj["owner_id"] != self.owner.owner_id:
                 raise QueueError("STALE_OR_INVALID_OWNER")
-            self.emit(self.owner.inventory(limit=_int(obj["limit"], 1, 16)))
+            # V2 entries retain full review receipts; keep frame size bounded.
+            self.emit(self.owner.inventory(limit=_int(obj["limit"], 1, 4 if self.disposition_wire else 16)))
         elif obj.get("kind") == "LOCAL_ACTION" and set(obj) == {
                 "version", "kind", "owner_id", "action_id"}:
             if obj["owner_id"] != self.owner.owner_id:
@@ -432,7 +480,8 @@ class Session:
             raise QueueError("WIRE_COMMAND")
 
 
-def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None, notification_max_age_ms=None):
+def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None, notification_max_age_ms=None,
+          disposition_wire=False):
     """Single session loop; caller owns descriptors and must close them.
 
     Blocking sleep when idle; a pending request arms just one timeout.
@@ -460,7 +509,7 @@ def serve(owner, read_fd, write_fd, *, io_timeout_ms, review_max_age_ms=None, no
                 raise QueueError("PIPE_WRITE_FAILED")
             data = data[count:]
     session = Session(owner, emit, review_max_age_ms=review_max_age_ms,
-                      notification_max_age_ms=notification_max_age_ms)
+                      notification_max_age_ms=notification_max_age_ms,disposition_wire=disposition_wire)
     buffer = bytearray()
     partial_deadline = None
     try:

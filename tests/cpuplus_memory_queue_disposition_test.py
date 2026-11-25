@@ -12,7 +12,7 @@ from memory_queue_local_actions import LocalActions
 from memory_queue_local_disposition import LocalActionsV2
 from memory_queue_runtime import Runtime
 from memory_queue_owner import Owner
-from memory_queue_pipe import Session
+from memory_queue_pipe import Session, encode
 
 SOURCE={"boot_id":"c23683a9-b2ab-4a2c-87ce-31bdf27a3012",
         "base":{"device":42,"inode":100,"size_kib":16777212},
@@ -127,6 +127,76 @@ class Tests(unittest.TestCase):
             self.owner.begin_recovery_review(str(uuid.uuid4()),max_age_ms=1000)
         self.assertIsNone(self.q.pending())
 
+
+    def wire(self,*,connect=True):
+        sent=[]
+        session=Session(self.owner,sent.append,review_max_age_ms=1000,disposition_wire=True)
+        session.start()
+        self.assertEqual([p["kind"] for p in sent],["HELLO_DISPOSITION"])
+        def send(kind,**fields):
+            session.receive(encode({"version":1,"kind":kind,"owner_id":self.owner.owner_id,**fields})[:-1])
+            return sent[-1]
+        if connect:
+            send("CONNECT_DISPOSITION")
+            self.assertEqual([p["kind"] for p in sent],["HELLO_DISPOSITION","INVALIDATE","STATUS"])
+        return session,sent,send
+
+    def test_wire_disposition_exact_review_then_history(self):
+        session,sent,send=self.wire()
+        review=send("RECOVERY_REVIEW",action_id=self.old["action_id"])
+        selection={"review_id":review["review"]["review_id"],"review_digest":review["review"]["review_digest"],
+                   "review_sequence":review["sequence"]}
+        send("RECOVERY_DISMISS",**selection)
+        self.assertEqual([p["kind"] for p in sent[-3:]],["LOCAL_DISPOSITION","INVALIDATE","STATUS"])
+        receipt=sent[-3]["receipt"]
+        self.assertFalse(receipt["startup_unlock"])
+        self.assertFalse(receipt["can_execute"])
+        inventory=send("INVENTORY",limit=4)["inventory"]
+        self.assertEqual(inventory["version"],2)
+        self.assertIsNone(inventory["prepared"])
+        self.assertEqual(inventory["recent"][0]["record"],self.original)
+        self.assertEqual(inventory["recent"][0]["disposition"],receipt)
+        self.assertEqual(send("DISPOSITION_HISTORY",action_id=self.old["action_id"])["receipt"],receipt)
+        with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_NOT_LIVE"):
+            send("RECOVERY_DISMISS",**selection)
+        self.assertTrue(session.closed)
+        self.assertEqual(self.captures,0)
+
+    def test_wire_lost_disposition_receipt_is_read_only_after_restart(self):
+        session,sent,send=self.wire()
+        review=send("RECOVERY_REVIEW",action_id=self.old["action_id"])
+        def fail(packet):
+            if packet["kind"]=="LOCAL_DISPOSITION":
+                raise OSError("fixture lost dismissal reply")
+            sent.append(packet)
+        session.emit=fail
+        with self.assertRaises(OSError):
+            send("RECOVERY_DISMISS",review_id=review["review"]["review_id"],
+                 review_digest=review["review"]["review_digest"],review_sequence=review["sequence"])
+        self.assertTrue(session.closed)
+        self.owner=self.open(True)
+        _,_,read=self.wire()
+        receipt=read("DISPOSITION_HISTORY",action_id=self.old["action_id"])["receipt"]
+        self.assertEqual(receipt["review"],review["review"])
+        self.assertIsNone(read("INVENTORY",limit=4)["inventory"]["prepared"])
+        self.assertIsNone(self.q.pending())
+
+    def test_wire_refuses_old_client_before_any_action(self):
+        session,_,send=self.wire(connect=False)
+        with self.assertRaisesRegex(QueueError,"LOCAL_DISPOSITION_HANDSHAKE_REQUIRED"):
+            send("INVENTORY",limit=1)
+        self.assertTrue(session.closed)
+        self.assertEqual(self.captures,0)
+
+    def test_wire_wrong_review_sequence_terminal(self):
+        session,_,send=self.wire()
+        review=send("RECOVERY_REVIEW",action_id=self.old["action_id"])
+        with self.assertRaisesRegex(QueueError,"RECOVERY_PIPE_MISMATCH"):
+            send("RECOVERY_DISMISS",review_id=review["review"]["review_id"],
+                 review_digest=review["review"]["review_digest"],review_sequence=review["sequence"]+1)
+        self.assertTrue(session.closed)
+        self.owner=self.open(True)
+        self.assertIsNone(self.owner.disposition_history(self.old["action_id"])["receipt"])
 
 if __name__=="__main__":
     unittest.main(verbosity=2)

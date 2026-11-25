@@ -99,13 +99,28 @@ class Owner:
         finally:
             self._gate.release()
 
+    def _discard_continuations(self):
+        # Caller holds the owner gate. No DB writes or provider calls.
+        self._published = None
+        self._staged_message = None
+        if self._recovery_review is not None:
+            self._recovery_review.invalidate()
+        if self._staged_max_age_ms is not None:
+            self.runtime.discard_staged_action()
+
     def close(self):
+        """Terminal session disconnect; discard live state before unlock.
+
+        A busy owner refuses teardown; caller must serialize disconnect
+        with dispatch, never release ownership while a call is running.
+        """
         if os.getpid() != self.pid:
             raise QueueError("OWNER_LOST")
         if not self._gate.acquire(blocking=False):
             raise QueueError("OWNER_BUSY")
         try:
             if self._fd is not None:
+                self._discard_continuations()
                 # Closing releases the flock, unless an inherited descriptor
                 # remains open. Do not fork with a live Owner.
                 os.close(self._fd)
@@ -167,7 +182,11 @@ class Owner:
             return copy.deepcopy(self._published)
 
     def invalidate(self):
-        """Host-owned observer loss/deadline/disconnect invalidation."""
+        """Publication-only invalidation, not terminal session disconnect.
+
+        Session teardown uses close(), including EOF/error in serve().
+        Scheduled publication must not consume a live staged continuation.
+        """
         with self._call():
             self._published = None
 
@@ -286,10 +305,14 @@ class Owner:
                 self._recovery_review.invalidate()
             self._next_action += 1
             self._published = None
-            record = self.runtime.prepare_staged_action(
-                m, max_age_ms=self._staged_max_age_ms)
-            self._staged_message = m
-            return self._envelope("PREPARED_ACTION", record=record)
+            try:
+                record = self.runtime.prepare_staged_action(
+                    m, max_age_ms=self._staged_max_age_ms)
+                self._staged_message = m
+                return self._envelope("PREPARED_ACTION", record=record)
+            except BaseException:
+                self._discard_continuations()
+                raise
 
     def commit_action(self, message):
         """Consume exact live continuation; exceptions leave durable evidence."""
@@ -300,10 +323,14 @@ class Owner:
             expected, self._staged_message = self._staged_message, None
             if expected is None:
                 raise QueueError("STAGED_ACTION_NOT_LIVE")
-            m = validate(message)
-            if m != expected or m["owner_id"] != self.owner_id:
-                # No matching retry after an invalid continuation.
-                raise QueueError("STAGED_ACTION_MISMATCH")
+            try:
+                m = validate(message)
+                if m != expected or m["owner_id"] != self.owner_id:
+                    raise QueueError("STAGED_ACTION_MISMATCH")
+            except BaseException:
+                # Owner and Runtime must agree even for malformed input.
+                self._discard_continuations()
+                raise
             self._published = None
             try:
                 result = self.runtime.commit_staged_action(m)

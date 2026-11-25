@@ -142,3 +142,24 @@ timestamps for both paths. No replay, clearing, or startup unlock.
 Explicit session disconnect/continuation invalidation is a distinct next
 correction; ordinary publication invalidation is not session teardown.
 No wire changes or production policy.
+
+## R3k // explicit disconnect and continuation retirement
+
+Stacked on independently reviewed #2675 exact 5c228392; do not edit its
+reviewed head or merge it without operator decision. Ordinary invalidate()
+remains publication-only. Terminal Owner.close() (already used by serve on
+EOF/failure) clears both owner and Runtime live staged messages, journal
+fresh continuation and recovery review ticket before releasing owner flock.
+No persistent row changes, no provider calls. Owner gate and Runtime lock
+serialize teardown with cooperating dispatch; busy teardown refuses rather
+than releasing a live owner. Caller must stop accepting commands and
+serialize terminal teardown. Invalid/malformed COMMIT consumes both live
+states; failed PREPARE receipt construction retires live state as well.
+Direct Runtime completion always clears journal transient continuation.
+Six regression cases cover late owner/runtime/journal continuation,
+review ticket, malformed/mismatch, ordinary publication, failed receipt,
+and busy teardown. No change to #2675 deadline checks, startup gate, wire
+protocol or production policy. An already admitted synchronous transaction
+is not undone by disconnect; full shell crash and actual staged wire still
+require native qualification. Direct callers outside cooperating owner fence
+remain outside protected trust boundary.

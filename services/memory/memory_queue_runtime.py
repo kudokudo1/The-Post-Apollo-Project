@@ -209,6 +209,13 @@ class Runtime:
             self._staged = (journal, m, (wall + max_age_ms, mono + max_age_ms))
             return record
 
+    def discard_staged_action(self):
+        """Explicit session teardown, serialized with local admission."""
+        with self._serialized():
+            staged, self._staged = self._staged, None
+            if staged is not None:
+                staged[0].discard_continuation()
+
     def commit_staged_action(self, message):
         """One explicit same-instance continuation, never replay after reopen."""
         from memory_queue_local_actions import validate
@@ -217,13 +224,16 @@ class Runtime:
             if staged is None:
                 raise QueueError("STAGED_ACTION_NOT_LIVE")
             journal, expected, deadline = staged
-            m = validate(message)
-            if m != expected:
-                raise QueueError("STAGED_ACTION_MISMATCH")
-            wall, mono = self._now()
-            if wall >= deadline[0] or mono >= deadline[1]:
-                raise QueueError("STAGED_ACTION_EXPIRED")
-            return self._complete_local_action(journal, m, deadline=deadline)
+            try:
+                m = validate(message)
+                if m != expected:
+                    raise QueueError("STAGED_ACTION_MISMATCH")
+                wall, mono = self._now()
+                if wall >= deadline[0] or mono >= deadline[1]:
+                    raise QueueError("STAGED_ACTION_EXPIRED")
+                return self._complete_local_action(journal, m, deadline=deadline)
+            finally:
+                journal.discard_continuation()
 
     def detail(self, request_id):
         with self._serialized():

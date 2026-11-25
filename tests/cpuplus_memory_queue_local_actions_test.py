@@ -594,5 +594,92 @@ class Tests(unittest.TestCase):
         self.assertEqual(owner.recovery_review_history(review["review_id"])["receipt"],receipt)
         self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
 
+    def test_disconnect_consumes_both_live_continuations(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        runtime=owner.runtime
+        journal=runtime._staged[0]
+        owner.close()
+        owner.close()
+        self.assertIsNone(owner._staged_message)
+        self.assertIsNone(runtime._staged)
+        self.assertIsNone(journal._fresh)
+        with self.assertRaisesRegex(QueueError,"OWNER_LOST"):
+            owner.commit_action(m)
+        with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+            runtime.commit_staged_action(m)
+        with self.assertRaisesRegex(QueueError,"ACTION_RECONCILIATION_REQUIRED"):
+            journal.commit(m,now=100,source=SOURCE)
+        self.assertIsNone(self.q.pending())
+        self.assertEqual(LocalActions(self.q).lookup(m["action_id"])["state"],"PREPARED")
+        self.assertEqual(self.captures,0)
+
+    def test_disconnect_consumes_review_ticket(self):
+        owner,m=self.interrupted_prepared()
+        review=owner.begin_recovery_review(m["action_id"],max_age_ms=1000)["review"]
+        reviewer=owner._recovery_review
+        owner.close()
+        with self.assertRaisesRegex(QueueError,"RECOVERY_REVIEW_NOT_LIVE"):
+            reviewer.acknowledge(review_id=review["review_id"],
+                review_digest=review["review_digest"],clock=owner.runtime._now)
+        self.assertIsNone(reviewer.lookup(review["review_id"]))
+        self.assertEqual(LocalActions(self.q).lookup(m["action_id"])["state"],"PREPARED")
+
+    def test_malformed_and_mismatch_discard_runtime_continuation(self):
+        for malformed in (False,True):
+            with self.subTest(malformed=malformed):
+                # Distinct disposable DB for each blocked preparation.
+                self.q=Queue(self.path.parent/str(uuid.uuid4()))
+                owner=self.staged_owner()
+                m=self.message()
+                owner.prepare_action(m)
+                runtime=owner.runtime
+                journal=runtime._staged[0]
+                bad={} if malformed else dict(m,expires_at=201)
+                with self.assertRaises(QueueError):
+                    owner.commit_action(bad)
+                self.assertIsNone(runtime._staged)
+                self.assertIsNone(journal._fresh)
+                with self.assertRaisesRegex(QueueError,"STAGED_ACTION_NOT_LIVE"):
+                    runtime.commit_staged_action(m)
+                self.assertIsNone(self.q.pending())
+                self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+                owner.close()
+        self.assertEqual(self.captures,0)
+
+    def test_publication_invalidation_is_not_disconnect(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        owner.invalidate()
+        owner.publish()
+        self.assertEqual(owner.commit_action(m)["disposition"],"REPORTED")
+        self.assertEqual(self.captures,1)
+
+    def test_failed_prepare_envelope_discards_live_state(self):
+        owner=self.staged_owner()
+        m=self.message()
+        with mock.patch.object(owner,"_envelope",side_effect=QueueError("TEST_REPLY_FAILURE")):
+            with self.assertRaisesRegex(QueueError,"TEST_REPLY_FAILURE"):
+                owner.prepare_action(m)
+        self.assertIsNone(owner._staged_message)
+        self.assertIsNone(owner.runtime._staged)
+        self.assertEqual(owner.lookup_action(m["action_id"])["record"]["state"],"PREPARED")
+        self.assertIsNone(self.q.pending())
+
+    def test_busy_disconnect_refuses_without_releasing_owner(self):
+        owner=self.staged_owner()
+        m=self.message()
+        owner.prepare_action(m)
+        with owner._call():
+            with self.assertRaisesRegex(QueueError,"OWNER_BUSY"):
+                owner.close()
+        with self.assertRaisesRegex(QueueError,"OWNER_BUSY"):
+            Owner(self.q,lambda q:self.make_runtime(),durable_actions=True)
+        owner.close()
+        self.assertIsNone(owner.runtime._staged)
+        self.assertIsNone(self.q.pending())
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

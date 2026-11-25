@@ -55,7 +55,7 @@ jobs:
           done
           grep -E '^(singleton Colors|ConversationFeed|NeonScrollBar|SafeDropShadow) ' "$GITHUB_WORKSPACE/components/qmldir" > "$scene/components/qmldir"
           test "$(wc -l < "$scene/components/qmldir")" -eq 4
-          for file in PublicConversationFixture.qml PublicSessionDisplay.js PublicHistoryDisplay.js PublicHistoryViewState.qml PublicHistoryStatus.qml PublicRuntimeStatusView.qml PublicRuntimeStatusDisplay.js PublicRestorationReview.qml PublicDormantTaskSelector.qml; do
+          for file in PublicConversationFixture.qml PublicSessionDisplay.js PublicHistoryDisplay.js PublicHistoryViewState.qml PublicHistoryStatus.qml PublicRuntimeStatusView.qml PublicRuntimeStatusDisplay.js PublicRestorationReview.qml PublicDormantTaskSelector.qml PublicSeasonIndicator.qml; do
             cp "$GITHUB_WORKSPACE/widgets/forest/ui2/$file" "$scene/widgets/forest/ui2/$file"
             cmp "$GITHUB_WORKSPACE/widgets/forest/ui2/$file" "$scene/widgets/forest/ui2/$file"
           done
@@ -78,9 +78,9 @@ jobs:
           PY
           timeout --signal=TERM --kill-after=3s 30s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
           if grep -q UI2_PREVIEW_FAIL "$work/output"; then exit 1; fi
-          if grep -Eq 'Binding loop detected for property "reviewState"|Cannot set activeFocusOnTab to false' "$work/output"; then exit 1; fi
+          if grep -Eq 'Binding loop detected|Cannot set activeFocusOnTab to false' "$work/output"; then exit 1; fi
           grep -q UI2_PREVIEW_STARTED "$work/output"
           observed="$(grep -oE 'UI2_PREVIEW_PHASE_PASS [0-9]+' "$work/output" || true)"
-          expected="$(printf 'UI2_PREVIEW_PHASE_PASS %s\n' 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64)"
+          expected="$(printf 'UI2_PREVIEW_PHASE_PASS %s\n' 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71)"
           test "$observed" = "$expected"
           grep -q UI2_PREVIEW_NATIVE_PASS "$work/output"

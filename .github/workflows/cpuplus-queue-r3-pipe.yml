@@ -1,0 +1,21 @@
+name: CPU++ queue R3 session pipe contract
+on:
+  pull_request:
+    paths:
+      - 'services/memory/memory_queue_pipe.py'
+      - 'tests/cpuplus_memory_queue_pipe_test.py'
+      - 'services/memory/QUEUE-R3-PIPE.md'
+      - '.github/workflows/cpuplus-queue-r3-pipe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pipe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Session framing, owner scheduling and pipe lifecycle fixtures
+        run: python3 -B tests/cpuplus_memory_queue_pipe_test.py

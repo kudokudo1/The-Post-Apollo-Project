@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import re
 import signal
+import subprocess
 import sys
 import time
 
@@ -63,37 +64,73 @@ def write(path,value):
         raise RuntimeError("trace control refused: "+str(path.relative_to(ROOT))+
                            " errno="+str(exc.errno)) from exc
 
+def probe_diagnostic(raw, command):
+    """Match the kernel's latest Command: record, not an arbitrary old error."""
+    lines=raw.splitlines()
+    matches=[i for i,line in enumerate(lines) if line.strip().startswith("Command:")]
+    if not matches:
+        return {"category":"NO_COMMAND_RECORD"}
+    index=matches[-1]
+    if lines[index].strip().removeprefix("Command:").strip()!=command:
+        return {"category":"LAST_COMMAND_MISMATCH"}
+    if index==0:
+        return {"category":"ERROR_HEADER_MISSING"}
+    header=lines[index-1]
+    match=re.fullmatch(r"\s*\[\s*\d+(?:\.\d+)?\]\s*([a-zA-Z0-9_/-]+):\s*error:\s*(.*)",header)
+    if match is None:
+        return {"category":"ERROR_HEADER_UNRECOGNIZED"}
+    location,message=match.groups()
+    # Export only bounded safe text from the fixed command's error header.
+    # Redact hex tokens, decimal addresses/large numbers, and any other
+    # non-prose characters; never emit raw trace or raw error_log.
+    message=re.sub(r"(?i)\b(?:0x)?[0-9a-f]{8,}\b","[redacted]",message)
+    message=re.sub(r"[^a-zA-Z0-9 _.,:;()/\[\]'%-]","?",message)[:160]
+    category="KERNEL_DIAGNOSTIC"
+    for label,pattern in (
+        ("SYMBOL_NOT_FOUND",r"symbol.*not found|failed to find.*symbol|no such symbol"),
+        ("PROBE_REGISTRATION_REJECTED",r"failed to register|not probeable|not probed|blacklist"),
+        ("INVALID_PROBE_ARGUMENT",r"invalid.*arg|bad.*arg|invalid.*type"),
+        ("UNSUPPORTED_PROBE",r"not supported|unsupported"),
+        ("PERMISSION_REFUSED",r"permission denied|operation not permitted"),
+    ):
+        if re.search(pattern,message,re.I):
+            category=label
+            break
+    return {"category":category,"location":location[:64],"message":message}
+
 def append_probe(value):
-    # Fixed function entry/return fprobe syntax, per kernel documentation.
-    # Not a runtime fallback after a security refusal. No address-based probes.
+    # Use one explicit write of the fixed command. Distinguish opening
+    # the interface from the kernel rejecting the command itself.
     operation=value.split()[0]
     stage("PROBE_CONTROL_BEGIN "+operation)
+    before=None
     try:
-        with (ROOT/"dynamic_events").open("a",encoding="ascii") as stream:
-            stream.write(value+"\n")
+        before=bounded(ROOT/"error_log",65536)
+    except (OSError,ValueError,RuntimeError):
+        pass
+    phase="open"
+    fd=None
+    try:
+        fd=os.open(ROOT/"dynamic_events",os.O_WRONLY|os.O_APPEND|os.O_CLOEXEC)
+        phase="write"
+        payload=(value+"\n").encode("ascii")
+        require(os.write(fd,payload)==len(payload),"short probe control write")
     except OSError as exc:
-        # Do not print raw error_log (could include addresses). Report a
-        # bounded diagnostic category, only when the last fixed command
-        # and a recognized kernel error message are both present.
-        category="UNCLASSIFIED"
+        diagnostic={"category":"ERROR_LOG_UNAVAILABLE"}
         try:
-            raw=bounded(ROOT/"error_log",65536)
-            lines=raw.splitlines()
-            if any(line.strip()==value for line in lines[-12:]):
-                for label,pattern in (
-                    ("SYMBOL_NOT_FOUND",r"symbol.*not found|failed to find.*symbol"),
-                    ("PROBE_REGISTRATION_REJECTED",r"failed to register|not probeable|not probed|blacklist"),
-                    ("INVALID_PROBE_ARGUMENT",r"invalid.*arg|bad.*arg|invalid.*type"),
-                    ("UNSUPPORTED_PROBE",r"not supported|unsupported"),
-                    ("PERMISSION_REFUSED",r"permission denied|operation not permitted"),
-                ):
-                    if re.search(pattern,"\n".join(lines[-12:]),re.I):
-                        category=label
-                        break
+            after=bounded(ROOT/"error_log",65536)
+            diagnostic=(probe_diagnostic(after,value) if before is not None and after!=before
+                        else {"category":"NO_NEW_KERNEL_ERROR_RECORD"})
         except (OSError,ValueError,RuntimeError):
             pass
+        stage("REGISTRATION_DIAGNOSTIC "+json.dumps(
+              {"operation":operation,"phase":phase,"errno":exc.errno,
+               "kernel":diagnostic},sort_keys=True))
         raise RuntimeError("fprobe control refused: "+operation+
-                           " errno="+str(exc.errno)+" diagnostic="+category) from exc
+                           " phase="+phase+" errno="+str(exc.errno)) from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
     stage("PROBE_CONTROL_COMPLETE "+operation)
 
 def stage(message):
@@ -150,18 +187,12 @@ def run(guard):
     require(not INSTANCE.exists() and not (ROOT/"events"/GROUP).exists(),
             "trace scope already exists")
     custody=load("collector_custody",CUSTODY)
-    guard.verify_swap(True)
-    require(custody.no_records(guard),"unfenced extension required")
-    original=custody.signature(guard)
-    identities=[guard.identity(guard.BASE),guard.identity(guard.EXTRA)]
-    history=guard.history()
-    boot=guard.boot_id()
-    require(len(history)==2,"normal cycles required")
-    ready=guard.helper("reduction-preflight","4")
-    require(ready.returncode==0 and json.loads(ready.stdout)["state"]=="READY_ADVISORY",
-            "ordinary withdrawal admission unavailable")
-    # Registration precedes helper start; on unavailable tracing, fail
-    # without initiating the third withdrawal. All changes are guest-only.
+    require(not any(os.path.lexists(path) for path in
+                    (guard.BASE.parent,guard.EXT,guard.HISTORY)),
+            "fresh guest required before registration")
+    # Establish the rejected registration boundary before allocating any
+    # managed swap. No additional native cycles if registration fails.
+    # All changes are confined to this disposable guest.
     created=[]
     instance_created=False
     try:
@@ -193,6 +224,20 @@ def run(guard):
                 and sum(line.split()[:2]==["f:"+GROUP+"/unuse_return","try_to_unuse%return"]
                         for line in definitions)==1,"registered fprobe identity unverified")
         stage("PRIVATE_INSTANCE_AND_PROBES_REGISTERED")
+        # All earlier assertions remain mandatory for calibration PASS.
+        # Tracing is disabled during the two normal cycles.
+        subprocess.run(["/usr/bin/bash","/usr/local/libexec/postapollo-memory-ci-cycle.sh"],
+                       check=True,cwd="/")
+        guard.verify_swap(True)
+        require(custody.no_records(guard),"unfenced extension required")
+        original=custody.signature(guard)
+        identities=[guard.identity(guard.BASE),guard.identity(guard.EXTRA)]
+        history=guard.history()
+        boot=guard.boot_id()
+        require(len(history)==2,"normal cycles required")
+        ready=guard.helper("reduction-preflight","4")
+        require(ready.returncode==0 and json.loads(ready.stdout)["state"]=="READY_ADVISORY",
+                "ordinary withdrawal admission unavailable")
         root,swap=custody.trace_to_entry(guard)
         intent_path,result_path=(guard.EXT/name for name in guard.RECORD_NAMES[:2])
         intent=guard.protected_bytes(intent_path)
@@ -290,6 +335,6 @@ def main():
 if __name__=="__main__":
     try:
         main()
-    except (OSError,ValueError,RuntimeError,KeyError,TypeError) as exc:
+    except (OSError,ValueError,RuntimeError,KeyError,TypeError,subprocess.SubprocessError) as exc:
         print("CPU_MEM_TRACECOLLECT_FAIL // "+type(exc).__name__+": "+str(exc),flush=True)
         raise SystemExit(2)

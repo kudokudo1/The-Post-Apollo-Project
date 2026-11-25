@@ -44,8 +44,8 @@ assert.equal(p.summarizeRange({...data,identityVerified:undefined}).sessions,25)
 const price=qml.slice(qml.indexOf('objectName: "marketResearchPriceSection"'),qml.indexOf("id: openSelectedInDay"));
 assert.ok(!price.includes("$"),"hardcoded currency in single-stock analysis");
 for(const token of ["RangeAnalysisPolicy.retainedGlobalRange(snapshot)","stocks.priceUnit",
-    "if (globalHistoryActive || rangeAnalysis === null || !stockFeed) return;",
-    "&& !globalHistoryActive && rangeAnalysis !== null && stockFeed",
-    "CROSS-STOCK PENDING"]) assert.ok(qml.includes(token),token);
+    "RangeAnalysisPolicy.captureGlobalStockReference(snapshot)",
+    "RangeAnalysisPolicy.compareGlobalStockReferences(stockReference,snapshot)",
+    "COMPARE MATCHING PROVIDER, CURRENCY, BASIS AND WINDOW"]) assert.ok(qml.includes(token),token);
 assert.ok(!js.includes("..."),"unsupported QML object spread");
 console.log("Finance Market M44 global EODHD/Alpha same-stock analytics, provenance, currency and legacy comparison isolation: PASS");

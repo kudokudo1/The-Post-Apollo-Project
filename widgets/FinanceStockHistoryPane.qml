@@ -49,7 +49,7 @@ Item {
         globalHistory=captured;
         globalHandoffMessage="";
         controlsExpanded=false;
-        researchView="price";
+        researchView=stockReference !== null && stockReference.identity ? "compare" : "price";
         discoveryOpen=false;
         scroll.contentY=0;
         return true;
@@ -140,9 +140,15 @@ Item {
     // same-snapshot pins. Survives issuer changes, never persists to disk.
     property var stockReference: null
     readonly property var crossStockComparison: stockReference !== null
-        && !globalHistoryActive && rangeAnalysis !== null && stockFeed
-        ? RangeAnalysisPolicy.compareStockReferences(stockReference, snapshot,
-            stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik))
+        && rangeAnalysis !== null && stockFeed
+        ? (globalHistoryActive
+            ? (stockReference.identity
+                ? RangeAnalysisPolicy.compareGlobalStockReferences(stockReference,snapshot)
+                : {state:"reference-kind-mismatch"})
+            : (stockReference.identity
+                ? {state:"reference-kind-mismatch"}
+                : RangeAnalysisPolicy.compareStockReferences(stockReference, snapshot,
+                    stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik))))
         : null
     // M37: chart is derived only from the ready M36 matched-date result.
     readonly property var crossStockChart: RangeAnalysisPolicy.crossStockNormalizedChart(crossStockComparison)
@@ -160,9 +166,11 @@ Item {
     readonly property var crossStockGap: crossStockChart !== null
         ? RangeAnalysisPolicy.crossStockGapChart(crossStockComparison) : null
     function saveStockReference() {
-        if (globalHistoryActive || rangeAnalysis === null || !stockFeed) return;
-        const captured=RangeAnalysisPolicy.captureStockReference(snapshot,
-            stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik));
+        if (rangeAnalysis === null || !stockFeed) return;
+        const captured=globalHistoryActive
+            ? RangeAnalysisPolicy.captureGlobalStockReference(snapshot)
+            : RangeAnalysisPolicy.captureStockReference(snapshot,
+                stockFeed.selectedCik, StockModePolicy.stockSymbol(stockFeed.selectedCik));
         if (captured) stockReference=captured;
     }
     function clearStockReference() { stockReference=null; }
@@ -313,8 +321,8 @@ Item {
             labelPixelSize: 10
             accentColor: Colors.magenta
             selected: stocks.researchView === "compare"
-            available: !stocks.globalHistoryActive
-            onLeftClicked: { if (!stocks.globalHistoryActive) stocks.selectResearchView("compare"); }
+            available: true
+            onLeftClicked: stocks.selectResearchView("compare")
         }
     }
     Flickable {
@@ -579,7 +587,7 @@ Item {
                         + "\nUSER-CHOSEN LISTING // FIGI MATCH NOT VERIFIED"
                         + (stocks.globalHistory.compactMayBeTruncated
                             ? "\nWARNING // COMPACT HISTORY MAY OMIT EARLIER DATES" : "")
-                        + "\nSEARCH TO LOAD ANOTHER RANGE // CROSS-STOCK PENDING")
+                        + "\nSEARCH TO LOAD ANOTHER RANGE // COMPARE MATCHING PROVIDER, CURRENCY, BASIS AND WINDOW")
                     : stocks.stockFeed ? stocks.stockFeed.message
                     : "STOCK HISTORY SOURCE UNAVAILABLE")
                 textFormat: Text.PlainText
@@ -725,6 +733,10 @@ Item {
                         const ref=stocks.stockReference;
                         if (!ref) return "";
                         const header="STOCK REF // " + ref.symbol + " // " + ref.priceBasis
+                            + (ref.identity ? "\n" + ref.listing.venue + " // " + ref.currency + " // "
+                                + (ref.source==="eodhd-eod" ? "EODHD" : "ALPHA VANTAGE")
+                                + " // FIGI MATCH NOT VERIFIED"
+                                + (ref.compactMayBeTruncated ? " // COMPACT COVERAGE MAY BE TRUNCATED" : "") : "")
                             + "\nREQUESTED " + ref.from + " TO " + ref.to
                             + "\nRETRIEVED " + ref.retrievedAt;
                         const d=stocks.crossStockComparison;
@@ -732,10 +744,15 @@ Item {
                         if (d.state === "same-stock") return header + "\nSELECT ANOTHER STOCK AND LOAD RANGE";
                         if (d.state === "window-mismatch") return header + "\nDATE WINDOW MISMATCH // MATCH REQUESTED DATES";
                         if (d.state === "basis-mismatch") return header + "\nPRICE BASIS MISMATCH // COMPARISON UNAVAILABLE";
+                        if (d.state === "provider-mismatch") return header + "\nPROVIDER MISMATCH // CHOOSE SAME PROVIDER";
+                        if (d.state === "currency-mismatch") return header + "\nCURRENCY MISMATCH // NO FX CONVERSION";
+                        if (d.state === "reference-kind-mismatch") return header + "\nLEGACY AND GLOBAL REFERENCES CANNOT BE MIXED";
                         if (d.state === "insufficient") return header + "\nNEED TWO COMMON CLOSE DATES // HAVE " + d.matched;
                         if (d.state !== "ready") return header + "\nCOMPARISON UNAVAILABLE";
                         return header
                             + "\nCURRENT " + d.currentSymbol + " // RETRIEVED " + d.currentRetrievedAt
+                            + (d.providerSource ? "\n" + d.currentVenue + " // " + d.currency
+                                + (d.currentTruncated ? " // COMPACT COVERAGE MAY BE TRUNCATED" : "") : "")
                             + "\nCOMMON CLOSE DATES " + d.from + " TO " + d.to
                             + " // " + d.matched + " MATCHED"
                             + "\n" + d.referenceSymbol + " // " + d.referencePct.toFixed(2) + "%"
@@ -890,7 +907,7 @@ Item {
                         const d=stocks.crossStockDateDetail;
                         if (!d) return "CLICK CROSS-STOCK CHART TO INSPECT A COMMON CLOSE DATE";
                         function describe(p) {
-                            return p.symbol + " // $" + p.price.toFixed(2)
+                            return p.symbol + " // " + (p.currency === "USD" ? "$" : p.currency + " ") + p.price.toFixed(2)
                                 + " // INDEX " + p.value.toPrecision(6)
                                 + " // " + p.changePct.toFixed(4) + "% FROM START";
                         }

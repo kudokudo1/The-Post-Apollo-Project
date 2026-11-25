@@ -35,7 +35,7 @@ assert.equal(capture(identity,avListing,{...av,returnedBars:1}),null);
 assert.equal(capture(identity,avListing,{...av,compactMayBeTruncated:"true"}),null);
 const f=qml.slice(qml.indexOf("function acceptGlobalHistory("),qml.indexOf("readonly property string priceUnit"));
 const ctx={discoveryOpen:true,visible:true,stockFeed:{monitoring:true},RangeAnalysisPolicy:{captureGlobalHistory:capture},
-    globalHistory:null,globalHandoffMessage:"",controlsExpanded:true,researchView:"compare",scroll:{contentY:90}};
+    stockReference:null,globalHistory:null,globalHandoffMessage:"",controlsExpanded:true,researchView:"compare",scroll:{contentY:90}};
 vm.createContext(ctx);vm.runInContext(f,ctx);
 assert.equal(ctx.acceptGlobalHistory(identity,listing,eod),true);
 assert.equal(ctx.discoveryOpen,false);assert.equal(ctx.researchView,"price");assert.equal(ctx.controlsExpanded,false);
@@ -50,7 +50,7 @@ ctx.returnToLegacyHistory();assert.equal(ctx.globalHistory,null);
 for(const token of ["readonly property var snapshot: globalHistoryActive ? globalHistory",
     "RangeAnalysisPolicy.retainedGlobalRange(snapshot)",
     "readonly property string priceUnit: globalHistoryActive ? globalHistory.currency",
-    "RETURN TO LEGACY STOCKS","FIGI MATCH NOT VERIFIED","CROSS-STOCK PENDING",
+    "RETURN TO LEGACY STOCKS","FIGI MATCH NOT VERIFIED","COMPARE MATCHING PROVIDER, CURRENCY, BASIS AND WINDOW",
     "onHistoryChosen: function(identity, listing, snapshot)","id: priceCanvas",
     "if (!stocks.globalHistoryActive && stocks.stockFeed) stocks.stockFeed.refresh()"])
     assert.ok(qml.includes(token),token);

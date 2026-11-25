@@ -177,9 +177,9 @@ ShellRoot {
                 const host=root.findItem(pane.item,"cpuplusDiagHostInstrument");
                 const toggle=root.findItem(pane.item,"cpuplusDiagHostToggle");
                 if(!host||!toggle||!ui)return;
-                if(!root.check(host.visible&&toggle.available&&ui.hostDetails.complete
+                if(!root.check(host.visible&&toggle.available&&ui.hostDetails&&ui.hostDetails.complete
                     &&ui.hostDetails.minimum===6291456&&ui.hostDetails.delta===-2097152
-                    &&ui.hostDetails.pssDelta===524288&&!CpuPlusDiagnostics.busy,"paired host instrument"))return;
+                    &&ui.hostDetails.pssDelta===524288&&!CpuPlusDiagnostics.busy,"paired host instrument // "+JSON.stringify({visible:host.visible,available:toggle.available,details:ui.hostDetails,busy:CpuPlusDiagnostics.busy})))return;
                 toggle.leftClicked(null);
                 if(!root.check(!host.visible&&!ui.showHostDetails,"hide historical host instrument"))return;
                 toggle.leftClicked(null);

@@ -30,21 +30,45 @@ function rootDirectory() {
   return path.join(parent, "post-apollo", "finance", "research-investigations");
 }
 function privateDirectory(dir, create) {
-  if (create) fs.mkdirSync(dir, {recursive:true,mode:0o700});
-  let info;
-  try { info = fs.lstatSync(dir); }
-  catch (e) { if (!create && e.code === "ENOENT") return false; refuse("STORE_UNAVAILABLE"); }
-  if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid() || (info.mode & 0o077))
+  if (typeof dir !== "string" || !path.isAbsolute(dir)
+      || path.normalize(dir) !== dir || dir.length > 4096)
     refuse("UNSAFE_DIRECTORY");
+  // Never use recursive mkdir: it follows unchecked parent symlinks
+  // and may create Research paths outside the intended data root.
+  let current=path.parse(dir).root;
+  const parts=dir.slice(current.length).split(path.sep).filter(Boolean);
+  for (const part of parts) {
+    current=path.join(current,part);
+    let info;
+    try { info=fs.lstatSync(current); }
+    catch (e) {
+      if (e.code !== "ENOENT") refuse("STORE_UNAVAILABLE");
+      if (!create) return false;
+      try {fs.mkdirSync(current,{mode:0o700});}
+      catch (error) {
+        if (error.code !== "EEXIST") refuse("STORE_UNAVAILABLE");
+      }
+      try {info=fs.lstatSync(current);}
+      catch {refuse("STORE_UNAVAILABLE");}
+    }
+    if (!info.isDirectory() || info.isSymbolicLink())
+      refuse("UNSAFE_DIRECTORY");
+    if (current === dir && (info.uid !== process.getuid()
+        || (info.mode & 0o077))) refuse("UNSAFE_DIRECTORY");
+  }
   return true;
+}
+function unsafeRegular(st) {
+  return !st.isFile() || st.isSymbolicLink() || st.nlink !== 1
+    || st.uid !== process.getuid() || (st.mode & 0o077)
+    || st.size > MAX_BYTES;
 }
 function secureRegular(file) {
   let st;
   try { st = fs.lstatSync(file); }
   catch(e) { if (e.code === "ENOENT") return false; refuse("UNSAFE_FILE"); }
-  if (!st.isFile() || st.isSymbolicLink() || st.uid !== process.getuid() || (st.mode & 0o077) || st.size > MAX_BYTES)
-    refuse("UNSAFE_FILE");
-  return true;
+  if (unsafeRegular(st)) refuse("UNSAFE_FILE");
+  return st;
 }
 // The writer's lock must be on stable storage before the first mutation.
 function syncPrivateDirectory(dir) {
@@ -81,11 +105,12 @@ function validDocument(doc) {
 function load(dir) {
   if (!privateDirectory(dir,false)) return empty();
   const file = path.join(dir,"investigations.json");
-  if (!secureRegular(file)) return empty();
+  const expected=secureRegular(file);
+  if (!expected) return empty();
   const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
   try {
     const st = fs.fstatSync(fd);
-    if (!st.isFile() || st.uid !== process.getuid() || (st.mode & 0o077) || st.size > MAX_BYTES)
+    if (unsafeRegular(st) || st.dev !== expected.dev || st.ino !== expected.ino)
       refuse("UNSAFE_FILE");
     const raw = fs.readFileSync(fd,{encoding:"utf8"});
     if (Buffer.byteLength(raw,"utf8") > MAX_BYTES) refuse("STORE_LIMIT");

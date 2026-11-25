@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import sys
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
@@ -14,6 +15,7 @@ from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "scripts/forest"))
+import runtime_public_conversation_r5 as r5
 from runtime_public_conversation_r5 import PublicConversationHost, FixtureHostRefusal
 from runtime_public_delivery_r4b import PresentationCorrelation
 
@@ -101,6 +103,60 @@ class ConnectedPublicConversation(unittest.TestCase):
         self.call("setupHistory")
         self.assertEqual(self.view.property("historyLabel"), "HISTORY SNAPSHOT COMPLETE")
         return self.view.property("historyCount")
+
+    def test_r7d_c_actual_writer_order_separate_fixture(self):
+        events = []
+        db = self.host._db
+        def audit(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and (table, column) in (
+                    ("forest_sessions", "title"), ("forest_turns", "body")):
+                events.append(column.upper())
+            if action == sqlite3.SQLITE_INSERT and table in (
+                    "forest_turns", "forest_attempts_b3"):
+                events.append("APPEND_SQL" if table == "forest_turns" else "RESERVE_SQL")
+            return sqlite3.SQLITE_OK
+        def spy(label, fn):
+            def call(*a, **kw):
+                events.append(label)
+                return fn(*a, **kw)
+            return call
+        db.set_authorizer(audit)
+        try:
+            with patch.object(self.host, "_open", spy("VIEW_OPEN", self.host._open)), \
+                 patch.object(self.host, "_view", spy("VIEW_CURRENT", self.host._view)), \
+                 patch.object(self.host._journal, "append_turn",
+                              spy("APPEND_CALL", self.host._journal.append_turn)), \
+                 patch.object(r5, "TaskContext", spy("CONTEXT", r5.TaskContext)), \
+                 patch.object(r5.RuntimeExchange, "run", spy("GENERATOR", r5.RuntimeExchange.run)), \
+                 patch.object(self.host, "_fake_stream", spy("FAKE_STREAM", self.host._fake_stream)):
+                self.host.start_next()
+                for a, b in zip(("VIEW_OPEN", "VIEW_CURRENT", "TITLE", "APPEND_CALL",
+                                 "APPEND_SQL", "CONTEXT"),
+                                ("VIEW_CURRENT", "TITLE", "APPEND_CALL", "APPEND_SQL",
+                                 "CONTEXT", "GENERATOR")):
+                    self.assertLess(events.index(a), events.index(b))
+                self.assertNotIn("RESERVE_SQL", events)
+                self.assertNotIn("FAKE_STREAM", events)
+                self.assertEqual(db.execute("SELECT revision FROM forest_sessions").fetchone(), (1,))
+                self.assertEqual(self.host.advance(), "ACTIVE")  # REQUESTED
+                self.assertNotIn("RESERVE_SQL", events)
+                before = len(events)
+                self.assertEqual(self.host.advance(), "ACTIVE")  # RESERVED
+                reservation = events[before:]
+                self.assertLess(reservation.index("BODY"), reservation.index("RESERVE_SQL"))
+                self.assertNotIn("TITLE", reservation)
+                self.assertNotIn("FAKE_STREAM", events)
+                self.assertEqual(db.execute("SELECT expected_revision,status FROM forest_attempts_b3").fetchall(),
+                                 [(1, "RESERVED")])
+                self.finish_turn()
+                self.assertLess(events.index("RESERVE_SQL"), events.index("FAKE_STREAM"))
+        finally:
+            db.set_authorizer(None)
+        self.assertEqual(db.execute("SELECT revision FROM forest_sessions").fetchone(), (2,))
+        self.assertEqual(db.execute("SELECT expected_revision,status FROM forest_attempts_b3").fetchall(),
+                         [(1, "COMMITTED")])
+        self.assertEqual(db.execute("SELECT role FROM forest_turns ORDER BY ordinal").fetchall(),
+                         [("user",), ("assistant",)])
 
     def test_two_explicit_turns_actual_status_history_and_stop(self):
         self.host.start_next()

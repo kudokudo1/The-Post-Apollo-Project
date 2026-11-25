@@ -12,6 +12,7 @@ import importlib.util
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -277,6 +278,64 @@ class LocalHistoryLedgerTests(unittest.TestCase):
         self.refused("EXISTING_SIGNED_VERIFIER_REFUSED",
                      revoked_history_authority_sha256=(
                          self.f.doc["historyAuthoritySha256"],))
+
+    def mutate_fixture(self, sql, parameters=()):
+        # Direct SQL corruption is confined to the existing disposable DB.
+        db = sqlite3.connect(self.work / M.DB)
+        try:
+            db.execute(sql, parameters)
+            db.commit()
+        finally:
+            db.close()
+
+    def assert_inconsistent_outcome(self):
+        before = (self.work / M.DB).read_bytes()
+        with self.assertRaisesRegex(
+                M.Refused, "OUTCOME_INCONSISTENT_UNKNOWN_HOLD_NO_REPLAY"):
+            self.ledger.outcome(self.challenge)
+        self.assertEqual((self.work / M.DB).read_bytes(), before)
+
+    def test_29_consumed_without_history_refuses_without_repair(self):
+        self.commit()
+        self.mutate_fixture("DELETE FROM history WHERE nonce_hash=?",
+                            (M.digest(self.challenge),))
+        self.assert_inconsistent_outcome()
+
+    def test_30_mismatched_history_commitment_or_sequence_refuses(self):
+        self.commit()
+        backup = (self.work / M.DB).read_bytes()
+        for column, value in (("previous_head", "a"*64),
+                              ("next_head", "b"*64),
+                              ("seq", self.seq + 2),
+                              ("record_hash", "invalid")):
+            with self.subTest(column=column):
+                (self.work / M.DB).write_bytes(backup)
+                self.mutate_fixture(
+                    "UPDATE history SET " + column + "=? WHERE nonce_hash=?",
+                    (value, M.digest(self.challenge)))
+                self.assert_inconsistent_outcome()
+
+    def test_31_issued_with_matching_history_is_not_a_fresh_challenge(self):
+        self.commit()
+        self.mutate_fixture(
+            "UPDATE challenges SET state='issued',next_head=NULL WHERE nonce_hash=?",
+            (M.digest(self.challenge),))
+        self.assert_inconsistent_outcome()
+
+    def test_32_original_consumed_observation_survives_later_head(self):
+        first = self.commit()
+        second = self.issue()
+        self.sign_for(second, head=first["nextHistoryHeadSha256"],
+                      seq=first["nextHistorySequence"])
+        self.ledger.record(**self.args(challenge=second))
+        out = self.ledger.outcome(self.challenge)
+        self.assert_denied(out)
+        self.assertEqual(out["developmentOnlyState"], "consumed")
+        self.assertEqual(out["developmentOnlyCommittedHeadSha256"],
+                         first["nextHistoryHeadSha256"])
+        self.mutate_fixture("UPDATE meta SET seq=?,head=? WHERE id=1",
+                            (self.seq, self.head))
+        self.assert_inconsistent_outcome()
 
 
 if __name__ == "__main__":

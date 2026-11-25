@@ -5,8 +5,8 @@ import "ParentWire.js" as Wire
 import "PublicRuntimeStatusDisplay.js" as Status
 import "PublicHistoryDisplay.js" as History
 
-// CI-only first actual child exchange. No Loader, UI paint or
-// installed ForestW connection. The harness owns an independent view object.
+// CI-only native exchange; optional actual ForestW Loader consumer.
+// Never an installed connection.
 // One instance owns one tracked Process for its entire lifetime.
 Item {
     id: root
@@ -14,10 +14,16 @@ Item {
     required property string fixtureDirectory
     required property var originalOwner
     property var observedOwner: null
+    property bool joined: false
+    property var originalLoader: null
+    property bool reopenReady: false
     property bool eligible: false
     property bool acceptOffer: false
     readonly property bool current: eligible && originalOwner !== null
         && observedOwner === originalOwner
+        && (!joined || (originalLoader !== null && originalLoader.active
+            && originalLoader.visible && originalLoader.item === originalOwner
+            && originalOwner.visible))
     property var wire: null
     property string phase: "NEW"
     property int action: 0
@@ -65,7 +71,9 @@ Item {
         if (phase !== "NEW" || !current || !Wire.token(trial) || worker.running)
             return false;
         wire = Wire.createWire();
-        historyController = History.createController();
+        if (joined) {
+            if (!originalOwner.beginConnectedHistory()) return false;
+        } else historyController = History.createController();
         phase = "STARTING";
         trialClock.restartMs();
         phaseClock.restartMs();
@@ -73,6 +81,9 @@ Item {
         return true;
     }
     function clearHistory() {
+        if (joined && originalOwner && historyScope
+            && originalOwner.sameHistoryScope(historyScope,originalOwner.historyCurrentScope))
+            originalOwner.historyCurrentScope = null;
         historyScope = null;
         pageRequest = null;
         historyDisplay = historyController ? historyController.close() : null;
@@ -81,6 +92,11 @@ Item {
         clearHistory();
         // This object cannot mutate another owner's view; no callbacks to a
         // replacement. Clear only its own retained reference and status.
+        if (joined && originalOwner && ref
+            && Status.same(Status.correlation(ref),Status.correlation(originalOwner.runtimeCurrentCorrelation))) {
+            originalOwner.runtimeViewOpen = false;
+            originalOwner.runtimeCurrentCorrelation = null;
+        }
         ref = null;
         sequence = 0;
         status = "";
@@ -119,6 +135,7 @@ Item {
             if (phase !== "IDLE" || turnsStarted >= 3) return false;
             clearOriginal();
             stopRequested = false;
+            reopenReady = false;
             turnSteps = 0;
         } else if (kind === "STEP" || kind === "STOP") {
             if (phase !== "ACTIVE" || ref === null) return false;
@@ -127,6 +144,10 @@ Item {
             if (kind === "STEP" && turnsStarted === 3 && turnSteps >= 4
                 && !stopRequested) return false;
             data = {ref:ref};
+        } else if (kind === "REOPEN") {
+            if (phase !== "IDLE" || !reopenReady) return false;
+            clearOriginal();
+            reopenReady = false;
         } else if (kind === "HISTORY_ATTACH") {
             if (phase !== "IDLE") return false;
             clearHistory();
@@ -134,14 +155,27 @@ Item {
             if (phase !== "IDLE" || historyScope === null || !Wire.token(pageId)
                 || pageId === trial || used.indexOf(pageId)>=0 || pageId === sessionAlias
                 || used.length >= 128 || !Wire.integer(limit,1,2)) return false;
-            if (historyDisplay && historyDisplay.state === "COMPLETE") return false;
-            const d = historyDisplay && historyDisplay.state === "PARTIAL"
-                ? historyController.next(historyScope,pageId,limit)
-                : historyController.open(historyScope,pageId,limit);
-            if (d.state !== "PENDING" || !d.request) { hold("HISTORY_REQUEST"); return false; }
+            if (joined) {
+                if (!originalOwner.historyScopeActive || !live()) return false;
+                const state = originalOwner.fixtureState;
+                if (state !== "CLOSED" && state !== "PARTIAL") return false;
+                const ok = state === "PARTIAL"
+                    ? originalOwner.nextHistoryPage(historyScope,pageId,limit)
+                    : originalOwner.openHistoryPage(historyScope,pageId,limit);
+                if (!ok || !live() || !originalOwner.historyPendingRequest) {
+                    hold("HISTORY_REQUEST"); return false;
+                }
+                pageRequest = originalOwner.historyPendingRequest;
+            } else {
+                if (historyDisplay && historyDisplay.state === "COMPLETE") return false;
+                const d = historyDisplay && historyDisplay.state === "PARTIAL"
+                    ? historyController.next(historyScope,pageId,limit)
+                    : historyController.open(historyScope,pageId,limit);
+                if (d.state !== "PENDING" || !d.request) { hold("HISTORY_REQUEST"); return false; }
+                pageRequest = d.request;
+                historyDisplay = d;
+            }
             used = used.concat([pageId]);
-            pageRequest = d.request;
-            historyDisplay = d;
             data = {scope:historyScope,request:pageRequest};
         } else if (kind === "CLOSE") {
             if (phase !== "IDLE" && phase !== "ACTIVE" && phase !== "BLOCKED")
@@ -154,7 +188,7 @@ Item {
         offered = false;
         phaseClock.restartMs();
         // ACK/STEP/CLOSE writes may race effects; never infer rollback.
-        if (kind === "STEP" || kind === "STOP" || kind === "CLOSE") possibleEffect = true;
+        if (kind === "STEP" || kind === "STOP" || kind === "CLOSE" || kind === "REOPEN") possibleEffect = true;
         if (!send(kind,data)) { hold("WRITE"); return false; }
         return true;
     }
@@ -191,12 +225,20 @@ Item {
                 return false;
             offered = true;
             // Independent owner eligibility/decision, never supplied by frame.
-            const accepted = current && acceptOffer;
+            let accepted = current && acceptOffer;
             if (accepted) {
                 ref = {requestId:data.ref.requestId,viewKey:data.ref.viewKey,
                     generation:data.ref.generation};
                 used = used.concat([ref.requestId,ref.viewKey]);
-                possibleEffect = true;
+                if (joined) {
+                    originalOwner.runtimeTreeKey = "CHERRY";
+                    originalOwner.runtimeCurrentCorrelation = ref;
+                    originalOwner.runtimeViewOpen = true;
+                    accepted = live() && originalOwner.runtimeInitialized
+                        && originalOwner.openRuntimeLifetime(ref) && live();
+                    if (!accepted) clearOriginal();
+                }
+                if (accepted) possibleEffect = true;
             }
             return send("OPEN_ACK",{ref:data.ref,accepted:accepted});
         }
@@ -231,9 +273,16 @@ Item {
                     || r.turnId===sessionAlias || used.indexOf(r.turnId)>=0)
                 || projected.complete !== (pageRequest.after+projected.messages.length===historyScope.revision)
                 || !live()) return false;
-            const d = historyController.receive(data.page,historyScope);
-            if (d.state !== "PARTIAL" && d.state !== "COMPLETE") return false;
-            historyDisplay = d;
+            if (joined) {
+                if (!originalOwner.historyScopeActive
+                    || !originalOwner.receiveHistoryPage(historyScope,data.page)
+                    || !live() || originalOwner.fixtureState !== (projected.complete ? "COMPLETE" : "PARTIAL"))
+                    return false;
+            } else {
+                const d = historyController.receive(data.page,historyScope);
+                if (d.state !== "PARTIAL" && d.state !== "COMPLETE") return false;
+                historyDisplay = d;
+            }
             pageRequest = null;
             pending = "";
             actionFinished("PAGE_READY");
@@ -253,7 +302,14 @@ Item {
         } else if (pending === "HELLO" && code === "READY" && !data.units.length)
             next = "IDLE";
         else if (pending === "HISTORY_ATTACH" && offered && historyScope !== null
-                && code === "HISTORY_ATTACHED" && !data.units.length) next = "IDLE";
+                && code === "HISTORY_ATTACHED" && !data.units.length) {
+            if (joined) {
+                originalOwner.historyCurrentScope = historyScope;
+                if (!live() || !originalOwner.attachHistoryScope(historyScope) || !live()) return false;
+            }
+            next = "IDLE";
+        } else if (pending === "REOPEN" && code === "JOURNAL_REOPENED" && !data.units.length)
+            next = "IDLE";
         else if (pending === "NEXT" && offered && ref !== null
                 && code === "TURN_STARTED" && !data.units.length) {
             turnsStarted++;
@@ -273,15 +329,22 @@ Item {
             if (code === "ABORTED_LOCAL" && !stopRequested) return false;
             if (turnsStarted === 3 && code === "COMMITTED_LOCAL") return false;
             turnSteps++;
+            if (code === "COMMITTED_LOCAL") reopenReady = true;
             next = code === "ACTIVE" ? "ACTIVE" : code === "COMMITTED_LOCAL" ? "IDLE" : "BLOCKED";
         } else if (pending === "CLOSE" && code === "CLOSED" && !data.units.length) {
             next = "CLOSE_EXIT";
             closeResult = true;
         } else return false;
-        // Whole batch validated before any local projection. No UI2 consumer
-        // call here; R6d will apply the original Loader guard for each unit.
+        // Whole batch validated before any actual consumer call.
         if (batch) {
             if (!live()) return false;
+            if (joined) for (const unit of data.units) {
+                if (!live() || !originalOwner.runtimeEligible
+                    || !Status.same(Status.correlation(ref),Status.correlation(originalOwner.runtimeCurrentCorrelation)))
+                    return false;
+                originalOwner.receiveRuntimeUnit(unit);
+                if (!live() || originalOwner.runtimeState !== "DISPLAYING") return false;
+            }
             sequence = batch.sequence;
             status = batch.status;
         }

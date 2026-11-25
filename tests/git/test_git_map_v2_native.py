@@ -87,25 +87,34 @@ print(json.dumps(getattr(v2,action)(Path(repo),Path(os.environ["XDG_CACHE_HOME"]
         statusText="CUSTODY LOST // REOPEN TO RECHECK";
     }
     function handleCustodyLoss() {''')
-    patch(host,"        if (!candidate.activate(result.directory,result.manifest,anchor)) {",'''        candidate.v2Generation=result;
-        if (!candidate.activate(result.directory,result.manifest,anchor)) {''')
+    patch(host,"        const previousLease=activeLease;",'''        candidate.v2Generation=result;
+        const previousLease=activeLease;''')
     patch(host,"        requestsEnabled: root.operatorActive && root.fullVisible",'''        requestsEnabled: root.operatorActive && root.fullVisible
         v2Lease: root.activeLease
-        onV2Fault: Qt.callLater(root.invalidateV2Selection)''')
+        onV2Fault: function(g) { Qt.callLater(()=>{ if (root.activeLease && g && root.activeLease.generation.device===g.device && root.activeLease.generation.inode===g.inode && root.activeLease.generation.manifest.snapshot===g.manifest.snapshot) root.invalidateV2Selection(); }); }''')
     patch(viewport,"    property alias requestsEnabled: bridge.requestsEnabled",'''    property alias requestsEnabled: bridge.requestsEnabled
     property alias v2Generation: bridge.v2Generation
     property alias v2Lease: bridge.v2Lease
-    signal v2Fault()''')
-    patch(viewport,"    GitMap.GitMapPageBridge { id: bridge }","    GitMap.GitMapPageBridge { id: bridge; onV2Fault: root.v2Fault() }")
+    signal v2Fault(var g)''')
+    patch(viewport,"    GitMap.GitMapPageBridge { id: bridge }","    GitMap.GitMapPageBridge { id: bridge; onV2Fault: function(g) { root.v2Fault(g); } }")
     patch(bridge,"    property var state: null",'''    property var state: null
     property var v2Generation: null
     property var v2Lease: null
     property var activeEvidence: null
-    signal v2Fault()''')
+    property bool v2ReadRefused: false
+    onV2GenerationChanged: v2ReadRefused=false
+    function sameGeneration(a,b) {
+        return a && b && a.directory===b.directory && a.repoId===b.repoId
+            && a.key===b.key && a.manifest.snapshot===b.manifest.snapshot
+            && a.device===b.device && a.inode===b.inode;
+    }
+    signal v2Fault(var g)''')
+    patch(bridge,"        if (!requestsEnabled || !state || faulted || busy || worker.running) return;","        if (!requestsEnabled || !state || faulted || busy || worker.running || v2ReadRefused) return;")
     patch(bridge,"        activeRequest = request;",'''        if (!v2Generation || !v2Lease || !v2Lease.held
-                || v2Lease.generation!==v2Generation || v2Generation.directory!==directory
+                || !sameGeneration(v2Lease.generation,v2Generation) || v2Generation.directory!==directory
                 || v2Generation.manifest.snapshot!==request.snapshot) {
-            v2Fault();
+            v2ReadRefused=true;
+            v2Fault(v2Generation);
             return;
         }
         activeEvidence=v2Generation;
@@ -120,13 +129,13 @@ print(json.dumps(getattr(v2,action)(Path(repo),Path(os.environ["XDG_CACHE_HOME"]
                     if (reply.schema==="post-apollo-git-map-reader-v2-candidate" && reply.status==="READY"
                             && reply.repoId===request.repoId && reply.key===activeDirectory.split("/").pop()
                             && reply.snapshot===request.snapshot && reply.device===activeEvidence.device && reply.inode===activeEvidence.inode
-                            && v2Lease && v2Lease.held && v2Lease.generation===activeEvidence && reply.reclamationAllowed===false)
+                            && v2Lease && v2Lease.held && sameGeneration(v2Lease.generation,activeEvidence) && reply.reclamationAllowed===false)
                         accepted=Policy.accept(state,request,reply.result);
                 }''')
     patch(bridge,"            state = accepted || Policy.fail(state,request);",'''            state = accepted || Policy.fail(state,request);
-            if (!accepted && v2Lease && v2Lease.held && v2Lease.generation===activeEvidence) {
-                requestsEnabled=false;
-                v2Fault();
+            if (!accepted && v2Lease && v2Lease.held && sameGeneration(v2Lease.generation,activeEvidence)) {
+                v2ReadRefused=true;
+                v2Fault(activeEvidence);
             }''')
     patch(lease,'''Quickshell.shellPath("scripts/git_map_reader_candidate.py"),
             generation.repoId,generation.key,generation.manifest.snapshot''','''Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),

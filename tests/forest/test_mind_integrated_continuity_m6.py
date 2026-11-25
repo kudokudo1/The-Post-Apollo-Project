@@ -17,6 +17,8 @@ from context_first_tree_m2 import ContextRefusal, SessionContextRef
 from runtime_stop_control_r2 import RuntimeStopControl
 from runtime_events_r3 import OperationRef, RuntimeExchange, RuntimeEventRefusal
 from runtime_public_status_r4 import FixtureTreeBinding, Observation, PublicRuntimeStatus
+from runtime_public_conversation_r5 import PublicConversationHost
+from runtime_public_delivery_r4b import PresentationCorrelation
 from history_public_fixture_m4 import (
     PublicViewRef, HistoryPageRef, history_public_fixture_in_transaction,
 )
@@ -474,6 +476,130 @@ process.stdout.write(JSON.stringify(snapshots));
         ).fetchone()[0], "ABORTED")
         self.assertEqual([r["body"] for r in self.display(self.history())["messages"]],
                          ["Public question"])
+
+
+
+class ConnectedHistoryRevision(unittest.TestCase):
+    """Actual R5 owner fixture + actual UI2 history controller; no UI sender."""
+
+    def test_r5_commit_between_pages_requires_explicit_fresh_snapshot(self):
+        current = None
+        units = []
+
+        def open_lifetime(ref):
+            nonlocal current
+            current = PresentationCorrelation(ref["requestId"], ref["viewKey"],
+                                              ref["generation"])
+            return True
+
+        def invalidate(ref):
+            nonlocal current
+            if current is not None and current.view_key == ref["viewKey"]:
+                current = None
+
+        # The status callback only records local fixture units. It never
+        # opens history or sends a packet to the history controller.
+        with PublicConversationHost(open_lifetime=open_lifetime,
+                current_view=lambda: current, receive_unit=units.append,
+                invalidate_lifetime=invalidate) as host:
+            def finish():
+                for _ in range(8):
+                    outcome = host.advance()
+                    if outcome != "ACTIVE":
+                        self.assertEqual(outcome, "TERMINAL")
+                        return
+                self.fail("bounded R5 fixture did not finish")
+
+            host.start_next()
+            finish()
+            host.start_next()
+            # REQUESTED, RESERVED, STARTED, DELTA: second answer is provisional.
+            for _ in range(4):
+                self.assertEqual(host.advance(), "ACTIVE")
+            first = host.history_page(limit=2)
+            self.assertEqual(first["revision"], 3)
+            self.assertFalse(first["complete"])
+            view_key = current.view_key
+            self.assertEqual(first["generation"], current.generation)
+            self.assertEqual(len(first["messages"]), 2)
+            finish()
+            self.assertEqual(current.view_key, view_key)
+            continuation = host.history_page(after=2, limit=2)
+            self.assertEqual(continuation["revision"], 4)
+            self.assertEqual(continuation["generation"], first["generation"])
+            self.assertEqual(continuation["sessionId"], first["sessionId"])
+            fresh = host.history_page(limit=2)
+            fresh_next = host.history_page(after=2, limit=2)
+            self.assertEqual(fresh["revision"], fresh_next["revision"])
+            self.assertEqual(len({f["requestId"] for f in
+                (first, continuation, fresh, fresh_next)}), 4)
+            # The fixed R5 host owns one immutable canonical session, with
+            # no caller-selected database, Tree or session. This is not a
+            # generic selectable-session write authorization test.
+            db = sqlite3.connect(host._path)
+            try:
+                self.assertEqual(db.execute(
+                    "SELECT session_id,tree_key,revision FROM forest_sessions"
+                ).fetchall(), [(first["sessionId"], "cherry", 4)])
+                self.assertEqual(db.execute(
+                    "SELECT status FROM forest_attempts_b3 ORDER BY created_at_ms"
+                ).fetchall(), [("COMMITTED",), ("COMMITTED",)])
+            finally:
+                db.close()
+
+            # Both defensive paths use the real controller: observe the
+            # independently changed revision, or receive a mismatched
+            # continuation before the observer reports that change.
+            # A fresh explicit open is the only recovery; never append
+            # pages across revisions or infer history from status.
+            script = """
+const fs=require("fs"), vm=require("vm"), assert=require("node:assert/strict");
+const ctx=vm.createContext({});
+vm.runInContext(fs.readFileSync(process.argv[1],"utf8"),ctx);
+const {first,continuation,fresh,freshNext,viewKey}=JSON.parse(fs.readFileSync(0,"utf8"));
+const scope=f=>({treeKey:f.treeKey,generation:f.generation,
+    sessionId:f.sessionId,revision:f.revision,viewKey});
+const old=scope(first), now=scope(fresh);
+function unavailable(s) {
+    assert.equal(s.state,"UNAVAILABLE");
+    assert.equal(s.complete,false);
+    assert.deepEqual(Array.from(s.messages),[]);
+    assert.equal(s.request,null);
+    assert.equal(s.sourceAuthenticated,false);
+    assert.equal(s.permissionGranted,false);
+}
+for(const observed of [true,false]) {
+    const c=ctx.createController();
+    assert.equal(c.open(old,first.requestId,2).state,"PENDING");
+    const partial=c.receive(first,old);
+    assert.equal(partial.state,"PARTIAL");
+    assert.equal(partial.messages.length,2);
+    const pending=c.next(old,continuation.requestId,2);
+    assert.equal(pending.state,"PENDING");
+    assert.equal(pending.request.revision,first.revision);
+    assert.equal(pending.request.after,2);
+    if(observed) unavailable(c.observe(now));
+    unavailable(c.receive(continuation,observed?now:old));
+    unavailable(c.next(now,continuation.requestId,2));
+    assert.equal(c.open(now,fresh.requestId,2).state,"PENDING");
+    assert.equal(c.receive(fresh,now).state,"PARTIAL");
+    assert.equal(c.next(now,freshNext.requestId,2).state,"PENDING");
+    const final=c.receive(freshNext,now);
+    assert.equal(final.state,"COMPLETE");
+    assert.deepEqual(Array.from(final.messages,m=>m.ordinal),[1,2,3,4]);
+    assert.deepEqual(Array.from(final.messages,m=>m.body),[
+        "What is a Tree?","Public fixture: a Tree is a Forest agent identity.",
+        "What does its journal preserve?","Public fixture: committed conversation turns."]);
+    assert.equal(final.permissionGranted,false);
+    assert.equal(final.sourceAuthenticated,false);
+}
+"""
+            # Only M4 public pages and local view correlation reach Node.
+            subprocess.run(["node", "-e", script,
+                str(ROOT / "widgets/forest/ui2/PublicHistoryDisplay.js")],
+                input=json.dumps(dict(first=first, continuation=continuation,
+                    fresh=fresh, freshNext=fresh_next, viewKey=view_key)),
+                text=True, capture_output=True, check=True, timeout=10)
 
 
 if __name__ == "__main__":

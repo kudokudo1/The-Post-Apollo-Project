@@ -468,6 +468,41 @@ function compareStockReferences(reference, current, cik, symbol) {
     const b = captureStockReference(current,cik,symbol);
     if (!a || !b) return {state:"invalid"};
     if (a.cik === b.cik || a.symbol === b.symbol) return {state:"same-stock"};
+    return compareValidatedStockRanges(a,b);
+}
+
+// M45: global references retain the actual user-selected provider listing.
+// Never invent an SEC identifier or infer equivalence across providers.
+function captureGlobalStockReference(snapshot) {
+    if (!retainedGlobalRange(snapshot) || snapshot.bars.length<2) return null;
+    const l=snapshot.listing;
+    return captureGlobalHistory(snapshot.identity,
+        {symbol:l.symbol,name:l.name,currency:l.currency,code:l.code,
+            exchange:l.exchange,region:l.region},snapshot);
+}
+function compareGlobalStockReferences(reference,current) {
+    const a=captureGlobalStockReference(reference),b=captureGlobalStockReference(current);
+    if (!a || !b) return {state:"invalid"};
+    if (a.identity.figi===b.identity.figi
+            || (a.source===b.source && a.symbol===b.symbol))
+        return {state:"same-stock"};
+    if (a.source!==b.source) return {state:"provider-mismatch"};
+    if (a.currency!==b.currency) return {state:"currency-mismatch"};
+    const compared=compareValidatedStockRanges(a,b);
+    if (compared.state==="ready") {
+        compared.providerSource=a.source;
+        compared.currency=a.currency;
+        compared.referenceVenue=a.listing.venue;
+        compared.currentVenue=b.listing.venue;
+        compared.referenceTruncated=a.compactMayBeTruncated;
+        compared.currentTruncated=b.compactMayBeTruncated;
+        compared.identityVerified=false;
+    }
+    return compared;
+}
+
+// The identical common-date join serves legacy and validated global ranges.
+function compareValidatedStockRanges(a,b) {
     if (a.from !== b.from || a.to !== b.to) return {state:"window-mismatch"};
     if (a.priceBasis !== b.priceBasis) return {state:"basis-mismatch"};
     const pairs = [];
@@ -507,6 +542,11 @@ function crossStockNormalizedChart(comparison) {
             || typeof comparison.referenceSymbol !== "string"
             || typeof comparison.currentSymbol !== "string"
             || comparison.referenceSymbol === comparison.currentSymbol
+            || (comparison.providerSource !== undefined
+                && (!["eodhd-eod","alpha-vantage-daily-compact"].includes(comparison.providerSource)
+                    || typeof comparison.currency!=="string" || !/^[A-Z]{3}$/.test(comparison.currency)
+                    || comparison.identityVerified!==false
+                    || (comparison.providerSource==="alpha-vantage-daily-compact" && comparison.priceBasis!=="CLOSE")))
             || !["CLOSE","ADJUSTED CLOSE"].includes(comparison.priceBasis)
             || !Array.isArray(comparison.pairs)
             || comparison.pairs.length < 2 || comparison.pairs.length > 132
@@ -540,7 +580,8 @@ function crossStockNormalizedChart(comparison) {
         low:Math.min.apply(null,values),high:Math.max.apply(null,values),
         maxSteps:pairs.length-1,from:comparison.from,to:comparison.to,
         referenceSymbol:comparison.referenceSymbol,currentSymbol:comparison.currentSymbol,
-        priceBasis:comparison.priceBasis,source:"loaded-eodhd-common-dates-only",
+        priceBasis:comparison.priceBasis,source:comparison.providerSource==="alpha-vantage-daily-compact"
+            ? "loaded-alpha-vantage-common-dates-only" : "loaded-eodhd-common-dates-only",
         readOnly:true,noProviderCalls:true
     };
 }
@@ -558,9 +599,11 @@ function inspectCrossStockDate(comparison, step) {
     return {
         step:step,date:row.date,priceBasis:chart.priceBasis,
         reference:{symbol:chart.referenceSymbol,date:row.date,step:step,
-            price:row.referencePrice,value:a.value,changePct:referencePct},
+            price:row.referencePrice,value:a.value,changePct:referencePct,
+            currency:comparison.currency || "USD"},
         current:{symbol:chart.currentSymbol,date:row.date,step:step,
-            price:row.currentPrice,value:b.value,changePct:currentPct},
+            price:row.currentPrice,value:b.value,changePct:currentPct,
+            currency:comparison.currency || "USD"},
         gapPoints:gap,from:chart.from,
         source:chart.source,readOnly:true,noProviderCalls:true
     };

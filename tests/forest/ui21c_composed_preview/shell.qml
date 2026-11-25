@@ -237,6 +237,96 @@ ShellRoot {
         return {treeKey:"CHERRY",taskAlias:alias,viewKey:(100+n).toString(16).padStart(32,"0"),
             planRevision:100+n};
     }
+    // Representative native row geometry, never actual Tree/Colony records.
+    // The source mount and identity colors remain UI1-owned.
+    function seasonScope(i,revision=1) {
+        return {kind:["TREE","COLONY","CLONE","ASSIGNMENT"][i],
+            entityAlias:(i+1).toString(16).padStart(32,"0"),
+            viewKey:(100+i+revision*10).toString(16).padStart(32,"0"),revision:revision};
+    }
+    Component {
+        id: seasonRowsType
+        Item {
+            id: seasonFixture
+            property bool compact: false
+            function rowAt(i) { return examples.itemAt(i); }
+            Column {
+                spacing: 3
+                Repeater {
+                    id: examples
+                    model: 4
+                    delegate: Rectangle {
+                        id: exampleRow
+                        required property int index
+                        readonly property bool isTree: index===0
+                        property alias indicator: indicator
+                        property alias titleItem: titleItem
+                        property alias detailItem: detailItem
+                        property alias artwork: artwork
+                        width: isTree ? (seasonFixture.compact?126:186)
+                            : (seasonFixture.compact?123:159)
+                        height: isTree?59:65
+                        color: "#181818"
+                        border.color: "#55CFCA"
+                        Rectangle {
+                            id: artwork
+                            x:9; y:6
+                            width:26; height:26
+                            visible: exampleRow.isTree
+                            color:"transparent"
+                            border.color:"#FFFFFF"
+                        }
+                        Text {
+                            id:titleItem
+                            x:exampleRow.isTree?41:9
+                            y:exampleRow.isTree?6:9
+                            width:indicator.x-4-x
+                            height:exampleRow.isTree?26:16
+                            text:"PUBLIC LONG EXAMPLE TITLE FOR ELISION"
+                            textFormat:Text.PlainText
+                            elide:Text.ElideRight
+                            font.pixelSize:12
+                            verticalAlignment:Text.AlignVCenter
+                            color:"#FFFFFF"
+                        }
+                        Text {
+                            id:detailItem
+                            x:9
+                            y:parent.height-height-9
+                            width:parent.width-18
+                            height:12
+                            text:exampleRow.isTree?"PUBLIC ROLE":"OPEN // REV 1"
+                            textFormat:Text.PlainText
+                            elide:Text.ElideRight
+                            font.pixelSize:9
+                            color:"#55CFCA"
+                        }
+                        UI2.PublicSeasonIndicator {
+                            id:indicator
+                            x:parent.width-9-width
+                            y:exampleRow.isTree?11:9
+                        }
+                    }
+                }
+            }
+        }
+    }
+    function seasonGeometry(item) {
+        for(let i=0;i<4;i++) {
+            const row=item.rowAt(i), icon=row.indicator, title=row.titleItem, detail=row.detailItem;
+            check(row.height===(i===0?59:65) && icon.width===16 && icon.height===16
+                && title.width>0 && title.x+title.width+4===icon.x
+                && icon.x+icon.width===row.width-9 && title.truncated
+                && icon.y>=title.y && icon.y+icon.height<=title.y+title.height
+                && detail.y>=title.y+title.height && detail.width===row.width-18
+                && !icon.focus && !icon.activeFocusOnTab && !icon.sourceAuthenticated
+                && !icon.permissionGranted && !icon.productionAuthority && !icon.restorationEnabled,
+                "season row geometry "+i);
+            if(i===0) check(row.artwork.visible && row.artwork.width===26
+                && row.artwork.height===26 && row.artwork.x+26+6===title.x,
+                "season preserves Tree artwork");
+        }
+    }
     Window {
         id: scene
         width: 480
@@ -253,6 +343,12 @@ ShellRoot {
             anchors.fill: parent
             active: false
             sourceComponent: UI2.PublicDormantTaskSelector {}
+        }
+        Loader {
+            id: seasonRows
+            anchors.fill: parent
+            active: false
+            sourceComponent: seasonRowsType
         }
         Loader {
             id: review
@@ -941,6 +1037,92 @@ ShellRoot {
             case 64:
                 check(selector.item===null,"cap fixture unloaded");
                 break;
+            case 65:
+                check(!seasonRows.active && seasonRows.item===null,"season default unmounted");
+                scene.width=480; scene.height=300;
+                seasonRows.active=true;
+                break;
+            case 66: {
+                const fixture=seasonRows.item;
+                seasonGeometry(fixture);
+                for(let i=0;i<4;i++) {
+                    const icon=fixture.rowAt(i).indicator;
+                    check(icon.season==="UNKNOWN" && icon.seasonLabel==="Season unknown",
+                        "season default unknown "+i);
+                    icon.syntheticOwner=true;
+                    icon.ownerScope=seasonScope(i);
+                    check(icon.receive(seasonScope(i),["SUMMER","WINTER","SPRING","FALL"][i]),
+                        "explicit public season "+i);
+                }
+                break;
+            }
+            case 67: {
+                const fixture=seasonRows.item;
+                const expected=["Summer Growing","Winter Dormant","Spring Cleaning","Fall Shedding"];
+                const paths=[];
+                for(let i=0;i<4;i++) {
+                    const icon=fixture.rowAt(i).indicator;
+                    check(icon.seasonLabel===expected[i] && paths.indexOf(icon.glyphPath)<0,
+                        "distinct glyph and label "+i);
+                    paths.push(icon.glyphPath);
+                }
+                const tree=fixture.rowAt(0).indicator, colony=fixture.rowAt(1).indicator;
+                check(!tree.receive(seasonScope(1),"WINTER") && tree.season==="SUMMER",
+                    "other entity ignored");
+                check(colony.receive(seasonScope(1),"FALL") && tree.season==="SUMMER"
+                    && fixture.rowAt(2).indicator.season==="SPRING"
+                    && fixture.rowAt(3).indicator.season==="FALL","no inherited state");
+                fixture.compact=true;
+                break;
+            }
+            case 68: {
+                const fixture=seasonRows.item, tree=fixture.rowAt(0).indicator;
+                seasonGeometry(fixture);
+                tree.ownerScope=seasonScope(0,2);
+                check(tree.season==="UNKNOWN" && !tree.receive(seasonScope(0),"WINTER"),
+                    "replacement and stale receipt");
+                check(tree.receive(seasonScope(0,2),"SPRING") && tree.season==="SPRING",
+                    "new scope");
+                check(!tree.receive(seasonScope(0,2),"PAUSED") && tree.season==="UNKNOWN"
+                    && tree.seasonLabel==="Season unknown"
+                    && tree.glyphPath!==fixture.rowAt(1).indicator.glyphPath,
+                    "invalid current unknown");
+                break;
+            }
+            case 69: {
+                const fixture=seasonRows.item, tree=fixture.rowAt(0).indicator;
+                check(tree.receive(seasonScope(0,2),"SUMMER"),"owner loss setup");
+                tree.syntheticOwner=false;
+                check(tree.season==="UNKNOWN" && !tree.receive(seasonScope(0,2),"WINTER"),
+                    "lost owner refuses");
+                tree.syntheticOwner=true;
+                check(tree.season==="UNKNOWN","owner regain no fallback");
+                tree.ownerScope=seasonScope(0,3);
+                check(tree.receive(seasonScope(0,3),"WINTER"),"visibility loss setup");
+                tree.visible=false;
+                check(tree.season==="UNKNOWN","visibility loss unknown");
+                tree.visible=true;
+                check(tree.season==="UNKNOWN","visibility gain no fallback");
+                check(fixture.rowAt(1).indicator.season==="FALL","unaffected sibling");
+                break;
+            }
+            case 70: {
+                const fixture=seasonRows.item, tree=fixture.rowAt(0).indicator;
+                check(!tree.receive(seasonScope(0,2),"SUMMER") &&
+                    !tree.receive(seasonScope(0,3),{season:"SUMMER"}) && tree.season==="UNKNOWN",
+                    "stale and wrong type");
+                check(tree.receive(seasonScope(0,3),"UNKNOWN") &&
+                    tree.seasonLabel==="Season unknown","explicit unknown");
+                const unknown=tree.glyphPath;
+                check(tree.receive(seasonScope(0,3),"WINTER") && tree.glyphPath!==unknown,
+                    "unknown distinct from winter");
+                seasonRows.active=false;
+                break;
+            }
+            case 71:
+                check(seasonRows.item===null && selector.item===null && review.item===null
+                    && preview.item===null,"season fixture unloaded");
+                break;
             default:
                 check(false, "unexpected phase");
             }
@@ -948,7 +1130,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 64) {
+            if (p === 71) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

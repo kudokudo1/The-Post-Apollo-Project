@@ -5,7 +5,9 @@ Records are inputs to an offline consistency check, not independent OS proof.
 Heart owns resource sampling/evaluation; Spirit owns isolation evidence.
 """
 from dataclasses import dataclass
-from h14d_resource_witness import CAP, QUOTA, TASK_CAP, MAX_NS, MAX_SAMPLE_NS, Hold, require
+from h14d_resource_witness import (CAP, QUOTA, TASK_CAP, MAX_NS, MAX_SAMPLE_NS,
+                                   MAX_SAMPLES, Sample, Hold, require,
+                                   validate_prefix, evaluate)
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,15 +102,7 @@ def _process(v):
             and type(v.start_ticks) is int and v.start_ticks > 0)
 
 
-def check_sequence(plan, *, parent_preflight_end_ns, outer_baseline_end_ns,
-                   launch, terminal):
-    """Check ordering and identity of already supplied reference records.
-
-    This is not a live evidence producer. No returned field grants admission
-    or proves confinement, resource accounting, successful terminal custody,
-    host/image provenance, or a right to dispose of a real cgroup.
-    The retained outer path is selected before launch; there is no fallback.
-    """
+def _check_launch(plan, *, parent_preflight_end_ns, outer_baseline_end_ns, launch):
     require(type(plan) is Plan and _scope(plan.parent) and _scope(plan.outer)
             and plan.parent != plan.outer
             and plan.parent.mount_id == plan.outer.mount_id
@@ -147,6 +141,13 @@ def check_sequence(plan, *, parent_preflight_end_ns, outer_baseline_end_ns,
     expected = Limits(CAP, 0, QUOTA, plan.cpus, TASK_CAP)
     require(_limits(launch.limits) and launch.limits == expected,
             "INNER_LIMIT_MISMATCH")
+
+
+def check_sequence(plan, *, parent_preflight_end_ns, outer_baseline_end_ns,
+                   launch, terminal):
+    """Offline original launch/terminal ordering; never OS proof or authority."""
+    _check_launch(plan, parent_preflight_end_ns=parent_preflight_end_ns,
+                  outer_baseline_end_ns=outer_baseline_end_ns, launch=launch)
     require(type(terminal) is Terminal and _process(terminal.process)
             and terminal.process == launch.process and _scope(terminal.outer)
             and terminal.outer == plan.outer,
@@ -167,3 +168,140 @@ def check_sequence(plan, *, parent_preflight_end_ns, outer_baseline_end_ns,
             "confinement_verified": False, "resource_verified": False,
             "disposal_authorized": False, "permission_granted": False,
             "production_authority": False, "safe_actions": []}
+
+
+@dataclass(frozen=True, slots=True)
+class ReaderRef:
+    """Synthetic independent provenance reference, not an OS Reader handle."""
+    boot: str
+    scope: Scope
+    key: str
+
+
+@dataclass(frozen=True, slots=True)
+class Observation:
+    reader: ReaderRef
+    sample: Sample
+
+
+@dataclass(frozen=True, slots=True)
+class JoinedLaunch:
+    process: Process
+    inner: Scope
+    image_digest: str
+    launch_ns: int
+    pinned_ns: int
+    limits_ns: int
+    limits: Limits
+    release_ns: int
+
+
+@dataclass(frozen=True, slots=True)
+class IsolationRef:
+    """Synthetic identity-bound reference only; cannot certify isolation."""
+    process: Process
+    inner: Scope
+    observed_ns: int
+    checks: tuple
+
+
+ISOLATION_CHECKS = ("DESCENDANTS", "CONTROLLER_WRITES", "UID_CAPABILITIES",
+                    "NAMESPACE_MOUNTS", "DEVICES", "CREDENTIALS", "NETWORK")
+
+
+@dataclass(frozen=True, slots=True)
+class TerminalRef:
+    process: Process
+    exit_status: int
+    observed_ns: int
+    disposed_ns: int
+
+
+@dataclass(frozen=True, slots=True)
+class _JoinedPrefix:
+    plan: Plan
+    parent_reader: ReaderRef
+    outer_reader: ReaderRef
+    parent: Observation
+    baseline: Observation
+    first: Observation
+    launch: Launch
+    isolation: IsolationRef
+
+
+def _reader(ref, boot, scope):
+    require(type(ref) is ReaderRef and type(ref.boot) is str and ref.boot == boot
+            and _scope(ref.scope) and ref.scope == scope
+            and type(ref.key) is str and bool(ref.key), "READER_REFERENCE_MISMATCH")
+
+
+def _observation(obs, reader):
+    require(type(obs) is Observation and obs.reader is reader
+            and type(obs.sample) is Sample and type(obs.sample.levels) is tuple
+            and bool(obs.sample.levels), "OBSERVATION_REFERENCE_MISMATCH")
+    return obs.sample
+
+
+def begin_join(plan, *, parent_reader, outer_reader, parent, baseline, first,
+               launch, isolation):
+    """Validate synthetic prefix before simulated progression.
+
+    No effect, permission, OS provenance or real isolation is established.
+    All resource fields are taken from the original Heart Sample instances.
+    """
+    require(type(plan) is Plan and _scope(plan.parent) and _scope(plan.outer)
+            and type(launch) is JoinedLaunch, "INVALID_JOIN_INPUT")
+    _reader(parent_reader, plan.boot, plan.parent)
+    _reader(outer_reader, plan.boot, plan.outer)
+    require(parent_reader is not outer_reader and parent_reader.key != outer_reader.key,
+            "READER_REFERENCE_REUSED")
+    p = _observation(parent, parent_reader)
+    b = _observation(baseline, outer_reader)
+    f = _observation(first, outer_reader)
+    # The single Heart prefix implementation owns all resource validation.
+    validate_prefix(p, f, selected=plan.cpus, launch_ns=launch.launch_ns,
+                    expected_leaf=(plan.outer.device, plan.outer.inode),
+                    scope="RETAINED_OUTER", baseline=b)
+    require(p.levels[-1].identity == (plan.parent.device, plan.parent.inode),
+            "PARENT_IDENTITY_MISMATCH")
+    derived = Launch(launch.process, launch.inner, plan.outer, launch.image_digest,
+                     launch.launch_ns, launch.pinned_ns, launch.limits_ns,
+                     launch.limits, plan.outer, f.start_ns, f.end_ns, launch.release_ns)
+    _check_launch(plan, parent_preflight_end_ns=p.end_ns,
+                  outer_baseline_end_ns=b.end_ns, launch=derived)
+    require(type(isolation) is IsolationRef and _process(isolation.process)
+            and isolation.process == derived.process and _scope(isolation.inner)
+            and isolation.inner == derived.inner and _uint(isolation.observed_ns)
+            and derived.pinned_ns <= isolation.observed_ns <= derived.release_ns
+            and type(isolation.checks) is tuple
+            and all(type(v) is str for v in isolation.checks)
+            and isolation.checks == ISOLATION_CHECKS, "ISOLATION_REFERENCE_MISMATCH")
+    return _JoinedPrefix(plan, parent_reader, outer_reader, parent, baseline,
+                         first, derived, isolation)
+
+
+def finish_join(prefix, *, parent, baseline, observations, terminal):
+    """Audit exactly the prefix's samples and original terminal; no effects."""
+    require(type(prefix) is _JoinedPrefix and type(terminal) is TerminalRef,
+            "JOIN_OR_TERMINAL_MISSING")
+    require(parent is prefix.parent and baseline is prefix.baseline
+            and type(observations) is tuple and 2 <= len(observations) <= MAX_SAMPLES
+            and observations[0] is prefix.first, "PREFIX_REPLACED")
+    p = _observation(parent, prefix.parent_reader)
+    b = _observation(baseline, prefix.outer_reader)
+    samples = tuple(_observation(o, prefix.outer_reader) for o in observations)
+    evaluate(p, samples, selected=prefix.plan.cpus, launch_ns=prefix.launch.launch_ns,
+             expected_leaf=(prefix.plan.outer.device, prefix.plan.outer.inode),
+             scope="RETAINED_OUTER", baseline=b)
+    final = samples[-1]
+    require(_uint(terminal.observed_ns) and terminal.observed_ns < final.start_ns,
+            "TERMINAL_NOT_BEFORE_FINAL_READ")
+    derived = Terminal(terminal.process, prefix.plan.outer, terminal.exit_status,
+                       terminal.observed_ns, final.end_ns, final.populated,
+                       final.levels[-1].tasks, terminal.disposed_ns)
+    result = check_sequence(prefix.plan, parent_preflight_end_ns=p.end_ns,
+                            outer_baseline_end_ns=b.end_ns, launch=prefix.launch,
+                            terminal=derived)
+    return dict(result, status="JOINED_OFFLINE_REFERENCE",
+                progression_authorized=False, reader_provenance_verified=False,
+                isolation_verified=False)

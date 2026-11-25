@@ -1,11 +1,14 @@
 """Fixed-public offline ordering tests; no OS operations."""
 from dataclasses import replace
 import unittest
+from unittest.mock import patch
 
 from h14d_runtime_sequence import (
     Scope, Process, Limits, Plan, Launch, Terminal, check_sequence,
+    ReaderRef, Observation, JoinedLaunch, IsolationRef, TerminalRef,
+    ISOLATION_CHECKS, begin_join, finish_join,
 )
-from h14d_resource_witness import CAP, QUOTA, TASK_CAP, MAX_NS, Hold
+from h14d_resource_witness import CAP, QUOTA, TASK_CAP, MAX_NS, Hold, GIB, Level, Sample, validate_prefix, evaluate
 
 
 class SequenceTest(unittest.TestCase):
@@ -119,6 +122,129 @@ class SequenceTest(unittest.TestCase):
                                  disposed_ns=self.launch.launch_ns + MAX_NS + 1)):
             with self.subTest(terminal=terminal), self.assertRaises(Hold):
                 self.check(terminal=terminal)
+
+
+class JoinedTests(unittest.TestCase):
+    def setUp(self):
+        parent = Scope(1, 1, 10)
+        outer = Scope(1, 1, 11)
+        inner = Scope(1, 1, 12)
+        self.plan = Plan("boot-fixture", "sha256:" + "b"*64, parent, outer, (0, 1))
+        process = Process(self.plan.boot, "a"*64, 50, 100)
+        self.pr = ReaderRef(self.plan.boot, parent, "parent")
+        self.orr = ReaderRef(self.plan.boot, outer, "outer")
+        ancestor = Level((1, 10), GIB, "unlimited", "unlimited",
+                         (None, 100000), ((0, 3),), 12, "unlimited", (0,)*6)
+        child = Level((1, 11), 16*1024**2, CAP, "unlimited",
+                      QUOTA, ((0, 1),), 2, TASK_CAP, (0,)*6)
+        psi = ((0, 0, 0, 10), (0, 0, 0, 5))
+        p = Sample(1, 100, (ancestor,), 12000, psi, None, None, None, None, None)
+        f = Sample(300, 400, (ancestor, child), 12000, psi, 32*1024**2, 0, 0, 100, 1)
+        b = replace(f, start_ns=110, end_ns=150,
+                    levels=(ancestor, replace(child, tasks=0, current=4*1024**2)),
+                    peak=8*1024**2, cpu_usec=10, populated=0)
+        end = replace(f, start_ns=500, end_ns=600,
+                      levels=(ancestor, replace(child, tasks=0)), cpu_usec=200, populated=0)
+        self.parent = Observation(self.pr, p)
+        self.baseline = Observation(self.orr, b)
+        self.first = Observation(self.orr, f)
+        self.final = Observation(self.orr, end)
+        self.launch = JoinedLaunch(process, inner, self.plan.image_digest, 200, 250, 270,
+                                   Limits(CAP, 0, QUOTA, (0, 1), TASK_CAP), 410)
+        self.iso = IsolationRef(process, inner, 280, ISOLATION_CHECKS)
+        self.terminal = TerminalRef(process, 0, 450, 610)
+
+    def begin(self, **kw):
+        args = dict(plan=self.plan, parent_reader=self.pr, outer_reader=self.orr,
+                    parent=self.parent, baseline=self.baseline, first=self.first,
+                    launch=self.launch, isolation=self.iso)
+        args.update(kw)
+        return begin_join(**args)
+
+    def finish(self, prefix, **kw):
+        args = dict(parent=self.parent, baseline=self.baseline,
+                    observations=(self.first, self.final), terminal=self.terminal)
+        args.update(kw)
+        return finish_join(prefix, **args)
+
+    def test_shared_prefix_and_final_receive_exact_sample_objects(self):
+        with patch("h14d_runtime_sequence.validate_prefix", wraps=validate_prefix) as pre, \
+             patch("h14d_runtime_sequence.evaluate", wraps=evaluate) as final:
+            prefix = self.begin()
+            self.assertIs(pre.call_args.args[0], self.parent.sample)
+            self.assertIs(pre.call_args.args[1], self.first.sample)
+            self.assertIs(pre.call_args.kwargs["baseline"], self.baseline.sample)
+            final.assert_not_called()
+            result = self.finish(prefix)
+            self.assertIs(final.call_args.args[0], self.parent.sample)
+            self.assertIs(final.call_args.args[1][0], self.first.sample)
+            self.assertIs(final.call_args.args[1][-1], self.final.sample)
+            self.assertIs(final.call_args.kwargs["baseline"], self.baseline.sample)
+        self.assertEqual(result.pop("status"), "JOINED_OFFLINE_REFERENCE")
+        self.assertEqual(result.pop("safe_actions"), [])
+        self.assertTrue(all(v is False for v in result.values()))
+
+    def test_independently_pinned_reader_provenance_and_scope(self):
+        for ref in (replace(self.orr), replace(self.orr, boot="other"),
+                    replace(self.orr, scope=self.plan.parent), replace(self.orr, key="")):
+            with self.subTest(ref=ref), self.assertRaises(Hold):
+                self.begin(outer_reader=ref)
+        with self.assertRaises(Hold):
+            self.begin(plan=replace(self.plan, parent=Scope(1, 1, 99)),
+                       parent_reader=replace(self.pr, scope=Scope(1, 1, 99)),
+                       parent=Observation(replace(self.pr, scope=Scope(1, 1, 99)), self.parent.sample))
+        other = replace(self.pr, scope=Scope(1, 1, 99))
+        with self.assertRaisesRegex(Hold, "PARENT_IDENTITY_MISMATCH"):
+            self.begin(plan=replace(self.plan, parent=other.scope),
+                       parent_reader=other, parent=Observation(other, self.parent.sample))
+        with self.assertRaises(Hold):
+            self.finish(self.begin(), observations=(self.first, replace(self.final, reader=replace(self.orr))))
+
+    def test_invalid_prefix_holds_before_simulated_progression(self):
+        for key, obs, changes in (
+                ("baseline", self.baseline, dict(populated=1)),
+                ("first", self.first, dict(swap=1)),
+                ("first", self.first, dict(populated=0)),
+                ("first", self.first, dict(host_available_mib=4096)),
+                ("first", self.first, dict(end_ns=1_000_000_201))):
+            with self.subTest(key=key, changes=changes), self.assertRaises(Hold):
+                self.begin(**{key: replace(obs, sample=replace(obs.sample, **changes))})
+        for launch in (replace(self.launch, pinned_ns=301, limits_ns=302),
+                       replace(self.launch, release_ns=399),
+                       replace(self.launch, release_ns=1_000_000_201)):
+            with self.subTest(launch=launch), self.assertRaises(Hold):
+                self.begin(launch=launch)
+
+    def test_independent_inner_and_isolation_reference(self):
+        for isolation in (None, replace(self.iso, checks=ISOLATION_CHECKS[:-1]),
+                          replace(self.iso, observed_ns=411),
+                          replace(self.iso, inner=self.plan.outer),
+                          replace(self.iso, process=replace(self.iso.process, pid=51))):
+            with self.subTest(isolation=isolation), self.assertRaises(Hold):
+                self.begin(isolation=isolation)
+        with self.assertRaises(Hold):
+            self.begin(launch=replace(self.launch, limits=replace(self.launch.limits, swap=False)))
+
+    def test_equal_value_prefix_replacement_refused(self):
+        prefix = self.begin()
+        for key, obs in (("parent", self.parent), ("baseline", self.baseline)):
+            with self.subTest(key=key), self.assertRaisesRegex(Hold, "PREFIX_REPLACED"):
+                self.finish(prefix, **{key: replace(obs, sample=replace(obs.sample))})
+        with self.assertRaisesRegex(Hold, "PREFIX_REPLACED"):
+            self.finish(prefix, observations=(replace(self.first, sample=replace(self.first.sample)), self.final))
+
+    def test_original_terminal_before_final_start_and_disposal(self):
+        prefix = self.begin()
+        for terminal in (None, replace(self.terminal, process=replace(self.terminal.process, start_ticks=101)),
+                         replace(self.terminal, observed_ns=500),
+                         replace(self.terminal, observed_ns=550),
+                         replace(self.terminal, disposed_ns=599)):
+            with self.subTest(terminal=terminal), self.assertRaises(Hold):
+                self.finish(prefix, terminal=terminal)
+        for sample in (replace(self.final.sample, populated=1),
+                       replace(self.final.sample, levels=self.first.sample.levels)):
+            with self.subTest(sample=sample), self.assertRaises(Hold):
+                self.finish(prefix, observations=(self.first, replace(self.final, sample=sample)))
 
 
 if __name__ == "__main__":

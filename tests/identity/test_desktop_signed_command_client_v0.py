@@ -12,6 +12,9 @@ import secrets
 import socket
 import sys
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from dataclasses import FrozenInstanceError
 from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -73,6 +76,108 @@ class SignedNativeCommandTests(unittest.TestCase):
             active_seat=seat or (lambda: self.accept_seat),
             enrolled_origin_consistent=origin,
         )
+
+    def test_delivery_snapshot_tracks_real_command_without_authority(self):
+        fresh = self.client.delivery_snapshot()
+        self.assertEqual(fresh.wire_outcome, "UNOBSERVED")
+        self.assertIsNone(fresh.last_attempted_wire)
+        self.assertFalse(fresh.faulted)
+        self.assertEqual(self.client.begin().phase, "REQUESTED")
+        first = self.client.delivery_snapshot()
+        self.assertEqual(first.wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertEqual(first.last_attempted_wire.action, "BEGIN")
+        with self.assertRaises(FrozenInstanceError):
+            first.wire_outcome = "UNKNOWN_HOLD"
+        with self.assertRaises(ReceiptRejected):
+            self.client.begin()
+        refused = self.client.delivery_snapshot()
+        self.assertEqual(refused.wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertIs(refused.last_attempted_wire, first.last_attempted_wire)
+        self.assertFalse(refused.faulted)
+        self.assertEqual(self.base.factory_calls, 1)
+        self.assertFalse(hasattr(refused, "can_retry"))
+
+    def test_guard_reentry_does_not_overwrite_status_attempt(self):
+        observations = []
+        client = None
+
+        def guard(peer):
+            if (client.last_wire_outcome == "UNKNOWN_HOLD"
+                    and client.last_attempted_wire.action == "STATUS"):
+                before = client.last_attempted_wire
+                try:
+                    client.cancel()
+                except ReceiptRejected as exc:
+                    observations.append((str(exc), client.delivery_snapshot(),
+                                         client.last_attempted_wire is before,
+                                         client.last_wire_outcome))
+                else:
+                    observations.append(("unexpected dispatch",))
+            return peer.uid == os.geteuid() and peer.pid == os.getpid()
+
+        client = self._client(guard=guard)
+        begin = client.begin()
+        pending = client.status()
+        self.assertEqual(pending.phase, "PENDING")
+        self.assertEqual(pending.sequence, begin.sequence + 1)
+        self.assertEqual(observations, [
+            ("Native command already in flight", None, True, "UNKNOWN_HOLD")
+        ])
+        self.assertEqual(client.delivery_snapshot().last_attempted_wire.action,
+                         "STATUS")
+        self.assertEqual(client.cancel().phase, "CANCELLED")
+
+    def test_concurrent_cancel_is_refused_not_queued_behind_real_status(self):
+        entered = Event()
+        release = Event()
+        client = None
+
+        def guard(peer):
+            if (client.last_wire_outcome == "UNKNOWN_HOLD"
+                    and client.last_attempted_wire.action == "STATUS"):
+                entered.set()
+                if not release.wait(1.5):
+                    return False
+            return peer.uid == os.geteuid() and peer.pid == os.getpid()
+
+        client = self._client(guard=guard)
+        begin = client.begin()
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(client.status)
+            try:
+                self.assertTrue(entered.wait(5), "status never reached post-receipt guard")
+                attempted = client.last_attempted_wire
+                self.assertIsNone(client.delivery_snapshot())
+                with self.assertRaisesRegex(ReceiptRejected, "already in flight"):
+                    client.cancel()
+                self.assertIs(client.last_attempted_wire, attempted)
+                self.assertEqual(client.last_wire_outcome, "UNKNOWN_HOLD")
+            finally:
+                release.set()
+            status = future.result(timeout=5)
+        self.assertEqual(status.phase, "PENDING")
+        self.assertEqual(status.sequence, begin.sequence + 1)
+        settled = client.delivery_snapshot()
+        self.assertEqual(settled.wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertIs(settled.last_attempted_wire, attempted)
+        self.assertFalse(settled.faulted)
+        # Explicit new call after the first returned; no queued cancellation.
+        cancelled = client.cancel()
+        self.assertEqual(cancelled.phase, "CANCELLED")
+        self.assertEqual(cancelled.sequence, status.sequence + 1)
+
+    def test_delivery_snapshot_retains_uncertainty_after_failed_send(self):
+        wrong = self._client(key=Ed25519PrivateKey.generate().public_key())
+        with self.assertRaises(ReceiptRejected):
+            wrong.begin()
+        snapshot = wrong.delivery_snapshot()
+        self.assertTrue(snapshot.faulted)
+        self.assertEqual(snapshot.wire_outcome, "UNKNOWN_HOLD")
+        self.assertEqual(snapshot.last_attempted_wire.action, "BEGIN")
+        with self.assertRaises(ReceiptRejected):
+            wrong.begin()
+        self.assertEqual(wrong.delivery_snapshot(), snapshot)
+        self.assertEqual(self.base.factory_calls, 1)
 
     def test_real_signed_request_to_actual_host_through_callback_recovery(self):
         begin = self.client.begin()

@@ -28,6 +28,7 @@ from desktop_signed_command_client_v0 import (
     HostCommandObservation, SignedIdentityCommandClient,
 )
 from installed_gateway_witness_v1 import InstalledGatewayWitness
+from native_attempt_fingerprint_v0 import NativeCommandDeliverySnapshot
 from signed_gateway_origin_probe_v0 import SignedGatewayOriginProbe
 
 
@@ -112,6 +113,14 @@ class InstalledIdentityCommandAdapterV1:
     @property
     def faulted(self) -> bool:
         return self._client.faulted
+
+    def delivery_snapshot(self) -> NativeCommandDeliverySnapshot | None:
+        """Expose coherent local evidence via the mandatory adapter only.
+
+        No socket, consent, settlement or retry authority. None means a
+        command is currently in flight, not an empty history or no effect.
+        """
+        return self._client.delivery_snapshot()
 
     def begin(self) -> HostCommandObservation:
         return self._client.begin()

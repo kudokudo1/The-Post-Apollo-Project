@@ -462,7 +462,20 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
     def test_f_native_adapter_mandatory_composite_trust_and_revocation(self):
         # Actual installed signed gateway, not a fake status transport.
         client = self._strict_adapter()
+        initial = client.delivery_snapshot()
+        self.assertEqual(initial.wire_outcome, "UNOBSERVED")
+        self.assertIsNone(initial.last_attempted_wire)
         self.assertEqual(client.begin().phase, "UNAVAILABLE")
+        observed = client.delivery_snapshot()
+        self.assertEqual(observed.wire_outcome, "SIGNED_FRAME_SEEN")
+        self.assertEqual(observed.last_attempted_wire.action, "BEGIN")
+        self.assertFalse(observed.faulted)
+        self.assertFalse(hasattr(observed, "can_retry"))
+        with self.assertRaises(ReceiptRejected):
+            client.begin()
+        rejected = client.delivery_snapshot()
+        self.assertEqual(rejected.wire_outcome, "NO_SEND_ATTEMPT")
+        self.assertIs(rejected.last_attempted_wire, observed.last_attempted_wire)
         self.assertFalse(client.faulted)
         self.assertFalse(hasattr(client, "hostAuthenticated"))
         self.assertFalse(hasattr(client, "canConnectProvider"))
@@ -532,6 +545,13 @@ class InstalledIdentityGatewayAcceptance(unittest.TestCase):
         with self.assertRaises(ReceiptRejected):
             seat_lost.begin()
         self.assertTrue(seat_lost.faulted)
+        uncertain = seat_lost.delivery_snapshot()
+        self.assertTrue(uncertain.faulted)
+        self.assertEqual(uncertain.wire_outcome, "UNKNOWN_HOLD")
+        self.assertEqual(uncertain.last_attempted_wire.action, "BEGIN")
+        with self.assertRaises(ReceiptRejected):
+            seat_lost.begin()
+        self.assertEqual(seat_lost.delivery_snapshot(), uncertain)
 
         peer_lost = self._strict_adapter(trust=approve_once())
         with self.assertRaises(ReceiptRejected):

@@ -20,3 +20,16 @@ class AttemptedWireFingerprint:
     request_id_sha256: str | None
     client_nonce_sha256: str
     frame_sha256: str
+
+@dataclass(frozen=True, slots=True)
+class NativeCommandDeliverySnapshot:
+    """Coherent process-local delivery observation, never authorization.
+
+    The latest attempted fingerprint may predate the current call's outcome.
+    A signed frame is not terminal effect evidence. A fresh process cannot
+    infer a previous process's outcome from UNOBSERVED.
+    """
+
+    wire_outcome: str
+    last_attempted_wire: AttemptedWireFingerprint | None
+    faulted: bool

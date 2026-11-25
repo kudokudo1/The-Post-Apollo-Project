@@ -11,6 +11,11 @@ Column {
     property Item headerTarget: null
     property Item footerTarget: null
     property string order: "RSS"
+    property string section: "PROCESSES"
+    readonly property bool groupIdentityAvailable: false
+    function selectSection(name) {
+        if (visible && ["PROCESSES","GROUPS"].includes(name)) section=name;
+    }
     readonly property bool censusRunning: CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind === "census"
     function cancelCensus() {
         if (censusRunning && !CpuPlusDiagnostics.cancelled) CpuPlusDiagnostics.cancel();
@@ -27,9 +32,29 @@ Column {
         spacing: 3
         GohuText {
             width: parent.width
-            text: "PROC // PROCESS OBSERVATION"
+            text: root.section==="GROUPS" ? "PROC // GROUP CONTROLS" : "PROC // PROCESS OBSERVATION"
             color: Colors.magenta
             font.pixelSize: 12
+        }
+        Row {
+            id: procNavigation
+            width: parent.width
+            spacing: 4
+            Repeater {
+                model: ["PROCESSES","GROUPS"]
+                delegate: ActionButton {
+                    required property string modelData
+                    objectName: modelData==="GROUPS" ? "cpuplusProcGroups" : "cpuplusProcProcesses"
+                    width: Math.max(0,(procNavigation.width-procNavigation.spacing)/2)
+                    height: 26
+                    label: modelData
+                    contentPadding: 2
+                    selected: root.section===modelData
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectSection(modelData)
+                }
+            }
         }
         Row {
             width: parent.width
@@ -42,10 +67,10 @@ Column {
                 labelFontSizeMode: Text.HorizontalFit
                 labelMinimumPixelSize: 8
                 contentPadding: 2
-                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy && !CpuPlusDiagnostics.faulted
+                available: root.section==="PROCESSES" && !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy && !CpuPlusDiagnostics.faulted
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"
-                onLeftClicked: CpuPlusDiagnostics.request("census")
+                onLeftClicked: { if(root.section==="PROCESSES" && visible && available) CpuPlusDiagnostics.request("census") }
             }
             ActionButton {
                 objectName: "cpuplusProcCancel"
@@ -70,6 +95,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.section==="PROCESSES"
         text: root.view ? "HISTORICAL CAPTURE // "+root.report.finishedAt
             + "\nRETURNED "+root.view.rows.length+" / OBSERVED "+root.view.observed
             + "\nCPU / I-O COVERAGE "+root.view.cpuMeasured+" / "+root.view.ioMeasured
@@ -84,6 +110,7 @@ Column {
         id: sortRail
         parent: root.footerTarget || root
         objectName: "cpuplusProcBottomControls"
+        visible: root.section==="PROCESSES"
         width: parent.width
         spacing: 4
         Repeater {
@@ -103,7 +130,7 @@ Column {
         }
     }
     Repeater {
-        model: root.ranked
+        model: root.section==="PROCESSES" ? root.ranked : []
         delegate: Rectangle {
             required property var modelData
             width: root.width
@@ -147,6 +174,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.section==="PROCESSES"
         text: "Same-user selected rows only. RSS includes shared pages. Change compares first/final returned rows with matching PID and start ticks, not continuous growth. Names are not application identities. No PSS, swap, group totals or process limits available here."
         color: Colors.orange
         font.pixelSize: 10
@@ -154,9 +182,58 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.section==="PROCESSES"
         text: "PROCESS CONTROLS // HOLD: VERIFIED GROUP IDENTITY & PERMISSIONS REQUIRED"
         color: Colors.orange
         font.pixelSize: 10
         wrapMode: Text.Wrap
+    }
+    Column {
+        objectName: "cpuplusProcGroupWorkspace"
+        visible: root.section==="GROUPS"
+        width: root.width
+        spacing: 5
+        GohuText {
+            width: parent.width
+            text: "GROUP IDENTITY // UNAVAILABLE"
+            color: Colors.orange
+            font.pixelSize: 12
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "No verified process-group provider connected. A process name or historical PID cannot identify a controllable application group."
+            color: Colors.white
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        GohuText {
+            width: parent.width
+            text: "MEMBERSHIP / MEMORY TOTAL / LIMIT / PROTECTION // NOT OBSERVED"
+            color: Colors.cyan
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        ActionButton {
+            objectName: "cpuplusProcGroupProtectionLocked"
+            width: parent.width
+            height: 28
+            label: "PROTECTION // LOCKED"
+            available: false
+        }
+        ActionButton {
+            objectName: "cpuplusProcGroupLimitLocked"
+            width: parent.width
+            height: 28
+            label: "RESOURCE LIMIT // LOCKED"
+            available: false
+        }
+        GohuText {
+            width: parent.width
+            text: "Requires verified group identity, current membership, fresh resource observations and separately authorized control. No group inferred from census; no change or background scan initiated."
+            color: Colors.orange
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
     }
 }

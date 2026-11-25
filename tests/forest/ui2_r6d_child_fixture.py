@@ -35,7 +35,11 @@ with ProcessTrial() as t:
     for _ in range(4):
         units_c.extend(t.result("STEP", {"ref": c}, "ACTIVE"))
     stop = t.result("STOP", {"ref": c}, "STOP_OBSERVED")
-    abort = t.result("STEP", {"ref": c}, "ABORTED_LOCAL")
+    t.send("STEP", {"ref": c})
+    final = t.read()
+    assert final["kind"] == "RESULT" and set(final["data"]) == {"code", "units"}
+    assert final["data"]["code"] == "ABORTED_LOCAL"
+    abort = final["data"]["units"]
     assert snapshot() == [5, 2]
     with closing(t.db()) as db:
         assert db.execute("SELECT status FROM forest_attempts_b3 ORDER BY expected_revision").fetchall() == [
@@ -44,4 +48,4 @@ with ProcessTrial() as t:
     assert t.result("CLOSE", {}, "CLOSED") == []
     t.closed(0)
     print(json.dumps(dict(a=a,b=b,c=c,unitsA=units_a,unitsB=units_b,unitsC=units_c,
-        stop=stop,abort=abort,h1=h1,h2=h2,h3=h3,first=first,second=second,reopened=reopened)))
+        stop=stop,abort=abort,abortCode=final["data"]["code"],h1=h1,h2=h2,h3=h3,first=first,second=second,reopened=reopened)))

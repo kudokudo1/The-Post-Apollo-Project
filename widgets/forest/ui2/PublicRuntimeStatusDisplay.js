@@ -44,19 +44,20 @@ function allowed(previous,next) {
     }
 }
 function createConsumer() {
-    let active=null, sequence=0, status="", state="CLOSED";
+    let active=null, sequence=0, status="", state="CLOSED", stopSeen=false, localOutcome="";
     // Bounded local reuse fence. A new host-owned consumer lifetime is required
     // on exhaustion, with independently fresh tokens; no automatic replacement.
     const used=Object.create(null);
     let count=0;
     function snapshot() {
-        return {state,status,label:status ? LABELS[status] : "",
+        return {state,status,localOutcome,label:localOutcome === "ABORTED_LOCAL"
+                ? "LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED" : status ? LABELS[status] : "",
             sourceAuthenticated:false,permissionGranted:false,
             productionAuthority:false,modelExecutionPermitted:false,
             sendEnabled:false,stopEnabled:false,safeActions:[]};
     }
     function clear(next) {
-        active=null; sequence=0; status=""; state=next;
+        active=null; sequence=0; status=""; stopSeen=false; localOutcome=""; state=next;
         return snapshot();
     }
     function open(ref,current) {
@@ -91,11 +92,27 @@ function createConsumer() {
             return clear("UNAVAILABLE");
         if (unit.kind==="WITHDRAW" && unit.statusPacket===null)
             return clear("CLOSED");
-        if (unit.kind!=="STATUS" || !packetOK(unit.statusPacket)
+        if (localOutcome || unit.kind!=="STATUS" || !packetOK(unit.statusPacket)
             || !allowed(status,unit.statusPacket.status))
             return clear("UNAVAILABLE");
         sequence=unit.sequence;status=unit.statusPacket.status;
+        if (status==="STOP_REQUESTED") stopSeen=true;
         state="DISPLAYING";return snapshot();
     }
-    return {open,observe,invalidate,receive,close:()=>clear("CLOSED")};
+    // Separate owner-only R6 typed result, NOT an R4 status packet. The
+    // parent must validate the exact STEP result, action and original Loader,
+    // including whole-batch acceptance and independent durable outcome.
+    // The sequence pins the last consumed status, not an authorization token.
+    function recordLocalAbort(ref,code,finalSequence,current) {
+        observe(current);
+        if (!active || !same(active,exact(ref,CORR)?correlation(ref):null))
+            return snapshot();
+        if (code!=="ABORTED_LOCAL" || !positive(finalSequence) || finalSequence!==sequence
+            || localOutcome || !stopSeen || state!=="DISPLAYING"
+            || (status!=="STOP_REQUESTED" && status!=="UNKNOWN_HOLD"))
+            return clear("UNAVAILABLE");
+        localOutcome=code;
+        return snapshot();
+    }
+    return {open,observe,invalidate,receive,recordLocalAbort,close:()=>clear("CLOSED")};
 }

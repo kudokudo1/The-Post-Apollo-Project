@@ -587,14 +587,22 @@ ShellRoot {
                 verifyConnectedStatus("STOP REQUESTED // OUTCOME PENDING");
                 break;
             }
-            case 37:
-                actualUnits(Actual.replay.abort);
+            case 37: {
+                const d=Actual.replay;
+                actualUnits(d.abort);
                 verifyConnected(0,"CLOSED");
                 check(preview.item.runtimeStatusText!=="LOCAL COMMIT RECORDED // DELIVERY UNCONFIRMED",
                     "aborted third turn painted as commit");
+                const seq=d.unitsC.concat(d.stop,d.abort).slice(-1)[0].sequence;
+                check(!preview.item.recordRuntimeLocalAbort(d.b,d.abortCode,seq),
+                    "stale abort accepted");
+                check(preview.item.recordRuntimeLocalAbort(d.c,d.abortCode,seq),
+                    "actual typed abort refused");
+                verifyConnectedStatus("LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED");
                 check(actualFeed().messages.length===0,"provisional reply");
                 preview.active=false;
                 break;
+            }
             case 38:
                 check(preview.item===null,"actual old Loader survived");
                 preview.active=true;
@@ -604,6 +612,7 @@ ShellRoot {
                 verifyLoaded();
                 check(preview.item.beginConnectedHistory(),"new Loader connected mode");
                 preview.item.receiveRuntimeUnit(d.unitsC[0]);
+                check(!preview.item.recordRuntimeLocalAbort(d.c,d.abortCode,4),"old abort opened replacement");
                 check(!preview.item.receiveHistoryPage(d.h3,d.reopened[0].frame),"old page opened replacement");
                 verifyConnected(0,"CLOSED");
                 verifyConnectedStatus("");

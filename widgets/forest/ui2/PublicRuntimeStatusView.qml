@@ -21,6 +21,7 @@ Item {
     readonly property string state: eligible && _snapshot ? _snapshot.state : "CLOSED"
     readonly property string statusText: eligible && _snapshot
         && _snapshot.state === "DISPLAYING" ? _snapshot.label : ""
+    readonly property string localOutcome: eligible && _snapshot ? _snapshot.localOutcome : ""
     readonly property bool sourceAuthenticated: false
     readonly property bool permissionGranted: false
     readonly property bool productionAuthority: false
@@ -57,6 +58,16 @@ Item {
         if (!_initialized) return;
         observeCurrent();
         if (eligible) _snapshot = _consumer.receive(unit, currentCorrelation);
+    }
+    // Owner invokes only after accepting the typed R6 STEP outcome. Return
+    // means local projection only, never a receipt or a cancellation grant.
+    function recordLocalAbort(ref, code, finalSequence) {
+        if (!_initialized || !eligible
+                || !Status.exact(ref, ["requestId","viewKey","generation"])
+                || !Status.same(Status.correlation(ref),Status.correlation(currentCorrelation)))
+            return false;
+        _snapshot = _consumer.recordLocalAbort(ref,code,finalSequence,currentCorrelation);
+        return _snapshot.localOutcome === "ABORTED_LOCAL";
     }
     function invalidateLifetime(ref) {
         if (!_initialized) return;

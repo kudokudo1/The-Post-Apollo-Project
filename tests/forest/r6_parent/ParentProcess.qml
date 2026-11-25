@@ -377,6 +377,17 @@ Item {
                 originalOwner.receiveRuntimeUnit(unit);
                 if (!live() || originalOwner.runtimeState !== "DISPLAYING") return false;
             }
+            // Only the independently correlated typed STEP result, never a
+            // status label or STOP_OBSERVED, can project this local outcome.
+            if (joined && code === "ABORTED_LOCAL") {
+                if (pending !== "STEP" || !stopRequested || !live()
+                    || !originalOwner.runtimeEligible
+                    || !Status.same(Status.correlation(ref),Status.correlation(originalOwner.runtimeCurrentCorrelation))
+                    || !originalOwner.recordRuntimeLocalAbort(ref,code,batch.sequence)
+                    || !live() || !originalOwner.runtimeEligible
+                    || !Status.same(Status.correlation(ref),Status.correlation(originalOwner.runtimeCurrentCorrelation)))
+                    return false;
+            }
             sequence = batch.sequence;
             status = batch.status;
         }

@@ -208,12 +208,31 @@ def prepare_candidate():
                     actual = (s.st_dev, s.st_ino)
                     require(actual == original,
                             "FENCE_IDENTITY_CHANGED expected=%r actual=%r" % (original, actual))
-                    names = set(os.listdir(child))
-                    require(names == {"prepared.json"},
-                            "FENCE_CONTENTS_CHANGED count=%d prepared=%s" %
-                            (len(names), "prepared.json" in names))
-                    require(read(child,"prepared.json") == marker, "PREPARED_READBACK_CHANGED")
-                    require(read(fd,ARCHIVE.name) == archive, "ARCHIVE_READBACK_CHANGED")
+                    # Btrfs can limit readdir to entries present when a directory
+                    # was opened (btrfs_file_private.last_index). The write fd
+                    # was opened before PREPARED existed. Open a fresh directory
+                    # description AFTER durable publication, through the same
+                    # retained parent, and verify it is still the original inode.
+                    fresh = os.open(FENCE.name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC,
+                                    dir_fd=fd)
+                    try:
+                        require(secure_dir(fresh,private=True) == original,
+                                "FENCE_REOPEN_IDENTITY_CHANGED")
+                        names = set(os.listdir(fresh))
+                        require(names == {"prepared.json"},
+                                "FENCE_CONTENTS_CHANGED count=%d prepared=%s" %
+                                (len(names), "prepared.json" in names))
+                        require(read(child,"prepared.json") == marker and
+                                read(fresh,"prepared.json") == marker,
+                                "PREPARED_READBACK_CHANGED")
+                        require(read(fd,ARCHIVE.name) == archive, "ARCHIVE_READBACK_CHANGED")
+                        final = os.stat(FENCE.name,dir_fd=fd,follow_symlinks=False)
+                        require((final.st_dev,final.st_ino) == original and
+                                secure_dir(child,private=True) == original and
+                                secure_dir(fresh,private=True) == original,
+                                "FENCE_FINAL_IDENTITY_CHANGED")
+                    finally:
+                        os.close(fresh)
                 finally:
                     os.close(child)
                 return {"state":"PREPARED_REVIEW_REQUIRED","can_execute":False,"can_clear":False}

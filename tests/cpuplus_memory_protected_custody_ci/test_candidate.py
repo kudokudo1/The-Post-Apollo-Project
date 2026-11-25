@@ -157,6 +157,43 @@ class CandidateTests(unittest.TestCase):
                 c.prepare_candidate()
         self.assertTrue((self.fence/"prepared.json").is_file())
 
+    def test_post_write_enumeration_requires_fresh_directory_description(self):
+        real_write=c.write_once
+        real_listdir=os.listdir
+        stale=[]
+        scanned=[]
+        def remember(fd,name,data):
+            if name=="prepared.json":
+                stale.append(fd)
+            real_write(fd,name,data)
+        def btrfs_view(fd):
+            scanned.append(fd)
+            if fd in stale:
+                return []
+            return real_listdir(fd)
+        with patch.object(c,"write_once",side_effect=remember),patch.object(c.os,"listdir",side_effect=btrfs_view):
+            receipt=c.prepare_candidate()
+        self.assertEqual(receipt["state"],"PREPARED_REVIEW_REQUIRED")
+        self.assertTrue(stale and scanned)
+        self.assertNotIn(stale[0],scanned)
+
+    def test_replaced_directory_on_fresh_open_refused(self):
+        real_open=os.open
+        opened=[]
+        def replacement(path,flags,*args,**kw):
+            if path==self.fence.name and flags & os.O_DIRECTORY:
+                opened.append(path)
+                if len(opened)==2:
+                    self.fence.rename(self.parent/"original-fence")
+                    self.fence.mkdir(mode=0o700)
+            return real_open(path,flags,*args,**kw)
+        with patch.object(c.os,"open",side_effect=replacement):
+            with self.assertRaisesRegex(c.CustodyRefused,"FENCE_REOPEN_IDENTITY_CHANGED"):
+                c.prepare_candidate()
+        self.assertTrue(self.archive.is_file())
+        self.assertTrue((self.parent/"original-fence"/"prepared.json").is_file())
+        self.assertTrue(self.fence.is_dir())
+
     def test_no_cli(self):
         self.assertFalse(hasattr(c,"main"))
 

@@ -24,8 +24,10 @@ Column {
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
     readonly property bool canChooseComparison: report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
     readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize) : null
-    readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true)
-    function memoryBreakdown(selected, report, includePrivate = false) {
+    readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true, true)
+    readonly property var hostDetails: memoryDetails ? memoryDetails.hostContext : null
+    property bool showHostDetails: true
+    function memoryBreakdown(selected, report, includePrivate = false, includeHost = false) {
         // Presentation only: reuse the existing completed JSONL capture.
         if (selected !== "memory" || !report || report.status !== "COMPLETE"
                 || typeof report.text !== "string" || report.text.length > 65536) return null;
@@ -100,8 +102,45 @@ Column {
                     }
                 }
             }
+            if (includeHost) details.hostContext = hostBreakdown(records);
             return details;
         } catch (_) { return null; }
+    }
+    // Optional additive observations; malformed host context does not erase
+    // the independently validated process capture. No second collector.
+    function hostBreakdown(records) {
+        if (!records.length) return null;
+        const keys=["MemTotal","MemAvailable","MemFree","AnonPages","Cached","Shmem",
+            "SReclaimable","SUnreclaim","SwapTotal","SwapFree"];
+        const count=v=>Number.isSafeInteger(v)&&v>=0;
+        const valid=v=>!!v&&keys.every(k=>count(v[k]))&&v.MemTotal>0
+            &&v.MemAvailable<=v.MemTotal&&v.MemFree<=v.MemTotal&&v.SwapFree<=v.SwapTotal;
+        const pairs=records.map(r=>{
+            const h=r.hostObservation;
+            return h&&typeof h.spanMs==="number"&&Number.isFinite(h.spanMs)&&h.spanMs>=0
+                &&valid(h.beforeKiB)&&valid(h.afterKiB)&&h.beforeKiB.MemTotal===h.afterKiB.MemTotal?h:null;
+        });
+        const observed=pairs.filter(Boolean);
+        const result={paired:observed.length,samples:records.length,minimum:null,maxSpan:null,
+            complete:false,total:null,start:null,final:null,delta:null,pssDelta:null};
+        if (!observed.length) return result;
+        const samples=observed.flatMap(h=>[h.beforeKiB,h.afterKiB]);
+        result.minimum=Math.min(...samples.map(v=>v.MemAvailable));
+        result.maxSpan=Math.max(...observed.map(h=>h.spanMs));
+        result.complete=observed.length===records.length&&samples.every(v=>v.MemTotal===samples[0].MemTotal);
+        if (result.complete) {
+            result.total=samples[0].MemTotal;
+            result.start=pairs[0].beforeKiB.MemAvailable;
+            result.final=pairs[pairs.length-1].afterKiB.MemAvailable;
+            if(records.length>1){
+                result.delta=result.final-result.start;
+                result.pssDelta=records[records.length-1].memoryKiB.Pss-records[0].memoryKiB.Pss;
+            }
+        }
+        return result;
+    }
+    function hostMiB(v,delta=false) {
+        return v===null?"N/A":(delta&&v>0?"+":"")+(v/1024).toFixed(1)+" MiB";
     }
 
     function comparisonLabel(row) {
@@ -210,6 +249,90 @@ Column {
             color: root.memoryDetails ? Colors.cyan : Colors.orange
             font.pixelSize: 10
             wrapMode: Text.WordWrap
+        }
+        ActionButton {
+            objectName: "cpuplusDiagHostToggle"
+            width: parent.width
+            height: 28
+            label: root.showHostDetails ? "HOST RAM // HIDE" : "HOST RAM // SHOW"
+            selected: root.showHostDetails
+            available: root.memoryDetails!==null
+            onLeftClicked: root.showHostDetails=!root.showHostDetails
+        }
+        Column {
+            objectName: "cpuplusDiagHostInstrument"
+            width: parent.width
+            visible: root.showHostDetails && root.memoryDetails!==null
+            spacing: 3
+            GohuText {
+                width: parent.width
+                text: "HOST AVAILABLE RAM // HISTORICAL"
+                color: Colors.magenta
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+            }
+            GohuText {
+                width: parent.width
+                text: root.hostDetails ? root.hostDetails.paired+"/"+root.hostDetails.samples+" PAIRED SAMPLES"
+                    : "HOST CONTEXT UNAVAILABLE"
+                color: root.hostDetails && root.hostDetails.complete ? Colors.cyan : Colors.orange
+                font.pixelSize: 10
+            }
+            GohuText {
+                width: parent.width
+                text: root.hostDetails ? "MIN OBSERVED // "+root.hostMiB(root.hostDetails.minimum)
+                    +"\nMAX BRACKET // "+(root.hostDetails.maxSpan===null?"N/A":root.hostDetails.maxSpan.toFixed(1)+" ms") : ""
+                color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
+            Repeater {
+                model: root.hostDetails && root.hostDetails.complete
+                    ? [{label:"START",value:root.hostDetails.start},{label:"FINAL",value:root.hostDetails.final}] : []
+                delegate: Column {
+                    required property var modelData
+                    width: parent.width
+                    spacing: 2
+                    GohuText {
+                        width: parent.width
+                        text: modelData.label+" // "+root.hostMiB(modelData.value)
+                        color: Colors.cyan
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 10
+                        color: Colors.black
+                        border.color: Colors.cyan
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.leftMargin: 1
+                            width: Math.max(0,parent.width-2)*Math.min(1,modelData.value/root.hostDetails.total)
+                            height: parent.height-2
+                            color: Colors.cyan
+                        }
+                    }
+                }
+            }
+            GohuText {
+                width: parent.width
+                text: root.hostDetails && root.hostDetails.complete
+                    ? "HOST CHANGE // "+root.hostMiB(root.hostDetails.delta,true)
+                        +"\nQUICKSHELL PSS CHANGE // "+root.hostMiB(root.hostDetails.pssDelta,true)
+                    : "HOST TREND // INCOMPLETE OR CHANGED CAPACITY"
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
+            GohuText {
+                width: parent.width
+                text: "OBSERVED SAMPLES ONLY // CORRELATION, NOT CAUSE"
+                color: Colors.orange
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
         }
         Repeater {
             model: root.memoryDetails ? root.memoryDetails.rows : []

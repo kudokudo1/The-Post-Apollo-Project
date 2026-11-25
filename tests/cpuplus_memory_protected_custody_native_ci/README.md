@@ -1,0 +1,7 @@
+# DOC 1 // Exact protected custody candidate native qualification
+
+Uses the reviewed offline #2786 guest pattern on the new exact #2798 helper and writer blobs (9dfd8331445ecf60d3a37ea630d08b1f3f6789a2, 95af22255db13baa829a68c7a9b90b25c50a6bdd), not prior native evidence transferred. Dedicated extra root-only guest marker; fixed installed helper bytes verified separately and loaded by the actual candidate. Before any managed allocation, partial archive-only fixture must block all eight real CLI entrypoints without mutation; remove only that disposable test leaf, then retain existing empty-fence test and two real swap cycles. After real withdrawal invoke the exact uninstalled writer without mock paths, helper, observations, locking or storage. Verify archive, PREPARED and actual kernel/file/history continuity across a real reboot, eight-entrypoint refusal. No deletion, forced interruption or production permission; archive-only partial marker is simulated, not a real writer crash. Native CI pending.
+
+Native failure revision: diagnostic-only writer predicates separated, same helper blob and qualification requirements. Re-run required; no prior failure reclassified.
+
+Correction for native FENCE_CONTENTS_CHANGED count=0: writer enumerates a newly opened, identity-verified directory description after publication. Exact original, reopened and named identities and both marker readbacks required. Fresh native CI pending.

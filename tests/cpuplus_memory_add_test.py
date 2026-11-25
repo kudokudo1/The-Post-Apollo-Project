@@ -771,7 +771,7 @@ class ExternalReclaimFenceTests(unittest.TestCase):
             def root_file(fd):
                 result = old_fstat(fd)
                 return SimpleNamespace(st_mode=result.st_mode, st_uid=0, st_nlink=result.st_nlink)
-            with patch.object(m, "LOCK", lock), patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "EXT_DIRECTORY", extension), patch.object(m, "secure_parent"), patch.object(m.os, "geteuid", return_value=0), patch.object(Path, "lstat", root_parent), patch.object(m.os, "fstat", root_file), patch.object(m, "run") as run, patch.object(m, "allocate") as allocate, patch.object(m, "persist_authorized") as persist, patch.object(m, "expand_authorized") as expand, patch.object(m, "withdraw_authorized") as withdraw, patch.object(m, "extension_identity") as identity, patch.object(m, "read_protected_record") as read, patch("builtins.print") as output:
+            with patch.object(m, "RECLAIM_ARCHIVE", folder / "archive.json"), patch.object(m, "LOCK", lock), patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "EXT_DIRECTORY", extension), patch.object(m, "secure_parent"), patch.object(m.os, "geteuid", return_value=0), patch.object(Path, "lstat", root_parent), patch.object(m.os, "fstat", root_file), patch.object(m, "run") as run, patch.object(m, "allocate") as allocate, patch.object(m, "persist_authorized") as persist, patch.object(m, "expand_authorized") as expand, patch.object(m, "withdraw_authorized") as withdraw, patch.object(m, "extension_identity") as identity, patch.object(m, "read_protected_record") as read, patch("builtins.print") as output:
                 for args in commands:
                     with self.subTest(args=args):
                         self.assertEqual(m.main(args),3)
@@ -798,12 +798,58 @@ class ExternalReclaimFenceTests(unittest.TestCase):
             def root_file(fd):
                 result = old_fstat(fd)
                 return SimpleNamespace(st_mode=result.st_mode, st_uid=0, st_nlink=result.st_nlink)
-            with patch.object(m, "LOCK", lock), patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "secure_parent"), patch.object(m.os, "geteuid", return_value=0), patch.object(Path, "lstat", root_parent), patch.object(m.os, "fstat", root_file), patch.object(m, "check_recovery_fence") as existing:
+            with patch.object(m, "RECLAIM_ARCHIVE", folder / "archive.json"), patch.object(m, "LOCK", lock), patch.object(m, "RECLAIM_FENCE", fence), patch.object(m, "secure_parent"), patch.object(m.os, "geteuid", return_value=0), patch.object(Path, "lstat", root_parent), patch.object(m.os, "fstat", root_file), patch.object(m, "check_recovery_fence") as existing:
                 with m.mutation_lock():
                     self.assertIsNotNone(m._mutation_fd)
                 existing.assert_called_once_with()
                 self.assertIsNone(m._mutation_fd)
                 self.assertFalse(os.path.lexists(fence))
+
+class ArchiveAdmissionFenceTests(unittest.TestCase):
+    def test_archive_presence_types_and_io_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"archive"
+            with patch.object(m,"RECLAIM_ARCHIVE",path):
+                m.check_reclaim_archive_admission()
+                for create in (lambda: path.write_bytes(b"{"), lambda: path.symlink_to(Path(tmp)/"absent")):
+                    create()
+                    with self.assertRaisesRegex(m.ReductionRecovery,"RECLAIM_RECOVERY_REQUIRED"):
+                        m.check_reclaim_archive_admission()
+                    path.unlink()
+                path.mkdir()
+                with self.assertRaisesRegex(m.ReductionRecovery,"RECLAIM_RECOVERY_REQUIRED"):
+                    m.check_reclaim_archive_admission()
+                self.assertTrue(path.is_dir())
+            with patch.object(Path,"lstat",side_effect=PermissionError):
+                with self.assertRaisesRegex(m.ReductionRecovery,"RECLAIM_ARCHIVE_UNVERIFIED"):
+                    m.check_reclaim_archive_admission()
+
+    def test_all_eight_commands_refuse_archive_only_under_common_lock(self):
+        commands=(["add","16"],["add-authorized","16"],["persist-authorized"],
+                  ["expand-authorized","24"],["withdraw-authorized","16"],
+                  ["reactivate-authorized","24"],["archive-cycle-authorized"],
+                  ["inspect-recovery-authorized"])
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            lock,archive,fence=(folder/name for name in ("lock","archive","fence"))
+            archive.write_bytes(b"partial archive")
+            old_lstat,old_fstat=Path.lstat,os.fstat
+            def root_parent(path):
+                result=old_lstat(path)
+                return SimpleNamespace(st_mode=result.st_mode,st_uid=0) if path==folder else result
+            def root_file(fd):
+                result=old_fstat(fd)
+                return SimpleNamespace(st_mode=result.st_mode,st_uid=0,st_nlink=result.st_nlink)
+            with patch.multiple(m,LOCK=lock,RECLAIM_ARCHIVE=archive,RECLAIM_FENCE=fence),patch.object(m,"secure_parent"),patch.object(m.os,"geteuid",return_value=0),patch.object(Path,"lstat",root_parent),patch.object(m.os,"fstat",root_file),patch.object(m,"check_recovery_fence") as recovery,patch.object(m,"run") as run,patch.object(m,"extension_identity") as identity,patch.object(m,"allocate") as allocate,patch("builtins.print") as output:
+                for command in commands:
+                    self.assertEqual(m.main(command),3)
+                    self.assertIn("RECLAIM_RECOVERY_REQUIRED",output.call_args.args[1])
+                    self.assertIsNone(m._mutation_fd)
+                for effect in (run,recovery,identity,allocate):
+                    effect.assert_not_called()
+            self.assertFalse(fence.exists())
+            self.assertEqual(archive.read_bytes(),b"partial archive")
+
 
 class WithdrawalBootBindingTests(unittest.TestCase):
     BOOT = "12345678-1234-1234-1234-123456789abc"

@@ -41,7 +41,10 @@ QtObject {
     function checkConfig() {
         const c=config();
         return c.every(x=>x.startsWith("/") && !/[\x00-\x1f]/.test(x))
-            && (!ctl.paths || Host.equal(c,ctl.paths));
+            // Host.equal compares record objects, not arrays. Compare each
+            // pinned path by position without weakening configuration custody.
+            && (!ctl.paths || (Array.isArray(ctl.paths) && ctl.paths.length===c.length
+                && c.every((value,index)=>value===ctl.paths[index])));
     }
     function fail(reason) {
         if (ctl.phase==="FAILED") return;

@@ -62,11 +62,11 @@ def secure_dir(fd, private=False):
 def directory(path):
     return os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
 
-def read(fd, name, limit=LIMIT, sync=False):
+def read(fd, name, limit=LIMIT, sync=False, private=True):
     item = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=fd)
     try:
         s = os.fstat(item)
-        require(stat.S_ISREG(s.st_mode) and s.st_uid == 0 and not s.st_mode & 0o077
+        require(stat.S_ISREG(s.st_mode) and s.st_uid == 0 and not s.st_mode & (0o077 if private else 0o022)
                 and s.st_nlink == 1 and 0 < s.st_size <= limit, "UNTRUSTED_RECORD")
         with os.fdopen(item, "rb", closefd=False) as stream:
             raw = stream.read(limit + 1)
@@ -104,15 +104,25 @@ def verify_helper(helper):
     # reading a file alone does not establish that provenance.
     path = Path(helper.__file__)
     require(path == Path("/usr/local/sbin/post-apollo-memory-add-swap"), "HELPER_NOT_INSTALLED")
-    helper.secure_parent()
-    parent = directory(path.parent)
+    # Resolve the fixed install path, then verify all canonical ancestors.
+    # Installer custody must independently establish the canonical path
+    # (including Silverblue's /usr/local mapping) before any real integration.
+    resolved = path.resolve(strict=True)
+    for ancestor in reversed(resolved.parents):
+        fd = directory(ancestor)
+        try:
+            secure_dir(fd)
+        finally:
+            os.close(fd)
+    parent = directory(resolved.parent)
     try:
         secure_dir(parent)
-        raw = read(parent, path.name, limit=262144)
+        raw = read(parent, resolved.name, limit=262144, private=False)
         blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
         require(blob == PIN, "HELPER_BLOB_MISMATCH")
     finally:
         os.close(parent)
+    helper.secure_parent()
 
 def observe(helper, fd, extfd):
     require(helper._mutation_fd is not None, "HELPER_LOCK_REQUIRED")

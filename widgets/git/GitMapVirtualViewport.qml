@@ -17,6 +17,9 @@ Rectangle {
     readonly property real scrollExtent: flick.contentHeight
     readonly property int renderedRows: rows.count
     readonly property int graphSurfaceHeight: graph.height
+    // Expose the real interaction targets for the disposable input fixture.
+    property alias scrollRail: rail
+    property alias scrollViewport: flick
     readonly property string bottomStatus: mapState ? Policy.bottomState(mapState) : "NO INDEX"
     readonly property bool bridgeFaulted: bridge.faulted
     property bool applyingGeometry: false
@@ -208,6 +211,7 @@ Rectangle {
         geometryHost: root
         handleStyle: "star"
         visible: scrollable
+        protectHandleDragFromAncestor: true
     }
     Text {
         id: footer

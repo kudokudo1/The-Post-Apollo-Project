@@ -13,28 +13,27 @@ permissions:
   contents: read
 jobs:
   native-feed:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: fedora:44
     steps:
+      - name: Install coherent Fedora Qt and Quickshell runtime
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui qt6-qtsvg git coreutils findutils diffutils grep
+          quickshell --version
+          quickshell --version | grep '0.3.'
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Prepare isolated Qt runtime
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb dbus-x11 libxcb-cursor0 libxkbcommon-x11-0 libgl1 libegl1 libgles2 libopengl0 libpipewire-0.3-0 libwayland-client0
-      - name: Download pinned Quickshell (same release as Hospital lifecycle CI)
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/feed-qs"
-          curl --proto '=https' --tlsv1.2 -fLSs --retry 2 https://github.com/actions-precompiled/quickshell-bin/releases/download/v0.3.0/quickshell-0.3.0-linux-amd64.tar.gz -o "$RUNNER_TEMP/feed-qs/qs.tar.gz"
-          printf '%s  %s\n' 3de3ac310a856a635fb6ed2d9850370ab7c4c06f7a4ecbc70773a93b4d0dd0b9 "$RUNNER_TEMP/feed-qs/qs.tar.gz" | sha256sum --check -
-          tar -xzf "$RUNNER_TEMP/feed-qs/qs.tar.gz" -C "$RUNNER_TEMP/feed-qs"
       - name: Native layout, draft, send and focus regressions
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           LIBGL_ALWAYS_SOFTWARE: '1'
+          QT_LOGGING_RULES: 'qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true'
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
@@ -53,6 +52,24 @@ jobs:
           done
           grep -E '^(singleton Colors|ConversationFeed|NeonScrollBar|SafeDropShadow) ' "$GITHUB_WORKSPACE/components/qmldir" > "$scene/components/qmldir"
           test "$(wc -l < "$scene/components/qmldir")" -eq 4
-          timeout 30s dbus-run-session -- xvfb-run -a "$RUNNER_TEMP/feed-qs/quickshell/bin/quickshell" --path "$scene/shell.qml" --no-color 2>&1 | tee "$work/output"
-          if grep -q FEED_TRANSCRIPT_FAIL "$work/output"; then exit 1; fi
-          grep -q FEED_TRANSCRIPT_NATIVE_PASS "$work/output"
+          # Quickshell filters QML console output by default. Explicitly
+          # enable it, as the existing Weather M26-D native fixture does.
+          timeout --signal=TERM --kill-after=3s 30s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
+          if grep -q FEED_TRANSCRIPT_FAIL "$work/output"; then
+            echo "Native fixture reported an assertion failure" >&2
+            exit 1
+          fi
+          if ! grep -q FEED_TRANSCRIPT_FIXTURE_STARTED "$work/output"; then
+            echo "Missing native fixture startup witness" >&2
+            exit 1
+          fi
+          observed="$(grep -oE 'FEED_TRANSCRIPT_PHASE_PASS [0-7]' "$work/output" || true)"
+          expected="$(printf 'FEED_TRANSCRIPT_PHASE_PASS %s\n' 0 1 2 3 4 5 6 7)"
+          if [ "$observed" != "$expected" ]; then
+            printf 'Incomplete or out-of-order native phases:\n%s\n' "$observed" >&2
+            exit 1
+          fi
+          if ! grep -q FEED_TRANSCRIPT_NATIVE_PASS "$work/output"; then
+            echo "Missing final native completion witness" >&2
+            exit 1
+          fi

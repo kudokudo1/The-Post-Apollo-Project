@@ -8,6 +8,7 @@ Item {
     visible: false
     property var generation: null
     property bool v2Mode: false
+    property bool compactHold: false
     property string v2Base: ""
     property int owners: 0
     property string custodyState: "NEW"
@@ -20,7 +21,7 @@ Item {
         if (custodyState!=="NEW" || !generation) return false;
         custodyState="STARTING";
         deadline.restart();
-        if (v2Mode) keeper.exec(["/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),"--base",v2Base,"--device",generation.device,"--inode",generation.inode,"hold",generation.repoId,generation.key,generation.manifest.snapshot]);
+        if (v2Mode) keeper.exec(["/usr/bin/python3","-I","-B",Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),"--base",v2Base,"--device",generation.device,"--inode",generation.inode].concat(compactHold ? ["--compact-hold"] : []).concat(["hold",generation.repoId,generation.key,generation.manifest.snapshot]));
         else keeper.exec(["/usr/bin/python3","-I","-B",
             Quickshell.shellPath("scripts/git_map_reader_candidate.py"),
             generation.repoId,generation.key,generation.manifest.snapshot]);

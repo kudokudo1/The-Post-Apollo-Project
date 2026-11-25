@@ -24,6 +24,8 @@ ShellRoot {
     property int negativeCase: 0
     property bool negativeTriggered: false
     property int reviewPhase: 0
+    property int dormantPhase: 0
+    property bool catalogDismissed: false
     property var originalPreviewComponent: null
     property var firstReviewScope: null
     property var secondReviewScope: null
@@ -531,6 +533,128 @@ ShellRoot {
             if (n===10) {
                 stop();
                 console.info("FOREST_HOST_REVIEW_PLACEMENT_PASS");
+                dormantPhase=0;
+                dormantTimer.start();
+            }
+        }
+    }
+    // R2 disposable actual host placement. Use the same inactive Loader,
+    // never mount a second panel or authorize a real catalog.
+    Component { id: dormantType; Review.PublicDormantTaskSelector {} }
+    function dormantScope(n) {
+        return {treeKey:"CHERRY",viewKey:(n===1?"b":"c").repeat(32),catalogRevision:n};
+    }
+    function dormantGeometry(item) {
+        const a=parts, body=find(item,"dormantCatalogBody");
+        check(a.loader.active && a.loader.visible && a.loader.item===item
+            && item.width===a.pane.width && item.height===a.pane.height
+            && item.width>=300 && item.height>=160 && !a.empty.visible
+            && a.pane.y>=a.heading.y+a.heading.height
+            && a.pane.y+a.pane.height<=a.prompt.y
+            && a.pane.x+a.pane.width<=a.rail.x
+            && body && body.visible && body.implicitHeight<=body.height
+            && !item.restorationEnabled && !item.sendEnabled && !item.stopEnabled
+            && !item.sourceAuthenticated && !item.permissionGranted
+            && !item.productionAuthority && !item.modelExecutionPermitted
+            && !forest.chatHostTrusted && !a.send.enabledAction && !a.voice.backendReady,
+            "dormant viewport and locked authority");
+        return !failed;
+    }
+    function dormantStep(n) {
+        const a=parts, first=dormantScope(1), second=dormantScope(2);
+        const rows=[{taskAlias:"a".repeat(32)},{taskAlias:"d".repeat(32)},{taskAlias:"e".repeat(32)}];
+        const plan={treeKey:"CHERRY",taskAlias:rows[0].taskAlias,viewKey:"f".repeat(32),planRevision:7};
+        const item=a.loader.item;
+        if (n===0) {
+            check(!a.loader.active && item===null && a.loader.sourceComponent===originalPreviewComponent,
+                "dormant default closed");
+            a.loader.sourceComponent=dormantType;
+            forest.menuOpen=true;
+        } else if (n===1) {
+            check(a.preview.interactive && !a.loader.active,"dormant explicit entry");
+            a.input.text="dormant-local draft";
+            a.preview.leftClicked(null);
+        } else if (n===2) {
+            check(item && item.catalogState==="CLOSED" && item.reviewState==="CLOSED","dormant initial");
+            if (failed) return;
+            catalogDismissed=false;
+            item.dismissed.connect(function(){catalogDismissed=true;});
+            item.syntheticOwner=true;
+            item.ownerScope=first;
+            check(item.openCatalog(first) && item.receiveCatalog(first,rows)
+                && item.catalogRows.length===3 && !item.selectedAlias && dormantGeometry(item),
+                "dormant fixed list");
+        } else if (n===3) {
+            item.ownerPlanScope=plan;
+            check(!item.openReview(first,plan) && item.selectTask(first,rows[0].taskAlias)
+                && item.reviewState==="CLOSED","dormant explicit selection");
+            const opener=find(item,"dormantOpenReview");
+            check(opener && opener.activeFocusOnTab,"dormant opener focus");
+            if (opener) opener.forceActiveFocus();
+        } else if (n===4) {
+            const opener=find(item,"dormantOpenReview"), body=find(item,"dormantCatalogBody");
+            check(item.openReview(first,plan) && item.receivePlan(first,plan,reviewPlan)
+                && item.catalogRows.length===0 && body && !body.visible
+                && opener && !opener.focus && !opener.activeFocusOnTab
+                && reviewGeometry(item),"dormant exclusive review");
+            const dismiss=find(item,"restorationReviewDismiss");
+            if (dismiss) dismiss.forceActiveFocus();
+        } else if (n===5) {
+            check(item.dismissPlan(first,plan) && item.reviewState==="CLOSED"
+                && item.reviewRows.length===0,"dormant review dismiss");
+        } else if (n===6) {
+            const opener=find(item,"dormantOpenReview");
+            check(item.catalogRows.length===3 && item.selectedAlias===rows[0].taskAlias
+                && opener && opener.focus && opener.activeFocusOnTab && dormantGeometry(item),
+                "dormant local focus return");
+            check(item.dismissCatalog(first) && catalogDismissed && item.catalogState==="CLOSED"
+                && !item.selectedAlias,"dormant catalog dismiss");
+        } else if (n===7) {
+            check(item.catalogState==="CLOSED" && !find(item,"dormantOpenReview").activeFocusOnTab
+                && !find(item,"dormantCatalogDismiss").activeFocusOnTab,"dormant tab retirement");
+            a.preview.leftClicked(null);
+            a.input.forceActiveFocus();
+        } else if (n===8) {
+            check(!a.loader.active && item===null && a.empty.visible && a.input.focus
+                && a.input.text==="dormant-local draft","dormant close to empty and focus request");
+            a.preview.leftClicked(null);
+        } else if (n===9) {
+            check(item && item.catalogState==="CLOSED" && !item.selectedAlias,"dormant fresh replacement");
+            if (failed) return;
+            item.syntheticOwner=true;
+            item.ownerScope=second;
+            check(item.openCatalog(second) && item.receiveCatalog(second,rows)
+                && !item.dismissCatalog(first) && !item.selectTask(first,rows[0].taskAlias)
+                && !item.receivePlan(first,plan,reviewPlan) && dormantGeometry(item),"dormant stale isolation");
+            forest.selectedTreeIndex=1;
+        } else if (n===10) {
+            check(!a.loader.active && item===null && a.empty.visible,"dormant Tree loss");
+            a.loader.sourceComponent=originalPreviewComponent;
+            forest.selectedTreeIndex=0;
+        } else if (n===11) {
+            check(a.preview.interactive && !a.loader.active && a.input.text==="dormant-local draft",
+                "dormant no automatic conversation");
+            a.preview.leftClicked(null);
+        } else if (n===12) {
+            geometry(true);
+            check(a.input.text==="dormant-local draft","dormant original preview preserved");
+            forest.menuOpen=false;
+        } else if (n===13) {
+            check(!a.loader.active && item===null && a.input.text==="","dormant menu close");
+        }
+    }
+    Timer {
+        id: dormantTimer
+        interval: 350
+        repeat: true
+        onTriggered: {
+            const n=dormantPhase++;
+            dormantStep(n);
+            if (failed) { stop(); finish(); return; }
+            console.info("FOREST_HOST_DORMANT_PHASE_PASS "+n);
+            if (n===13) {
+                stop();
+                console.info("FOREST_HOST_DORMANT_PLACEMENT_PASS");
                 finish();
             }
         }

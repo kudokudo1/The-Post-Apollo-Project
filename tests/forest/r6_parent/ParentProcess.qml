@@ -3,8 +3,9 @@ import Quickshell
 import Quickshell.Io
 import "ParentWire.js" as Wire
 import "PublicRuntimeStatusDisplay.js" as Status
+import "PublicHistoryDisplay.js" as History
 
-// CI-only first actual child exchange. No Loader, history, UI paint or
+// CI-only first actual child exchange. No Loader, UI paint or
 // installed ForestW connection. The harness owns an independent view object.
 // One instance owns one tracked Process for its entire lifetime.
 Item {
@@ -24,6 +25,12 @@ Item {
     property bool offered: false
     property var ref: null
     property var used: []
+    property var historyController: null
+    property var historyScope: null
+    property var historyDisplay: null
+    property var pageRequest: null
+    property int historyGeneration: 0
+    property string sessionAlias: ""
     property int sequence: 0
     property bool stopRequested: false
     property int turnsStarted: 0
@@ -58,13 +65,20 @@ Item {
         if (phase !== "NEW" || !current || !Wire.token(trial) || worker.running)
             return false;
         wire = Wire.createWire();
+        historyController = History.createController();
         phase = "STARTING";
         trialClock.restartMs();
         phaseClock.restartMs();
         worker.running = true;
         return true;
     }
+    function clearHistory() {
+        historyScope = null;
+        pageRequest = null;
+        historyDisplay = historyController ? historyController.close() : null;
+    }
     function clearOriginal() {
+        clearHistory();
         // This object cannot mutate another owner's view; no callbacks to a
         // replacement. Clear only its own retained reference and status.
         ref = null;
@@ -96,7 +110,7 @@ Item {
         return true;
     }
     // Explicit harness actions only. No action queue and no automatic retry.
-    function request(kind) {
+    function request(kind, pageId, limit) {
         if (!live() || pending || action >= Wire.ACTIONS) return false;
         let data = {};
         if (kind === "HELLO") {
@@ -113,12 +127,28 @@ Item {
             if (kind === "STEP" && turnsStarted === 3 && turnSteps >= 4
                 && !stopRequested) return false;
             data = {ref:ref};
+        } else if (kind === "HISTORY_ATTACH") {
+            if (phase !== "IDLE") return false;
+            clearHistory();
+        } else if (kind === "HISTORY_PAGE") {
+            if (phase !== "IDLE" || historyScope === null || !Wire.token(pageId)
+                || pageId === trial || used.indexOf(pageId)>=0 || pageId === sessionAlias
+                || used.length >= 128 || !Wire.integer(limit,1,2)) return false;
+            if (historyDisplay && historyDisplay.state === "COMPLETE") return false;
+            const d = historyDisplay && historyDisplay.state === "PARTIAL"
+                ? historyController.next(historyScope,pageId,limit)
+                : historyController.open(historyScope,pageId,limit);
+            if (d.state !== "PENDING" || !d.request) { hold("HISTORY_REQUEST"); return false; }
+            used = used.concat([pageId]);
+            pageRequest = d.request;
+            historyDisplay = d;
+            data = {scope:historyScope,request:pageRequest};
         } else if (kind === "CLOSE") {
             if (phase !== "IDLE" && phase !== "ACTIVE" && phase !== "BLOCKED")
                 return false;
             clearOriginal();
         } else return false;
-        if (!wire.reserve(kind === "NEXT")) { hold("RESERVE"); return false; }
+        if (!wire.reserve(kind === "NEXT" || kind === "HISTORY_ATTACH")) { hold("RESERVE"); return false; }
         action++;
         pending = kind;
         offered = false;
@@ -156,7 +186,7 @@ Item {
         if (frame.kind === "OPEN_OFFER") {
             if (pending !== "NEXT" || offered || !Wire.exact(data,["ref"])
                 || !exactRef(data.ref) || used.length >= 128
-                || data.ref.requestId === trial || data.ref.viewKey === trial
+                || data.ref.requestId === trial || data.ref.viewKey === trial || data.ref.requestId === sessionAlias || data.ref.viewKey === sessionAlias
                 || used.indexOf(data.ref.requestId)>=0 || used.indexOf(data.ref.viewKey)>=0)
                 return false;
             offered = true;
@@ -169,6 +199,45 @@ Item {
                 possibleEffect = true;
             }
             return send("OPEN_ACK",{ref:data.ref,accepted:accepted});
+        }
+        if (frame.kind === "HISTORY_OFFER") {
+            const v = data.scope;
+            if (pending !== "HISTORY_ATTACH" || offered || !Wire.exact(data,["scope"])
+                || !Wire.exact(v,["treeKey","generation","sessionId","revision","viewKey"])
+                || v.treeKey !== "CHERRY" || !Wire.integer(v.generation,1,Number.MAX_SAFE_INTEGER)
+                || v.generation !== historyGeneration+1 || v.revision !== turnsStarted*2
+                || !Wire.token(v.sessionId) || !Wire.token(v.viewKey)
+                || v.sessionId === v.viewKey || v.sessionId === trial || v.viewKey === trial
+                || used.indexOf(v.viewKey)>=0 || used.indexOf(v.sessionId)>=0
+                || (sessionAlias && v.sessionId !== sessionAlias) || used.length>=128) return false;
+            offered = true;
+            const accepted = current && acceptOffer;
+            if (accepted) {
+                historyScope = Object.assign({},v);
+                historyGeneration = v.generation;
+                sessionAlias = v.sessionId;
+                used = used.concat([v.viewKey]);
+            }
+            return send("HISTORY_ACK",{scope:v,accepted:accepted});
+        }
+        if (frame.kind === "PAGE") {
+            if (pending !== "HISTORY_PAGE" || !pageRequest || !historyScope
+                || !Wire.exact(data,["scope","page"])
+                || !Wire.exact(data.scope,Object.keys(historyScope))
+                || !Object.keys(historyScope).every(k=>data.scope[k]===historyScope[k])) return false;
+            const projected = History.project(data.page,pageRequest,pageRequest);
+            if (projected.state !== "STRUCTURALLY_VALID_PUBLIC_FIXTURE"
+                || projected.messages.some(r=>!Wire.token(r.turnId) || r.turnId===trial
+                    || r.turnId===sessionAlias || used.indexOf(r.turnId)>=0)
+                || projected.complete !== (pageRequest.after+projected.messages.length===historyScope.revision)
+                || !live()) return false;
+            const d = historyController.receive(data.page,historyScope);
+            if (d.state !== "PARTIAL" && d.state !== "COMPLETE") return false;
+            historyDisplay = d;
+            pageRequest = null;
+            pending = "";
+            actionFinished("PAGE_READY");
+            return true;
         }
         if (frame.kind !== "RESULT" || !Wire.exact(data,["code","units"])
             || !Array.isArray(data.units) || typeof data.code !== "string")
@@ -183,6 +252,8 @@ Item {
             outcome = possibleEffect ? "UNKNOWN_HOLD" : "REFUSED";
         } else if (pending === "HELLO" && code === "READY" && !data.units.length)
             next = "IDLE";
+        else if (pending === "HISTORY_ATTACH" && offered && historyScope !== null
+                && code === "HISTORY_ATTACHED" && !data.units.length) next = "IDLE";
         else if (pending === "NEXT" && offered && ref !== null
                 && code === "TURN_STARTED" && !data.units.length) {
             turnsStarted++;

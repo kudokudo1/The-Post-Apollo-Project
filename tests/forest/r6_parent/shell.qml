@@ -8,8 +8,10 @@ ShellRoot {
     property int steps: 0
     property string last: ""
     property bool failed: false
-    property var modes: ["commit","refuse","detach","two-commit-stop"]
+    property var modes: ["commit","refuse","detach","two-commit-stop","history"]
     property int commits: 0
+    property int historyStage: 0
+    property string firstAlias: ""
     property bool sawStop: false
     property bool sawAbort: false
     property var oldRef: null
@@ -24,7 +26,7 @@ ShellRoot {
     }
     function startCase() {
         if (active !== null || scenario >= modes.length) { fail("case start"); return; }
-        steps=0; last=""; commits=0; sawStop=false; sawAbort=false; oldRef=null;
+        steps=0; last=""; commits=0; sawStop=false; sawAbort=false; oldRef=null; historyStage=0; firstAlias="";
         const p = trialType.createObject(witness,{
             trial:String(scenario+1).repeat(32),
             fixtureDirectory:Quickshell.shellPath("private"+scenario),
@@ -54,10 +56,12 @@ ShellRoot {
             else if (scenario===2)
                 ok=ok && p.failure==="OWNER_LOST" && p.outcome==="UNKNOWN_HOLD"
                     && p.action===2 && p.cleanupStarted;
-            else
+            else if (scenario===3)
                 ok=ok && !p.failure && p.closeResult && last==="CLOSED"
                     && commits===2 && sawStop && sawAbort && p.turnsStarted===3
                     && p.action===21 && p.outcome==="ABORTED_LOCAL" && stats.ended;
+            else ok=ok && !p.failure && p.closeResult && last==="CLOSED"
+                && historyStage===5 && p.action===13 && p.historyScope===null && stats.ended;
             if (!ok) { fail("terminal evidence "+scenario); return; }
             console.info("R6_PARENT_CASE_PASS "+scenario+" "+modes[scenario]
                 +" actions="+p.action+" bytes="+stats.bytes+" frames="+stats.frames);
@@ -79,7 +83,40 @@ ShellRoot {
             const p=witness.active;
             if (!p || witness.failed) return;
             let ok=false;
-            if (witness.last==="READY") ok=p.request("NEXT");
+            if (witness.scenario===4) {
+                const id = n => ("0000000000000000000000000000000"+n);
+                if (witness.last==="READY") ok=p.request("HISTORY_ATTACH");
+                else if (witness.last==="HISTORY_ATTACHED") {
+                    ok=p.historyScope.revision===(witness.historyStage===0?0:2)
+                        && p.request("HISTORY_PAGE",id(witness.historyStage===0?1:2),1);
+                } else if (witness.last==="PAGE_READY") {
+                    const d=p.historyDisplay;
+                    if (witness.historyStage===0) {
+                        witness.historyStage=1;
+                        witness.firstAlias=p.sessionAlias;
+                        ok=d.state==="COMPLETE" && d.messages.length===0
+                            && !p.request("HISTORY_PAGE",id(3),1) && p.request("NEXT")
+                            && p.historyScope===null;
+                    } else if (witness.historyStage===2) {
+                        witness.historyStage=3;
+                        ok=d.state==="PARTIAL" && d.messages.length===1 && d.nextAfter===1
+                            && !p.request("HISTORY_PAGE",id(2),1)
+                            && p.request("HISTORY_PAGE",id(3),1);
+                    } else if (witness.historyStage===3) {
+                        witness.historyStage=5;
+                        ok=d.state==="COMPLETE" && d.messages.length===2
+                            && d.messages[0].direction==="outgoing" && d.messages[1].direction==="incoming"
+                            && p.sessionAlias===witness.firstAlias && p.status==="LOCAL_COMMIT_RECORDED"
+                            && p.request("CLOSE");
+                    }
+                } else if (witness.last==="TURN_STARTED" || witness.last==="ACTIVE") {
+                    witness.steps++;
+                    ok=p.historyScope===null && witness.steps<=5 && p.request("STEP");
+                } else if (witness.last==="COMMITTED_LOCAL") {
+                    witness.historyStage=2;
+                    ok=p.historyScope===null && witness.steps===5 && p.request("HISTORY_ATTACH");
+                } else if (witness.last==="CLOSED") return;
+            } else if (witness.last==="READY") ok=p.request("NEXT");
             else if (witness.last==="TURN_STARTED" && witness.scenario===2) {
                 // Different owner object, independently observed after true ACK.
                 p.observedOwner=ownerB;

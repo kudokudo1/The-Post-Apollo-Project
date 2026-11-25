@@ -3,7 +3,7 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 from h14d_resource_witness import (
-    CAP, GIB, QUOTA, Hold, Level, Sample, Reader, evaluate, preflight,
+    CAP, GIB, QUOTA, Hold, Level, Sample, Reader, evaluate, preflight, preflight_outer,
 )
 
 
@@ -123,6 +123,97 @@ class ResourceWitnessTests(unittest.TestCase):
         ):
             with self.subTest(bad=bad), self.assertRaises(Hold):
                 self.check(samples=(bad, self.final))
+
+
+    def outer_baseline(self):
+        # Empty does not mean uncharged; preserve observed nonzero peak.
+        return replace(self.active, start_ns=110, end_ns=150,
+                       levels=(self.ancestor, replace(self.child, tasks=0,
+                               current=4*1024**2)),
+                       peak=8*1024**2, cpu_usec=10, populated=0)
+
+    def outer_check(self, baseline, samples=None, **kw):
+        return evaluate(self.parent,
+                        (self.active, self.final) if samples is None else samples,
+                        selected=(0, 1), launch_ns=200, expected_leaf=(1, 11),
+                        scope="RETAINED_OUTER", baseline=baseline, **kw)
+
+    def test_retained_outer_observed_baseline_not_reset(self):
+        baseline = self.outer_baseline()
+        self.assertEqual(preflight_outer(self.parent, baseline, selected=(0, 1),
+                         now_ns=200, expected_leaf=(1, 11)),
+                         "OUTER_RESOURCE_PREFLIGHT_REFERENCE")
+        r = self.outer_check(baseline)
+        self.assertEqual(r["accounting_scope"], "RETAINED_OUTER")
+        self.assertTrue(r["outer_baseline_observed"])
+        self.assertEqual(r["outer_baseline_current_bytes"], 4*1024**2)
+        self.assertEqual(r["outer_baseline_peak_bytes"], 8*1024**2)
+        self.assertEqual(r["cpu_usage_usec_observed_delta"], 190)
+        self.assertFalse(r["terminal_verified"])
+        self.assertFalse(r["permission_granted"])
+        self.assertFalse(r["measurement_coverage_complete"])
+        self.assertEqual(r["safe_actions"], [])
+
+    def test_scope_selection_no_fallback(self):
+        baseline = self.outer_baseline()
+        self.assertEqual(self.check()["accounting_scope"], "DIRECT")
+        self.assertFalse(self.check()["outer_baseline_observed"])
+        for scope, b in (("DIRECT", baseline), ("RETAINED_OUTER", None),
+                         ("AUTO", baseline), (False, None)):
+            with self.subTest(scope=scope), self.assertRaises(Hold):
+                evaluate(self.parent, (self.active, self.final), selected=(0, 1),
+                         launch_ns=200, expected_leaf=(1, 11), scope=scope, baseline=b)
+
+    def test_baseline_empty_exact_and_fresh(self):
+        b = self.outer_baseline()
+        for bad in (
+            replace(b, populated=1),
+            replace(b, levels=(self.ancestor, replace(b.levels[-1], tasks=1))),
+            replace(b, levels=(self.ancestor, replace(b.levels[-1], identity=(1, 12)))),
+            replace(b, levels=(replace(self.ancestor, identity=(1, 20)), b.levels[-1])),
+            replace(b, levels=(self.ancestor, replace(b.levels[-1], hard=CAP+1))),
+            replace(b, levels=(self.ancestor, replace(b.levels[-1], events=(1,0,0,0,0,0)))),
+            replace(b, swap=1), replace(b, swap_max=1), replace(b, peak=0),
+            replace(b, host_available_mib=4096),
+            replace(b, host_pressure=((0,0,0,11), self.psi[1])),
+            replace(b, start_ns=201, end_ns=202),
+        ):
+            with self.subTest(bad=bad), self.assertRaises(Hold):
+                self.outer_check(bad)
+        fresh_parent = replace(self.parent, start_ns=1_000_000_100, end_ns=1_000_000_200)
+        with self.assertRaisesRegex(Hold, "BASELINE_STALE"):
+            preflight_outer(fresh_parent, b, selected=(0,1),
+                            now_ns=1_000_000_201, expected_leaf=(1,11))
+
+    def test_first_observation_completion_boundary_both_scopes(self):
+        # First start can be on time while the completed observation is late.
+        boundary = 200 + 1_000_000_000
+        first = replace(self.active, start_ns=boundary-100, end_ns=boundary)
+        final = replace(self.final, start_ns=boundary+100, end_ns=boundary+200)
+        for scope, baseline in (("DIRECT", None),
+                                ("RETAINED_OUTER", self.outer_baseline())):
+            with self.subTest(scope=scope):
+                args = dict(selected=(0,1), launch_ns=200,
+                            expected_leaf=(1,11), scope=scope, baseline=baseline)
+                self.assertEqual(evaluate(self.parent, (first, final), **args)["status"],
+                                 "RESOURCE_ENVELOPE_OBSERVED")
+                late = replace(first, end_ns=boundary+1)
+                with self.assertRaisesRegex(Hold, "FIRST_OBSERVATION_LATE"):
+                    evaluate(self.parent, (late, final), **args)
+
+    def test_baseline_counter_continuity_and_first_active(self):
+        b = self.outer_baseline()
+        for active in (
+            replace(self.active, peak=b.peak-1),
+            replace(self.active, cpu_usec=b.cpu_usec-1),
+            replace(self.active, levels=(self.ancestor, replace(self.child, high=CAP))),
+            replace(self.active, start_ns=1_000_000_201, end_ns=1_000_000_202),
+            replace(self.active, populated=0),
+        ):
+            with self.subTest(active=active), self.assertRaises(Hold):
+                self.outer_check(b, (active,self.final))
+        with self.assertRaises(Hold):
+            self.outer_check(b, (self.active,replace(self.final,populated=1)))
 
 
 class ReaderPinTests(unittest.TestCase):

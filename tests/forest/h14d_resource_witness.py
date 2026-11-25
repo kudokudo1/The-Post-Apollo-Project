@@ -271,58 +271,93 @@ def preflight(sample, *, selected, now_ns):
     return "RESOURCE_PREFLIGHT_REFERENCE"
 
 
-def evaluate(parent, samples, *, selected, launch_ns, expected_leaf):
-    """Evaluate exact bounded observations, not model demand or terminal proof.
-
-    Runtime/Security must separately verify host, image, disk, namespace,
-    original process/container, and terminal/quiescence evidence.
-    """
-    preflight(parent, selected=selected, now_ns=launch_ns)
-    require(type(samples) is tuple and 2 <= len(samples) <= MAX_SAMPLES,
-            "SAMPLE_COUNT")
+def _expected_identity(parent, expected_leaf):
     require(type(expected_leaf) is tuple and len(expected_leaf) == 2
             and all(_number(v) and v > 0 for v in expected_leaf)
             and expected_leaf not in tuple(l.identity for l in parent.levels),
             "LEAF_IDENTITY_INVALID")
-    previous = None
-    max_charge = 0
-    minimum_host = parent.host_available_mib
+
+
+def _scope_sample(parent, sample, selected, expected_leaf):
+    _validate(sample, leaf=True)
+    require(len(sample.levels) == len(parent.levels) + 1, "ANCESTRY_MISMATCH")
+    for original, current in zip(parent.levels, sample.levels[:-1]):
+        require((current.identity, current.hard, current.high, current.quota,
+                 current.cpus, current.pids_max, current.events) ==
+                (original.identity, original.hard, original.high, original.quota,
+                 original.cpus, original.pids_max, original.events),
+                "ANCESTOR_CHANGED")
+    child = sample.levels[-1]
+    require(child.identity == expected_leaf, "LEAF_CHANGED")
     expected_cpus = tuple((c, c) for c in selected)
     if selected[1] == selected[0] + 1:
         expected_cpus = ((selected[0], selected[1]),)
-    for sample in samples:
-        _validate(sample, leaf=True)
+    require(child.hard == CAP and child.quota == QUOTA
+            and child.cpus == expected_cpus and child.pids_max == TASK_CAP
+            and sample.swap_max == 0, "LEAF_LIMIT_MISMATCH")
+    require(child.high == "unlimited" or child.high >= CAP,
+            "LEAF_HIGH_THRESHOLD")
+    require(child.current <= CAP and child.current <= sample.peak <= CAP
+            and sample.swap == 0 and child.tasks <= TASK_CAP
+            and child.events == (0,) * len(EVENT_KEYS), "LEAF_RESOURCE_EVENT")
+    require(sample.host_pressure == parent.host_pressure, "HOST_PRESSURE_CHANGED")
+    # Conservative uncharged cap and margin, not physical release credit.
+    remaining = CAP - child.current
+    require(sample.host_available_mib * 1024**2 >= 4 * GIB + remaining,
+            "HOST_MARGIN")
+    for level in sample.levels[:-1]:
+        _limits(level, selected, remaining + 4 * GIB, TASK_CAP - child.tasks)
+    return child
+
+
+def preflight_outer(parent, baseline, *, selected, now_ns, expected_leaf):
+    """Check original empty retained group before launch, not permission.
+
+    Runtime must establish fresh exclusive creation and independently
+    pin mount/ancestry/identity. Nonzero observed peak/current is allowed;
+    neither this function nor Reader resets any kernel counter.
+    """
+    preflight(parent, selected=selected, now_ns=now_ns)
+    _expected_identity(parent, expected_leaf)
+    outer = _scope_sample(parent, baseline, selected, expected_leaf)
+    require(0 <= now_ns - baseline.end_ns <= MAX_SAMPLE_NS, "BASELINE_STALE")
+    require(baseline.populated == 0 and outer.tasks == 0, "BASELINE_NOT_EMPTY")
+    return "OUTER_RESOURCE_PREFLIGHT_REFERENCE"
+
+
+def evaluate(parent, samples, *, selected, launch_ns, expected_leaf,
+             scope="DIRECT", baseline=None):
+    """Evaluate explicit accounting scope, not model demand or terminal proof.
+
+    DIRECT preserves original child behavior. RETAINED_OUTER is selected
+    before launch and requires original empty baseline from same pinned
+    Reader. Runtime must bind scope/timing to original launch; no fallback.
+    Inner effective limits, original terminal and confinement are separate.
+    """
+    require(type(scope) is str and scope in ("DIRECT", "RETAINED_OUTER"),
+            "ACCOUNTING_SCOPE_INVALID")
+    if scope == "DIRECT":
+        require(baseline is None, "UNEXPECTED_OUTER_BASELINE")
+        preflight(parent, selected=selected, now_ns=launch_ns)
+        _expected_identity(parent, expected_leaf)
+    else:
+        preflight_outer(parent, baseline, selected=selected, now_ns=launch_ns,
+                        expected_leaf=expected_leaf)
+    require(type(samples) is tuple and 2 <= len(samples) <= MAX_SAMPLES,
+            "SAMPLE_COUNT")
+    previous = baseline
+    max_charge = baseline.levels[-1].current if baseline is not None else 0
+    minimum_host = min(parent.host_available_mib, baseline.host_available_mib) \
+        if baseline is not None else parent.host_available_mib
+    for index, sample in enumerate(samples):
+        child = _scope_sample(parent, sample, selected, expected_leaf)
         require(launch_ns <= sample.start_ns < sample.end_ns <= launch_ns + MAX_NS,
                 "WITNESS_WINDOW")
-        require(0 <= sample.start_ns - (launch_ns if previous is None else previous.end_ns)
+        require(0 <= sample.start_ns - (launch_ns if index == 0 else previous.end_ns)
                 <= MAX_GAP_NS, "SAMPLE_GAP")
-        require(len(sample.levels) == len(parent.levels) + 1,
-                "ANCESTRY_MISMATCH")
-        ancestor_pairs = zip(parent.levels, sample.levels[:-1])
-        for original, current in ancestor_pairs:
-            require((current.identity, current.hard, current.high, current.quota,
-                     current.cpus, current.pids_max, current.events) ==
-                    (original.identity, original.hard, original.high, original.quota,
-                     original.cpus, original.pids_max, original.events),
-                    "ANCESTOR_CHANGED")
-        child = sample.levels[-1]
-        require(child.identity == expected_leaf, "LEAF_CHANGED")
-        require(child.hard == CAP and child.quota == QUOTA
-                and child.cpus == expected_cpus and child.pids_max == TASK_CAP
-                and sample.swap_max == 0, "LEAF_LIMIT_MISMATCH")
-        require(child.high == "unlimited" or child.high >= CAP,
-                "LEAF_HIGH_THRESHOLD")
-        require(child.current <= CAP and child.current <= sample.peak <= CAP
-                and sample.swap == 0 and child.tasks <= TASK_CAP
-                and child.events == (0,) * len(EVENT_KEYS), "LEAF_RESOURCE_EVENT")
-        require(sample.host_pressure == parent.host_pressure, "HOST_PRESSURE_CHANGED")
-        # Conservatively reserve still-uncharged portion of the cap and
-        # host margin; charged memory is not credited as physical release.
-        remaining = CAP - child.current
-        require(sample.host_available_mib * 1024**2 >= 4 * GIB + remaining,
-                "HOST_MARGIN")
-        for level in sample.levels[:-1]:
-            _limits(level, selected, remaining + 4 * GIB, TASK_CAP - child.tasks)
+        if index == 0:
+            require(sample.end_ns - launch_ns <= MAX_SAMPLE_NS,
+                    "FIRST_OBSERVATION_LATE")
         if previous is not None:
             require(sample.peak >= previous.peak and sample.cpu_usec >= previous.cpu_usec
                     and child.high == previous.levels[-1].high, "COUNTER_REGRESSION")
@@ -334,11 +369,15 @@ def evaluate(parent, samples, *, selected, launch_ns, expected_leaf):
             "QUIESCENCE_NOT_OBSERVED")
     return {
         "status": "RESOURCE_ENVELOPE_OBSERVED",
+        "accounting_scope": scope,
         "samples": len(samples),
+        "outer_baseline_observed": baseline is not None,
+        "outer_baseline_current_bytes": baseline.levels[-1].current if baseline is not None else None,
+        "outer_baseline_peak_bytes": baseline.peak if baseline is not None else None,
         "host_available_mib_sampled_min": minimum_host,
         "charged_memory_sampled_max_bytes": max_charge,
         "kernel_peak_reported_bytes": samples[-1].peak,
-        "cpu_usage_usec_observed_delta": samples[-1].cpu_usec - samples[0].cpu_usec,
+        "cpu_usage_usec_observed_delta": samples[-1].cpu_usec - (baseline.cpu_usec if baseline is not None else samples[0].cpu_usec),
         "terminal_verified": False,
         "device_isolation_verified": False,
         "measurement_coverage_complete": False,

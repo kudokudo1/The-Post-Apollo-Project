@@ -1,8 +1,9 @@
 """Offline H14-D Heart resource tests; no Docker/kernel/host calls."""
 from dataclasses import replace
 import unittest
+from unittest.mock import patch
 from h14d_resource_witness import (
-    CAP, GIB, QUOTA, Hold, Level, Sample, evaluate, preflight,
+    CAP, GIB, QUOTA, Hold, Level, Sample, Reader, evaluate, preflight,
 )
 
 
@@ -22,10 +23,10 @@ class ResourceWitnessTests(unittest.TestCase):
                              levels=(self.ancestor, replace(self.child, tasks=0)),
                              cpu_usec=200, populated=0)
 
-    def check(self, parent=None, samples=None, selected=(0, 1), launch_ns=200):
+    def check(self, parent=None, samples=None, selected=(0, 1), launch_ns=200, expected_leaf=(1, 11)):
         return evaluate(self.parent if parent is None else parent,
                         (self.active, self.final) if samples is None else samples,
-                        selected=selected, launch_ns=launch_ns)
+                        selected=selected, launch_ns=launch_ns, expected_leaf=expected_leaf)
 
     def changed(self, **fields):
         return replace(self.active, levels=(self.ancestor, replace(self.child, **fields)))
@@ -83,6 +84,12 @@ class ResourceWitnessTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(Hold):
                 self.check(samples=(self.active, bad))
 
+    def test_independent_leaf_identity_not_first_sample(self):
+        with self.assertRaises(Hold):
+            self.check(expected_leaf=(1, 12))
+        with self.assertRaises(Hold):
+            self.check(expected_leaf=(1, 10))
+
     def test_stall_gap_and_counter_regression(self):
         for bad in (
             replace(self.final, host_pressure=((0, 0, 0, 11), self.psi[1])),
@@ -116,6 +123,31 @@ class ResourceWitnessTests(unittest.TestCase):
         ):
             with self.subTest(bad=bad), self.assertRaises(Hold):
                 self.check(samples=(bad, self.final))
+
+
+class ReaderPinTests(unittest.TestCase):
+    def test_original_path_replacement_refuses_and_closes(self):
+        with patch("h14d_resource_witness.I5._mount", return_value=(b"1", b"0:1")), \
+             patch("h14d_resource_witness.I5._open_group", side_effect=[10, 11]), \
+             patch("h14d_resource_witness.I5._identity", side_effect=lambda fd: (1, fd)), \
+             patch("h14d_resource_witness.os.close") as close:
+            with self.assertRaisesRegex(Hold, "SCOPE_CHANGED"):
+                with Reader("/scope", ((1, 10),), leaf=False):
+                    self.fail("replacement accepted")
+            self.assertEqual({call.args[0] for call in close.call_args_list}, {10, 11})
+
+    def test_pins_are_closed_on_exit_and_cannot_reopen(self):
+        with patch("h14d_resource_witness.I5._mount", return_value=(b"1", b"0:1")), \
+             patch("h14d_resource_witness.I5._open_group", return_value=10), \
+             patch("h14d_resource_witness.I5._identity", return_value=(1, 10)), \
+             patch("h14d_resource_witness.os.close"):
+            reader = Reader("/scope", ((1, 10),), leaf=False)
+            with reader:
+                self.assertEqual(reader.fds, (10,))
+            self.assertEqual(reader.fds, ())
+            with self.assertRaises(Hold):
+                with reader:
+                    self.fail("reopened")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ import signal
 import sys
 import time
 
-PIN = "6bac8be7b1de6883f480a95944d6ba1130852270"
+PIN = "5f6e6d800dcf41c1f0f7330fdb248dfd2177104f"
 KERNEL_PIN = "f0889696b252969d5f96f7824d4f7374fad2108c"
 MARKER = Path("/etc/postapollo-memory-native-tracecollect-ci-only")
 GUARD = Path("/usr/local/libexec/postapollo-memory-ci-fault.py")
@@ -64,16 +64,36 @@ def write(path,value):
                            " errno="+str(exc.errno)) from exc
 
 def append_probe(value):
-    # The specification is a fixed fixture literal. Log the event name
-    # only; don't dump tracefs error logs that may include addresses.
+    # Fixed function entry/return fprobe syntax, per kernel documentation.
+    # Not a runtime fallback after a security refusal. No address-based probes.
     operation=value.split()[0]
     stage("PROBE_CONTROL_BEGIN "+operation)
     try:
-        with (ROOT/"kprobe_events").open("a",encoding="ascii") as stream:
+        with (ROOT/"dynamic_events").open("a",encoding="ascii") as stream:
             stream.write(value+"\n")
     except OSError as exc:
-        raise RuntimeError("probe control refused: "+operation+
-                           " errno="+str(exc.errno)) from exc
+        # Do not print raw error_log (could include addresses). Report a
+        # bounded diagnostic category, only when the last fixed command
+        # and a recognized kernel error message are both present.
+        category="UNCLASSIFIED"
+        try:
+            raw=bounded(ROOT/"error_log",65536)
+            lines=raw.splitlines()
+            if any(line.strip()==value for line in lines[-12:]):
+                for label,pattern in (
+                    ("SYMBOL_NOT_FOUND",r"symbol.*not found|failed to find.*symbol"),
+                    ("PROBE_REGISTRATION_REJECTED",r"failed to register|not probeable|not probed|blacklist"),
+                    ("INVALID_PROBE_ARGUMENT",r"invalid.*arg|bad.*arg|invalid.*type"),
+                    ("UNSUPPORTED_PROBE",r"not supported|unsupported"),
+                    ("PERMISSION_REFUSED",r"permission denied|operation not permitted"),
+                ):
+                    if re.search(pattern,"\n".join(lines[-12:]),re.I):
+                        category=label
+                        break
+        except (OSError,ValueError,RuntimeError):
+            pass
+        raise RuntimeError("fprobe control refused: "+operation+
+                           " errno="+str(exc.errno)+" diagnostic="+category) from exc
     stage("PROBE_CONTROL_COMPLETE "+operation)
 
 def stage(message):
@@ -158,10 +178,20 @@ def run(guard):
         stage("GLOBAL_CLOCK_SELECTED")
         write(INSTANCE/"buffer_size_kb","64")
         stage("PRIVATE_BUFFER_CONFIGURED")
-        append_probe("p:"+GROUP+"/unuse_enter try_to_unuse")
+        require((ROOT/"dynamic_events").is_file(),"dynamic event control unavailable")
+        functions=bounded(ROOT/"available_filter_functions",16*1024*1024)
+        require(sum(line.split()[:1]==["try_to_unuse"] for line in functions.splitlines())==1,
+                "exact unique function unavailable")
+        stage("EXPLICIT_FPROBE_BACKEND")
+        append_probe("f:"+GROUP+"/unuse_enter try_to_unuse")
         created.append("unuse_enter")
-        append_probe("r:"+GROUP+"/unuse_return try_to_unuse ret=$retval:s64")
+        append_probe("f:"+GROUP+"/unuse_return try_to_unuse%return ret=$retval:s32")
         created.append("unuse_return")
+        definitions=bounded(ROOT/"dynamic_events",1048576).splitlines()
+        require(sum(line.split()[:2]==["f:"+GROUP+"/unuse_enter","try_to_unuse"]
+                    for line in definitions)==1
+                and sum(line.split()[:2]==["f:"+GROUP+"/unuse_return","try_to_unuse%return"]
+                        for line in definitions)==1,"registered fprobe identity unverified")
         stage("PRIVATE_INSTANCE_AND_PROBES_REGISTERED")
         root,swap=custody.trace_to_entry(guard)
         intent_path,result_path=(guard.EXT/name for name in guard.RECORD_NAMES[:2])

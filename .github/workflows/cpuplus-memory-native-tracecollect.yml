@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: e5791de485453e3ab0f11740582058c6a234f5b3
+          ref: c6a3c6c0e7f59849e228c5200a63fa2833d57c33
           path: reviewed-memory-source
           persist-credentials: false
       - name: Gate isolated runner and exact reviewed source
@@ -30,7 +30,7 @@ jobs:
           test -c /dev/kvm || { echo "CPU_MEM_NATIVE_BLOCKED // NO_KVM"; exit 2; }
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-          test "$(git hash-object reviewed-memory-source/scripts/post-apollo-memory-add-swap)" = 6bac8be7b1de6883f480a95944d6ba1130852270
+          test "$(git hash-object reviewed-memory-source/scripts/post-apollo-memory-add-swap)" = 5f6e6d800dcf41c1f0f7330fdb248dfd2177104f
           test "$(df -B1 --output=avail / | tail -n 1)" -ge 24000000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_DISK"; exit 2; }
           test "$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)" -ge 7000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_RAM"; exit 2; }
           test "$(git hash-object tests/cpuplus_memory_kernel_ci/guest-kernel-custody.py)" = f0889696b252969d5f96f7824d4f7374fad2108c

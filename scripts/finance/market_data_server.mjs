@@ -68,9 +68,10 @@ export function createMarketDataServer({hub=createMarketDataHub()}={}) {
           });
       reply(response,200,payload);
     } catch(error) {
-      const code=ERRORS.has(error?.code)?error.code:"provider-failed";
+      const rangeQuota=rangeMode && ["local-quota-exhausted","local-quota-unavailable"].includes(error?.code);
+      const code=rangeQuota || ERRORS.has(error?.code)?error.code:"provider-failed";
       const status=["invalid-selection","invalid-range","unknown-provider"].includes(code)
-        ? 400 : code==="provider-busy" ? 429 : 503;
+        ? 400 : ["provider-busy","local-quota-exhausted"].includes(code) ? 429 : 503;
       reply(response,status,{error:code});
     }
   });

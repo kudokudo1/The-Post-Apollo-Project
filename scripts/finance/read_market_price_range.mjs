@@ -75,7 +75,11 @@ export async function loadPriceRange(cik,from,to, fetcher=fetch,
       method:"GET",redirect:"error",headers:{Accept:"application/json"},
       signal:AbortSignal.timeout(12000)
     });
-  } catch {
+  } catch (error) {
+    // Preserve only the two typed local quota denials at the outbound seam.
+    // Arbitrary transport errors still become provider-unavailable.
+    if (error?.message==="local-quota-exhausted" || error?.message==="local-quota-unavailable")
+      throw new Error(error.message);
     throw new Error("provider-unavailable");
   }
   if (!response.ok) {

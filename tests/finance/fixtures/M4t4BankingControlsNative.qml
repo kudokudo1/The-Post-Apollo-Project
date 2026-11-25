@@ -69,6 +69,22 @@ ShellRoot {
         onTriggered: {
             const secret=root.input(1025), file=root.input(53);
             if(!root.check(secret!==null&&file!==null,"native input fields"))return;
+            if(Quickshell.env("BANKING_M4T5_TIMEOUT_FIXTURE")==="1"){
+                if(root.stage===0){
+                    backup.reviewEnabled=true;portable.reviewEnabled=true;
+                    secret.text=root.password;
+                    if(!root.click(backup,"REFRESH BACKUPS")
+                        ||!root.click(portable,"EXPORT SAVED MANUAL LEDGER")
+                        ||!root.click(portable,"CONFIRM EXPORT"))return;
+                    root.stage=1;return;
+                }
+                if(!backup.requestRetired||!portable.requestRetired
+                    ||!backup.requestDrained||!portable.requestDrained)return;
+                if(!root.check(backup.requestBusy&&portable.requestBusy&&!backup.rowsLoaded
+                    &&portable.receipt===null&&secret.text===""&&!backup.refresh()
+                    &&!portable.confirm("export"),"timeout retired and drained both children"))return;
+                console.log("M4T5_TIMEOUT_PASS");Qt.quit();return;
+            }
             switch(root.stage){
             case 0:
                 if(!root.check(!backup.available&&!portable.available&&!backup.refresh()&&!portable.confirm("export"),"default disabled"))return;

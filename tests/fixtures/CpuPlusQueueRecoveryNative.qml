@@ -15,7 +15,7 @@ ShellRoot {
     id: smoke
     readonly property bool armed: Quickshell.env("POST_APOLLO_QUEUE_PIPE_SMOKE") === "CI_DISPOSABLE_ONLY"
     readonly property bool timeoutTrial: Quickshell.env("POST_APOLLO_QUEUE_WATCHDOG_TRIAL") === "1"
-    readonly property string stagedTrial: Quickshell.env("POST_APOLLO_QUEUE_STAGED_TRIAL")
+    readonly property string stagedTrial: (Quickshell.env("POST_APOLLO_QUEUE_STAGED_TRIAL") || "")
     property int commits: 0
     property int watchdogTrips: 0
     property var host: Host.initial(Consumer)
@@ -208,7 +208,7 @@ ShellRoot {
                     && view.recent[0].state === (smoke.stagedTrial === "EOF" ? "PREPARED" : "COMMITTED")
                     && view.pendingId === (smoke.stagedTrial === "EOF" ? null : smoke.resultId) && view.outcome === "UNVERIFIED"
                     && !view.canExecute && smoke.recovery.hostStatus.unresolved,"actual recovery pane local commit")) return;
-                console.log("QUEUE_R3_RECOVERY_STEP // committed local intent rendered, startup locked");
+                console.log("QUEUE_R3_RECOVERY_STEP // "+view.recent[0].state+" local intent rendered, startup locked");
                 smoke.phase = 5;
                 recoveryPane.lookupText = smoke.actionId;
                 recoveryPane.requestRead("LOCAL_ACTION",recoveryPane.lookupText);

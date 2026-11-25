@@ -197,7 +197,7 @@ def trial(width, height, count):
                         for line in output.splitlines() if "FOREST_HOST_HISTORY_NEGATIVE_PASS " in line]
             review = [line.split("FOREST_HOST_REVIEW_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_REVIEW_PHASE_PASS " in line]
-            if (review != ([str(i) for i in range(10)] if width >= 770 else []) or
+            if (review != ([str(i) for i in range(11)] if width >= 770 else []) or
                     output.count("FOREST_HOST_REVIEW_PLACEMENT_PASS") != (1 if width >= 770 else 0) or
                     negative != (["1", "2"] if width == 1366 else []) or
                     code != 0 or "FOREST_HOST_FAIL" in output or

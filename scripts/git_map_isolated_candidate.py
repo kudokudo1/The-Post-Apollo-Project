@@ -118,10 +118,15 @@ def build(repo,base):
         target=folder/key
         if os.path.lexists(target):
             return lookup(repo,base)
+        count=0
         with os.scandir(folder) as items:
-            if sum(1 for item in items if item.name!=".build.lock")>=manager.MAX_GENERATIONS:
-                return {"schema":PROTOCOL,"status":"CACHE LIMIT","repoId":repo_id,
-                        "key":key,"reclamationAllowed":False}
+            for item in items:
+                if item.name==".build.lock":
+                    continue
+                count+=1
+                if count>=manager.MAX_GENERATIONS:
+                    return {"schema":PROTOCOL,"status":"CACHE LIMIT","repoId":repo_id,
+                            "key":key,"reclamationAllowed":False}
         stage=folder/(".candidate-"+uuid.uuid4().hex)
         m=index.build(repo,stage)
         if m["repoId"]!=repo_id or m["rootsDigest"]!=digest or m["shallow"]:

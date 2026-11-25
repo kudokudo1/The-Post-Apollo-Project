@@ -14,6 +14,9 @@ Rectangle {
     border.width: 1
     readonly property int rowHeight: 24
     property alias requestsEnabled: bridge.requestsEnabled
+    property alias custodyBase: bridge.custodyBase
+    property alias custodyLease: bridge.custodyLease
+    signal custodyFault(var g)
     property bool indexedActive: true
     property bool externalSelection: false
     property var recentTopology: null
@@ -97,9 +100,9 @@ Rectangle {
     property string selectedSha: ""
     signal commitSelected(string sha)
 
-    function activate(directory, manifest, anchor) {
+    function activate(directory, manifest, anchor, generation) {
         applyingGeometry = true;
-        const ok = bridge.activate(directory,manifest,rowHeight,Math.max(1,flick.height),anchor);
+        const ok = bridge.activate(directory,manifest,rowHeight,Math.max(1,flick.height),anchor,generation);
         if (ok) {
             flick.cancelFlick();
             if (indexedActive) flick.contentY = bridge.state.y;
@@ -128,7 +131,7 @@ Rectangle {
         return true;
     }
 
-    GitMap.GitMapPageBridge { id: bridge }
+    GitMap.GitMapPageBridge { id: bridge; onCustodyFault: function(g) { root.custodyFault(g); } }
 
     function currentAnchor() { return mapState ? Policy.anchorOf(mapState) : null; }
 

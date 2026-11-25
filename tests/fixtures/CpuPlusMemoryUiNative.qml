@@ -132,7 +132,7 @@ ShellRoot {
                     const detailRail=smoke.find(pane,"cpuplusCapDetailRail");
                     if(!smoke.check(detailRail&&detailRail.parent===pinned
                         &&Math.abs(detailRail.mapToItem(pane,0,0).y-targetMountY)<1
-                        &&detailRail.height===46
+                        &&detailRail.height===28
                         && scroll.y>=detailRail.mapToItem(pane,0,detailRail.height).y,
                         "subject rail outside scroll"))return;
                     const railY=detailRail.mapToItem(pane,0,0).y;

@@ -542,11 +542,11 @@ PanelWindow {
     }
 
     readonly property var activeMemoryPane: memoryActuatorLoader.active ? memoryActuatorLoader.item : null
-    readonly property string cpuHeaderStatus: activeMemoryPane ? activeMemoryPane.status
+    readonly property string cpuHeaderStatus: activeMemoryPane ? activeMemoryPane.scanBadge
         : selectedModeIndex===2 || selectedModeIndex===3 ? ((selectedMonitorRows().length>0)?"OBSERVED":"WAITING")
         : modes[selectedModeIndex].name
     readonly property bool showCpuObservation: selectedModeIndex<=3
-    readonly property color cpuHeaderColor: !showCpuObservation ? internetStatusColor : cpuHeaderStatus==="OBSERVED" ? Colors.omnitrix
+    readonly property color cpuHeaderColor: !showCpuObservation ? internetStatusColor : (cpuHeaderStatus==="OBSERVED" || cpuHeaderStatus.startsWith("LIVE")) ? Colors.omnitrix
         : cpuHeaderStatus==="UNAVAILABLE" ? Colors.orange : Colors.cyan
     function refreshCpuMenu() {
         refreshSharedMonitors();
@@ -1092,7 +1092,7 @@ PanelWindow {
         ResizeButton {
             id: growCpuButton
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
-            anchors.right: cpuPlusInternetIndicator.left
+            anchors.right: cpuPlusScanDiagnosticsButton.left
             anchors.rightMargin: 8
             direction: "up"
             available: cpuPlusWindow.resizeLevel
@@ -1102,23 +1102,28 @@ PanelWindow {
             }
         }
 
-        ActionButton {
+        DiagnosticsDockButton {
+            id: cpuPlusScanDiagnosticsButton
+            anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
+            anchors.right: cpuPlusInternetIndicator.left
+            anchors.rightMargin: 5
+            available: !!cpuPlusWindow.activeMemoryPane
+            diagnosticsOpen: !!cpuPlusWindow.activeMemoryPane && cpuPlusWindow.activeMemoryPane.scanDiagnosticsOpen
+            onToggleRequested: if(cpuPlusWindow.activeMemoryPane)cpuPlusWindow.activeMemoryPane.scanDiagnosticsOpen=!cpuPlusWindow.activeMemoryPane.scanDiagnosticsOpen
+        }
+        ReloadButton {
             id: cpuPlusReloadButton
             objectName: "cpuplusHeaderReload"
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
             anchors.right: cpuPlusCloseButton.left
             anchors.rightMargin: 5
-            width: 24
-            height: 22
-            label: "↻"
-            labelPixelSize: 15
-            contentPadding: 1
-            accentColor: Colors.cyan
+            width: 30
+            height: 28
             available: cpuPlusWindow.menuOpen && (!cpuPlusWindow.activeMemoryPane || !cpuPlusWindow.activeMemoryPane.refreshBusy)
             acceptedButtons: Qt.LeftButton
             keyboardActivationSignal: "leftClicked"
             Accessible.name: "Refresh CPU++ observations"
-            onLeftClicked: cpuPlusWindow.refreshCpuMenu()
+            onReloadRequested: cpuPlusWindow.refreshCpuMenu()
         }
         Rectangle {
             id: cpuPlusInternetIndicator

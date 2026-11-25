@@ -14,6 +14,37 @@ Item {
     // Borrowed session: this view does not own its lifecycle or launch paths.
     property var recoverySession: null
     property var sample: null
+    property var lastGoodSample: null
+    readonly property var displaySample: sample || lastGoodSample
+    readonly property var displayCapacity: Snapshot.capacityPlan(displaySample,stagedGiB)
+    property bool scanLive: true
+    property int scanIntervalSeconds: 10
+    property bool scanDiagnosticsOpen: false
+    property double scanClockMs: Date.now()
+    property double scanLastSuccessMs: 0
+    property double scanNextMs: 0
+    property var scanRows: []
+    property var pendingReport: null
+    property string scanReason: "No completed attempt"
+    readonly property string scanBadge: status==="READING" ? (lastGoodSample?"RESCANNING":"SCANNING") : !scanLive ? "PAUSED" : status==="OBSERVED" ? "LIVE // "+Math.max(0,Math.ceil((scanNextMs-scanClockMs)/1000))+"s" : lastGoodSample ? "STALE // "+Math.max(0,Math.ceil((scanNextMs-scanClockMs)/1000))+"s" : "UNAVAILABLE"
+    function scheduleScan() {
+        scanTimer.stop();
+        scanClockMs=Date.now();
+        scanNextMs=scanLive ? scanClockMs+scanIntervalSeconds*1000 : 0;
+        if(scanLive&&visible&&status!=="READING")scanTimer.start();
+    }
+    function setScanLive(value) {
+        if(scanLive===value)return;
+        scanLive=value;
+        if(!value){sample=null;clearCapConfirmation();}
+        if(value&&status!=="READING")refresh();
+        else scheduleScan();
+    }
+    function setScanInterval(value) {
+        if(![5,10,30,60].includes(value))return;
+        scanIntervalSeconds=value;
+        scheduleScan();
+    }
     property string status: "READING"
     property bool received: false
     property bool exited: false
@@ -21,8 +52,13 @@ Item {
     property var pendingSample: null
     function finish() {
         if (!received || !exited) return;
-        sample = exitOk ? pendingSample : null;
-        status = sample ? "OBSERVED" : "UNAVAILABLE";
+        scanRows=pendingReport ? pendingReport.rows : Snapshot.scanReport("").rows;
+        scanReason=exitOk&&pendingReport?pendingReport.reason:"Scanner exited unsuccessfully; snapshot not published";
+        const result=exitOk?pendingSample:null;
+        if(result){lastGoodSample=result;scanLastSuccessMs=Date.now();}
+        sample = scanLive ? result : null;
+        status = result ? "OBSERVED" : "UNAVAILABLE";
+        scheduleScan();
     }
     // Draft belongs to this memory pane, not the demand-loaded PROF subpage.
     property string selectedProfile: ""
@@ -157,6 +193,7 @@ Item {
         stagedSwappiness = value;
     }
     onSampleChanged: {
+        if(sample)lastGoodSample=sample;
         adoptActual();
         reconcilePriority();
         if (sample && stagedSwappiness < 0)
@@ -169,29 +206,40 @@ Item {
         exited = false;
         exitOk = false;
         pendingSample = null;
-        sample = null;
+        pendingReport = null;
+        sample = null; // invalidate operation input, not the retained display
+        clearCapConfirmation();
+        scanTimer.stop();
+        scanNextMs=0;
         status = "READING";
         probe.running = true;
     }
     Component.onCompleted: refresh()
+    onVisibleChanged: { if(visible&&scanLive&&status!=="READING")refresh(); else if(!visible)scanTimer.stop(); }
     Connections {
         target: MemoryOperation
-        function onRevisionChanged() { root.refresh(); }
+        function onRevisionChanged() { root.sample=null; if(root.scanLive)root.refresh(); }
     }
     Timer {
-        interval: 10000
+        id: scanTimer
+        interval: root.scanIntervalSeconds*1000
+        repeat: false
+        onTriggered: if(root.scanLive&&root.visible)root.refresh()
+    }
+    Timer {
+        interval: 1000
         repeat: true
         running: root.visible
-        onTriggered: root.refresh()
+        onTriggered: root.scanClockMs=Date.now()
     }
     Process {
         id: probe
         running: false
-        command: ["/usr/bin/cat", "/proc/meminfo", "/proc/swaps",
-                  "/proc/pressure/memory", "/proc/sys/vm/swappiness"]
+        command: ["/usr/bin/python3", "-I", "-B", "-c", "import json\npaths=(\"/proc/meminfo\",\"/proc/swaps\",\"/proc/pressure/memory\",\"/proc/sys/vm/swappiness\")\nout=[]\nfor path in paths:\n    try:\n        with open(path,\"rb\") as f:\n            data=f.read(65537)\n        if len(data)>65536:\n            raise ValueError(\"limit\")\n        out.append(dict(path=path,ok=True,text=data.decode(\"ascii\"),error=\"\"))\n    except (OSError,ValueError) as exc:\n        out.append(dict(path=path,ok=False,text=\"\",error=type(exc).__name__+((\" errno=\"+str(exc.errno)) if isinstance(exc,OSError) else \"\")))\nprint(json.dumps(out,separators=(\",\",\":\")))"]
         stdout: StdioCollector {
             onStreamFinished: {
-                root.pendingSample = Snapshot.parseSnapshot(this.text);
+                root.pendingReport = Snapshot.scanReport(this.text);
+                root.pendingSample = root.pendingReport.sample;
                 root.received = true;
                 root.finish();
             }
@@ -212,12 +260,13 @@ Item {
     property int capSection: 0 // TARGET / ACTIONS / DETAILS
     property string capDetailSubject: "SWAP"
     property bool detailsInfoOpen: false
+    property int infoSizeLevel: 1
     property bool headerRefreshAvailable: false
     readonly property bool refreshBusy: probe.running
     readonly property real detailScale: Math.max(1,Math.min(2, root.height/620, root.width/320))
     readonly property int detailMeterHeight: Math.max(12, Math.round(12*detailScale))
     readonly property bool capDetailsActive: page==="CAP" && capSection===2
-    readonly property var ramDetailRows: Snapshot.ramDetailRows(sample)
+    readonly property var ramDetailRows: Snapshot.ramDetailRows(displaySample)
     // Operator-approved RAM dataset identities. Component identity remains
     // magenta; do not change the shared theme for a local dataset.
     // Match the established resize-arrow purple locally; shared theme is unchanged.
@@ -457,8 +506,8 @@ Item {
                 width: Math.max(0, parent.width - (refreshCap.visible ? refreshCap.width + parent.spacing : 0))
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
-                text: "LIVE // " + root.status
-                color: root.sample ? Colors.cyan : Colors.orange
+                text: "MEMORY // " + root.scanBadge
+                color: root.displaySample ? Colors.cyan : Colors.orange
                 font.pixelSize: 11
                 elide: Text.ElideRight
             }
@@ -480,8 +529,8 @@ Item {
         }
         CpuPlusMemoryReadout {
             width: parent.width
-            text: root.sample ? "RAM AVAIL // " + root.gib(root.sample.available)
-                + " / " + root.gib(root.sample.total) : "RAM // UNAVAILABLE"
+            text: root.displaySample ? "RAM AVAIL // " + root.gib(root.displaySample.available)
+                + " / " + root.gib(root.displaySample.total) : "RAM // UNAVAILABLE"
             color: Colors.cyan
             font.pixelSize: 12
             wrapMode: Text.WordWrap
@@ -497,21 +546,21 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 3
                 color: Colors.cyan
-                opacity: root.sample ? 0.22 : 0
+                opacity: root.displaySample ? 0.22 : 0
             }
             Rectangle {
                 x: 3; y: 3
                 height: Math.max(0, parent.height - 6)
-                width: root.sample && root.sample.total > 0
-                    ? Math.max(0, parent.width - 6) * root.sample.available / root.sample.total : 0
+                width: root.displaySample && root.displaySample.total > 0
+                    ? Math.max(0, parent.width - 6) * root.displaySample.available / root.displaySample.total : 0
                 color: Colors.cyan
                 opacity: 0.85
             }
         }
         CpuPlusSwapComposition {
             width: parent.width
-            sample: root.sample
-            capacity: root.capacity
+            sample: root.displaySample
+            capacity: root.displayCapacity
             compact: true
         }
         Rectangle { width: parent.width; height: 1; color: Colors.cyan }
@@ -521,9 +570,9 @@ Item {
             spacing: 4
             Repeater {
                 model: [
-                    {label:"ACTUAL DISK",value:root.capacity ? root.gib(root.capacity.actualKiB) : "—",accent:Colors.cyan},
+                    {label:"ACTUAL DISK",value:root.displayCapacity ? root.gib(root.displayCapacity.actualKiB) : "—",accent:Colors.cyan},
                     {label:"TARGET DISK",value:root.stagedGiB + " GiB",accent:Colors.yellow},
-                    {label:"TOTAL PLAN",value:root.capacity ? root.gib(root.capacity.projectedKiB) : "—",accent:Colors.yellow}
+                    {label:"TOTAL PLAN",value:root.displayCapacity ? root.gib(root.displayCapacity.projectedKiB) : "—",accent:Colors.yellow}
                 ]
                 delegate: Rectangle {
                     required property var modelData
@@ -595,10 +644,10 @@ Item {
         }
         Row {
             id: capDetailRail
-            // Same 46px mounting height as CpuPlusMemoryCapacitySlider.
+            // Same mounting origin as slider, original 28px subject buttons.
             objectName: "cpuplusCapDetailRail"
             visible: root.capSection===2
-            height: visible ? 46 : 0
+            height: visible ? 28 : 0
             width: parent.width
             spacing: 4
             Repeater {
@@ -755,10 +804,10 @@ Item {
                         accentColor: Colors.yellow
                         idleForegroundColor: Colors.white
                         hoverForegroundColor: Colors.white
-                        selectedForegroundColor: Colors.white
+                        selectedForegroundColor: Colors.magenta
                         idleContentGlowColor: Colors.yellow
                         hoverContentGlowColor: Colors.yellow
-                        selectedContentGlowColor: Colors.yellow
+                        selectedContentGlowColor: Colors.magenta
                         contentGlowIdleOpacity: 0.85
                         selected: root.detailsInfoOpen
                         acceptedButtons: Qt.LeftButton
@@ -773,7 +822,7 @@ Item {
                     visible: root.capDetailSubject==="RAM"
                     CpuPlusMemoryReadout {
                         width: parent.width
-                        text: root.sample?"KERNEL USABLE RAM // "+root.gib(root.sample.total):"RAM SNAPSHOT UNAVAILABLE"
+                        text: root.displaySample?"KERNEL USABLE RAM // "+root.gib(root.displaySample.total):"RAM SNAPSHOT UNAVAILABLE"
                         color: Colors.cyan
                         font.pixelSize: 10
                         wrapMode: Text.Wrap
@@ -845,14 +894,14 @@ Item {
                     }
                     CpuPlusMemoryReadout {
                         width: parent.width
-                        text: root.sample?"PSI AVG10 // SOME "+root.sample.some+"% / FULL "+root.sample.full+"%":"PSI UNAVAILABLE"
+                        text: root.displaySample?"PSI AVG10 // SOME "+root.displaySample.some+"% / FULL "+root.displaySample.full+"%":"PSI UNAVAILABLE"
                         color: Colors.orange
                         font.pixelSize: 10
                         wrapMode: Text.Wrap
                     }
                 }
                 Repeater {
-                    model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.sample ? root.sample.rows : []
+                    model: root.page === "CAP" && root.capSection === 2 && root.capDetailSubject==="SWAP" && root.displaySample ? root.displaySample.rows : []
                     delegate: Rectangle {
                         required property var modelData
                         objectName: "cpuplusSwapDetailCard"
@@ -1261,9 +1310,9 @@ Item {
         anchors.topMargin: 26
         anchors.leftMargin: 5
         anchors.rightMargin: 5
-        height: Math.max(0,Math.min(infoContents.implicitHeight+12,footer.y-y-4))
-        color: Colors.black
-        border.color: Colors.cyan
+        height: Math.max(0,Math.min(infoContents.implicitHeight+12, (footer.y-y-4)*[0.55,0.78,1][root.infoSizeLevel]))
+        color: "#190309"
+        border.color: Colors.red
         clip: true
         MouseArea { anchors.fill: parent }
         Flickable {
@@ -1279,24 +1328,31 @@ Item {
                 spacing: 4
                 Row {
                     width: parent.width
-                    height: 22
+                    height: 26
                     CpuPlusMemoryReadout {
-                        width: Math.max(0,parent.width-24)
+                        width: Math.max(0,parent.width-78)
                         height: parent.height
                         text: "MEMORY // INFO"
-                        color: Colors.cyan
+                        color: Colors.red
                         font.pixelSize: 11
                         verticalAlignment: Text.AlignVCenter
                     }
-                    ActionButton {
+                    ResizeButton {
+                        width: 26
+                        direction: "down"
+                        available: root.infoSizeLevel>0
+                        onResizeRequested: delta=>root.infoSizeLevel+=delta
+                    }
+                    ResizeButton {
+                        width: 26
+                        direction: "up"
+                        available: root.infoSizeLevel<2
+                        onResizeRequested: delta=>root.infoSizeLevel+=delta
+                    }
+                    CloseButton {
                         objectName: "cpuplusCapDetailsInfoClose"
-                        width: 24
-                        height: 22
-                        label: "×"
-                        contentPadding: 2
-                        acceptedButtons: Qt.LeftButton
-                        keyboardActivationSignal: "leftClicked"
-                        onLeftClicked: root.detailsInfoOpen=false
+                        width: 26
+                        onCloseRequested: root.detailsInfoOpen=false
                     }
                 }
                 CpuPlusMemoryReadout {
@@ -1347,5 +1403,60 @@ Item {
             }
         }
     }
-    NeonScrollBar { flickable: scroll; visible: root.visible && scroll.visible && scrollable && scroll.interactive }
+    Rectangle {
+        id: scanInspector
+        objectName: "cpuplusMemoryScanDiagnostics"
+        anchors.fill: parent
+        z: 40
+        visible: root.scanDiagnosticsOpen
+        color: "#110319"
+        border.color: Colors.magenta
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
+        Row {
+            id: scanControls
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 5
+            height: 30
+            spacing: 4
+            ActionButton {
+                width: (parent.width-20)/5
+                height: parent.height
+                label: root.scanLive?"LIVE":"PAUSED"
+                selected: root.scanLive
+                onLeftClicked: root.setScanLive(!root.scanLive)
+            }
+            Repeater {
+                model: [5,10,30,60]
+                delegate: ActionButton {
+                    required property int modelData
+                    width: (scanControls.width-20)/5
+                    height: scanControls.height
+                    label: modelData+"s"
+                    selected: root.scanIntervalSeconds===modelData
+                    onLeftClicked: root.setScanInterval(modelData)
+                }
+            }
+        }
+        DiagnosticsServicePopup {
+            anchors.top: scanControls.bottom
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 4
+            heading: "MEMORY // SCAN DIAGNOSTICS"
+            displayedState: root.status==="READING"?"READING":!root.scanLive?"MANUAL":root.status==="OBSERVED"?"LIVE":root.lastGoodSample?"CACHE STALE":"WAITING"
+            providerLabel: "LOCAL LINUX // PROCFS"
+            currentAge: root.scanLastSuccessMs ? Math.max(0,Math.floor((root.scanClockMs-root.scanLastSuccessMs)/1000))+"s" : "--"
+            showLocation: false
+            serviceRows: root.scanRows
+            reasonHeading: "LAST ATTEMPT // SOURCE RESULTS"
+            ageHeading: "READ // "
+            reason: root.scanReason+"\n"+root.scanRows.map(x=>x.label+" // "+x.reason).join("\n")
+            footnote: "DISPLAY RETAINS LAST VALID SNAPSHOT; STALE DATA NEVER AUTHORIZES AN OPERATION. LIVE controls memory polling only; shared system telemetry and independent diagnostics retain their owners."
+            onCloseRequested: root.scanDiagnosticsOpen=false
+        }
+    }
+    NeonScrollBar { flickable: scroll; visible: root.visible && scroll.visible && scrollable && scroll.interactive && !root.scanDiagnosticsOpen }
 }

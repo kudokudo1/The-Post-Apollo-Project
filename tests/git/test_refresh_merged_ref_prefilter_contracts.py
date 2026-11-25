@@ -8,6 +8,7 @@ import ast
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -148,3 +149,79 @@ with tempfile.TemporaryDirectory(prefix="pa-git-refresh-merged-") as temp:
 
 
 print("Git refresh merged-ref prefilter: exact-output and patch-equivalence PASS")
+
+# A separate scaled benchmark measures G4a itself (not the earlier remote
+# local-branch-index optimization). Timing is evidence, never a flaky gate.
+if "--benchmark" in sys.argv:
+    import statistics
+    import time
+
+    with tempfile.TemporaryDirectory(prefix="pa-git-g4a-bench-") as temp:
+        repo = Path(temp) / "fixture"
+        repo.mkdir()
+        git(repo, "init", "-q", "-b", "main")
+        git(repo, "config", "user.name", "Disposable Benchmark")
+        git(repo, "config", "user.email", "benchmark@example.invalid")
+        commits = 4000
+        refs = 1200
+        lines = []
+        for i in range(1, commits + 1):
+            lines.extend([
+                "commit refs/heads/main",
+                f"mark :{i}",
+                f"committer Bench <benchmark@example.invalid> {1700000000+i} +0000",
+                "data 1",
+                "x",
+            ])
+            if i > 1:
+                lines.append(f"from :{i-1}")
+            if i == 1:
+                lines.extend(["M 100644 inline tracked.txt", "data 1", "x"])
+            lines.append("")
+        subprocess.run(["git", "-C", str(repo), "fast-import", "--quiet"],
+                       input=("\n".join(lines)+"\n").encode(),
+                       check=True, capture_output=True, timeout=60)
+        git(repo, "reset", "--hard", "HEAD")
+        shas = git(repo, "rev-list", "--reverse", "HEAD").splitlines()
+        assert len(shas) == commits
+        commands = "".join(
+            f"update refs/remotes/origin/bench-{i:04d} {shas[i*(commits-1)//(refs-1)]}\n"
+            for i in range(refs)
+        )
+        subprocess.run(["git", "-C", str(repo), "update-ref", "--stdin"],
+                       input=commands.encode(), check=True, capture_output=True, timeout=30)
+        git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/bench-1199")
+        # Pack fixture objects for a more realistic repository; no commit graph
+        # is generated explicitly, and no operator repository is accessed.
+        git(repo, "gc", "--quiet")
+        # Warm both variants, then alternate order to limit cache-order bias.
+        baseline = stable(refresh(previous, repo))
+        assert stable(refresh(script, repo)) == baseline
+        assert len(remote_rows(baseline)) == refs
+        samples = {"before": [], "after": []}
+        for labels in (("before", "after"), ("after", "before"), ("before", "after")):
+            for label in labels:
+                started = time.monotonic()
+                data = refresh(previous if label == "before" else script, repo)
+                wall = round((time.monotonic()-started)*1000)
+                assert stable(data) == baseline, label
+                marks = dict((stage, int(ms)) for stage, ms in
+                             re.findall(r"^DIAGTIME\t([a-z_]+)\t(\d+)$", data, re.M))
+                assert list(marks) == ["repo_check", "metadata", "status", "upstream",
+                    "merged_refs", "cherry", "local_branches", "remote_branches",
+                    "history", "finished"], marks
+                assert list(marks.values()) == sorted(marks.values()), marks
+                samples[label].append({
+                    "wall": wall,
+                    "shell": marks["finished"],
+                    "merged": marks["cherry"]-marks["merged_refs"],
+                    "remote": marks["history"]-marks["remote_branches"],
+                    "combined": marks["cherry"]-marks["merged_refs"]+
+                                marks["history"]-marks["remote_branches"],
+                })
+        print(f"G4a scaled fixture: {commits} commits / {refs} remote refs / 3 paired samples; full stdout parity PASS")
+        for label, rows in samples.items():
+            print("G4a", label, "raw ms:", rows)
+            print("G4a", label, "median ms:",
+                  {key: statistics.median(row[key] for row in rows) for key in rows[0]})
+        print("Synthetic warm-cache timing only; no operator-workstation speed claim")

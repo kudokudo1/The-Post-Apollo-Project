@@ -27,6 +27,7 @@ Item {
     property alias searchQuery: searchInput.text
     property string searchStatus: ""
     property var searchRequest: null
+    property int searchEpoch: 0
     property var lastMatch: null
     property var pendingResult: null
     property string pendingRepo: ""
@@ -65,6 +66,7 @@ Item {
     }
 
     onOperatorActiveChanged: {
+        if (!operatorActive) searchEpoch++;
         if (operatorActive) {
             if (!pendingResult && !busy && !buildQueued) lookupQueued = true;
             schedule();
@@ -148,7 +150,7 @@ Item {
         const start=next && lastMatch && lastMatch.query===query
             && lastMatch.snapshot===s.snapshot ? lastMatch.ordinal+1 : 0;
         if (start>s.total) return false;
-        searchRequest={query:query,start:start,snapshot:s.snapshot,repoId:s.repoId,total:s.total};
+        searchRequest={query:query,start:start,snapshot:s.snapshot,repoId:s.repoId,total:s.total,epoch:searchEpoch};
         job="search";
         jobRepo=repoRoot;
         jobEpoch=repoEpoch;
@@ -157,14 +159,14 @@ Item {
         watchdog.restart();
         worker.exec(["/usr/bin/timeout","--kill-after=1s","5s","/usr/bin/python3","-I","-B",
             Quickshell.shellPath("scripts/git_map_history_index.py"),
-            "search",activeDirectory,s.snapshot,query,String(start)]);
+            "search",activeDirectory,s.snapshot,"--",query,String(start)]);
         return true;
     }
     function finishSearch(result) {
         const req=searchRequest;
         searchRequest=null;
         const s=candidate.mapState;
-        if (!req || !operatorActive || !fullVisible || !s
+        if (!req || req.epoch!==searchEpoch || !operatorActive || !fullVisible || !s
                 || req.query!==searchInput.text.trim() || req.snapshot!==s.snapshot
                 || req.repoId!==s.repoId || req.total!==s.total) {
             searchStatus="SEARCH DISCARDED";
@@ -365,7 +367,7 @@ Item {
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.white
                 verticalAlignment: TextInput.AlignVCenter
-                onTextChanged: { root.lastMatch=null; root.searchStatus=""; }
+                onTextChanged: { root.searchEpoch++; root.lastMatch=null; root.searchStatus=""; }
                 onAccepted: root.searchHistory(false)
             }
             GohuText {

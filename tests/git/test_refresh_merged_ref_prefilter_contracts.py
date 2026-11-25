@@ -100,7 +100,10 @@ with tempfile.TemporaryDirectory(prefix="pa-git-refresh-merged-") as temp:
 
     baseline = refresh(original, repo)
     faster = refresh(script, repo)
-    assert faster == baseline, (
+    def stable(output):
+        return "".join(line for line in output.splitlines(keepends=True)
+                       if not re.fullmatch(r"DIAGTIME\t(?:repo_check|metadata|status|upstream|merged_refs|cherry|local_branches|remote_branches|history|finished)\t\d+\n", line))
+    assert stable(faster) == stable(baseline), (
         "refresh output changed, including branch, status, or topology\n"
         + repr(baseline) + "\n\n" + repr(faster)
     )

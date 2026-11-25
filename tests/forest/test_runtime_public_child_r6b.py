@@ -189,6 +189,30 @@ class ChildTests(unittest.TestCase):
                 self.assertEqual(t.result("REOPEN", {}, "REFUSED"), [])
                 t.closed(2)
 
+    def test_cumulative_frame_reserve_before_next_offer(self):
+        # HELLO consumes two frames, every history attachment four.
+        # At 158 frames, CLOSE can fit but NEXT's full exchange cannot.
+        for close in (True, False):
+            with self.subTest(close=close), ProcessTrial() as t:
+                t.result("HELLO", {}, "READY")
+                for _ in range(39):
+                    t.history()
+                self.assertEqual(t.frames, 158)
+                with t.db() as db:
+                    self.assertEqual(db.execute(
+                        "SELECT revision FROM forest_sessions").fetchone(), (0,))
+                    self.assertEqual(db.execute(
+                        "SELECT COUNT(*) FROM forest_turns").fetchone(), (0,))
+                if close:
+                    self.assertEqual(t.result("CLOSE", {}, "CLOSED"), [])
+                    self.assertEqual(t.frames, 160)
+                    t.closed(0)
+                else:
+                    t.send("NEXT", {})
+                    # No OPEN_OFFER or RESULT may consume the reserved
+                    # capacity or start an operation. Child closes silently.
+                    t.closed(2)
+
     def test_wrong_or_false_ack_closes(self):
         for false in (True,False):
             with self.subTest(false=false),ProcessTrial() as t:
@@ -370,6 +394,39 @@ class OwnerBoundaryTests(unittest.TestCase):
                         saved.rename(path)
                     child.current = None
                     host.close()
+
+    def test_reopen_rechecks_identity_after_retirement_before_opener(self):
+        child = self._committed_child()
+        host = child.host
+        path = host._path
+        saved = path.with_name("original.sqlite")
+        original = host._db
+        retire = child._retire
+
+        def substitute_after_retire():
+            retire()
+            path.rename(saved)
+            path.write_bytes(b"substituted before reopen")
+
+        try:
+            with patch.object(child, "_retire", side_effect=substitute_after_retire) as retired, \
+                 patch.object(sqlite3, "connect", wraps=sqlite3.connect) as connect:
+                child.action += 1
+                with self.assertRaises(Exception):
+                    child.dispatch("REOPEN", {})
+                retired.assert_called_once_with()
+                connect.assert_not_called()
+            self.assertIs(host._db, original)
+            self.assertFalse(original.in_transaction)
+            self.assertFalse(child.effect_possible)
+            self.assertIsNone(child.current)
+            self.assertNotEqual(child.wire.last["data"]["code"], "JOURNAL_REOPENED")
+        finally:
+            if saved.exists():
+                path.unlink(missing_ok=True)
+                saved.rename(path)
+            child.current = None
+            host.close()
 
     def test_reopen_retains_post_open_identity_check(self):
         child = self._committed_child()

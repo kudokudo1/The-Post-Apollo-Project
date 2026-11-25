@@ -28,6 +28,10 @@ def build(directory,count,offset,snapshot,repo):
                     parents.append(format(offset+131,"040x"))
                 elif i==129:
                     parents=[format(offset+132,"040x")]
+            if count==64:
+                # One wide merge opens 32 simultaneous lanes; all join a shared tail.
+                if i==0: parents=[format(offset+n+1,"040x") for n in range(1,33)]
+                elif i<=32: parents=[format(offset+34,"040x")]
             yield sha,parents,i,"Fixture","Commit "+str(i)
     with sqlite3.connect(db) as conn:
         manifest=index.fill(conn,rows(),snapshot=snapshot,repo_id=repo,
@@ -68,6 +72,8 @@ with tempfile.TemporaryDirectory(prefix="git-map-native-") as temporary:
     shutil.copy2(ROOT/"tests/git/fixtures/GitMapVirtualViewportNative.qml",scene/"smoke.qml")
     a=build(base/"index-a",100000,0,"a"*32,"b"*64)
     b=build(base/"index-b",257,200000,"d"*32,"e"*64)
+    c=build(base/"index-c",64,300000,"f"*32,"1"*64)
+    assert c["maxLane"]>=31
     env=os.environ.copy()
     for key in ("HOME","XDG_CACHE_HOME","XDG_CONFIG_HOME","XDG_STATE_HOME","XDG_DATA_HOME","XDG_RUNTIME_DIR"):
         d=base/key
@@ -78,8 +84,8 @@ with tempfile.TemporaryDirectory(prefix="git-map-native-") as temporary:
                LIBGL_ALWAYS_SOFTWARE="1",QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",
                DISPLAY=os.environ.get("DISPLAY","") if input_test else "",
                MAP_FIXTURE_INPUT="1" if input_test else "0",
-               MAP_FIXTURE_A=json.dumps(a),MAP_FIXTURE_B=json.dumps(b),
-               MAP_FIXTURE_DIR_A=str(base/"index-a"),MAP_FIXTURE_DIR_B=str(base/"index-b"))
+               MAP_FIXTURE_A=json.dumps(a),MAP_FIXTURE_B=json.dumps(b),MAP_FIXTURE_C=json.dumps(c),
+               MAP_FIXTURE_DIR_A=str(base/"index-a"),MAP_FIXTURE_DIR_B=str(base/"index-b"),MAP_FIXTURE_DIR_C=str(base/"index-c"))
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,
                           text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=45)
     print(result.stdout)

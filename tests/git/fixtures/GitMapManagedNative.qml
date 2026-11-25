@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
+import Quickshell.Io
 import "widgets/git"
 
 ShellRoot {
@@ -10,6 +11,16 @@ ShellRoot {
     property bool done: false
     readonly property string repo: Quickshell.env("MAP_MANAGED_REPO")
     property bool operatorActive: false
+    property var oldAnchor: null
+    property string oldSnapshot: ""
+    property bool commitDone: false
+    Process {
+        id: mutateFixture
+        onExited: function(code,exitStatus) {
+            if (!root.check(code===0 && exitStatus===0,"disposable repo advance")) return;
+            root.commitDone=true;
+        }
+    }
     QtObject {
         id: recent
         property string repoPath: root.repo
@@ -73,7 +84,7 @@ ShellRoot {
             }
             if (root.phase===1) {
                 if (!host.fullVisible || !host.viewport.rowAt(0)) return;
-                if (!root.check(host.jobsStarted===2 && host.viewport.mapState.total===1,
+                if (!root.check(host.jobsStarted===2 && host.viewport.mapState.total===40,
                         "automatic lookup and single missing-cache build/adopt")) return;
                 root.operatorActive=false;
                 root.phase=2;
@@ -89,6 +100,37 @@ ShellRoot {
             if (root.phase===3 && !host.busy && host.jobsStarted===3) {
                 if (!root.check(host.statusText==="INDEX CURRENT // POSITION RETAINED" && host.fullVisible,
                         "reopen automatically reuses snapshot")) return;
+                host.viewport.scrollTo(5*24+5);
+                root.phase=4;
+                return;
+            }
+            if (root.phase===4) {
+                const anchor=host.viewport.currentAnchor();
+                if (!anchor || !anchor.sha) return;
+                if (!root.check(anchor.ordinal===5 && anchor.offset===5,"historical anchor before refresh")) return;
+                root.oldAnchor=anchor;
+                root.oldSnapshot=host.viewport.mapState.snapshot;
+                root.operatorActive=false;
+                mutateFixture.exec(["/usr/bin/git","-C",root.repo,"-c","user.name=Fixture",
+                    "-c","user.email=fixture@example.invalid","commit","--allow-empty","-m","new head"]);
+                root.phase=5;
+                return;
+            }
+            if (root.phase===5 && root.commitDone) {
+                if (!root.check(host.jobsStarted===3 && host.viewport.mapState.snapshot===root.oldSnapshot,
+                        "hidden generation must stay frozen")) return;
+                root.operatorActive=true;
+                root.phase=6;
+                return;
+            }
+            if (root.phase===6) {
+                if (host.busy || host.viewport.mapState.snapshot===root.oldSnapshot) return;
+                const anchor=host.viewport.currentAnchor();
+                if (!anchor || !anchor.sha) return;
+                if (!root.check(host.jobsStarted===6 && host.viewport.mapState.total===41
+                        && anchor.sha===root.oldAnchor.sha && anchor.offset===root.oldAnchor.offset
+                        && anchor.ordinal===root.oldAnchor.ordinal+1,
+                        "new index exact SHA and intra-row position preserved")) return;
                 console.log("GIT_MAP_MANAGED_PASS");
                 root.done=true;
                 Qt.quit();

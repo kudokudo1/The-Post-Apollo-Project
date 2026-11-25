@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/forest"))
 import test_runtime_events_r3 as fixture
 from shared_context_b6r1 import BarkAttachment
 from runtime_events_r3 import InternalEvent
-from runtime_public_status_r4 import PublicRuntimeStatus
+from runtime_public_status_r4 import PublicRuntimeStatus, Observation
 
 
 class PublicRuntimeStatusTests(unittest.TestCase):
@@ -30,10 +30,12 @@ class PublicRuntimeStatusTests(unittest.TestCase):
 
     def test_real_r3_status_sequence_never_serializes_internal_data(self):
         frames = list(self.fixture.exchange().run())
-        packets = [self.observe(f) for f in frames]
+        results = [self.observe(f) for f in frames]
+        self.assertIs(results[3], Observation.NO_UPDATE)
+        packets = [p for p in results if type(p) is dict]
         self.assertEqual([p["status"] for p in packets],
                          ["REQUEST_PENDING", "PREPARING", "GENERATING",
-                          "GENERATING", "LOCAL_COMMIT_RECORDED"])
+                          "LOCAL_COMMIT_RECORDED"])
         for packet in packets:
             self.assertEqual(set(packet), {"schema", "status",
                 "sourceAuthenticated", "permissionGranted",
@@ -67,7 +69,7 @@ class PublicRuntimeStatusTests(unittest.TestCase):
             self.observe(frame)
         self.assertEqual(self.fixture.status(), ("COMMITTED",))
         self.assertEqual(self.p.finish(**self.current)["status"], "UNKNOWN_HOLD")
-        self.assertEqual(self.observe(frames[-1])["status"], "UNKNOWN_HOLD")
+        self.assertIs(self.observe(frames[-1]), Observation.NO_UPDATE)
 
     def test_detach_and_reattach_cannot_revive_view(self):
         frames = list(self.fixture.exchange().run())
@@ -107,12 +109,40 @@ class PublicRuntimeStatusTests(unittest.TestCase):
             p.observe(frames[0], **self.current)
             p.observe(frames[1], **self.current)
             self.assertEqual(p.observe(bad, **self.current)["status"], "UNKNOWN_HOLD")
-            self.assertEqual(p.observe(frames[-1], **self.current)["status"], "UNKNOWN_HOLD")
+            self.assertIs(p.observe(frames[-1], **self.current), Observation.NO_UPDATE)
 
     def test_explicit_withdrawal_returns_no_packet(self):
         self.p.withdraw()
         self.assertIsNone(self.p.finish(**self.current))
         self.assertIsNone(self.p.observe_stop_ack("STOP_LATCHED", None, **self.current))
+
+    def test_many_deltas_never_generate_more_public_updates(self):
+        frames = list(self.fixture.exchange().run())
+        for f in frames[:3]:
+            self.assertIsInstance(self.observe(f), dict)
+        for ordinal in range(4, 104):
+            f = replace(frames[3], ordinal=ordinal)
+            self.assertIs(self.observe(f), Observation.NO_UPDATE)
+        terminal = replace(frames[-1], ordinal=104)
+        self.assertEqual(self.observe(terminal)["status"],
+                         "LOCAL_COMMIT_RECORDED")
+        self.assertIs(self.p.finish(**self.current), Observation.NO_UPDATE)
+        with self.assertRaises(TypeError):
+            json.dumps(Observation.NO_UPDATE)
+
+    def test_repeated_stop_ack_and_delta_do_not_emit(self):
+        x = self.fixture.exchange()
+        g = x.run()
+        for _ in range(4):
+            frame = next(g)
+            self.observe(frame)
+        ack = x.request_stop(self.op, frame.attempt_id)
+        self.assertEqual(self.p.observe_stop_ack(ack, frame.attempt_id,
+                         **self.current)["status"], "STOP_REQUESTED")
+        self.assertIs(self.p.observe_stop_ack(ack, frame.attempt_id,
+                      **self.current), Observation.NO_UPDATE)
+        self.assertEqual(self.observe(list(g)[-1])["status"], "UNKNOWN_HOLD")
+        self.assertIs(self.p.finish(**self.current), Observation.NO_UPDATE)
 
     def test_entry_won_stop_does_not_claim_cancelled(self):
         frames = list(self.fixture.exchange().run())
@@ -120,7 +150,7 @@ class PublicRuntimeStatusTests(unittest.TestCase):
             self.observe(frame)
         p = self.p.observe_stop_ack("COMMIT_ENTRY_ALREADY_WON",
                                     frames[1].attempt_id, **self.current)
-        self.assertEqual(p["status"], "GENERATING")
+        self.assertIs(p, Observation.NO_UPDATE)
         self.assertEqual(self.observe(frames[-1])["status"], "LOCAL_COMMIT_RECORDED")
 
 

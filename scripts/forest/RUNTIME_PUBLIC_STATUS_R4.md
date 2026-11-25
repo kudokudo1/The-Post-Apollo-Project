@@ -28,3 +28,23 @@ UI2 owns rendering, local request/view correlation and clearing stale state.
 No SEND/STOP capability enabled. This candidate does not establish native
 execution permission or resource safety. Tests use actual R3/B3/M2/R2 with
 fake model and disposable SQLite, including loss of terminal observation.
+
+## R4 revision: transition-only updates
+
+observe, observe_stop_ack and finish return a fresh fixed packet only on a
+status transition. Observation.NO_UPDATE is an internal non-serializable
+sentinel: do not publish it or clear the view. None means withdrawal and
+must clear the view. DELTA still participates in exact internal ordering,
+but emits no repeated GENERATING or STOP_REQUESTED status. Repeated ACKs,
+finish after terminal and repeated HOLD do not produce extra packets.
+Snapshot is for explicit owner-side inspection, not a per-token send hook.
+No polling or scheduling based on internal fragment count. This removes
+fragment-count-dependent status emissions, not all timing side channels.
+Only isolated public fixture operations are eligible.
+
+Proposed UI2 correlation remains a separately resolved public request and
+view lifetime held by the host; the status packet contains no original
+operation, attempt or attachment identity. A host must invalidate pending
+updates and clear on detach or changed request/view before display; no
+automatic reattachment, retry or retarget. Actual adapter/send placement
+requires UI2/DOC3F agreement. No wire schema is frozen here.

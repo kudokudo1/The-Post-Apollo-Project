@@ -8,11 +8,18 @@ Never use this projector on a private operation, even for status alone.
 from __future__ import annotations
 
 from types import MappingProxyType
+from enum import Enum
 
 from runtime_events_r3 import InternalEvent, OperationRef
 from shared_context_b6r1 import BarkAttachment, _KEY
 
 SCHEMA = "postapollo.forest.public-runtime-status.v1"
+
+
+class Observation(Enum):
+    # Internal sentinel, deliberately not JSON serializable. None means
+    # withdrawal; NO_UPDATE means retain display without sending anything.
+    NO_UPDATE = 0
 
 
 def _packet(status):
@@ -68,10 +75,15 @@ class PublicRuntimeStatus:
             return None
         return _packet(self._status)
 
+    def _change(self, previous):
+        return (_packet(self._status) if previous != self._status
+                else Observation.NO_UPDATE)
+
     def _hold(self):
+        previous = self._status
         self._terminal = True
         self._status = "UNKNOWN_HOLD"
-        return _packet(self._status)
+        return self._change(previous)
 
     def observe(self, event, *, current_operation, current_attachment):
         if not self._current(current_operation, current_attachment):
@@ -85,6 +97,7 @@ class PublicRuntimeStatus:
                 or event.ordinal != self._ordinal + 1
                 or type(event.payload) is not MappingProxyType):
             return self._hold()
+        previous = self._status
         name = event.payload.get("event")
         if type(name) is not str:
             return self._hold()
@@ -122,7 +135,7 @@ class PublicRuntimeStatus:
             return self._hold()
         if self._stop and not self._terminal:
             self._status = "STOP_REQUESTED"
-        return _packet(self._status)
+        return self._change(previous)
 
     def observe_stop_ack(self, disposition, attempt_id, *,
                          current_operation, current_attachment):
@@ -134,20 +147,21 @@ class PublicRuntimeStatus:
         if not self._current(current_operation, current_attachment):
             return None
         if self._terminal:
-            return _packet(self._status)
+            return Observation.NO_UPDATE
         if (type(disposition) is not str
                 or disposition not in ("STOP_LATCHED",
                     "COMMIT_ENTRY_ALREADY_WON", "CONTROL_CLOSED")
                 or attempt_id != self._attempt
                 or self._phase == "INITIAL"):
             return self._hold()
+        previous = self._status
         if disposition == "STOP_LATCHED":
             self._stop = True
             self._status = "STOP_REQUESTED"
-        return _packet(self._status)
+        return self._change(previous)
 
     def finish(self, *, current_operation, current_attachment):
         """Missing terminal evidence is HOLD, never inferred success."""
         if not self._current(current_operation, current_attachment):
             return None
-        return _packet(self._status) if self._terminal else self._hold()
+        return Observation.NO_UPDATE if self._terminal else self._hold()

@@ -1,0 +1,19 @@
+name: CPU++ interruption evidence v2 source gate (production HOLD)
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_interrupt_v2_ci/**'
+      - '.github/workflows/cpuplus-memory-interrupt-v2-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify exact integrated helper and conservative evidence gate
+        run: |
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 5f6e6d800dcf41c1f0f7330fdb248dfd2177104f
+          python3 -B tests/cpuplus_memory_interrupt_v2_ci/test_evidence_v2.py

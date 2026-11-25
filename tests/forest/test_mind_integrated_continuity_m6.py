@@ -524,12 +524,41 @@ class ConnectedHistoryRevision(unittest.TestCase):
             self.assertEqual(len(first["messages"]), 2)
             finish()
             self.assertEqual(current.view_key, view_key)
-            continuation = host.history_page(after=2, limit=2)
+            # An independent receiver-defense fixture, NOT an alternate R5
+            # history API or an automatic fallback after a refused request.
+            # R5b rejects stale/unpinned continuations at its host boundary.
+            # Exercise UI2 defense even if a valid M4 page for a different
+            # explicit revision is accidentally routed to the old request.
+            def independently_project(revision, request_id):
+                self.assertEqual(current.view_key, view_key)
+                attachment = host._binding.attachment
+                self.assertEqual(attachment.view_generation, current.generation)
+                req = HistoryPageRef(PublicViewRef(attachment, request_id),
+                                     first["sessionId"], revision, 2, 2)
+                db = sqlite3.connect(host._path)
+                try:
+                    journal = ForestSessionJournal(db)
+                    db.execute("BEGIN")
+                    observed = host._binding
+                    self.assertEqual(observed.correlation, current)
+                    resolved = HistoryPageRef(
+                        PublicViewRef(observed.attachment, request_id),
+                        first["sessionId"], revision, 2, 2)
+                    return history_public_fixture_in_transaction(
+                        journal, req, current=resolved)
+                finally:
+                    db.rollback()
+                    db.close()
+
+            fresh = host.history_page(limit=2)
+            self.assertEqual(fresh["revision"], 4)
+            continuation = independently_project(
+                fresh["revision"], "receiver_fixture_wrong_revision_0001")
             self.assertEqual(continuation["revision"], 4)
             self.assertEqual(continuation["generation"], first["generation"])
             self.assertEqual(continuation["sessionId"], first["sessionId"])
-            fresh = host.history_page(limit=2)
-            fresh_next = host.history_page(after=2, limit=2)
+            fresh_next = independently_project(
+                fresh["revision"], "receiver_fixture_fresh_revision_0002")
             self.assertEqual(fresh["revision"], fresh_next["revision"])
             self.assertEqual(len({f["requestId"] for f in
                 (first, continuation, fresh, fresh_next)}), 4)

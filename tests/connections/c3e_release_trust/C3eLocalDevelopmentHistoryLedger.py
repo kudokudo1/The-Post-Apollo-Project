@@ -296,17 +296,57 @@ class DevelopmentLedger:
         if type(challenge) is not bytes or len(challenge) != 32:
             deny("LOCAL_OUTCOME_INPUT_INVALID")
         db = connect(self.root)
+        read_failed = False
         try:
+            # One statement gives a consistent observation of the requested
+            # challenge, its history row and the current local metadata.
             row = db.execute(
-                "SELECT state,next_head FROM challenges WHERE nonce_hash=?",
+                "SELECT c.state,c.next_head,c.purpose,c.previous_head,"
+                "c.previous_seq,h.seq,h.previous_head,h.next_head,"
+                "h.record_hash,m.seq,m.head "
+                "FROM challenges AS c "
+                "LEFT JOIN history AS h ON h.nonce_hash=c.nonce_hash "
+                "JOIN meta AS m ON m.id=1 WHERE c.nonce_hash=?",
                 (digest(challenge),)).fetchone()
+        except sqlite3.DatabaseError:
+            read_failed = True
         finally:
             db.close()
+        if read_failed:
+            deny("LOCAL_OUTCOME_INCONSISTENT_UNKNOWN_HOLD_NO_REPLAY")
         if row is None:
             deny("LOCAL_UNKNOWN_OUTCOME_NO_REPLAY")
+        (state, next_head, purpose, previous_head, previous_seq,
+         history_seq, history_previous, history_next, record_hash,
+         current_seq, current_head) = row
+        def valid_head(value):
+            return type(value) is str and HEX.fullmatch(value) is not None
+        if (purpose != PURPOSE or not valid_head(previous_head)
+                or type(previous_seq) is not int or previous_seq < 1
+                or type(current_seq) is not int or current_seq < previous_seq
+                or not valid_head(current_head)):
+            deny("LOCAL_OUTCOME_INCONSISTENT_UNKNOWN_HOLD_NO_REPLAY")
+        if state == "issued":
+            if (next_head is not None or history_seq is not None
+                    or (current_seq == previous_seq
+                        and current_head != previous_head)):
+                deny("LOCAL_OUTCOME_INCONSISTENT_UNKNOWN_HOLD_NO_REPLAY")
+        elif state == "consumed":
+            if (not valid_head(next_head)
+                    or type(history_seq) is not int
+                    or history_seq != previous_seq + 1
+                    or history_previous != previous_head
+                    or history_next != next_head
+                    or not valid_head(record_hash)
+                    or current_seq < history_seq
+                    or (current_seq == history_seq
+                        and current_head != next_head)):
+                deny("LOCAL_OUTCOME_INCONSISTENT_UNKNOWN_HOLD_NO_REPLAY")
+        else:
+            deny("LOCAL_OUTCOME_INCONSISTENT_UNKNOWN_HOLD_NO_REPLAY")
         return {"schema": SCHEMA, "status": STATUS,
-                "developmentOnlyState": row[0],
-                "developmentOnlyCommittedHeadSha256": row[1],
+                "developmentOnlyState": state,
+                "developmentOnlyCommittedHeadSha256": next_head,
                 **DENIED}
 
     def production_admission(self, *_args, **_kwargs):

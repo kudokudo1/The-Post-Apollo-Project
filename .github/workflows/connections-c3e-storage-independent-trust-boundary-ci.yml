@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'tests/connections/c3e_release_trust/C3eStorageIndependentTrustBoundary.py'
+      - 'tests/connections/c3e_release_trust/C3eLocalDevelopmentHistoryLedger.py'
+      - 'tests/connections/test_connections_c3e_local_development_history_ledger.py'
       - 'tests/connections/test_connections_c3e_storage_independent_trust_boundary.py'
       - '.github/workflows/connections-c3e-storage-independent-trust-boundary-ci.yml'
       - 'docs/connections-c3e-storage-independent-trust-boundary.md'

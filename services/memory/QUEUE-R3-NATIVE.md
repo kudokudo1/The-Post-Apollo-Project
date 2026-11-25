@@ -76,3 +76,17 @@ retained unchanged. Real Process pipes, test timer and synthetic source;
 no raw byte-bounded QML parser, real watchdog, full-shell crash, native
 resource acceptance, production launcher/provider or Hub. Test invokes
 pane methods rather than physical clicks. No production unlock method.
+
+## R3f revision 2 // container preflight and DOC 2 atomic pane
+
+7637bbbd returned 7/8 workflows PASS; native job 139037356751 failed
+at git rev-parse HEAD with dubious checkout ownership, before executing
+Python or QML. Scope git safe.directory to exact CI checkout paths per
+command, not global wildcard. DOC 2 #2631 exact f21740ed5d4786c487ffa4b31d24c2377e0fd9a9 passed 4/4 workflows;
+overlay only its two recovery presentation files and verify pin. Everything
+else comes from actual checkout. Native fixture now binds atomicMode and
+Host.recoveryContext, uses actual pane requestRead signals for inventory,
+exact committed lookup and missing lookup, verifies pending duplicate
+refusal and EOF invalidation. No production code or gate weakening.
+Re-pin or switch to merged checkout when DOC 2 candidate changes/merges.
+New CI required; prior native runtime has not run.

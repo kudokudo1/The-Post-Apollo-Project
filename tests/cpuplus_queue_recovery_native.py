@@ -18,6 +18,11 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
     for name in ("CpuPlusQueuePane.qml","CpuPlusQueueConsumer.js","CpuPlusQueuePresentation.js",
                  "CpuPlusQueueHistory.js","CpuPlusQueueRecovery.js","CpuPlusQueueRecoveryPane.qml"):
         shutil.copy2(ROOT/"widgets/cpuplus"/name,widgets/name)
+    # Only DOC 2's exact candidate pane and parser are overlaid. The host,
+    # owner, pipe and all other components come from actual checkout.
+    candidate=ROOT/"candidate-recovery-ui/widgets/cpuplus"
+    for name in ("CpuPlusQueueRecovery.js","CpuPlusQueueRecoveryPane.qml"):
+        shutil.copy2(candidate/name,widgets/name)
     shutil.copytree(ROOT/"services/memory",config/"memory")
     shutil.copy2(ROOT/"tests/fixtures/CpuPlusQueueRecoveryNative.qml",config/"smoke.qml")
     child=config/"child.py"

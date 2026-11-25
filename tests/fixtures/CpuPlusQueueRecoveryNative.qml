@@ -21,6 +21,7 @@ ShellRoot {
     property int phase: 0
     property int ticks: 0
     property int writes: 0
+    property int reads: 0
     property bool dropping: false
     property bool exited: false
     property bool done: false
@@ -60,6 +61,7 @@ ShellRoot {
         const request = Host.readRecovery(host,kind,value);
         if (!check(!!request.frame,"explicit recovery read")) return;
         host = request.state;
+        ++reads;
         child.write(request.frame);
     }
     function submit(intent) {
@@ -98,8 +100,10 @@ ShellRoot {
             CpuPlusQueueRecoveryPane {
                 id: recoveryPane
                 width: parent.width
-                hostStatus: smoke.recovery.hostStatus
-                inventory: smoke.recovery.inventory
+                atomicMode: true
+                recoveryContext: smoke.recovery
+                readAvailable: !!Host.readRecovery(smoke.host,"INVENTORY",16).frame
+                onRecoveryReadRequested: (kind,value) => smoke.read(kind,value)
             }
         }
     }
@@ -116,7 +120,9 @@ ShellRoot {
                 pane.prepareIntent("QUEUE");
                 if (!smoke.check(!pane.preparation,"locked queue refused")) return;
                 smoke.phase = 1;
-                smoke.read("INVENTORY",16);
+                recoveryPane.requestRead("INVENTORY",16);
+                recoveryPane.requestRead("INVENTORY",16);
+                if (!smoke.check(smoke.reads === 1,"one inventory signal while pending")) return;
             } else if (smoke.phase === 1 && recoveryPane.view) {
                 if (!smoke.check(recoveryPane.view.recent.length === 0 && recoveryPane.view.startupLocked
                     && smoke.host.startupLocked,"empty inventory no unlock")) return;
@@ -137,7 +143,8 @@ ShellRoot {
                     && smoke.host.session.status.requestId === smoke.resultId
                     && smoke.host.session.unresolved && smoke.host.startupLocked,"new owner same saved request")) return;
                 smoke.phase = 4;
-                smoke.read("INVENTORY",16);
+                recoveryPane.requestRead("INVENTORY",16);
+                if (!smoke.check(smoke.reads === 2,"new epoch inventory signal")) return;
             } else if (smoke.phase === 4 && recoveryPane.view) {
                 const view = recoveryPane.view;
                 if (!smoke.check(view.recent.length === 1 && view.recent[0].actionId === smoke.actionId
@@ -146,18 +153,33 @@ ShellRoot {
                     && !view.canExecute && smoke.recovery.hostStatus.unresolved,"actual recovery pane local commit")) return;
                 console.log("QUEUE_R3_RECOVERY_STEP // committed local intent rendered, startup locked");
                 smoke.phase = 5;
-                smoke.read("LOCAL_ACTION",smoke.actionId);
-            } else if (smoke.phase === 5 && smoke.recovery.localAction) {
+                recoveryPane.lookupText = smoke.actionId;
+                recoveryPane.requestRead("LOCAL_ACTION",recoveryPane.lookupText);
+                recoveryPane.requestRead("LOCAL_ACTION",recoveryPane.lookupText);
+                if (!smoke.check(smoke.reads === 3,"one exact lookup signal while pending")) return;
+            } else if (smoke.phase === 5 && recoveryPane.localView) {
                 const local = smoke.recovery.localAction;
+                if (!smoke.check(recoveryPane.localView.record && !recoveryPane.localView.missing
+                    && recoveryPane.localView.record.resultId === smoke.resultId
+                    && recoveryPane.view === null,"actual exact lookup display")) return;
                 if (!smoke.check(local.record.result_request_id === smoke.resultId
                     && local.record.state === "COMMITTED" && !local.canExecute
                     && smoke.host.startupLocked && smoke.host.session.unresolved && smoke.writes === 1,"exact action recovered without unlock")) return;
                 pane.prepareIntent("CANCEL");
                 if (!smoke.check(!pane.preparation,"no cancel before reconciliation")) return;
                 smoke.phase = 6;
+                recoveryPane.requestRead("LOCAL_ACTION","c23683a9-b2ab-4a2c-87ce-000000000099");
+                if (!smoke.check(smoke.reads === 4,"missing-record lookup signal")) return;
+            } else if (smoke.phase === 6 && recoveryPane.localView) {
+                if (!smoke.check(recoveryPane.localView.missing && recoveryPane.localView.record === null
+                    && smoke.host.startupLocked && smoke.host.session.unresolved,"missing record is not noncommit")) return;
+                smoke.phase = 7;
                 smoke.dropping = true;
                 child.stdinEnabled = false;
-            } else if (smoke.phase === 6 && smoke.exited) {
+            } else if (smoke.phase === 7 && smoke.exited) {
+                recoveryPane.requestRead("INVENTORY",16);
+                if (!smoke.check(smoke.reads === 4 && !recoveryPane.canRead && recoveryPane.view === null
+                    && recoveryPane.localView === null,"EOF refuses reads and clears pane")) return;
                 if (!smoke.check(smoke.recovery.inventory === null && smoke.recovery.localAction === null
                     && smoke.host.startupLocked && smoke.host.session.unresolved && smoke.writes === 1,"EOF clears recovery")) return;
                 console.log("QUEUE_R3_RECOVERY_PASS // actual canonical host, QML pane, durable lost QUEUE, inventory, lookup, EOF");

@@ -31,13 +31,7 @@ function project(packet,ownerId,requestId,sequenceFloor) {
         || (r.state === "QUEUED" && r.changed_at !== r.requested_at)
         || (r.state === "EXPIRED" && r.changed_at < r.expires_at)
         || (r.state === "REPLACED" ? !uuid(r.replaced_by) || r.replaced_by === r.id : r.replaced_by !== null)) return null;
-    const codes={
-        DEFERRED:["BASE_OR_EXTENSION_INACTIVE","UNEXPECTED_SWAP_IDENTITY","UNEXPECTED_CAPACITY","UNSUPPORTED_TARGET",
-            "EXTENSION_OCCUPIED","RAM_HEADROOM","BASE_HEADROOM","MEMORY_PRESSURE","OPERATION_BUSY","STABILITY_INTERVAL"],
-        ATTENTION:["OBSERVATION_UNAVAILABLE","BOOT_CHANGED","SOURCE_CHANGED","OPERATION_AMBIGUOUS",
-            "STALE_OBSERVATION","INVALID_OBSERVATION","OBSERVATION_ORDER_INVALID"],
-        READY_ADVISORY:["FRESH_AUTH_AND_ROOT_CHECK_REQUIRED"],EXPIRED:["EXPIRED"],CANCELLED:["CANCELLED"]
-    };
+    const codes=eventCodes();
     if (!Array.isArray(d.notification_events) || d.notification_events.length > 5) return null;
     const seen=[],events=[];
     for (const e of d.notification_events) {
@@ -64,4 +58,46 @@ function project(packet,ownerId,requestId,sequenceFloor) {
         requestedAt:r.requested_at,expiresAt:r.expires_at,changedAt:r.changed_at,replacedBy:r.replaced_by,
         events:events,evidenceAt:evidence===null?null:evidence.observed_at,
         outcome:"UNVERIFIED",canExecute:false};
+}
+
+function eventCodes() {
+    return {
+        DEFERRED:["BASE_OR_EXTENSION_INACTIVE","UNEXPECTED_SWAP_IDENTITY","UNEXPECTED_CAPACITY","UNSUPPORTED_TARGET",
+            "EXTENSION_OCCUPIED","RAM_HEADROOM","BASE_HEADROOM","MEMORY_PRESSURE","OPERATION_BUSY","STABILITY_INTERVAL"],
+        ATTENTION:["OBSERVATION_UNAVAILABLE","BOOT_CHANGED","SOURCE_CHANGED","OPERATION_AMBIGUOUS",
+            "STALE_OBSERVATION","INVALID_OBSERVATION","OBSERVATION_ORDER_INVALID"],
+        READY_ADVISORY:["FRESH_AUTH_AND_ROOT_CHECK_REQUIRED"],EXPIRED:["EXPIRED"],CANCELLED:["CANCELLED"]
+    };
+}
+
+// The canonical host already correlated DETAIL against owner, request and
+// global sequence. This second guard checks presentation shape only; it is
+// not a replacement for wire correlation or a recovery acknowledgment.
+function hostView(v,selectedId,available) {
+    if(available!==true||!uuid(selectedId)
+        ||!exact(v,["requestId","state","targetGiB","originalKiB","requestedAt","expiresAt","changedAt","replacedBy","events","evidenceAt","outcome","canExecute"])
+        ||v.requestId!==selectedId||v.canExecute!==false||v.outcome!=="UNVERIFIED"
+        ||!["QUEUED","CANCELLED","REPLACED","EXPIRED"].includes(v.state)
+        ||!count(v.targetGiB)||v.targetGiB>64||v.targetGiB%4||!count(v.originalKiB)
+        ||!seconds(v.requestedAt)||!seconds(v.expiresAt)||!seconds(v.changedAt)
+        ||v.expiresAt<=v.requestedAt||v.changedAt<v.requestedAt
+        ||(v.state==="QUEUED"&&v.changedAt!==v.requestedAt)
+        ||(v.state==="EXPIRED"&&v.changedAt<v.expiresAt)
+        ||(v.state==="REPLACED"? !uuid(v.replacedBy)||v.replacedBy===v.requestId : v.replacedBy!==null)
+        ||(v.evidenceAt!==null&&(!seconds(v.evidenceAt)||v.evidenceAt<v.requestedAt))
+        ||!Array.isArray(v.events)||v.events.length>5)return null;
+    const codes=eventCodes(), seen=new Set();
+    for(const e of v.events){
+        if(!exact(e,["kind","code","observedAt","delivery"]))return null;
+        const kind=e.kind==="READINESS REPORTED (HISTORICAL)"?"READY_ADVISORY":e.kind;
+        if(e.kind==="READY_ADVISORY"||!Object.prototype.hasOwnProperty.call(codes,kind)
+            ||!codes[kind].includes(e.code)||seen.has(kind)||!seconds(e.observedAt)
+            ||e.observedAt<v.requestedAt
+            ||!["NO ATTEMPT RECORDED","ATTEMPT RESERVED // DELIVERY UNKNOWN"].includes(e.delivery))return null;
+        const terminal=kind==="EXPIRED"||kind==="CANCELLED";
+        if(terminal? v.state!==kind||e.observedAt!==v.changedAt
+            : e.observedAt>=v.expiresAt||(v.state!=="QUEUED"&&e.observedAt>v.changedAt))return null;
+        seen.add(kind);
+    }
+    return v;
 }

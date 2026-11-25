@@ -527,6 +527,13 @@ Item {
             Loader {
                 width: parent.width
                 height: active && item ? item.implicitHeight : 0
+                active: root.page === "PROC"
+                visible: active
+                sourceComponent: CpuPlusProcessPane {}
+            }
+            Loader {
+                width: parent.width
+                height: active && item ? item.implicitHeight : 0
                 active: root.page === "DIAG"
                 visible: active
                 sourceComponent: CpuPlusDiagnosticsPane {}
@@ -895,9 +902,8 @@ Item {
             }
             GohuText {
                 width: parent.width
-                visible: root.page === "PROC" || root.page === "PROF"
-                text: root.page === "PROC" ? "PROCESS CONTROLS // NOT CONNECTED"
-                    : "PROFILE CONTROLS // NOT CONNECTED"
+                visible: root.page === "PROF"
+                text: "PROFILE CONTROLS // NOT CONNECTED"
                 color: Colors.orange
                 font.pixelSize: 11
                 wrapMode: Text.WordWrap

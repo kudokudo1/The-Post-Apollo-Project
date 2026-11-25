@@ -1,3 +1,9 @@
 module qs.services.memory
 
 singleton MemoryOperation 1.0 MemoryOperation.qml
+
+# Unmounted queue recovery composition; types only, no singleton startup.
+MemoryQueueSessionWatchdog 1.0 MemoryQueueSessionWatchdog.qml
+MemoryQueueCheckpointAdapter 1.0 MemoryQueueCheckpointAdapter.qml
+MemoryQueueHubBinding 1.0 MemoryQueueHubBinding.qml
+MemoryQueueDesktopSession 1.0 MemoryQueueDesktopSession.qml

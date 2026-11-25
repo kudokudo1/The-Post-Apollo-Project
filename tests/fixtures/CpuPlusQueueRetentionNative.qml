@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "host/MemoryQueueSessionHost.js" as Host
+import "host" as Runtime
 import "widgets/cpuplus/CpuPlusQueueConsumer.js" as Consumer
 import "widgets/cpuplus/CpuPlusQueuePresentation.js" as Presentation
 import "widgets/cpuplus/CpuPlusQueueHistory.js" as History
@@ -22,15 +23,14 @@ ShellRoot {
     property var loaded: null
     property var advanceRequest: null
     property var helperRequest: null
-    property var helperReply: null
-    property bool helperInvalid: false
+    property int helperTicket: 0
     property int prepWrites: 0
     property int dismissWrites: 0
     property int historyWrites: 0
     function check(ok,label) {
         if (!ok) {
             console.error("R6F_FAIL // "+trial+" // "+phase+" // "+label+" // "+host.failure);
-            done=true; child.running=false; helper.running=false; Qt.quit();
+            done=true; child.running=false; helper.cancel(); Qt.quit();
         }
         return ok;
     }
@@ -49,12 +49,10 @@ ShellRoot {
         child.write(next.frame);
     }
     function io(command,value) {
-        if (!check(!helperRequest && !helper.running,"single helper"))return;
+        if (!check(!helperRequest && !helper.busy,"single helper"))return;
         helperRequest={command,value,generation};
-        helperReply=null;helperInvalid=false;
-        helper.command=["/usr/bin/python3","-B",rootPath+"/helper.py",command,rootPath+"/checkpoint"];
-        helper.stdinEnabled=true;
-        helper.running=true;
+        helperTicket=helper.begin(command,generation,value);
+        if (!check(helperTicket>0,"canonical generation adapter start"))return;
     }
     function checkpoint(next) {
         if (!check(!!next.checkpoint && !next.frame,"durable gate before frame"))return;
@@ -130,33 +128,20 @@ ShellRoot {
             else smoke.check(false,"unexpected exit");
         }
     }
-    Process {
+    Runtime.MemoryQueueCheckpointAdapter {
         id: helper
-        stdinEnabled: true
-        onStarted: {
-            if (!smoke.helperRequest) { running=false;return; }
-            if (smoke.helperRequest.value!==null) write(JSON.stringify(smoke.helperRequest.value)+"\n");
-            stdinEnabled=false;
-        }
-        stdout: SplitParser {
-            onRead: data=>{
-                if (smoke.helperReply!==null || typeof data!=="string" || !data.length || data.length>=16384) {
-                    smoke.helperInvalid=true;return;
-                }
-                try {
-                    const p=JSON.parse(data);
-                    if (!Host.safe(p) || JSON.stringify(p)!==data) throw Error("noncanonical");
-                    smoke.helperReply=p;
-                } catch (_) { smoke.helperInvalid=true; }
-            }
-        }
-        stderr: SplitParser { onRead: data=>{smoke.helperInvalid=true;console.error(data);} }
-        onExited: (code,status)=>{
+        generationMode: true
+        pythonPath: "/usr/bin/python3"
+        helperPath: smoke.rootPath+"/helper.py"
+        directory: smoke.rootPath+"/checkpoint"
+        timeoutMs: 8000
+        onCompleted: (sessionGeneration,ticket,operation,p)=>{
             if (smoke.done)return;
-            const q=smoke.helperRequest,p=smoke.helperReply;
+            const q=smoke.helperRequest;
             smoke.helperRequest=null;
-            if (!smoke.check(q && q.generation===smoke.generation && !smoke.helperInvalid
-                && code===0 && status===0 && p?.version===1 && p.can_execute===false,"exact helper result"))return;
+            if (!smoke.check(q && q.generation===smoke.generation && sessionGeneration===q.generation
+                && ticket===smoke.helperTicket && operation===q.command
+                && p?.version===1 && p.can_execute===false,"canonical adapter correlated result"))return;
             if (q.command==="GEN_SAVE") {
                 if (!smoke.check(Host.exact(p,["version","kind","generation","record","can_execute"])
                     && p.kind==="CHECKPOINT_GENERATION_SAVED" && p.generation===0
@@ -204,7 +189,7 @@ ShellRoot {
         onTriggered: {
             if (++smoke.ticks>1200){smoke.check(false,"timeout");return;}
             if (smoke.phase==="BOOT" || smoke.phase==="LAUNCH_REVIEW" || smoke.phase==="LAUNCH_HISTORY") {
-                if (!child.running && !helper.running) smoke.launch();
+                if (!child.running && !helper.busy) smoke.launch();
             } else if (smoke.phase==="WAIT_STATUS" && smoke.host.session.status && !smoke.host.publicationRequired) {
                 if (smoke.generation===1) {
                     const intent=Consumer.prepare(smoke.host.session,"QUEUE",16,Math.floor(Date.now()/1000)+180).prepared;
@@ -226,16 +211,16 @@ ShellRoot {
                     digest:v.review.review_digest,sequence:v.reviewSequence},smoke.generation,Recovery.row));
             } else if (smoke.phase==="WAIT_DISMISS_STATUS" && smoke.host.session.status && !smoke.host.publicationRequired) {
                 smoke.retire("EXIT_REVIEW");
-            } else if (smoke.phase==="LOAD_REVIEW" && !child.running && !helper.running) {
+            } else if (smoke.phase==="LOAD_REVIEW" && !child.running && !helper.busy) {
                 smoke.phase="WAIT_LOAD";smoke.io("GEN_LOAD",null);
-            } else if (smoke.phase==="ADVANCE" && !child.running && !helper.running) {
+            } else if (smoke.phase==="ADVANCE" && !child.running && !helper.busy) {
                 smoke.phase="WAIT_ADVANCE";smoke.io("GEN_ADVANCE",smoke.advanceRequest);
-            } else if (smoke.phase==="RELOAD" && !helper.running) {
+            } else if (smoke.phase==="RELOAD" && !helper.busy) {
                 smoke.phase="WAIT_RELOAD";smoke.io("GEN_LOAD",null);
             } else if (smoke.phase==="FINISH" || smoke.phase==="FINISH_MISSING") {
                 if (!smoke.check(smoke.prepWrites===1 && smoke.historyWrites===1
                     && smoke.dismissWrites===(smoke.trial==="MISSING"?0:1)
-                    && smoke.host.startupLocked && !child.running && !helper.running,"exact counts and no unlock"))return;
+                    && smoke.host.startupLocked && !child.running && !helper.busy,"exact counts and no unlock"))return;
                 console.log("R6F_NATIVE_PASS // "+smoke.trial);
                 smoke.done=true;Qt.quit();
             }
@@ -243,6 +228,9 @@ ShellRoot {
     }
     Component.onCompleted: {
         if (Quickshell.env("POST_APOLLO_QUEUE_PIPE_SMOKE")!=="CI_DISPOSABLE_ONLY"
-            || !["LIVE","LOST","MISSING"].includes(trial) || !rootPath.startsWith("/tmp/"))Qt.quit();
+            || !["LIVE","LOST","MISSING"].includes(trial) || !rootPath.startsWith("/tmp/")){Qt.quit();return;}
+        check(helper.begin("LOAD",1,null)===0 && helper.begin("GEN_LOAD",1,{})===0
+            && helper.begin("GEN_SAVE",1,{version:1,generation:-1,record:{}})===0,
+            "legacy and invalid generation requests refused");
     }
 }

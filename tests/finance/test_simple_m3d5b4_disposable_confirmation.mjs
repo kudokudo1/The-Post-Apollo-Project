@@ -211,3 +211,33 @@ test("nonexistent receipt is blocked and never created or retried",async()=>{
     assert.equal((await readdir(join(root,"holds"))).length,1);
   });
 });
+
+test("cancel racing a started seal cannot erase or reinterpret durable custody",async()=>{
+  await fixture(async root=>{
+    const x=run(root,{mode:"cancel-race"});
+    assert.equal(x.staged.ok,true);
+    assert.equal(x.cancel.ok,false);
+    assert.equal(x.cancel.reason,"in-flight-custody-recovery-required");
+    assert.equal(x.result.ok,true,JSON.stringify(x));
+    const inspection=run(root,{mode:"inspect",receiptId:x.staged.receiptId});
+    assert.equal(inspection.ok,true);
+    isNoWrite(inspection);
+    assert.equal((await readdir(join(root,"holds"))).length,1);
+  });
+});
+test("tampered sealed private request ID or digest cannot pass restart inspection",async()=>{
+  for(const variant of ["requestId","digest"]){
+    await fixture(async root=>{
+      const x=run(root);
+      assert.equal(x.sealed.ok,true);
+      const file=join(root,"holds","hold-"+x.sealed.receiptId+".json");
+      const record=JSON.parse(await readFile(file,"utf8"));
+      record[variant]=(variant==="requestId"?"f".repeat(32):"d".repeat(64));
+      await writeFile(file,JSON.stringify(record)+"\n",{mode:0o600});
+      const inspected=run(root,{mode:"inspect",receiptId:x.sealed.receiptId});
+      assert.equal(inspected.ok,false);
+      assert.equal(inspected.reason,"receipt-financial-details-changed");
+      isNoWrite(inspected);
+    });
+  }
+});

@@ -1,0 +1,21 @@
+name: CPU++ reclaim custody recovery observation source gate
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_reclaim_observation_ci/**'
+      - '.github/workflows/cpuplus-memory-reclaim-observation-source.yml'
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify exact helper and pure observation tests
+        run: |
+          test "$(git hash-object scripts/post-apollo-memory-add-swap)" = 9dfd8331445ecf60d3a37ea630d08b1f3f6789a2
+          test "$(git hash-object tests/cpuplus_memory_protected_custody_ci/candidate.py)" = 95af22255db13baa829a68c7a9b90b25c50a6bdd
+          python3 -B tests/cpuplus_memory_reclaim_observation_ci/test_observation.py
+          python3 -B tests/cpuplus_memory_reclaim_observation_ci/test_reader.py

@@ -104,7 +104,7 @@ export function createM3d5bNonActivatedController({
   configDir=join(homedir(),".config","financew"),
   journalDir=join(homedir(),".local","state","financew","operations")
 }={}) {
-  let phase="idle",prior=null,challenge="";
+  let phase="idle",prior=null,challenge="",epoch=0;
   const status=()=>({phase,canSave:false,writeAllowed:false,
     productionDispatch:"HARD-HOLD"});
   async function verifyReadiness(view){
@@ -118,9 +118,11 @@ export function createM3d5bNonActivatedController({
   async function stage(view){
     if(phase!=="idle")return fail("controller-not-idle");
     phase="checking";
+    const ticket=++epoch;
     const checked=guardOffline(view);
     if(!checked.ok){phase="refused";return checked;}
     const ready=await verifyReadiness(view);
+    if(ticket!==epoch)return fail("controller-invalidated");
     if(!ready.ok){phase="refused";return ready;}
     const refreshed=guardOffline(view,checked);
     if(!refreshed.ok){phase="refused";return refreshed;}
@@ -136,6 +138,7 @@ export function createM3d5bNonActivatedController({
     // Consume confirmation before any awaits so concurrent calls cannot
     // mint two operation IDs. Even a wrong/failed attempt cannot be retried.
     phase="checking-confirmation";
+    const ticket=++epoch;
     const expected=challenge;
     challenge="";
     if(confirmationText!==expected){
@@ -145,6 +148,7 @@ export function createM3d5bNonActivatedController({
     const checked=guardOffline(current,prior);
     if(!checked.ok){phase="refused";prior=null;return checked;}
     const ready=await verifyReadiness(current);
+    if(ticket!==epoch)return fail("controller-invalidated");
     if(!ready.ok){phase="refused";prior=null;return ready;}
     const second=guardOffline(current,prior);
     if(!second.ok){phase="refused";prior=null;return second;}
@@ -152,9 +156,11 @@ export function createM3d5bNonActivatedController({
     // Validate the EXACT M3b schema in memory, then irreversibly discard it.
     // An executable command MUST NOT escape this non-activated controller.
     const requestId=randomBytes(16).toString("hex");
-    const command=validateCategorizedExpenseCommand({
+    let command;
+    try{command=validateCategorizedExpenseCommand({
       action:"create-categorized-expense",requestId,...second.previewFields
-    });
+    });}
+    catch{phase="refused";prior=null;return fail("invalid-command-shape");}
     const fingerprint=createHash("sha256")
       .update(JSON.stringify(command)).digest("hex");
     prior=null;
@@ -163,6 +169,7 @@ export function createM3d5bNonActivatedController({
       reason:"request-identity-issued-and-discarded",fingerprint};
   }
   function cancel(){
+    ++epoch;
     challenge="";prior=null;phase="canceled";
     return {ok:true,canSave:false,writeAllowed:false,phase};
   }

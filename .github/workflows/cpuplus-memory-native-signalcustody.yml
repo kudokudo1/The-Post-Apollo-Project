@@ -1,0 +1,59 @@
+name: CPU++ memory native signal custody calibration (production HOLD)
+on:
+  pull_request:
+    paths:
+      - 'tests/cpuplus_memory_signalcustody_ci/**'
+      - '.github/workflows/cpuplus-memory-native-signalcustody.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-signalcustody:
+    if: github.actor == 'kudokudo1' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: c6a3c6c0e7f59849e228c5200a63fa2833d57c33
+          path: reviewed-memory-source
+          persist-credentials: false
+      - name: Gate isolated runner and exact reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test -c /dev/kvm || { echo "CPU_MEM_NATIVE_BLOCKED // NO_KVM"; exit 2; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+          test "$(git hash-object reviewed-memory-source/scripts/post-apollo-memory-add-swap)" = 5f6e6d800dcf41c1f0f7330fdb248dfd2177104f
+          test "$(df -B1 --output=avail / | tail -n 1)" -ge 24000000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_DISK"; exit 2; }
+          test "$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)" -ge 7000000 || { echo "CPU_MEM_NATIVE_BLOCKED // HOST_RAM"; exit 2; }
+          python3 -B tests/cpuplus_memory_signalcustody_ci/test_signal_evidence.py
+          bash -n tests/cpuplus_memory_signalcustody_ci/run-silverblue-signalcustody.sh
+          bash -n tests/cpuplus_memory_signalcustody_ci/guest-signalcustody-phase.sh
+          python3 -B -m py_compile tests/cpuplus_memory_native_faults/guest-recovery.py tests/cpuplus_memory_signalcustody_ci/guest-signalcustody.py
+          set +e
+          output="$(python3 -I -B tests/cpuplus_memory_signalcustody_ci/guest-signalcustody.py guard 2>&1)"
+          rc="$?"
+          set -e
+          test "$rc" = 2
+          grep -Fq 'CPU_MEM_SIGNALCUSTODY_FAIL // RuntimeError: not a root Silverblue guest' <<<"$output"
+      - name: Run isolated offline KVM guest, no host swap changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 5100s docker run --rm --device=/dev/kvm \
+            --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted \
+            --env GITHUB_ACTOR="$GITHUB_ACTOR" --env POST_APOLLO_MEMORY_NATIVE_CI_ONLY=1 \
+            --env POST_APOLLO_MEMORY_SIGNALCUSTODY_CI_ONLY=1 \
+            --mount "type=bind,src=$PWD,dst=/src,readonly" \
+            fedora:44 /usr/bin/bash -c '
+              set -euo pipefail
+              dnf -y --setopt=install_weak_deps=False --setopt=gpgcheck=1 install curl qemu-system-x86 qemu-img xorriso genisoimage
+              /usr/bin/bash /src/tests/cpuplus_memory_signalcustody_ci/run-silverblue-signalcustody.sh /src/reviewed-memory-source/scripts/post-apollo-memory-add-swap
+            '

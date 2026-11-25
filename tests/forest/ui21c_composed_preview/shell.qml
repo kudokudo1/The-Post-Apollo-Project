@@ -140,6 +140,36 @@ ShellRoot {
         check(!input.activeFocus && !input.focus, "hidden input gained focus");
         input.text = "";
     }
+    function reviewScope(n,rev=1) {
+        return {treeKey:"CHERRY",taskAlias:"f".repeat(32),
+            viewKey:n.toString(16).padStart(32,"0"),planRevision:rev};
+    }
+    function fixedReviewRows() {
+        return [{category:"CONTINUITY",state:"PRESERVED"},
+            {category:"CONTEXT",state:"REVIEW"},{category:"WORKSHOP",state:"AVAILABLE"},
+            {category:"MODEL_FORM",state:"DORMANT"},{category:"REASONING",state:"UNKNOWN"}];
+    }
+    function verifyReview(state,count) {
+        const item=review.item;
+        check(item && item.reviewState===state && item.reviewRows.length===count,
+            "review state or rows "+state);
+        if (!item) return;
+        const body=child(item,"restorationReviewBody");
+        check(body && body.visible===(state!=="CLOSED"),"review body visibility");
+        check(!item.sourceAuthenticated && !item.permissionGranted && !item.productionAuthority
+            && !item.modelExecutionPermitted && !item.restorationEnabled && !item.sendEnabled
+            && !item.stopEnabled, "review authority changed");
+        check(preview.item===null, "conversation and review coexist");
+        if (state==="DISPLAYING") {
+            check(item.reviewRows.every((r,i)=>r.category===fixedReviewRows()[i].category
+                && r.state===fixedReviewRows()[i].state),"fixed review ordering");
+            check(body.implicitHeight<=body.height,"review exceeds viewport");
+            const badge=child(body,"restorationReviewSynthetic"), locked=child(body,"restorationReviewLocked");
+            check(badge && locked && badge.text==="SYNTHETIC // NO LIVE SEASON OR AVAILABILITY"
+                && locked.text==="READ ONLY // RESTORATION LOCKED" && !badge.truncated && !locked.truncated,
+                "missing synthetic/locked labels");
+        }
+    }
     Window {
         id: scene
         width: 480
@@ -150,6 +180,12 @@ ShellRoot {
             anchors.fill: parent
             active: false
             sourceComponent: UI2.PublicConversationFixture {}
+        }
+        Loader {
+            id: review
+            anchors.fill: parent
+            active: false
+            sourceComponent: UI2.PublicRestorationReview {}
         }
     }
     Timer {
@@ -335,6 +371,105 @@ ShellRoot {
                 break;
             case 21:
                 check(preview.item===null, "joined presentation survived unload");
+                scene.width=480;
+                scene.height=240;
+                review.active=true;
+                break;
+            case 22: {
+                verifyReview("CLOSED",0);
+                const item=review.item, a=reviewScope(1);
+                item.ownerScope=a;
+                check(!item.openReview(a),"open without synthetic owner");
+                item.syntheticOwner=true;
+                check(!item.receiveReview(a,fixedReviewRows()),"unsolicited review");
+                check(item.openReview(a),"explicit review open");
+                verifyReview("PENDING",0);
+                check(item.receiveReview(a,fixedReviewRows()),"review plan accepted");
+                break;
+            }
+            case 23:
+                verifyReview("DISPLAYING",5);
+                scene.width=300;
+                scene.height=160;
+                break;
+            case 24: {
+                verifyReview("DISPLAYING",5);
+                const item=review.item, a=reviewScope(1), b=reviewScope(2,2);
+                item.ownerScope=b;
+                verifyReview("CLOSED",0);
+                check(item.openReview(b),"replacement review");
+                check(!item.receiveReview(a,fixedReviewRows()) && !item.refuseReview(a)
+                    && !item.dismissReview(a) && !item.openReview(a),"stale scope accepted");
+                verifyReview("PENDING",0);
+                check(item.receiveReview(b,fixedReviewRows()),"replacement plan");
+                break;
+            }
+            case 25: {
+                verifyReview("DISPLAYING",5);
+                const item=review.item, b=reviewScope(2,2);
+                check(!item.receiveReview(b,fixedReviewRows()),"duplicate plan accepted");
+                verifyReview("UNAVAILABLE",0);
+                check(!item.openReview(b),"refused view reused");
+                const wrongPlans=[
+                    fixedReviewRows().slice(0,4),
+                    fixedReviewRows().concat([{category:"EXTRA",state:"UNKNOWN"}]),
+                    [fixedReviewRows()[0],...fixedReviewRows().slice(0,4)],
+                    fixedReviewRows().slice().reverse(),
+                    fixedReviewRows().map((r,i)=>i===1?{category:r.category,state:"ACTIVE"}:r),
+                    fixedReviewRows().map((r,i)=>i===1?{category:r.category,state:r.state,text:"not public"}:r)
+                ];
+                for(let i=0;i<wrongPlans.length;i++){
+                    const ref=reviewScope(3+i,3+i);
+                    item.ownerScope=ref;
+                    check(item.openReview(ref),"invalid plan test open");
+                    check(!item.receiveReview(ref,wrongPlans[i]),"invalid plan accepted");
+                    verifyReview("UNAVAILABLE",0);
+                    check(!item.receiveReview(ref,fixedReviewRows()),"invalid lifetime recovered");
+                }
+                break;
+            }
+            case 26: {
+                const item=review.item, ref=reviewScope(10,10);
+                item.ownerScope=ref;
+                check(item.openReview(ref)&&item.receiveReview(ref,fixedReviewRows()),"dismiss setup");
+                check(item.dismissReview(ref),"explicit dismiss");
+                verifyReview("CLOSED",0);
+                check(!item.openReview(ref)&&!item.receiveReview(ref,fixedReviewRows()),"dismiss replay");
+                const next=reviewScope(11,11);
+                item.ownerScope=next;
+                check(item.openReview(next)&&item.receiveReview(next,fixedReviewRows()),"scope loss setup");
+                item.syntheticOwner=false;
+                verifyReview("CLOSED",0);
+                item.syntheticOwner=true;
+                check(!item.openReview(next),"scope restored old view");
+                verifyReview("CLOSED",0);
+                break;
+            }
+            case 27: {
+                const item=review.item, ref=reviewScope(12,12);
+                item.ownerScope=ref;
+                check(item.openReview(ref)&&item.receiveReview(ref,fixedReviewRows()),"viewport loss setup");
+                scene.width=299;
+                break;
+            }
+            case 28:
+                verifyReview("CLOSED",0);
+                scene.width=300;
+                break;
+            case 29: {
+                verifyReview("CLOSED",0);
+                const item=review.item;
+                check(!item.openReview(reviewScope(12,12)), "viewport loss replay");
+                const ref=reviewScope(13,13);
+                item.ownerScope=ref;
+                check(item.openReview(ref)&&item.receiveReview(ref,fixedReviewRows()),"owner null setup");
+                item.ownerScope=null;
+                verifyReview("CLOSED",0);
+                review.active=false;
+                break;
+            }
+            case 30:
+                check(review.item===null && preview.item===null, "review survived unload");
                 break;
             default:
                 check(false, "unexpected phase");
@@ -343,7 +478,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 21) {
+            if (p === 30) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

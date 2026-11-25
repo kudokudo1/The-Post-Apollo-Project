@@ -141,6 +141,9 @@ def native():
             text=True,errors="replace",start_new_session=True)
         try:
             output,_=p.communicate(timeout=60)
+            # Check before process-group cleanup so cleanup cannot hide a leak.
+            if p.returncode==0 and "M4T2_NATIVE_PASS" in output:
+                lease_free(directory(env))
         except subprocess.TimeoutExpired:
             os.killpg(p.pid,signal.SIGKILL)
             output,_=p.communicate(timeout=10)

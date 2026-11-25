@@ -3,7 +3,7 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 from h14d_resource_witness import (
-    CAP, GIB, QUOTA, Hold, Level, Sample, Reader, evaluate, preflight, preflight_outer,
+    CAP, GIB, QUOTA, Hold, Level, Sample, Reader, evaluate, preflight, preflight_outer, validate_prefix,
 )
 
 
@@ -214,6 +214,75 @@ class ResourceWitnessTests(unittest.TestCase):
                 self.outer_check(b, (active,self.final))
         with self.assertRaises(Hold):
             self.outer_check(b, (self.active,replace(self.final,populated=1)))
+
+
+    def test_shared_prefix_active_only_no_authority(self):
+        for scope, baseline in (("DIRECT", None),
+                                ("RETAINED_OUTER", self.outer_baseline())):
+            with self.subTest(scope=scope):
+                args = dict(selected=(0, 1), launch_ns=200, expected_leaf=(1, 11),
+                            scope=scope, baseline=baseline)
+                result = validate_prefix(self.parent, self.active, **args)
+                self.assertEqual(result.pop("status"), "RESOURCE_PREFIX_REFERENCE")
+                self.assertEqual(result.pop("accounting_scope"), scope)
+                self.assertEqual(result.pop("safe_actions"), [])
+                self.assertTrue(all(value is False for value in result.values()))
+                with self.assertRaises(Hold):
+                    evaluate(self.parent, (self.active,), **args)
+
+    def test_prefix_and_final_refuse_same_invalid_first(self):
+        baseline = self.outer_baseline()
+        for scope, b in (("DIRECT", None), ("RETAINED_OUTER", baseline)):
+            args = dict(selected=(0, 1), launch_ns=200, expected_leaf=(1, 11),
+                        scope=scope, baseline=b)
+            for first in (
+                self.changed(hard=CAP+1),
+                self.changed(identity=(1, 12)),
+                self.changed(tasks=0),
+                replace(self.active, populated=0),
+                replace(self.active, swap=1),
+                replace(self.active, host_available_mib=4096),
+                replace(self.active, host_pressure=((0,0,0,11), self.psi[1])),
+                replace(self.active, start_ns=199),
+                replace(self.active, start_ns=1_000_000_100, end_ns=1_000_000_201),
+            ):
+                with self.subTest(scope=scope, first=first):
+                    with self.assertRaises(Hold) as prefix_error:
+                        validate_prefix(self.parent, first, **args)
+                    with self.assertRaises(Hold) as final_error:
+                        evaluate(self.parent, (first, self.final), **args)
+                    self.assertEqual(str(prefix_error.exception), str(final_error.exception))
+
+    def test_prefix_retained_baseline_continuity_and_no_fallback(self):
+        b = self.outer_baseline()
+        args = dict(selected=(0, 1), launch_ns=200, expected_leaf=(1, 11),
+                    scope="RETAINED_OUTER")
+        for baseline in (None, replace(b, populated=1),
+                         replace(b, levels=(self.ancestor,
+                                            replace(b.levels[-1], identity=(1,12)))),
+                         replace(b, cpu_usec=self.active.cpu_usec+1),
+                         replace(b, peak=self.active.peak+1)):
+            with self.subTest(baseline=baseline), self.assertRaises(Hold):
+                validate_prefix(self.parent, self.active, baseline=baseline, **args)
+        for scope, baseline in (("DIRECT", b), ("AUTO", b)):
+            with self.subTest(scope=scope), self.assertRaises(Hold):
+                validate_prefix(self.parent, self.active, selected=(0, 1),
+                                launch_ns=200, expected_leaf=(1, 11),
+                                scope=scope, baseline=baseline)
+
+    def test_final_calls_shared_prefix_with_original_sample_objects(self):
+        b = self.outer_baseline()
+        with patch("h14d_resource_witness.validate_prefix",
+                   wraps=validate_prefix) as shared:
+            self.outer_check(b)
+            shared.assert_called_once()
+            self.assertIs(shared.call_args.args[0], self.parent)
+            self.assertIs(shared.call_args.args[1], self.active)
+            self.assertIs(shared.call_args.kwargs["baseline"], b)
+        with patch("h14d_resource_witness.validate_prefix",
+                   side_effect=Hold("PREFIX_REFUSED")):
+            with self.assertRaisesRegex(Hold, "PREFIX_REFUSED"):
+                self.outer_check(b)
 
 
 class ReaderPinTests(unittest.TestCase):

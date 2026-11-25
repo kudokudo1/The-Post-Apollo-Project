@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory(prefix="git-map-managed-native-") as tmp:
     shutil.copy2(ROOT/"tests/git/fixtures/GitMapManagedNative.qml",scene/"smoke.qml")
     repo=base/"repo"
     repo.mkdir()
-    for args in (("init","-b","main"),("commit","--allow-empty","-m","first")):
+    for args in [("init","-b","main")]+[("commit","--allow-empty","-m",f"commit {i}") for i in range(40)]:
         subprocess.run(["/usr/bin/git","-C",str(repo),"-c","user.name=Fixture",
             "-c","user.email=fixture@example.invalid",*args],check=True,
             stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

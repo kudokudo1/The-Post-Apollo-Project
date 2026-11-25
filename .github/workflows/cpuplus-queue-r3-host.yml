@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'services/memory/MemoryQueueSessionHost.js'
+      - 'services/memory/memory_queue_checkpoint_io.py'
+      - 'services/memory/memory_queue_host_checkpoint.py'
       - 'tests/cpuplus/test_queue_session_host.cjs'
       - 'services/memory/QUEUE-R3-HOST.md'
       - 'widgets/cpuplus/CpuPlusQueueConsumer.js'

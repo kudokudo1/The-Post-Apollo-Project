@@ -263,12 +263,25 @@ def open_index(directory):
 
 def manifest_for(conn, snapshot=None):
     rows = conn.execute("SELECT document FROM manifest LIMIT 2").fetchall()
-    if len(rows) != 1:
+    if len(rows) != 1 or not isinstance(rows[0][0], str) or len(rows[0][0]) > 4096:
         raise ValueError("invalid manifest")
-    m = json.loads(rows[0][0])
-    if (m.get("schema") != SCHEMA or m.get("pageSize") != PAGE
-            or not isinstance(m.get("total"), int) or not 0 <= m["total"] <= MAX_ROWS
+    try:
+        m = json.loads(rows[0][0])
+    except (ValueError, RecursionError) as error:
+        raise ValueError("invalid manifest JSON") from error
+    # Every caller (page, locate, search, manager, inventory and custody)
+    # shares this v1 validation. JSON scalars and bool-as-int are not valid.
+    if not isinstance(m, dict):
+        raise ValueError("manifest object required")
+    if (m.get("schema") != SCHEMA or type(m.get("pageSize")) is not int
+            or m["pageSize"] != PAGE
+            or type(m.get("total")) is not int or not 0 <= m["total"] <= MAX_ROWS
             or not isinstance(m.get("snapshot"), str) or not SNAPSHOT.fullmatch(m["snapshot"])
+            or not isinstance(m.get("repoId"), str) or not re.fullmatch(r"[0-9a-f]{64}",m["repoId"])
+            or not isinstance(m.get("rootsDigest"), str) or not re.fullmatch(r"[0-9a-f]{64}",m["rootsDigest"])
+            or type(m.get("shallow")) is not bool
+            or type(m.get("maxLane")) is not int or not 0 <= m["maxLane"] < MAX_LANES
+            or m.get("scope") != "captured-local-ref-tips-and-head"
             or (snapshot is not None and m["snapshot"] != snapshot)):
         raise ValueError("snapshot unavailable or mismatched")
     return m

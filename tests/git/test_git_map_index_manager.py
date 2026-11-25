@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import hashlib
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -129,6 +130,23 @@ class ManagedCacheTests(unittest.TestCase):
         self.assertEqual(limited["observedSlots"],2)
         self.assertTrue(limited["truncated"])
         self.assertFalse(limited["reclamationAllowed"])
+
+    def test_inventory_preserves_good_entries_and_refuses_malformed_manifest(self):
+        old=manager.build(self.repo,self.root)
+        self.git("commit","--allow-empty","-m","next")
+        current=manager.build(self.repo,self.root)
+        db=Path(old["directory"])/manager.index.NAME
+        for value in ("[]","null","true","42",'"string"',"{"):
+            with sqlite3.connect(db) as conn:
+                conn.execute("UPDATE manifest SET document=?",(value,))
+            conn.close()
+            before=hashlib.sha256(db.read_bytes()).hexdigest()
+            result=manager.inventory(self.repo,self.root)
+            entries={row["key"]:row for row in result["entries"]}
+            self.assertEqual(entries[old["key"]]["state"],"UNSAFE OR INVALID")
+            self.assertEqual(entries[current["key"]]["state"],"CURRENT")
+            self.assertFalse(result["reclamationAllowed"])
+            self.assertEqual(hashlib.sha256(db.read_bytes()).hexdigest(),before)
 
     def test_inventory_rejects_changed_repo_identity(self):
         ident=manager.identity(self.repo)

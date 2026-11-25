@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -27,6 +28,29 @@ def make_index(rows):
     return conn
 
 class HistoryIndexTests(unittest.TestCase):
+    def test_manifest_nonobject_and_invalid_fields_refused_by_all_readers(self):
+        with make_index(chain(2)) as conn:
+            valid=index.manifest_for(conn)
+            malformed=["[]","null","true","42",'"string"',"{", "["*1500+"]"*1500,
+                       " "*4097, None, b"{}"]
+            for key,value in (("total",True),("total",-1),("pageSize",128.0),
+                    ("maxLane",False),("maxLane",index.MAX_LANES),("repoId","invalid"),
+                    ("rootsDigest",None),("shallow",0),("scope","other")):
+                malformed.append(json.dumps(dict(valid,**{key:value})))
+            for value in malformed:
+                # The schema's NOT NULL constraint prevents SQL NULL.
+                if value is None:
+                    continue
+                conn.execute("UPDATE manifest SET document=?",(value,))
+                for call in (lambda:index.manifest_for(conn),
+                             lambda:index.page(conn,"a"*32,0),
+                             lambda:index.locate(conn,"a"*32,sha(0)),
+                             lambda:index.search(conn,"a"*32,"fixture",0)):
+                    with self.subTest(value=str(value)[:80]):
+                        with self.assertRaises(ValueError): call()
+            conn.execute("UPDATE manifest SET document=?",(json.dumps(valid),))
+            self.assertEqual(index.manifest_for(conn),valid)
+
     def test_large_exact_pages_and_bottom(self):
         with make_index(chain(100000)) as conn:
             m=index.manifest_for(conn)

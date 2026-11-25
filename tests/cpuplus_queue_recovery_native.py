@@ -52,3 +52,6 @@ with tempfile.TemporaryDirectory(prefix="cpu-queue-recovery-") as tmp:
         raise SystemExit("Native recovery fixture failed")
     if env.get("POST_APOLLO_QUEUE_WATCHDOG_TRIAL")=="1" and "QUEUE_R3_WATCHDOG_PASS" not in proc.stdout:
         raise SystemExit("Native watchdog fixture failed")
+    trial=env.get("POST_APOLLO_QUEUE_STAGED_TRIAL")
+    if trial and "QUEUE_R3_STAGED_PASS //" not in proc.stdout:
+        raise SystemExit("Native staged transport fixture failed")

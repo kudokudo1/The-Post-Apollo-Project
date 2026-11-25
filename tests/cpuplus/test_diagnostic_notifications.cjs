@@ -12,7 +12,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const id = "timeabc-abc-def-1";
 const secret = "RAW REPORT MUST NOT ENTER NOTIFICATION HISTORY";
 const report = {id, status:"COMPLETE", summary:secret, text:secret};
-for (const kind of ["memory", "inventory", "threads", "census", "storage"]) {
+for (const kind of ["memory", "inventory", "threads", "census", "storage", "appcontrol"]) {
     for (const status of ["COMPLETE", "CANCELLED", "NOT VERIFIED"]) {
         const notice = plain(policy.noticeFor(kind, {...report,status}));
         assert.equal(notice.id,"apollo-cpu-diag-"+id);

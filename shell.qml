@@ -36,6 +36,13 @@ PanelWindow {
 
     // Keep the idle diagnostic session referenced by the root, not a transient pane.
     readonly property var diagnosticSessionOwner: CpuPlusDiagnostics
+    Binding {
+        target: CpuPlusDiagnostics
+        property: "appControlMode"
+        value: !appControlWindow.menuOpen ? "closed"
+            : appControlWindow.selectedModeIndex === appControlWindow.appsModeIndex ? "app"
+            : appControlWindow.selectedModeIndex === appControlWindow.killModeIndex ? "kill" : "other"
+    }
     Connections {
         target: CpuPlusDiagnostics
         function onCaptureFinished(job, reportId) {
@@ -775,6 +782,10 @@ PanelWindow {
 
             AppControlW {
                 id: appControlWindow
+                diagnosticCaptureActive: CpuPlusDiagnostics.appControlCaptureActive
+                onDiagnosticOpeningStage: function(stage, sequence, elapsedMs, timestampMs) {
+                    CpuPlusDiagnostics.recordOpening(stage, sequence, elapsedMs, timestampMs);
+                }
 
                 systemTelemetry: sharedSystemTelemetry
                 fanControl: sharedFanControl

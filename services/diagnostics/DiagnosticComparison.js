@@ -109,9 +109,17 @@ function censusMetrics(rows) {
     ];
 }
 
-function extract(report, validate) {
+function extract(report, validate, appMetrics) {
     if (!report || report.status !== "COMPLETE" || typeof report.text !== "string"
             || report.text.length > 65536 || !validate(report.kind, report.text)) return null;
+    if (report.kind === "appcontrol") {
+        const d = typeof appMetrics === "function" ? appMetrics(report.text) : null;
+        if (!d) return null;
+        return [metric("OBSERVED TIME",d.durationMs/1000,"s",1),
+            ...["all","app","kill"].flatMap(key=>[metric(key.toUpperCase()+" TOTAL CPU",d[key].total,"%",1),
+                metric(key.toUpperCase()+" MAIN CPU",d[key].main,"%",1),metric(key.toUpperCase()+" SAMPLES",d[key].count,"",0)]),
+            metric("OPENINGS",d.openings,"",0),metric("OPEN MEAN",d.openingMean,"ms",1),metric("OPEN MAX",d.openingMax,"ms",1)];
+    }
     if (report.kind === "inventory") {
         const d = JSON.parse(report.text);
         return [metric("QML FILES", d.scannedQml, "", 0),
@@ -136,7 +144,7 @@ function extract(report, validate) {
     return null;
 }
 
-function compare(before, after, validate) {
+function compare(before, after, validate, appMetrics) {
     const fail = error => ({error: error, rows: [], note: ""});
     if (!before || !after) return fail("SELECT TWO RETAINED CAPTURES");
     if (before.id === after.id) return fail("SELECT DIFFERENT CAPTURES");
@@ -147,7 +155,7 @@ function compare(before, after, validate) {
     if (!Number.isFinite(firstTime) || !Number.isFinite(secondTime) || secondTime <= firstTime)
         return fail("AFTER MUST BE NEWER THAN BEFORE");
     try {
-        const a = extract(before, validate), b = extract(after, validate);
+        const a = extract(before, validate, appMetrics), b = extract(after, validate, appMetrics);
         if (!a || !b || a.length !== b.length) return fail("INCOMPLETE OR UNSUPPORTED EVIDENCE");
         const rows = a.map((left, i) => {
             const right = b[i], x = left.value, y = right.value;
@@ -166,6 +174,7 @@ function compare(before, after, validate) {
                 : "PID/start ticks match; boot identity and continuity between captures are unverified. ")
                 + "PSS + SwapPss is a proportional footprint estimate, not physical swap cost. Private resident excludes separately accounted hugetlb; legacy or partial private readings are N/A. No component attribution. PSS mean is a time-weighted trapezoid estimate; CPU mean is interval-weighted. " + note;
         }
+        if (before.kind === "appcontrol") note = "Whole capture includes closed/other; APP/KILL include only stable-mode intervals. Opening is synchronous, not first paint. Thread sums may omit exiting threads. " + note;
         if (before.kind === "threads") note = "Thread sums may omit exiting threads. " + note;
         if (before.kind === "storage") note = "Sampled metadata changes only; not writes, transactions or writer identity. Missing/unavailable endpoints are N/A. " + note;
         if (before.kind === "census") note = "Final intervals only; RSS is not PSS. Top-N rows are not totals. QS requires one returned exact-name match; identity and absence of omitted matches are not proven. " + note;

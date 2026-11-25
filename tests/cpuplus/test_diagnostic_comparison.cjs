@@ -111,7 +111,7 @@ assert.equal(state.selectComparison("bogus",afterId),false);
 state.archiveBusy=true;
 assert.equal(state.selectComparison("before",afterId),false);
 const ui = read("widgets/cpuplus/CpuPlusDiagnosticsPane.qml");
-assert.match(ui,/showComparison \? Compare.compare\(beforeRecord, afterRecord, Policy.summarize\) : null/);
+assert.match(ui,/showComparison \? Compare.compare\(beforeRecord, afterRecord, Policy.summarize, Policy.appControlMetrics\) : null/);
 assert.match(ui,/archiveRows.find\(row => row.id === CpuPlusDiagnostics.compareBeforeId\)/);
 assert.match(ui,/archiveRows.find\(row => row.id === CpuPlusDiagnostics.compareAfterId\)/);
 assert.doesNotMatch(ui,/Process\s*\{|Timer\s*\{/);

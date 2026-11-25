@@ -1704,12 +1704,17 @@ PanelWindow {
     // Opening traces share the existing opt-in completion probe.
     // These wall-clock markers describe synchronous handler stages, not paint.
     property int appControlOpenTraceSequence: 0
+    property bool diagnosticCaptureActive: false
+    signal diagnosticOpeningStage(string stage, int sequence, double elapsedMs, double timestampMs)
 
     function traceAppControlOpen(stage, sequence, startMs) {
         if (sequence <= 0)
             return 0;
         const now = Date.now();
-        console.warn("SYNTAGMA_COMPLETION_PROBE // service=appcontrol"
+        if (diagnosticCaptureActive)
+            diagnosticOpeningStage(stage, sequence, now - startMs, now);
+        if (appControlSnapshotTraceEnabled)
+            console.warn("SYNTAGMA_COMPLETION_PROBE // service=appcontrol"
                      + " stage=open:" + stage + ":end"
                      + " seq=" + sequence
                      + " elapsedMs=" + (now - startMs) + " tsMs=" + now);
@@ -29400,7 +29405,7 @@ PanelWindow {
     onMenuOpenChanged: {
         if(!menuOpen) clearFavoriteNavigation();
         if (menuOpen) {
-            const openTrace = appControlSnapshotTraceEnabled
+            const openTrace = (appControlSnapshotTraceEnabled || diagnosticCaptureActive)
                 ? ++appControlOpenTraceSequence : 0;
             const openStart = openTrace ? Date.now() : 0;
             let openStage = openStart;

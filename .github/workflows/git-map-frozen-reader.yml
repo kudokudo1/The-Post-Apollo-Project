@@ -1,0 +1,29 @@
+name: Git map frozen historical reader compatibility
+on:
+  pull_request:
+    paths:
+      - "tests/git/test_git_map_frozen_reader.py"
+      - "scripts/git_map_isolated_candidate.py"
+      - "scripts/git_map_history_index.py"
+      - "scripts/git_map_index_manager.py"
+      - ".github/workflows/git-map-frozen-reader.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  historical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 489423080aadedeb2a389ebff14b2a8360d812ca
+          path: frozen-reader
+          persist-credentials: false
+      - name: Historical reader native Linux compatibility
+        env:
+          POST_APOLLO_GIT_MAP_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/git/test_git_map_frozen_reader.py frozen-reader

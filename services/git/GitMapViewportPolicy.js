@@ -56,7 +56,7 @@ function retain(s) {
         if(s.pending[key]) pending[key]=s.pending[key];
         if(s.errors[key]) errors[key]=s.errors[key];
     }
-    return {...s,cache,pending,errors};
+    return Object.assign({},s,{cache:cache,pending:pending,errors:errors});
 }
 function activate(previous,m,rowHeight,viewportHeight,anchor) {
     if(!manifest(m) || !validGeometry(rowHeight,viewportHeight)) return null;
@@ -79,15 +79,15 @@ function activate(previous,m,rowHeight,viewportHeight,anchor) {
 function scroll(s,y) {
     if(!Number.isFinite(y)) return s;
     const next=clamp(s,y);
-    return retain({...s,y:next,direction:next===s.y?s.direction:next>s.y?1:-1});
+    return retain(Object.assign({},s,{y:next,direction:next===s.y?s.direction:next>s.y?1:-1}));
 }
 function resize(s,viewportHeight) {
     if(!validGeometry(s.rowHeight,viewportHeight)) return s;
-    const next={...s,viewportHeight};
-    return retain({...next,y:clamp(next,s.y)});
+    const next=Object.assign({},s,{viewportHeight:viewportHeight});
+    return retain(Object.assign({},next,{y:clamp(next,s.y)}));
 }
 function requests(s) {
-    let next={...s,pending:{...s.pending}};
+    let next=Object.assign({},s,{pending:Object.assign({},s.pending)});
     const list=[];
     for(const start of wantedPages(next)) {
         if(next.cache[start] || next.pending[start] || next.errors[start]) continue;
@@ -149,22 +149,26 @@ function validPage(s,r,p) {
 }
 function reject(s,r,reason) {
     if(!sameRequest(s,r)) return s;
-    const pending={...s.pending};delete pending[r.start];
-    return {...s,pending,errors:{...s.errors,[r.start]:reason}};
+    const pending=Object.assign({},s.pending);delete pending[r.start];
+    const errors=Object.assign({},s.errors);
+    errors[r.start]=reason;
+    return Object.assign({},s,{pending:pending,errors:errors});
 }
 function accept(s,r,p) {
     if(!sameRequest(s,r)) return s;
     if(!validPage(s,r,p)) return reject(s,r,"INVALID PAGE");
-    const pending={...s.pending};delete pending[r.start];
-    const cache={...s.cache,[r.start]:p};
+    const pending=Object.assign({},s.pending);delete pending[r.start];
+    const cache=Object.assign({},s.cache);
+    cache[r.start]=p;
     if(Object.keys(cache).length>MAX_CACHE) return reject(s,r,"CACHE LIMIT");
     // Data arrival changes only the cache and request state, not scroll geometry.
-    return {...s,pending,cache};
+    return Object.assign({},s,{pending:pending,cache:cache});
 }
 function fail(s,r) {return reject(s,r,"PAGE UNAVAILABLE");}
 function retry(s,start) {
     if(!s.errors[start] || !wantedPages(s).includes(start)) return s;
-    const errors={...s.errors};delete errors[start];return {...s,errors};
+    const errors=Object.assign({},s.errors);delete errors[start];
+    return Object.assign({},s,{errors:errors});
 }
 function rowAt(s,ordinal) {
     if(!integer(ordinal,0,s.total-1)) return null;

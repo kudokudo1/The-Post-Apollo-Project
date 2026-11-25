@@ -35,6 +35,8 @@ def _snapshot(db, journal, action_id, owner_id):
     if raw is None:
         raise QueueError("ACTION_RECORD_UNAVAILABLE")
     row = journal._decode(db, raw)
+    if journal._is_dismissed(db, action_id):
+        raise QueueError("ACTION_ALREADY_DISMISSED")
     if row["message"]["owner_id"] == owner_id:
         raise QueueError("RECOVERY_REQUIRES_NEW_OWNER")
     pending = journal.queue._pending(db)
@@ -86,6 +88,13 @@ class RecoveryReview:
         self._live = None
 
     def acknowledge(self, *, review_id, review_digest, clock):
+        return self._finish(review_id=review_id,review_digest=review_digest,clock=clock,dismiss=False)
+
+    def dismiss(self, *, review_id, review_digest, clock):
+        """Explicit separate local disposition; never imply protected consent."""
+        return self._finish(review_id=review_id,review_digest=review_digest,clock=clock,dismiss=True)
+
+    def _finish(self, *, review_id, review_digest, clock, dismiss):
         live,self._live=self._live,None
         if live is None:
             raise QueueError("RECOVERY_REVIEW_NOT_LIVE")
@@ -112,6 +121,11 @@ class RecoveryReview:
             # schema creation takes time, recheck before inserting as well;
             # expiration rolls back the entire transaction (including DDL).
             admit()
+            if dismiss:
+                if not hasattr(self.journal,"dismiss_in_transaction"):
+                    raise QueueError("LOCAL_DISPOSITION_MODE_REQUIRED")
+                wall_ms=admit()
+                return self.journal.dismiss_in_transaction(db,review,wall_ms)
             _schema(db,create=True)
             wall_ms=admit()
             receipt={"version":1,"review":review,"acknowledged_at_ms":wall_ms,

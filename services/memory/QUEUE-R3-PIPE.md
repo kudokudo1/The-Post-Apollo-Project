@@ -47,3 +47,15 @@ or weaken permissions. No subprocess launch in library. Fixtures use fake
 source, deterministic clock, temporary private DB, and real anonymous pipes
 for idle startup/EOF. These are not actual shell or native memory tests.
 Protected completion, reduction and automatic execution HOLD.
+
+## R3e // recovery reads
+
+INVENTORY {version:1,kind:"INVENTORY",owner_id,limit:1..16} and
+LOCAL_ACTION {version:1,kind:"LOCAL_ACTION",owner_id,action_id} delegate
+to existing durable Owner. Both use standard sequence envelope; inventory
+or action_id/record fields as #2603. Legacy mode refuses; owner mismatch,
+unknown command or malformed input fails session. No capture, observation,
+action sequence consumption, scheduler change, acknowledgment or unlock.
+A null lookup is not proof of noncommit. Existing frame size bound applies.
+Four additional Python fixture cases exercise dispatch, 50 repeated reads,
+new owner recovery, invalid fields and legacy refusal. No production launch.

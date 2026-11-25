@@ -23,6 +23,7 @@ function safe(v,depth=0) {
 }
 function initial(consumer) {
     return {session:consumer.initial(),projection:null,history:null,historyRead:null,
+        recoveryRead:null,inventory:null,localAction:null,
         buffer:"",phase:"STOPPED",sequence:0,generation:0,startupLocked:true,
         awaitingStatus:false,publicationRequired:false,failure:null};
 }
@@ -48,6 +49,7 @@ function waiting(state) {
     if (state.awaitingStatus || state.publicationRequired) waits.push("PUBLICATION");
     if (state.session.pending) waits.push("ACTION");
     if (state.historyRead) waits.push("HISTORY");
+    if (state.recoveryRead) waits.push("RECOVERY");
     if (state.buffer) waits.push("PARTIAL_FRAME");
     return waits;
 }
@@ -55,13 +57,23 @@ function context(state) {
     if (!state.session.ownerId && !state.session.pending && !state.session.unresolved) return null;
     // Startup inventory is a separate lock, not a fabricated unresolved action.
     // Keep pending/unknown state even when the projection is invalid.
-    const session=state.startupLocked || state.historyRead
+    const session=state.startupLocked || state.historyRead || state.recoveryRead
         ? Object.assign({},state.session,{nextActionSequence:null,prepared:null})
         : state.session;
     return {state:session,projection:state.projection,startupLocked:state.startupLocked,
-        historyPending:!!state.historyRead,phase:state.phase,waiting:waiting(state),failure:state.failure};
+        historyPending:!!state.historyRead,phase:state.phase,waiting:waiting(state),failure:state.failure,
+        recoveryPending:!!state.recoveryRead};
 }
-function packet(state,p,consumer,project,historyProject) {
+function recoveryContext(state) {
+    // Atomic snapshot for DOC 2's read-only pane. This metadata is not
+    // authority, and a missing response is never evidence of noncommit.
+    return {hostStatus:{phase:state.phase,startupLocked:state.startupLocked,
+        historyPending:!!(state.historyRead || state.recoveryRead),
+        actionPending:!!state.session.pending,unresolved:!!state.session.unresolved},
+        inventory:state.inventory,localAction:state.localAction,
+        recoveryPending:!!state.recoveryRead
+}
+function packet(state,p,consumer,project,historyProject,recoveryProject,recoveryRow) {
     const fail=reason=>stop(state,consumer,reason,state.generation);
     if (!p || typeof p!=="object" || Array.isArray(p) || !safe(p) || p.version!==1 || p.can_execute!==false) return fail("INVALID_PACKET");
     if (state.phase==="HELLO") {
@@ -78,7 +90,8 @@ function packet(state,p,consumer,project,historyProject) {
         // Pending action may have been sent just before an owner timer fired.
         // Preserve pending until its correlated reply or explicit timeout.
         return Object.assign({},state,{session:consumer.invalidate(state.session,"FRESH STATUS REQUIRED"),
-            projection:null,history:null,awaitingStatus:true,publicationRequired:true});
+            projection:null,history:null,inventory:null,localAction:null,
+            awaitingStatus:true,publicationRequired:true});
     }
     if (!positive(p.sequence) || p.sequence<=state.sequence) return fail("SEQUENCE_MISMATCH");
     if (p.kind==="STATUS") {
@@ -95,7 +108,7 @@ function packet(state,p,consumer,project,historyProject) {
             projection:next.status?p.projection:null,awaitingStatus:false,publicationRequired:false,history:null});
     }
     if (p.kind==="ACTION") {
-        if (!state.session.pending || state.historyRead || state.awaitingStatus) return fail("UNEXPECTED_ACTION");
+        if (!state.session.pending || state.historyRead || state.recoveryRead || state.awaitingStatus) return fail("UNEXPECTED_ACTION");
         const next=consumer.acceptAction(state.session,p);
         if (next.sequence!==p.sequence || next.pending
             || next.feedback==="INVALID RESPONSE // RECONCILE"
@@ -115,9 +128,47 @@ function packet(state,p,consumer,project,historyProject) {
         return Object.assign({},state,{sequence:p.sequence,history:view,historyRead:null,
             session:Object.assign({},state.session,{sequence:p.sequence,prepared:null})});
     }
+    if (p.kind==="INVENTORY" || p.kind==="LOCAL_ACTION") {
+        const read=state.recoveryRead;
+        const fields=["version","owner_id","sequence","next_action_sequence","kind","can_execute"];
+        if (!read || read.kind!==p.kind || state.historyRead || state.session.pending
+            || state.awaitingStatus || state.publicationRequired || !state.session.status
+            || p.next_action_sequence!==state.session.nextActionSequence)
+            return fail("UNEXPECTED_RECOVERY");
+        let inventory=null, localAction=null;
+        try {
+            if (p.kind==="INVENTORY") {
+                if (!exact(p,fields.concat(["inventory"])) || typeof recoveryProject!=="function")
+                    return fail("INVALID_INVENTORY");
+                const view=recoveryProject(p.inventory);
+                if (!view || view.canExecute!==false || view.startupLocked!==true
+                    || view.outcome!=="UNVERIFIED" || view.recent.length>read.limit
+                    || (p.inventory.truncated && view.recent.length!==read.limit))
+                    return fail("INVALID_INVENTORY");
+                // UNKNOWN may have no request ID; never interpret that as
+                // absence. Only compare a concrete ID or explicit IDLE.
+                const observed=state.session.status;
+                if ((observed.requestId!==null || observed.state==="IDLE REPORTED")
+                    && observed.requestId!==view.pendingId)
+                    return fail("INVENTORY_STATUS_MISMATCH");
+                inventory=p.inventory;
+            } else {
+                if (!exact(p,fields.concat(["action_id","record"])) || p.action_id!==read.actionId
+                    || typeof recoveryRow!=="function") return fail("INVALID_LOCAL_ACTION");
+                if (p.record!==null) {
+                    const view=recoveryRow(p.record);
+                    if (!view || view.actionId!==read.actionId) return fail("INVALID_LOCAL_ACTION");
+                }
+                localAction={actionId:read.actionId,record:p.record,
+                    outcome:"UNVERIFIED",canExecute:false};
+            }
+        } catch (_) { return fail("INVALID_RECOVERY"); }
+        return Object.assign({},state,{sequence:p.sequence,recoveryRead:null,inventory,localAction,
+            session:Object.assign({},state.session,{sequence:p.sequence,prepared:null})});
+    }
     return fail("INVALID_KIND");
 }
-function feed(state,chunk,consumer,project,historyProject,generation) {
+function feed(state,chunk,consumer,project,historyProject,generation,recoveryProject,recoveryRow) {
     if (generation!==state.generation || (state.phase!=="HELLO" && state.phase!=="CONNECTED")) return state;
     if (typeof chunk!=="string" || chunk.length>MAX_CHUNK || /[^\x20-\x7e\n]/.test(chunk))
         return stop(state,consumer,"INVALID_CHUNK",generation);
@@ -137,7 +188,7 @@ function feed(state,chunk,consumer,project,historyProject,generation) {
                 return stop(next,consumer,"NONCANONICAL_JSON",generation);
         } catch (_) { return stop(next,consumer,"INVALID_JSON",generation); }
         buffer=buffer.slice(i+1);
-        next=packet(next,p,consumer,project,historyProject);
+        next=packet(next,p,consumer,project,historyProject,recoveryProject,recoveryRow);
         if (next.phase==="FAILED") return next;
     }
     if (buffer.length>=MAX_FRAME) return stop(next,consumer,"FRAME_SIZE",generation);
@@ -145,22 +196,37 @@ function feed(state,chunk,consumer,project,historyProject,generation) {
 }
 function confirm(state,intent,actionId,consumer) {
     const no={state:state,frame:null};
-    if (state.phase!=="CONNECTED" || state.startupLocked || state.historyRead
+    if (state.phase!=="CONNECTED" || state.startupLocked || state.historyRead || state.recoveryRead
         || state.awaitingStatus || state.publicationRequired || !state.projection || !uuid(actionId)
         || !exact(intent,["ownerId","statusSequence","actionSequence","kind","expectedId","targetGiB","expiresAt"])) return no;
     const prepared=consumer.prepare(state.session,intent.kind,intent.targetGiB,intent.expiresAt);
     if (!prepared.prepared || !Object.keys(intent).every(k=>intent[k]===prepared.prepared[k])) return no;
     const submitted=consumer.submit(prepared,actionId);
     if (!submitted.message) return no;
-    return {state:Object.assign({},state,{session:submitted.state,projection:null,history:null,
+    return {state:Object.assign({},state,{session:submitted.state,projection:null,history:null,inventory:null,localAction:null,
         awaitingStatus:false}),frame:JSON.stringify({version:1,kind:"ACTION",message:submitted.message})+"\n"};
 }
 function readHistory(state,requestId) {
     const no={state:state,frame:null};
-    if (state.phase!=="CONNECTED" || state.historyRead || state.session.pending
+    if (state.phase!=="CONNECTED" || state.historyRead || state.recoveryRead || state.session.pending
         || state.awaitingStatus || state.publicationRequired || !uuid(requestId) || !state.session.status) return no;
     return {state:Object.assign({},state,{history:null,historyRead:{requestId}}),
         frame:JSON.stringify({version:1,kind:"HISTORY",owner_id:state.session.ownerId,request_id:requestId})+"\n"};
+}
+function readRecovery(state,kind,value) {
+    const no={state:state,frame:null};
+    if (state.phase!=="CONNECTED" || state.historyRead || state.recoveryRead
+        || state.session.pending || state.awaitingStatus || state.publicationRequired
+        || !state.session.status) return no;
+    let request;
+    if (kind==="INVENTORY" && positive(value) && value<=16) request={kind,limit:value};
+    else if (kind==="LOCAL_ACTION" && uuid(value)) request={kind,actionId:value};
+    else return no;
+    const message={version:1,kind,owner_id:state.session.ownerId};
+    if (kind==="INVENTORY") message.limit=value;
+    else message.action_id=value;
+    return {state:Object.assign({},state,{recoveryRead:request,inventory:null,localAction:null,history:null,
+        session:Object.assign({},state.session,{prepared:null})}),frame:JSON.stringify(message)+"\n"};
 }
 // Deliberately no public startup unlock or reconciliation acknowledgment.
 // Complete durable inventory / lost action correlation is a prerequisite for

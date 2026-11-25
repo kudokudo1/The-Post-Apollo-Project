@@ -4,7 +4,8 @@ function load(file){const c=vm.createContext({});vm.runInContext(fs.readFileSync
 const h=load(path.join(root,"services/memory/MemoryQueueSessionHost.js"));
 const c=load(path.join(root,"widgets/cpuplus/CpuPlusQueueConsumer.js"));
 const p=load(path.join(root,"widgets/cpuplus/CpuPlusQueuePresentation.js"));
-const history=load(process.argv[2]);
+const history=load(path.join(root,"widgets/cpuplus/CpuPlusQueueHistory.js"));
+const recovery=load(path.join(root,"widgets/cpuplus/CpuPlusQueueRecovery.js"));
 const A="c23683a9-b2ab-4a2c-87ce-31bdf27a3012", B="c23683a9-b2ab-4a2c-87ce-31bdf27a3013",
 R="c23683a9-b2ab-4a2c-87ce-31bdf27a3014", X="c23683a9-b2ab-4a2c-87ce-31bdf27a3015";
 const wire=x=>JSON.stringify(x)+"\n";
@@ -16,7 +17,7 @@ function status(sequence,next,id=null,owner_id=A){
  state:id?"WAITING":"IDLE",code:id?"EXTENSION_OCCUPIED":"NO_PENDING_REQUEST",can_execute:false,
  last_checked_at:id?100:null,next_check_monotonic_ms:id?11000:null,ready_valid_before_monotonic_ms:null,transition:true}}};
 }
-function feed(s,x,generation=s.generation){return h.feed(s,typeof x==="string"?x:wire(x),c,p.project,history.project,generation);}
+function feed(s,x,generation=s.generation){return h.feed(s,typeof x==="string"?x:wire(x),c,p.project,history.project,generation,recovery.project,recovery.row);}
 function connect(owner=A){
  let s=h.start(h.initial(c),c,1);
  const hello=wire(control("HELLO",owner));
@@ -110,3 +111,35 @@ assert.equal(feed(race,status(4,2,R)).phase,"FAILED");
 race=feed(race,wire(control("INVALIDATE"))+wire(status(4,2,R)));
 assert.equal(race.session.status.requestId,R);
 console.log("R3c host controller PASS: startup lock, canonical framing, pending race, history watermark, timeout, generation fencing");
+
+let recovering=connect();
+const invRead=h.readRecovery(recovering,"INVENTORY",16);
+recovering=invRead.state;
+assert.ok(invRead.frame && h.waiting(recovering).includes("RECOVERY"));
+assert.equal(h.readRecovery(recovering,"INVENTORY",1).frame,null);
+assert.equal(h.readHistory(recovering,R).frame,null);
+const inv={version:1,owner_id:A,kind:"INVENTORY",sequence:2,next_action_sequence:1,can_execute:false,
+ inventory:{version:1,recent:[],truncated:false,prepared:null,pending_request_id:null,
+ startup_unlock:false,adjustment_outcome:"UNVERIFIED",can_execute:false}};
+assert.equal(feed(recovering,{...inv,inventory:{...inv.inventory,startup_unlock:true}}).phase,"FAILED");
+assert.equal(feed(recovering,{...inv,inventory:{...inv.inventory,pending_request_id:R}}).phase,"FAILED");
+recovering=feed(recovering,inv);
+assert.equal(recovering.session.sequence,2);
+assert.ok(h.recoveryContext(recovering).hostStatus.startupLocked);
+assert.equal(h.recoveryContext(recovering).inventory.recent.length,0);
+assert.equal(h.confirm(recovering,c.prepare(recovering.session,"QUEUE",16,200).prepared,X,c).frame,null);
+const lookup=h.readRecovery(recovering,"LOCAL_ACTION",X);
+const missing={version:1,owner_id:A,kind:"LOCAL_ACTION",sequence:3,next_action_sequence:1,
+ can_execute:false,action_id:X,record:null};
+assert.equal(feed(lookup.state,{...missing,action_id:B}).phase,"FAILED");
+recovering=feed(lookup.state,missing);
+assert.equal(h.recoveryContext(recovering).localAction.record,null);
+assert.ok(recovering.startupLocked);
+recovering=feed(recovering,control("INVALIDATE"));
+assert.equal(h.recoveryContext(recovering).localAction,null);
+recovering=feed(recovering,status(4,1));
+recovering=h.readRecovery(recovering,"INVENTORY",1).state;
+recovering=h.stop(recovering,c,"RECOVERY_TIMEOUT",1);
+assert.equal(h.recoveryContext(recovering).inventory,null);
+assert.equal(h.recoveryContext(recovering).hostStatus.phase,"FAILED");
+console.log("R3e recovery read PASS: correlated inventory/lookup, no unlock, invalidation, timeout");

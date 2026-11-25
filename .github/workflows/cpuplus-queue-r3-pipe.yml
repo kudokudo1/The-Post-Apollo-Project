@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'services/memory/memory_queue_pipe.py'
+      - 'services/memory/memory_queue_owner.py'
+      - 'services/memory/memory_queue_local_actions.py'
+      - 'services/memory/memory_queue_runtime.py'
       - 'tests/cpuplus_memory_queue_pipe_test.py'
       - 'services/memory/QUEUE-R3-PIPE.md'
       - '.github/workflows/cpuplus-queue-r3-pipe.yml'

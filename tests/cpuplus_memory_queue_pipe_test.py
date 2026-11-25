@@ -168,6 +168,86 @@ class PipeTests(unittest.TestCase):
         with self.assertRaisesRegex(QueueError, "OWNER_LOST"):
             self.owner.status()
 
+    def durable(self):
+        self.owner.close()
+        self.queue = Queue(self.queue.path)
+        self.owner = Owner(self.queue, self.factory, durable_actions=True)
+        self.addCleanup(self.owner.close)
+        self.sent = []
+        self.session = Session(self.owner, self.sent.append)
+        self.session.start()
+
+    def inventory(self, limit=16):
+        self.send({"version": 1, "kind": "INVENTORY", "owner_id": self.owner.owner_id,
+                   "limit": limit})
+        return self.sent[-1]
+
+    def lookup(self, action_id):
+        self.send({"version": 1, "kind": "LOCAL_ACTION", "owner_id": self.owner.owner_id,
+                   "action_id": action_id})
+        return self.sent[-1]
+
+    def test_durable_recovery_reads_no_poll_or_action_sequence(self):
+        self.durable()
+        first = self.inventory()
+        self.assertEqual(first["inventory"]["recent"], [])
+        self.assertFalse(first["inventory"]["startup_unlock"])
+        self.assertIsNone(self.session.wait_seconds())
+        self.assertIsNone(self.lookup(str(uuid.uuid4()))["record"])
+        self.assertEqual(self.sent[-1]["next_action_sequence"], 1)
+        self.assertEqual((self.captures, self.samples), (0, 0))
+        message = self.message()
+        self.send(message)
+        rid = self.queue.pending()["id"]
+        due = self.session.deadline
+        counts = self.captures, self.samples
+        previous = self.sent[-1]["sequence"]
+        for _ in range(50):
+            packet = self.inventory(1)
+            self.assertGreater(packet["sequence"], previous)
+            previous = packet["sequence"]
+            self.assertEqual(packet["next_action_sequence"], 2)
+            self.assertEqual(packet["inventory"]["pending_request_id"], rid)
+        self.assertEqual((self.captures, self.samples), counts)
+        self.assertEqual(self.session.deadline, due)
+        self.assertEqual(self.lookup(message["message"]["action_id"])["record"]["result_request_id"], rid)
+        self.assertNotIn(b"inode", encode(self.sent[-1]))
+
+    def test_durable_lost_queue_reply_recovery_new_epoch(self):
+        self.durable()
+        message = self.message()
+        self.send(message)
+        rid = self.queue.pending()["id"]
+        # Drop all replies, close and construct a different owner.
+        self.durable()
+        packet = self.inventory()
+        self.assertNotEqual(packet["owner_id"], message["message"]["owner_id"])
+        self.assertEqual(packet["inventory"]["recent"][0]["result_request_id"], rid)
+        self.assertEqual(self.lookup(message["message"]["action_id"])["record"]["state"], "COMMITTED")
+        with self.assertRaisesRegex(QueueError, "STALE_OR_INVALID_OWNER"):
+            self.send(message)
+        self.assertEqual(self.captures, 1)
+
+    def test_recovery_reads_refuse_invalid_commands(self):
+        self.durable()
+        for bad in (
+            {"version":1,"kind":"INVENTORY","owner_id":self.owner.owner_id,"limit":17},
+            {"version":1,"kind":"INVENTORY","owner_id":str(uuid.uuid4()),"limit":1},
+            {"version":1,"kind":"LOCAL_ACTION","owner_id":self.owner.owner_id,"action_id":"wrong"},
+            {"version":1,"kind":"INVENTORY","owner_id":self.owner.owner_id,"limit":1,"unlock":True},
+            {"version":1,"kind":"ACKNOWLEDGE","owner_id":self.owner.owner_id},
+        ):
+            with self.subTest(bad=bad), self.assertRaises(QueueError):
+                self.send(bad)
+        self.assertEqual((self.captures,self.samples),(0,0))
+
+    def test_recovery_reads_legacy_owner_refused(self):
+        self.session.start()
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            self.inventory()
+        with self.assertRaisesRegex(QueueError,"DURABLE_ACTION_MODE_REQUIRED"):
+            self.lookup(str(uuid.uuid4()))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

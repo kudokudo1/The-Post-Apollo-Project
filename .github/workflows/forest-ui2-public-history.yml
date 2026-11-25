@@ -10,6 +10,12 @@ on:
       - 'tests/forest/ui2_m4_public_fixture.py'
       - 'tests/forest/test_ui23a_public_history.js'
       - 'tests/forest/test_ui23b_history_controller.js'
+      - 'scripts/forest/runtime_public_child_r6b.py'
+      - 'scripts/forest/runtime_public_conversation_r5.py'
+      - 'widgets/forest/ui2/PublicRuntimeStatusDisplay.js'
+      - 'tests/forest/test_runtime_public_child_r6b.py'
+      - 'tests/forest/ui2_r6d_child_fixture.py'
+      - 'tests/forest/test_ui2_r6d_child_consumer.js'
       - '.github/workflows/forest-ui2-public-history.yml'
 permissions:
   contents: read
@@ -24,3 +30,5 @@ jobs:
       - run: node tests/forest/test_ui23a_public_history.js
 
       - run: node tests/forest/test_ui23b_history_controller.js
+
+      - run: node tests/forest/test_ui2_r6d_child_consumer.js

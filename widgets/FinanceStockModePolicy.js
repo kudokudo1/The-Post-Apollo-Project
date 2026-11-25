@@ -218,6 +218,9 @@ function loadedGlobalDay(snapshot, requestedDay) {
             || requestedDay<snapshot.from || requestedDay>snapshot.to)
         return {state:"invalid",date:requestedDay,close:null};
     const matches=snapshot.bars.filter(function(bar) { return bar && bar.date===requestedDay; });
+    if (matches.length===0 && snapshot.from===requestedDay && snapshot.to===requestedDay
+            && snapshot.bars.length===0)
+        return {state:snapshot.compactMayBeTruncated ? "unavailable" : "no-session",date:requestedDay,close:null};
     if (matches.length!==1 || typeof matches[0].price!=="number"
             || !Number.isFinite(matches[0].price) || matches[0].price<=0)
         return {state:"invalid",date:requestedDay,close:null};

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../widgets/FinanceStockModePolicy.js" as StockModePolicy
 
 // M18: explicit free-token EODHD listing search and one selected EOD read.
 // OpenFIGI identities and EODHD listings are NEVER automatically equated.
@@ -21,6 +22,9 @@ Scope {
     // Last successfully reserved durable local budget, not account balance.
     property var sharedQuota: null
     property int presetDays: 30
+    property string startDate: dateOffset(-29)
+    property string endDate: dateOffset(0)
+    readonly property bool validWindow: StockModePolicy.selectWindow("range","",startDate,endDate,dateOffset(0)) !== null
     property string requestedOp: ""
     property string requestedIdentity: ""
     property string requestedTicker: ""
@@ -60,6 +64,8 @@ Scope {
         requestedFrom="";
         requestedTo="";
         presetDays=30;
+        startDate=dateOffset(-29);
+        endDate=dateOffset(0);
     }
     onMonitoringChanged: {
         if (!monitoring) clear();
@@ -119,19 +125,25 @@ Scope {
         message="EODHD LISTING SELECTED // VERIFY NAME + EXCHANGE // THEN LOAD.";
         return true;
     }
-    function selectPreset(days) {
-        if (![7,30,90,180].includes(days) || loading || reader.running)
-            return false;
-        if (presetDays!==days) {
-            presetDays=days;
-            snapshot=null;
-            if (selectedListing) {
-                state="selected";
-                message="DATE RANGE CHANGED // PRESS LOAD HISTORY.";
-            }
-        }
+    function applyDates(from,to,preset) {
+        if (!monitoring || loading || reader.running || !selectedListing
+                || !validDate(from) || !validDate(to)) return false;
+        if (startDate===from && endDate===to && presetDays===preset) return true;
+        startDate=from;
+        endDate=to;
+        presetDays=preset;
+        snapshot=null;
+        state="selected";
+        message="DATE RANGE CHANGED // PRESS LOAD HISTORY.";
         return true;
     }
+    function selectPreset(days) {
+        const window=StockModePolicy.presetWindow(days,dateOffset(0));
+        return window!==null && applyDates(window.from,window.to,days);
+    }
+    function selectStartDate(day) { return applyDates(day,endDate,0); }
+    function selectEndDate(day) { return applyDates(startDate,day,0); }
+    function selectSingleDate(day) { return applyDates(day,day,0); }
     function dateOffset(days) {
         const day=new Date();
         day.setUTCDate(day.getUTCDate()+days);
@@ -141,13 +153,15 @@ Scope {
         if (!monitoring || loading || reader.running || !identity
                 || !selectedListing || !(state==="selected" || state==="ready"))
             return false;
+        const window=StockModePolicy.selectWindow("range","",startDate,endDate,dateOffset(0));
+        if (!window) { message="INVALID DATE WINDOW // NO REQUEST"; return false; }
         if (!freeAttemptAllowed()) return false;
         requestedOp="history";
         requestedIdentity=identity.figi;
         requestedSymbol=selectedListing.symbol;
         requestedCurrency=selectedListing.currency;
-        requestedTo=dateOffset(0);
-        requestedFrom=dateOffset(-(presetDays-1));
+        requestedTo=window.to;
+        requestedFrom=window.from;
         snapshot=null;
         sharedQuota=null;
         state="loading";

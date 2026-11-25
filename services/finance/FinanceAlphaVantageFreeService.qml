@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../widgets/FinanceStockModePolicy.js" as StockModePolicy
 
 // M19: separate Alpha Vantage free-key reader, no provider auto-fallback.
 // Counts requests started in THIS running widget only, never account usage.
@@ -15,6 +16,9 @@ Scope {
     property var snapshot: null
     property var sharedQuota: null // Durable local readers only, not API balance.
     property int presetDays: 30
+    property string startDate: dayOffset(-29)
+    property string endDate: dayOffset(0)
+    readonly property bool validWindow: StockModePolicy.selectWindow("range","",startDate,endDate,dayOffset(0)) !== null
     property string quotaUtcDay: ""
     property int requestsThisRuntime: 0
     readonly property int advertisedFreeDailyAllowance: 25
@@ -64,6 +68,8 @@ Scope {
         requestedFrom="";
         requestedTo="";
         presetDays=30;
+        startDate=dayOffset(-29);
+        endDate=dayOffset(0);
         // Do not reset requestsThisRuntime when changing/closing an instrument.
     }
     onMonitoringChanged: {
@@ -119,29 +125,37 @@ Scope {
         message="ALPHA VANTAGE SYMBOL CHOSEN // VERIFY REGION / NAME / CURRENCY.";
         return true;
     }
-    function selectPreset(days) {
-        if(![7,30,90,180].includes(days) || loading || reader.running)
-            return false;
-        if(presetDays!==days) {
-            presetDays=days;
-            snapshot=null;
-            if(selectedListing) {
-                state="selected";
-                message="DATE RANGE CHANGED // PRESS LOAD HISTORY.";
-            }
-        }
+    function applyDates(from,to,preset) {
+        if (!monitoring || loading || reader.running || !selectedListing
+                || !validDate(from) || !validDate(to)) return false;
+        if (startDate===from && endDate===to && presetDays===preset) return true;
+        startDate=from;
+        endDate=to;
+        presetDays=preset;
+        snapshot=null;
+        state="selected";
+        message="DATE RANGE CHANGED // PRESS LOAD HISTORY.";
         return true;
     }
+    function selectPreset(days) {
+        const window=StockModePolicy.presetWindow(days,dayOffset(0));
+        return window!==null && applyDates(window.from,window.to,days);
+    }
+    function selectStartDate(day) { return applyDates(day,endDate,0); }
+    function selectEndDate(day) { return applyDates(startDate,day,0); }
+    function selectSingleDate(day) { return applyDates(day,day,0); }
     function loadHistory() {
         if(!monitoring || loading || reader.running || !identity
-            || !selectedListing || !["selected","ready"].includes(state)
-            || !availableCall())return false;
+            || !selectedListing || !["selected","ready"].includes(state))return false;
+        const window=StockModePolicy.selectWindow("range","",startDate,endDate,dayOffset(0));
+        if (!window) { message="INVALID DATE WINDOW // NO REQUEST"; return false; }
+        if (!availableCall()) return false;
         requestedOp="history";
         requestedIdentity=identity.figi;
         requestedSymbol=selectedListing.symbol;
         requestedCurrency=selectedListing.currency;
-        requestedTo=dayOffset(0);
-        requestedFrom=dayOffset(-(presetDays-1));
+        requestedTo=window.to;
+        requestedFrom=window.from;
         snapshot=null;
         sharedQuota=null;
         state="loading";

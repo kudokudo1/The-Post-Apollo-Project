@@ -49,6 +49,7 @@ Item {
         }
         dayDate="";
         globalHistory=captured;
+        if (captured.from===captured.to) dayDate=captured.from;
         globalHandoffMessage="";
         controlsExpanded=false;
         researchView=stockReference !== null && stockReference.identity ? "compare" : "price";
@@ -426,10 +427,13 @@ Item {
                           + "\nSESSION " + (stocks.dayResult
                               && stocks.dayResult.state === "session" ? "AVAILABLE"
                               : stocks.dayResult && stocks.dayResult.state === "no-session"
-                                  ? "NO TRADING SESSION" : "INVALID DATA")
+                                  ? "NO TRADING SESSION" : stocks.dayResult && stocks.dayResult.state === "unavailable"
+                                      ? "SESSION NOT COVERED BY COMPACT HISTORY" : "INVALID DATA")
                           + "\nCLOSE " + (stocks.dayResult && stocks.dayResult.state === "session"
                               ? stocks.priceUnit + stocks.dayResult.close.toFixed(2) : "N/A")
-                          + "\nDAY SOURCE // PREVIOUSLY LOADED RANGE // NO NEW REQUEST"
+                          + (stocks.snapshot.from===stocks.snapshot.to
+                              ? "\nDAY SOURCE // EXPLICIT PROVIDER DATE REQUEST"
+                              : "\nDAY SOURCE // PREVIOUSLY LOADED RANGE // NO NEW REQUEST")
                         : !stocks.controlsExpanded
                             ? (stocks.snapshot.symbol + " // " + stocks.snapshot.priceBasis
                                 + " // " + stocks.historySource

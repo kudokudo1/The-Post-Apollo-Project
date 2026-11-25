@@ -16,6 +16,7 @@ from shared_context_b6r1 import TaskContext, BarkAttachment
 from context_first_tree_m2 import ContextRefusal, SessionContextRef
 from runtime_stop_control_r2 import RuntimeStopControl
 from runtime_events_r3 import OperationRef, RuntimeExchange, RuntimeEventRefusal
+from runtime_public_status_r4 import FixtureTreeBinding, Observation, PublicRuntimeStatus
 from history_public_fixture_m4 import (
     PublicViewRef, HistoryPageRef, history_public_fixture_in_transaction,
 )
@@ -66,18 +67,25 @@ class IntegratedContinuity(unittest.TestCase):
             current_context_ref=self.ref, resolve_current_context=lambda: self.ref,
             stop_control=self.control, operation_id=self.operation)
 
-    def history(self, *, after=0, limit=16, revision=None):
-        revision = self.rev if revision is None else revision
-        attachment = BarkAttachment(self.context, "bark-a", "requester-a",
+    def attachment(self):
+        return BarkAttachment(self.context, "bark-a", "requester-a",
             "release-a", "seat-a", "recipient-a", "CHERRY", self.context.generation)
+
+    def history(self, *, after=0, limit=16, revision=None, attachment=None,
+                current_attachment=None):
+        revision = self.rev if revision is None else revision
+        attachment = self.attachment() if attachment is None else attachment
+        current_attachment = attachment if current_attachment is None else current_attachment
         rid = "fixture_request_" + str(self.tick()).zfill(4)
         ref = HistoryPageRef(PublicViewRef(attachment, rid), self.sid, revision, after, limit)
+        # Distinct immutable original/current refs. Test host only, not custody.
+        current = replace(ref, view=PublicViewRef(current_attachment, rid))
         self.db.execute("BEGIN")
         try:
-            frame = history_public_fixture_in_transaction(self.journal, ref, current=ref)
+            frame = history_public_fixture_in_transaction(self.journal, ref, current=current)
         finally:
             self.db.rollback()
-        fields = {"requestId":rid,"treeKey":"CHERRY","generation":self.context.generation,
+        fields = {"requestId":rid,"treeKey":attachment.requested_tree,"generation":attachment.view_generation,
                   "sessionId":self.sid,"revision":revision,"after":after,"limit":limit}
         return frame, fields
 
@@ -161,6 +169,153 @@ process.stdout.write(JSON.stringify(snapshots));
             input=json.dumps({"pages":pages,"changedScope":changed_scope}, ensure_ascii=False),
             text=True, capture_output=True, check=True, timeout=10)
         return json.loads(result.stdout)
+
+    def projector(self, op, attachment):
+        binding = FixtureTreeBinding("cherry", "CHERRY")
+        p = PublicRuntimeStatus(op, attachment, tree_binding=binding)
+        # Fixture owner selects the pair independently of presentation inputs.
+        current = dict(current_operation=op, current_attachment=attachment,
+                       current_tree_binding=FixtureTreeBinding("cherry", "CHERRY"))
+        return p, current
+
+    def assert_status(self, packet, status):
+        self.assertEqual(packet, {
+            "schema":"postapollo.forest.public-runtime-status.v1",
+            "status":status, "sourceAuthenticated":False,
+            "permissionGranted":False, "productionAuthority":False,
+            "modelExecutionPermitted":False, "safeActions":[]})
+
+    def test_r4a_status_and_committed_history_after_restart(self):
+        self.append_user("Public first question")
+        op, runtime = self.runtime("status-first")
+        att = self.attachment()
+        projector, current = self.projector(op, att)
+        gen = runtime.run()
+        for expected in ("REQUEST_PENDING", "PREPARING", "GENERATING"):
+            self.assert_status(projector.observe(next(gen), **current), expected)
+        delta = next(gen)
+        self.assertEqual(delta.payload["event"], "DELTA")
+        self.assertIs(projector.observe(delta, **current), Observation.NO_UPDATE)
+        old_page = self.history(attachment=att)
+        before = self.controller([old_page])[-1]
+        self.assertTrue(before["complete"])
+        self.assertEqual([m["body"] for m in before["messages"]], ["Public first question"])
+        self.assert_status(projector.snapshot(**current), "GENERATING")
+        receipt = list(gen)[-1]
+        self.assertEqual(receipt.payload["event"], "COMMITTED")
+        self.assert_status(projector.observe(receipt, **current), "LOCAL_COMMIT_RECORDED")
+        self.assertIs(projector.finish(**current), Observation.NO_UPDATE)
+        # A status packet is not a page. Old revision is refused; only explicit
+        # new M4 requests may render the committed response.
+        old_rev = self.rev
+        self.rev += 1
+        with self.assertRaisesRegex(ContextRefusal, "STALE_REVISION"):
+            self.history(revision=old_rev, attachment=att)
+        self.assertEqual(self.controller([old_page], {"revision":self.rev})[-1]["messages"], [])
+        first = self.controller([self.history(limit=1, attachment=att),
+                                 self.history(after=1, limit=1, attachment=att)])[-1]
+        self.assertEqual([m["body"] for m in first["messages"]],
+                         ["Public first question", "Public answer"])
+        self.assertEqual(self.journal.session("fixture-owner", self.sid)["tree_key"], "cherry")
+        self.db.close()
+        self.db = sqlite3.connect(self.path)
+        self.journal = ForestSessionJournal(self.db)
+        self.context = replace(self.context, task_id="task-b",
+                               execution_context_id="exec-b", generation=2)
+        att2 = self.attachment()
+        self.assertIsNone(projector.snapshot(**dict(current, current_attachment=att2)))
+        self.assertIsNone(projector.snapshot(**current))
+        reopened = self.controller([self.history(attachment=att2)])[-1]
+        self.assertEqual(reopened["messages"], first["messages"])
+        self.append_user("Public follow-up")
+        self.reply = "Public second answer"
+        op2, runtime2 = self.runtime("status-second")
+        p2, c2 = self.projector(op2, att2)
+        self.assert_status(p2.snapshot(**c2), "IDLE")
+        frames = list(runtime2.run())
+        observations = [p2.observe(f, **c2) for f in frames]
+        self.assertIs(observations[3], Observation.NO_UPDATE)
+        self.assert_status(observations[-1], "LOCAL_COMMIT_RECORDED")
+        self.assertNotEqual(op2, op)
+        self.assertNotEqual(frames[-1].attempt_id, receipt.attempt_id)
+        self.assertEqual(self.calls[-1], [
+            {"role":"user","content":"Public first question"},
+            {"role":"assistant","content":"Public answer"},
+            {"role":"user","content":"Public follow-up"}])
+        self.rev += 1
+        final = self.controller([self.history(limit=2, attachment=att2),
+                                 self.history(after=2, limit=2, attachment=att2)])[-1]
+        self.assertEqual([m["body"] for m in final["messages"]],
+                         ["Public first question", "Public answer",
+                          "Public follow-up", "Public second answer"])
+
+    def test_r4a_stop_status_is_not_history_or_terminal_ack(self):
+        self.append_user("Public question")
+        self.reply = "Public provisional text"
+        op, runtime = self.runtime("status-stop")
+        att = self.attachment()
+        projector, current = self.projector(op, att)
+        gen = runtime.run()
+        for expected in ("REQUEST_PENDING", "PREPARING", "GENERATING"):
+            self.assert_status(projector.observe(next(gen), **current), expected)
+        delta = next(gen)
+        self.assertIs(projector.observe(delta, **current), Observation.NO_UPDATE)
+        ack = runtime.request_stop(op, delta.attempt_id)
+        self.assertEqual(ack, "STOP_LATCHED")
+        self.assert_status(projector.observe_stop_ack(ack, delta.attempt_id, **current),
+                           "STOP_REQUESTED")
+        before = self.controller([self.history(attachment=att)])[-1]
+        self.assertEqual([m["body"] for m in before["messages"]], ["Public question"])
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?", (delta.attempt_id,)
+        ).fetchone()[0], "RESERVED")
+        end = list(gen)[-1]
+        self.assert_status(projector.observe(end, **current), "UNKNOWN_HOLD")
+        self.assertIs(projector.finish(**current), Observation.NO_UPDATE)
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?", (delta.attempt_id,)
+        ).fetchone()[0], "ABORTED")
+        self.assertEqual(self.controller([self.history(attachment=att)])[-1]["messages"],
+                         before["messages"])
+        _, again = self.runtime("status-stop-other-operation")
+        self.assertEqual(list(again.run())[-1].payload["event"], "UNKNOWN_HOLD")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_r4a_view_withdrawal_does_not_cancel_durable_operation(self):
+        self.append_user("Public question")
+        op, runtime = self.runtime("status-withdraw")
+        att = self.attachment()
+        projector, current = self.projector(op, att)
+        gen = runtime.run()
+        for expected in ("REQUEST_PENDING", "PREPARING", "GENERATING"):
+            self.assert_status(projector.observe(next(gen), **current), expected)
+        delta = next(gen)
+        self.assertIs(projector.observe(delta, **current), Observation.NO_UPDATE)
+        old_page = self.history(attachment=att)
+        # View recipient changes but the task and its original operation do not.
+        changed = replace(att, recipient_id="recipient-b", view_generation=2)
+        self.assertIsNone(projector.snapshot(**dict(current, current_attachment=changed)))
+        self.assertIsNone(projector.snapshot(**current))
+        with self.assertRaisesRegex(ContextRefusal, "VIEW_CHANGED"):
+            self.history(attachment=att, current_attachment=changed)
+        cleared = self.controller([old_page], {"generation":2, "viewKey":"new-view"})[-1]
+        self.assertEqual(cleared["state"], "UNAVAILABLE")
+        self.assertEqual(cleared["messages"], [])
+        # No STOP request was made; the fixture can finish internally.
+        end = list(gen)[-1]
+        self.assertEqual(end.payload["event"], "COMMITTED")
+        self.assertIsNone(projector.observe(end, **current))
+        self.assertIsNone(projector.finish(**current))
+        self.rev += 1
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?", (delta.attempt_id,)
+        ).fetchone()[0], "COMMITTED")
+        # Explicit independently resolved public history, not old status replay.
+        refreshed = self.controller([self.history(attachment=changed,
+                                                  current_attachment=changed)])[-1]
+        self.assertEqual([m["body"] for m in refreshed["messages"]],
+                         ["Public question", "Public answer"])
+        self.assertEqual(len(self.calls), 1)
 
     def test_r3_restart_followup_and_controller_reopens_committed_history(self):
         self.append_user("Public first question")

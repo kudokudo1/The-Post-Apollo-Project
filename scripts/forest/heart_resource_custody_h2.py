@@ -8,9 +8,10 @@ from dataclasses import dataclass
 import threading
 
 from heart_dispatch_reference_h1 import (
-    DispatchRefusal, MAX_AGE_NS, compare_dispatch, _key, _time,
+    DispatchRefusal, TransportSettings, MAX_AGE_NS, compare_dispatch, _key, _time,
 )
 from shared_context_b6r1 import TaskContext
+from model_binding_i2 import ModelBinding
 from resource_governor_p1 import ResourceAvailability
 
 MAX_OPERATIONS = 256
@@ -27,10 +28,19 @@ class AttemptRef:
     turn_id: str
     operation_id: str
     attempt_id: str
+    binding: ModelBinding
+    settings: TransportSettings
 
     def __post_init__(self):
         if type(self.context) is not TaskContext:
             raise CustodyRefusal("INVALID_CONTEXT")
+        if type(self.binding) is not ModelBinding or type(self.settings) is not TransportSettings:
+            raise CustodyRefusal("INVALID_ATTEMPT_BINDING")
+        if (self.settings.model != self.binding.identity.model_name
+                or self.settings.num_ctx != self.binding.context_tokens
+                or self.settings.max_predict != self.binding.output_tokens
+                or self.settings.config_digest != self.binding.config_digest):
+            raise CustodyRefusal("ATTEMPT_SETTINGS_MISMATCH")
         try:
             for value in (self.turn_id, self.operation_id, self.attempt_id):
                 _key(value)
@@ -94,7 +104,8 @@ class ResourceCustody:
                 return "DISPATCH_REFERENCE_HOLD"
             scope = current.binding.recommendation.original.scope
             attempt = AttemptRef(scope.context, scope.turn_id,
-                                 current.operation_id, current.attempt_id)
+                                 current.operation_id, current.attempt_id,
+                                 current.binding.binding, current.settings)
             turn = (attempt.context, attempt.turn_id)
             if (attempt.operation_id in self._operations
                     or attempt.attempt_id in self._attempts

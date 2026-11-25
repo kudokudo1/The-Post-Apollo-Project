@@ -50,3 +50,24 @@ release ownership unchanged. 256-reference limit is a provisional
 disposable test bound, not a production lifetime limit. Nurse2F
 independent review required. Native resource producer, enforceable
 runtime settings, durable custody and approved live trial remain HOLD.
+
+
+## H11 // Exact model and transport lineage through terminal accounting
+H2 previously retained task/turn/operation/attempt but dropped the
+selected binding and transport settings after H1 claim. Recover the
+freeze-once binding at the existing custody boundary: AttemptRef now
+requires the exact I2 ModelBinding and H1 TransportSettings, with
+matching model name, context, output and settings fingerprint. Claim
+takes them directly from the successfully recomputed H1 snapshot.
+Terminal and release references must match the entire active attempt,
+including artifact, adapter, runtime identity/release/config and
+settings. Different same-attempt binding/settings cannot settle or
+clear the original slot. Unknown remains sticky. This is an explicit
+developer API tightening, not a new wire schema; no legacy four-field
+constructor or permissive fallback. Existing H2 test caller migrated.
+Equality is fixture consistency, not independently authenticated
+identity, actual provider terminal/quiescence, or physical resource
+release. R7b's separate exact evidence and local terminal/settlement
+checks remain Runtime-owned; do not substitute H2 state for them.
+No native execution, new issuer, collector, or runtime modification.
+Nurse2F independent review and DOC2F/DOC3F owner compatibility requested.

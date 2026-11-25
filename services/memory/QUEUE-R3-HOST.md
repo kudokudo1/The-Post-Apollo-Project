@@ -101,3 +101,24 @@ watchdog or host source, timeout durations, trial steps, or acceptance
 assertions. Both native trials must pass at the revised exact head before
 independent review. DOC 2 #2635 workspace qualification is separate;
 no shared fixture or presentation modifications.
+
+## R3m // canonical staged host candidate
+
+Stacked on #2680 reviewed 053f103a; preserve reviewed server. Explicit
+host start mode STAGED supplied by trusted wrapper; LEGACY default
+retained for existing fixtures only. No negotiation/downgrade. Confirm
+publishes existing Consumer pending before PREPARE frame; RECHECK remains
+ordinary ACTION. Strict receipt validation via actual recovery row parser,
+owner, watermark, sequence, exact typed pending message and challenge.
+Receipt is not completion. takeCommit is one-use state transition: wrapper
+must publish returned state before writing frame, never retry a failed write.
+Same ACTION watchdog remains active throughout; no extension. Reject extra
+frames while receipt ready, premature ACTION, malformed receipts. Preserve
+unresolved on loss in any stage, erase transient challenge on stop; restart
+never emits COMMIT from history. No additional controller or startup unlock.
+DOC 2 context adds presentation-only actionStage; existing pending gating
+unchanged. Native fixture adds staged ROUNDTRIP, LOST and EOF trials with
+actual child, panes and isolated watchdog; previous two trials preserved.
+Fixture-only startup injection and durations; no installed wrapper, raw
+byte-bounded reader, event-loop starvation or whole-shell recovery proof.
+No recovery acknowledgment wire or release of PREPARED. CI pending.

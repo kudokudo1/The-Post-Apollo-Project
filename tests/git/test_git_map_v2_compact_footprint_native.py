@@ -203,6 +203,7 @@ print(json.dumps(getattr(v2,action)(Path(repo),Path(os.environ["XDG_CACHE_HOME"]
     patch(lease,'''Quickshell.shellPath("scripts/git_map_reader_candidate.py"),
             generation.repoId,generation.key,generation.manifest.snapshot''','''Quickshell.shellPath("scripts/git_map_v2_reader_candidate.py"),
             "--base",Quickshell.env("XDG_CACHE_HOME"),"--device",generation.device,"--inode",generation.inode].concat(Quickshell.env("MAP_COMPACT_HOLDER")==="yes" ? ["--compact-hold"] : []).concat(["hold",generation.repoId,generation.key,generation.manifest.snapshot])''')
+    patch(lease,'generation.manifest.snapshot])]);','generation.manifest.snapshot]));')
     patch(lease,'"post-apollo-git-map-reader-candidate-v1"','"post-apollo-git-map-reader-v2-candidate"')
     patch(lease,"m.snapshot!==g.manifest.snapshot || m.reclamationAllowed!==false","m.snapshot!==g.manifest.snapshot || m.device!==g.device || m.inode!==g.inode || m.reclamationAllowed!==false")
     binary=scene/"scripts/git_map_compact_holder"

@@ -52,16 +52,24 @@ export function inspectM3d5b2StdinFrame(frame) {
 // Parse fixed M3b result grammar without trusting a successful exit status
 // alone. Unknown/multiple statuses are UNCERTAIN, never implicit success.
 export function inspectM3d5b2WriterOutcome({stdout="",exitCode=null}={}) {
+  // Accept EXACTLY one fixed status line followed by exactly one LF.
+  // Never drop blank lines: a second LF, a missing final LF, a leading
+  // newline, CRLF, or any appended output makes the result uncertain.
   if(typeof stdout!=="string" || Buffer.byteLength(stdout,"utf8")>2048
-      || stdout.includes("\r"))return {state:"uncertain",canRetry:false};
-  const lines=stdout.split("\n").filter(Boolean);
-  if(lines.length!==1)return {state:"uncertain",canRetry:false};
+      || !stdout.endsWith("\n")
+      || stdout.indexOf("\n")!==stdout.length-1
+      || stdout.includes("\r"))
+    return {state:"uncertain",canRetry:false};
+  const line=stdout.slice(0,-1);
   const m=/^FINANCEW_CATEGORIZED_EXPENSE_RESULT (committed|uncertain|blocked:[a-z0-9-]+)$/
-    .exec(lines[0]);
-  if(!m)return {state:"uncertain",canRetry:false};
+    .exec(line);
+  // JS's $ anchor also matches before some trailing line terminators. Check
+  // the whole captured string so Unicode separators cannot hide extra data.
+  if(!m || m[0]!==line)return {state:"uncertain",canRetry:false};
   if(m[1]==="committed" && exitCode===0)
     return {state:"committed",canRetry:false};
-  if(m[1].startsWith("blocked:") && exitCode!==0 && exitCode!==null)
+  if(m[1].startsWith("blocked:")
+      && Number.isInteger(exitCode) && exitCode>0)
     return {state:"blocked",canRetry:false,reason:m[1].slice(8)};
   return {state:"uncertain",canRetry:false};
 }

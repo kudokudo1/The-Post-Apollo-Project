@@ -49,7 +49,7 @@ def generation_path(base,repo_id,key):
     return manager.private_dir(folder/key)
 
 @contextmanager
-def read(base,repo_id,key,snapshot=None):
+def read(base,repo_id,key,snapshot=None,*,expected_identity=None,evidence=None):
     if snapshot is not None and (not isinstance(snapshot,str) or not index.SNAPSHOT.fullmatch(snapshot)):
         raise ValueError("invalid snapshot")
     path=generation_path(base,repo_id,key)
@@ -58,6 +58,10 @@ def read(base,repo_id,key,snapshot=None):
         fcntl.flock(fd,fcntl.LOCK_SH|fcntl.LOCK_NB)
         if not same_directory(path,fd) or os.path.lexists(path/index.NAME):
             raise ValueError("mixed or changed candidate generation")
+        opened=os.fstat(fd)
+        identity=(str(opened.st_dev),str(opened.st_ino))
+        if expected_identity is not None and expected_identity!=identity:
+            raise ValueError("candidate directory identity changed")
         db=path/NAME
         info=db.lstat()
         if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid()
@@ -75,15 +79,18 @@ def read(base,repo_id,key,snapshot=None):
                 raise ValueError("candidate manifest identity mismatch")
             if not same_directory(path,fd):
                 raise ValueError("candidate directory moved")
+            if evidence is not None:
+                evidence.update(device=identity[0],inode=identity[1])
             yield conn,m
         finally: conn.close()
     finally: os.close(fd)
 
 def receipt(base,repo_id,key):
-    with read(base,repo_id,key) as (_,m):
+    evidence={}
+    with read(base,repo_id,key,evidence=evidence) as (_,m):
         return {"schema":PROTOCOL,"status":"READY","repoId":repo_id,"key":key,
                 "directory":str(generation_path(base,repo_id,key)),
-                "manifest":m,"reclamationAllowed":False}
+                "manifest":m,"reclamationAllowed":False,**evidence}
 
 def lookup(repo,base):
     repo_id,digest,key=identity(repo)

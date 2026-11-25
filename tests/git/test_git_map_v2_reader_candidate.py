@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import select
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -46,8 +47,11 @@ class Transport(unittest.TestCase):
         self.assertEqual(self.git("status","--porcelain"),self.status)
     def argv(self,action,*args,receipt=None):
         r=receipt or self.new
-        return [sys.executable,"-I","-B",str(ROOT/"scripts/git_map_v2_reader_candidate.py"),
-            "--base",str(self.cache),action,r["repoId"],r["key"],r["manifest"]["snapshot"],*args]
+        command=[sys.executable,"-I","-B",str(ROOT/"scripts/git_map_v2_reader_candidate.py"),
+            "--base",str(self.cache)]
+        if "device" in r and "inode" in r:
+            command+=["--device",r["device"],"--inode",r["inode"]]
+        return command+[action,r["repoId"],r["key"],r["manifest"]["snapshot"],*args]
     def finite(self,action,*args,receipt=None,env=None):
         return subprocess.run(self.argv(action,*args,receipt=receipt),env=env or self.env,
             capture_output=True,text=True,timeout=5,stdin=subprocess.DEVNULL)
@@ -59,7 +63,8 @@ class Transport(unittest.TestCase):
         m=json.loads(p.stdout.readline())
         self.assertEqual(m,{"schema":"post-apollo-git-map-reader-v2-candidate",
             "status":"HELD","repoId":self.new["repoId"],"key":self.new["key"],
-            "snapshot":self.new["manifest"]["snapshot"],"reclamationAllowed":False})
+            "snapshot":self.new["manifest"]["snapshot"],"reclamationAllowed":False,
+            "device":self.new["device"],"inode":self.new["inode"]})
         return p
     def cleanup_process(self,p):
         if p.poll() is None: p.kill()
@@ -89,6 +94,7 @@ class Transport(unittest.TestCase):
             self.assertEqual(receipt["snapshot"],self.new["manifest"]["snapshot"])
             self.assertIs(receipt["reclamationAllowed"],False)
             self.assertEqual(receipt["result"],expected[action])
+            self.assertEqual((receipt["device"],receipt["inode"]),(self.new["device"],self.new["inode"]))
             self.assertTrue(self.exclusive())
         p=self.finite("info",receipt=self.old)
         self.assertEqual(p.returncode,1)
@@ -99,6 +105,41 @@ class Transport(unittest.TestCase):
         p=self.finite("info",env=dict(self.env,POST_APOLLO_GIT_MAP_SMOKE=""))
         self.assertEqual(p.returncode,1)
         self.assertEqual(p.stdout,"")
+    def test_same_name_replacement_refuses_stale_inode(self):
+        self.assertEqual((self.new["device"],self.new["inode"]),
+                         (str(self.path.stat().st_dev),str(self.path.stat().st_ino)))
+        wrong=dict(self.new,inode=str(int(self.new["inode"])+1))
+        result=self.finite("info",receipt=wrong)
+        self.assertEqual((result.returncode,result.stdout),(1,""))
+        self.assertTrue(self.exclusive())
+        holder=self.held()
+        displaced=self.path.with_name(".fixture-displaced")
+        self.path.rename(displaced)
+        shutil.copytree(displaced,self.path)
+        # The bytes, manifest, key and pathname all match, but the directory
+        # inode is different. Do not mistake the old lock for the new path.
+        self.assertNotEqual(self.path.stat().st_ino,displaced.stat().st_ino)
+        for action,args in (("info",()),("page",("0",)),("locate",(self.head,)),("search",("first","0"))):
+            result=self.finite(action,*args)
+            self.assertEqual((result.returncode,result.stdout),(1,""))
+        result=subprocess.run(self.argv("hold"),env=self.env,input="",
+                              capture_output=True,text=True,timeout=5)
+        self.assertEqual((result.returncode,result.stdout),(1,""))
+        self.assertTrue(self.exclusive())
+        fd=os.open(displaced,os.O_RDONLY|os.O_DIRECTORY)
+        try:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            holder.stdin.close()
+            self.assertEqual(holder.wait(timeout=5),0)
+            fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        finally: os.close(fd)
+        fresh=v2.lookup(self.repo,self.cache)
+        self.assertNotEqual(fresh["inode"],self.new["inode"])
+        self.assertEqual(fresh["manifest"],self.new["manifest"])
+        result=self.finite("info",receipt=fresh)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout)["inode"],fresh["inode"])
     def test_concurrent_process_lifetimes_and_conflict(self):
         a=self.held()
         b=self.held()

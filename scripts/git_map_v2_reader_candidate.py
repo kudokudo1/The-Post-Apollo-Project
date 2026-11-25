@@ -28,6 +28,7 @@ def main(argv=None):
     parser.add_argument("--base",type=Path,required=True)
     parser.add_argument("--device")
     parser.add_argument("--inode")
+    parser.add_argument("--compact-hold",action="store_true",help="Disposable native holder experiment")
     sub=parser.add_subparsers(dest="action",required=True)
     for action in ("info","page","locate","search","hold"):
         sp=sub.add_parser(action)
@@ -41,6 +42,8 @@ def main(argv=None):
             sp.add_argument("start",type=int)
     args=parser.parse_args(argv)
     try:
+        if args.compact_hold and args.action!="hold":
+            raise ValueError("compact mode requires hold")
         if args.action=="hold" and not stat.S_ISFIFO(os.fstat(sys.stdin.fileno()).st_mode):
             raise ValueError("lifetime pipe required")
         if not all(isinstance(x,str) and re.fullmatch(r"0|[1-9][0-9]{0,19}",x)
@@ -48,14 +51,29 @@ def main(argv=None):
             raise ValueError("expected directory identity required")
         expected=(args.device,args.inode)
         evidence={}
+        lease_fd=[] if args.compact_hold else None
         with v2.read(args.base,args.repo_id,args.key,args.snapshot,
-                     expected_identity=expected,evidence=evidence) as (conn,m):
+                     expected_identity=expected,evidence=evidence,lease_fd=lease_fd) as (conn,m):
             if args.action=="hold":
                 # The directory descriptor remains held by read() even after
                 # the SQLite connection closes. No heartbeat, no open DB.
                 conn.close()
-                emit({"schema":SCHEMA,"status":"HELD","repoId":args.repo_id,
-                      "key":args.key,"snapshot":m["snapshot"],"reclamationAllowed":False,**evidence})
+                receipt={"schema":SCHEMA,"status":"HELD","repoId":args.repo_id,
+                         "key":args.key,"snapshot":m["snapshot"],"reclamationAllowed":False,**evidence}
+                if args.compact_hold:
+                    # exec keeps the original open file description (and flock),
+                    # but replaces the Python address space. Native code emits
+                    # HELD only after successful handoff; no fallback on failure.
+                    fd,=lease_fd
+                    holder=Path(__file__).resolve().with_name("git_map_compact_holder")
+                    path=v2.generation_path(args.base,args.repo_id,args.key)
+                    os.set_inheritable(fd,True)
+                    try:
+                        os.execv(str(holder),[str(holder),str(fd),str(path),
+                            json.dumps(receipt,ensure_ascii=True,separators=(",",":"))])
+                    finally:
+                        os.set_inheritable(fd,False)
+                emit(receipt)
                 if sys.stdin.buffer.read(1):
                     raise ValueError("unexpected lifetime channel data")
                 return 0

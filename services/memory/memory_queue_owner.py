@@ -69,6 +69,11 @@ class Owner:
                 self._fd = None
             raise
 
+    @property
+    def staged_max_age_ms(self):
+        """Explicit local owner configuration; not a client-selected grant."""
+        return self._staged_max_age_ms
+
     def _legacy_fence(self):
         with self.queue._transaction() as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE name=?",

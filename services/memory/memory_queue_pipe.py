@@ -9,6 +9,7 @@ import os
 import select
 import stat
 import time
+import uuid
 
 from memory_adjustment_queue import QueueError, _int, _uuid
 from memory_queue_owner import MAX_SAFE
@@ -113,6 +114,18 @@ class Session:
         self.owner, self.emit = owner, emit
         self.deadline = None
         self.started = False
+        self.closed = False
+        self.prepared = None
+        self.prepare_deadline = None
+
+    def close(self):
+        """Terminal teardown; never preserve an admission across sessions."""
+        if self.closed:
+            return
+        self.prepared = None
+        self.prepare_deadline = self.deadline = None
+        self.owner.close()
+        self.closed = True
 
     def _control(self, kind):
         return {"version": 1, "kind": kind, "owner_id": self.owner.owner_id,
@@ -139,26 +152,79 @@ class Session:
         self.emit(status_for_ui(packet))
 
     def start(self):
-        if self.started:
+        if self.closed or self.started:
             raise QueueError("SESSION_ALREADY_STARTED")
         self.started = True
         self.emit(self._control("HELLO"))
         self.publish()
 
     def wait_seconds(self):
+        if self.closed:
+            raise QueueError("SESSION_CLOSED")
+        if self.prepare_deadline is not None:
+            return max(0, self.prepare_deadline - time.monotonic())
         if self.deadline is None:
             return None
         _, mono = self.owner.runtime._now()
         return max(0, self.deadline - mono) / 1000
 
     def due(self):
+        if self.prepare_deadline is not None and self.wait_seconds() == 0:
+            self.close()
+            raise QueueError("STAGED_PIPE_EXPIRED")
         if self.deadline is not None and self.wait_seconds() == 0:
             self.publish()
 
     def receive(self, line):
-        if not self.started:
+        if not self.started or self.closed:
             raise QueueError("SESSION_NOT_STARTED")
+        try:
+            self._receive(line)
+        except BaseException:
+            # Staged mode is terminal on any malformed/unexpected command,
+            # emission failure or lost continuation, even in direct fixtures.
+            # Existing legacy direct Session fixtures retain their contract.
+            if self.owner.staged_max_age_ms is not None:
+                self.close()
+            raise
+
+    def _receive(self, line):
         obj = decode(line)
+        mode = self.owner.staged_max_age_ms
+        if self.prepared is not None:
+            if time.monotonic() >= self.prepare_deadline:
+                raise QueueError("STAGED_PIPE_EXPIRED")
+            message, sequence, challenge = self.prepared
+            if (set(obj) != {"version","kind","message","prepared_sequence","challenge"}
+                    or obj["kind"] != "COMMIT_ACTION"
+                    or type(obj["prepared_sequence"]) is not int
+                    or obj["prepared_sequence"] != sequence
+                    or obj["challenge"] != challenge or obj["message"] != message):
+                raise QueueError("STAGED_PIPE_MISMATCH")
+            # Consume the receipt before the synchronous owner dispatch. A
+            # lost commit reply cannot be retried, even in this generation.
+            self.prepared = None
+            self.prepare_deadline = None
+            reply = self.owner.commit_action(message)
+            self.emit(reply)
+            self.publish()
+            return
+        if obj.get("kind") == "PREPARE_ACTION":
+            if mode is None or set(obj) != {"version","kind","message"}:
+                raise QueueError("STAGED_PIPE_MODE_REQUIRED")
+            # Stop advisory publication while waiting for the exact receipt
+            # response. The owner separately checks both clocks under lock.
+            self.deadline = None
+            self.prepare_deadline = time.monotonic() + mode / 1000
+            packet = self.owner.prepare_action(obj["message"])
+            if time.monotonic() >= self.prepare_deadline:
+                raise QueueError("STAGED_PIPE_EXPIRED")
+            challenge = str(uuid.uuid4())
+            self.prepared = (packet["record"]["message"],packet["sequence"],challenge)
+            self.emit(dict(packet,challenge=challenge))
+            return
+        if obj.get("kind") == "COMMIT_ACTION":
+            raise QueueError("STAGED_PIPE_NOT_PREPARED")
         if obj.get("kind") == "ACTION" and set(obj) == {"version", "kind", "message"}:
             # ACTION reply precedes the new STATUS. Client clears the old
             # projection on submit. Unknown response must never be replayed.
@@ -251,7 +317,7 @@ def serve(owner, read_fd, write_fd, *, io_timeout_ms):
             session.due()
     finally:
         try:
-            owner.close()
+            session.close()
         finally:
             os.set_blocking(read_fd, before_read)
             os.set_blocking(write_fd, before_write)

@@ -127,3 +127,85 @@ class HeadroomTests(unittest.TestCase):
             self.skipTest("Native hierarchy unsupported: " + str(exc))
         self.assertGreaterEqual(result["sampled_memory_headroom_hint_mib"], 0)
         self.assertFalse(result["safe_to_start_inference"])
+
+
+class PressureTests(unittest.TestCase):
+    PSI = b"some avg10=0.25 avg60=1.10 avg300=0.00 total=100\nfull avg10=0.00 avg60=0.10 avg300=0.00 total=20\n"
+    EVENTS = b"low 0\nhigh 1\nmax 2\noom 0\noom_kill 0\n"
+
+    def test_exact_parse_units_and_optional_events(self):
+        first = (H._pressure(self.PSI), H._events(self.EVENTS))
+        second = (H._pressure(self.PSI.replace(b"total=100", b"total=150")),
+                  H._events(self.EVENTS.replace(b"high 1", b"high 3")))
+        out = H._pressure_summary(first, second)
+        self.assertEqual(out["psi"]["some"]["avg10_hundredths_percent"], 25)
+        self.assertEqual(out["psi"]["some"]["avg60_hundredths_percent"], 110)
+        self.assertEqual(out["psi"]["some"]["observed_delta_us"], 50)
+        self.assertEqual(out["events_observed_delta"]["high"], 2)
+        self.assertIsNone(out["events_total"]["oom_group_kill"])
+        self.assertFalse(out["pressure_free_established"])
+
+    def test_malformed_pressure_refused(self):
+        for raw in (b"", self.PSI.splitlines()[0], self.PSI+self.PSI,
+                    self.PSI.replace(b"0.25", b"100.01"),
+                    self.PSI.replace(b"0.25", b"nan"),
+                    self.PSI.replace(b"total=100", b"total=-1"),
+                    self.PSI.replace(b"total=100", b"total=9223372036854775808")):
+            with self.subTest(raw=raw), self.assertRaises(H.I5.CgroupRefusal):
+                H._pressure(raw)
+
+    def test_invalid_events_refused(self):
+        for raw in (b"", self.EVENTS.replace(b"oom_kill 0\n", b""),
+                    self.EVENTS+self.EVENTS, self.EVENTS.replace(b"max 2", b"max -1"),
+                    self.EVENTS.replace(b"max 2", b"max 9223372036854775808")):
+            with self.subTest(raw=raw), self.assertRaises(H.I5.CgroupRefusal):
+                H._events(raw)
+
+    def test_counter_reset_and_key_change_refused(self):
+        first = (H._pressure(self.PSI), H._events(self.EVENTS))
+        for second in (
+            (H._pressure(self.PSI.replace(b"total=100", b"total=99")), first[1]),
+            (first[0], H._events(self.EVENTS.replace(b"max 2", b"max 1"))),
+            (first[0], H._events(self.EVENTS+b"oom_group_kill 0\n")),
+        ):
+            with self.assertRaisesRegex(H.I5.CgroupRefusal, "MEMORY_COUNTER_CONTINUITY_LOST"):
+                H._pressure_summary(first, second)
+
+    def test_existing_observer_opt_in_and_fd_boundaries(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            for name, value in (("memory.current", b"10"), ("memory.max", b"100"),
+                                ("memory.high", b"max"), ("memory.pressure", self.PSI),
+                                ("memory.events", self.EVENTS)):
+                (path/name).write_bytes(value)
+            with patch.object(H.I5, "_open_group",
+                              side_effect=lambda _: os.open(root, os.O_RDONLY | os.O_DIRECTORY)), \
+                 patch.object(H.I5, "_mount", return_value=("mount","device")), \
+                 patch.object(H, "_host_memory_available_mib", return_value=100):
+                ordinary = H.observe("/fixture")
+                observed = H.observe("/fixture", pressure=True)
+                self.assertNotIn("selected_cgroup_pressure", ordinary)
+                self.assertEqual(observed["selected_cgroup_pressure"]["events_observed_delta"]["oom"], 0)
+                self.assertFalse(observed["safe_to_start_inference"])
+                self.assertNotIn(root, str(observed))
+                (path/"memory.pressure").unlink()
+                with self.assertRaises(H.I5.CgroupRefusal):
+                    H.observe("/fixture", pressure=True)
+                (path/"memory.pressure").symlink_to(path/"memory.events")
+                with self.assertRaises(H.I5.CgroupRefusal):
+                    H.observe("/fixture", pressure=True)
+                self.assertNotIn("selected_cgroup_pressure", H.observe("/fixture"))
+
+    def test_native_pressure_optional(self):
+        if sys.platform != "linux":
+            self.skipTest("Linux only")
+        path = next((line[3:] for line in Path("/proc/self/cgroup").read_text().splitlines()
+                     if line.startswith("0::")), None)
+        if not path or path == "/":
+            self.skipTest("No explicit non-root self group")
+        try:
+            observed = H.observe(path, pressure=True)
+        except H.I5.CgroupRefusal as exc:
+            self.skipTest("Native pressure unsupported: " + str(exc))
+        self.assertGreaterEqual(observed["selected_cgroup_pressure"]["events_total"]["oom"], 0)
+        self.assertFalse(observed["safe_to_start_inference"])

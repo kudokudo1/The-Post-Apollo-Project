@@ -304,5 +304,179 @@ class RetirementTransactionTests(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
 
 
+    # R7d-b: negative coverage of actual unrestricted direct writers.
+    # Each unittest has a fresh R7c DB and an independently held H11/H2.
+    def r7d_open_pending(self):
+        self.assert_status(self.pending(), "FIXTURE_PENDING")
+        self.assert_pending()
+        self.db.set_authorizer(None)
+        self.r7d_original = self.db.execute(
+            "SELECT * FROM forest_retirement_r7c_fixture").fetchall()
+        self.assertEqual(self.custody.status()["status"], "REFERENCE_HELD")
+
+    def r7d_check_hold(self):
+        self.db.set_authorizer(None)
+        self.assertEqual(self.db.execute(
+            "SELECT * FROM forest_retirement_r7c_fixture").fetchall(),
+            self.r7d_original)
+        self.assertEqual(self.custody.status(), self.custody_before)
+        before = self.snapshot()
+        self.guard()
+        self.assert_status(self.finish(), "UNKNOWN_HOLD")
+        self.assert_pending()
+        self.assertEqual(self.denied, [])
+        self.db.set_authorizer(None)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.db.execute(
+            "SELECT * FROM forest_retirement_r7c_fixture").fetchall(),
+            self.r7d_original)
+        self.assertEqual(self.custody.status(), self.custody_before)
+
+    def test_r7d_create_unmapped_open_is_not_activation(self):
+        self.r7d_open_pending()
+        new = self.journal.create_session(self.ctx.principal_key, "cherry",
+                     "Fixed public unmapped session", now_ms=4)
+        self.assertNotEqual(new["session_id"], self.session)
+        self.assertEqual(new["state"], "OPEN")
+        self.assertEqual(new["revision"], 0)
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM forest_retirement_r7c_fixture WHERE session_id=?",
+            (new["session_id"],)).fetchone(), (0,))
+        self.assertEqual(self.db.execute(
+            "SELECT * FROM forest_retirement_r7c_fixture").fetchall(),
+            self.r7d_original)
+        self.assert_pending()
+        self.assertEqual(self.custody.status(), self.custody_before)
+        # Unrelated session creation did not change original lineage.
+        # Do not claim it activates a task, or that the fixture fences it.
+        self.guard()
+        self.assert_status(self.finish(), "FIXTURE_RETIRED")
+        self.assertEqual(self.denied, [])
+        self.assertEqual(self.custody.status(), self.custody_before)
+
+    def r7d_append(self, role):
+        kw = {"provider": "ollama", "model": self.model} if role == "assistant" else {}
+        row = self.journal.append_turn(self.ctx.principal_key, self.session,
+                 expected_revision=2, role=role, body="Fixed public bypass",
+                 now_ms=4, **kw)
+        self.assertEqual(row["revision"], 3)
+        self.assertEqual(self.db.execute(
+            "SELECT turn_id,role,ordinal FROM forest_turns WHERE session_id=? "
+            "ORDER BY ordinal DESC LIMIT 1", (self.session,)).fetchone(),
+            (row["turn_id"], role, 3))
+        return row
+
+    def test_r7d_direct_user_append_bypasses_pending(self):
+        self.r7d_open_pending()
+        self.r7d_append("user")
+        self.r7d_check_hold()
+
+    def test_r7d_direct_assistant_append_bypasses_pending(self):
+        self.r7d_open_pending()
+        self.r7d_append("assistant")
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM forest_attempts_b3").fetchone(), (1,))
+        self.r7d_check_hold()
+
+    def test_r7d_direct_pause_bypasses_pending(self):
+        self.r7d_open_pending()
+        row = self.journal.set_state(self.ctx.principal_key, self.session,
+                    expected_revision=2, next_state="PAUSED", now_ms=4)
+        self.assertEqual((row["state"], row["revision"]), ("PAUSED", 3))
+        self.r7d_check_hold()
+
+    def test_r7d_direct_resume_bypasses_pending(self):
+        self.r7d_open_pending()
+        paused = self.journal.set_state(self.ctx.principal_key, self.session,
+                    expected_revision=2, next_state="PAUSED", now_ms=4)
+        self.assertEqual((paused["state"], paused["revision"]), ("PAUSED", 3))
+        resumed = self.journal.set_state(self.ctx.principal_key, self.session,
+                    expected_revision=3, next_state="OPEN", now_ms=5)
+        self.assertEqual((resumed["state"], resumed["revision"]), ("OPEN", 4))
+        self.r7d_check_hold()
+
+    def r7d_reserve(self, *, scoped):
+        self.r7d_open_pending()
+        user = self.r7d_append("user")
+        ref = SessionContextRef(self.ctx, self.session, 3, user["turn_id"])
+        events = []
+        def audit(action, table, column, database, trigger):
+            # Record only SQL operation/column labels, never content or SQL
+            # expanded parameters. Authorizer observes statement preparation,
+            # while the returned reservation row proves the durable write.
+            if action == sqlite3.SQLITE_READ and column in ("title", "body"):
+                events.append((column, self.db.in_transaction))
+            elif action == sqlite3.SQLITE_INSERT and table == "forest_attempts_b3":
+                events.append(("reserve_insert", self.db.in_transaction))
+            return sqlite3.SQLITE_OK
+        def forbidden_stream(**kw):
+            self.fail("reservation must not invoke transport")
+        bridge = ForestTurnBridge(self.journal, clock_ms=lambda:5,
+                                  streamer=forbidden_stream)
+        self.db.set_authorizer(audit)
+        kw = {"context_ref": ref, "current_context_ref": ref} if scoped else {}
+        attempt, messages = bridge._reserve(self.ctx.principal_key, self.session,
+                                            3, self.model, **kw)
+        self.db.set_authorizer(None)
+        self.assertIn(("body", True), events)
+        self.assertIn(("reserve_insert", True), events)
+        index = events.index(("reserve_insert", True))
+        self.assertLess(events.index(("body", True)), index)
+        if scoped:
+            self.assertNotIn(("title", True), events)
+        else:
+            self.assertLess(events.index(("title", True)), index)
+        self.assertEqual(messages[-1]["role"], "user")
+        self.assertNotEqual(attempt, self.scope.attempt.attempt_id)
+        self.assertEqual(self.db.execute(
+            "SELECT user_turn_id,expected_revision,status,reply_turn_id FROM "
+            "forest_attempts_b3 WHERE attempt_id=?", (attempt,)).fetchone(),
+            (user["turn_id"], 3, "RESERVED", None))
+        self.assertEqual(self.db.execute(
+            "SELECT revision FROM forest_sessions WHERE session_id=?",
+            (self.session,)).fetchone(), (3,))
+        self.r7d_check_hold()
+
+    def test_r7d_legacy_reserve_reads_before_insert(self):
+        self.r7d_reserve(scoped=False)
+
+    def test_r7d_exact_m2_reserve_reads_before_insert(self):
+        self.r7d_reserve(scoped=True)
+
+    def test_r7d_reserved_precedes_transport_and_close_locally_aborts(self):
+        self.r7d_open_pending()
+        user = self.r7d_append("user")
+        calls = []
+        def fake_stream(**kw):
+            # Ordinary function (not a generator) detects invocation itself.
+            calls.append("called")
+            return iter(())
+        bridge = ForestTurnBridge(self.journal, clock_ms=lambda:5,
+                                  streamer=fake_stream)
+        stream = bridge.exchange(owner=self.ctx.principal_key,
+            session_id=self.session, expected_revision=3, model=self.model)
+        try:
+            first = next(stream)
+            self.assertEqual(first["event"], "RESERVED")
+            self.assertEqual(calls, [])
+            attempt = first["attempt_id"]
+            self.assertNotEqual(attempt, self.scope.attempt.attempt_id)
+            self.assertEqual(self.db.execute(
+                "SELECT user_turn_id,status,reply_turn_id FROM forest_attempts_b3 "
+                "WHERE attempt_id=?", (attempt,)).fetchone(),
+                (user["turn_id"], "RESERVED", None))
+            self.assertEqual(self.custody.status(), self.custody_before)
+        finally:
+            stream.close()
+        self.assertEqual(calls, [])
+        self.assertEqual(self.db.execute(
+            "SELECT status,reply_turn_id FROM forest_attempts_b3 WHERE attempt_id=?",
+            (attempt,)).fetchone(), ("ABORTED", None))
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?",
+            (self.scope.attempt.attempt_id,)).fetchone(), ("COMMITTED",))
+        self.r7d_check_hold()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

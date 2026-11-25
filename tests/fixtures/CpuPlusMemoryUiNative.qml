@@ -114,6 +114,7 @@ ShellRoot {
                     shared.requestStepDelta(1);
                     shared.requestStepDelta(1);
                     if (!smoke.check(pane.stagedGiB === 24 && pane.capacity.actualKiB === 16777212, "target versus actual")) return;
+                    const targetMountY=slider.mapToItem(pane,0,0).y;
                     pane.selectCapSection(1);
                     if (!smoke.check(!slider.visible && scroll.visible, "actions section")) return;
                     slider.valueRequested(32);
@@ -130,6 +131,8 @@ ShellRoot {
                         "RAM details selection and unavailable optional fields"))return;
                     const detailRail=smoke.find(pane,"cpuplusCapDetailRail");
                     if(!smoke.check(detailRail&&detailRail.parent===pinned
+                        &&Math.abs(detailRail.mapToItem(pane,0,0).y-targetMountY)<1
+                        &&detailRail.height===46
                         && scroll.y>=detailRail.mapToItem(pane,0,detailRail.height).y,
                         "subject rail outside scroll"))return;
                     const railY=detailRail.mapToItem(pane,0,0).y;
@@ -148,12 +151,12 @@ ShellRoot {
                     const bar=smoke.find(ramView,"cpuplusRamMetricBar");
                     if(!smoke.check(grid&&card&&bar&&grid.columns===(grid.width>=440?2:1)
                         &&card.width<=grid.width&&card.height>textItem.implicitHeight
-                        &&bar.height===12&&String(pane.ramDatasetColor("ANONYMOUS")).toLowerCase()==="#a46aff",
+                        &&bar.height===pane.detailMeterHeight&&String(pane.ramDatasetColor("ANONYMOUS")).toLowerCase()==="#a46aff",
                         "compact RAM card geometry and local purple"))return;
                     const fill=smoke.find(bar,"cpuplusRamMetricFill");
                     const info=smoke.find(pane,"cpuplusCapDetailsInfo");
                     const popup=smoke.find(pane,"cpuplusCapDetailsInfoPopup");
-                    if(!smoke.check(fill&&fill.x===2&&fill.height===8&&info&&popup&&!popup.visible,
+                    if(!smoke.check(fill&&fill.x===2&&fill.height===bar.height-4&&info&&popup&&!popup.visible,
                         "inset gauge and closed info"))return;
                     info.leftClicked(null);
                     if(!smoke.check(popup.visible&&pane.detailsInfoOpen,"info opens"))return;

@@ -212,6 +212,10 @@ Item {
     property int capSection: 0 // TARGET / ACTIONS / DETAILS
     property string capDetailSubject: "SWAP"
     property bool detailsInfoOpen: false
+    property bool headerRefreshAvailable: false
+    readonly property bool refreshBusy: probe.running
+    readonly property real detailScale: Math.max(1,Math.min(2, root.height/620, root.width/320))
+    readonly property int detailMeterHeight: Math.max(12, Math.round(12*detailScale))
     readonly property bool capDetailsActive: page==="CAP" && capSection===2
     readonly property var ramDetailRows: Snapshot.ramDetailRows(sample)
     // Operator-approved RAM dataset identities. Component identity remains
@@ -443,14 +447,14 @@ Item {
         anchors.topMargin: 6
         visible: root.page === "CAP"
         height: visible ? implicitHeight : 0
-        spacing: root.capDetailsActive ? 3 : 5
+        spacing: 5
 
         Row {
             width: parent.width
-            height: root.capDetailsActive ? 22 : 25
+            height: 25
             spacing: 5
             CpuPlusMemoryReadout {
-                width: Math.max(0, parent.width - refreshCap.width - parent.spacing)
+                width: Math.max(0, parent.width - (refreshCap.visible ? refreshCap.width + parent.spacing : 0))
                 height: parent.height
                 verticalAlignment: Text.AlignVCenter
                 text: "LIVE // " + root.status
@@ -461,6 +465,7 @@ Item {
             ActionButton {
                 id: refreshCap
                 objectName: "cpuplusCapRefresh"
+                visible: !root.headerRefreshAvailable
                 accentColor: Colors.yellow
                 idleFillColor: Colors.yellow
                 idleForegroundColor: Colors.magenta
@@ -523,7 +528,7 @@ Item {
                 delegate: Rectangle {
                     required property var modelData
                     width: Math.max(0, (parent.width - 8) / 3)
-                    height: root.capDetailsActive ? 34 : 40
+                    height: 40
                     border.width: 1
                     border.color: modelData.accent
                     color: Colors.black
@@ -590,9 +595,10 @@ Item {
         }
         Row {
             id: capDetailRail
+            // Same 46px mounting height as CpuPlusMemoryCapacitySlider.
             objectName: "cpuplusCapDetailRail"
             visible: root.capSection===2
-            height: visible ? 28 : 0
+            height: visible ? 46 : 0
             width: parent.width
             spacing: 4
             Repeater {
@@ -601,7 +607,7 @@ Item {
                     required property string modelData
                     objectName: modelData==="RAM"?"cpuplusCapDetailRam":"cpuplusCapDetailSwap"
                     width: Math.max(0,(parent.width-parent.spacing)/2)
-                    height: 28
+                    height: parent.height
                     label: modelData
                     accentColor: modelData==="RAM"?Colors.magenta:Colors.yellow
                     selected: root.capDetailSubject===modelData
@@ -746,7 +752,14 @@ Item {
                         height: parent.height
                         label: "i"
                         contentPadding: 2
-                        accentColor: Colors.cyan
+                        accentColor: Colors.yellow
+                        idleForegroundColor: Colors.white
+                        hoverForegroundColor: Colors.white
+                        selectedForegroundColor: Colors.white
+                        idleContentGlowColor: Colors.yellow
+                        hoverContentGlowColor: Colors.yellow
+                        selectedContentGlowColor: Colors.yellow
+                        contentGlowIdleOpacity: 0.85
                         selected: root.detailsInfoOpen
                         acceptedButtons: Qt.LeftButton
                         keyboardActivationSignal: "leftClicked"
@@ -770,7 +783,7 @@ Item {
                         objectName: "cpuplusRamCardGrid"
                         width: parent.width
                         columns: width >= 440 ? 2 : 1
-                        spacing: 2
+                        spacing: Math.round(2*root.detailScale)
                         Repeater {
                             model: root.page==="CAP"&&root.capSection===2&&root.capDetailSubject==="RAM"?root.ramDetailRows:[]
                             delegate: Rectangle {
@@ -796,7 +809,7 @@ Item {
                                             text: root.ramDetailText(modelData)
                                             textFormat: Text.RichText
                                             color: Colors.white
-                                            font.pixelSize: 11
+                                            font.pixelSize: Math.round(11*root.detailScale)
                                             wrapMode: Text.Wrap
                                         }
                                         // One existing safe effect per visible dataset.
@@ -806,12 +819,13 @@ Item {
                                             requestedVisible: ramMetricText.visible
                                             foregroundColor: Colors.white
                                             preferredGlowColor: root.ramDatasetGlow(modelData.label)
+                                            opacity: 0.95
                                         }
                                     }
                                     Rectangle {
                                         objectName: "cpuplusRamMetricBar"
                                         width: parent.width
-                                        height: 12
+                                        height: root.detailMeterHeight
                                         visible: modelData.fraction!==null
                                         color: Colors.black
                                         border.color: root.ramDatasetColor(modelData.label)
@@ -1287,22 +1301,46 @@ Item {
                 }
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    text: "INDEPENDENT KERNEL COUNTERS // OVERLAP; DO NOT ADD. AVAILABLE IS AN ESTIMATE, NOT FREE RAM. NO DIMM ATTRIBUTION."
+                    text: "INDEPENDENT KERNEL COUNTERS // OVERLAP; DO NOT ADD. NO DIMM ATTRIBUTION."
                     color: Colors.orange
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
                 }
+                Repeater {
+                    model: root.capDetailSubject==="RAM" ? [
+                        {label:"AVAILABLE", note:"Estimated usable RAM, not free RAM."},
+                        {label:"FREE", note:"Unused physical memory."},
+                        {label:"ANONYMOUS", note:"Anonymous mapped pages."},
+                        {label:"FILE CACHE", note:"Cached file pages."},
+                        {label:"SHARED / TMPFS", note:"Shared memory and tmpfs."},
+                        {label:"RECLAIMABLE SLAB", note:"Potentially reclaimable kernel slab."},
+                        {label:"UNRECLAIMABLE SLAB", note:"Unreclaimable kernel slab."}
+                    ] : [
+                        {label:"ZRAM", note:"Logical compressed swap, not extra physical RAM.", ink:Colors.cyan},
+                        {label:"BASE NVMe", note:"Disk-backed base swap.", ink:Colors.yellow},
+                        {label:"EXTENSION", note:"Temporary disk-backed extension.", ink:Colors.magenta},
+                        {label:"OTHER SWAP", note:"Other observed swap.", ink:Colors.blue}
+                    ]
+                    delegate: CpuPlusMemoryReadout {
+                        required property var modelData
+                        width: infoContents.width
+                        text: modelData.label+" // "+modelData.note
+                        color: modelData.ink || root.ramDatasetColor(modelData.label)
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                    }
+                }
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    text: "RAM bright = estimated available. Swap bright = used, dim = free. ZRAM is logical compressed swap, not additional physical RAM. Target changes do not alter the live bars."
-                    color: Colors.white
+                    text: "RAM bright = estimated available. Swap bright = used, dim = free. Target changes do not alter the live bars."
+                    color: Colors.cyan
                     font.pixelSize: 11
                     wrapMode: Text.Wrap
                 }
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: "Disk swap targets reserve storage. Zero and reduction remain previews until supported by the authorized capacity backend."
-                    color: Colors.orange
+                    color: Colors.yellow
                     font.pixelSize: 11
                     wrapMode: Text.Wrap
                 }

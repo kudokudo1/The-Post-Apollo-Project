@@ -72,7 +72,8 @@ def execute(args):
 
 def strip_profiles(raw):
     return b"".join(line for line in raw.splitlines(keepends=True)
-                    if not line.startswith((b"PROFILE\t", b"DIAGTIME\t")))
+                    if not line.startswith(b"PROFILE\t")
+                    and not re.fullmatch(rb"DIAGTIME\t(?:repo_check|metadata|status|upstream|merged_refs|cherry|local_branches|remote_branches|history|finished)\t\d+\n", line))
 
 with tempfile.TemporaryDirectory(prefix="git-remote-index-") as folder:
     repo = Path(folder) / "repo"

@@ -122,3 +122,26 @@ actual child, panes and isolated watchdog; previous two trials preserved.
 Fixture-only startup injection and durations; no installed wrapper, raw
 byte-bounded reader, event-loop starvation or whole-shell recovery proof.
 No recovery acknowledgment wire or release of PREPARED. CI pending.
+
+## R3o // canonical review acknowledgment interface
+
+Stacked on reviewed #2698 exact c95bf995, previous #2692 and #2680 unchanged.
+Explicit staged start option reviewEnabled (default false) must match trusted
+server configuration. beginReview, acknowledgeReview and readReviewReceipt
+are separate explicit transitions returning state/frame; wrapper must publish
+state before each write and fail terminally on write loss. No automatic ACK.
+Review uses exact wire fields and existing recovery row parser; live receipt
+requires current owner, selected action, exact sequence and digest. Review
+blocks unrelated requests, remains under existing RECOVERY watchdog without
+reset across phases, tolerates scheduled publication; ACK unavailable while
+publication pending or concrete pending ID differs. Server independently
+revalidates exact snapshot and deadline under SQLite lock. ACK selection binds
+reviewId/digest/sequence/generation; history cannot create live ACK. Loss
+after ACK submission retains exact review in memory across reconnect; only
+matching historical receipt clears review-loss marker, null leaves unknown.
+Action unresolved and startup lock never cleared. Separate reviewContext
+for DOC 2; no new controller, no production UI edits. Tests cover invalid
+receipts, stale selection, publication, explicit one-use ACK and history.
+No full-shell durable host-loss record, native ACK fixture, startup unlock,
+PREPARED release, production launch or protected consent. Combined actual
+main verification required after operator merge decisions.

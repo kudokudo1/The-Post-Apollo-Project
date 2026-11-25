@@ -197,3 +197,70 @@ for(const lost of [prep.state,staged,commit.state]) {
  assert.equal(feed(stopped,receipt,1),stopped);
 }
 console.log("R3m staged host PASS: receipt validation, one-use commit, partial frame, loss and restart refusal");
+
+ // R3o: exact review and explicit acknowledgment; no auto-ACK or release.
+const REVIEW="c23683a9-b2ab-4a2c-87ce-31bdf27a3099", DIG="a".repeat(64);
+function reviewStart() {
+ let s=h.stop(prep.state,c,"LOST",1);
+ s=h.start(s,c,2,"STAGED",true);
+ return feed(s,wire(control("HELLO",B))+wire(control("INVALIDATE",B))+wire(status(1,1,null,B)));
+}
+const rv={version:1,review_id:REVIEW,owner_id:B,action_id:X,review_digest:DIG,reviewed_at_ms:100000,
+ snapshot:{version:1,record:receipt.record,pending_request_id:null,pending_digest:"b".repeat(64),
+ adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false},can_execute:false,startup_unlock:false};
+const rp={version:1,kind:"RECOVERY_REVIEW",owner_id:B,sequence:2,next_action_sequence:1,can_execute:false,review:rv};
+const saved={version:1,review:rv,acknowledged_at_ms:100100,disposition:"REVIEW_ACKNOWLEDGED_ONLY",
+ adjustment_outcome:"UNVERIFIED",can_execute:false,startup_unlock:false};
+const ack={version:1,kind:"RECOVERY_ACK",owner_id:B,sequence:3,next_action_sequence:1,can_execute:false,receipt:saved};
+const selection={reviewId:REVIEW,digest:DIG,sequence:2};
+assert.equal(h.beginReview(connect(),X).frame,null);
+let rs=reviewStart();
+let begin=h.beginReview(rs,X);
+assert.equal(JSON.parse(begin.frame).kind,"RECOVERY_REVIEW");
+assert.equal(h.acknowledgeReview(begin.state,selection,2).frame,null);
+assert.equal(h.readRecovery(begin.state,"INVENTORY",16).frame,null);
+for(const bad of [{...rv,startup_unlock:true},{...rv,action_id:R},{...rv,owner_id:A},
+ {...rv,snapshot:{...rv.snapshot,pending_digest:"bad"}},
+ {...rv,snapshot:{...rv.snapshot,record:{...receipt.record,can_execute:true}}}]) {
+ assert.equal(feed(begin.state,{...rp,review:bad}).phase,"FAILED");
+}
+let ready=feed(begin.state,rp);
+assert.equal(h.reviewContext(ready).phase,"REVIEW_READY");
+assert.equal(h.reviewContext(ready).canAcknowledge,true);
+assert.ok(h.waiting(ready).includes("RECOVERY"));
+assert.equal(h.acknowledgeReview(ready,selection,1).frame,null);
+assert.equal(h.acknowledgeReview(ready,{...selection,digest:"c".repeat(64)},2).frame,null);
+let refreshed=feed(ready,control("INVALIDATE",B));
+assert.equal(h.reviewContext(refreshed).canAcknowledge,false);
+refreshed=feed(refreshed,status(3,1,R,B));
+assert.equal(h.reviewContext(refreshed).canAcknowledge,false);
+let validRefresh=feed(feed(ready,control("INVALIDATE",B)),status(3,1,null,B));
+assert.ok(h.acknowledgeReview(validRefresh,selection,2).frame);
+const issued=h.acknowledgeReview(ready,selection,2);
+assert.equal(JSON.parse(issued.frame).kind,"RECOVERY_ACK");
+assert.equal(h.acknowledgeReview(issued.state,selection,2).frame,null);
+assert.equal(feed(issued.state,{...ack,receipt:{...saved,startup_unlock:true}}).phase,"FAILED");
+let reviewed=feed(issued.state,ack);
+assert.equal(h.reviewContext(reviewed).receipt.disposition,"REVIEW_ACKNOWLEDGED_ONLY");
+assert.ok(reviewed.startupLocked && reviewed.session.unresolved);
+assert.equal(h.takeCommit(reviewed,2).frame,null);
+let lost=h.stop(issued.state,c,"ACK_LOST",2);
+assert.equal(h.reviewContext(lost).unknownReviewId,REVIEW);
+lost=h.start(lost,c,3,"STAGED",true);
+lost=feed(lost,wire(control("HELLO",R))+wire(control("INVALIDATE",R))+wire(status(1,1,null,R)));
+assert.equal(h.beginReview(lost,X).frame,null);
+assert.equal(h.readReviewReceipt(lost,X).frame,null);
+assert.equal(h.acknowledgeReview(lost,selection,3).frame,null);
+const request=h.readReviewReceipt(lost,REVIEW);
+const hist={version:1,kind:"RECOVERY_REVIEW_HISTORY",owner_id:R,sequence:2,next_action_sequence:1,
+ can_execute:false,review_id:REVIEW,receipt:null};
+let missingReceipt=feed(request.state,hist);
+assert.equal(h.reviewContext(missingReceipt).unknownReviewId,REVIEW);
+assert.equal(h.beginReview(missingReceipt,X).frame,null);
+const again=h.readReviewReceipt(missingReceipt,REVIEW);
+let recovered=feed(again.state,{...hist,sequence:3,receipt:saved});
+assert.equal(h.reviewContext(recovered).unknownReviewId,null);
+assert.equal(h.reviewContext(recovered).receipt.disposition,"REVIEW_ACKNOWLEDGED_ONLY");
+assert.ok(recovered.startupLocked && recovered.session.unresolved);
+assert.equal(h.takeCommit(recovered,3).frame,null);
+console.log("R3o review host PASS: explicit ack, exact receipt, publication fencing, lost ACK lookup and no unlock");

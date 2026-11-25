@@ -61,7 +61,7 @@ export function inspectM3d5b2WriterOutcome({stdout="",exitCode=null}={}) {
   if(!m)return {state:"uncertain",canRetry:false};
   if(m[1]==="committed" && exitCode===0)
     return {state:"committed",canRetry:false};
-  if(m[1].startsWith("blocked:"))
+  if(m[1].startsWith("blocked:") && exitCode!==0 && exitCode!==null)
     return {state:"blocked",canRetry:false,reason:m[1].slice(8)};
   return {state:"uncertain",canRetry:false};
 }

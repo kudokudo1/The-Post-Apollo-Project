@@ -1,13 +1,13 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
-import "../../components"
+import qs.components
 
 ShellRoot {
     Window {
         id: lab
         width: 620
-        height: 490
+        height: 510
         visible: true
         color: Colors.dark
         title: "Post-Apollo // Energy Progress Laboratory"

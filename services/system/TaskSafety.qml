@@ -106,20 +106,18 @@ Scope {
         return base && ["kill", "restart", "freeze", "limit"].indexOf(action) !== -1 ? base + "|action:" + action : "";
     }
 
-    function dangerActionUnlockMode(entry, actionKind) {
-        const master = dangerUnlockMode(entry);
-
-        if (master === "once" || master === "sticky")
-            return master;
-
+    function dangerActionLocalUnlockMode(entry, actionKind) {
         const key = dangerActionKey(entry, actionKind);
-        if (!key)
-            return "";
-
+        if (!key) return "";
         const value = String(actionUnlockedKeys[key] || "");
-        return value === "sticky" ? "sticky"
-             : value === "once" ? "once"
-             : "";
+        return value === "sticky" ? "sticky" : value === "once" ? "once" : "";
+    }
+
+    function dangerActionUnlockMode(entry, actionKind) {
+        if (!dangerActionKey(entry, actionKind)) return "";
+        const master = dangerUnlockMode(entry);
+        if (master === "once" || master === "sticky") return master;
+        return dangerActionLocalUnlockMode(entry, actionKind);
     }
 
     function dangerActionUnlocked(entry, actionKind) {

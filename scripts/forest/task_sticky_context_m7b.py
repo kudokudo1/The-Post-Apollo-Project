@@ -324,7 +324,7 @@ class TaskStickyContext:
             self._route = None
 
 
-    def _versioned(self, requested, current, dependencies, use, *, install=False):
+    def _validate_versioned(self, requested, current, dependencies, use):
         # Validate exact independent references before any invalidation.
         # No caller callback or external read while the lock is held.
         if self._mode != "public-versioned":
@@ -348,7 +348,10 @@ class TaskStickyContext:
         # version is handled below when explicitly selected on a newer input.
         if self._route is not None and old == dependencies and self._route != current:
             raise ContextRefusal("HOT_ROUTE_CHANGED")
-        route_changed = old != dependencies or self._route != current
+        return old != dependencies or self._route != current
+
+    def _versioned(self, requested, current, dependencies, use, *, install=False):
+        route_changed = self._validate_versioned(requested, current, dependencies, use)
         self._observe(dependencies)
         route = current.route
         if self._policy_floor is not None and route.policy_generation <= self._policy_floor:
@@ -456,6 +459,14 @@ class TaskStickyContext:
     def assemble_versioned(self, requested, *, current, dependencies, use,
                            final_use, max_bytes=MAX_ASSEMBLY_BYTES):
         with self._lock:
+            # Validate independent observations before any state change. The
+            # initial explicit revoke keeps precedence over a bad final use.
+            self._validate_versioned(requested, current, dependencies, use)
+            if use.revoked:
+                self._versioned(requested, current, dependencies, use)
+            self._validate_versioned(requested, current, dependencies, final_use)
+            if final_use.revoked:
+                self._versioned(requested, current, dependencies, final_use)
             result = self.lookup_versioned(requested, current=current,
                                             dependencies=dependencies, use=use)
             # Final-use revocation is independent of cache completeness.

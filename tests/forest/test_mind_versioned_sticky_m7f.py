@@ -484,5 +484,130 @@ class VersionedTests(unittest.TestCase):
         self.assertTrue(owner.apply(spring,"lookup",fresh,**self.args(fresh)).complete)
         self.assertEqual(impostor.counts(),(0,0))
 
+
+    def m7h_context(self, context):
+        self.setUp()
+        if context != CONTEXT:
+            self.cache=TaskStickyContext(context,mode="public-versioned")
+            self.route=replace(self.route,context=context)
+            self.sel=replace(self.sel,route=self.route)
+            self.install(self.sel)
+            self.remember(self.sel,(self.user,self.op))
+
+    def m7h_assemble(self, s, use, final):
+        return self.cache.assemble_versioned(s,**self.args(s,use),final_use=final)
+
+    def test_m7h_initial_unknown_final_revoke_both_contexts(self):
+        for context in (CONTEXT,PUBLIC_RESTORATION_CONTEXT):
+            with self.subTest(context=context):
+                self.m7h_context(context)
+                self.assertEqual(self.cache.counts(),(1,1))
+                with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+                    self.m7h_assemble(self.sel,PublicUse(self.sel,()),
+                                      PublicUse(self.sel,(),(self.u,)))
+                self.assertEqual(self.cache.counts(),(0,0))
+                with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+                    self.install(self.fresh(input_generation=2))
+                allowed=self.fresh(input_generation=3,policy_generation=3)
+                self.install(allowed)
+                self.assertEqual(self.lookup(allowed).missing,allowed.versions)
+
+    def test_m7h_final_revoke_uninstalled_or_shed_route(self):
+        for context in (CONTEXT,PUBLIC_RESTORATION_CONTEXT):
+            for shed in (False,True):
+                with self.subTest(context=context,shed=shed):
+                    self.m7h_context(context)
+                    if shed:
+                        self.cache.shed_versioned(self.sel,**self.args(self.sel),drop_user=True)
+                        s=self.sel
+                        self.assertEqual(self.cache.counts(),(0,1))
+                    else:
+                        s=self.fresh(input_generation=2)
+                        self.assertEqual(self.cache.counts(),(1,1))
+                    with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+                        self.m7h_assemble(s,PublicUse(s,()),PublicUse(s,(),(self.o,)))
+                    self.assertEqual(self.cache.counts(),(0,0))
+                    with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+                        self.install(self.fresh(input_generation=3))
+
+    def test_m7h_final_revoke_before_domain_conflict_floor(self):
+        alternate=version(CATALOG[0])
+        conflict=replace(self.fresh(input_generation=2),versions=(alternate,self.o))
+        with self.assertRaisesRegex(ContextRefusal,"CONFLICT"):
+            self.install(conflict)
+        self.assertEqual(self.cache.counts(),(0,1))
+        s=self.fresh(input_generation=3)
+        with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+            self.m7h_assemble(s,PublicUse(s,()),PublicUse(s,(),(self.o,)))
+        self.assertEqual(self.cache.counts(),(0,0))
+        with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+            self.install(self.fresh(input_generation=4,user_context_generation=4))
+
+    def test_m7h_valid_initial_revoke_wins_bad_final(self):
+        for malformed in (False,True):
+            self.setUp()
+            foreign=replace(self.sel,recipient="other")
+            final=None if malformed else PublicUse(foreign,(),(self.u,))
+            with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+                self.m7h_assemble(self.sel,PublicUse(self.sel,(),(self.o,)),final)
+            self.assertEqual(self.cache.counts(),(0,0))
+            with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+                self.install(self.fresh(input_generation=2))
+
+    def test_m7h_bad_final_cannot_advance_newer_dependency_clocks(self):
+        for context in (CONTEXT,PUBLIC_RESTORATION_CONTEXT):
+            self.m7h_context(context)
+            s=self.fresh(input_generation=2,policy_generation=3,user_context_generation=4)
+            foreign=replace(s,recipient="other")
+            other_context=CONTEXT if context!=CONTEXT else PUBLIC_RESTORATION_CONTEXT
+            wrong_context=replace(s,route=replace(s.route,context=other_context))
+            for final in (None,PublicUse(foreign,(),(self.u,)),
+                          PublicUse(self.sel,(),(self.u,)),
+                          PublicUse(wrong_context,(),(self.u,)),
+                          PublicUse(foreign,foreign.versions)):
+                with self.subTest(context=context,final=final):
+                    with self.assertRaisesRegex(ContextRefusal,"SCOPE"):
+                        self.m7h_assemble(s,PublicUse(s,s.versions),final)
+                    self.assertEqual(self.cache.counts(),(1,1))
+                    self.assertEqual(self.lookup().entries,(self.user,self.op))
+
+    def test_m7h_bad_initial_and_stale_contradiction_no_mutation(self):
+        for context in (CONTEXT,PUBLIC_RESTORATION_CONTEXT):
+            self.m7h_context(context)
+            s=self.fresh(input_generation=2)
+            self.install(s)
+            for initial in (None,PublicUse(self.sel,()),PublicUse(replace(s,recipient="other"),())):
+                with self.assertRaisesRegex(ContextRefusal,"SCOPE"):
+                    self.m7h_assemble(s,initial,PublicUse(s,(),(self.u,)))
+                self.assertEqual(self.lookup(s).entries,(self.user,self.op))
+            with self.assertRaisesRegex(ContextRefusal,"HOT_CLOCK_REGRESSED"):
+                self.m7h_assemble(self.sel,PublicUse(self.sel,()),
+                                  PublicUse(self.sel,(),(self.u,)))
+            contradictory=replace(s,versions=(version(CATALOG[0]),self.o))
+            with self.assertRaisesRegex(ContextRefusal,"HOT_ROUTE_CHANGED"):
+                self.m7h_assemble(contradictory,PublicUse(contradictory,()),
+                                  PublicUse(contradictory,(),(self.u,)))
+            self.assertEqual(self.lookup(s).entries,(self.user,self.op))
+
+    def test_m7h_nonrevoked_unknown_and_existing_floor_preserved(self):
+        with self.assertRaisesRegex(ContextRefusal,"USE"):
+            self.m7h_assemble(self.sel,PublicUse(self.sel,()),PublicUse(self.sel,self.sel.versions))
+        self.assertEqual(self.lookup().entries,(self.user,self.op))
+        with self.assertRaisesRegex(ContextRefusal,"REVOKED"):
+            self.lookup(use=PublicUse(self.sel,(),(self.u,)))
+        s=self.fresh(input_generation=2)
+        with self.assertRaisesRegex(ContextRefusal,"FLOOR"):
+            self.m7h_assemble(s,PublicUse(s,()),PublicUse(s,(),(self.o,)))
+        self.assertEqual(self.cache.counts(),(0,0))
+
+    def test_m7h_closed_and_legacy_cannot_accept_final_revoke(self):
+        self.cache.close()
+        with self.assertRaisesRegex(ContextRefusal,"CLOSED"):
+            self.m7h_assemble(self.sel,PublicUse(self.sel,()),PublicUse(self.sel,(),(self.u,)))
+        self.cache=TaskStickyContext(CONTEXT)
+        with self.assertRaisesRegex(ContextRefusal,"MODE"):
+            self.m7h_assemble(self.sel,PublicUse(self.sel,()),PublicUse(self.sel,(),(self.u,)))
+        self.assertEqual(self.cache.counts(),(0,0))
+
 if __name__ == "__main__":
     unittest.main()

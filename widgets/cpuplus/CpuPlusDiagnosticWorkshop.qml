@@ -13,7 +13,10 @@ Column {
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
     readonly property int instrumentHeight: compactLayout ? 120 : 160
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
-    readonly property real lowerInstrumentWidth: Math.max(0,Math.floor((width-4*Math.max(0,lowerInstrumentCount-1))/Math.max(1,lowerInstrumentCount)))
+    readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
+    readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
+    readonly property real storageWidth: lowerInstrumentCount===3 ? Math.floor(lowerInstrumentSpace*0.24) : lowerInstrumentWidth
+    readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property bool locked: CpuPlusDiagnostics.workshopPresetLocked
     readonly property var plan: makePlan(draft)
@@ -122,10 +125,6 @@ Column {
                 labelElide: Text.ElideNone
                 contentPadding: 0
                 selected: root.draft.selected.includes(modelData.kind)
-                selectedForegroundColor: accentColor
-                selectedBorderColor: accentColor
-                selectedContentGlowColor: accentColor
-                selectedSoftGlowColor: accentColor
                 contentGlowSelectedOpacity: 0.95
                 normalFace: true
                 available: !root.locked
@@ -167,6 +166,7 @@ Column {
         objectName: "cpuplusWorkshopThreadInterval"
         width: parent.width
         compact: root.compactLayout
+        subjectColor: Colors.cyan
         fillColor: Colors.cyan
         visible: root.draft.selected.includes("threads")
         title: "THREAD INTERVAL"
@@ -181,6 +181,7 @@ Column {
         objectName: "cpuplusWorkshopMemoryInterval"
         width: parent.width
         compact: root.compactLayout
+        subjectColor: Colors.magenta
         fillColor: Colors.magenta
         visible: root.draft.selected.includes("memory")
         title: "MEMORY INTERVAL"
@@ -195,6 +196,7 @@ Column {
         objectName: "cpuplusWorkshopCensusInterval"
         width: parent.width
         compact: root.compactLayout
+        subjectColor: Colors.orange
         fillColor: Colors.orange
         visible: root.draft.selected.includes("census")
         title: "PROCESS INTERVAL"
@@ -210,7 +212,7 @@ Column {
         spacing: 4
         visible: root.lowerInstrumentCount>0
         Item {
-            width: root.lowerInstrumentWidth
+            width: root.dialWidth
             height: root.instrumentHeight
             visible: root.draft.selected.includes("threads")
             SelectorDial {
@@ -221,7 +223,10 @@ Column {
                 options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
                 displayOptions: options
                 numericLabelPixelSize: root.compactLayout ? 13 : 10
-                readoutPixelSize: root.compactLayout ? 15 : 11
+                readoutPixelSize: root.compactLayout ? 17 : 14
+                titlePixelSize: 12
+                idleRingGlowStrength: 0.65
+                titleColor: accentColor
                 numericDetentInterval: 1
                 numericDetentOrigin: 1
                 selectorMode: "continuous"
@@ -244,45 +249,10 @@ Column {
             }
         }
 
-        Item {
-            width: root.lowerInstrumentWidth
-            height: root.instrumentHeight
-            visible: root.draft.selected.includes("stall")
-            SelectorDial {
-                objectName: "cpuplusWorkshopStallThreshold"
-                anchors.centerIn: parent
-                scale: Math.min(1,parent.width/width,parent.height/height)
-                labelText: "STALL THRESHOLD"
-                options: ["150","500","1000","1500","2000"]
-                displayOptions: options
-                numericReferenceValues: [150,500,1000,1500,2000]
-                numericLabelPixelSize: root.compactLayout ? 13 : 10
-                readoutPixelSize: root.compactLayout ? 15 : 11
-                selectorMode: "continuous"
-                minimumValue: 150
-                maximumValue: 2000
-                currentValue: root.draft.stallThresholdMs
-                valueStep: 50
-                numericDetentInterval: 50
-                numericDetentOrigin: 150
-                valueDecimals: 0
-                snapContinuousToStep: true
-                showNumericDetentTicks: true
-                accentColor: Colors.white
-                markerColor: Colors.orange
-                labelColor: Colors.yellow
-                readoutColor: Colors.white
-                readoutGlowEnabled: true
-                interactionGlowColor: Colors.magenta
-                readoutText: Math.round(previewNumericValue)+" MS"
-                interactive: !root.locked
-                onValueRequested: value=>root.edit("stallThresholdMs",Math.round(value))
-            }
-        }
         Rectangle {
             objectName: "cpuplusWorkshopStorageInstrument"
             visible: root.draft.selected.includes("storage")
-            width: root.lowerInstrumentWidth
+            width: root.storageWidth
             height: root.instrumentHeight
             color: Colors.black
             border.color: Colors.blue
@@ -302,8 +272,11 @@ Column {
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: "1 SEC"
+                    semanticGlowColor: Colors.blue
                     color: Colors.blue
                     font.pixelSize: root.compactLayout ? 20 : 24
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 10
                     horizontalAlignment: Text.AlignHCenter
                 }
                 Rectangle {
@@ -337,6 +310,8 @@ Column {
                     text: root.draft.durationSeconds+" INTERVALS"
                     color: Colors.blue
                     font.pixelSize: 11
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 8
                     horizontalAlignment: Text.AlignHCenter
                 }
                 GohuText {
@@ -346,6 +321,45 @@ Column {
                     font.pixelSize: 9
                     horizontalAlignment: Text.AlignHCenter
                 }
+            }
+        }
+        Item {
+            width: root.dialWidth
+            height: root.instrumentHeight
+            visible: root.draft.selected.includes("stall")
+            SelectorDial {
+                objectName: "cpuplusWorkshopStallThreshold"
+                anchors.centerIn: parent
+                scale: Math.min(1,parent.width/width,parent.height/height)
+                labelText: "STALL THRESHOLD"
+                options: ["150","500","1000","1500","2000"]
+                displayOptions: options
+                numericReferenceValues: [150,500,1000,1500,2000]
+                numericLabelPixelSize: root.compactLayout ? 13 : 10
+                readoutPixelSize: root.compactLayout ? 17 : 14
+                titlePixelSize: 12
+                idleRingGlowStrength: 0.65
+                titleColor: accentColor
+                selectorMode: "continuous"
+                minimumValue: 150
+                maximumValue: 2000
+                currentValue: root.draft.stallThresholdMs
+                valueStep: 50
+                numericDetentInterval: 50
+                numericDetentOrigin: 150
+                valueDecimals: 0
+                snapContinuousToStep: true
+                showNumericDetentTicks: true
+                accentColor: Colors.white
+                markerColor: Colors.orange
+                labelColor: Colors.white
+                readoutColor: Colors.white
+                readoutGlowEnabled: true
+                interactionGlowColor: Colors.magenta
+                readoutText: String(Math.round(previewNumericValue))
+                readoutUnit: "MS"
+                interactive: !root.locked
+                onValueRequested: value=>root.edit("stallThresholdMs",Math.round(value))
             }
         }
     }

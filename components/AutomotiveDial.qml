@@ -157,8 +157,6 @@ Item {
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onAvailableChanged: if(available) requestPaint()
-                onWidthChanged: requestPaint()
-                onHeightChanged: requestPaint()
                 Connections {target: root; function onAccentColorChanged(){valueFrame.requestPaint()}}
                 onPaint: {
                     const c=getContext("2d"); c.reset();c.clearRect(0,0,width,height);
@@ -206,6 +204,7 @@ Item {
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onAvailableChanged: if(available) requestPaint()
+                id: setFrame
                 Connections {target:root; function onStructuralColorChanged(){setFrame.requestPaint()}}
                 onPaint: {
                     const c=getContext("2d"),k=Math.max(2,Math.round(height*0.2)),b=width-0.5,d=height-0.5;
@@ -234,6 +233,8 @@ Item {
                 anchors.fill: parent
                 property bool hasPainted: false
                 onPainted: hasPainted = true
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
                 onAvailableChanged: if(available) requestPaint()
                 Connections {
                     target: root
@@ -242,10 +243,11 @@ Item {
                     function onLiveColorChanged() {arm.requestPaint()}
                 }
                 onPaint: {
-                    const c=getContext("2d"), r=root.boundedArmReach-2;
+                    const c=getContext("2d");
                     c.reset();c.clearRect(0,0,width,height);
                     if(width<=0)return;
                     const u=width/216;
+                    const r=Math.max(1,root.boundedArmReach-Math.max(2,0.4/u+1));
                     c.translate(width/2,height/2);c.scale(u,u);
                     const tapered=root.resolvedArmStyle==="tapered";
                     const half=root.resolvedArmStyle==="industrial"?14:11;

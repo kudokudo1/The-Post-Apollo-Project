@@ -85,3 +85,21 @@ function threadLaunchPlan(input, resolvePath) {
         "--workshop","--duration",String(config.durationSeconds),
         "--interval",String(config.intervalMs/1000),"--top",String(config.topCount)]};
 }
+
+// D1c: existing observers only. No arbitrary executable, target or path.
+function observerLaunchPlan(input, resolvePath, dataDir) {
+    const preview=previewCalibration(input);
+    if (!preview.ok) return null;
+    const config=preview.config;
+    if (config.kind==="threads") return threadLaunchPlan(config,resolvePath);
+    const scripts={memory:"cpuplus_quickshell_memory_observer.py",
+        census:"cpuplus_process_census.py",storage:"cpuplus_storage_observer.py"};
+    if (!Object.prototype.hasOwnProperty.call(scripts,config.kind)) return null;
+    const args=["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B",
+        resolvePath("scripts/"+scripts[config.kind]),"--workshop","--duration",String(config.durationSeconds)];
+    if (config.kind==="storage") {
+        if (typeof dataDir!=="string" || !dataDir.startsWith("/")) return null;
+        args.push("--data-dir",dataDir,"--shell-dir",resolvePath("."));
+    } else args.push("--interval",String(config.intervalMs/1000));
+    return {config:config,args:args};
+}

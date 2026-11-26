@@ -134,6 +134,7 @@ ShellRoot {
                     text:[one,two,terminal].map(row=>JSON.stringify(row)).join("\n"),finishedAt:"2026-11-24T12:00:00.000Z"};
                 CpuPlusDiagnostics.reports = Object.assign({},CpuPlusDiagnostics.reports,{memory:report});
                 CpuPlusDiagnostics.selectLatest("memory");
+                ui.selectView("REPORT");
                 root.phase = 6;
                 return;
             }
@@ -297,7 +298,11 @@ ShellRoot {
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
                 if (!root.check(duration && execute && dial && duration.width===32
                     && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
-                    && workshop.phase==="PREPARE","actual Workshop hardware and no automatic launch")) return;
+                    && workshop.phase==="PREPARE" && dial.options.length===4
+                    && dial.numericDetentInterval===1,"actual Workshop hardware and no automatic launch")) return;
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!root.check(viewport && viewport.contentHeight<=viewport.height+1,
+                    "default Workshop fits native 320x620 viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("censusIntervalMs",1000);
                 duration.valueRequested(1);

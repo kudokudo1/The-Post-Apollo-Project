@@ -15,6 +15,8 @@ Item {
     property bool showGlow: true
     property bool showValue: true
     property bool showSetValue: true
+    // Caller may provide an unobstructed external value/unit readout.
+    property bool externalUnitReadout: false
     property color accentColor: Colors.orange
     property color structuralColor: Colors.cyan
     property real faceDiameter: 116
@@ -24,6 +26,7 @@ Item {
     property string valueText: "0"
     property string valueUnit: ""
     property string setText: ""
+    property string compactSetText: setText
     property real scaleMinimum: 0
     property real scaleMaximum: 5
     readonly property string resolvedArmStyle: ["tapered","industrial","capsule"].includes(armStyle) ? armStyle : "tapered"
@@ -32,6 +35,30 @@ Item {
     readonly property int litSegments: Math.ceil(segmentCount*boundedFraction)
     readonly property real actualFaceDiameter: Math.max(0,Math.min(faceDiameter,Math.min(width,height)-(showChassis?2*Math.max(0,Math.min(40,chassisClearance)):0)))
     readonly property real faceUnit: actualFaceDiameter/216
+    readonly property real insetRadius: Math.max(0,70*faceUnit-1)
+    readonly property real minimumSegmentGap: 2
+    // Width is computed from the actual chamfer vertices, not a rectangle
+    // percentage. Both readout frames fit inside the innermost visible ring.
+    function insetWindow(lower) {
+        const u=faceUnit, r=insetRadius;
+        const inner=Math.ceil(Math.max(4,17*u)+1);
+        const available=Math.max(0,r-inner-1);
+        const h=Math.max(0,Math.floor(Math.min(available,lower?Math.max(12,actualFaceDiameter*0.12):Math.max(12,actualFaceDiameter*0.17))));
+        const outer=inner+h;
+        const cut=Math.min(Math.floor(h/3),Math.max(2,Math.round(h*0.18)));
+        const chord=y=>Math.sqrt(Math.max(0,r*r-y*y));
+        const half=Math.max(0,Math.min(chord(outer)+cut,chord(outer-cut))-0.5);
+        const w=Math.max(0,2*Math.floor(half));
+        return {width:w,height:h,cut:cut,y:actualFaceDiameter/2+(lower?inner:-outer)};
+    }
+    readonly property var upperGeometry: insetWindow(false)
+    readonly property var lowerGeometry: insetWindow(true)
+    function insetWindowFits(g) {
+        if(g.width<=0||g.height<=0)return false;
+        const half=g.width/2, outer=Math.max(Math.abs(g.y-actualFaceDiameter/2),Math.abs(g.y+g.height-actualFaceDiameter/2));
+        return Math.hypot(half-g.cut,outer)<=insetRadius+0.01
+            && Math.hypot(half,outer-g.cut)<=insetRadius+0.01;
+    }
     readonly property string detailTier: actualFaceDiameter>=150?"large":actualFaceDiameter>=105?"medium":actualFaceDiameter>=72?"small":"compact"
     readonly property int segmentCount: detailTier==="large"?30:detailTier==="medium"?24:detailTier==="small"?18:12
     readonly property int tickCount: detailTier==="large"?60:detailTier==="medium"?30:12
@@ -117,20 +144,33 @@ Item {
                         c.save();c.rotate(i*tau/n);
                         c.fillStyle=i<Math.ceil(f*n)?root.liveColor:"#39283f";
                         const major=i%Math.max(1,Math.floor(n/12))===0;
-                        const w=teeth?Math.max(major?5:2.8,1.1/u):Math.min(18,2*Math.PI*93/n-2/u);
-                        c.fillRect(-w/2,-100,w,teeth?(major?17:10):15);
+                        if(teeth) {
+                            const w=Math.max(major?5:2.8,1.1/u);
+                            c.fillRect(-w/2,-100,w,major?17:10);
+                        } else {
+                            // True annular sectors with a constant actual-pixel
+                            // gap at BOTH the inner and outer edges.
+                            const pitch=tau/n, outer=100, inner=85;
+                            const go=Math.min(pitch*0.40,root.minimumSegmentGap/(outer*u))/2;
+                            const gi=Math.min(pitch*0.40,root.minimumSegmentGap/(inner*u))/2;
+                            const mid=-Math.PI/2;
+                            c.beginPath();
+                            c.arc(0,0,outer,mid-pitch/2+go,mid+pitch/2-go);
+                            c.arc(0,0,inner,mid+pitch/2-gi,mid-pitch/2+gi,true);
+                            c.closePath();c.fill();
+                        }
                         c.restore();
                     }
                 }
                 ring(82,null,root.structuralColor,1);
                 if(root.detailTier==="large" || root.detailTier==="medium") ring(79,null,"#78858a",0.8);
                 ring(70,"#120c19",root.accentColor,0.8);
-                if(root.detailTier==="large"){c.globalAlpha=0.65;ring(63,null,root.accentColor,0.8);c.globalAlpha=1;}
+                // Radius 70 is the clear mechanical/display boundary.
                 if(root.scaleStyle!=="none") for(let i=0;i<root.tickCount;i++){
                     const major=root.tickCount<=12 || i%Math.max(1,Math.floor(root.tickCount/12))===0;
                     const tickWidth=Math.max(major?2:1.2,(major?1.25:0.8)/u);
                     c.save();c.rotate(i*tau/root.tickCount);c.fillStyle=major?Colors.white:root.accentColor;
-                    c.globalAlpha=major?1:0.75;c.fillRect(-tickWidth/2,-77,tickWidth,major?9:4);c.restore();
+                    c.globalAlpha=major?1:0.75;c.fillRect(-tickWidth/2,-79,tickWidth,major?8:4);c.restore();
                 }
                 if(root.scaleStyle==="numbers" || root.scaleStyle==="sparse"){
                     const n=root.scaleStyle==="sparse"||root.detailTier==="small"||root.detailTier==="compact"?3:5;
@@ -142,15 +182,27 @@ Item {
                 }
             }
         }
-        // Real-pixel chamfered windows, rendered behind the arm.
+        // The two plates are positioned using the circle chord at each
+        // chamfer vertex. The arm intentionally remains in front of both.
         Item {
             id: valueWindow
             objectName: "automotiveValueWindow"
-            visible: root.showValue
-            width: Math.round(face.width*0.64)
-            height: Math.max(24,Math.round(face.height*0.27))
+            visible: root.showValue && root.insetWindowFits(root.upperGeometry)
+            width: root.upperGeometry.width
+            height: root.upperGeometry.height
             anchors.horizontalCenter: parent.horizontalCenter
-            y: Math.round(face.height*0.15)
+            y: root.upperGeometry.y
+            readonly property bool inlineUnit: root.valueUnit!=="" &&
+                width>=unitMeasure.advanceWidth+Math.max(22,root.valuePixelSize*1.1)+5
+            readonly property bool stackedUnit: root.valueUnit!=="" && !inlineUnit && !root.externalUnitReadout
+            readonly property real unitWidth: inlineUnit ? Math.ceil(unitMeasure.advanceWidth)+2 : 0
+            readonly property real unitHeight: stackedUnit ? Math.min(height/2,root.unitPixelSize+2) : 0
+            TextMetrics {
+                id: unitMeasure
+                font.family: unitLabel.font.family
+                font.pixelSize: root.unitPixelSize
+                text: root.valueUnit
+            }
             Canvas {
                 id: valueFrame
                 anchors.fill: parent
@@ -167,60 +219,75 @@ Item {
                         c.lineTo(b,d-k);c.lineTo(b-k,d);c.lineTo(x+k,d);c.lineTo(x,d-k);c.lineTo(x,y+k);c.closePath();
                         c.fillStyle=fill;c.fill();c.strokeStyle=stroke;c.lineWidth=1;c.stroke();
                     }
-                    cut(0.5,Math.max(2,Math.round(height*0.16)),"#33263d","#78858a");
-                    cut(2,Math.max(1,Math.round(height*0.10)),"#07040b",root.accentColor);
+                    cut(0.5,root.upperGeometry.cut,"#33263d","#78858a");
+                    cut(1.5,Math.max(1,root.upperGeometry.cut-1),"#07040b",root.accentColor);
                 }
             }
             GohuText {
+                id: valueLabel
                 objectName: "selectorStopwatchCenter"
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: root.valueUnit!==""?1:Math.max(0,(parent.height-height)/2)
-                width: parent.width-6
+                x: 2; y: 1
+                width: Math.max(0,parent.width-4-parent.unitWidth)
+                height: Math.max(0,parent.height-2-parent.unitHeight)
                 text: root.valueText
                 color: root.liveColor
                 font.pixelSize: root.valuePixelSize
                 horizontalAlignment: Text.AlignHCenter
-                fontSizeMode: Text.HorizontalFit
-                minimumPixelSize: 10
+                verticalAlignment: Text.AlignVCenter
+                fontSizeMode: Text.Fit
+                minimumPixelSize: 9
+                clip: true
             }
             GohuText {
+                id: unitLabel
                 objectName: "automotiveValueUnit"
-                visible: root.valueUnit!==""
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 2
+                visible: parent.inlineUnit || parent.stackedUnit
+                x: parent.inlineUnit ? parent.width-parent.unitWidth-1 : 2
+                y: parent.inlineUnit ? 1 : parent.height-parent.unitHeight-1
+                width: parent.inlineUnit ? parent.unitWidth : Math.max(0,parent.width-4)
+                height: parent.inlineUnit ? Math.max(0,parent.height-2) : parent.unitHeight
                 text: root.valueUnit; color: Colors.white; font.pixelSize: root.unitPixelSize
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                fontSizeMode: Text.Fit
+                minimumPixelSize: 8
+                clip: true
             }
         }
         Item {
             id: setWindow
-            visible: root.showSetValue && root.setText!==""
-            width: Math.round(face.width*0.58)
-            height: Math.max(13,Math.round(face.height*0.14))
+            objectName: "automotiveSetWindow"
+            visible: root.showSetValue && root.setText!=="" && root.insetWindowFits(root.lowerGeometry)
+            width: root.lowerGeometry.width
+            height: root.lowerGeometry.height
             anchors.horizontalCenter: parent.horizontalCenter
-            y: Math.round(face.height*0.66)
+            y: root.lowerGeometry.y
             Canvas {
+                id: setFrame
                 anchors.fill: parent
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
                 onAvailableChanged: if(available) requestPaint()
-                id: setFrame
                 Connections {target:root; function onStructuralColorChanged(){setFrame.requestPaint()}}
                 onPaint: {
-                    const c=getContext("2d"),k=Math.max(2,Math.round(height*0.2)),b=width-0.5,d=height-0.5;
+                    const c=getContext("2d"),k=root.lowerGeometry.cut,b=width-0.5,d=height-0.5;
                     c.reset();c.clearRect(0,0,width,height);
-                    c.beginPath();c.moveTo(k,0.5);c.lineTo(b-k,0.5);c.lineTo(b,k);c.lineTo(b,d-k);c.lineTo(b-k,d);c.lineTo(k,d);c.lineTo(0.5,d-k);c.lineTo(0.5,k);c.closePath();
+                    c.beginPath();c.moveTo(k+0.5,0.5);c.lineTo(b-k,0.5);c.lineTo(b,k+0.5);c.lineTo(b,d-k);c.lineTo(b-k,d);c.lineTo(k+0.5,d);c.lineTo(0.5,d-k);c.lineTo(0.5,k+0.5);c.closePath();
                     c.fillStyle="#09060e";c.fill();c.strokeStyle=root.structuralColor;c.lineWidth=1;c.stroke();
                 }
             }
             GohuText {
-                anchors.centerIn: parent
-                width: parent.width-4
+                objectName: "automotiveSetText"
+                anchors.fill: parent; anchors.leftMargin: 2; anchors.rightMargin: 2
+                anchors.topMargin: 1; anchors.bottomMargin: 1
                 horizontalAlignment: Text.AlignHCenter
-                text: root.setText; textFormat: Text.RichText; color: root.accentColor
-                font.pixelSize: Math.max(9,Math.round(face.width*0.08))
-                fontSizeMode: Text.HorizontalFit; minimumPixelSize: 8
+                verticalAlignment: Text.AlignVCenter
+                text: root.detailTier==="small"||root.detailTier==="compact" ? root.compactSetText : root.setText
+                textFormat: Text.RichText; color: root.accentColor
+                font.pixelSize: Math.max(9,Math.round(face.width*0.09))
+                fontSizeMode: Text.Fit; minimumPixelSize: 8
                 elide: Text.ElideRight
+                clip: true
             }
         }
         Item {

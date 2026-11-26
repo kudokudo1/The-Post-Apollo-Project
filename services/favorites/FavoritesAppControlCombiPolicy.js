@@ -123,7 +123,7 @@ function buildTasks(tasks, identityFor, recordFor) {
     }
 
     identities.sort();
-    const signature = identities.join("\n");
+    const signature = identities.join("\\n");
     rows.sort(function(a, b) {
         return String(a.name || "").localeCompare(String(b.name || ""));
     });

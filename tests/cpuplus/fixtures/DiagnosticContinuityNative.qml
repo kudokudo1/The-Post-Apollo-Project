@@ -457,6 +457,65 @@ ShellRoot {
                     && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id),
                     "real coordinated storage/clock witness and fixture heartbeat // "+CpuPlusDiagnostics.feedback)) return;
                 console.log("CPU_D3E_NATIVE_PASS");
+                root.paneActive=true;
+                root.phase=27;
+                return;
+            }
+            if (root.phase===27 && pane.item) {
+                pane.item.selectMenu(4);
+                const rail=root.findItem(pane.item,"cpuplusDiagnosticTopRail");
+                const modes=root.findItem(pane.item,"cpuplusMemoryMenuRail");
+                const controls=root.findItem(pane.item,"cpuplusDiagnosticTop-WORK");
+                const workflows=root.findItem(pane.item,"cpuplusDiagnosticTop-PRESETS");
+                if (!root.check(rail && modes && controls && workflows && rail.visible
+                    && rail.y+rail.height<=modes.y && controls.selected,
+                    "two fixed top rail buttons above memory modes")) return;
+                workflows.leftClicked(null);
+                root.phase=28;
+                return;
+            }
+            if (root.phase===28 && pane.item) {
+                const catalog=root.findItem(pane.item,"cpuplusDiagnosticWorkflowCatalog");
+                const name=root.findItem(catalog,"cpuplusDiagnosticPresetName");
+                const save=root.findItem(catalog,"cpuplusDiagnosticSavePreset");
+                if (!root.check(catalog && catalog.visible && !root.findItem(pane.item,"cpuplusDiagnosticWorkshop")
+                    && !CpuPlusDiagnostics.busy,"workflow catalog separate from controls")) return;
+                name.text="STALL SESSION";
+                save.leftClicked(null);
+                if (!root.check(CpuPlusDiagnostics.workshopPresets.length===1
+                    && CpuPlusDiagnostics.workshopPresets[0].plan.instruments[1].thresholdMs===500
+                    && !CpuPlusDiagnostics.saveWorkshopPreset("stall session")
+                    && !CpuPlusDiagnostics.busy,"save calibrated session preset without starting")) return;
+                root.paneActive=false;
+                root.phase=29;
+                return;
+            }
+            if (root.phase===29) {
+                if (!root.check(CpuPlusDiagnostics.workshopPresets.length===1,"preset survives menu destruction")) return;
+                root.paneActive=true;
+                root.phase=30;
+                return;
+            }
+            if (root.phase===30 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop) return;
+                workshop.edit("stallThresholdMs",650);
+                root.findItem(pane.item,"cpuplusDiagnosticTop-PRESETS").leftClicked(null);
+                root.phase=31;
+                return;
+            }
+            if (root.phase===31 && pane.item) {
+                const load=root.findItem(pane.item,"cpuplusDiagnosticLoadPreset-STALL SESSION");
+                if (!root.check(load && load.visible,"saved preset shown after reopen")) return;
+                load.leftClicked(null);
+                root.phase=32;
+                return;
+            }
+            if (root.phase===32 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!root.check(workshop && workshop.draft.stallThresholdMs===500 && !workshop.ready
+                    && !CpuPlusDiagnostics.busy,"loaded calibration requires fresh prepare")) return;
+                console.log("CPU_D4A_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

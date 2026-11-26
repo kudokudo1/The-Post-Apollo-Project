@@ -74,9 +74,8 @@ ShellRoot {
                     + " monitor=" + JSON.stringify(store.favoriteMonitorBoxKeys)
                     + " preferred=" + JSON.stringify(store.favoriteDetailActionKeys));
                 if (!generalTask || !generalFile || !processWatch
-                        || !monitorWatch || !preferredFirst || !preferredSecond
-                        || !matches) {
-                    root.fail("SERVICE_MUTATIONS_OR_PARITY");
+                        || !monitorWatch || !preferredFirst || !preferredSecond) {
+                    root.fail("SERVICE_REJECTED_MUTATION");
                     return;
                 }
                 console.log("FB_PENDING // SERVICE_MUTATIONS_QUEUED");
@@ -101,6 +100,11 @@ ShellRoot {
         interval: 900
         repeat: false
         onTriggered: {
+            console.log("FB_SETTLED // favorites="
+                + JSON.stringify(store.favoriteKeys)
+                + " task=" + JSON.stringify(store.favoriteTaskMetricKeys)
+                + " monitor=" + JSON.stringify(store.favoriteMonitorBoxKeys)
+                + " preferred=" + JSON.stringify(store.favoriteDetailActionKeys));
             if (!root.verified()) {
                 root.fail("POST_WRITE_IN_MEMORY_STATE");
                 return;

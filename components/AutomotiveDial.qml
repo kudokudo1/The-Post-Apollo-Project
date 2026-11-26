@@ -26,6 +26,7 @@ Item {
     property string setText: ""
     property real scaleMinimum: 0
     property real scaleMaximum: 5
+    readonly property string resolvedArmStyle: ["tapered","industrial","capsule"].includes(armStyle) ? armStyle : "tapered"
     readonly property real boundedFraction: Number.isFinite(fraction) ? Math.max(0,Math.min(1,fraction)) : 0
     readonly property real boundedArmReach: Number.isFinite(armReach) ? Math.max(65,Math.min(95,armReach)) : 95
     readonly property int litSegments: Math.ceil(30*boundedFraction)
@@ -190,8 +191,8 @@ Item {
                 onPaint: {
                     const c=getContext("2d"), r=root.boundedArmReach-1;
                     c.reset();c.clearRect(0,0,width,height);c.translate(108,108);
-                    const tapered=root.armStyle==="tapered";
-                    const half=root.armStyle==="industrial"?14:11;
+                    const tapered=root.resolvedArmStyle==="tapered";
+                    const half=root.resolvedArmStyle==="industrial"?14:11;
                     const tip=Math.sqrt(r*r-half*half);
                     function body(offset) {
                         c.beginPath();
@@ -199,7 +200,7 @@ Item {
                             c.moveTo(-14,0+offset);c.lineTo(-7,-r+12+offset);
                             c.quadraticCurveTo(0,-r-12+offset,7,-r+12+offset);c.lineTo(14,0+offset);c.closePath();
                         } else {
-                            const k=root.armStyle==="industrial"?3:half;
+                            const k=root.resolvedArmStyle==="industrial"?3:half;
                             c.moveTo(-half,-tip+k+offset);c.quadraticCurveTo(-half,-tip+offset,-half+k,-tip+offset);
                             c.lineTo(half-k,-tip+offset);c.quadraticCurveTo(half,-tip+offset,half,-tip+k+offset);
                             c.lineTo(half,offset);c.lineTo(-half,offset);c.closePath();

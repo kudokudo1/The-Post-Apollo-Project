@@ -44,9 +44,17 @@ Item {
         ? Number(appControlWindow.taskMiniDisplayRevision || 0) : 0
     readonly property var ownerFavoriteStore: appControlWindow
         ? appControlWindow.favoriteStore : null
-    readonly property bool hunterOperationActive: false
-    readonly property bool destructiveConfirmOpen: false
-    readonly property string destructiveConfirmKind: ""
+    property var bulkReview: null
+    readonly property bool bulkAvailable: !!appControlWindow
+        && typeof appControlWindow.prepareCpuBulkReview === "function"
+    readonly property bool hasBulkReview: !!bulkReview && bulkAvailable
+        && appControlWindow.cpuBulkReview === bulkReview
+    readonly property bool bulkOperation: bulkAvailable && !!appControlWindow.cpuBulkOperation
+    readonly property bool hunterOperationActive: bulkOperation
+        && appControlWindow.hunterOperationPhase === "running"
+    readonly property bool destructiveConfirmOpen: hasBulkReview || bulkOperation
+    readonly property string destructiveConfirmKind: hasBulkReview ? bulkReview.kind
+        : bulkOperation ? appControlWindow.hunterOperationKind : ""
     property bool ready: false
     property bool modelBlank: false
     property int viewSerial: 0
@@ -139,7 +147,7 @@ Item {
         });
     }
     function changeView(kind,value) {
-        if (locallyPending || (gate && (gate.pending || gate.busy))) return;
+        if (locallyPending || hasBulkReview || (gate && (gate.pending || gate.busy))) return;
         const serial=++viewSerial;
         hoveredIndex=-1;
         // Donor blank/reset strategy: no live rowsMoved storm on filter changes.
@@ -214,16 +222,42 @@ Item {
         return graphGeometry.linePoints(values,w,h,
             key==="normal"?5:hunterGraph.metricRangeForKey(key),48,2,2);
     }
-    // Mount the actual shared HunterControls including its bottom buttons.
-    // Bulk dispatch is deliberately held until its owner can provide a
-    // CPU++-local capture/confirmation contract. Empty eligibility disables
-    // those buttons; it does not silently route a hidden donor confirmation.
-    function killAllEligibleTasks() { return []; }
-    function hunterHogCandidates() { return []; }
-    function hunterMouseCandidates() { return []; }
-    function requestKillAllEligibleTasks() { return false; }
-    function requestKillHogs() { return false; }
-    function requestKillMice() { return false; }
+    // The shared owner computes candidates; only the explicit metric and
+    // visibility are supplied. Search never silently changes global scope.
+    function bulkCandidates(kind) {
+        if (!active || !bulkAvailable) return [];
+        if (bulkOperation) return [{}]; // existing report can be reopened
+        if (hasBulkReview || locallyPending || (gate && (gate.pending || gate.busy))) return [];
+        const revision = miniHistoryRevision;
+        return appControlWindow.cpuBulkCandidates(kind,hunterMetricMode,hunterVisibilityMode);
+    }
+    function killAllEligibleTasks() { return bulkCandidates("kill-all"); }
+    function hunterHogCandidates() { return bulkCandidates("kill-hogs"); }
+    function hunterMouseCandidates() { return bulkCandidates("kill-mice"); }
+    function requestBulk(kind) {
+        if (!active || !bulkAvailable) return false;
+        if (bulkOperation || hasBulkReview) {
+            actuatorScroll.contentY = 0;
+            return true;
+        }
+        if (locallyPending || modelBlank || (gate && (gate.pending || gate.busy))) return false;
+        bulkReview = appControlWindow.prepareCpuBulkReview(kind,hunterMetricMode,hunterVisibilityMode);
+        if (hasBulkReview) actuatorScroll.contentY = 0;
+        return hasBulkReview;
+    }
+    function requestKillAllEligibleTasks() { return requestBulk("kill-all"); }
+    function requestKillHogs() { return requestBulk("kill-hogs"); }
+    function requestKillMice() { return requestBulk("kill-mice"); }
+    function cancelBulk() {
+        if (hasBulkReview) appControlWindow.cancelCpuBulkReview(bulkReview);
+        bulkReview = null;
+    }
+    function confirmBulk() {
+        if (!active || !hasBulkReview) return false;
+        const accepted = appControlWindow.confirmCpuBulkReview(bulkReview);
+        if (accepted) bulkReview = null;
+        return accepted;
+    }
 
     property int selectedPid: 0
     property double selectedStartTicks: 0
@@ -338,7 +372,7 @@ Item {
     function prepareAction(action, percent) {
         const row = currentTask;
         if (!active || !exactTargetAvailable || !gate || locallyPending
-                || appControlWindow.destructiveConfirmOpen)
+                || hasBulkReview || bulkOperation || appControlWindow.destructiveConfirmOpen)
             return false;
         const ok = gate.prepare(
             Number(row.pid), Number(row.startTicks), String(row.comm),
@@ -364,6 +398,7 @@ Item {
     function canChangeLock(row) {
         return active && exactTargetAvailable && sameTarget(row)
             && !!gate && !gate.pending && !gate.busy
+            && !hasBulkReview && !bulkOperation
             && !appControlWindow.destructiveConfirmOpen && isProtected(row);
     }
     function toggleLock(row,action,sticky) {
@@ -399,7 +434,7 @@ Item {
         appendCurrentHistory();
     }
     onActiveChanged: {
-        if (!active) cancelOwned();
+        if (!active) { cancelOwned(); cancelBulk(); }
         else if (ready) requestRefresh();
     }
     Component.onCompleted: {
@@ -407,7 +442,7 @@ Item {
         updateOrder(true);
         requestRefresh();
     }
-    Component.onDestruction: cancelOwned()
+    Component.onDestruction: { cancelOwned(); cancelBulk(); }
     // The existing AppControl timer already samples in all modes; do not
     // create a competing periodic refresh request from the recipient.
     Connections {
@@ -872,7 +907,8 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: hunterControls.bottomSelectorHeight+2
-                text: String(workspace.filteredRows.length)+" TARGETS • BULK HOLD"
+                text: String(workspace.filteredRows.length)+" TARGETS"
+                    + (workspace.bulkAvailable ? "" : " • BULK HOLD")
                 color: Colors.orange
                 font.pixelSize: 9
             }
@@ -901,6 +937,56 @@ Item {
                     text: "PROCESS // ACTUATORS"
                     color: Colors.magenta
                     font.pixelSize: 12
+                }
+                Column {
+                    objectName: "cpuPlusBulkReview"
+                    width: parent.width
+                    visible: workspace.hasBulkReview || workspace.bulkOperation
+                    spacing: 8
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Colors.red
+                        text: workspace.hasBulkReview
+                            ? "REVIEW // " + workspace.bulkReview.label
+                            : workspace.bulkOperation
+                            ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase() : ""
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Colors.white
+                        font.pixelSize: 11
+                        text: workspace.hasBulkReview
+                            ? String(workspace.bulkReview.targets.length) + " CAPTURED TARGETS"
+                              + "\nGLOBAL SCOPE • NOT SEARCH RESULTS"
+                              + "\nNO COMMAND SENT • PROTECTION RECHECKED BEFORE DISPATCH\n\n"
+                              + workspace.bulkReview.targets.map(t => t.name + " [PID " + t.pid + "]").join("\n")
+                            : workspace.bulkOperation ? workspace.appControlWindow.cpuBulkMessage : ""
+                    }
+                    Rectangle {
+                        objectName: "cpuPlusBulkConfirm"
+                        width: parent.width; height: 38
+                        visible: workspace.hasBulkReview
+                        color: Colors.black; border.color: Colors.red; border.width: 1
+                        GohuText { anchors.centerIn: parent; text: "CONFIRM CAPTURE"; color: Colors.red }
+                        MouseArea { anchors.fill: parent; enabled: workspace.hasBulkReview; onClicked: workspace.confirmBulk() }
+                    }
+                    Rectangle {
+                        objectName: "cpuPlusBulkCancel"
+                        width: parent.width; height: 34
+                        visible: workspace.hasBulkReview || (workspace.bulkOperation
+                            && workspace.appControlWindow.hunterOperationPhase === "report")
+                        color: Colors.black; border.color: Colors.cyan; border.width: 1
+                        GohuText { anchors.centerIn: parent; text: workspace.hasBulkReview ? "CANCEL" : "ACKNOWLEDGE"; color: Colors.cyan }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                if (workspace.hasBulkReview) workspace.cancelBulk();
+                                else if (workspace.bulkOperation) workspace.appControlWindow.acknowledgeCpuBulkReport();
+                            }
+                        }
+                    }
                 }
                 GohuText {
                     width: parent.width

@@ -10,6 +10,8 @@ QtObject {
 
     property string phase: "idle" // idle, running, report
     property string kind: ""
+    property bool recipientOwned: false
+    property string message: ""
     property var targets: []
     property var results: []
     property int completed: 0
@@ -108,21 +110,22 @@ QtObject {
                 lines.push(operationStatusLine(results[i]));
         }
 
-        host.destructiveConfirmMessage = lines.join("\n");
+        message = lines.join("\n");
+        if (!recipientOwned) host.destructiveConfirmMessage = message;
     }
 
     function showWindow() {
-        if (phase !== "running" && phase !== "report")
+        if (recipientOwned || (phase !== "running" && phase !== "report"))
             return false;
 
         host.destructiveConfirmKind = kind;
         host.destructiveConfirmChoice = 0;
-        host.destructiveConfirmOpen = true;
+        if (!recipientOwned) host.destructiveConfirmOpen = true;
         refreshMessage();
         return true;
     }
 
-    function start(operationKind, operationTargets) {
+    function start(operationKind, operationTargets, cpuRecipient) {
         if (phase === "running") {
             showWindow();
             return;
@@ -152,6 +155,7 @@ QtObject {
             }));
         }
 
+        recipientOwned = cpuRecipient === true;
         phase = "running";
         kind = String(operationKind || "kill-hogs");
         targets = captured;
@@ -171,7 +175,7 @@ QtObject {
             : kind === "kill-mice"
             ? "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  HUNTING MICE…  ⚠︎"
             : "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  HUNTING HOGS…  ⚠︎";
-        host.destructiveConfirmOpen = true;
+        if (!recipientOwned) host.destructiveConfirmOpen = true;
         refreshMessage();
 
         dispatchNext();
@@ -271,7 +275,7 @@ QtObject {
             ? "⚠︎ (-_•)デ╾━  (ᐢ××ᐢ)౨  MICE HUNT COMPLETE  ⚠︎"
             : "⚠︎ (-_•)デ╾━  ₍˄×⚇×˄₎  HOG HUNT COMPLETE  ⚠︎";
         host.destructiveConfirmKind = kind;
-        host.destructiveConfirmOpen = true;
+        if (!recipientOwned) host.destructiveConfirmOpen = true;
         refreshMessage();
         refreshTimer.restart();
     }

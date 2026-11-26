@@ -94,20 +94,21 @@ QtObject {
         return seconds;
     }
 
-    function taskMetricScore(entry) {
+    function taskMetricScore(entry, requestedMetric) {
+        const metric = requestedMetric === undefined ? metricMode : requestedMetric;
         if (!entry)
             return 0;
 
-        if (metricMode === metricCpu)
+        if (metric === metricCpu)
             return taskPeak(entry) + taskAverage(entry) * 0.55;
 
-        if (metricMode === metricMemory)
+        if (metric === metricMemory)
             return taskMemoryMiB(entry);
 
-        if (metricMode === metricIo)
+        if (metric === metricIo)
             return taskIoRate(entry);
 
-        if (metricMode === metricAge)
+        if (metric === metricAge)
             return elapsedSeconds(entry.elapsed);
 
         const ioMiB = taskIoRate(entry) / (1024.0 * 1024.0);

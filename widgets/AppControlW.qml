@@ -41,6 +41,12 @@ PanelWindow {
     property bool menuOpen: false
     // Shell-owned visibility demand: read-only telemetry consumers do not start their own pollers.
     property bool cpuPlusProcessVisible: false
+    onCpuPlusProcessVisibleChanged: if (!cpuPlusProcessVisible) cpuBulkReview = null
+    property var cpuBulkReview: null
+    readonly property bool cpuBulkOperation: hunterOperationController.recipientOwned
+        && hunterOperationPhase !== "idle"
+    readonly property string cpuBulkMessage: cpuBulkOperation
+        ? hunterOperationController.message : ""
     // U7b-F: local navigation never waits for inventory/telemetry. A missing
     // saved item is explained inside the already-open destination.
     property var pendingFavoriteSelection: null
@@ -1002,6 +1008,9 @@ PanelWindow {
         controlOwner: processControl
         limitsOwner: processLimits
         refreshOwner: taskRefreshAfterKillTimer
+        bulkBlocked: appControlWindow.cpuBulkReview !== null
+            || appControlWindow.hunterOperationPhase !== "idle"
+            || appControlWindow.destructiveConfirmOpen
     }
 
     HunterOperationController {
@@ -1293,6 +1302,8 @@ PanelWindow {
         hunterOperationKind === "kill-mice" ? Colors.yellow : Colors.orange
 
     function openDestructiveConfirm(kind, title, message, actionLabel) {
+        if (cpuBulkReview || cpuBulkOperation)
+            return;
         destructiveConfirmKind = String(kind || "");
         destructiveConfirmTitle = String(title || "CONFIRM ACTION");
         destructiveConfirmMessage = String(message || "");
@@ -1989,7 +2000,69 @@ PanelWindow {
     }
 
     function showHunterOperationWindow() {
+        if (cpuBulkOperation) return false;
         return hunterOperationController.showWindow();
+    }
+
+    // Recipient chooses a metric, never a target list or executable command.
+    // The existing owner computes candidates globally; search is inspection only.
+    function cpuBulkCandidates(kind, metric, visibility) {
+        if (!cpuPlusProcessVisible || !Number.isInteger(metric) || metric < 0 || metric > 4
+                || !Number.isInteger(visibility) || visibility < 0 || visibility > 2)
+            return [];
+        if (kind !== "kill-all" && visibility === 1) return [];
+        const rows = kind === "kill-all" ? killAllEligibleTasks()
+            : kind === "kill-hogs" ? hunterHogCandidates(metric)
+            : kind === "kill-mice" ? hunterMouseCandidates() : [];
+        return rows.filter(function(row) {
+            const target = hunterTargetsFromRows([row])[0];
+            return target && Number.isSafeInteger(target.pid) && target.pid > 1
+                && Number.isSafeInteger(target.startTicks) && target.startTicks > 0
+                && !!target.name && !!target.identity && !hunterTargetIsFavorite(target);
+        });
+    }
+
+    function prepareCpuBulkReview(kind, metric, visibility) {
+        if (!cpuPlusProcessVisible || cpuBulkReview || destructiveConfirmOpen
+                || hunterOperationPhase !== "idle" || hubProcessActionGate.pending
+                || hubProcessActionGate.busy) return null;
+        const rows = cpuBulkCandidates(kind, metric, visibility);
+        const captures = hunterTargetsFromRows(rows);
+        if (!captures.length || new Set(captures.map(t => t.pid)).size !== captures.length)
+            return null;
+        const targets = Object.freeze(captures.map(t => Object.freeze(t)));
+        const label = kind === "kill-all" ? "ALL ELIGIBLE PROCESSES"
+            : kind === "kill-mice" ? "DETACHED IDLE LEAVES"
+            : ["COMBI","CPU","MEMORY","I/O","AGE"][metric] + " HOGS";
+        cpuBulkReview = Object.freeze({kind:kind, metric:metric, visibility:visibility,
+            label:label, targets:targets});
+        return cpuBulkReview;
+    }
+
+    function cancelCpuBulkReview(review) {
+        if (!review || cpuBulkReview !== review) return false;
+        cpuBulkReview = null;
+        return true;
+    }
+
+    function confirmCpuBulkReview(review) {
+        if (!review || cpuBulkReview !== review || !cpuPlusProcessVisible
+                || destructiveConfirmOpen || hunterOperationPhase !== "idle"
+                || hubProcessActionGate.pending || hubProcessActionGate.busy) return false;
+        cpuBulkReview = null; // consume once; never recompute or broaden the review
+        hunterOperationController.start(review.kind, review.targets, true);
+        return true;
+    }
+
+    function acknowledgeCpuBulkReport() {
+        if (!cpuBulkOperation || hunterOperationPhase !== "report") return false;
+        hunterOperationPhase = "idle";
+        hunterOperationKind = "";
+        hunterOperationTargets = [];
+        hunterOperationResults = [];
+        hunterOperationCompleted = 0;
+        hunterOperationTotal = 0;
+        return true;
     }
 
     function startHunterOperation(kind, targets) {
@@ -2032,22 +2105,23 @@ PanelWindow {
         return hunterTaskMetricScore(entry);
     }
 
-    function hunterTaskActive(entry) {
+    function hunterTaskActive(entry, requestedMetric) {
+        const metric = requestedMetric === undefined ? hunterMetricMode : requestedMetric;
         if (!entry || !entry._taskRecord)
             return false;
 
-        if (hunterMetricMode === hunterMetricMemory)
+        if (metric === hunterMetricMemory)
             return hunterTaskMemoryMiB(entry) >= 16;
 
-        if (hunterMetricMode === hunterMetricIo)
+        if (metric === hunterMetricIo)
             return hunterTaskIoRate(entry) >= 1024;
 
-        if (hunterMetricMode === hunterMetricAge)
+        if (metric === hunterMetricAge)
             return taskElapsedSeconds(entry.elapsed) > 0;
 
         // COMBI's memory threshold independently admits a row.
         // Avoid scanning CPU history when it already qualifies.
-        if (hunterMetricMode === hunterMetricCombined
+        if (metric === hunterMetricCombined
                 && hunterTaskMemoryMiB(entry) >= 128)
             return true;
 
@@ -2128,30 +2202,31 @@ PanelWindow {
         return hunterPresentation.elapsedSeconds(value);
     }
 
-    function hunterHogCandidates() {
+    function hunterHogCandidates(requestedMetric) {
+        const metric = requestedMetric === undefined ? hunterMetricMode : requestedMetric;
         // Bulk HOG execution always excludes protected/session-critical rows,
         // even when PROTECTED or ALL is selected for inspection.
         const rows = taskRows.filter(function(entry) {
             return taskEligibleForKillAll(entry)
-                   && hunterTaskActive(entry)
+                   && hunterTaskActive(entry, metric)
                    && !isFavoriteItem(entry, killModeIndex);
         });
         rows.sort(function(a, b) {
-            return hunterTaskMetricScore(b) - hunterTaskMetricScore(a);
+            return hunterPresentation.taskMetricScore(b, metric) - hunterPresentation.taskMetricScore(a, metric);
         });
         if (rows.length === 0)
             return [];
 
-        const topScore = Math.max(0.01, hunterTaskMetricScore(rows[0]));
+        const topScore = Math.max(0.01, hunterPresentation.taskMetricScore(rows[0], metric));
         let minimum = 0;
         let ratio = 0.48;
-        if (hunterMetricMode === hunterMetricCpu)
+        if (metric === hunterMetricCpu)
             minimum = 8.0;
-        else if (hunterMetricMode === hunterMetricMemory)
+        else if (metric === hunterMetricMemory)
             minimum = 128.0; // MiB RSS
-        else if (hunterMetricMode === hunterMetricIo)
+        else if (metric === hunterMetricIo)
             minimum = 1024 * 1024; // 1 MiB/s
-        else if (hunterMetricMode === hunterMetricAge) {
+        else if (metric === hunterMetricAge) {
             minimum = 3600;
             ratio = 0.72;
         } else
@@ -2159,7 +2234,7 @@ PanelWindow {
 
         const threshold = Math.max(minimum, topScore * ratio);
         return rows.filter(function(entry) {
-            return hunterTaskMetricScore(entry) >= threshold;
+            return hunterPresentation.taskMetricScore(entry, metric) >= threshold;
         }).slice(0, 8);
     }
 
@@ -2408,7 +2483,7 @@ PanelWindow {
             return;
         }
 
-        if (destructiveConfirmOpen || hubProcessActionGate.pending)
+        if (cpuBulkReview || destructiveConfirmOpen || hubProcessActionGate.pending || hubProcessActionGate.busy)
             return;
 
         const rows = hunterHogCandidates();
@@ -2440,7 +2515,7 @@ PanelWindow {
             showHunterOperationWindow();
             return;
         }
-        if (destructiveConfirmOpen || hubProcessActionGate.pending)
+        if (cpuBulkReview || destructiveConfirmOpen || hubProcessActionGate.pending || hubProcessActionGate.busy)
             return;
 
         const rows = hunterMouseCandidates();
@@ -29556,7 +29631,8 @@ PanelWindow {
 
             // A hunt may finish while AppControl is closed. Preserve the
             // verified report and surface it automatically on the next open.
-            if (appControlWindow.hunterOperationPhase === "report")
+            if (appControlWindow.hunterOperationPhase === "report"
+                    && !appControlWindow.cpuBulkOperation)
                 Qt.callLater(function() {
                     appControlWindow.showHunterOperationWindow();
                 });

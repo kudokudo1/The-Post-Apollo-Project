@@ -83,7 +83,7 @@ for entry in [start,row,row,row,row,end]: print(json.dumps(entry))
 assert sys.argv[1]=="--plan" and sys.argv[3]=="--data-dir"
 plan=json.loads(sys.argv[2])
 if any(c["kind"]=="stall" for c in plan["instruments"]):
-    assert plan=={"durationSeconds":5,"instruments":[{"kind":"storage"},{"kind":"stall","thresholdMs":500}]}
+    assert plan=={"durationSeconds":5,"instruments":[{"kind":"storage","sampleSeconds":2,"reportSeconds":4},{"kind":"stall","thresholdMs":500}]}
     os.execv(sys.executable,[sys.executable,"-B",str(pathlib.Path(__file__).parent.parent/"real-capture"/"scripts"/"cpuplus_diagnostic_workflow.py"),*sys.argv[1:]])
 assert plan=={"durationSeconds":1,"instruments":[{"kind":"census","intervalMs":1000},{"kind":"storage"}]}
 time.sleep(.4)

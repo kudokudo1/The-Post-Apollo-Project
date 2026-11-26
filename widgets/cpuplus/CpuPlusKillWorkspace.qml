@@ -336,6 +336,7 @@ Item {
                 contentHeight: details.implicitHeight + 20
                 TaskManagerView {
                     id: details
+                    objectName: "cpuPlusKillSharedTaskView"
                     x: 8
                     width: detailsScroll.width - 16
                     host: taskHost
@@ -376,6 +377,7 @@ Item {
             }
             ListView {
                 id: targets
+                objectName: "cpuPlusKillLiveTargets"
                 anchors.top: countText.bottom
                 anchors.topMargin: 10
                 anchors.left: parent.left

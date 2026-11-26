@@ -1,0 +1,66 @@
+name: Native Fedora Xvfb image pilot
+
+on:
+  pull_request:
+    paths:
+      - "ci/native/fedora-xvfb.Containerfile"
+      - ".github/workflows/native-fedora-xvfb-image-pilot.yml"
+      - "ci/native/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build version-checked candidate once
+        run: |
+          set -euo pipefail
+          /usr/bin/time -p docker build -f ci/native/fedora-xvfb.Containerfile -t post-apollo-native:pilot .
+          docker image inspect post-apollo-native:pilot --format 'IMAGE_ID={{.Id}} SIZE_BYTES={{.Size}}'
+          docker run --rm --network none post-apollo-native:pilot rpm -q quickshell
+          docker save post-apollo-native:pilot | gzip -1 > native-image.tar.gz
+          sha256sum native-image.tar.gz > native-image.sha256
+          du -h native-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-fedora-xvfb-image-pilot
+          path: |
+            native-image.tar.gz
+            native-image.sha256
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+
+  offline-native:
+    needs: build-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch candidate (fresh runner, measure delivery)
+        uses: actions/download-artifact@v4
+        with:
+          name: native-fedora-xvfb-image-pilot
+          path: /tmp/native-image
+      - name: Verify archive and load
+        run: |
+          set -euo pipefail
+          cd /tmp/native-image
+          sha256sum -c native-image.sha256
+          /usr/bin/time -p docker load -i native-image.tar.gz
+          docker image inspect post-apollo-native:pilot --format 'IMAGE_ID={{.Id}} SIZE_BYTES={{.Size}}'
+          docker run --rm --network none post-apollo-native:pilot rpm -q quickshell
+      - name: Run existing Favorites U1 U2 U3 native probes without network
+        run: |
+          set -euo pipefail
+          for probe in verify_default_store_fedora_u1.sh verify_unified_catalog_fedora_u2.sh verify_collections_fedora_u3.sh; do
+            echo "NATIVE_PILOT // $probe"
+            /usr/bin/time -p docker run --rm --network none \
+              --mount "type=bind,source=$GITHUB_WORKSPACE,target=/repo,readonly" \
+              post-apollo-native:pilot bash "/repo/scripts/favorites/$probe"
+          done

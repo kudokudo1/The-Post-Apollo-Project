@@ -4,6 +4,9 @@ on:
     paths:
       - "services/diagnostics/**"
       - "widgets/cpuplus/CpuPlusDiagnosticsPane.qml"
+      - "widgets/cpuplus/CpuPlusDiagnosticWorkshop.qml"
+      - "widgets/cpuplus/CpuPlusDiagnosticSlider.qml"
+      - "widgets/cpuplus/CpuPlusDiagnosticExecutionButton.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
       - "widgets/cpuplus/CpuPlusProcessPane.qml"
       - "widgets/cpuplus/CpuPlusProcessPresentation.js"

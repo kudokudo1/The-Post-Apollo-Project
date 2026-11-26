@@ -90,6 +90,31 @@ Scope {
     // Detached serialization freezes the submitted calibration for completion validation.
     property string activeCalibration: ""
 
+    // Session-owned draft, not authorization. No persistence or auto-start.
+    property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
+        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4})
+    property string workshopRunId: ""
+    property string workshopRunKind: ""
+    property string workshopRunPlan: ""
+    property double workshopStartedMs: 0
+    property int workshopDurationSeconds: 0
+
+    function requestWorkshopCapture(plan) {
+        if (!plan || !Array.isArray(plan.instruments) || plan.instruments.length < 1) return false;
+        const single = plan.instruments.length === 1;
+        const job = single ? plan.instruments[0].kind : "workflow";
+        const config = single ? Object.assign({},plan.instruments[0],{durationSeconds:plan.durationSeconds}) : plan;
+        const frozen = JSON.stringify(plan);
+        if (!(single ? requestConfigured(config) : requestWorkflow(config))) return false;
+        workshopRunId = captureId;
+        workshopRunKind = job;
+        workshopRunPlan = frozen;
+        workshopStartedMs = Date.now();
+        workshopDurationSeconds = plan.durationSeconds;
+        return true;
+    }
+
+
     function requestConfigured(configuration) {
         if (!configuration || typeof configuration !== "object") return false;
         const descriptor=Object.getOwnPropertyDescriptor(configuration,"kind");

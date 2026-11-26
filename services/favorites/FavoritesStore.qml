@@ -24,6 +24,17 @@ Scope {
     // it as permission to execute actions.
     property var favoriteDisplayLabels: ({})
 
+    // Coalesce multiple list edits made during one QML event into one
+    // serialized adapter snapshot. Immediate writeAdapter() calls for each
+    // property change can race with FileView's own watched reload and lose
+    // unrelated favorite/watch edits.
+    Timer {
+        id: favoriteWriteDispatch
+        interval: 0
+        repeat: false
+        onTriggered: favoriteStoreFile.writeAdapter()
+    }
+
     FileView {
         id: favoriteStoreFile
 
@@ -31,7 +42,7 @@ Scope {
         watchChanges: true
 
         onFileChanged: reload()
-        onAdapterUpdated: writeAdapter()
+        onAdapterUpdated: favoriteWriteDispatch.restart()
 
         JsonAdapter {
             id: adapter

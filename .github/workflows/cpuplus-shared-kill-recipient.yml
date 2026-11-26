@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'widgets/CpuPlusW.qml'
+      - 'services/kill/**'
+      - 'services/system/ProcessTelemetry.qml'
+      - 'tests/cpuplus/fixtures/KillStoreStandaloneNative.qml'
       - 'components/AnimatedTextCursor.qml'
       - 'widgets/cpuplus/CpuPlusKillWorkspace.qml'
       - 'widgets/appcontrol/TaskManagerView.qml'

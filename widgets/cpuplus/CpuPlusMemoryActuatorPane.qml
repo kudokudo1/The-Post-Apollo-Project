@@ -352,6 +352,8 @@ Item {
         Repeater {
             model: root.menus
             delegate: ActionButton {
+                id: memoryModeFilter
+                objectName: "cpuplusMemoryMode-"+modelData
                 required property string modelData
                 required property int index
                 width: Math.max(0, Math.floor((menuRail.width
@@ -367,7 +369,19 @@ Item {
                 selectedForegroundColor: Colors.magenta
                 selectedBorderColor: Colors.magenta
                 contentGlowEnabled: true
-                outlineOnlyGlow: true
+                // U9g / Angels: deterministic opaque face, no filled shadow layers.
+                color: Colors.black
+                softGlowEnabled: false
+                wideGlowEnabled: false
+                pressedForegroundColor: Colors.magenta
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.width: 1
+                    border.color: memoryModeFilter.activeBorderColor
+                    opacity: 0.48
+                    visible: memoryModeFilter.selected || memoryModeFilter.hovered || memoryModeFilter.pressed
+                }
                 onLeftClicked: root.selectMenu(index)
             }
         }

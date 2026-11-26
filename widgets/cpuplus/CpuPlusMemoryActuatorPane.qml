@@ -418,6 +418,62 @@ Item {
         }
 
     }
+    // CAP is the reference. All memory/swap modes mount the same header
+    // and divider, with identical margins, row height and bar composition.
+    component LiveCapacityHeader: Column {
+        id: sharedHeader
+        required property var sample
+        required property var capacity
+        required property var formatGiB
+        required property string badge
+        required property bool showRefresh
+        required property bool canRefresh
+        property string refreshName: "cpuplusWorkRefresh"
+        signal refreshRequested()
+        spacing: 5
+        Row {
+            width: parent.width
+            height: 25
+            spacing: 5
+            CpuPlusMemoryReadout {
+                width: Math.max(0,parent.width-(sharedRefresh.visible ? sharedRefresh.width+parent.spacing : 0))
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: "MEMORY // " + sharedHeader.badge
+                color: sharedHeader.sample ? Colors.cyan : Colors.orange
+                font.pixelSize: 11
+                elide: Text.ElideRight
+            }
+            ActionButton {
+                id: sharedRefresh
+                objectName: sharedHeader.refreshName
+                visible: sharedHeader.showRefresh
+                accentColor: Colors.yellow
+                idleFillColor: Colors.yellow
+                idleForegroundColor: Colors.magenta
+                idleBorderColor: Colors.orange
+                width: 68
+                height: parent.height
+                label: "REFRESH"
+                contentPadding: 2
+                available: sharedHeader.canRefresh
+                onLeftClicked: sharedHeader.refreshRequested()
+            }
+        }
+        LiveCapacityBars {
+            objectName: "cpuplusSharedLiveCapacityBars"
+            width: parent.width
+            sample: sharedHeader.sample
+            capacity: sharedHeader.capacity
+            formatGiB: sharedHeader.formatGiB
+        }
+        Rectangle {
+            objectName: "cpuplusSharedCapacityDivider"
+            width: parent.width
+            height: 1
+            color: Colors.cyan
+        }
+    }
     readonly property bool fixedWorkPage: ["PROC","AUTO","DIAG","PROF"].includes(root.page)
     Column {
         id: workHeader
@@ -427,55 +483,30 @@ Item {
         anchors.top: menuRail.bottom
         anchors.leftMargin: 5
         anchors.rightMargin: 5
-        anchors.topMargin: 4
-        spacing: 3
-        visible: root.fixedWorkPage
+        anchors.topMargin: 6
+        spacing: 5
+        visible: root.page !== "CAP"
         height: visible ? implicitHeight : 0
-        GohuText {
-            width: parent.width
-            visible: root.page !== "DIAG"
-            text: "MEMORY // " + root.menuTitles[root.menuIndex]
-            color: Colors.magenta
-            font.pixelSize: 11
-            wrapMode: Text.WordWrap
-        }
-        Row {
-            width: parent.width
-            spacing: 4
-            GohuText {
-                width: Math.max(0,parent.width-(workRefresh.visible ? 72+parent.spacing : 0))
-                height: Math.max(workRefresh.visible ? 26 : 14,implicitHeight)
-                text: root.page === "DIAG" ? root.status+" // "+CpuPlusDiagnostics.feedback : "SOURCE // "+root.status
-                color: root.sample ? Colors.cyan : Colors.orange
-                font.pixelSize: 10
-                verticalAlignment: Text.AlignVCenter
-                wrapMode: Text.Wrap
-            }
-            ActionButton {
-                id: workRefresh
-                objectName: "cpuplusWorkRefresh"
-                visible: !root.headerRefreshAvailable
-                width: 72
-                height: 26
-                label: "REFRESH"
-                contentPadding: 2
-                accentColor: Colors.yellow
-                idleFillColor: Colors.yellow
-                idleForegroundColor: Colors.magenta
-                idleBorderColor: Colors.orange
-                available: !probe.running && root.status !== "READING"
-                onLeftClicked: root.refresh()
-            }
-        }
-        LiveCapacityBars {
-            objectName: "cpuplusDiagPinnedStatus"
+        LiveCapacityHeader {
+            objectName: "cpuplusSharedCapacityHeader"
             width: parent.width
             sample: root.displaySample
             capacity: root.displayCapacity
             formatGiB: value => root.gib(value)
-            visible: root.page === "DIAG"
+            badge: root.scanBadge
+            showRefresh: !root.headerRefreshAvailable
+            canRefresh: !probe.running && root.status !== "READING"
+            onRefreshRequested: root.refresh()
         }
-        GohuText {
+        CpuPlusMemoryReadout {
+            width: parent.width
+            visible: root.page === "DIAG" && (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted)
+            text: CpuPlusDiagnostics.feedback
+            color: Colors.orange
+            font.pixelSize: 10
+            elide: Text.ElideRight
+        }
+        CpuPlusMemoryReadout {
             width: parent.width
             visible: root.page === "DIAG"
             color: Colors.yellow
@@ -579,42 +610,18 @@ Item {
         height: visible ? implicitHeight : 0
         spacing: 5
 
-        Row {
-            width: parent.width
-            height: 25
-            spacing: 5
-            CpuPlusMemoryReadout {
-                width: Math.max(0, parent.width - (refreshCap.visible ? refreshCap.width + parent.spacing : 0))
-                height: parent.height
-                verticalAlignment: Text.AlignVCenter
-                text: "MEMORY // " + root.scanBadge
-                color: root.displaySample ? Colors.cyan : Colors.orange
-                font.pixelSize: 11
-                elide: Text.ElideRight
-            }
-            ActionButton {
-                id: refreshCap
-                objectName: "cpuplusCapRefresh"
-                visible: !root.headerRefreshAvailable
-                accentColor: Colors.yellow
-                idleFillColor: Colors.yellow
-                idleForegroundColor: Colors.magenta
-                idleBorderColor: Colors.orange
-                width: 68
-                height: parent.height
-                label: "REFRESH"
-                contentPadding: 2
-                available: !probe.running
-                onLeftClicked: root.refresh()
-            }
-        }
-        LiveCapacityBars {
+        LiveCapacityHeader {
+            objectName: "cpuplusSharedCapacityHeader"
             width: parent.width
             sample: root.displaySample
             capacity: root.displayCapacity
             formatGiB: value => root.gib(value)
+            badge: root.scanBadge
+            showRefresh: !root.headerRefreshAvailable
+            canRefresh: !probe.running && root.status !== "READING"
+            refreshName: "cpuplusCapRefresh"
+            onRefreshRequested: root.refresh()
         }
-        Rectangle { width: parent.width; height: 1; color: Colors.cyan }
         Grid {
             width: parent.width
             columns: 3
@@ -724,7 +731,7 @@ Item {
         objectName: "cpuplusMemoryScroll"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: root.page === "CAP" ? capInstrument.bottom : root.fixedWorkPage ? workHeader.bottom : menuRail.bottom
+        anchors.top: root.page === "CAP" ? capInstrument.bottom : workHeader.bottom
         anchors.bottom: footer.top
         visible: root.page !== "CAP" || root.capSection !== 0
         anchors.topMargin: 4
@@ -741,32 +748,6 @@ Item {
             y: root.capDetailsActive || root.page === "DIAG" ? 2 : 8
             width: Math.max(0, scroll.width - 17)
             spacing: root.page === "DIAG" ? 2 : 10
-            GohuText {
-                visible: root.page !== "CAP" && !root.fixedWorkPage
-                text: "MEMORY // " + root.menuTitles[root.menuIndex]
-                color: Colors.magenta
-                font.pixelSize: 12
-                width: parent.width
-                wrapMode: Text.WordWrap
-            }
-            GohuText {
-                visible: root.page !== "CAP" && !root.fixedWorkPage
-                text: "SOURCE // " + root.status
-                color: root.sample ? Colors.cyan : Colors.orange
-                font.pixelSize: 10
-            }
-            ActionButton {
-                width: parent.width
-                height: 30
-                visible: root.page !== "CAP" && root.page !== "POL" && !root.fixedWorkPage
-                label: "REFRESH"
-                accentColor: Colors.yellow
-                idleFillColor: Colors.yellow
-                idleForegroundColor: Colors.magenta
-                idleBorderColor: Colors.orange
-                available: !probe.running
-                onLeftClicked: root.refresh()
-            }
             Loader {
                 width: parent.width
                 height: active && item ? item.implicitHeight : 0

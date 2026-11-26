@@ -1,0 +1,44 @@
+name: CPU++ shared Kill recipient source contract
+on:
+  pull_request:
+    paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusKillWorkspace.qml'
+      - 'widgets/appcontrol/TaskManagerView.qml'
+      - 'widgets/appcontrol/AppControlHubActionGate.qml'
+      - 'tests/cpuplus/test_shared_kill_recipient.cjs'
+      - 'tests/cpuplus/test_shared_kill_recipient_native.py'
+      - 'tests/cpuplus/fixtures/SharedKillRecipientNative.qml'
+      - '.github/workflows/cpuplus-shared-kill-recipient.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify shared Kill recipient source boundaries
+        run: node --test tests/cpuplus/test_shared_kill_recipient.cjs
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Exercise isolated CPU++ shared Kill view with synthetic process gate
+        env:
+          POST_APOLLO_CPU_KILL_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/cpuplus/test_shared_kill_recipient_native.py

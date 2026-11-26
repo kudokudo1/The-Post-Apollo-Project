@@ -98,7 +98,7 @@ PanelWindow {
         id: syntagmaEventLoopProbe
         interval: 100
         repeat: true
-        running: shellRoot.syntagmaLagProbeEnabled
+        running: shellRoot.syntagmaLagProbeEnabled || CpuPlusDiagnostics.appControlCaptureActive
         property double previousTickMs: 0
 
         onRunningChanged: {
@@ -112,6 +112,10 @@ PanelWindow {
             previousTickMs = now;
 
             if (elapsed >= 350) {
+                if (CpuPlusDiagnostics.appControlCaptureActive)
+                    CpuPlusDiagnostics.recordWork("event-loop-gap", elapsed, now);
+                if (!shellRoot.syntagmaLagProbeEnabled)
+                    return;
                 const modeAgeMs = shellRoot.syntagmaHospitalLastModeChangeMs > 0
                                   ? now - shellRoot.syntagmaHospitalLastModeChangeMs : -1;
                 console.warn(
@@ -788,6 +792,9 @@ PanelWindow {
                 }
                 onDiagnosticKillWorkStage: function(stage, elapsedMs, timestampMs) {
                     CpuPlusDiagnostics.recordKillWork(stage, elapsedMs, timestampMs);
+                }
+                onDiagnosticWorkStage: function(stage, elapsedMs, timestampMs) {
+                    CpuPlusDiagnostics.recordWork(stage, elapsedMs, timestampMs);
                 }
 
                 systemTelemetry: sharedSystemTelemetry

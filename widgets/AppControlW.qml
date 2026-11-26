@@ -1695,6 +1695,8 @@ PanelWindow {
         const elapsedMs = now - startMs;
         if (killDiagnosticActive())
             diagnosticKillWorkStage(stage, elapsedMs, now);
+        else if (diagnosticCaptureActive)
+            diagnosticWorkStage(stage, elapsedMs, now);
         if (!appControlSnapshotTraceEnabled || (elapsedMs < 25 && sequence % 16 !== 1))
             return;
         console.warn("SYNTAGMA_COMPLETION_PROBE // service=appcontrol"
@@ -1709,6 +1711,15 @@ PanelWindow {
     property bool diagnosticCaptureActive: false
     signal diagnosticOpeningStage(string stage, int sequence, double elapsedMs, double timestampMs)
     signal diagnosticKillWorkStage(string stage, double elapsedMs, double timestampMs)
+    signal diagnosticWorkStage(string stage, double elapsedMs, double timestampMs)
+
+    function traceDiagnosticWork(stage, startMs) {
+        if (!startMs || !diagnosticCaptureActive)
+            return 0;
+        const now = Date.now();
+        diagnosticWorkStage(stage, now - startMs, now);
+        return now;
+    }
 
     function killDiagnosticActive() {
         return diagnosticCaptureActive && menuOpen && selectedModeIndex === killModeIndex;
@@ -1737,7 +1748,7 @@ PanelWindow {
 
     function applyTaskSnapshot(rows) {
         const snapshotRows = Array.isArray(rows) ? rows : [];
-        const traceSequence = (appControlSnapshotTraceEnabled || killDiagnosticActive())
+        const traceSequence = (appControlSnapshotTraceEnabled || diagnosticCaptureActive)
             ? ++appControlSnapshotTraceSequence : 0;
         const traceRowCount = snapshotRows.length;
 
@@ -1776,7 +1787,9 @@ PanelWindow {
                     || selectedResultIsWindow()
                     || selectedResultIsTab())) {
             Qt.callLater(function() {
+                const started = appControlWindow.diagnosticCaptureActive ? Date.now() : 0;
                 appControlWindow.reconcileSelectedResourceLimitPolicy();
+                appControlWindow.traceDiagnosticWork("resource-reconcile", started);
             });
         }
 
@@ -8984,10 +8997,13 @@ PanelWindow {
     }
 
     function restoreRememberedAppSelection() {
+        let stageStart = diagnosticCaptureActive ? Date.now() : 0;
         const apps = currentApplicationValues();
+        stageStart = traceDiagnosticWork("app-model-read", stageStart);
 
         if (apps.length === 0) {
             selectedResultIndex = -1;
+            traceDiagnosticWork("app-index-write", stageStart);
             return;
         }
 
@@ -9005,13 +9021,17 @@ PanelWindow {
         if (restoredIndex < 0)
             restoredIndex = 0;
 
+        stageStart = traceDiagnosticWork("app-key-scan", stageStart);
         selectedResultIndex = restoredIndex;
+        traceDiagnosticWork("app-index-write", stageStart);
 
         Qt.callLater(function () {
+            const started = appControlWindow.diagnosticCaptureActive ? Date.now() : 0;
             resultList.positionViewAtIndex(
                 appControlWindow.selectedResultIndex,
                 ListView.Center
             );
+            appControlWindow.traceDiagnosticWork("app-position-view", started);
         });
     }
 

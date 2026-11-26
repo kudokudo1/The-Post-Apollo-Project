@@ -773,3 +773,16 @@ test('task favorite first matches use one pass and avoid unneeded snapshot subsc
     assert.match(model,/if \(watchedIdentities.length > 0\) \{\s*const first = appControlWindow.firstFavoriteTaskRows\(\s*watchedIdentities, appControlWindow.taskRows\)/);
     assert.match(model,/favoriteRecordForTaskIdentity\(\s*identity,\s*first\[identity\] \|\| null/);
 });
+
+test('APP row restore observes read, scan, assignment and deferred view without changing order',()=>{
+    const start=app.indexOf('    function restoreRememberedAppSelection()');
+    const end=app.indexOf('    function switchMode(',start);
+    const body=app.slice(start,end);
+    let prev=-1;
+    for(const marker of ['currentApplicationValues()','traceDiagnosticWork("app-model-read"','appEntryKey(apps[i])','traceDiagnosticWork("app-key-scan"','selectedResultIndex = restoredIndex','traceDiagnosticWork("app-index-write"','Qt.callLater','resultList.positionViewAtIndex','traceDiagnosticWork("app-position-view"']){
+        const ix=body.indexOf(marker,prev+1);assert.ok(ix>prev,marker);prev=ix;
+    }
+    assert.match(app,/if \(!startMs \|\| !diagnosticCaptureActive\)\s*return 0/);
+    assert.match(app,/traceSequence = \(appControlSnapshotTraceEnabled \|\| diagnosticCaptureActive\)/);
+    assert.match(app,/else if \(diagnosticCaptureActive\)\s*diagnosticWorkStage\(stage, elapsedMs, now\)/);
+});

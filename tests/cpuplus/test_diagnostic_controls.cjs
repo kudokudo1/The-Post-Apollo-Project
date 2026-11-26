@@ -235,3 +235,21 @@ assert.equal(policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,[
 assert.equal(policy.combineAppControl(jsonl(acRows),acModes,[...detailedOpen].reverse(),false,work),null);
 assert.equal(policy.appControlMetrics(ac).openings,1);
 assert.deepEqual(JSON.parse(JSON.stringify(policy.appControlMetrics(ac).killWork)),{});
+
+
+const moreWork=[{stage:"app-model-read",mode:"closed",tsMs:2100,elapsedMs:80},
+    {stage:"app-index-write",mode:"app",tsMs:2200,elapsedMs:100},
+    {stage:"task-rows",mode:"app",tsMs:2300,elapsedMs:60},
+    {stage:"event-loop-gap",mode:"app",tsMs:2900,elapsedMs:600},
+    {stage:"event-loop-gap",mode:"kill",tsMs:5001,elapsedMs:400}];
+const more=policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,work,moreWork);
+assert.ok(more);
+const moreMetrics=policy.appControlMetrics(more);
+assert.equal(moreMetrics.work["closed / app-model-read"].maxMs,80);
+assert.equal(moreMetrics.work["app / event-loop-gap"].totalMs,600);
+assert.equal(moreMetrics.work["kill / event-loop-gap"],undefined);
+assert.equal(moreMetrics.killWork["task-rows"].totalMs,50);
+assert.equal(policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,work,[{...moreWork[0],mode:"unknown"}]),null);
+assert.equal(policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,work,Array(257).fill(moreWork[0])),null);
+assert.deepEqual(JSON.parse(JSON.stringify(policy.appControlMetrics(ac).work)),{});
+assert.match(policy.summarize("appcontrol",more),/APP \/ EVENT-LOOP-GAP/);

@@ -10,10 +10,12 @@ shell = (root / "shell.qml").read_text(encoding="utf-8")
 git = (root / "widgets/GitW.qml").read_text(encoding="utf-8")
 hospital = (root / "widgets/HospitalW.qml").read_text(encoding="utf-8")
 
-# No probe work is scheduled unless the operator opts in at process launch.
+# No probe work is scheduled unless the operator opts in at launch or starts the existing capture.
 assert 'Quickshell.env("POST_APOLLO_UI_LAG_PROBE")' in shell
 assert 'trim() === "1"' in shell
-assert "running: shellRoot.syntagmaLagProbeEnabled" in shell
+assert "running: shellRoot.syntagmaLagProbeEnabled || CpuPlusDiagnostics.appControlCaptureActive" in shell
+assert 'CpuPlusDiagnostics.recordWork("event-loop-gap", elapsed, now)' in shell
+assert "if (!shellRoot.syntagmaLagProbeEnabled)" in shell
 assert "interval: 100" in shell
 assert "if (elapsed >= 350)" in shell
 assert "SYNTAGMA_LAG_PROBE // event-loop interval" in shell

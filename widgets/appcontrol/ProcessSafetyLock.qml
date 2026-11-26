@@ -18,9 +18,13 @@ Item {
         ? controller.lockMode(taskItem, actionKind) : ""
     readonly property bool masterUnlocked: isProtected && !master
         && controller.lockMode(taskItem, "") !== ""
+    readonly property string localMode: !master && controller.localLockMode
+        ? controller.localLockMode(taskItem, actionKind) : ""
     readonly property bool stickyUnlocked: mode === "sticky"
     readonly property bool unlocked: mode === "once" || stickyUnlocked
     visible: isProtected
+    Accessible.name: master ? "Master process lock" : actionKind + " process lock"
+    Accessible.description: masterUnlocked ? "Master authorization is active; individual lock changes do not revoke it." : "Left click: one-shot; right click: sticky."
 
     Rectangle {
         id: plate
@@ -53,10 +57,18 @@ Item {
             transparentBorder: true
         }
     }
+    GohuText {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        text: root.localMode === "sticky" ? "" : "+"
+        font.pixelSize: 8
+        color: root.accentColor
+        visible: root.masterUnlocked && root.localMode !== ""
+    }
     MouseArea {
         id: mouse
         anchors.fill: parent
-        enabled: root.isProtected && !root.masterUnlocked
+        enabled: root.isProtected
                  && root.controller.canChangeLock(root.taskItem)
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton

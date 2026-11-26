@@ -413,6 +413,12 @@ Item {
         return appControlWindow.taskDangerActionUnlockMode
             ? appControlWindow.taskDangerActionUnlockMode(exact,action) : "";
     }
+    function localLockMode(row, action) {
+        if (!row || !gate || !appControlWindow || !action) return "";
+        const exact=gate.exactRow(Number(row.pid),Number(row.startTicks),String(row.comm || ""));
+        return exact && appControlWindow.taskDangerActionLocalUnlockMode
+            ? appControlWindow.taskDangerActionLocalUnlockMode(exact,action) : "";
+    }
     function canChangeLock(row) {
         return active && exactTargetAvailable && sameTarget(row)
             && !!gate && !gate.pending && !gate.busy
@@ -746,7 +752,7 @@ Item {
                 anchors.right: parent.right
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
-                height: workspace.currentTask && workspace.isProtected(workspace.currentTask) ? 77 : 48
+                height: Math.max(48, lockRail.implicitHeight + 7 - Math.max(0, processIdentity.height - 34))
                 visible: !!workspace.currentTask
                 GohuText {
                     anchors.left: parent.left
@@ -762,6 +768,7 @@ Item {
                 Row {
                     id: headerLocks
                     anchors.right: parent.right
+                    anchors.rightMargin: 42
                     anchors.bottom: parent.bottom
                     anchors.bottomMargin: 7
                     spacing: 5
@@ -783,13 +790,7 @@ Item {
                         id: killSlot
                         objectName: "cpuPlusProcessKillSlot"
                         width: 88; height: 34
-                        Item {
-                            id: killLockSlot
-                            objectName: "cpuPlusProcessKillLockSlot"
-                            width: parent.width; height: 26
-                            anchors.bottom: parent.top
-                            anchors.bottomMargin: 3
-                        }
+
                     }
                     Item {
                         id: headerActions
@@ -800,25 +801,9 @@ Item {
                         id: freezeSlot
                         objectName: "cpuPlusProcessFreezeSlot"
                         width: 34; height: 34
-                        Item {
-                            id: freezeLockSlot
-                            objectName: "cpuPlusProcessFreezeLockSlot"
-                            width: parent.width; height: 26
-                            anchors.bottom: parent.top
-                            anchors.bottomMargin: 3
-                        }
+
                     }
-                    ProcessInformationButton {
-                        id: lockHelpButton
-                        objectName: "cpuPlusProcessLockHelpButton"
-                        anchors.verticalCenter: parent.verticalCenter
-                        Accessible.name: "Lock usage help"
-                        selected: false
-                        available: !!workspace.currentTask && !workspace.locallyPending
-                            && !workspace.hasBulkReview && !workspace.bulkOperation
-                            && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
-                            && !workspace.appControlWindow.destructiveConfirmOpen && !cpuProcessInformation.open
-                    }
+
                 }
 
                 Rectangle {
@@ -827,6 +812,48 @@ Item {
                     height: 1
                     color: Colors.red
                 }
+            }
+            Column {
+                id: lockRail
+                objectName: "cpuPlusProcessIndependentLockRail"
+                anchors.right: instrumentBay.right
+                anchors.rightMargin: 8
+                anchors.bottom: processStateHeader.bottom
+                anchors.bottomMargin: 7
+                spacing: 2
+                width: 26
+                visible: !!workspace.currentTask
+                z: 2
+                readonly property bool protectedTarget: !!workspace.currentTask && workspace.isProtected(workspace.currentTask)
+                Item {
+                    id: killLockSlot
+                    objectName: "cpuPlusProcessKillLockSlot"
+                    width: parent.width; height: 23
+                    visible: lockRail.protectedTarget
+                }
+                Item {
+                    id: restartLockSlot
+                    objectName: "cpuPlusProcessRestartLockSlot"
+                    width: parent.width; height: 23
+                    visible: lockRail.protectedTarget
+                }
+                Item {
+                    id: freezeLockSlot
+                    objectName: "cpuPlusProcessFreezeLockSlot"
+                    width: parent.width; height: 23
+                    visible: lockRail.protectedTarget
+                }
+            ProcessInformationButton {
+                id: lockHelpButton
+                objectName: "cpuPlusProcessLockHelpButton"
+                anchors.horizontalCenter: parent.horizontalCenter
+                Accessible.name: "Lock usage help"
+                selected: false
+                available: !!workspace.currentTask && !workspace.locallyPending
+                    && !workspace.hasBulkReview && !workspace.bulkOperation
+                    && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
+                    && !workspace.appControlWindow.destructiveConfirmOpen && !cpuProcessInformation.open
+            }
             }
             Flickable {
                 id: actuatorScroll
@@ -921,6 +948,7 @@ Item {
                     killActionTarget: killSlot
                     freezeActionTarget: freezeSlot
                     killLockTarget: killLockSlot
+                    restartLockTarget: restartLockSlot
                     freezeLockTarget: freezeLockSlot
                     viewportHeight: actuatorScroll.height - 12
                 }
@@ -1079,7 +1107,7 @@ Item {
                     }
                     GohuText {
                         width: parent.width
-                        text: "Left click lock: one-shot • Right click: sticky. Existing owner safety policy applies. Dispatch is not proof of success."
+                        text: "Left click lock: one-shot • Right click: sticky. Magenta unlocks all actions. Red: kill; yellow: restart; cyan: freeze/thaw. Each individual lock works without the master. While master authorization is active it overrides individual locks. A small + or key marks a separate individual grant while the master is open. Closing the master clears individual grants. Limit has its own lock beside the slider. Dispatch is not proof of success."
                         wrapMode: Text.Wrap
                         textFormat: Text.PlainText
                         color: Colors.orange

@@ -21,6 +21,7 @@ import "../../components"
     property Item killActionTarget: null
     property Item freezeActionTarget: null
     property Item killLockTarget: null
+    property Item restartLockTarget: null
     property Item freezeLockTarget: null
     readonly property bool headerActions: quickActionTarget !== null
     property real viewportHeight: 0
@@ -1201,8 +1202,8 @@ import "../../components"
                             id: taskFreezeSafetyLockLoader
                             parent: taskManagerBody.freezeLockTarget || taskActionLockRow
                             anchors.horizontalCenter: taskManagerBody.freezeLockTarget ? parent.horizontalCenter : undefined
-                            width: 30
-                            height: 26
+                            width: taskManagerBody.freezeLockTarget ? parent.width : 30
+                            height: taskManagerBody.freezeLockTarget ? parent.height : 26
                             visible:
                                 taskManagerBody.currentTask
                                 && Number(taskManagerBody.currentTask.pid || 0) > 1
@@ -1224,8 +1225,8 @@ import "../../components"
                             id: taskKillSafetyLockLoader
                             parent: taskManagerBody.killLockTarget || taskActionLockRow
                             anchors.horizontalCenter: taskManagerBody.killLockTarget ? parent.horizontalCenter : undefined
-                            width: 30
-                            height: 26
+                            width: taskManagerBody.killLockTarget ? parent.width : 30
+                            height: taskManagerBody.killLockTarget ? parent.height : 26
                             visible:
                                 taskManagerBody.currentTask
                                 && Number(taskManagerBody.currentTask.pid || 0) > 1
@@ -1237,6 +1238,29 @@ import "../../components"
                             onLoaded: {
                                 item.actionKind = "kill";
                                 item.accentColor = Colors.red;
+                                item.taskItem = Qt.binding(function() {
+                                    return taskManagerBody.currentTask;
+                                });
+                            }
+                        }
+
+                        Loader {
+                            id: taskRestartSafetyLockLoader
+                            parent: taskManagerBody.restartLockTarget || taskActionLockRow
+                            anchors.horizontalCenter: taskManagerBody.restartLockTarget ? parent.horizontalCenter : undefined
+                            width: taskManagerBody.restartLockTarget ? parent.width : 30
+                            height: taskManagerBody.restartLockTarget ? parent.height : 26
+                            visible:
+                                taskManagerBody.currentTask
+                                && Number(taskManagerBody.currentTask.pid || 0) > 1
+                                && processController.requiresDangerUnlock(
+                                       taskManagerBody.currentTask
+                                   )
+                            sourceComponent:
+                                visible ? taskManagerBody.safetyLockComponent : undefined
+                            onLoaded: {
+                                item.actionKind = "restart";
+                                item.accentColor = Colors.yellow;
                                 item.taskItem = Qt.binding(function() {
                                     return taskManagerBody.currentTask;
                                 });
@@ -1262,7 +1286,7 @@ import "../../components"
                         && Number(taskManagerBody.currentTask.pid || 0) > 1
                         && (!protectedTask
                             || processController.dangerActionUnlocked(
-                                   taskManagerBody.currentTask, "kill"
+                                   taskManagerBody.currentTask, "restart"
                                ))
                     available: canRestart
                     suppressHover: host.keyboardActive
@@ -1308,6 +1332,15 @@ import "../../components"
                     softGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0.58
                     wideGlowEnabled: taskManagerBody.headerActions
 
+                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.52 : 0
+                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0
+                    idleContentGlowColor: Colors.yellow
+                    hoverContentGlowColor: Colors.yellow
+                    selectedContentGlowColor: Colors.yellow
+                    pressedContentGlowColor: Colors.yellow
+                    trackLabelGlowLocally: taskManagerBody.headerActions
                     onHoverEntered: {
                         host.setKeyboardActive(false);
                         host.clearModeRailFocus();
@@ -1798,8 +1831,8 @@ import "../../components"
                         && (processController.currentTask !== null)
                         && host.selectedDetailActionIndex === 1
                     showLabel: taskManagerBody.headerActions
-                    label: taskManagerBody.headerActions ? (processController.isFrozen() ? "⋆♨⋆" : "⋆❆⋆") : ""
-                    labelPixelSize: 18
+                    label: taskManagerBody.headerActions ? (processController.isFrozen() ? "♨" : "❆") : ""
+                    labelPixelSize: taskManagerBody.headerActions ? 25 : 18
                     labelMinimumPixelSize: 7
                     labelFontSizeMode: Text.Fit
                     contentPadding: taskManagerBody.headerActions ? 2 : 8
@@ -1841,6 +1874,12 @@ import "../../components"
                     hoverContentGlowColor: Colors.cyan
                     selectedContentGlowColor: Colors.cyan
 
+                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.52 : 0
+                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0
+                    pressedContentGlowColor: Colors.cyan
+                    trackLabelGlowLocally: taskManagerBody.headerActions
                     onHoverEntered: {
                         host.setKeyboardActive(false);
                         host.clearModeRailFocus();
@@ -2006,6 +2045,15 @@ import "../../components"
                     softGlowPressedOpacity: 0.92
                     wideGlowEnabled: false
 
+                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.52 : 0
+                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0
+                    idleContentGlowColor: Colors.red
+                    hoverContentGlowColor: Colors.red
+                    selectedContentGlowColor: Colors.red
+                    pressedContentGlowColor: Colors.red
+                    trackLabelGlowLocally: taskManagerBody.headerActions
                     onHoverEntered: {
                         host.setKeyboardActive(false);
                         host.clearModeRailFocus();

@@ -103,23 +103,21 @@ Scope {
     function dangerActionKey(entry, actionKind) {
         const base = dangerKey(entry);
         const action = String(actionKind || "").trim().toLowerCase();
-        return base && action ? base + "|action:" + action : "";
+        return base && ["kill", "restart", "freeze", "limit"].indexOf(action) !== -1 ? base + "|action:" + action : "";
+    }
+
+    function dangerActionLocalUnlockMode(entry, actionKind) {
+        const key = dangerActionKey(entry, actionKind);
+        if (!key) return "";
+        const value = String(actionUnlockedKeys[key] || "");
+        return value === "sticky" ? "sticky" : value === "once" ? "once" : "";
     }
 
     function dangerActionUnlockMode(entry, actionKind) {
+        if (!dangerActionKey(entry, actionKind)) return "";
         const master = dangerUnlockMode(entry);
-
-        if (master === "once" || master === "sticky")
-            return master;
-
-        const key = dangerActionKey(entry, actionKind);
-        if (!key)
-            return "";
-
-        const value = String(actionUnlockedKeys[key] || "");
-        return value === "sticky" ? "sticky"
-             : value === "once" ? "once"
-             : "";
+        if (master === "once" || master === "sticky") return master;
+        return dangerActionLocalUnlockMode(entry, actionKind);
     }
 
     function dangerActionUnlocked(entry, actionKind) {
@@ -153,7 +151,7 @@ Scope {
     }
 
     function toggleDangerActionUnlock(entry, actionKind) {
-        if (!entry || Number(entry.pid || 0) <= 1 || dangerUnlocked(entry))
+        if (!entry || Number(entry.pid || 0) <= 1)
             return;
 
         const key = dangerActionKey(entry, actionKind);
@@ -171,7 +169,7 @@ Scope {
     }
 
     function toggleDangerActionStickyUnlock(entry, actionKind) {
-        if (!entry || Number(entry.pid || 0) <= 1 || dangerUnlocked(entry))
+        if (!entry || Number(entry.pid || 0) <= 1)
             return;
 
         const key = dangerActionKey(entry, actionKind);

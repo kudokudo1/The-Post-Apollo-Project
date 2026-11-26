@@ -150,11 +150,11 @@ QtObject {
             return;
 
         if (host.taskRequiresDangerUnlock(entry)
-                && !host.taskDangerActionUnlocked(entry, "kill"))
+                && !host.taskDangerActionUnlocked(entry, "restart"))
             return;
 
         processControlObject.restart(entry.pid);
-        relockTaskDangerAction(entry, "kill");
+        relockTaskDangerAction(entry, "restart");
         refreshTimer.restart();
     }
 

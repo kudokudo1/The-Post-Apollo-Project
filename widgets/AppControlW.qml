@@ -1362,7 +1362,8 @@ PanelWindow {
             if (entry)
                 relockTaskDangerAction(
                     entry,
-                    cancelKind.indexOf("freeze") !== -1 ? "freeze" : "kill"
+                    cancelKind.indexOf("freeze") !== -1 ? "freeze"
+                    : cancelKind.indexOf("restart") !== -1 ? "restart" : "kill"
                 );
         }
 
@@ -1902,6 +1903,10 @@ PanelWindow {
 
     function taskDangerActionUnlockMode(entry, actionKind) {
         return taskSafety.dangerActionUnlockMode(entry, actionKind);
+    }
+
+    function taskDangerActionLocalUnlockMode(entry, actionKind) {
+        return taskSafety.dangerActionLocalUnlockMode(entry, actionKind);
     }
 
     function taskDangerActionUnlocked(entry, actionKind) {
@@ -9092,7 +9097,7 @@ PanelWindow {
                 return false;
             if (actionIndex === 0)
                 return !taskRequiresDangerUnlock(task)
-                       || taskDangerActionUnlocked(task, "kill");
+                       || taskDangerActionUnlocked(task, "restart");
             return actionIndex >= 1 && actionIndex < 3;
         }
 
@@ -18858,6 +18863,7 @@ PanelWindow {
                 isValidTarget && appControlWindow.taskRequiresDangerUnlock(taskItem)
             readonly property bool masterUnlocked:
                 isValidTarget && appControlWindow.taskDangerUnlocked(taskItem)
+            readonly property string localMode: isValidTarget ? appControlWindow.taskDangerActionLocalUnlockMode(taskItem, actionKind) : ""
             readonly property bool unlocked:
                 isValidTarget
                 && appControlWindow.taskDangerActionUnlocked(taskItem, actionKind)
@@ -18907,12 +18913,24 @@ PanelWindow {
                 }
             }
 
+            GohuText {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                text: taskActionSafetyLockRoot.localMode === "sticky" ? "" : "+"
+                font.pixelSize: 8
+                color: taskActionSafetyLockRoot.accentColor
+                visible: taskActionSafetyLockRoot.masterUnlocked && taskActionSafetyLockRoot.localMode !== ""
+            }
+
             MouseArea {
                 id: taskActionSafetyLockMouse
                 anchors.fill: parent
                 enabled:
                     taskActionSafetyLockRoot.isValidTarget
-                    && !taskActionSafetyLockRoot.masterUnlocked
+                    && taskActionSafetyLockRoot.isProtected
+                    && !appControlWindow.destructiveConfirmOpen
+                    && !appControlWindow.hubProcessActionGate.pending
+                    && !appControlWindow.hubProcessActionGate.busy
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 onClicked: function(mouse) {

@@ -135,6 +135,7 @@ ShellRoot {
         property var actionModes: ({})
         function taskRequiresDangerUnlock(row) { return !!row; }
         function taskDangerUnlockMode(row) { return masterMode; }
+        function taskDangerActionLocalUnlockMode(row,action) { return String(actionModes[action] || ""); }
         function taskDangerActionUnlockMode(row,action) {
             return masterMode || String(actionModes[action] || "");
         }
@@ -238,6 +239,8 @@ ShellRoot {
                 const freeze=smoke.find(view,"cpuPlusProcessFreezeSlot");
                 const killLock=smoke.find(view,"cpuPlusProcessKillLockSlot");
                 const freezeLock=smoke.find(view,"cpuPlusProcessFreezeLockSlot");
+                const restartLock=smoke.find(view,"cpuPlusProcessRestartLockSlot");
+                const lockRail=smoke.find(view,"cpuPlusProcessIndependentLockRail");
                 const helpButton=smoke.find(view,"cpuPlusProcessLockHelpButton");
                 const help=smoke.find(view,"cpuPlusProcessLockHelpPopup");
                 const leftBay=smoke.find(view,"cpuPlusProcessControlBay");
@@ -253,7 +256,7 @@ ShellRoot {
                     && detail.mapToItem(leftBay,0,0).x >= 0
                     && detail.mapToItem(leftBay,0,0).x + detail.width <= leftBay.width
                     && detail.actionSection.parent===actionTarget
-                    && quick && kill && freeze && killLock && freezeLock && helpButton && help
+                    && quick && kill && freeze && killLock && freezeLock && restartLock && lockRail && helpButton && help
                     && detail.restartAction.parent===quick
                     && detail.freezeAction.parent===freeze
                     && detail.endAction.parent===kill
@@ -262,9 +265,11 @@ ShellRoot {
                     && detail.freezeAction.width===34 && detail.freezeAction.height===34
                     && detail.endAction.width>detail.restartAction.width && detail.endAction.height===34
                     && detail.restartAction.showLabel && detail.freezeAction.showLabel && detail.endAction.showLabel
-                    && kill.x < quick.x && quick.x < freeze.x && freeze.x < helpButton.x
-                    && killLock.parent===kill && freezeLock.parent===freeze
-                    && killLock.y<0 && freezeLock.y<0
+                    && kill.x < quick.x && quick.x < freeze.x
+                    && killLock.parent===lockRail && restartLock.parent===lockRail && freezeLock.parent===lockRail
+                    && killLock.y < restartLock.y && restartLock.y < freezeLock.y && freezeLock.y < helpButton.y
+                    && freeze.mapToItem(leftBay,freeze.width,0).x + 6 <= lockRail.mapToItem(leftBay,0,0).x
+                    && detail.freezeAction.label === "❆"
                     && detail.restartAction.label=== "⟳" && helpButton.label === "i"
                     && search && hunter
                     && smoke.find(view,"cpuPlusKillTargetScroll")
@@ -289,6 +294,13 @@ ShellRoot {
                 info.open=false;
                 if (!smoke.check(!info.visible && !infoButton.selected,
                     "information closes without action")) return;
+                if (!smoke.check(view.toggleLock(view.currentTask,"restart",false)
+                    && view.lockMode(view.currentTask,"restart")==="once"
+                    && view.lockMode(view.currentTask,"kill")===""
+                    && view.lockMode(view.currentTask,"freeze")===""
+                    && detail.restartAction.available && !detail.endAction.available && !detail.freezeAction.available
+                    && view.toggleLock(view.currentTask,"restart",false)
+                    && !detail.restartAction.available, "restart lock is separate while master remains locked")) return;
                 if (!smoke.check(view.toggleLock(view.currentTask,"limit",false)
                     && view.lockMode(view.currentTask,"limit")==="once"
                     && view.toggleLock(view.currentTask,"limit",true)

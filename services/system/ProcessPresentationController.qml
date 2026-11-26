@@ -270,7 +270,7 @@ Scope {
 
         const protectedTask = requiresDangerUnlock(target);
 
-        if (protectedTask && !dangerActionUnlocked(target, "kill"))
+        if (protectedTask && !dangerActionUnlocked(target, "restart"))
             return;
 
         confirmationRequested(
@@ -284,7 +284,7 @@ Scope {
             + (
                 protectedTask
                 ? safetyService.dangerReason(target)
-                  + "\n\nTHE KILL ACTION IS UNLOCKED FOR THIS TARGET. CONFIRM RESTART?"
+                  + "\n\nTHE RESTART ACTION IS UNLOCKED FOR THIS TARGET. CONFIRM RESTART?"
                 : "CONFIRM RESTART?"
             ),
             "RESTART PROCESS",

@@ -57,13 +57,25 @@ ShellRoot {
                     root.fail("UNEXPECTED_EXISTING_DATA");
                     return;
                 }
-                if (!service.toggleFavoriteKey(root.taskKey)
-                        || !service.toggleFavoriteKey(root.fileKey)
-                        || !service.toggleTaskMetricKey(root.taskMetricKey)
-                        || !service.toggleMonitorBoxKey(root.monitorKey)
-                        || !service.togglePreferredActionKey(root.context, root.preferredOld)
-                        || !service.togglePreferredActionKey(root.context, root.preferredNew)
-                        || !root.verified()) {
+                const generalTask = service.toggleFavoriteKey(root.taskKey);
+                const generalFile = service.toggleFavoriteKey(root.fileKey);
+                const processWatch = service.toggleTaskMetricKey(root.taskMetricKey);
+                const monitorWatch = service.toggleMonitorBoxKey(root.monitorKey);
+                const preferredFirst =
+                    service.togglePreferredActionKey(root.context, root.preferredOld);
+                const preferredSecond =
+                    service.togglePreferredActionKey(root.context, root.preferredNew);
+                const matches = root.verified();
+                console.log("FB_TRACE // op=" + JSON.stringify([
+                    generalTask, generalFile, processWatch, monitorWatch,
+                    preferredFirst, preferredSecond, matches
+                ]) + " favorites=" + JSON.stringify(store.favoriteKeys)
+                    + " task=" + JSON.stringify(store.favoriteTaskMetricKeys)
+                    + " monitor=" + JSON.stringify(store.favoriteMonitorBoxKeys)
+                    + " preferred=" + JSON.stringify(store.favoriteDetailActionKeys));
+                if (!generalTask || !generalFile || !processWatch
+                        || !monitorWatch || !preferredFirst || !preferredSecond
+                        || !matches) {
                     root.fail("SERVICE_MUTATIONS_OR_PARITY");
                     return;
                 }

@@ -1,0 +1,106 @@
+name: Publish qualified native Fedora Xvfb image
+
+# Explicit operator action on reviewed main only. Never publish on a PR.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: native-fedora-xvfb-publication
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/kudokudo1/post-apollo-native-fedora-xvfb
+  TAG: qs-0.3.2-pilot-c78bc776
+  PILOT_RUN: "45816601818"
+  PILOT_HEAD: c78bc77615713ab6cedafcba4afd196280a0db02
+  ARTIFACT_ID: "15116892285"
+  ZIP_DIGEST: 34e2582f7ed7553173063bd15d14d97f028e4060b8ddb14f66aed509416e013a
+  IMAGE_ID: sha256:f7879a5660aa1c0a6d5aaf57941080553d2cb3e796aa1de8b6438787b8869e68
+
+jobs:
+  publish-qualified:
+    if: github.ref == 'refs/heads/main' && github.repository == 'kudokudo1/The-Post-Apollo-Project'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      packages: write
+    outputs:
+      image-ref: ${{ steps.push.outputs.image-ref }}
+    steps:
+      - name: Verify qualified run and exact artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PILOT_RUN" > run.json
+          jq -e --arg head "$PILOT_HEAD" --arg repo "$GITHUB_REPOSITORY" \
+            '.head_sha == $head and .head_repository.full_name == $repo and .conclusion == "success" and .status == "completed" and .run_attempt == 2 and .path == ".github/workflows/native-fedora-xvfb-image-pilot.yml"' run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PILOT_RUN/attempts/2/jobs" > jobs.json
+          jq -e '([.jobs[] | select(.name == "build-candidate" and .conclusion == "success")] | length) == 1 and ([.jobs[] | select(.name == "offline-native" and .conclusion == "success")] | length) == 1' jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > artifact.json
+          jq -e --arg head "$PILOT_HEAD" --arg run "$PILOT_RUN" --arg digest "sha256:$ZIP_DIGEST" \
+            '.expired == false and .name == "native-fedora-xvfb-image-pilot" and .workflow_run.head_sha == $head and (.workflow_run.id | tostring) == $run and .digest == $digest' artifact.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > candidate.zip
+          printf '%s  candidate.zip\n' "$ZIP_DIGEST" | sha256sum -c -
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("candidate.zip") as z:
+              assert sorted(z.namelist()) == ["native-image.sha256", "native-image.tar.gz"]
+              for name in z.namelist():
+                  z.extract(name)
+          PY
+          sha256sum -c native-image.sha256
+          docker load -i native-image.tar.gz
+          test "$(docker image inspect post-apollo-native:pilot --format '{{.Id}}')" = "$IMAGE_ID"
+
+      - name: Publish verified bytes without running the image
+        id: push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker tag post-apollo-native:pilot "$IMAGE:$TAG"
+          docker push "$IMAGE:$TAG" | tee push.log
+          digest="$(awk '/digest: sha256:/ {for(i=1;i<=NF;i++) if ($i=="digest:") print $(i+1)}' push.log | tail -n1)"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'image-ref=%s@%s\n' "$IMAGE" "$digest" >> "$GITHUB_OUTPUT"
+          printf 'Published immutable reference: %s@%s\n' "$IMAGE" "$digest" >> "$GITHUB_STEP_SUMMARY"
+
+  cold-pull-verify:
+    needs: publish-qualified
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c78bc77615713ab6cedafcba4afd196280a0db02
+          persist-credentials: false
+      - name: Pull exact registry digest on a fresh runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_REF: ${{ needs.publish-qualified.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_REF" =~ ^ghcr\.io/kudokudo1/post-apollo-native-fedora-xvfb@sha256:[a-f0-9]{64}$ ]]
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          /usr/bin/time -p docker pull "$IMAGE_REF"
+          test "$(docker image inspect "$IMAGE_REF" --format '{{.Id}}')" = "$IMAGE_ID"
+      - name: Repeat offline native qualification with read-only repository
+        env:
+          IMAGE_REF: ${{ needs.publish-qualified.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+          for probe in verify_default_store_fedora_u1.sh verify_unified_catalog_fedora_u2.sh verify_collections_fedora_u3.sh; do
+            /usr/bin/time -p docker run --rm --network none \
+              --mount "type=bind,source=$GITHUB_WORKSPACE,target=/repo,readonly" \
+              "$IMAGE_REF" bash "/repo/scripts/favorites/$probe"
+          done

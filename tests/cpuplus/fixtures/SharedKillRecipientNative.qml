@@ -13,6 +13,7 @@ ShellRoot {
     property bool done: false
     property int previousRevision: 0
     property real previousInfoHeight: 0
+    property real previousInfoY: 0
     property real previousScopeHeight: 0
     property real previousArgumentsHeight: 0
     property var lastRow: null
@@ -230,11 +231,18 @@ ShellRoot {
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
+                const leftBay=smoke.find(view,"cpuPlusProcessControlBay");
+                const rightBay=smoke.find(view,"cpuPlusProcessResourceBay");
                 const search=smoke.find(view,"cpuPlusKillSearch");
                 const hunter=smoke.find(view,"cpuPlusSharedHunterControls");
                 if (!smoke.check(view.currentTask && view.currentTask.pid===3442
                     && detail.visible && header && header.visible
                     && master && master.visible && actionTarget
+                    && leftBay && rightBay && leftBay.x < rightBay.x
+                    && actionTarget.mapToItem(leftBay,0,0).x >= 0
+                    && actionTarget.mapToItem(leftBay,0,0).x + actionTarget.width <= leftBay.width
+                    && detail.mapToItem(rightBay,0,0).x >= 0
+                    && detail.mapToItem(rightBay,0,0).x + detail.width <= rightBay.width
                     && detail.actionSection.parent===actionTarget
                     && detail.restartAction.parent===detail.actionSection
                     && detail.endAction.parent===detail.actionSection
@@ -308,6 +316,7 @@ ShellRoot {
                 if (!smoke.check(scope.contentY===12 && args.contentY===15 && command.y===before,
                     "command scrolling does not move scope or its own box")) return;
                 smoke.previousInfoHeight=info.height;
+                smoke.previousInfoY=info.y;
                 smoke.previousScopeHeight=scope.height;
                 smoke.previousArgumentsHeight=args.height;
                 grow.resizeRequested(1);
@@ -320,9 +329,11 @@ ShellRoot {
                 const args=smoke.find(info,"processInformationArgumentsScroll");
                 const grow=smoke.find(info,"processInformationGrow");
                 if (!smoke.check(info.sizeLevel===1 && info.height>smoke.previousInfoHeight
+                    && info.y < smoke.previousInfoY && info.y===info.expandedTop
                     && scope.height>=smoke.previousScopeHeight && args.height>=smoke.previousArgumentsHeight,
-                    "upper level enlarges both long bodies")) return;
+                    "upper level moves above state divider and enlarges both bodies")) return;
                 smoke.previousInfoHeight=info.height;
+                smoke.previousInfoY=info.y;
                 smoke.previousScopeHeight=scope.height;
                 smoke.previousArgumentsHeight=args.height;
                 grow.resizeRequested(1);
@@ -336,6 +347,8 @@ ShellRoot {
                 const grow=smoke.find(info,"processInformationGrow");
                 const shrink=smoke.find(info,"processInformationShrink");
                 if (!smoke.check(info.sizeLevel===2 && !grow.available && shrink.available
+                    && info.y===info.fullTop && info.y < smoke.previousInfoY
+                    && info.y < smoke.find(view,"cpuPlusProcessStateHeader").y
                     && Math.abs(info.height-info.maximumHeight)<1
                     && info.height>smoke.previousInfoHeight
                     && scope.height>=smoke.previousScopeHeight && args.height>=smoke.previousArgumentsHeight,
@@ -344,7 +357,7 @@ ShellRoot {
                 if (!smoke.check(info.sizeLevel===2,"maximum step clamps")) return;
                 shrink.resizeRequested(-1);
                 shrink.resizeRequested(-1);
-                if (!smoke.check(info.sizeLevel===0,"shrink restores compact level")) return;
+                if (!smoke.check(info.sizeLevel===0 && info.y===info.compactTop,"shrink restores compact position")) return;
                 info.open=false;
                 if (!smoke.check(detail.cpuCanvas.graphRevision>smoke.previousRevision,
                     "new owner sample repaints shared detail")) return;
@@ -431,8 +444,11 @@ ShellRoot {
                 if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
                     "prepare before process removal")) return;
                 smoke.lastRow = fakeOwner.taskRows[0];
-                smoke.find(view,"cpuPlusProcessInformation").open=true;
-            fakeOwner.taskRows = [];
+                const pendingInfo=smoke.find(view,"cpuPlusProcessInformation");
+                pendingInfo.open=true;
+                if (!smoke.check(!pendingInfo.open && !pendingInfo.visible,
+                    "information cannot obscure pending confirmation")) return;
+                fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }

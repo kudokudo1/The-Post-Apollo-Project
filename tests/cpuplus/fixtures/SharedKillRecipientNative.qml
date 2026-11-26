@@ -1,4 +1,5 @@
 import QtQuick
+// P3c3 main-lineage native qualification: exercise the recipient after the P3c2 parent merge.
 import QtQuick.Window
 import Quickshell
 import "widgets/cpuplus"

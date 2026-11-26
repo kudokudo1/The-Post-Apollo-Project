@@ -24,7 +24,7 @@ Scope {
     function selectComparison(side, reportId) {
         if (archiveBusy || archiveStatus !== "READY") return false;
         const row = archiveRows.find(item => item.id === reportId);
-        if (!row || row.status !== "COMPLETE" || row.kind === "workflow") return false;
+        if (!row || row.status !== "COMPLETE" || ["workflow","stall"].includes(row.kind)) return false;
         if (side === "before") compareBeforeId = row.id;
         else if (side === "after") compareAfterId = row.id;
         else return false;
@@ -63,6 +63,20 @@ Scope {
     property var workRecords: []
     property var modeRecords: []
     property bool diagnosticOverflow: false
+    readonly property bool stallCaptureActive: busy && kind === "stall" && !cancelled && !exited
+    property var stallTicks: []
+    property bool stallOverflow: false
+
+    function recordStallTick(timestampMs) {
+        if (!stallCaptureActive || stallOverflow) return;
+        // Do not publish a reactive model or copy the history every tick.
+        if (!Number.isSafeInteger(timestampMs) || timestampMs<=0 || stallTicks.length>=1500
+                || (stallTicks.length && timestampMs<=stallTicks[stallTicks.length-1])) {
+            stallOverflow=true;
+            return;
+        }
+        stallTicks.push(timestampMs);
+    }
     onAppControlModeChanged: {
         if (appControlCaptureActive) recordMode();
     }
@@ -154,6 +168,8 @@ Scope {
         workRecords = [];
         modeRecords = [];
         diagnosticOverflow = false;
+        stallTicks = [];
+        stallOverflow = false;
         busy = true;
         if (job === "appcontrol") recordMode();
         feedback = "RUNNING // " + job.toUpperCase();
@@ -204,6 +220,15 @@ Scope {
         deadline.stop();
         if (kind === "appcontrol" && !cancelled && exitOk && output.length <= maximumReport)
             output = Policy.combineAppControl(output, modeRecords, openingRecords, diagnosticOverflow, killWorkRecords, workRecords) || "";
+        if (kind === "stall") {
+            const report = !cancelled && exitOk && activeCalibration && !stallOverflow
+                ? Policy.combineStall(output, stallTicks, JSON.parse(activeCalibration)) : null;
+            publishResult(cancelled ? "CANCELLED" : report ? "COMPLETE" : "NOT VERIFIED",
+                report ? Policy.summarize("stall", report) : cancelled ? "CAPTURE STOPPED" : "STALL COVERAGE OR CLOCK NOT VERIFIED",
+                report || "");
+            stallTicks=[];
+            return;
+        }
         if (kind === "workflow") {
             const evidence = activeCalibration && Policy.workflowEvidence(output, JSON.parse(activeCalibration));
             const status = cancelled ? "CANCELLED" : exitOk && evidence && evidence.status === "COLLECTED" ? "COMPLETE" : "NOT VERIFIED";
@@ -230,7 +255,7 @@ Scope {
             // accepting late output under a new request identity.
             owner.faulted = true;
             owner.publishResult("NOT VERIFIED", "RUNNER UNAVAILABLE // COMPLETION NOT OBSERVED",
-                                owner.kind !== "workflow" && owner.output.length <= owner.maximumReport ? owner.output : "");
+                                owner.kind !== "workflow" && owner.kind !== "stall" && owner.output.length <= owner.maximumReport ? owner.output : "");
             worker.running = false;
         }
     }

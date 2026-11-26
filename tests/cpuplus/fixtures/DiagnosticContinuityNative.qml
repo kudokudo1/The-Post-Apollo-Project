@@ -38,11 +38,46 @@ ShellRoot {
         const glow=b && findItem(b,"actionButtonNormalPerimeter");
         const broadSoft=b && findItem(b,"actionButtonBroadSoftGlow");
         const broadWide=b && findItem(b,"actionButtonBroadWideGlow");
-        return b && b.normalFace && b.washSafePerimeter && b.selected===selected
+        const ok = b && b.normalFace && b.washSafePerimeter && b.selected===selected
             && String(b.color).toLowerCase()===(selected ? "#f2be4e" : "#1b0623")
             && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
             && broadSoft && !broadSoft.visible && broadWide && !broadWide.visible
             && glow && glow.active && glow.z===-1 && glow.item && glow.item.color.a===0;
+        // Keep the assertion unchanged; expose the precise observed mismatch.
+        if (!ok) {
+            console.log("CPU_DIAG_FACE_EVIDENCE // " + JSON.stringify({
+                name: name, phase: root.phase, exists: !!b,
+                expectedSelected: selected,
+                expectedColor: selected ? "#f2be4e" : "#1b0623",
+                actual: b ? {
+                    color: String(b.color), alpha: b.color.a,
+                    fillColor: String(b.fillColor),
+                    idleFillColor: String(b.idleFillColor),
+                    hoverFillColor: String(b.hoverFillColor),
+                    selectedFillColor: String(b.selectedFillColor),
+                    normalFace: b.normalFace, washSafePerimeter: b.washSafePerimeter,
+                    selected: b.selected, hovered: b.hovered, pressed: b.pressed,
+                    keyboardSelected: b.keyboardSelected,
+                    contentKeyboardPrimary: b.contentKeyboardPrimary,
+                    cursorPrimaryNotActivated: b.cursorPrimaryNotActivated,
+                    pointerSecondaryHovered: b.pointerSecondaryHovered,
+                    available: b.available, visible: b.visible,
+                    softGlowEnabled: b.softGlowEnabled, wideGlowEnabled: b.wideGlowEnabled,
+                    contentGlowEnabled: b.contentGlowEnabled,
+                    perimeterGlowEnabled: b.perimeterGlowEnabled,
+                    perimeterGlowOpacity: b.perimeterGlowOpacity
+                } : null,
+                broadSoft: broadSoft ? {visible: broadSoft.visible} : null,
+                broadWide: broadWide ? {visible: broadWide.visible} : null,
+                perimeter: glow ? {
+                    active: glow.active, visible: glow.visible, z: glow.z,
+                    itemExists: !!glow.item,
+                    itemColor: glow.item ? String(glow.item.color) : null,
+                    itemAlpha: glow.item ? glow.item.color.a : null
+                } : null
+            }));
+        }
+        return ok;
     }
     function check(ok, message) {
         if (!ok) {

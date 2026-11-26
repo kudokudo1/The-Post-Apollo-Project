@@ -81,16 +81,29 @@ ShellRoot {
                 console.log("FB_PENDING // SERVICE_MUTATIONS_QUEUED");
                 settleTimer.start();
             } else if (root.phase === "read") {
-                if (!root.verified()) {
-                    root.fail("RESTART_READBACK");
-                    return;
-                }
-                root.finished = true;
-                console.log("FB_PASS // STANDALONE_RESTART_READ_ONLY");
-                Qt.quit();
+                // FileView reads asynchronously. Do not treat the first
+                // timer callback as proof that the backing JSON has loaded.
+                console.log("FB_READ_INITIAL // favorites="
+                    + JSON.stringify(store.favoriteKeys));
             } else {
                 root.fail("UNKNOWN_PHASE");
             }
+        }
+    }
+
+    // In a widgetless shell, asynchronous FileView loading may complete
+    // after Component.onCompleted and the first timer callback. Observe
+    // the actual owner state rather than guessing a fixed read delay.
+    Timer {
+        interval: 100
+        repeat: true
+        running: root.phase === "read" && !root.finished
+        onTriggered: {
+            if (!root.verified())
+                return;
+            root.finished = true;
+            console.log("FB_PASS // STANDALONE_RESTART_READ_ONLY");
+            Qt.quit();
         }
     }
 

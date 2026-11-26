@@ -107,7 +107,8 @@ test("master and per-action lock state is rendered with donor glyphs and exact-o
     const lock = read("widgets/appcontrol/ProcessSafetyLock.qml");
     assert.match(lock,/root\.stickyUnlocked \? "" : root\.unlocked \? "☍" : ""/);
     assert.match(lock,/acceptedButtons: Qt.LeftButton \| Qt.RightButton/);
-    assert.match(lock,/!root\.masterUnlocked/);
+    assert.doesNotMatch(lock,/enabled: root.isProtected && !root.masterUnlocked/);
+    assert.match(lock,/enabled: root.isProtected\s+&& root.controller.canChangeLock/);
     assert.match(recipient,/objectName: "cpuPlusProcessMasterLock"/);
     assert.match(recipient,/function canChangeLock\(row\)[\s\S]*?exactTargetAvailable[\s\S]*?!gate\.pending && !gate\.busy/);
     assert.match(recipient,/appControlWindow\.taskDangerActionUnlockMode/);
@@ -218,7 +219,7 @@ test("P4e: CPU++ mounts the same three action instances in its floating identity
     assert.equal((donorView.match(/parent: taskManagerBody\.(?:(?:killActionTarget|freezeActionTarget) \|\| taskManagerBody\.)?quickActionTarget \|\| actionColumn/g)||[]).length,3);
     assert.match(donorView,/parent: taskManagerBody.lockTarget \|\| taskTerminationHeaderBox/);
     assert.match(donorView,/id: taskRestartAction[\s\S]*?accentColor: taskManagerBody.headerActions \? Colors.yellow/);
-    assert.match(donorView,/⋆❆⋆/);
+    assert.match(donorView,/processController.isFrozen\(\) \? "♨" : "❆"/);
     assert.match(recipient,/ProcessInformationButton\s*\{\s*id: lockHelpButton/);
     assert.match(recipient,/id: lockHelp[\s\S]*?open: lockHelpButton.hovered && lockHelpButton.available && workspace.active[\s\S]*?Left click lock: one-shot/);
     assert.equal((recipient.match(/Left click lock: one-shot/g)||[]).length,1);
@@ -239,4 +240,64 @@ test("P4f: aligned safety slots and semantic information", () => {
     assert.match(info,/case "MEM": case "MEMORY": return Colors.magenta/);
     assert.match(info,/case "I\/O": case "FREEZE"/);
     assert.match(info,/GaussianBlur \{ anchors.fill: purposeText; source: purposeText/);
+});
+
+test("P4g: real owner grants isolate restart, kill, freeze and limit; master grants all", () => {
+    const safety=read("services/system/TaskSafety.qml");
+    const start=safety.indexOf("    function dangerKey(");
+    const end=safety.lastIndexOf("}");
+    assert.ok(start>=0&&end>start);
+    const owner=new Function("let unlockedKeys={},actionUnlockedKeys={};"+safety.slice(start,end)+
+        "\nreturn {dangerActionUnlocked,dangerActionLocalUnlockMode,toggleDangerActionUnlock,toggleDangerActionStickyUnlock,toggleDangerUnlock,relockDangerAction};")();
+    const row={pid:3442,startTicks:967833,comm:"quickshell",user:"ci"};
+    const other={...row,startTicks:967834};
+    const actions=["kill","restart","freeze","limit"];
+    for(const kind of actions) assert.equal(owner.dangerActionUnlocked(row,kind),false);
+    for(const kind of actions) {
+        owner.toggleDangerActionUnlock(row,kind);
+        for(const otherKind of actions) assert.equal(owner.dangerActionUnlocked(row,otherKind),kind===otherKind);
+        assert.equal(owner.dangerActionUnlocked(other,kind),false);
+        owner.relockDangerAction(row,kind);
+        assert.equal(owner.dangerActionUnlocked(row,kind),false);
+    }
+    owner.toggleDangerActionStickyUnlock(row,"restart");
+    owner.relockDangerAction(row,"restart");
+    assert.equal(owner.dangerActionUnlocked(row,"restart"),true);
+    assert.equal(owner.dangerActionUnlocked(row,"kill"),false);
+    owner.toggleDangerActionUnlock(row,"restart");
+    owner.toggleDangerUnlock(row);
+    for(const kind of actions) assert.equal(owner.dangerActionUnlocked(row,kind),true);
+    owner.toggleDangerActionUnlock(row,"freeze");
+    assert.equal(owner.dangerActionLocalUnlockMode(row,"freeze"),"once");
+    owner.relockDangerAction(row,"kill");
+    assert.equal(owner.dangerActionUnlocked(row,"kill"),false);
+    assert.equal(owner.dangerActionUnlocked(row,"freeze"),true);
+    owner.toggleDangerUnlock(row);
+    owner.toggleDangerUnlock(row);
+    for(const kind of actions) assert.equal(owner.dangerActionUnlocked(row,kind),false);
+    owner.toggleDangerUnlock(row);
+    assert.equal(owner.dangerActionUnlocked(row,"invalid"),false);
+});
+test("P4g: restart lock is checked and consumed at all existing authorization seams",()=>{
+    const controller=read("services/system/ProcessPresentationController.qml");
+    const global=read("widgets/appcontrol/GlobalTaskActionController.qml");
+    const app=read("widgets/AppControlW.qml");
+    const begin=gate.indexOf("    function actionLockKind(");
+    const end=gate.indexOf("    function isUnlocked(",begin);
+    const map=new Function(gate.slice(begin,end)+"\nreturn actionLockKind;")();
+    assert.equal(map("restart"),"restart");
+    assert.equal(map("end"),"kill");
+    assert.equal(map("freeze"),"freeze");
+    assert.equal(map("resume"),"freeze");
+    assert.equal(map("limit"),"limit");
+    assert.equal(map("invalid"),"");
+    assert.equal((gate.match(/actionLockKind\(req.action\)/g)||[]).length,2);
+    assert.match(gate,/actionLockKind\(pending.action\)/);
+    assert.match(gate,/const key = actionLockKind\(action\)/);
+    assert.match(controller,/function requestRestart\([\s\S]*?dangerActionUnlocked\(target, "restart"\)/);
+    assert.match(global,/function executeTaskRestart\([\s\S]*?taskDangerActionUnlocked\(entry, "restart"\)[\s\S]*?relockTaskDangerAction\(entry, "restart"\)/);
+    assert.match(app,/cancelKind.indexOf\("restart"\) !== -1 \? "restart"/);
+    assert.match(recipient,/id: lockRail[\s\S]*?id: killLockSlot[\s\S]*?id: restartLockSlot[\s\S]*?id: freezeLockSlot[\s\S]*?id: lockHelpButton/);
+    assert.match(recipient,/restartLockTarget: restartLockSlot/);
+    assert.match(donorView,/item.actionKind = "restart"/);
 });

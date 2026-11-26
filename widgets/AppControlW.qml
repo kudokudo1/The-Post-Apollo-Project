@@ -6245,39 +6245,15 @@ PanelWindow {
     }
 
     function favoriteKeyFor(entry, modeIndex) {
-        if (!entry)
-            return "";
-
-        if (entry._favoriteRecord && entry._favoriteKey)
-            return entry._favoriteKey;
-
-        if (modeIndex === appsModeIndex)
-            return appEntryKey(entry);
-
-        if (modeIndex === runModeIndex)
-            return runFavoriteKey(
-                runCommandText(entry),
-                runPrefixModeForEntry(entry)
-            );
-
-        if (modeIndex === thermalModeIndex && entry.id)
-            return "thermal|" + encodeURIComponent(String(entry.id));
-
-        if (modeIndex === systemModeIndex && entry.id)
-            return "system|" + encodeURIComponent(String(entry.id));
-
-        if (modeIndex === killModeIndex && entry._taskRecord)
-            return taskFavoriteKey(entry);
-
-        // WINDOWS and any remaining placeholders include the mode index so
-        // identical temporary labels remain distinct until those modes get
-        // their real stable identities.
-        const label = String(entry.label || entry.name || "");
-
-        if (!label)
-            return "";
-
-        return "mode:" + modeIndex + ":" + label;
+        return FavoriteIdentity.keyFor(entry, modeIndex, {
+            apps: appsModeIndex, run: runModeIndex, thermal: thermalModeIndex,
+            system: systemModeIndex, kill: killModeIndex
+        }, function(item) { return appControlWindow.appEntryKey(item); },
+        function(item) {
+            return appControlWindow.runFavoriteKey(
+                appControlWindow.runCommandText(item),
+                appControlWindow.runPrefixModeForEntry(item));
+        });
     }
 
     function isFavoriteItem(entry, modeIndex) {
@@ -6356,64 +6332,13 @@ PanelWindow {
 
     function favoriteRecordForModeItem(entry, modeIndex) {
         const key = favoriteKeyFor(entry, modeIndex);
-        const modeName = modes[modeIndex]
-                         ? modes[modeIndex].name
-                         : "MODE";
-        const label = entry.label || entry.name || "OPTION";
-
-        return {
-            _favoriteRecord: true,
-            _favoriteType: "mode",
-            _favoriteKey: key,
-            _sourceModeIndex: modeIndex,
-            _sourceItem: entry,
-
-            id: key,
-            name: label,
-            genericName: modeName,
-            comment: "FAVORITE FROM " + modeName,
-            keywords: "",
-            icon: "",
-            actions: [],
-            command: [],
-            startupClass: "",
-
-            execute: function() {
-                console.log("AppControl:", modeName, label);
-            }
-        };
+        const modeName = modes[modeIndex] ? modes[modeIndex].name : "MODE";
+        return FavoriteRecord.modeRecord(entry, key, modeIndex, modeName,
+            function(name, label) { console.log("AppControl:", name, label); });
     }
 
     function favoriteRecordForTaskIdentity(identity, liveEntry) {
-        const normalized = String(identity || "").trim().toLowerCase();
-        if (!normalized)
-            return null;
-
-        const source = liveEntry ? liveEntry : {
-            _taskRecord: true,
-            _taskOffline: true,
-            id: "task-offline:" + normalized,
-            pid: 0, ppid: 0, user: "", state: "OFFLINE",
-            cpu: 0, mem: 0, rss: 0, vsz: 0, threads: 0,
-            elapsed: "NOT RUNNING",
-            comm: normalized, args: "", name: normalized, label: normalized
-        };
-        const key = "task|" + encodeURIComponent(normalized);
-        return {
-            _favoriteRecord: true,
-            _favoriteType: "task",
-            _favoriteKey: key,
-            _sourceModeIndex: killModeIndex,
-            _sourceItem: source,
-            id: key,
-            name: source.comm || normalized,
-            genericName: "WATCHED PROCESS",
-            comment: liveEntry
-                     ? "KILL • RUNNING • PID " + String(source.pid || "?")
-                     : "KILL • NOT RUNNING • FAVORITE RETAINED",
-            keywords: "kill process task watched",
-            icon: "", actions: [], command: [], startupClass: ""
-        };
+        return FavoriteRecord.taskRecord(identity, liveEntry, killModeIndex);
     }
 
     function currentApplicationValues() {

@@ -60,3 +60,62 @@ function runRecord(sourceItem, key, resolvedPrefix, runModeIndex,
         startupClass: ""
     };
 }
+
+// Local display records, including explicitly offline process placeholders.
+function modeRecord(entry, key, modeIndex, modeName, onExecute) {
+    const label = entry.label || entry.name || "OPTION";
+
+    return {
+        _favoriteRecord: true,
+        _favoriteType: "mode",
+        _favoriteKey: key,
+        _sourceModeIndex: modeIndex,
+        _sourceItem: entry,
+
+        id: key,
+        name: label,
+        genericName: modeName,
+        comment: "FAVORITE FROM " + modeName,
+        keywords: "",
+        icon: "",
+        actions: [],
+        command: [],
+        startupClass: "",
+
+        execute: function() {
+            onExecute(modeName, label);
+        }
+    };
+}
+
+function taskRecord(identity, liveEntry, killModeIndex) {
+    const normalized = String(identity || "").trim().toLowerCase();
+    if (!normalized)
+        return null;
+
+    const source = liveEntry ? liveEntry : {
+        _taskRecord: true,
+        _taskOffline: true,
+        id: "task-offline:" + normalized,
+        pid: 0, ppid: 0, user: "", state: "OFFLINE",
+        cpu: 0, mem: 0, rss: 0, vsz: 0, threads: 0,
+        elapsed: "NOT RUNNING",
+        comm: normalized, args: "", name: normalized, label: normalized
+    };
+    const key = "task|" + encodeURIComponent(normalized);
+    return {
+        _favoriteRecord: true,
+        _favoriteType: "task",
+        _favoriteKey: key,
+        _sourceModeIndex: killModeIndex,
+        _sourceItem: source,
+        id: key,
+        name: source.comm || normalized,
+        genericName: "WATCHED PROCESS",
+        comment: liveEntry
+                 ? "KILL • RUNNING • PID " + String(source.pid || "?")
+                 : "KILL • NOT RUNNING • FAVORITE RETAINED",
+        keywords: "kill process task watched",
+        icon: "", actions: [], command: [], startupClass: ""
+    };
+}

@@ -50,7 +50,7 @@ assert shutil.which("jq"), "jq is required for the real PR loader and its regres
 SCRIPT = embedded_pull_script()
 
 
-def run_synthetic(payload, gh_code=0, raw=False):
+def run_synthetic(payload, gh_code=0, raw=False, target=0):
     with tempfile.TemporaryDirectory(prefix="apollo-pr-regression-") as tmp:
         root = Path(tmp)
         bindir = root / "bin"
@@ -75,6 +75,12 @@ if "graphql" in args:
     except ValueError:
         sys.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n" + raw)
         sys.exit(code)
+    target = next((int(arg.split("=", 1)[1]) for arg in args if arg.startswith("number=")), 0)
+    if target:
+        body = {"data":{"repository":{"pullRequest":next((r for r in rows if r["number"] == target), None)}}}
+        sys.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n")
+        json.dump(body, sys.stdout)
+        sys.exit(code)
     page = 0
     for arg in args:
         if arg.startswith("cursor="):
@@ -86,6 +92,8 @@ if "graphql" in args:
     sys.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\n\\r\\n")
     json.dump(body, sys.stdout)
     sys.exit(code)
+with open(os.environ["PA_TEST_CALLS"], "a") as calls:
+    calls.write("REST\\n")
 if any("requested_reviewers" in arg for arg in args):
     print("0")
 else:
@@ -102,16 +110,18 @@ else:
             "PA_TEST_GRAPHQL_FIXTURE": str(fixture),
             "PA_TEST_GH_EXIT": str(gh_code),
             "PA_TEST_RAW": "1" if raw else "0",
+            "PA_TEST_CALLS": str(root / "calls"),
         })
         # The production service uses bash -lc. Run its identical script with
         # bash -c here, so the test's fake gh PATH is not reset by login files.
         run = subprocess.run(
             ["bash", "-c", SCRIPT, "pa-github-pulls-graphql",
-             "kudokudo1/The-Post-Apollo-Project"],
+             "kudokudo1/The-Post-Apollo-Project", str(target)],
             env=env, capture_output=True, text=True, timeout=30,
         )
         leftovers = list(tmpdir.iterdir())
         assert not leftovers, f"Temporary PR data leaked: {leftovers}"
+        run.rest_calls = (root / "calls").read_text().count("REST") if (root / "calls").exists() else 0
         return run
 
 
@@ -143,8 +153,8 @@ assert len(output) == 100, f"Expected 100 PRs, got {len(output)}"
 assert output[0]["number"] == 1 and output[-1]["number"] == 100
 assert output[0]["checkState"] == "SUCCESS"
 assert len(output[0]["checkContexts"]) == 1
-assert output[0]["checkEvidenceLoaded"] is False
-assert output[0]["reviewRequestCount"] == 0
+assert output[0]["checkDetailsDeferred"] is False
+assert success.rest_calls == 0
 
 # A sparse open PR must exercise the review/CI evidence fallback. The
 # fallback may be empty, but it must still produce the original PR record.
@@ -159,9 +169,17 @@ fallback = run_synthetic(json.dumps([fallback_row]))
 assert fallback.returncode == 0, fallback.stderr
 fallback_rows = json.loads(fallback.stdout)
 assert len(fallback_rows) == 1 and fallback_rows[0]["number"] == 1
-assert fallback_rows[0]["checkEvidenceLoaded"] is True
-assert fallback_rows[0]["reviewEvidenceLoaded"] is True
-assert fallback_rows[0]["reviewRequestCount"] == 0
+assert fallback_rows[0]["checkDetailsDeferred"] is True
+assert fallback_rows[0]["reviewDetailsDeferred"] is True
+assert fallback.rest_calls == 0
+selected = run_synthetic(json.dumps([fallback_row]), target=1)
+assert selected.returncode == 0, selected.stderr
+selected_rows = json.loads(selected.stdout)
+assert len(selected_rows) == 1 and selected_rows[0]["number"] == 1
+assert selected_rows[0]["checkEvidenceLoaded"] is True
+assert selected_rows[0]["reviewEvidenceLoaded"] is True
+assert selected_rows[0]["reviewRequestCount"] == 0
+assert selected.rest_calls == 5
 
 empty = run_synthetic("[]")
 assert empty.returncode == 0 and json.loads(empty.stdout) == []

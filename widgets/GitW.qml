@@ -7741,11 +7741,10 @@ PanelWindow {
                                     root.closePullRequestControl()
 
                                 onTargetRefreshRequested: {
-                                    if (!githubWorkItemsService.pullsBusy) {
-                                        githubWorkItemsService.refreshPulls(
-                                            gitService.repoRemoteSlug
-                                        );
-                                    }
+                                    githubWorkItemsService.refreshPulls(
+                                        gitService.repoRemoteSlug,
+                                        githubWorkItemsService.rowNumber(root.selectedPullRequest)
+                                    );
                                 }
                             }
                         }

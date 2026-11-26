@@ -432,6 +432,7 @@ Item {
         signal refreshRequested()
         spacing: 5
         Row {
+            objectName: "cpuplusSharedCapacityTitle"
             width: parent.width
             height: 25
             spacing: 5
@@ -500,9 +501,9 @@ Item {
         }
         CpuPlusMemoryReadout {
             width: parent.width
-            visible: root.page === "DIAG" && (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted)
+            visible: root.page === "DIAG"
             text: CpuPlusDiagnostics.feedback
-            color: Colors.orange
+            color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
             font.pixelSize: 10
             elide: Text.ElideRight
         }
@@ -1000,20 +1001,6 @@ Item {
                             width: Math.max(0, policyInstrument.width - policyDial.width - policyInstrument.spacing)
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 8
-                            ActionButton {
-                                objectName: "cpuplusPolicyRefresh"
-                                width: parent.width
-                                height: 30
-                                label: "REFRESH"
-                                accentColor: Colors.yellow
-                                idleFillColor: Colors.yellow
-                                idleForegroundColor: Colors.magenta
-                                idleBorderColor: Colors.orange
-                                contentPadding: 2
-                                labelFontSizeMode: Text.HorizontalFit
-                                available: !probe.running
-                                onLeftClicked: root.refresh()
-                            }
                             ActionButton {
                                 objectName: "cpuplusPolicyReset"
                                 width: parent.width

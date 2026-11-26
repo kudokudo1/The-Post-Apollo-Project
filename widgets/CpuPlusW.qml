@@ -2279,11 +2279,20 @@ PanelWindow {
                 || cpuPlusWindow.selectedModeIndex === 3
                 || cpuPlusWindow.selectedModeIndex === 6
 
-            Flow {
+            CpuPlusSystemTargetStrip {
                 id: systemTargetFlow
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
+                visible: cpuPlusWindow.selectedModeIndex === 3
+                choices: cpuPlusWindow.systemSubModes
+                selectedKey: cpuPlusWindow.systemSubMode
+                onTargetRequested: function(key) { cpuPlusWindow.selectSystemSubMode(key); }
+            }
+
+            Flow {
+                visible: cpuPlusWindow.selectedModeIndex !== 3
+                anchors.fill: parent
                 spacing: 4
 
                 Repeater {
@@ -2291,7 +2300,7 @@ PanelWindow {
                         cpuPlusWindow.selectedModeIndex === 2
                         ? cpuPlusWindow.thermalSubModes
                         : cpuPlusWindow.selectedModeIndex === 3
-                        ? cpuPlusWindow.systemSubModes
+                        ? []
                         : cpuPlusWindow.settingsSubModes
 
                     Rectangle {
@@ -2315,40 +2324,24 @@ PanelWindow {
 
                         readonly property bool isSpacer:
                             !!modelData.spacer
-                        readonly property bool isSystemTarget: cpuPlusWindow.selectedModeIndex === 3
-                        readonly property color subjectColor: isSystemTarget
-                            ? Colors.resourceColor(modelData.key) : Colors.cyan
-                        Accessible.name: String(modelData.name || "")
-                        Accessible.role: Accessible.Button
-                        Accessible.onPressAction: {
-                            if (isSpacer) return;
-                            if (cpuPlusWindow.selectedModeIndex === 2)
-                                cpuPlusWindow.selectThermalSubMode(modelData.key);
-                            else if (isSystemTarget)
-                                cpuPlusWindow.selectSystemSubMode(modelData.key);
-                            else if (cpuPlusWindow.selectedModeIndex === 6)
-                                cpuPlusWindow.selectSettingsSubMode(modelData.key);
-                        }
 
                         width:
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
                             : cpuPlusWindow.selectedModeIndex === 6
                              ? (targetSubModeStrip.width - 12) / 4
-                            : 36
+                            : (targetSubModeStrip.width - 8) / 3
 
                         height:
                             cpuPlusWindow.selectedModeIndex === 2
                             || cpuPlusWindow.selectedModeIndex === 6
-                            ? 38 : 36
+                            ? 38 : 27
 
                         color:
                             isSpacer
                             ? "transparent"
                             : isPressed
                             ? Colors.magenta
-                            : isSystemTarget && isSelected
-                            ? subjectColor
                             : isHovered || isSelected
                             ? Colors.yellow
                             : Colors.dark
@@ -2357,9 +2350,7 @@ PanelWindow {
                             isSpacer ? 0 : 1
 
                         border.color:
-                            isSystemTarget
-                            ? subjectColor
-                            : isSelected
+                            isSelected
                             ? Colors.magenta
                             : isHovered || isPressed
                             ? Colors.orange
@@ -2427,15 +2418,18 @@ PanelWindow {
                                             || String(subModeButton.modelData.key) === "KEYBOARD")
                                         ? 30
                                         : cpuPlusWindow.selectedModeIndex === 3
-                                        ? 24
+                                        ? (
+                                              String(subModeButton.modelData.key)
+                                              === "ALL" ? 15
+                                              : String(subModeButton.modelData.key)
+                                                === "NETWORK" ? 16
+                                              : 17
+                                          )
                                         : 20
 
                                     color:
                                         subModeButton.isPressed
                                         ? Colors.black
-                                        : subModeButton.isSystemTarget
-                                        ? (subModeButton.isSelected || subModeButton.isHovered
-                                           ? Colors.black : subModeButton.subjectColor)
                                         : subModeButton.isSelected
                                         ? Colors.magenta
                                         : subModeButton.isHovered
@@ -2451,9 +2445,7 @@ PanelWindow {
                                         samples: 7
                                         opacity: 0.60
                                         color:
-                                            subModeButton.isSystemTarget
-                                            ? subModeButton.subjectColor
-                                            : subModeButton.isHovered
+                                            subModeButton.isHovered
                                             ? Colors.orange
                                             : subModeButton.isSelected
                                             ? Colors.magenta
@@ -2468,9 +2460,9 @@ PanelWindow {
 
                             GohuText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                // Icon-only SYSTEM and Settings selectors. Keep the name in
+                                // Icon-only Settings selector. Keep the name in
                                 // the model for headings, navigation and audits.
-                                visible: cpuPlusWindow.selectedModeIndex === 2
+                                visible: cpuPlusWindow.selectedModeIndex !== 6
                                 text: String(modelData.name || "")
                                 font.pixelSize: 8
 
@@ -2513,9 +2505,7 @@ PanelWindow {
                                   || subModeButton.isSelected
                                 ? 0.42 : 0.12
                             color:
-                                subModeButton.isSystemTarget
-                                ? subModeButton.subjectColor
-                                : isSelected
+                                isSelected
                                 ? Colors.magenta
                                 : isHovered
                                 ? Colors.orange

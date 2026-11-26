@@ -59,6 +59,8 @@ class StickyLookup:
 # authenticated observations, durable knowledge or production wire types.
 PUBLIC_CONTEXT = TaskContext("fixture-owner", "cherry", None, "task-a",
                              "ctx-a", 1, "INTERACTIVE")
+PUBLIC_RESTORATION_CONTEXT = TaskContext("fixture-owner", "cherry", None, "task-a",
+                                         "ctx-restored", 2, "INTERACTIVE")
 PUBLIC_SCOPE = ("public-fixture-source", "fixture-compose",
                 "public-fixture-recipient")
 
@@ -169,7 +171,8 @@ class TaskStickyContext:
     def __init__(self, context, *, mode="legacy"):
         if type(mode) is not str or mode not in ("legacy", "public-versioned"):
             raise ContextRefusal("STICKY_MODE")
-        if mode == "public-versioned" and context != PUBLIC_CONTEXT:
+        if mode == "public-versioned" and (type(context) is not TaskContext
+                or context not in (PUBLIC_CONTEXT, PUBLIC_RESTORATION_CONTEXT)):
             raise ContextRefusal("STICKY_VERSION_SCOPE")
         self._mode = mode
         self._policy_floor = self._user_floor = self._operational_floor = None

@@ -15,6 +15,16 @@ Column {
     property bool showReport: false
     property string viewMode: "WORK"
     readonly property bool workshopOpen: viewMode === "WORK"
+    function consumeReportView() {
+        if (!CpuPlusDiagnostics.pendingReportView) return;
+        CpuPlusDiagnostics.pendingReportView = false;
+        selectView("REPORT");
+    }
+    Component.onCompleted: consumeReportView()
+    Connections {
+        target: CpuPlusDiagnostics
+        function onPendingReportViewChanged() { root.consumeReportView(); }
+    }
     function selectView(mode) {
         if (!["WORK","QUICK","REPORT","HISTORY","COMPARE"].includes(mode)) return;
         showReport=false;
@@ -468,8 +478,9 @@ Column {
             labelPixelSize: 9
             selected: root.report !== null && root.report.id === modelData.id
             onLeftClicked: {
-                if (CpuPlusDiagnostics.selectExactReport(modelData.kind, modelData.id)) {
+                if (CpuPlusDiagnostics.selectExactReport(modelData.kind, modelData.id, false)) {
                     root.showReport = false;
+                    if (root.viewMode === "HISTORY") root.selectView("REPORT");
                 }
             }
         }

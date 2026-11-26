@@ -1,0 +1,31 @@
+name: Favorites Phase A membership extraction parity
+
+on:
+  pull_request:
+    paths:
+      - "widgets/AppControlW.qml"
+      - "services/favorites/FavoritesService.qml"
+      - "services/favorites/FavoritesStore.qml"
+      - "widgets/appcontrol/HunterOperationController.qml"
+      - "tests/favorites/test_favorites_membership_handoff_b.cjs"
+      - ".github/workflows/favorites-membership-extraction-phase-a.yml"
+  push:
+    paths:
+      - "widgets/AppControlW.qml"
+      - "services/favorites/FavoritesService.qml"
+      - "services/favorites/FavoritesStore.qml"
+      - "widgets/appcontrol/HunterOperationController.qml"
+      - "tests/favorites/test_favorites_membership_handoff_b.cjs"
+      - ".github/workflows/favorites-membership-extraction-phase-a.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  membership-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare actual AppControl and FavoritesService membership operations
+        run: node --test tests/favorites/test_favorites_membership_handoff_b.cjs

@@ -2715,6 +2715,41 @@ PanelWindow {
     // Exact visible spacing between app rows and their neighboring edges.
     property int appSelectorRowGap: 6
 
+    // Only the KILL selector uses the shared process card. Other selector
+    // modes (including wrapped Favorites) retain their existing delegate.
+    QtObject {
+        id: appKillRowController
+        readonly property int killViewMode: appControlWindow.killViewMode
+        readonly property int killViewHunter: appControlWindow.killViewHunter
+        readonly property int hunterMetricMode: appControlWindow.hunterMetricMode
+        readonly property int hunterMetricCombined: appControlWindow.hunterMetricCombined
+        readonly property string metricKey: ["combined","cpu","mem","io","age"][hunterMetricMode]
+        readonly property int miniHistoryRevision: appControlWindow.taskMiniDisplayRevision
+        readonly property int miniHistoryLimit: appControlWindow.taskMiniHistoryLimit
+        readonly property int miniScrollDuration: appControlWindow.taskMiniGraphScrollDuration
+        readonly property var miniGeometry: graphHistory
+        function isProtected(row) { return appControlWindow.taskRequiresDangerUnlock(row); }
+        function hunterMetricAccent() { return appControlWindow.hunterMetricAccent(); }
+        function taskGlyph(row) { return appControlWindow.monitorResultIcon(row); }
+        function lockMode(row,action) { return appControlWindow.taskDangerUnlockMode(row); }
+        function taskDisplayName(row) { return appControlWindow.resultDisplayName(row,appControlWindow.killModeIndex); }
+        function taskRowMetric(row) {
+            if (killViewMode === killViewHunter) return appControlWindow.hunterMetricReason(row);
+            return "CPU " + Number(row.cpu || 0).toFixed(1) + "% • MEM " + Number(row.mem || 0).toFixed(1) + "%";
+        }
+        function isTaskFavorite(row) { return appControlWindow.isFavoriteItem(row,appControlWindow.killModeIndex); }
+        function toggleTaskFavorite(row) { appControlWindow.toggleFavorite(row,appControlWindow.killModeIndex); }
+        function miniHistory(row,key) {
+            const live = taskGraphController.liveTaskForMiniGraph(row) || row;
+            return key === "normal"
+                ? taskGraphController.miniCpuHistoryByIdentity(taskGraphController.identityForEntry(row),live)
+                : taskGraphController.miniHunterHistoryForMetric(live,key);
+        }
+        function miniRange(key) { return key === "io" ? 0.25 : key === "age" ? 1.0 : 5.0; }
+        function miniMetricRange(key) { return appControlWindow.hunterMetricRangeForKey(key); }
+    }
+
+
 
     // Keep the selected application stable while cycling through modes.
     property string rememberedAppKey: ""
@@ -14572,8 +14607,41 @@ PanelWindow {
 
                 z: resultButton.isSelected || resultButton.isHovered ? 10 : 0
 
+                Loader {
+                    id: sharedKillRow
+                    anchors.fill: parent
+                    active: appControlWindow.selectedModeIndex === appControlWindow.killModeIndex
+                        && !!resultDelegate.modelData && !!resultDelegate.modelData._taskRecord
+                    sourceComponent: ProcessTargetRow {
+                        entry: resultDelegate.modelData
+                        controller: appKillRowController
+                        selected: resultButton.isSelected
+                        hovered: resultButton.isHovered
+                        leftInset: appControlWindow.appSelectorRowGap
+                        rightInset: (resultList.width - resultScrollTrack.x) + appControlWindow.appSelectorRowGap
+                        onSelectedRequested: {
+                            appControlWindow.modeRailFocused = false;
+                            appControlWindow.detailFocused = false;
+                            appControlWindow.keyboardActive = false;
+                            appControlWindow.hoveredResultIndex = resultDelegate.index;
+                            appControlWindow.selectedResultIndex = resultDelegate.index;
+                            appControlWindow.resetDetailActionSelection();
+                            appControlWindow.activateSelectedResult();
+                        }
+                        onFavoriteHovered: {
+                            appControlWindow.keyboardActive = false;
+                            appControlWindow.modeRailFocused = false;
+                            appControlWindow.detailFocused = false;
+                            appControlWindow.hoveredResultIndex = resultDelegate.index;
+                            appControlWindow.selectedResultIndex = resultDelegate.index;
+                        }
+                        onFavoriteSelectedRequested: appControlWindow.selectedResultIndex = resultDelegate.index
+                    }
+                }
+
                 Rectangle {
                     id: resultButton
+                    visible: !sharedKillRow.active
 
                     property bool isSelected: resultDelegate.index === appControlWindow.selectedResultIndex
 
@@ -14656,7 +14724,7 @@ PanelWindow {
                                    || rowItem;
                         }
                         readonly property bool showingTask:
-                            sourceMode === appControlWindow.killModeIndex
+                            !sharedKillRow.active && sourceMode === appControlWindow.killModeIndex
                             && taskIdentity.length > 0
                         readonly property color accent:
                             appControlWindow.selectedModeIndex

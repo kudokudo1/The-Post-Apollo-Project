@@ -14,6 +14,9 @@ function frame(phase, mode, progress, seconds, finishFrom, reduced) {
     const exact = mode === "measured" || mode === "timed";
     if (running && exact) {
         p = clamp(progress, 0, 1);
+    } else if (running && reduced) {
+        // A stationary, explicitly indeterminate activity cue.
+        p = .35;
     } else if (running) {
         let base;
         if (t < .65) base = .055*smooth(t/.65);

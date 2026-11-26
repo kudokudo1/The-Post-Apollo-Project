@@ -106,6 +106,18 @@ print(own)
             self.assertTrue(all(i["payloadBytes"]<=w.CHILD_BYTES for i in result["instruments"]))
             self.assertIsNone(result["pinnedQuickshell"])
 
+    def test_configured_storage_workflow(self):
+        plan={"durationSeconds":5,"instruments":[{"kind":"storage","sampleSeconds":2,"reportSeconds":4},
+                                                 {"kind":"stall","thresholdMs":350}]}
+        configs=w.validate(plan)
+        self.assertEqual(configs[0]["sampleSeconds"],2)
+        self.assertEqual(w.commands(configs,Path("/data"),ROOT/"scripts",None)["storage"][-4:],
+                         ["--sample-seconds","2","--report-seconds","4"])
+        for bad in ({"kind":"storage","sampleSeconds":2},
+                    {"kind":"storage","sampleSeconds":2,"reportSeconds":3}):
+            with self.assertRaises(ValueError):
+                w.validate(dict(plan,instruments=[bad,plan["instruments"][1]]))
+
     def test_actual_storage_and_stall_witness(self):
         with tempfile.TemporaryDirectory() as folder:
             plan={"durationSeconds":5,"instruments":[{"kind":"storage"},{"kind":"stall","thresholdMs":350}]}

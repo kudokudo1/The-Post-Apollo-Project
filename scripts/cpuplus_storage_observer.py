@@ -117,8 +117,10 @@ def main(argv=None):
                 previous[key] = current
             if tick % 10 == 0 or tick == args.duration:
                 samples += 1
-                elapsed_ms = round((time.monotonic() - start) * 1000)
-                send({"schema": SCHEMA, "event": "storage", "sequence": samples,
+                now = time.monotonic()
+                elapsed_ms = round((now - start) * 1000)
+                timeline = {"monotonicMs": round(now*1000)} if args.workshop else {}
+                send({**timeline, "schema": SCHEMA, "event": "storage", "sequence": samples,
                       "intervals": tick, "elapsedMs": elapsed_ms,
                       "rows": list(rows.values())})
     except output_errors:
@@ -133,7 +135,8 @@ def main(argv=None):
     if args.workshop:
         end.update(workshopSchema="post-apollo-observer-calibration-v1",
                    calibration={"kind":"storage","durationSeconds":args.duration},
-                   observedMs=elapsed_ms)
+                   observedMs=elapsed_ms, monotonicMs=round(now*1000),
+                   startedMonotonicMs=round(start*1000))
     try:
         send(end)
     except output_errors:

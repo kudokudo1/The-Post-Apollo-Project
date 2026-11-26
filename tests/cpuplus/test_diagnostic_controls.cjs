@@ -363,3 +363,11 @@ assert.match(workshop,/parent: root.filterTarget \|\| root/);
 assert.match(ui,/filterTarget: root.workshopFilterTarget/);
 assert.match(read("components/SelectorSlider.qml"),/property bool responsiveHardware: false/);
 assert.match(read("components/SelectorSlider.qml"),/property bool energizedValueFill: false/);
+
+assert.match(workshop,/storageMechanical: width>=340 && storageDialScale>=0.55/);
+assert.match(workshop,/selectorColor: field==="sample" \? Colors.orange : Colors.magenta/);
+assert.match(workshop,/accentColor: Colors.red\s+normalFace: true\s+label: "−"/);
+assert.match(workshop,/accentColor: Colors.green\s+normalFace: true\s+label: "\+"/);
+assert.match(workshop,/objectName: "cpuplusWorkshopCalibrationStatus"/);
+assert.match(read("widgets/cpuplus/CpuPlusMemoryReadout.js"),/\|INT\|RPT\|/);
+assert.match(executionFace,/idleBorderWidth: preparationFace \? 2 : 1/);

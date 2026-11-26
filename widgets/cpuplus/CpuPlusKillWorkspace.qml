@@ -452,7 +452,7 @@ Item {
         appendCurrentHistory();
     }
     onActiveChanged: {
-        if (!active) { if (lockHelp) lockHelp.open = false; cancelOwned(); cancelBulk(); }
+        if (!active) { cancelOwned(); cancelBulk(); }
         else if (ready) requestRefresh();
     }
     Component.onCompleted: {
@@ -621,7 +621,7 @@ Item {
                 : selectedDetailActionIndex===0 ? details.restartAction
                 : selectedDetailActionIndex===1 ? details.freezeAction
                 : selectedDetailActionIndex===2 ? details.endAction : null;
-            if (!item || !actuatorScroll || item.parent === headerActions) return;
+            if (!item || !actuatorScroll || item.parent === headerActions || item.parent === killSlot || item.parent === freezeSlot) return;
             const y=item.mapToItem(actuatorScroll.contentItem,0,0).y;
             if (y<actuatorScroll.contentY) actuatorScroll.contentY=Math.max(0,y);
             else if (y+item.height>actuatorScroll.contentY+actuatorScroll.height)
@@ -708,6 +708,7 @@ Item {
                         width: parent.width
                         wrapMode: Text.Wrap
                         objectName: "cpuPlusProcessExactIdentity"
+                        visible: !workspace.exactTargetAvailable
                         text: workspace.exactTargetAvailable
                             ? "EXACT LIVE PID + START TICKS + NAME"
                             : workspace.currentTask && !workspace.selectedTargetVisible
@@ -723,16 +724,6 @@ Item {
                         text: "Live owner • explicit review before dispatch"
                         color: Colors.white
                         font.pixelSize: 10
-                    }
-                    Row {
-                        id: headerActions
-                        objectName: "cpuPlusProcessHeaderActions"
-                        width: parent.width
-                        height: 34
-                        spacing: 6
-                        enabled: workspace.exactTargetAvailable && !workspace.locallyPending
-                            && !workspace.hasBulkReview && !workspace.bulkOperation
-                            && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
                     }
 
                 }
@@ -755,14 +746,14 @@ Item {
                 anchors.right: parent.right
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
-                height: 30
+                height: workspace.currentTask && workspace.isProtected(workspace.currentTask) ? 77 : 48
                 visible: !!workspace.currentTask
                 GohuText {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
                     anchors.right: headerLocks.left
                     anchors.rightMargin: 4
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenter: headerLocks.verticalCenter
                     elide: Text.ElideRight
                     text: "PROCESS STATE"
                     color: Colors.red
@@ -771,44 +762,65 @@ Item {
                 Row {
                     id: headerLocks
                     anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 3
-                    ProcessSafetyLock {
-                        objectName: "cpuPlusProcessMasterLock"
-                        width: 30
-                        height: 26
-                        controller: workspace
-                        taskItem: workspace.currentTask
-                        accentColor: Colors.magenta
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 7
+                    spacing: 5
+                    enabled: workspace.exactTargetAvailable && !workspace.locallyPending
+                        && !workspace.hasBulkReview && !workspace.bulkOperation
+                        && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
+                    Item {
+                        width: 30; height: 34
+                        ProcessSafetyLock {
+                            objectName: "cpuPlusProcessMasterLock"
+                            anchors.centerIn: parent
+                            width: 30; height: 26
+                            controller: workspace
+                            taskItem: workspace.currentTask
+                            accentColor: Colors.magenta
+                        }
                     }
                     Item {
-                        id: headerActionLocks
-                        objectName: "cpuPlusProcessHeaderActionLocks"
-                        width: childrenRect.width
-                        height: 26
+                        id: killSlot
+                        objectName: "cpuPlusProcessKillSlot"
+                        width: 88; height: 34
+                        Item {
+                            id: killLockSlot
+                            objectName: "cpuPlusProcessKillLockSlot"
+                            width: parent.width; height: 26
+                            anchors.bottom: parent.top
+                            anchors.bottomMargin: 3
+                        }
                     }
-                    ActionButton {
+                    Item {
+                        id: headerActions
+                        objectName: "cpuPlusProcessHeaderActions"
+                        width: 34; height: 34
+                    }
+                    Item {
+                        id: freezeSlot
+                        objectName: "cpuPlusProcessFreezeSlot"
+                        width: 34; height: 34
+                        Item {
+                            id: freezeLockSlot
+                            objectName: "cpuPlusProcessFreezeLockSlot"
+                            width: parent.width; height: 26
+                            anchors.bottom: parent.top
+                            anchors.bottomMargin: 3
+                        }
+                    }
+                    ProcessInformationButton {
                         id: lockHelpButton
                         objectName: "cpuPlusProcessLockHelpButton"
-                        width: 26
-                        height: 26
-                        label: "󰈈"
-                        labelPixelSize: 15
-                        contentPadding: 2
-                        accentColor: Colors.yellow
-                        idleForegroundColor: Colors.white
-                        hoverForegroundColor: Colors.orange
-                        selectedForegroundColor: Colors.magenta
-                        selected: lockHelp.open
+                        anchors.verticalCenter: parent.verticalCenter
+                        Accessible.name: "Lock usage help"
+                        selected: false
                         available: !!workspace.currentTask && !workspace.locallyPending
                             && !workspace.hasBulkReview && !workspace.bulkOperation
                             && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
                             && !workspace.appControlWindow.destructiveConfirmOpen && !cpuProcessInformation.open
-                        acceptedButtons: Qt.LeftButton
-                        Accessible.name: "Lock usage help"
-                        onLeftClicked: lockHelp.open = !lockHelp.open
                     }
                 }
+
                 Rectangle {
                     anchors.bottom: parent.bottom
                     width: parent.width
@@ -905,10 +917,21 @@ Item {
                     safetyLockComponent: safetyLock
                     actionTarget: leftActions
                     quickActionTarget: headerActions
-                    lockTarget: headerActionLocks
+                    lockTarget: limitLockSlot
+                    killActionTarget: killSlot
+                    freezeActionTarget: freezeSlot
+                    killLockTarget: killLockSlot
+                    freezeLockTarget: freezeLockSlot
                     viewportHeight: actuatorScroll.height - 12
                 }
 
+                Item {
+                    id: limitLockSlot
+                    objectName: "cpuPlusProcessLimitLockSlot"
+                    width: parent.width
+                    height: childrenRect.height
+                    visible: height > 0
+                }
                 Column {
                     id: leftActions
                     objectName: "cpuPlusSharedActionTarget"
@@ -1020,15 +1043,8 @@ Item {
             Rectangle {
                 id: lockHelp
                 objectName: "cpuPlusProcessLockHelpPopup"
-                property bool open: false
-                readonly property string targetIdentity: workspace.currentTask
-                    ? String(workspace.selectedPid) + "|" + String(workspace.selectedStartTicks) + "|" + workspace.selectedComm : ""
-                onTargetIdentityChanged: open = false
-                visible: open && lockHelpButton.available && workspace.active
-                Connections {
-                    target: lockHelpButton
-                    function onAvailableChanged() { if (!lockHelpButton.available) lockHelp.open = false }
-                }
+                readonly property bool open: lockHelpButton.hovered && lockHelpButton.available && workspace.active
+                visible: open
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: processStateHeader.bottom
@@ -1053,17 +1069,12 @@ Item {
                         width: parent.width
                         height: 24
                         GohuText {
-                            width: Math.max(0,parent.width-26)
+                            width: parent.width
                             height: parent.height
                             text: "LOCK // HELP"
                             verticalAlignment: Text.AlignVCenter
                             color: Colors.yellow
                             font.pixelSize: 12
-                        }
-                        CloseButton {
-                            width: 24
-                            height: 24
-                            onCloseRequested: lockHelp.open = false
                         }
                     }
                     GohuText {

@@ -89,6 +89,15 @@ ShellRoot {
                             + " scroll=" + scroll.y + "/" + scroll.height + " footer=" + footer.y)) return;
                 if (pane.page === "CAP" && !smoke.check(pinned && pinned.y + pinned.height <= footer.y
                         && scroll.y >= pinned.y + pinned.height, "CAP pinned overlap")) return;
+                const header=smoke.find(pane.page==="CAP"?pinned:smoke.find(pane,"cpuplusWorkHeader"),"cpuplusSharedCapacityHeader");
+                const title=header&&smoke.find(header,"cpuplusSharedCapacityTitle");
+                const bars=header&&smoke.find(header,"cpuplusSharedLiveCapacityBars");
+                const divider=header&&smoke.find(header,"cpuplusSharedCapacityDivider");
+                if(!header||!title||!bars||!divider||divider.y===0)return;
+                if(!smoke.check(header.visible && title.height===25 && header.spacing===5 && divider.height===1
+                    && Math.abs(header.mapToItem(pane,0,0).y-(rail.y+rail.height)-6)<1
+                    && Math.abs(bars.y-title.y-title.height-5)<1
+                    && Math.abs(divider.y-bars.y-bars.height-5)<1,"shared CAP header geometry "+pane.page))return;
                 if (smoke.phase === 0) {
                     if (!pane.received || !pane.exited) return;
                     // Supply stable synthetic observations after the real read-only probe exits.
@@ -212,7 +221,7 @@ ShellRoot {
                     const dial = smoke.find(pane, "cpuplusSwappinessDial");
                     if (!dial) return;
                     const actions = smoke.find(pane, "cpuplusPolicyActions");
-                    const refresh = smoke.find(pane, "cpuplusPolicyRefresh");
+                    const refresh = smoke.find(pane, "cpuplusWorkRefresh");
                     if (!smoke.check(actions && refresh && actions.width > 60
                         && actions.mapToItem(pane,0,0).x >= dial.mapToItem(pane,dial.width,0).x
                         && !bottomRail.visible, "POL side actions geometry")) return;

@@ -842,11 +842,8 @@ class WarmMatcherWitnessTests(unittest.TestCase):
             row.record_id, row.kind, row.strength, *row.tags)) + 4
         remaining = WARM_MAX_PROJECTION_BYTES - header - 128 * row_base
         self.assertTrue(128 <= remaining < 128 * WARM_MAX_PROVENANCE)
-        quotient, extra = divmod(remaining, 128)
-        rows = tuple(replace(row, record_id="id", provenance="p" * quotient)
-                     for _ in range(128))
-        # Same ID with differing provenance is a conflict. Use unique
-        # fixed-width IDs and adjust the independently calculated budget.
+        # Use unique four-byte IDs instead of the two-byte base ID.
+        # Same ID with differing provenance would be a separate conflict.
         remaining -= 2 * 128
         quotient, extra = divmod(remaining, 128)
         rows = tuple(replace(row, record_id="%04d" % i,

@@ -1,3 +1,4 @@
 module qs.services.kill
 
 singleton KillStore 1.0 KillStore.qml
+TaskGraphController 1.0 TaskGraphController.qml

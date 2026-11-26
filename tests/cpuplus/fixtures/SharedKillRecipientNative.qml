@@ -106,6 +106,7 @@ ShellRoot {
             "cpu:pid:3442":[2,5,12], "mem:pid:3442":[20,21,23],
             "io:pid:3442":[0,1,2], "age:pid:3442":[0.5,0.7,0.9],
             "combined:pid:3442":[2,6,14]})
+        property var taskMiniCpuIdentityHistories: ({})
         property int taskMiniDisplayRevision: 1
         property var favoriteStore: QtObject { property var favoriteKeys: [] }
         property bool destructiveConfirmOpen: false
@@ -184,6 +185,7 @@ ShellRoot {
             active: smoke.armed
             sourceComponent: CpuPlusKillWorkspace {
                 appControlWindow: fakeOwner
+                graphSource: fakeOwner
                 active: smoke.armed
             }
         }

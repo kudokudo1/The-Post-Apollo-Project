@@ -13,6 +13,33 @@ Scope {
     readonly property var telemetry: sampler
     readonly property var rows: sampler.rows
 
+    // Both consumers read the authoritative graph-history state.
+    // Transitional donor bindings select visibility and its legacy detail mode.
+    property bool graphVisible: false
+    property int graphMetricMode: 0
+    readonly property var graphState: histories
+    readonly property var graphController: graph
+    readonly property var hunterPresentation: hunter
+
+    ProcessPresentationState {
+        id: histories
+        taskMiniHistoryKeepImmutable: root.graphVisible
+    }
+
+    HunterPresentation {
+        id: hunter
+        presentationState: histories
+        metricMode: root.graphMetricMode
+    }
+
+    TaskGraphController {
+        id: graph
+        presentationState: histories
+        telemetry: sampler
+        hunterPresentation: hunter
+        taskRows: root.rows
+    }
+
     function publishSnapshot(rows) {
         sampler.rows = Array.isArray(rows) ? rows : [];
     }

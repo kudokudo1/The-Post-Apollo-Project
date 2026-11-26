@@ -20,6 +20,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
     (config / "widgets/cpuplus").mkdir(parents=True)
     (config / "services/system").mkdir(parents=True)
     shutil.copytree(ROOT / "components", config / "components")
+    shutil.copytree(ROOT / "services/kill", config / "services/kill")
     for name in ("TaskManagerView.qml", "TaskGraphController.qml",
                  "HunterControls.qml", "ProcessTargetRow.qml", "ProcessMiniGraph.qml",
                  "ProcessSafetyLock.qml", "ProcessInformationButton.qml",
@@ -29,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
     shutil.copy2(ROOT / "widgets/cpuplus/CpuPlusKillWorkspace.qml",
                  config / "widgets/cpuplus")
     for name in ("GraphHistory.qml", "ProcessPresentationState.qml",
-                 "HunterPresentation.qml"):
+                 "HunterPresentation.qml", "ProcessTelemetry.qml"):
         shutil.copy2(ROOT / "services/system" / name,
                      config / "services/system")
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/SharedKillRecipientNative.qml",
@@ -63,8 +64,10 @@ with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
     config = base / "scene"
     (config / "services/system").mkdir(parents=True)
     shutil.copytree(ROOT / "services/kill", config / "services/kill")
-    shutil.copy2(ROOT / "services/system/ProcessTelemetry.qml",
-                 config / "services/system")
+    shutil.copytree(ROOT / "components", config / "components")
+    for name in ("ProcessTelemetry.qml", "ProcessPresentationState.qml",
+                 "HunterPresentation.qml"):
+        shutil.copy2(ROOT / "services/system" / name, config / "services/system")
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/KillStoreStandaloneNative.qml",
                  config / "smoke.qml")
     env = os.environ.copy()
@@ -76,9 +79,14 @@ with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
     env.update(QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
                LIBGL_ALWAYS_SOFTWARE="1", QS_DISABLE_FILE_WATCHER="1",
                WAYLAND_DISPLAY="", DISPLAY="")
-    proc = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
-                          cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, timeout=20, check=False)
+    try:
+        proc = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
+                              cwd=config, env=env, text=True, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, timeout=20, check=False)
+    except subprocess.TimeoutExpired as exc:
+        print(exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes)
+              else (exc.stdout or ""))
+        raise SystemExit("Independent KillStore native fixture timed out") from exc
     print(proc.stdout)
     if (proc.returncode or "KILL_STORE_NATIVE_PASS" not in proc.stdout
             or "KILL_STORE_NATIVE_FAIL" in proc.stdout):

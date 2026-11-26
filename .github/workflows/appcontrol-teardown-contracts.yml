@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "widgets/AppControlW.qml"
+      - "services/kill/**"
       - "tests/appcontrol/**"
       - ".github/workflows/appcontrol-teardown-contracts.yml"
   push:
@@ -11,6 +12,7 @@ on:
       - main
     paths:
       - "widgets/AppControlW.qml"
+      - "services/kill/**"
       - "tests/appcontrol/**"
       - ".github/workflows/appcontrol-teardown-contracts.yml"
 

@@ -772,7 +772,7 @@ PanelWindow {
             if (serial !== appControlWindow.killViewSwitchSerial)
                 return;
 
-            appControlWindow.taskRestoringSelection = true;
+            appControlWindow.processPresentationState.taskRestoringSelection = true;
             appControlWindow.selectedResultIndex = -1;
             appControlWindow.resetDetailActionSelection();
 
@@ -801,7 +801,7 @@ PanelWindow {
                             return;
 
                         appControlWindow.killViewSwitchPending = false;
-                        appControlWindow.taskRestoringSelection = false;
+                        appControlWindow.processPresentationState.taskRestoringSelection = false;
 
                         if (!appControlWindow.menuOpen
                                 || appControlWindow.selectedModeIndex
@@ -829,7 +829,7 @@ PanelWindow {
                                 ListView.Beginning
                             );
 
-                        appControlWindow.taskMiniHistoryRevision += 1;
+                        appControlWindow.processPresentationState.taskMiniHistoryRevision += 1;
                         appControlWindow.rebindTaskDetailGraph(true);
                     });
                 });
@@ -861,19 +861,20 @@ PanelWindow {
         id: graphHistory
     }
 
-    ProcessPresentationState {
-        id: processPresentationState
-        // Hidden history sampling must remain continuous for FAVORITES/preload,
-        // but visible history arrays remain snapshot-immutable.
-        taskMiniHistoryKeepImmutable: appControlWindow.menuOpen
-                                      || appControlWindow.cpuPlusProcessVisible
+    readonly property var processPresentationState: KillBackend.KillStore.graphState
+    readonly property var hunterPresentation: KillBackend.KillStore.hunterPresentation
+    readonly property var taskGraphController: KillBackend.KillStore.graphController
+
+    // Preserve the existing visible/hidden history policy.
+    Binding {
+        target: KillBackend.KillStore
+        property: "graphVisible"
+        value: appControlWindow.menuOpen || appControlWindow.cpuPlusProcessVisible
     }
-
-    HunterPresentation {
-        id: hunterPresentation
-
-        presentationState: processPresentationState
-        metricMode: appControlWindow.hunterMetricMode
+    Binding {
+        target: KillBackend.KillStore
+        property: "graphMetricMode"
+        value: appControlWindow.hunterMetricMode
     }
 
     AppControlTaskHost {
@@ -905,38 +906,34 @@ PanelWindow {
         }
     }
 
-    TaskGraphController {
-        id: taskGraphController
-        presentationState: processPresentationState
-        telemetry: processTelemetry
-        hunterPresentation: hunterPresentation
-        taskRows: appControlWindow.taskRows
+    Connections {
+        target: appControlWindow.taskGraphController
 
-        onPrepareCpuMemAppend: {
+        function onPrepareCpuMemAppend() {
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(true);
             if (taskManagerBody.memCanvas)
                 taskManagerBody.memCanvas.requestPaint(true);
         }
 
-        onPrepareCombiAppend: {
+        function onPrepareCombiAppend() {
             if (taskManagerBody.combiScoreCanvas)
                 taskManagerBody.combiScoreCanvas.requestPaint(true);
         }
 
-        onRepaintCpuMem: function(forceReset) {
+        function onRepaintCpuMem(forceReset) {
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
             if (taskManagerBody.memCanvas)
                 taskManagerBody.memCanvas.requestPaint(false, !!forceReset);
         }
 
-        onRepaintCpu: function(forceReset) {
+        function onRepaintCpu(forceReset) {
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
         }
 
-        onRepaintAll: function(forceReset) {
+        function onRepaintAll(forceReset) {
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
             if (taskManagerBody.memCanvas)
@@ -945,7 +942,7 @@ PanelWindow {
                 taskManagerBody.combiScoreCanvas.requestPaint(false, !!forceReset);
         }
 
-        onRetryRequested: {
+        function onRetryRequested() {
             if (appControlWindow.menuOpen
                     && appControlWindow.selectedResultIsTask())
                 appControlWindow.refreshSelectedTaskGraph();
@@ -1530,24 +1527,24 @@ PanelWindow {
     // AppControl-owned storage. Compatibility aliases keep the existing
     // orchestration stable while TaskManagerView/CPU++ can consume the state
     // directly.
-    property alias taskHistoryPid: processPresentationState.taskHistoryPid
-    property alias taskRestoringSelection: processPresentationState.taskRestoringSelection
-    property alias taskCpuHistory: processPresentationState.taskCpuHistory
-    property alias taskMemHistory: processPresentationState.taskMemHistory
+    readonly property int taskHistoryPid: processPresentationState.taskHistoryPid
+    readonly property bool taskRestoringSelection: processPresentationState.taskRestoringSelection
+    readonly property var taskCpuHistory: processPresentationState.taskCpuHistory
+    readonly property var taskMemHistory: processPresentationState.taskMemHistory
     readonly property int taskHistoryLimit: processPresentationState.taskHistoryLimit
     readonly property int taskGraphScrollDuration: processPresentationState.taskGraphScrollDuration
     readonly property int taskMiniGraphScrollDuration: processPresentationState.taskMiniGraphScrollDuration
     readonly property int taskCombiRenderPointLimit: processPresentationState.taskCombiRenderPointLimit
-    property alias taskMiniCpuHistories: processPresentationState.taskMiniCpuHistories
-    property alias taskMiniHunterMetricHistories: processPresentationState.taskMiniHunterMetricHistories
-    property alias taskHunterDetailHistories: processPresentationState.taskHunterDetailHistories
-    property alias taskHunterDetailHistoryRevision: processPresentationState.taskHunterDetailHistoryRevision
-    property alias taskMiniCpuIdentityHistories: processPresentationState.taskMiniCpuIdentityHistories
-    property alias taskMiniHistoryRevision: processPresentationState.taskMiniHistoryRevision
+    readonly property var taskMiniCpuHistories: processPresentationState.taskMiniCpuHistories
+    readonly property var taskMiniHunterMetricHistories: processPresentationState.taskMiniHunterMetricHistories
+    readonly property var taskHunterDetailHistories: processPresentationState.taskHunterDetailHistories
+    readonly property int taskHunterDetailHistoryRevision: processPresentationState.taskHunterDetailHistoryRevision
+    readonly property var taskMiniCpuIdentityHistories: processPresentationState.taskMiniCpuIdentityHistories
+    readonly property int taskMiniHistoryRevision: processPresentationState.taskMiniHistoryRevision
     readonly property bool taskMiniProbeLoading: processTelemetry.miniProbeLoading
-    property alias taskMiniDisplayRevision: processPresentationState.taskMiniDisplayRevision
+    readonly property int taskMiniDisplayRevision: processPresentationState.taskMiniDisplayRevision
     readonly property int taskMiniHistoryLimit: processPresentationState.taskMiniHistoryLimit
-    property alias taskMiniPreloadSnapshots: processPresentationState.taskMiniPreloadSnapshots
+    readonly property int taskMiniPreloadSnapshots: processPresentationState.taskMiniPreloadSnapshots
     readonly property int taskMiniPreloadTarget: processPresentationState.taskMiniPreloadTarget
 
     // Graph geometry is generated as ordinary QML points and rendered with
@@ -1799,8 +1796,8 @@ PanelWindow {
             traceTaskSnapshotDuration("hunter-history", traceSequence, stageStart, traceRowCount);
 
             stageStart = traceSequence ? Date.now() : 0;
-            taskMiniHistoryRevision += 1;
-            taskMiniDisplayRevision += 1;
+            appControlWindow.processPresentationState.taskMiniHistoryRevision += 1;
+            appControlWindow.processPresentationState.taskMiniDisplayRevision += 1;
             traceTaskSnapshotDuration("history-revisions", traceSequence, stageStart, traceRowCount);
         }
 
@@ -1823,7 +1820,7 @@ PanelWindow {
             });
         }
 
-        taskMiniPreloadSnapshots = Math.min(
+        appControlWindow.processPresentationState.taskMiniPreloadSnapshots = Math.min(
             taskMiniPreloadTarget,
             taskMiniPreloadSnapshots + 1
         );
@@ -1850,14 +1847,14 @@ PanelWindow {
                 }
             }
 
-            taskRestoringSelection = true;
+            appControlWindow.processPresentationState.taskRestoringSelection = true;
 
             selectedResultIndex =
                 killTaskResults.values.length > 0
                 ? Math.min(targetIndex, killTaskResults.values.length - 1)
                 : -1;
 
-            taskRestoringSelection = false;
+            appControlWindow.processPresentationState.taskRestoringSelection = false;
 
             if (taskHistoryPid <= 0)
                 resetTaskHistoryForSelection();
@@ -2657,8 +2654,8 @@ PanelWindow {
             updateTaskMiniHunterMetricHistories(samples);
             traceKillWork("mini-hunter-history", stageStart);
             stageStart = timed ? Date.now() : 0;
-            taskMiniHistoryRevision += 1;
-            taskMiniDisplayRevision += 1;
+            appControlWindow.processPresentationState.taskMiniHistoryRevision += 1;
+            appControlWindow.processPresentationState.taskMiniDisplayRevision += 1;
             traceKillWork("mini-history-revisions", stageStart);
         }
     }
@@ -28469,7 +28466,7 @@ PanelWindow {
 
             // Force graph geometry to rebind after PanelWindow visibility
             // changes. The histories themselves stay intact across close/open.
-            appControlWindow.taskMiniHistoryRevision += 1;
+            appControlWindow.processPresentationState.taskMiniHistoryRevision += 1;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint();
             if (taskManagerBody.memCanvas)

@@ -13,6 +13,8 @@ Rectangle {
     property bool hostConnected: false
     // These read-only signals come from B0; they do not establish a chat host.
     property string treeKey: ""
+    // Public display label only; never a member ID or authority.
+    property string treeName: ""
     property string inventoryStatus: "NOT_CHECKED"
     property int discoveredModels: 0
     property string selectedModel: ""
@@ -24,6 +26,8 @@ Rectangle {
     color: Colors.black
     border.width: 0
     clip: true
+    enabled: width > 0 && visible
+    Accessible.ignored: !enabled
 
     Rectangle {
         id: chatListHeader
@@ -42,8 +46,10 @@ Rectangle {
             anchors.topMargin: 9
             font.pixelSize: 12
             color: Colors.cyan
-            text: "CHATS // " + String(chatListRoot.visibleSessions.length).padStart(2, "0")
+            text: chatListRoot.treeName
+            textFormat: Text.PlainText
             elide: Text.ElideRight
+            Accessible.ignored: !chatListRoot.enabled
         }
         GohuText {
             anchors.left: parent.left
@@ -53,9 +59,11 @@ Rectangle {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 8
             font.pixelSize: 9
-            color: chatListRoot.hostConnected ? Colors.green : Colors.orange
-            text: chatListRoot.hostConnected ? "OPEN SESSIONS" : "CHAT HOST OFFLINE"
+            color: Colors.orange
+            text: "COLONY UNAVAILABLE"
+            textFormat: Text.PlainText
             elide: Text.ElideRight
+            Accessible.ignored: !chatListRoot.enabled
         }
         Rectangle {
             anchors.left: parent.left
@@ -93,6 +101,7 @@ Rectangle {
                         ? "OLLAMA // NOT SCANNED" : "OLLAMA // OFFLINE"
             elide: Text.ElideRight
             textFormat: Text.PlainText
+            Accessible.ignored: !chatListRoot.enabled
         }
         GohuText {
             anchors.left: parent.left
@@ -108,11 +117,13 @@ Rectangle {
                 : "MODEL // NOT SELECTED"
             elide: Text.ElideRight
             textFormat: Text.PlainText
+            Accessible.ignored: !chatListRoot.enabled
         }
     }
 
     ListView {
         id: activeChatList
+        Accessible.ignored: !chatListRoot.enabled
         anchors.top: modelStatusStrip.bottom
         anchors.bottom: parent.bottom
         anchors.left: parent.left
@@ -142,6 +153,7 @@ Rectangle {
                 anchors.margins: 9
                 text: String(modelData.title || "")
                 textFormat: Text.PlainText
+                Accessible.ignored: !chatListRoot.enabled
                 font.pixelSize: 12
                 color: Colors.orange
                 elide: Text.ElideRight
@@ -153,6 +165,7 @@ Rectangle {
                 anchors.margins: 9
                 text: "OPEN // REV " + String(modelData.revision)
                 textFormat: Text.PlainText
+                Accessible.ignored: !chatListRoot.enabled
                 font.pixelSize: 10
                 color: Colors.cyan
                 elide: Text.ElideRight
@@ -162,6 +175,7 @@ Rectangle {
 
     NeonScrollBar {
         flickable: activeChatList
+        Accessible.ignored: !chatListRoot.enabled || !visible
         handleStyle: "star"
         accountForContentOrigin: true
         visible: chatListRoot.hostConnected
@@ -171,9 +185,11 @@ Rectangle {
     GohuText {
         anchors.centerIn: activeChatList
         width: Math.max(1, activeChatList.width - 8)
+        // Connectivity and an empty projection do not prove complete coverage.
         text: chatListRoot.hostConnected
-            ? "NO ACTIVE CHATS"
-            : "NO ACTIVE CHATS\nTRUSTED CHAT HOST NOT CONNECTED"
+            ? "CHAT COVERAGE UNKNOWN"
+            : "CHAT HOST OFFLINE"
+        Accessible.ignored: !chatListRoot.enabled || !visible
         color: Colors.orange
         font.pixelSize: 10
         horizontalAlignment: Text.AlignHCenter

@@ -289,7 +289,11 @@ assert.match(workshop,/readoutColor: Colors.cyan/);
 assert.match(workshop,/interactionGlowColor: Colors.magenta/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorageInstrument"/);
 assert.match(ui,/normalFace: true/);
-assert.match(workshop,/text: "FIXED CADENCE"/);
+assert.doesNotMatch(workshop,/text: "FIXED CADENCE"/);
+assert.match(workshop,/storageCadenceExplicit:true/);
+assert.match(workshop,/root.changeStorageCadence\(cadenceRow.field,1\)/);
+assert.match(workshop,/root.changeStorageCadence\(cadenceRow.field,-1\)/);
+assert.match(workshop,/storagePreview.observations/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
 assert.match(workshop,/instrumentHeight: compactLayout \? 112 : 176/);

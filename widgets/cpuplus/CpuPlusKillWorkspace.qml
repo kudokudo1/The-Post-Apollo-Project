@@ -231,6 +231,7 @@ Item {
     property bool locallyPending: false
     property var ownedPendingRef: null
     property int stagedLimitPercent: -1
+    property double lastDetailSampleMs: 0
 
     function matchingRow() {
         for (let i = 0; i < taskRows.length; i++) {
@@ -274,6 +275,7 @@ Item {
                 })) return false;
         if (sameTarget(row)) return true; // hovering over the current row must not reset graphs
         stagedLimitPercent=-1;
+        lastDetailSampleMs=0;
         selectedPid=Number(row.pid || 0);
         selectedStartTicks=Number(row.startTicks || 0);
         selectedComm=String(row.comm || "");
@@ -299,11 +301,20 @@ Item {
     function appendCurrentHistory() {
         const row=matchingRow();
         if (!row || !active || !ready) return;
-        // Use real owner snapshots only. The shared graph controller publishes
-        // bounded history arrays and starts the original scrolling animations.
-        detailGraph.appendTaskHistoryValues(Number(row.cpu || 0),Number(row.mem || 0));
-        detailGraph.appendSelectedTaskHunterHistories(row,Number(row.cpu || 0),
-            Number(row.rss || 0),Number(row.mem || 0));
+        // The single owner now publishes rows every 600ms when either
+        // Kill consumer is visible. Coalesce detail samples so the existing
+        // 920ms scroll animation can finish; never invent intermediate points.
+        const now=Date.now();
+        if (lastDetailSampleMs && now>=lastDetailSampleMs
+                && now-lastDetailSampleMs<history.taskGraphScrollDuration) return;
+        lastDetailSampleMs=now;
+        // ps CPU is a lifetime average; cpuInstant is the owner-observed
+        // delta between snapshots and is the appropriate live graph input.
+        const cpu=Number(row.cpuInstant !== undefined ? row.cpuInstant : row.cpu || 0);
+        const mem=Number(row.mem || 0);
+        detailGraph.appendTaskHistoryValues(cpu,mem);
+        detailGraph.appendSelectedTaskHunterHistories(row,cpu,
+            Number(row.rss || 0),mem);
     }
     function cycleTarget(direction) {
         if (!active || locallyPending || modelBlank) return;

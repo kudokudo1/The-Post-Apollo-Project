@@ -130,7 +130,7 @@ function hostMemorySummary(rows) {
 }
 
 // Bounded numeric opening markers plus the existing external thread sampler.
-function combineAppControl(raw, modes, openings, overflow, killWork) {
+function combineAppControl(raw, modes, openings, overflow, killWork, work) {
     if (overflow || typeof raw !== "string" || raw.length > 65536) return null;
     try {
         const rows = raw.trim().split("\n").map(line => JSON.parse(line));
@@ -144,6 +144,7 @@ function combineAppControl(raw, modes, openings, overflow, killWork) {
             samples:rows.map(row=>({tsMs:row.tsMs,intervalMs:row.sampleIntervalMs,
                 total:row.totalCpuPct,main:row.main.cpuPct}))};
         if (killWork !== undefined) doc.killWork = killWork;
+        if (work !== undefined) doc.work = work;
         const text = JSON.stringify(doc);
         return text.length <= 65536 && appControlMetrics(text) ? text : null;
     } catch (error) { return null; }
@@ -209,6 +210,23 @@ function appControlMetrics(text) {
                 killWork[o.stage]=v;
             }
         }
+        const observedWork = {};
+        if (d.work !== undefined) {
+            const moreStages = workStages.concat(["app-model-read","app-key-scan","app-index-write",
+                "app-position-view","resource-reconcile","event-loop-gap"]);
+            if (!Array.isArray(d.work) || d.work.length>256
+                    || d.work.some((o,i)=>!o || moreStages.indexOf(o.stage)<0
+                        || ["closed","app","kill","other","unavailable"].indexOf(o.mode)<0
+                        || !stamp(o.tsMs) || !numeric(o.elapsedMs)
+                        || (i>0 && o.tsMs<d.work[i-1].tsMs))) return null;
+            for (const o of d.work) {
+                if (o.tsMs-o.elapsedMs<d.startMs || o.tsMs>d.endMs) continue;
+                const key=o.mode+" / "+o.stage;
+                const v=observedWork[key] || {count:0,totalMs:0,maxMs:0};
+                v.count++; v.totalMs+=o.elapsedMs; v.maxMs=Math.max(v.maxMs,o.elapsedMs);
+                observedWork[key]=v;
+            }
+        }
         const weighted = rows => {
             const ms=rows.reduce((n,s)=>n+s.intervalMs,0);
             return {count:rows.length,ms:ms,
@@ -226,7 +244,7 @@ function appControlMetrics(text) {
         }
         return {pid:d.pid,durationMs:d.endMs-d.startMs,all:weighted(d.samples),
             app:weighted(buckets.app),kill:weighted(buckets.kill),
-            selection:selection,killWork:killWork,
+            selection:selection,killWork:killWork,work:observedWork,
             openings:totals.length,openingMean:totals.length?totals.reduce((a,b)=>a+b,0)/totals.length:null,
             openingMax:totals.length?Math.max(...totals):null};
     } catch (error) { return null; }
@@ -241,7 +259,8 @@ function summarize(kind, text) {
                 +"\nOPENINGS // "+d.openings+(d.openings?" / mean "+d.openingMean.toFixed(1)+" ms / max "+d.openingMax+" ms":" / N/A")
                 +Object.keys(d.selection).filter(k=>d.selection[k].length).map(k=>"\n"+k.toUpperCase()+" // mean "+(d.selection[k].reduce((a,b)=>a+b,0)/d.selection[k].length).toFixed(1)+" ms").join("")
                 +Object.keys(d.killWork).sort((a,b)=>d.killWork[b].totalMs-d.killWork[a].totalMs).map(k=>"\nKILL "+k.toUpperCase()+" // "+d.killWork[k].count+" calls / "+d.killWork[k].totalMs+" ms summed / "+d.killWork[k].maxMs+" ms max").join("")
-                +"\nStable-mode intervals only; whole capture includes closed/other. Stage timings are synchronous wall time, not CPU attribution or first paint. 100% = one core.";
+                +Object.keys(d.work).sort((a,b)=>d.work[b].maxMs-d.work[a].maxMs).map(k=>"\n"+k.toUpperCase()+" // "+d.work[k].count+" calls / "+d.work[k].totalMs+" ms summed / "+d.work[k].maxMs+" ms max").join("")
+                +"\nStable-mode CPU intervals only; whole capture includes closed/other. Work mode is observed at completion, not necessarily throughout the call. Event-loop gaps may overlap measured work; do not add them as CPU time. Stage timings are synchronous wall time, not CPU attribution or first paint. 100% = one core.";
         }
         if (kind === "inventory") {
             const data = JSON.parse(text);

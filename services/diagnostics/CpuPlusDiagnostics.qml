@@ -18,6 +18,7 @@ Scope {
     property string captureId: ""
     signal captureFinished(string job, string reportId)
     property string selectedArchiveId: ""
+    property bool pendingReportView: false
     property string compareBeforeId: ""
     property string compareAfterId: ""
     function selectComparison(side, reportId) {
@@ -176,11 +177,12 @@ Scope {
         return archiveRows.find(row => row.kind === job && row.id === reportId) || null;
     }
 
-    function selectExactReport(job, reportId) {
+    function selectExactReport(job, reportId, openReport = true) {
         if (!reportFor(job, reportId)) return false;
         selectedReport = job;
         selectedArchiveId = reports[job] && reports[job].id === reportId ? "" : reportId;
         memoryMenuIndex = 4;
+        if (openReport) pendingReportView = true;
         return true;
     }
 

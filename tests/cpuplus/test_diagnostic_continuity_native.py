@@ -50,6 +50,18 @@ Scope {
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')
     (scripts / "cpuplus_process_census.py").write_text("import time\ntime.sleep(10)\n")
+    # Disposable child validates exact argv, emits a calibrated synthetic report.
+    (scripts / "syntagma_quickshell_thread_sampler.py").write_text("""import json,sys,time
+assert sys.argv[1:]==["--workshop","--duration","2","--interval","0.5","--top","2"]
+time.sleep(1)
+tag={"workshopSchema":"post-apollo-thread-calibration-v1","pid":123,"startTicks":456}
+main={"tid":123,"cpuPct":55}
+start=dict(tag,event="start",durationSeconds=2,intervalMs=500,topCount=2)
+row=dict(event="threads",pid=123,startTicks=456,sampleIntervalMs=500,totalCpuPct=55,threadCount=1,main=main,top=[main])
+end=dict(tag,event="complete",samples=4,observedMs=2000)
+for entry in [start,row,row,row,row,end]: print(json.dumps(entry))
+""")
+
     env = os.environ.copy()
     for key in ("HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
                 "XDG_DATA_HOME", "XDG_RUNTIME_DIR"):
@@ -63,5 +75,5 @@ Scope {
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=25, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

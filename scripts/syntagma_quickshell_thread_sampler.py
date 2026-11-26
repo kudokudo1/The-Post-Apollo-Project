@@ -127,6 +127,25 @@ def emit(record):
     print(json.dumps(record, separators=(",", ":"), sort_keys=True), flush=True)
 
 
+class WorkshopOutputLimit(Exception):
+    pass
+
+
+class WorkshopOutput:
+    """ASCII JSONL; enforce the byte cap before writing each complete record."""
+    def __init__(self, write=None):
+        self.write = write if write is not None else lambda line: print(line, flush=True)
+        self.size = 0
+
+    def emit(self, record):
+        line = json.dumps(record, separators=(",", ":"), sort_keys=True, ensure_ascii=True)
+        size = len(line) + 1
+        if self.size + size > 65536:
+            raise WorkshopOutputLimit()
+        self.write(line)
+        self.size += size
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pid", type=int, help="Quickshell PID (default: newest owned process)")
@@ -136,7 +155,8 @@ def main(argv=None):
     parser.add_argument("--interval", type=float, default=0.25,
                         help="Sampling period in seconds (default .25)")
     parser.add_argument("--top", type=int, default=4,
-                        help="Non-main thread entries to retain (default 4)")
+                        help="Ranked entries plus main if outside rank (default 4)")
+    parser.add_argument("--workshop", action="store_true", help="Bounded calibrated JSONL receipt")
     args = parser.parse_args(argv)
     if not 0.1 <= args.interval <= 5:
         parser.error("--interval must be between 0.1 and 5 seconds")
@@ -145,6 +165,17 @@ def main(argv=None):
     if not 1 <= args.top <= 12:
         parser.error("--top must be between 1 and 12")
 
+    if args.workshop:
+        interval_ms = round(args.interval * 1000)
+        if (int(args.duration) != args.duration or not 1 <= args.duration <= 120
+                or interval_ms not in (100, 250, 500, 1000, 2000, 5000)
+                or args.interval != interval_ms / 1000
+                or interval_ms > args.duration * 1000
+                or args.pid is not None or args.parent_quickshell):
+            parser.error("invalid workshop calibration")
+        limit = (int(args.duration * 1000) + interval_ms - 1) // interval_ms
+        if limit > 30 or limit * (args.top + 1) > 150:
+            parser.error("workshop report budget")
     proc_root = Path("/proc")
     if args.parent_quickshell and args.pid is not None:
         parser.error("Choose one PID source")
@@ -157,7 +188,10 @@ def main(argv=None):
         if (proc_root / str(pid)).stat().st_uid != os.getuid():
             print("Refusing to sample another user's process.", file=sys.stderr)
             return 2
-        proc_start = parse_stat_line((proc_root / str(pid) / "stat").read_text())["start"]
+        identity = parse_stat_line((proc_root / str(pid) / "stat").read_text())
+        if args.workshop and identity["name"] != "quickshell":
+            raise ValueError("not Quickshell")
+        proc_start = identity["start"]
     except (OSError, ValueError, IndexError):
         print("Quickshell PID disappeared or cannot be inspected.", file=sys.stderr)
         return 2
@@ -169,14 +203,20 @@ def main(argv=None):
         return 2
     started = time.monotonic()
     sampled_at = started
-    emit({"event": "start", "tsMs": round(time.time() * 1000), "pid": pid,
-          "intervalMs": round(args.interval * 1000),
-          "durationSeconds": args.duration,
-          "note": "CPU percentages are per one logical CPU; no Qt stack traces"})
+    send = WorkshopOutput().emit if args.workshop else emit
+    tag = {"workshopSchema": "post-apollo-thread-calibration-v1", "startTicks": proc_start} if args.workshop else {}
+    start_record = {"event": "start", "tsMs": round(time.time() * 1000), "pid": pid,
+                    "intervalMs": round(args.interval * 1000),
+                    "durationSeconds": args.duration,
+                    "note": "CPU percentages are per one logical CPU; no Qt stack traces"}
+    if args.workshop:
+        start_record.update(tag, topCount=args.top)
+    send(start_record)
+    samples = 0
 
     try:
-        while time.monotonic() - started < args.duration:
-            time.sleep(args.interval)
+        while (sampled_at if args.workshop else time.monotonic()) - started < args.duration:
+            time.sleep(min(args.interval, max(0, args.duration - (time.monotonic() - started))) if args.workshop else args.interval)
             now = time.monotonic()
             seconds = now - sampled_at
             sampled_at = now
@@ -185,25 +225,45 @@ def main(argv=None):
             except (OSError, ValueError, IndexError):
                 latest_start = None
             if latest_start != proc_start:
-                emit({"event": "stopped", "reason": "quickshell-exited-or-replaced",
+                send({"event": "stopped", "reason": "quickshell-exited-or-replaced",
                       "tsMs": round(time.time() * 1000), "pid": pid})
                 return 1
             current = read_threads(proc_root, pid)
             if not current:
-                emit({"event": "stopped", "reason": "no-readable-threads",
+                send({"event": "stopped", "reason": "no-readable-threads",
                       "tsMs": round(time.time() * 1000), "pid": pid})
                 return 1
             record = build_sample(previous, current, seconds, hz, pid,
                                   round(time.time() * 1000), args.top)
             add_wchan(record, proc_root, pid)
-            emit(record)
+            if args.workshop:
+                # Recheck identity after reading thread counters and wait channels.
+                path = proc_root / str(pid)
+                latest = parse_stat_line((path / "stat").read_text())
+                if (path.stat().st_uid != os.getuid() or latest["name"] != "quickshell"
+                        or latest["start"] != proc_start or pid not in current
+                        or samples >= limit):
+                    return 1
+                record["startTicks"] = proc_start
+            send(record)
+            samples += 1
             previous = current
+    except (WorkshopOutputLimit, OSError, ValueError, IndexError):
+        return 1
     except KeyboardInterrupt:
-        emit({"event": "stopped", "reason": "user-interrupt",
-              "tsMs": round(time.time() * 1000), "pid": pid})
+        try:
+            send({"event": "stopped", "reason": "user-interrupt",
+                  "tsMs": round(time.time() * 1000), "pid": pid})
+        except WorkshopOutputLimit:
+            pass
         return 130
-    emit({"event": "complete", "tsMs": round(time.time() * 1000),
-          "pid": pid})
+    complete = {"event": "complete", "tsMs": round(time.time() * 1000), "pid": pid}
+    if args.workshop:
+        complete.update(tag, samples=samples, observedMs=round((sampled_at - started)*1000))
+    try:
+        send(complete)
+    except WorkshopOutputLimit:
+        return 1
     return 0
 
 

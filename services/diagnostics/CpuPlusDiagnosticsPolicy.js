@@ -86,6 +86,47 @@ function argumentsFor(kind, resolvePath, dataDir) {
     return null;
 }
 
+// Configured evidence remains JSONL, retaining existing archive and copy paths.
+function configuredThreadEvidence(text, expected) {
+    try {
+        if (typeof text !== "string" || text.length > 65536) return null;
+        const rows = text.trim().split("\n").map(line=>JSON.parse(line));
+        const start = rows.shift(), end = rows.pop();
+        const tag = "post-apollo-thread-calibration-v1";
+        const int = (v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
+        if (!start || !end || start.event !== "start" || end.event !== "complete"
+                || start.workshopSchema !== tag || end.workshopSchema !== tag
+                || !int(start.pid,1,Number.MAX_SAFE_INTEGER)
+                || !int(start.startTicks,1,Number.MAX_SAFE_INTEGER)
+                || !int(start.durationSeconds,1,120)
+                || [100,250,500,1000,2000,5000].indexOf(start.intervalMs)<0
+                || start.intervalMs>start.durationSeconds*1000
+                || !int(start.topCount,1,12)
+                || end.pid!==start.pid || end.startTicks!==start.startTicks
+                || end.samples!==rows.length || !int(end.observedMs,start.durationSeconds*1000,145000))
+            return null;
+        const limit=Math.ceil(start.durationSeconds*1000/start.intervalMs);
+        if (limit>30 || limit*(start.topCount+1)>150 || !rows.length || rows.length>limit)
+            return null;
+        if (expected && (expected.kind!=="threads" || expected.durationSeconds!==start.durationSeconds
+                || expected.intervalMs!==start.intervalMs || expected.topCount!==start.topCount)) return null;
+        let elapsed=0;
+        for (const row of rows) {
+            if (!row || row.event!=="threads" || row.pid!==start.pid || row.startTicks!==start.startTicks
+                    || !int(row.sampleIntervalMs,1,145000) || !numeric(row.totalCpuPct)
+                    || !int(row.threadCount,1,Number.MAX_SAFE_INTEGER)
+                    || !Array.isArray(row.top) || row.top.length>Math.min(row.threadCount,start.topCount+1)
+                    || !row.top.length || !row.main || row.main.tid!==start.pid || !numeric(row.main.cpuPct)
+                    || row.top.some(t=>!t || !int(t.tid,1,Number.MAX_SAFE_INTEGER)||!numeric(t.cpuPct))
+                    || new Set(row.top.map(t=>t.tid)).size!==row.top.length
+                    || !row.top.some(t=>t.tid===start.pid && t.cpuPct===row.main.cpuPct)) return null;
+            elapsed+=row.sampleIntervalMs;
+        }
+        if (Math.abs(elapsed-end.observedMs)>rows.length+1) return null;
+        return {kind:"threads",durationSeconds:start.durationSeconds,intervalMs:start.intervalMs,topCount:start.topCount};
+    } catch (_) { return null; }
+}
+
 function numeric(value) {
     return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
@@ -382,9 +423,13 @@ function summarize(kind, text) {
                 + " GiB   CPU PEAK // " + cpu.toFixed(1) + "%" + hostMemorySummary(rows);
         }
         if (rows.some(row => !numeric(row.totalCpuPct))) return null;
+        const configured = records.some(row=>Object.prototype.hasOwnProperty.call(row,"workshopSchema"));
+        const config = configured ? configuredThreadEvidence(text,null) : null;
+        if (configured && !config) return null;
         const peak = Math.max(...rows.map(row => row.totalCpuPct));
         return "PID // " + final.pid + "   SAMPLES // " + rows.length
-            + "\nTHREAD CPU PEAK // " + peak.toFixed(1) + "% (ONE CORE = 100%)";
+            + "\nTHREAD CPU PEAK // " + peak.toFixed(1) + "% (ONE CORE = 100%)"
+            + (config ? "\nCALIBRATION // "+config.durationSeconds+" s / "+config.intervalMs+" ms / TOP "+config.topCount : "");
     } catch (error) {
         return null;
     }

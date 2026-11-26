@@ -74,3 +74,14 @@ function previewCalibration(input) {
     return {ok:true,config:d,intervals:intervals,observations:observations,
         scope:scope,fixed:fixed};
 }
+
+// First qualified configurable instrument. Executable and target are fixed.
+function threadLaunchPlan(input, resolvePath) {
+    const preview = previewCalibration(input);
+    if (!preview.ok || preview.config.kind !== "threads") return null;
+    const config = preview.config;
+    return {config:config, args:["/usr/bin/timeout","--kill-after=3s","145s",
+        "/usr/bin/python3","-B",resolvePath("scripts/syntagma_quickshell_thread_sampler.py"),
+        "--workshop","--duration",String(config.durationSeconds),
+        "--interval",String(config.intervalMs/1000),"--top",String(config.topCount)]};
+}

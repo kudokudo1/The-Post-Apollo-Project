@@ -1,0 +1,29 @@
+name: Favorites AppControl identity adapter donor parity
+
+on:
+  push:
+    paths:
+      - "services/favorites/FavoritesAppControlIdentityPolicy.js"
+      - "tests/favorites/test_appcontrol_identity_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-identity-policy.yml"
+      - "widgets/AppControlW.qml"
+      - "widgets/appcontrol/HunterOperationController.qml"
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesAppControlIdentityPolicy.js"
+      - "tests/favorites/test_appcontrol_identity_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-identity-policy.yml"
+      - "widgets/AppControlW.qml"
+      - "widgets/appcontrol/HunterOperationController.qml"
+
+permissions:
+  contents: read
+
+jobs:
+  donor-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare process and monitor identity keys against live AppControl
+        run: node --test tests/favorites/test_appcontrol_identity_policy.cjs

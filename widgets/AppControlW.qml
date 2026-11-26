@@ -39,6 +39,8 @@ PanelWindow {
     // ============================================================
 
     property bool menuOpen: false
+    // Shell-owned visibility demand: read-only telemetry consumers do not start their own pollers.
+    property bool cpuPlusProcessVisible: false
     // U7b-F: local navigation never waits for inventory/telemetry. A missing
     // saved item is explained inside the already-open destination.
     property var pendingFavoriteSelection: null
@@ -850,6 +852,7 @@ PanelWindow {
         // Hidden history sampling must remain continuous for FAVORITES/preload,
         // but visible history arrays remain snapshot-immutable.
         taskMiniHistoryKeepImmutable: appControlWindow.menuOpen
+                                      || appControlWindow.cpuPlusProcessVisible
     }
 
     HunterPresentation {
@@ -2512,9 +2515,10 @@ PanelWindow {
     }
 
     function taskMiniProbeNeeded() {
-        return menuOpen
-               && (selectedModeIndex === killModeIndex
-                   || selectedModeIndex === favoritesModeIndex);
+        return cpuPlusProcessVisible
+               || (menuOpen
+                   && (selectedModeIndex === killModeIndex
+                       || selectedModeIndex === favoritesModeIndex));
     }
 
 
@@ -2571,7 +2575,9 @@ PanelWindow {
         // is closed. After warm-up, use a gentler hidden cadence; entering KILL
         // or task FAVORITES immediately returns to the normal live cadence.
         interval:
-            appControlWindow.menuOpen
+            appControlWindow.cpuPlusProcessVisible
+            ? 600
+            : appControlWindow.menuOpen
             && (appControlWindow.selectedResultIsApplication()
                 || appControlWindow.selectedResultIsWindow()
                 || appControlWindow.selectedResultIsTab())

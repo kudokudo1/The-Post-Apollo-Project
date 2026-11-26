@@ -222,7 +222,7 @@ ShellRoot {
                     && fakeOwner.favoriteStore.favoriteKeys[0]==="task|synthetic-worker",
                     "shared favorite identity")) return;
                 const initial=detail.cpuCanvas.graphRevision;
-                fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,mem:7})];
+                fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];
                 smoke.previousRevision=initial;
                 smoke.phase=10;
                 return;
@@ -230,6 +230,9 @@ ShellRoot {
             if (smoke.phase===10) {
                 if (!smoke.check(detail.cpuCanvas.graphRevision>smoke.previousRevision,
                     "new owner sample repaints shared detail")) return;
+                const observed=detail.presentationState.taskCpuHistory;
+                if (!smoke.check(observed[observed.length-1]===37,
+                    "detail graph reads instantaneous CPU, not lifetime ps average")) return;
                 const revision=detail.cpuCanvas.graphRevision;
                 view.selectTarget(view.currentTask);
                 if (!smoke.check(detail.cpuCanvas.graphRevision===revision,

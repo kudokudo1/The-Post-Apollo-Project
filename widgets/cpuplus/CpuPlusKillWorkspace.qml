@@ -215,12 +215,26 @@ Item {
         if (index>=0) next.splice(index,1); else next.unshift(key);
         ownerFavoriteStore.favoriteKeys=next;
     }
+    readonly property var miniGeometry: graphGeometry
+    readonly property int miniHistoryLimit: history.taskMiniHistoryLimit
+    readonly property int miniScrollDuration: history.taskMiniGraphScrollDuration
+    function taskDisplayName(row) {
+        return appControlWindow && appControlWindow.resultDisplayName
+            ? appControlWindow.resultDisplayName(row, appControlWindow.killModeIndex)
+            : String(row.comm || row.name || "PROCESS")
+    }
+    function miniHistory(row,key) {
+        if (key==="normal")
+            return detailGraph.miniCpuHistoryByIdentity("",row);
+        return detailGraph.miniHunterHistoryForMetric(row,key);
+    }
+    function miniMetricRange(key) { return hunterGraph.metricRangeForKey(key); }
+    function miniRange(key) {
+        return key==="io" ? 0.25 : key==="age" ? 1.0 : 5.0;
+    }
     function miniGraphPoints(row,key,w,h) {
-        const values=key==="normal"
-            ? detailGraph.miniCpuHistoryByIdentity("",row)
-            : detailGraph.miniHunterHistoryForMetric(row,key);
-        return graphGeometry.linePoints(values,w,h,
-            key==="normal"?5:hunterGraph.metricRangeForKey(key),48,2,2);
+        return graphGeometry.linePoints(miniHistory(row,key),w,h,
+            miniRange(key),miniHistoryLimit,2,3);
     }
     // The shared owner computes candidates; only the explicit metric and
     // visibility are supplied. Search never silently changes global scope.
@@ -433,6 +447,9 @@ Item {
         if (!modelBlank) updateOrder(false);
         appendCurrentHistory();
     }
+    // Owner mini publication can advance without replacing a selected row.
+    // Reuse the same sample coalescing guard rather than creating a poller.
+    onMiniHistoryRevisionChanged: if (ready && active) appendCurrentHistory()
     onActiveChanged: {
         if (!active) { cancelOwned(); cancelBulk(); }
         else if (ready) requestRefresh();
@@ -827,20 +844,20 @@ Item {
                         }
                     }
                 }
-            GohuText {
-                id: emptyTarget
-                visible: !workspace.currentTask
-                                width: parent.width
+                GohuText {
+                    id: emptyTarget
+                    visible: !workspace.currentTask
+                    width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
                 text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
                 color: Colors.cyan
                 font.pixelSize: 12
             }
-            TaskManagerView {
-                id: details
-                objectName: "cpuPlusKillSharedTaskView"
-                                width: parent.width
+                TaskManagerView {
+                    id: details
+                    objectName: "cpuPlusKillSharedTaskView"
+                    width: parent.width
                 visible: !!workspace.currentTask
                 host: taskHost
                 presentationState: history

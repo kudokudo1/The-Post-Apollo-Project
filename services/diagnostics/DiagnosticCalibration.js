@@ -152,3 +152,18 @@ function previewWorkflow(input) {
         sharedQuickshellIdentityRequired:seen.includes("threads")&&seen.includes("memory"),
         launchReady:false};
 }
+
+
+// D2b transport command only. D2c must mount the session owner and qualify
+// the returned envelope before any UI success/archive publication.
+function workflowLaunchPlan(input,resolvePath,dataDir) {
+    const preview=previewWorkflow(input);
+    if (!preview.ok || typeof dataDir!=="string" || !dataDir.startsWith("/")) return null;
+    const plan={durationSeconds:preview.durationSeconds,instruments:preview.instruments.map(entry=>{
+        const item=Object.assign({},entry.config);
+        delete item.durationSeconds;
+        return item;
+    })};
+    return {plan:plan,args:["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B",
+        resolvePath("scripts/cpuplus_diagnostic_workflow.py"),"--plan",JSON.stringify(plan),"--data-dir",dataDir]};
+}

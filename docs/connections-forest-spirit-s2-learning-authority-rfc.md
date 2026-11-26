@@ -101,3 +101,142 @@ producers. Nurse2F and Connections Nurse2 review their respective scopes;
 operator approval is separate. No new schema, signer, store, daemon,
 private read, protected grant, or native activation. Existing public
 fixtures and R6 wire remain unchanged.
+
+## S4 // Unified Tree continuity and stewardship authority (design only)
+
+Operator unified Forest direction #2161 7202168479 and development
+autonomy 7204485179; Nurse bounded reconciliation 7204663398.
+Spirit proposal 7204342935, Runtime 7204354166, Heart 7204360784,
+UI1 7204351741 and UI2 7204365035. This append-only proposal preserves
+S2/S3 and the R7g custody findings. Connections owner review of the
+completed interface is required before shared adoption, not before
+draft preparation. No positive policy, default, issuer, schema or
+execution is selected.
+
+Historical input: frozen Forest repository 28895aaf, language candidate
+0.13.35 Edit Chain 002, blob 5fcd899aff88db3fd8090b2e7c6e0645235b1816,
+Maple profiles, Syrup/Leaf stewardship, Cedar protections and Canopy
+material modes. These recover separate view/use/reference/copy/move/
+edit/download/absorption intents, explicit Loose/Sturdy boundaries,
+Never Reabsorb, minimum-copy derivation, reversible undo and explicit
+early-destruction permission. Historical automatic feeding and discarded
+Syrup reabsorption were off by default; this is not a new product
+configuration or authority to enable either.
+
+### One Tree, multiple authorized presences
+
+A Tree's durable identity, knowledge, toolbox and Workshop relationship
+can be shared by its base presence and named Clones. Separate stable
+member and conversation identities from mutable display name, logical
+home, assignment, binding revision, Task, input, recipient and actual
+execution incarnation. Shared ownership is not shared active prompts,
+unrestricted transcript access, a physical resource reservation or
+permission to execute every capability. Do not derive identity or grant
+from a label, default Clone number, widget, local process or model name.
+
+Standing user-approved policy may authorize recurring ordinary work
+without another prompt for each covered action. Proposed policy field
+groups: independently authenticated principal/Tree and delegated
+member/role scope; exact allowed source classes and operations; purpose,
+destination/recipient and capability limits; retention/protection
+restrictions; time, workload and effect budgets; explicit exclusions,
+revision and independently current revocation. No silent escalation or
+Tar Sap expansion. The actual source must check eligibility before
+enumeration/read, and the actual effect boundary must verify current
+authority and original operation identity before submission or mutation.
+A standing policy can be changed or withdrawn; unknown currentness
+does not become implicit permission. Cross-Tree Mycelium and external
+routing remain separately scoped. No repeated operator confirmation
+is necessary for already approved reversible work within its bounds.
+
+| Intent | Independent boundary (proposed, not signed actions) |
+| --- | --- |
+| List or inspect member/chat associations | Authenticate recipient and purpose before source enumeration; separately permit each field, relation and completeness claim. Hidden name, number gaps, count, title, home, role, task and season must not leak. |
+| Rename / change display label | Exact stable member and current metadata revision, authorized mutation and durable receipt. No recreation, history relabel or permission expansion; default number comes from owner, not UI enumeration. |
+| Reassign conversation / change binding | Exact old and proposed new member/chat, current binding revision, independently permitted new recipient and data scope, original pending effects retained. No implied cardinality, draft/history/cache or grant transfer; no automatic send or replay. |
+| Renew execution | Keep original committed conversation and authorship; requalify new Task/lifetime, input, model/recipient, resource and policy. Original uncertain effect stays fenced under its original identity. |
+| Automatic same-Tree coordination | Current scoped standing policy, exact eligible version/source, task/recipient and action, separate actual capability and resource admission; no broadcast of protected work. |
+| Cross-Tree or external release | Separate current destination and disclosure/delegation permission; bind actual serialized unit and original effect before first possible send, per S3. |
+
+A local filter or selection is navigation, not a query grant or a
+composer retarget. Source-side field authorization and relevant coverage
+must precede assembly; independently current source, recipient and exact
+view must hold at delivery. An authorized subset does not prove absence
+of hidden members or complete-empty. Unknown is neutral unavailable,
+not a guessed count or hidden reason. Withdrawal removes only affected
+presentation/eligibility, not durable data or original pending custody.
+
+### Leaf stewardship and retention boundaries
+
+Keep retention priority (Loose/normal/Sturdy), active use or storage
+location, and independently established protection/permission separate.
+A Leaf is a meaningful knowledge object, not a token, byte, native
+context entry or measured physical resource. Original history, immutable
+approved knowledge versions, derived summary/decision material, task
+working set and provider context remain distinct.
+
+| Intent | Required scoped effect and outcome |
+| --- | --- |
+| Inspect / temporarily use | Exact permitted metadata then independent version/body/use/recipient scope; no durable retention or sharing inferred. |
+| Preserve / change Leaf state | Current authorized metadata mutation; respect user-marked Sturdy and Loose limits. No silent demotion or permission change. |
+| Remove from active context | Invalidate only the authorized derived working set; no journal deletion, durable erasure or physical resource-release claim. |
+| Refine / derive Syrup or summary | Independently authorized source, version, purpose, derived destination and retention. Minimum necessary copy; preserve Sturdy original and protection; whole-copy needs exact scope. Preserve permitted provenance, decisions, rejected alternatives and uncertainty; no rewrite of original authorship. |
+| Shed / retain inactive material | Exact retention/grace/recovery policy and source transition; explain reversible changes and offer authorized undo while actual recovery remains possible. No invented grace duration or implied destruction. |
+| Recover / reabsorb | Independently current eligible source, provenance, destination and consent. Never Reabsorb remains binding; Trusted Shed historical exception is not a current grant or unrestricted Cedar bypass. |
+| Absorb / promote lasting learning | Separate explicit approval or exact standing absorption policy, original writer/version and durable outcome. A preview, temporary use, active flag or derived summary does not approve promotion. |
+| Transmit or feed another Tree | Separate recipient/destination and exact release scope, including actual bytes and use limits. Retention and source permission alone do not authorize feeding. |
+| Irreversibly destroy | Explicit separately approved scope and effect, actual source owner and dependency/replica/recovery coverage, independently verified outcome. No automatic destruction from ordinary pruning, confidence, cache eviction or season. |
+
+For destruction, distinguish requested, pending, confirmed within
+verified scope, and unknown/partial outcome. Before actual mutation,
+resolve the authorized original records/versions and affected copies,
+derivatives, indexes, caches, logs, replicas and recovery material with
+their owning custodians. Do not read protected content merely to discover
+or disclose scope; require authorized metadata and independent source
+coverage. Identify excluded copies and externally delivered bytes only
+as permitted. Do not promise their recall or unverified backup erasure.
+Resolve conflicts with retained provenance, recovery requirements and
+other owners before effect; preserve only authorized non-content receipts
+that cannot recover or expose forbidden content. No covert retained
+summaries, fragments, fingerprints or recurrence checks contrary to
+destruction scope. A confirmed irreversible destruction is not undoable.
+Unknown effect retains original operation custody, not success, rollback
+or permission to retry. No actual deletion algorithm is selected here.
+
+Maple/Cedar automation may apply already approved reversible actions
+with bounded workload, policy/currentness and user-readable permitted
+reason, source/version and undo when available. Explicit new irreversible
+scope, external effects and permission expansion remain separate. Actual
+summarization/refinement may itself require a model and resource claim;
+no budget bypass or guaranteed speed improvement. Reduced Leaf count,
+dropped references or deleted files are not proof of freed RAM/VRAM;
+independent Heart H11/H2 terminal, quiescence and accounting remain
+required. Resource cleanup likewise does not prove content destruction.
+
+### Negative cases and review boundary
+
+| Case | Required result |
+| --- | --- |
+| Shared Tree, foreign Task or revoked recipient | No private enumeration/use or effect despite common ownership. |
+| Allowed visible subset, hidden members or unknown completeness | No inferred total/empty, numbering gaps or revealing status. |
+| Rename/rebind with stale revision, foreign recipient or unresolved original send | No silent transfer, relabel or replay; original custody retained. |
+| Replacement execution or filter change | No inherited old grant, automatic composer target or resource credit. |
+| Sturdy derivation, Loose restriction, Never Reabsorb | Preserve authorized original/protection; refuse conflicting reuse or revival. |
+| Allowed reversible automation, denied promotion or transfer | Ordinary covered action only; no expanded authority or repeated prompt for the already covered action. |
+| Derived working set shed, allocator/provider still resident | No inferred durable erasure, physical credit or original settlement. |
+| Destruction requested, unknown derivative/backup or lost receipt | No complete-erasure claim, covert retention, new effect ID or automatic retry. |
+| Confirmed scoped destruction, later recurrence request | No recovery or forbidden reuse; only permitted surviving provenance/receipt. |
+| Local SQL success, matching fixture signatures, revoke after send | No independently authenticated external terminal or recall of delivered bytes. |
+
+Runtime owns identity, binding and actual writer/submission ordering;
+Mind owns version/dependency and storage/derivative outcome; Heart owns
+resource measurement; Spirit owns permission and destruction semantics;
+UI owners present qualified outcomes. Connections DOC1/DOC2 retain
+independent custody/currentness and enrolled source/recipient; actual
+F1–F6 remain unresolved and NAS/second-PC setup deferred by #2119
+7132962989. R7g A/B unselected. This design selects no authority,
+default, registry, storage, signed action, API, transport or deletion
+implementation. No new executable source, test, protected read, grant,
+credential, external effect, host operation or production activation.
+Review this exact completed proposal with affected owners and Nurse;
+operator integration remains separate.

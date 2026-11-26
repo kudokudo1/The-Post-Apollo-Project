@@ -43,7 +43,7 @@ Scope {
 
     KillDetailSession {
         id: selectedDetail
-        graph: graph
+        graph: root.graphController
         state: histories
         rows: root.rows
     }

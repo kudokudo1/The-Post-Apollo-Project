@@ -86,7 +86,8 @@ present('property color increaseAccentColor: "#A46AFF"')
 present("accentColor: increasing ? increaseAccentColor : decreaseAccentColor")
 assert 'readonly property color orange:' in COLORS
 assert 'readonly property color yellow:' in COLORS
-assert not re.search(r"(?m)^\s*readonly property color purple:", COLORS)
+# A shared purple now exists for resource identity; the resize-up arrow keeps its distinct, operator-approved local swatch.
+assert re.search(r'(?m)^\s*readonly property color purple:\s*"#A879ED"', COLORS)
 assert "Colors.magenta" not in RESIZE
 
 # CloseButton-like behavior, but each direction owns its own semantic hue.

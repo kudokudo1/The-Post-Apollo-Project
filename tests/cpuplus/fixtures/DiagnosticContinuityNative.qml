@@ -15,6 +15,10 @@ ShellRoot {
     property int completions: 0
     property string diagnosticFooterGeometry: ""
     property string completedId: ""
+    property real compactThumbLength: 0
+    property real mediumThumbLength: 0
+    property real lowFillOpacity: 0
+    property real lowHaloOpacity: 0
     Connections {
         target: CpuPlusDiagnostics
         function onCaptureFinished(job, reportId) {
@@ -113,6 +117,7 @@ ShellRoot {
         return ok;
     }
     Window {
+        id: nativeWindow
         width: 320
         height: 620
         visible: true
@@ -515,6 +520,62 @@ ShellRoot {
                     "storage contents fit card with all five instruments")) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,
                     "all five instruments fit // "+viewport.contentHeight+" / "+viewport.height)) return;
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const fill=root.findItem(duration,"selectorNumericFill");
+                const halo=root.findItem(duration,"selectorNumericFillHalo");
+                if (!duration || !fill || !halo || Math.abs(duration.liveFillFraction-29/119)>0.02) return;
+                if (!root.check(fill.width>4 && halo.visible && duration.hardwareThumbLength<52,
+                    "compact thumb and widened energized fill")) return;
+                root.compactThumbLength=duration.hardwareThumbLength;
+                root.lowFillOpacity=fill.opacity;
+                root.lowHaloOpacity=halo.opacity;
+                workshop.edit("durationSeconds",100);
+                root.phase=241;
+                return;
+            }
+            if (root.phase===241 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                if (!duration || duration.liveFillFraction<0.82) return;
+                const fill=root.findItem(duration,"selectorNumericFill");
+                const halo=root.findItem(duration,"selectorNumericFillHalo");
+                if (!root.check(fill.opacity>root.lowFillOpacity && halo.opacity>root.lowHaloOpacity
+                    && !CpuPlusDiagnostics.busy,"fill and halo intensify without launching capture")) return;
+                nativeWindow.width=400;
+                nativeWindow.height=700;
+                root.phase=242;
+                return;
+            }
+            if (root.phase===242 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!duration || duration.hardwareThumbLength<=root.compactThumbLength) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"medium instruments fit")) return;
+                root.mediumThumbLength=duration.hardwareThumbLength;
+                nativeWindow.width=500;
+                nativeWindow.height=800;
+                root.phase=243;
+                return;
+            }
+            if (root.phase===243 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!duration || duration.hardwareThumbLength<=root.mediumThumbLength) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"large instruments fit")) return;
+                nativeWindow.width=320;
+                nativeWindow.height=620;
+                root.phase=244;
+                return;
+            }
+            if (root.phase===244 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const dial=root.findItem(workshop,"cpuplusWorkshopStallThreshold");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!duration || duration.hardwareThumbLength!==root.compactThumbLength) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"compact instruments fit after resize")) return;
                 workshop.edit("selected",["storage","stall"]);
                 workshop.edit("durationSeconds",5);
                 dial.valueRequested(500);

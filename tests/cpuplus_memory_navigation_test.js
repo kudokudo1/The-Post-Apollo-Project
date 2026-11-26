@@ -14,7 +14,7 @@ assert.equal((pane.match(/\bProcess\s*\{/g) || []).length, 1);
 assert.equal((pane.match(/\bTimer\s*\{/g) || []).length, 2); // one scanner scheduler, one display clock
 assert.equal((pane.match(/\bCpuPlusMemoryAddControl\s*\{/g) || []).length, 1);
 assert.match(pane, /CpuPlusMemoryAddControl\s*\{\s*id: addControl\s*width: parent.width\s*stagedGiB: root.stagedGiB\s*sample: root.sample/);
-assert.match(pane, /CpuPlusSwapComposition\s*\{\s*width: parent.width\s*sample: root.displaySample\s*capacity: root.displayCapacity/);
+assert.match(pane, /CpuPlusSwapComposition\s*\{\s*width: parent.width\s*sample: liveBars.sample\s*capacity: liveBars.capacity/);
 assert.match(pane, /CpuPlusMemoryCapacitySlider\s*\{/);
 const slider = fs.readFileSync(path.join(__dirname, "../widgets/cpuplus/CpuPlusMemoryCapacitySlider.qml"), "utf8");
 assert.match(slider, /SelectorSlider\s*\{/);
@@ -441,7 +441,7 @@ assert.ok(!htmlM11d.includes("<tag>"));
 assert.ok(htmlM11d.includes('<font color="#abc">80</font>'));
 assert.match(pane,/objectName: "cpuplusCapDetailsInfoPopup"/);
 assert.match(pane,/objectName: "cpuplusRamMetricFill"[\s\S]*?anchors.leftMargin: 2/);
-assert.match(pane,/interactive: !root.capDetailsActive \|\| contentHeight > height \+ 1/);
+assert.match(pane,/interactive: \(root.page !== "DIAG" && !root.capDetailsActive\) \|\| contentHeight > height \+ 1/);
 console.log("CPU++ M11d punctuation escaping, inset bars and info contract PASS");
 
 assert.match(pane,/readonly property int detailMeterHeight: Math.max\(12, Math.round\(12\*detailScale\)\)/);
@@ -518,3 +518,7 @@ console.log("CPU++ M11h compact transport palette and pinned diagnostics header 
  assert.match(targetStripSource,/selectedFillColor: Colors.black/);
  assert.match(targetStripSource,/selectedContentGlowColor: accentColor/);
  console.log("CPU++ SYSTEM and KILL semantic palette source contracts PASS");
+
+assert.match(pane,/component LiveCapacityBars: Column/);
+assert.equal((pane.match(/LiveCapacityBars\s*\{/g)||[]).length,2);
+assert.match(targetStripSource,/outlineOnlyGlow: true/);

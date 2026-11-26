@@ -14,6 +14,10 @@ ActionButton {
         : phase === "RECORDING" ? Colors.green
         : phase === "COMPLETE" ? Colors.omnitrix : Colors.red
     height: 34
+    // Dedicated execution hardware, not an ordinary filter/action face.
+    readonly property bool preparationFace: phase === "PREPARE" || phase === "RETRY"
+    idleBorderWidth: preparationFace ? 2 : 1
+    softGlowIdleOpacity: preparationFace ? 0.46 : 0.22
     accentColor: stateColor
     showLabel: false
     acceptedButtons: Qt.LeftButton
@@ -28,10 +32,21 @@ ActionButton {
         anchors.fill: parent
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        font.pixelSize: 11
+        font.pixelSize: root.preparationFace ? 13 : 11
         color: root.pressed ? Colors.black : root.hovered ? Colors.orange : root.stateColor
         text: root.caption
         elide: Text.ElideRight
+    }
+    Repeater {
+        model: root.preparationFace ? 2 : 0
+        Rectangle {
+            required property int index
+            width: 4
+            height: Math.max(0,root.height-12)
+            x: index===0 ? 6 : root.width-width-6
+            y: 6
+            color: root.pressed ? Colors.black : root.hovered ? Colors.orange : root.stateColor
+        }
     }
     Rectangle {
         x: 1; y: 1

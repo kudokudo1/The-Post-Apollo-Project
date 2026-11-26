@@ -6,7 +6,7 @@ function format(s, ink, white) {
     const text = String(s);
     const tokens = text.match(/(?:[A-Za-z]+|[0-9]+|\s+|[^A-Za-z0-9\s]+)/g) || [];
     return tokens.map(t => {
-        const neutral = /^(?:B|KiB|MiB|GiB|TiB|KB|MB|GB|TB|Hz|kHz|MHz|GHz|ms|s|ns|us|kB|MS|SEC|MIN|HRS|RPM|W|V|A|°C|°F)$/.test(t) || /^[^A-Za-z0-9\s]+$/.test(t);
+        const neutral = /^(?:B|KiB|MiB|GiB|TiB|KB|MB|GB|TB|Hz|kHz|MHz|GHz|ms|s|ns|us|kB|MS|SEC|MIN|HRS|RPM|INT|RPT|W|V|A|°C|°F)$/.test(t) || /^[^A-Za-z0-9\s]+$/.test(t);
         return '<font color="'+(neutral?white:ink)+'">'+escapeText(t)+'</font>';
     }).join("");
 }

@@ -587,8 +587,12 @@ ShellRoot {
                 dial.valueRequested(500);
                 const samplePlus=root.findItem(workshop,"cpuplusWorkshopStorage-sample-plus");
                 const reportMinus=root.findItem(workshop,"cpuplusWorkshopStorage-report-minus");
-                if (!root.check(samplePlus && samplePlus.available && reportMinus && reportMinus.available,
-                    "editable storage controls mounted")) return;
+                if (!root.check(!workshop.storageMechanical && samplePlus && samplePlus.visible && samplePlus.available
+                    && reportMinus && reportMinus.visible && reportMinus.available
+                    && String(samplePlus.accentColor).toLowerCase()==="#9ece6a"
+                    && String(reportMinus.accentColor).toLowerCase()==="#d16041"
+                    && samplePlus.width===samplePlus.height && samplePlus.height<19,
+                    "smallest storage stays digital with compact green plus and red minus")) return;
                 samplePlus.leftClicked(null);
                 reportMinus.leftClicked(null);
                 if (!root.check(workshop.draft.storageCadenceExplicit && workshop.draft.storageSampleSeconds===2
@@ -751,6 +755,12 @@ ShellRoot {
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);
+                if (!root.check(!workshop.preview.ok && workshop.draft.storageSampleSeconds===2,
+                    "shortening duration preserves explicit cadence and refuses invalid plan")) return;
+                workshop.chooseStorageCadence("sample",1);
+                workshop.chooseStorageCadence("report",10);
+                if (!root.check(workshop.preview.ok && workshop.draft.storageSampleSeconds===1 && workshop.draft.storageReportSeconds===10,
+                    "explicit recalibration enables short set capture")) return;
                 if (!root.check(CpuPlusDiagnostics.saveWorkshopPreset("QUICK A")
                     && CpuPlusDiagnostics.saveWorkshopPreset("QUICK B")
                     && CpuPlusDiagnostics.queueWorkshop("QUICK A")

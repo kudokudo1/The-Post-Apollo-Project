@@ -27,7 +27,7 @@ Column {
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
     readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(230,Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
     readonly property real storageDialScale: Math.max(0,Math.min(1,(storageWidth-16)/272,(instrumentHeight-23)/160))
-    readonly property bool storageMechanical: storageDialScale>=0.55
+    readonly property bool storageMechanical: width>=340 && storageDialScale>=0.55
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property int storageSample: draft.storageSampleSeconds || 1
@@ -326,7 +326,7 @@ Column {
                         CpuPlusMemoryReadout {
                             width: parent.width
                             text: parent.modelData.label
-                            color: Colors.blue
+                            color: parent.modelData.key==="sample" ? Colors.orange : Colors.magenta
                             font.pixelSize: root.compactLayout ? 9 : 11
                             horizontalAlignment: Text.AlignHCenter
                         }
@@ -338,15 +338,17 @@ Column {
                             readonly property string field: parent.modelData.key
                             readonly property int seconds: field==="sample" ? root.storageSample : root.storageReport
                             readonly property var countdown: root.countdown(field)
-                            readonly property real buttonSize: Math.min(height,Math.max(12,Math.floor((width-24)/2)))
+                            readonly property color selectorColor: field==="sample" ? Colors.orange : Colors.magenta
+                            readonly property real buttonSize: Math.min(height-4,Math.max(10,Math.floor((width-30)/2)))
                             ActionButton {
                                 objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-minus"
                                 width: cadenceRow.buttonSize
-                                height: cadenceRow.height
-                                accentColor: Colors.blue
+                                height: cadenceRow.buttonSize
+                                anchors.verticalCenter: parent.verticalCenter
+                                accentColor: Colors.red
                                 normalFace: true
                                 label: "−"
-                                labelPixelSize: 15
+                                labelPixelSize: Math.max(9,Math.min(13,height-2))
                                 contentPadding: 0
                                 acceptedButtons: Qt.LeftButton
                                 available: !root.locked && root.cadenceStep(cadenceRow.field,-1)!==null
@@ -360,8 +362,8 @@ Column {
                                 height: cadenceRow.height
                                 objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-clock"
                                 text: !root.storageRunning ? cadenceRow.seconds+" SEC" : !cadenceRow.countdown ? "WAIT" : (cadenceRow.countdown.remainingMs/1000).toFixed(1)+" SEC"
-                                color: cadenceRow.countdown && cadenceRow.countdown.flash ? Colors.white : Colors.blue
-                                semanticGlowColor: Colors.blue
+                                color: cadenceRow.countdown && cadenceRow.countdown.flash ? Colors.white : cadenceRow.selectorColor
+                                semanticGlowColor: cadenceRow.selectorColor
                                 font.pixelSize: root.compactLayout ? 12 : 16
                                 fontSizeMode: Text.HorizontalFit
                                 minimumPixelSize: 7
@@ -371,11 +373,12 @@ Column {
                             ActionButton {
                                 objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-plus"
                                 width: cadenceRow.buttonSize
-                                height: cadenceRow.height
-                                accentColor: Colors.blue
+                                height: cadenceRow.buttonSize
+                                anchors.verticalCenter: parent.verticalCenter
+                                accentColor: Colors.green
                                 normalFace: true
                                 label: "+"
-                                labelPixelSize: 15
+                                labelPixelSize: Math.max(9,Math.min(13,height-2))
                                 contentPadding: 0
                                 acceptedButtons: Qt.LeftButton
                                 available: !root.locked && root.cadenceStep(cadenceRow.field,1)!==null
@@ -393,12 +396,14 @@ Column {
                             Rectangle {
                                 width: parent.width*(cadenceRow.countdown ? cadenceRow.countdown.fraction : 0)
                                 height: parent.height
-                                color: cadenceRow.countdown && cadenceRow.countdown.flash ? Colors.white : Colors.blue
+                                color: cadenceRow.countdown && cadenceRow.countdown.flash ? Colors.white : cadenceRow.selectorColor
                             }
                         }
                     }
                 }
                 Row {
+                    id: storageDialPair
+                    readonly property Item workshopOwner: root
                     objectName: "cpuplusWorkshopStorageDialPair"
                     visible: root.storageMechanical
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -406,28 +411,32 @@ Column {
                     height: visible ? 160*root.storageDialScale : 0
                     spacing: 2
                     Repeater {
-                        model: [{key:"sample",label:"SAMPLE",max:5,marks:[0,1,2,3,4,5]},
-                                {key:"report",label:"REPORT",max:30,marks:[0,5,10,15,20,25,30]}]
+                        model: root.storageMechanical ? [{key:"sample",label:"SAMPLE",max:5,marks:[0,1,2,3,4,5]},
+                                {key:"report",label:"REPORT",max:30,marks:[0,5,10,15,20,25,30]}] : []
                         Item {
+                            id: storageDialCell
                             required property var modelData
+                            readonly property Item workshopOwner: storageDialPair.workshopOwner
+                            readonly property string field: modelData.key
+                            readonly property color selectorColor: field==="sample" ? Colors.orange : Colors.magenta
                             width: 136*root.storageDialScale
                             height: 160*root.storageDialScale
                             SelectorDial {
                                 id: storageDial
-                                objectName: "cpuplusWorkshopStorage-"+parent.modelData.key+"-dial"
+                                objectName: "cpuplusWorkshopStorage-"+storageDialCell.modelData.key+"-dial"
                                 anchors.centerIn: parent
-                                scale: root.storageDialScale
-                                readonly property string field: parent.modelData.key
-                                readonly property var countdown: root.countdown(field)
-                                labelText: parent.modelData.label
+                                scale: storageDialCell.workshopOwner ? storageDialCell.workshopOwner.storageDialScale : 0
+                                readonly property string field: storageDialCell.field
+                                readonly property var countdown: storageDialCell.workshopOwner ? storageDialCell.workshopOwner.countdown(field) : null
+                                labelText: storageDialCell.modelData.label
                                 selectorMode: "continuous"
                                 minimumValue: 0
-                                maximumValue: parent.modelData.max
-                                currentValue: root.storageRunning ? (countdown ? countdown.remainingMs/1000 : 0)
-                                    : field==="sample" ? root.storageSample : root.storageReport
-                                options: parent.modelData.marks.map(n=>String(n))
+                                maximumValue: storageDialCell.modelData.max
+                                currentValue: !storageDialCell.workshopOwner ? 0 : storageDialCell.workshopOwner.storageRunning ? (countdown ? countdown.remainingMs/1000 : 0)
+                                    : field==="sample" ? storageDialCell.workshopOwner.storageSample : storageDialCell.workshopOwner.storageReport
+                                options: storageDialCell.modelData.marks.map(n=>String(n))
                                 displayOptions: options
-                                numericReferenceValues: parent.modelData.marks
+                                numericReferenceValues: storageDialCell.modelData.marks
                                 valueStep: 1
                                 valueDecimals: 1
                                 numericDetentInterval: 1
@@ -437,18 +446,18 @@ Column {
                                 titlePixelSize: 15
                                 numericLabelPixelSize: 13
                                 readoutPixelSize: 18
-                                titleColor: Colors.blue
-                                accentColor: Colors.blue
-                                labelColor: Colors.blue
-                                markerColor: countdown && countdown.flash ? Colors.white : Colors.magenta
-                                activeDetentColor: Colors.magenta
+                                titleColor: storageDialCell.selectorColor
+                                accentColor: storageDialCell.selectorColor
+                                labelColor: storageDialCell.selectorColor
+                                markerColor: countdown && countdown.flash ? Colors.white : storageDialCell.selectorColor
+                                activeDetentColor: storageDialCell.selectorColor
                                 readoutGlowEnabled: true
-                                readoutColor: countdown && countdown.flash ? Colors.white : Colors.blue
-                                readoutText: root.storageRunning ? (countdown ? (countdown.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
-                                readoutUnit: root.storageRunning && !countdown ? "" : "SEC"
+                                readoutColor: countdown && countdown.flash ? Colors.white : storageDialCell.selectorColor
+                                readoutText: storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageRunning ? (countdown ? (countdown.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
+                                readoutUnit: storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageRunning && !countdown ? "" : "SEC"
                                 outlinedOptionLabels: true
-                                interactive: root.storageMechanical && !root.locked && root.draft.durationSeconds<=30
-                                onValueRequested: value=>root.chooseStorageCadence(field,value)
+                                interactive: !!storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageMechanical && !storageDialCell.workshopOwner.locked && storageDialCell.workshopOwner.draft.durationSeconds<=30
+                                onValueRequested: value=>{if (storageDialCell.workshopOwner) storageDialCell.workshopOwner.chooseStorageCadence(field,value)}
                             }
                         }
                     }
@@ -517,7 +526,8 @@ Column {
             }
         }
     }
-    GohuText {
+    CpuPlusMemoryReadout {
+        objectName: "cpuplusWorkshopCalibrationStatus"
         width: parent.width
         text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
             : root.ready ? "SECOND CLICK STARTS CAPTURE"

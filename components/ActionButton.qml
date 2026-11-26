@@ -520,24 +520,27 @@ Rectangle {
 
     // Only the perimeter is sampled, and the result is behind the opaque
     // parent face. No full-rectangle color source, no imperative state writes.
-    Rectangle {
+    Loader {
         id: normalPerimeter
         objectName: "actionButtonNormalPerimeter"
         anchors.fill: parent
         z: -1
-        color: "transparent"
-        border.width: 1
-        border.color: actionButton.activeBorderColor
-        visible: actionButton.normalFace && actionButton.perimeterGlowEnabled
-            && actionButton.perimeterGlowOpacity > 0 && actionButton.available
-        layer.enabled: visible
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: actionButton.contentGlowColor
-            shadowOpacity: actionButton.perimeterGlowOpacity
-            shadowBlur: 0.5
-            shadowHorizontalOffset: 0
-            shadowVerticalOffset: 0
+        active: actionButton.normalFace && actionButton.perimeterGlowEnabled
+            && actionButton.perimeterGlowOpacity > 0 && actionButton.available && actionButton.visible
+        visible: active
+        sourceComponent: Rectangle {
+            color: "transparent"
+            border.width: 1
+            border.color: actionButton.activeBorderColor
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: actionButton.contentGlowColor
+                shadowOpacity: actionButton.perimeterGlowOpacity
+                shadowBlur: 0.5
+                shadowHorizontalOffset: 0
+                shadowVerticalOffset: 0
+            }
         }
     }
 

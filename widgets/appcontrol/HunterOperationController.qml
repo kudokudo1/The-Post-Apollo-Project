@@ -20,6 +20,7 @@ QtObject {
         return rows.map(function(entry) {
             return {
                 pid: Number(entry.pid || 0),
+                startTicks: Number(entry.startTicks || 0),
                 name: String(entry.comm || entry.name || "PROCESS").trim(),
                 identity: host.taskPersistentIdentity(entry)
             };

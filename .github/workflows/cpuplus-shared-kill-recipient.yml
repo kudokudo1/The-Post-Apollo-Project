@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'widgets/CpuPlusW.qml'
+      - 'components/AnimatedTextCursor.qml'
       - 'widgets/cpuplus/CpuPlusKillWorkspace.qml'
       - 'widgets/appcontrol/TaskManagerView.qml'
       - 'widgets/AppControlW.qml'

@@ -520,13 +520,13 @@ function workflowEvidence(text, expected) {
         if (!d || d.schema!=="post-apollo-diagnostic-workflow-transport-v1"
                 || !["COLLECTED","NOT VERIFIED","CANCELLED"].includes(d.status)
                 || !int(d.durationSeconds,1,120) || !Array.isArray(d.instruments)
-                || d.instruments.length<2 || d.instruments.length>4
+                || d.instruments.length<2 || d.instruments.length>5
                 || !int(d.startedMonotonicMs,0,Number.MAX_SAFE_INTEGER)
                 || !int(d.finishedMonotonicMs,d.startedMonotonicMs,Number.MAX_SAFE_INTEGER)
                 || d.finishedMonotonicMs-d.startedMonotonicMs>145000) return null;
         if (expected && (expected.durationSeconds!==d.durationSeconds
                 || expected.instruments.length!==d.instruments.length)) return null;
-        const order=["threads","memory","census","storage"], seen=[], summaries=[];
+        const order=["threads","memory","census","storage","stall"], seen=[], summaries=[];
         let first=0,last=Number.MAX_SAFE_INTEGER, complete=0;
         const pin=d.pinnedQuickshell;
         for (let i=0;i<d.instruments.length;i++) {
@@ -535,10 +535,11 @@ function workflowEvidence(text, expected) {
                     || (seen.length && order.indexOf(kind)<=order.indexOf(seen[seen.length-1]))
                     || c.durationSeconds!==d.durationSeconds) return null;
             const keys=kind==="threads"?["kind","durationSeconds","intervalMs","topCount"]:
-                kind==="storage"?["kind","durationSeconds"]:["kind","durationSeconds","intervalMs"];
+                kind==="storage"?["kind","durationSeconds"]:kind==="stall"?["kind","durationSeconds","thresholdMs"]:["kind","durationSeconds","intervalMs"];
             if (Object.keys(c).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(c,k))) return null;
             if (expected && keys.some(k=>k!=="durationSeconds" && expected.instruments[i][k]!==c[k])) return null;
-            if (kind==="storage") { if (c.durationSeconds>30) return null; }
+            if (kind==="stall") { if (c.durationSeconds<5 || !int(c.thresholdMs,150,2000) || c.thresholdMs%50) return null; }
+            else if (kind==="storage") { if (c.durationSeconds>30) return null; }
             else {
                 if (!int(c.intervalMs,100,Math.min(60000,c.durationSeconds*1000))) return null;
                 const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
@@ -566,6 +567,23 @@ function workflowEvidence(text, expected) {
                     || !int(item.firstMonotonicMs,item.launchMonotonicMs,d.finishedMonotonicMs)
                     || !int(item.lastMonotonicMs,item.firstMonotonicMs,d.finishedMonotonicMs)
                     || !item.records.length || item.records.length>32) return null;
+            if (kind==="stall") {
+                if (item.records.length!==1 || item.payloadBytes>2048) return null;
+                const record=item.records[0], evidence=stallEvidence(JSON.stringify(record),c);
+                if (!evidence || record.witness.startedMonotonicMs!==item.firstMonotonicMs
+                        || record.witness.monotonicMs!==item.lastMonotonicMs
+                        || Math.abs(item.lastMonotonicMs-item.firstMonotonicMs-record.witness.elapsedMs)>2
+                        || JSON.stringify(record).length>24000) return null;
+                // Estimate common observed coverage from the witness endpoints;
+                // exclude 250ms at each edge for the accepted clock discrepancy.
+                const a=item.firstMonotonicMs+record.ticks[0]-record.witness.startWallMs+250;
+                const b=item.lastMonotonicMs-(record.witness.endWallMs-record.ticks[record.ticks.length-1])-250;
+                first=Math.max(first,a);
+                last=Math.min(last,b);
+                complete++;
+                summaries.push("STALL // "+evidence.gaps.length+" GAPS / MAX "+evidence.maxGapMs+" ms / THRESHOLD "+evidence.thresholdMs+" ms");
+                continue;
+            }
             const rows=item.records, end=rows[rows.length-1];
             if (!end || end.monotonicMs!==item.lastMonotonicMs
                     || Math.abs(item.lastMonotonicMs-item.firstMonotonicMs-end.observedMs)>2
@@ -643,4 +661,43 @@ function combineStall(witnessText,ticks,config) {
             ticks:ticks.filter(t=>t>=witness.startWallMs&&t<=witness.endWallMs)});
         return stallEvidence(text,config) ? text : null;
     } catch (_) { return null; }
+}
+
+
+// Attach the shell's heartbeat timestamps to the runner's clock witness.
+// The transport is not a COMPLETE stall result without this step.
+function attachWorkflowStall(text,expected,ticks,overflow) {
+    try {
+        if (typeof text!=="string" || text.length>300000 || !expected || !Array.isArray(expected.instruments)) return null;
+        const cfg=expected.instruments.find(c=>c.kind==="stall");
+        if (!cfg) return text;
+        const d=JSON.parse(text);
+        if (!d || d.schema!=="post-apollo-diagnostic-workflow-transport-v1"
+                || !["COLLECTED","NOT VERIFIED","CANCELLED"].includes(d.status)
+                || !Array.isArray(d.instruments)) return null;
+        const item=d.instruments.find(x=>x && x.config && x.config.kind==="stall");
+        if (!item) return null;
+        if (item.status==="COLLECTED") {
+            if (!Array.isArray(item.records) || item.records.length!==1 || item.records[0].schema!=="post-apollo-stall-clock-v1") return null;
+            const combined=!overflow && combineStall(JSON.stringify(item.records[0]),ticks,
+                Object.assign({},cfg,{durationSeconds:expected.durationSeconds}));
+            if (!combined) {
+                item.status="NOT VERIFIED";item.error="STALL COVERAGE OR CLOCK NOT VERIFIED";item.records=[];
+                delete item.firstMonotonicMs;delete item.lastMonotonicMs;
+            } else item.records=[JSON.parse(combined)];
+        }
+        const complete=d.instruments.every(x=>x.status==="COLLECTED");
+        let first=0,last=Number.MAX_SAFE_INTEGER;
+        if (complete) for (const x of d.instruments) {
+            if (x.config.kind==="stall") {
+                const s=x.records[0], w=s.witness;
+                first=Math.max(first,x.firstMonotonicMs+s.ticks[0]-w.startWallMs+250);
+                last=Math.min(last,x.lastMonotonicMs-(w.endWallMs-s.ticks[s.ticks.length-1])-250);
+            } else {first=Math.max(first,x.firstMonotonicMs);last=Math.min(last,x.lastMonotonicMs);}
+        }
+        d.overlapMs=complete?Math.max(0,last-first):null;
+        if (d.status!=="CANCELLED") d.status=complete&&d.overlapMs>0?"COLLECTED":"NOT VERIFIED";
+        const result=JSON.stringify(d).replace(/[^\x00-\x7f]/g,ch=>"\\u"+ch.charCodeAt(0).toString(16).padStart(4,"0"));
+        return workflowEvidence(result,expected)?result:null;
+    } catch (_) {return null;}
 }

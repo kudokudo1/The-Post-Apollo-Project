@@ -64,9 +64,19 @@ end=dict(tag,event="complete",samples=4,observedMs=2000)
 for entry in [start,row,row,row,row,end]: print(json.dumps(entry))
 """)
 
-    (scripts / "cpuplus_diagnostic_workflow.py").write_text("""import json,sys,time
+    shutil.copy2(ROOT / "scripts/cpuplus_diagnostic_workflow.py", scripts / "_real_workflow.py")
+    shutil.copy2(ROOT / "scripts/cpuplus_storage_observer.py", scripts / "cpuplus_storage_observer.py")
+    # The legacy fixture sampler emits fixed test data when executed. Import the
+    # real sampler under its original module name for the actual workflow child.
+    shutil.copy2(ROOT / "scripts/syntagma_quickshell_thread_sampler.py", scripts / "_real_thread_sampler.py")
+    (scripts / "_real_workflow.py").write_text((scripts / "_real_workflow.py").read_text().replace(
+        "from syntagma_quickshell_thread_sampler import", "from _real_thread_sampler import"))
+    (scripts / "cpuplus_diagnostic_workflow.py").write_text("""import json,sys,time,os,pathlib
 assert sys.argv[1]=="--plan" and sys.argv[3]=="--data-dir"
 plan=json.loads(sys.argv[2])
+if any(c["kind"]=="stall" for c in plan["instruments"]):
+    assert plan=={"durationSeconds":5,"instruments":[{"kind":"storage"},{"kind":"stall","thresholdMs":500}]}
+    os.execv(sys.executable,[sys.executable,"-B",str(pathlib.Path(__file__).with_name("_real_workflow.py")),*sys.argv[1:]])
 assert plan=={"durationSeconds":1,"instruments":[{"kind":"census","intervalMs":1000},{"kind":"storage"}]}
 time.sleep(.4)
 ids=["notifications.history","notifications.favorites","notifications.policies","notifications.scroll","weather.cache","weather.history","weather.events","weather.places","weather.dossier","hub.layout","hub.notes","hub.todo","social.identities","git.journal","git.delta","forest.preferences","finance.manual","company.hubs"]
@@ -94,7 +104,7 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                WAYLAND_DISPLAY="", DISPLAY="")
     result = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=35, check=False)
+                            stderr=subprocess.STDOUT, timeout=45, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

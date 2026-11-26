@@ -664,12 +664,22 @@ class ForestLauncherContract(unittest.TestCase):
             "signal indexRequested(int index)", "function indexFromHandleY(handleY)",
             "Math.round(fraction * (count - 1))",
             "function handleYForIndex(index)",
-            "width: 40", "height: 52", "width: 28",
+            "width: 40",
+            "property bool responsiveHardware: false",
+            "readonly property real hardwareThumbWidth: responsiveHardware ? Math.min(28, Math.max(10, Math.round(width*0.78))) : 28",
+            "readonly property real hardwareThumbLength: responsiveHardware ? Math.min(52, Math.max(22, Math.round(height*0.105))) : 52",
+            "width: slider.hardwareThumbWidth",
+            "height: slider.hardwareThumbLength",
             "color: dragArea.pressed ? Colors.yellow",
             "slider.handleGlowColor",
             "onWheel: function(wheel)",
         ):
             self.assertIn(source, selector)
+
+        # D4c-c (#2944) makes hardware sizing opt-in; existing consumers
+        # must retain the actual 28x52 default rather than a literal geometry.
+        for consumer in (view, git, hospital):
+            self.assertNotIn("responsiveHardware: true", consumer)
 
         # Legacy Git/Hospital sliders are unchanged at runtime: the
         # gradient overlay is disabled by default. Forest binds a live

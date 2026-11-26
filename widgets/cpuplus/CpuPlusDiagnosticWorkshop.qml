@@ -11,7 +11,7 @@ Column {
     spacing: 2
     property real viewportHeight: 0
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
-    readonly property int instrumentHeight: compactLayout ? 120 : 160
+    readonly property int instrumentHeight: compactLayout ? 120 : 176
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))

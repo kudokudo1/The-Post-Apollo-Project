@@ -148,8 +148,6 @@ Rectangle {
 
     // Primary action halo. AppControl commonly uses one rectangular halo.
     property bool softGlowEnabled: true
-    // Opt-in border-only halo: do not sample a filled rectangle behind the face.
-    property bool outlineOnlyGlow: false
     property real softGlowSpread: 3
     property real softGlowMargin: 0
 
@@ -521,28 +519,11 @@ Rectangle {
         z: -1
 
         visible:
-            actionButton.softGlowEnabled && !actionButton.outlineOnlyGlow
+            actionButton.softGlowEnabled
             && actionButton.effectiveSoftGlowOpacity > 0.0
 
         opacity: actionButton.effectiveSoftGlowOpacity
         color: actionButton.softGlowColor
-    }
-
-    // Transparent outline source, so the halo cannot wash the black face.
-    Rectangle {
-        anchors.fill: parent
-        color: "transparent"
-        border.width: 1
-        border.color: actionButton.activeBorderColor
-        visible: actionButton.outlineOnlyGlow && actionButton.effectiveSoftGlowOpacity > 0
-        z: 0
-        layer.enabled: visible
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: actionButton.softGlowColor
-            shadowOpacity: actionButton.effectiveSoftGlowOpacity
-            shadowBlur: 0.6
-        }
     }
 
     RectangularShadow {

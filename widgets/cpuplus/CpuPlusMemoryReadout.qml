@@ -7,6 +7,7 @@ Item {
     id: root
     property string text: ""
     property color color: Colors.cyan
+    property color semanticGlowColor: color===Colors.white ? Colors.cyan : color
     property alias font: face.font
     property alias wrapMode: face.wrapMode
     property alias horizontalAlignment: face.horizontalAlignment
@@ -28,7 +29,7 @@ Item {
         safeSource: root.visible ? face : null
         requestedVisible: root.visible
         foregroundColor: Colors.white
-        preferredGlowColor: root.color===Colors.white?Colors.cyan:root.color
+        preferredGlowColor: root.semanticGlowColor
         opacity: 0.95
     }
 }

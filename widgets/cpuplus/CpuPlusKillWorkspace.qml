@@ -69,6 +69,12 @@ Item {
     function keyOf(row) {
         return String(row.id || ("task:" + row.pid));
     }
+    function protectedProcessRisk(row) {
+        const reason = row && appControlWindow && appControlWindow.taskDangerReason
+            ? String(appControlWindow.taskDangerReason(row) || "") : "";
+        return "Changing a critical process can freeze the desktop, interrupt essential services, end your session or force a reboot. Unsaved work may be lost."
+            + (reason ? "\n" + reason : "");
+    }
     function isProtected(row) {
         // Read-only classification, identical to donor filter. Avoid a full
         // exact-row search for every row; mutations still require gate.exactRow.
@@ -666,16 +672,36 @@ Item {
             GohuText {
                 id: instrumentTitle
                 anchors.top: parent.top
-                anchors.topMargin: 14
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "PROCESS // TASK MANAGER"
+                anchors.left: parent.left
+                anchors.topMargin: 16
+                anchors.leftMargin: 16
+                text: "KILL // TASK MANAGER"
                 color: Colors.magenta
-                font.pixelSize: 12
+                font.pixelSize: 13
+            }
+            Rectangle {
+                id: instrumentHeaderLine
+                objectName: "cpuPlusKillHeaderDivider"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: instrumentTitle.bottom
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                anchors.topMargin: 6
+                height: 2
+                color: Colors.red
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.38
+                    color: parent.color
+                }
             }
             Item {
                 id: processIdentity
                 objectName: "cpuPlusProcessIdentity"
-                anchors.top: instrumentTitle.bottom
+                anchors.top: instrumentHeaderLine.bottom
                 anchors.topMargin: 7
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -746,13 +772,14 @@ Item {
             Item {
                 id: processStateHeader
                 objectName: "cpuPlusProcessStateHeader"
-                anchors.top: processIdentity.visible ? processIdentity.bottom : instrumentTitle.bottom
+                anchors.top: processIdentity.visible ? processIdentity.bottom : instrumentHeaderLine.bottom
                 anchors.topMargin: 4
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
-                height: Math.max(48, lockRail.implicitHeight + 7 - Math.max(0, processIdentity.height - 34))
+                // Reserve the full lock rail even when no individual locks are visible.
+                height: Math.max(48, lockRail.reservedHeight + 7 + 32 - processIdentity.height - 4)
                 visible: !!workspace.currentTask
                 GohuText {
                     anchors.left: parent.left
@@ -825,23 +852,24 @@ Item {
                 visible: !!workspace.currentTask
                 z: 2
                 readonly property bool protectedTarget: !!workspace.currentTask && workspace.isProtected(workspace.currentTask)
+                readonly property int reservedHeight: 3 * 23 + 3 * spacing + 22
                 Item {
                     id: killLockSlot
                     objectName: "cpuPlusProcessKillLockSlot"
                     width: parent.width; height: 23
-                    visible: lockRail.protectedTarget
+                    // Keep this slot in the layout; the loaded lock itself is conditional.
                 }
                 Item {
                     id: restartLockSlot
                     objectName: "cpuPlusProcessRestartLockSlot"
                     width: parent.width; height: 23
-                    visible: lockRail.protectedTarget
+                    // Keep this slot in the layout; the loaded lock itself is conditional.
                 }
                 Item {
                     id: freezeLockSlot
                     objectName: "cpuPlusProcessFreezeLockSlot"
                     width: parent.width; height: 23
-                    visible: lockRail.protectedTarget
+                    // Keep this slot in the layout; the loaded lock itself is conditional.
                 }
             ProcessInformationButton {
                 id: lockHelpButton
@@ -858,7 +886,7 @@ Item {
             Flickable {
                 id: actuatorScroll
                 objectName: "cpuPlusKillInstrumentViewport"
-                anchors.top: workspace.currentTask ? processStateHeader.bottom : instrumentTitle.bottom
+                anchors.top: workspace.currentTask ? processStateHeader.bottom : instrumentHeaderLine.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
@@ -957,8 +985,8 @@ Item {
                     id: limitLockSlot
                     objectName: "cpuPlusProcessLimitLockSlot"
                     width: parent.width
-                    height: childrenRect.height
-                    visible: height > 0
+                    height: 26
+                    visible: !!workspace.currentTask
                 }
                 Column {
                     id: leftActions
@@ -1008,10 +1036,15 @@ Item {
                     width: parent.width
                     visible: workspace.hasOwnedPending
                     wrapMode: Text.Wrap
+                    objectName: "cpuPlusProcessReviewWarning"
                     text: workspace.hasOwnedPending
                         ? ("CONFIRM " + String(workspace.gate.pending.action).toUpperCase()
                            + " FOR PID " + String(workspace.gate.pending.pid)
-                           + "\nNO COMMAND HAS BEEN SENT")
+                           + "\nNO COMMAND HAS BEEN SENT"
+                           + (workspace.isProtected(workspace.currentTask)
+                               ? "\nWARNING // PROTECTED PROCESS\n"
+                                 + workspace.protectedProcessRisk(workspace.currentTask)
+                               : ""))
                         : ""
                     color: Colors.red
                     font.pixelSize: 12
@@ -1106,12 +1139,66 @@ Item {
                         }
                     }
                     GohuText {
+                        objectName: "cpuPlusLockRiskHelp"
                         width: parent.width
-                        text: "Left click lock: one-shot • Right click: sticky. Magenta unlocks all actions. Red: kill; yellow: restart; cyan: freeze/thaw. Each individual lock works without the master. While master authorization is active it overrides individual locks. A small + or key marks a separate individual grant while the master is open. Closing the master clears individual grants. Limit has its own lock beside the slider. Dispatch is not proof of success."
+                        text: lockRail.protectedTarget
+                            ? "PROTECTED TARGET // These locks guard critical processes. Stopping or restarting one can disable the desktop, end your session or force a reboot."
+                            : "ORDINARY TARGET // No extra safety locks are required. Actions still require review and confirmation."
                         wrapMode: Text.Wrap
                         textFormat: Text.PlainText
-                        color: Colors.orange
+                        color: lockRail.protectedTarget ? Colors.red : Colors.white
                         font.pixelSize: 11
+                    }
+                    Rectangle { width: parent.width; height: 1; color: Colors.orange; opacity: 0.7 }
+                    Repeater {
+                        model: [
+                            { name: "MASTER", ink: Colors.magenta, detail: "Unlock all. Closing it clears every individual grant." },
+                            { name: "KILL", ink: Colors.red, detail: "Authorize ending this process." },
+                            { name: "RESTART", ink: Colors.yellow, detail: "Authorize restart only." },
+                            { name: "FREEZE / THAW", ink: Colors.cyan, detail: "Authorize pause or resume only." },
+                            { name: "LIMIT", ink: Colors.yellow, detail: "Separate lock beside the limit control." }
+                        ]
+                        delegate: Row {
+                            required property var modelData
+                            width: helpContent.width
+                            spacing: 6
+                            GohuText {
+                                width: Math.min(112, parent.width * 0.36)
+                                text: modelData.name
+                                color: modelData.ink
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            GohuText {
+                                width: Math.max(0, parent.width - 6 - Math.min(112, parent.width * 0.36))
+                                text: modelData.detail
+                                color: Colors.white
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                        }
+                    }
+                    Rectangle { width: parent.width; height: 1; color: Colors.orange; opacity: 0.7 }
+                    GohuText {
+                        width: parent.width
+                        text: "Left click lock: one-shot • Right click: sticky."
+                        color: Colors.yellow
+                        font.pixelSize: 11
+                        wrapMode: Text.Wrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Individual locks work independently. Master overrides them while open. A + or key marks an individual grant."
+                        color: Colors.white
+                        font.pixelSize: 11
+                        wrapMode: Text.Wrap
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "UNLOCK ≠ EXECUTE // Review and confirm. Dispatch is not proof of success."
+                        color: Colors.red
+                        font.pixelSize: 11
+                        wrapMode: Text.Wrap
                     }
                 }
             }

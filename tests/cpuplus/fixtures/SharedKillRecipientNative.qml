@@ -10,6 +10,7 @@ ShellRoot {
     property int phase: 0
     property int ticks: 0
     property bool done: false
+    property int previousRevision: 0
 
     QtObject {
         id: fakePresentation
@@ -40,10 +41,17 @@ ShellRoot {
             }
             return null;
         }
-        function isProtected(pid, ticks, name) { return false; }
-        function isUnlocked(pid, ticks, name, action) { return true; }
+        function isProtected(pid, ticks, name) { return !!exactRow(pid,ticks,name); }
+        function isUnlocked(pid, ticks, name, action) {
+            return !!exactRow(pid,ticks,name) && fakeOwner.taskDangerActionUnlockMode(
+                exactRow(pid,ticks,name),action)!=="";
+        }
         function currentLimitPercent(pid, ticks, name) { return 100; }
-        function toggleOneShotUnlock(pid, ticks, name) { return false; }
+        function toggleOneShotUnlock(pid, ticks, name) {
+            if (!exactRow(pid,ticks,name)) return false;
+            fakeOwner.masterMode=fakeOwner.masterMode ? "" : "once";
+            return true;
+        }
         function prepare(pid, ticks, name, action, percent) {
             if (pending || busy || !exactRow(pid,ticks,name))
                 return false;
@@ -74,12 +82,43 @@ ShellRoot {
         id: fakeOwner
         property var hubProcessActionGate: fakeGate
         property var taskRows: [{
-            _taskRecord: true, pid: 3442, startTicks: 967833,
+            id: "task:3442", _taskRecord: true, pid: 3442, startTicks: 967833,
             comm:"synthetic-worker", name:"synthetic-worker",
             cpu:12, mem:4, rss:23456, vsz:100000,
             threads:3, state:"S", ppid:1, elapsed:"00:55",
             user:"ci", args:"synthetic-worker --test"
         }]
+        property var taskMiniCpuHistories: ({"pid:3442":[2,5,12]})
+        property var taskMiniHunterMetricHistories: ({
+            "cpu:pid:3442":[2,5,12], "mem:pid:3442":[20,21,23],
+            "io:pid:3442":[0,1,2], "age:pid:3442":[0.5,0.7,0.9],
+            "combined:pid:3442":[2,6,14]})
+        property int taskMiniDisplayRevision: 1
+        property var favoriteStore: QtObject { property var favoriteKeys: [] }
+        property bool destructiveConfirmOpen: false
+        property string masterMode: ""
+        property var actionModes: ({})
+        function taskRequiresDangerUnlock(row) { return !!row; }
+        function taskDangerUnlockMode(row) { return masterMode; }
+        function taskDangerActionUnlockMode(row,action) {
+            return masterMode || String(actionModes[action] || "");
+        }
+        function toggleTaskDangerStickyUnlock(row) {
+            masterMode=masterMode==="sticky"?"":"sticky";
+        }
+        function toggleTaskDangerActionStickyUnlock(row,action) {
+            let next=Object.assign({},actionModes);
+            next[action]=next[action]==="sticky"?"":"sticky";
+            actionModes=next;
+        }
+        function toggleTaskDangerActionUnlock(row,action) {
+            let next=Object.assign({},actionModes);
+            next[action]=next[action]?"":"once";
+            actionModes=next;
+        }
+        function taskFavoriteKey(row) { return "task|"+row.comm; }
+        function taskSimplePurpose(row) { return "Synthetic purpose"; }
+        function monitorResultIcon(row) { return "(╭ರ_•́)"; }
         property bool menuOpen: false
         property int selectedModeIndex: 0
         readonly property int killModeIndex: 7
@@ -135,9 +174,8 @@ ShellRoot {
             if (!view || view.width <= 0) return;
             const detail = smoke.find(view,"cpuPlusKillSharedTaskView");
             const targets = smoke.find(view,"cpuPlusKillLiveTargets");
-            // The final phase deliberately removes the one synthetic row.
             if (!detail || !targets
-                    || (smoke.phase < 4 && targets.count !== 1)) {
+                    || (smoke.phase === 0 && targets.count !== 1)) {
                 if (smoke.ticks > 12) {
                     smoke.check(false, "mount incomplete: loader="
                         + String(scene.status) + " view=" + (!!view)
@@ -157,10 +195,84 @@ ShellRoot {
                 return;
             }
             if (smoke.phase === 1) {
-                if (!smoke.check(view.currentTask
-                    && view.currentTask.pid===3442
-                    && detail.visible, "shared detail mounting"))
-                    return;
+                const header=smoke.find(view,"cpuPlusProcessIdentity");
+                const master=smoke.find(view,"cpuPlusProcessMasterLock");
+                const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
+                const search=smoke.find(view,"cpuPlusKillSearch");
+                const hunter=smoke.find(view,"cpuPlusSharedHunterControls");
+                if (!smoke.check(view.currentTask && view.currentTask.pid===3442
+                    && detail.visible && header && header.visible
+                    && master && master.visible && actionTarget
+                    && detail.restartAction.parent===actionTarget
+                    && detail.endAction.parent===actionTarget
+                    && search && hunter
+                    && smoke.find(view,"cpuPlusKillTargetScroll")
+                    && smoke.find(view,"cpuPlusKillDetailScroll"),
+                    "shared detail, identity, controls, scrollbar mounting")) return;
+                if (!smoke.check(view.toggleLock(view.currentTask,"limit",false)
+                    && view.lockMode(view.currentTask,"limit")==="once"
+                    && view.toggleLock(view.currentTask,"limit",true)
+                    && view.lockMode(view.currentTask,"limit")==="sticky"
+                    && view.toggleLock(view.currentTask,"",false)
+                    && master.mode==="once"
+                    && view.toggleLock(view.currentTask,"",true)
+                    && master.mode==="sticky", "three real owner lock states")) return;
+                view.toggleTaskFavorite(view.currentTask);
+                if (!smoke.check(view.isTaskFavorite(view.currentTask)
+                    && fakeOwner.favoriteStore.favoriteKeys[0]==="task|synthetic-worker",
+                    "shared favorite identity")) return;
+                const initial=detail.cpuCanvas.graphRevision;
+                fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,mem:7})];
+                smoke.previousRevision=initial;
+                smoke.phase=10;
+                return;
+            }
+            if (smoke.phase===10) {
+                if (!smoke.check(detail.cpuCanvas.graphRevision>smoke.previousRevision,
+                    "new owner sample repaints shared detail")) return;
+                const revision=detail.cpuCanvas.graphRevision;
+                view.selectTarget(view.currentTask);
+                if (!smoke.check(detail.cpuCanvas.graphRevision===revision,
+                    "hover same target does not reset graph")) return;
+                const search=smoke.find(view,"cpuPlusKillSearch");
+                search.text="not-present";
+                smoke.phase=11;
+                return;
+            }
+            if (smoke.phase===11) {
+                if (!smoke.check(targets.count===0,"search filters actual live model")) return;
+                smoke.find(view,"cpuPlusKillSearch").text="synthetic";
+                view.setKillViewMode(view.killViewHunter);
+                view.setHunterVisibilityMode(view.hunterVisibilityAll);
+                // view requests are serialized, so explicitly switch after first settles
+                smoke.phase=12;
+                return;
+            }
+            if (smoke.phase===12) {
+                if (view.modelBlank) return;
+                if (view.killViewMode!==view.killViewHunter) {
+                    view.setKillViewMode(view.killViewHunter); return;
+                }
+                if (view.hunterVisibilityMode!==view.hunterVisibilityAll) {
+                    view.setHunterVisibilityMode(view.hunterVisibilityAll); return;
+                }
+                if (!smoke.check(targets.count===1
+                    && view.hunterMetricMode===view.hunterMetricCombined,
+                    "shared Hunter / COMBI / ALL filters")) return;
+                view.setHunterVisibilityMode(view.hunterVisibilityTargets);
+                smoke.phase=13;
+                return;
+            }
+            if (smoke.phase===13) {
+                if (view.modelBlank) return;
+                if (!smoke.check(targets.count===0,"protected row excluded by TARGETS")) return;
+                view.setHunterVisibilityMode(view.hunterVisibilityProtected);
+                smoke.phase=14;
+                return;
+            }
+            if (smoke.phase===14) {
+                if (view.modelBlank) return;
+                if (!smoke.check(targets.count===1,"PROTECTED filter uses owner policy")) return;
                 if (!smoke.check(view.prepareAction("end")
                     && fakeGate.preparations===1
                     && fakeGate.confirmations===0

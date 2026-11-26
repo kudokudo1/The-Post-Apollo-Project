@@ -115,6 +115,7 @@ Column {
                 {kind:"census",symbol:"",subject:"CPU"},
                 {kind:"storage",symbol:"",subject:"STORAGE"}]
             ActionButton {
+                id: instrumentFilter
                 required property var modelData
                 objectName: "cpuplusWorkshopInstrument-"+modelData.kind
                 width: 32
@@ -131,7 +132,20 @@ Column {
                 selectedContentGlowColor: accentColor
                 selectedSoftGlowColor: accentColor
                 contentGlowSelectedOpacity: 0.95
-                outlineOnlyGlow: true
+                // U9g / Angels: deterministic opaque face, no filled shadow layers.
+                color: Colors.black
+                softGlowEnabled: false
+                wideGlowEnabled: false
+                contentGlowEnabled: true
+                pressedForegroundColor: Colors.magenta
+                Rectangle {
+                    anchors.fill: parent
+                    color: "transparent"
+                    border.width: 1
+                    border.color: instrumentFilter.activeBorderColor
+                    opacity: 0.48
+                    visible: instrumentFilter.selected || instrumentFilter.hovered || instrumentFilter.pressed
+                }
                 available: !root.locked
                 acceptedButtons: Qt.LeftButton
                 Accessible.name: modelData.kind.toUpperCase()

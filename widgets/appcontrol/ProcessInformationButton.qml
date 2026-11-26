@@ -10,7 +10,7 @@ ActionButton {
     contentPadding: 2
     accentColor: Colors.yellow
     idleForegroundColor: Colors.white
-    hoverForegroundColor: Colors.white
+    hoverForegroundColor: Colors.orange
     selectedForegroundColor: Colors.magenta
     idleContentGlowColor: Colors.yellow
     hoverContentGlowColor: Colors.yellow

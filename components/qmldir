@@ -3,6 +3,7 @@ module qs.components
 singleton Colors 1.0 Colors.qml
 singleton GohuFont 1.0 GohuFont.qml
 GohuText 1.0 GohuText.qml
+AnimatedTextCursor 1.0 AnimatedTextCursor.qml
 NotoText 1.0 NotoText.qml
 ConversationFeed 1.0 ConversationFeed.qml
 SelectorDial 1.0 SelectorDial.qml

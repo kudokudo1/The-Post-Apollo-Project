@@ -22,6 +22,7 @@ Item {
     property double selectedStartTicks: 0
     property string selectedComm: ""
     property bool locallyPending: false
+    property var ownedPendingRef: null
     property int stagedLimitPercent: -1
 
     function matchingRow() {
@@ -39,15 +40,19 @@ Item {
     readonly property bool exactTargetAvailable: !!gate && !!currentTask
         && !!gate.exactRow(selectedPid, selectedStartTicks, selectedComm)
     readonly property bool hasOwnedPending: !!gate && locallyPending
-        && !!gate.pending && !gate.busy
+        && !!ownedPendingRef && gate.pending === ownedPendingRef && !gate.busy
 
     function cancelOwned() {
-        if (gate && locallyPending && gate.pending && !gate.busy)
+        if (gate && locallyPending && ownedPendingRef
+                && gate.pending === ownedPendingRef && !gate.busy)
             gate.cancel();
         locallyPending = false;
+        ownedPendingRef = null;
     }
 
     function selectTarget(row) {
+        if (locallyPending && gate && gate.busy)
+            return false; // No silent switch during a submitted request.
         if (locallyPending) cancelOwned();
         stagedLimitPercent = -1;
         history.resetDetailHistories();
@@ -85,7 +90,10 @@ Item {
             Number(row.pid), Number(row.startTicks), String(row.comm),
             action, action === "limit" ? Number(percent) : 0
         );
-        if (ok) locallyPending = true;
+        if (ok) {
+            ownedPendingRef = gate.pending;
+            locallyPending = !!ownedPendingRef;
+        }
         return !!ok;
     }
 
@@ -124,8 +132,11 @@ Item {
     Connections {
         target: workspace.gate
         function onPendingChanged() {
-            if (workspace.gate && !workspace.gate.pending)
+            if (workspace.gate
+                    && workspace.gate.pending !== workspace.ownedPendingRef) {
                 workspace.locallyPending = false;
+                workspace.ownedPendingRef = null;
+            }
         }
     }
 

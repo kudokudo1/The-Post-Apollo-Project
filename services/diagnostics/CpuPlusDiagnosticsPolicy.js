@@ -677,6 +677,11 @@ function attachWorkflowStall(text,expected,ticks,overflow) {
                 || !Array.isArray(d.instruments)) return null;
         const item=d.instruments.find(x=>x && x.config && x.config.kind==="stall");
         if (!item) return null;
+        const allTransport=d.instruments.every(x=>x && x.status==="COLLECTED");
+        const transportOverlap=allTransport?Math.max(0,Math.min(...d.instruments.map(x=>x.lastMonotonicMs))
+            -Math.max(...d.instruments.map(x=>x.firstMonotonicMs))):null;
+        if (d.overlapMs!==transportOverlap || (d.status==="COLLECTED" && !(allTransport&&transportOverlap>0))
+                || (d.status==="NOT VERIFIED" && allTransport&&transportOverlap>0)) return null;
         if (item.status==="COLLECTED") {
             if (!Array.isArray(item.records) || item.records.length!==1 || item.records[0].schema!=="post-apollo-stall-clock-v1") return null;
             const combined=!overflow && combineStall(JSON.stringify(item.records[0]),ticks,

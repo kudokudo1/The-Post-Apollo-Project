@@ -1020,7 +1020,7 @@ Rectangle {
                             width: parent.width
                             label: "LOAD BODY"
                             enabledAction: root.hasTarget && root.pullRequestBodyAvailable
-                                && !root.lifecycleService.busy && !root.factsBusy
+                                && !root.lifecycleService.busy && !root.factsBusy && !root.factsError
                             onTriggered: {
                                 root.clearArm();
                                 bodyEditRow.originalBody = root.pullRequestBody;
@@ -1036,7 +1036,7 @@ Rectangle {
                                 : "SET BODY"
                             accent: Colors.cyan
                             enabledAction: root.hasTarget && bodyEditRow.changed
-                                && bodyEditRow.current && !root.lifecycleService.busy && !root.factsBusy
+                                && bodyEditRow.current && !root.lifecycleService.busy && !root.factsBusy && !root.factsError
                             onTriggered: root.armOrRun("body", function() {
                                 root.startLifecycleAction("body", function() {
                                     return root.lifecycleService.editPullRequest(

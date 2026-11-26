@@ -27,6 +27,7 @@ def validate_record(record):
             or len(record["id"]) > 128 or not ID.fullmatch(record["id"])
             or len(record["summary"]) > 4096
             or len(record["text"]) > (300000 if record["kind"] == "workflow" else 65536)
+            or (record["kind"] == "workflow" and not record["text"].isascii() and record["text"] != "")
             or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", record["finishedAt"])):
         raise ValueError("record values")
     datetime.datetime.fromisoformat(record["finishedAt"].replace("Z", "+00:00"))

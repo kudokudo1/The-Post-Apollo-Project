@@ -108,7 +108,8 @@ ShellRoot {
         function prepareCpuBulkReview(kind,metric,visibility) {
             if (cpuBulkReview || cpuBulkOperation) return null;
             cpuBulkReview={kind:kind,metric:metric,visibility:visibility,label:"FAKE",
-                targets:[{pid:3442,startTicks:967833,name:"synthetic-worker"}]};
+                targets:Array.from({length:kind==="kill-all"?120:1},(_,i)=>(
+                    {pid:3442+i,startTicks:967833+i,name:"synthetic-worker-"+i}))};
             return cpuBulkReview;
         }
         function cancelCpuBulkReview(review) {
@@ -341,27 +342,64 @@ ShellRoot {
                 if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
                     "prepare before process removal")) return;
                 smoke.lastRow = fakeOwner.taskRows[0];
-            fakeOwner.taskRows = [];
+                fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }
-            if (!smoke.check(!view.currentTask && !view.exactTargetAvailable
-                && !view.prepareAction("end") && !view.hasOwnedPending
-                && fakeGate.pending===null && fakeGate.cancels===2
-                && fakeGate.confirmations===1, "stale selection refusal and owned review cancelled"))
+            if (smoke.phase===4) {
+                if (!smoke.check(!view.currentTask && !view.exactTargetAvailable
+                    && !view.prepareAction("end") && !view.hasOwnedPending
+                    && fakeGate.pending===null && fakeGate.cancels===2
+                    && fakeGate.confirmations===1,"stale selection refusal and owned review cancelled")) return;
+                fakeOwner.taskRows=[smoke.lastRow];
+                if (!smoke.check(view.requestKillAllEligibleTasks() && view.hasBulkReview
+                    && fakeOwner.bulkConfirmed===0 && view.bulkReview.targets.length===120,
+                    "long capture opens review without execution")) return;
+                smoke.phase=5;
                 return;
-            fakeOwner.taskRows = [smoke.lastRow];
-            if (!smoke.check(view.requestKillHogs() && view.hasBulkReview
-                    && fakeOwner.bulkConfirmed===0
+            }
+            if (smoke.phase===5) {
+                const panel=smoke.find(view,"cpuPlusBulkReview");
+                const scroll=smoke.find(view,"cpuPlusBulkReviewScroll");
+                const confirm=smoke.find(view,"cpuPlusBulkConfirm");
+                const cancel=smoke.find(view,"cpuPlusBulkCancel");
+                const single=smoke.find(view,"cpuPlusSingleActuatorBody");
+                if (!smoke.check(panel && panel.visible && scroll && scroll.contentHeight>scroll.height
+                    && confirm && confirm.visible && cancel && cancel.visible
+                    && single && !single.visible && !single.enabled,
+                    "long review has independent scroll and hides single actuators")) return;
+                const before=confirm.mapToItem(panel,0,0).y;
+                scroll.contentY=scroll.contentHeight-scroll.height;
+                if (!smoke.check(before===confirm.mapToItem(panel,0,0).y
+                    && before>=0 && before+confirm.height<=panel.height,
+                    "confirmation remains in viewport after scrolling")) return;
+                view.active=false;
+                if (!smoke.check(fakeOwner.bulkCancelled===1 && !view.hasBulkReview
+                    && fakeOwner.bulkConfirmed===0,"closing unsent review cancels only owned capture")) return;
+                view.active=true;
+                if (!smoke.check(view.requestKillHogs() && view.hasBulkReview
                     && fakeOwner.cpuBulkReview.metric===view.hunterMetricMode,
-                    "bulk click prepares only, uses recipient metric")) return;
-            view.cancelBulk();
-            if (!smoke.check(fakeOwner.bulkCancelled===1 && !view.hasBulkReview
-                    && fakeOwner.bulkConfirmed===0,"bulk cancellation sends no command")) return;
-            if (!smoke.check(view.requestKillMice() && view.confirmBulk()
+                    "bulk review uses recipient metric")) return;
+                view.cancelBulk();
+                if (!smoke.check(fakeOwner.bulkCancelled===2 && !view.hasBulkReview
+                    && fakeOwner.bulkConfirmed===0,"explicit cancel sends no command")) return;
+                if (!smoke.check(view.requestKillMice() && view.confirmBulk()
                     && fakeOwner.bulkConfirmed===1 && view.bulkOperation
                     && !view.hasBulkReview && !view.confirmBulk(),
                     "bulk review consumed once, progress remains owner-owned")) return;
+                view.active=false;
+                if (!smoke.check(fakeOwner.cpuBulkOperation && fakeOwner.bulkConfirmed===1,
+                    "closing submitted operation does not cancel owner")) return;
+                view.active=true;
+                fakeOwner.hunterOperationPhase="report";
+                fakeOwner.cpuBulkMessage="SYNTHETIC REPORT";
+                smoke.phase=6;
+                return;
+            }
+            if (!smoke.check(smoke.find(view,"cpuPlusBulkCancel").visible
+                    && !smoke.find(view,"cpuPlusBulkConfirm").visible
+                    && view.bulkOperation && fakeOwner.acknowledgeCpuBulkReport(),
+                    "reopened report permits acknowledgement only")) return;
             console.log("CPU_KILL_NATIVE_PASS");
             smoke.done = true;
             Qt.quit();

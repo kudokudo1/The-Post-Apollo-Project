@@ -24,7 +24,7 @@ ActionButton {
         Colors.black.b*(1-washStrength)+stateColor.b*washStrength,1)
     softGlowEnabled: !preparationFace
     wideGlowEnabled: !preparationFace && redActionFace
-    washSafePerimeter: true
+    washSafePerimeter: preparationFace || (!redActionFace && !wideGlowEnabled)
     accentColor: stateColor
     showLabel: false
     acceptedButtons: Qt.LeftButton

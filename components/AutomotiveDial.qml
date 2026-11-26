@@ -26,6 +26,7 @@ Item {
     property string valueText: "0"
     property string valueUnit: ""
     property string setText: ""
+    property string compactSetText: setText
     property real scaleMinimum: 0
     property real scaleMaximum: 5
     readonly property string resolvedArmStyle: ["tapered","industrial","capsule"].includes(armStyle) ? armStyle : "tapered"
@@ -40,9 +41,9 @@ Item {
     // percentage. Both readout frames fit inside the innermost visible ring.
     function insetWindow(lower) {
         const u=faceUnit, r=insetRadius;
-        const inner=Math.ceil(Math.max(4,17*u)+1.5);
+        const inner=Math.ceil(Math.max(4,17*u)+1);
         const available=Math.max(0,r-inner-1);
-        const h=Math.max(0,Math.floor(Math.min(available,lower?Math.max(12,actualFaceDiameter*0.12):Math.max(13,actualFaceDiameter*0.20))));
+        const h=Math.max(0,Math.floor(Math.min(available,lower?Math.max(12,actualFaceDiameter*0.12):Math.max(12,actualFaceDiameter*0.17))));
         const outer=inner+h;
         const cut=Math.min(Math.floor(h/3),Math.max(2,Math.round(h*0.18)));
         const chord=y=>Math.sqrt(Math.max(0,r*r-y*y));
@@ -277,10 +278,12 @@ Item {
             }
             GohuText {
                 objectName: "automotiveSetText"
-                anchors.fill: parent; anchors.margins: 2
+                anchors.fill: parent; anchors.leftMargin: 2; anchors.rightMargin: 2
+                anchors.topMargin: 1; anchors.bottomMargin: 1
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
-                text: root.setText; textFormat: Text.RichText; color: root.accentColor
+                text: root.detailTier==="small"||root.detailTier==="compact" ? root.compactSetText : root.setText
+                textFormat: Text.RichText; color: root.accentColor
                 font.pixelSize: Math.max(9,Math.round(face.width*0.09))
                 fontSizeMode: Text.Fit; minimumPixelSize: 8
                 elide: Text.ElideRight

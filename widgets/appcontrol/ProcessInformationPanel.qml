@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import "../../components"
 
-// Read-only information overlay. It does not own selection or authorize actions.
+// Read-only information overlay. Selection and action authority remain host-owned.
 Rectangle {
     id: root
     property var task: null
@@ -11,74 +11,137 @@ Rectangle {
     property string virtualMemory: "?"
     property bool contextActive: false
     property bool open: false
+    // Host supplies the FULL usable side-panel height, excluding its fixed chrome.
     property real maximumHeight: 0
+    property int sizeLevel: 0
+    readonly property real availableHeight: Math.max(0, maximumHeight)
+    readonly property int inset: 7
+    readonly property int gap: 6
+    readonly property real scopeNeed: Math.max(0, scopeValue.implicitHeight)
+    readonly property real argumentsNeed: Math.max(0, argumentsValue.implicitHeight)
+    readonly property real scopeMinimum: Math.min(36, scopeNeed)
+    readonly property real argumentsMinimum: Math.min(28, argumentsNeed)
+    // Only the two variable-length bodies consume flexible space. Titles, purpose
+    // and technical fields remain stationary at every supported panel size.
+    readonly property real fixedHeight: 2 * inset + header.height + 5 * gap
+        + identity.implicitHeight + purposeBlock.implicitHeight
+        + technicalBlock.implicitHeight + scopeFrame.chromeHeight + argumentsFrame.chromeHeight
+    readonly property real naturalHeight: fixedHeight + scopeNeed + argumentsNeed
+    readonly property real minimumReadableHeight: fixedHeight + scopeMinimum + argumentsMinimum
+    readonly property real flexibleBudget: Math.max(0, height - fixedHeight)
+    readonly property real baseNeed: scopeMinimum + argumentsMinimum
+    readonly property real extraNeed: Math.max(0, scopeNeed + argumentsNeed - baseNeed)
+    readonly property real baseFraction: baseNeed > 0 ? Math.min(1, flexibleBudget / baseNeed) : 0
+    readonly property real extraFraction: extraNeed > 0
+        ? Math.min(1, Math.max(0, flexibleBudget - baseNeed) / extraNeed) : 0
+    readonly property real scopeAllocation: scopeMinimum * baseFraction
+        + (scopeNeed - scopeMinimum) * extraFraction
+    readonly property real argumentsAllocation: argumentsMinimum * baseFraction
+        + (argumentsNeed - argumentsMinimum) * extraFraction
     readonly property string targetIdentity: task
         ? String(task.pid || 0) + "|" + String(task.startTicks || 0) + "|" + String(task.comm || "")
         : ""
+
     onTargetIdentityChanged: open = false
     onContextActiveChanged: if (!contextActive) open = false
-    onOpenChanged: if (open) body.contentY = 0
+    onOpenChanged: if (open) {
+        sizeLevel = 0
+        scopeScroll.contentY = 0
+        argumentsScroll.contentY = 0
+    }
+
+    function resizeBy(delta) {
+        sizeLevel = Math.max(0, Math.min(2, sizeLevel + delta))
+    }
+    // Like the CAP readout, semantic text is colored, punctuation and unit
+    // suffixes are white. Escape even process-supplied metadata before markup.
+    function semanticText(value, ink) {
+        const tokens = String(value).match(/(?:[A-Za-z0-9]+|\s+|[^A-Za-z0-9\s]+)/g) || []
+        return tokens.map(function(token) {
+            const neutral = /^(?:B|KiB|MiB|GiB|TiB|KB|MB|GB|TB|Hz|kHz|MHz|GHz|ms|s|ns|us|kB)$/.test(token)
+                || /^[^A-Za-z0-9\s]+$/.test(token)
+            const safe = token.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+            return '<font color="' + (neutral ? Colors.white : ink) + '">' + safe + '</font>'
+        }).join("")
+    }
 
     visible: contextActive && open && !!task && height > 0
-    height: Math.max(0, Math.min(maximumHeight, contents.implicitHeight + header.height + 22))
+    // Compact fits its content when possible; upper/full are actual viewport
+    // escalations, not merely larger caps on the same natural document height.
+    height: Math.max(0, Math.min(availableHeight,
+        sizeLevel === 2 ? availableHeight
+        : sizeLevel === 1 ? Math.max(minimumReadableHeight, availableHeight * 0.78)
+        : Math.max(minimumReadableHeight, Math.min(naturalHeight, availableHeight * 0.55))))
     color: Colors.black
     border.color: Colors.cyan
     border.width: 1
     clip: true
     z: 400
 
-    MouseArea { anchors.fill: parent }
-    Row {
-        id: header
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 7
-        height: 26
-        spacing: 5
-        GohuText {
-            width: Math.max(0, parent.width - close.width - parent.spacing)
-            height: parent.height
-            text: "PROCESS // INFORMATION"
-            color: Colors.cyan
-            font.pixelSize: 12
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-        }
-        CloseButton {
-            id: close
-            objectName: "processInformationClose"
-            width: 26
-            height: 26
-            onCloseRequested: root.open = false
-        }
+    MouseArea {
+        anchors.fill: parent
+        onWheel: function(wheel) { wheel.accepted = true }
     }
-    Flickable {
-        id: body
-        objectName: "processInformationScroll"
-        anchors.top: header.bottom
-        anchors.bottom: parent.bottom
+    Column {
+        anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.margins: 7
-        anchors.rightMargin: 18
-        contentWidth: width
-        contentHeight: contents.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        flickableDirection: Flickable.VerticalFlick
-        Column {
-            id: contents
-            width: body.width
-            spacing: 8
+        anchors.margins: root.inset
+        spacing: root.gap
+        Row {
+            id: header
+            width: parent.width
+            height: 26
+            spacing: 4
             GohuText {
-                width: parent.width
-                text: root.task ? String(root.task.comm || "PROCESS") + " // PID " + String(root.task.pid || "?") : ""
-                textFormat: Text.PlainText
-                color: Colors.orange
-                font.pixelSize: 13
-                wrapMode: Text.WrapAnywhere
+                width: Math.max(0, parent.width - shrink.width - grow.width - close.width - 3 * parent.spacing)
+                height: parent.height
+                text: root.semanticText("PROCESS // INFORMATION", Colors.cyan)
+                textFormat: Text.RichText
+                color: Colors.cyan
+                font.pixelSize: 12
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
             }
+            ResizeButton {
+                id: shrink
+                objectName: "processInformationShrink"
+                width: 26
+                direction: "down"
+                available: root.sizeLevel > 0
+                onResizeRequested: delta => root.resizeBy(delta)
+            }
+            ResizeButton {
+                id: grow
+                objectName: "processInformationGrow"
+                width: 26
+                direction: "up"
+                available: root.sizeLevel < 2
+                onResizeRequested: delta => root.resizeBy(delta)
+            }
+            CloseButton {
+                id: close
+                objectName: "processInformationClose"
+                width: 26
+                height: 26
+                onCloseRequested: root.open = false
+            }
+        }
+        GohuText {
+            id: identity
+            width: parent.width
+            text: root.task ? root.semanticText(String(root.task.comm || "PROCESS")
+                + " // PID " + String(root.task.pid || "?"), Colors.orange) : ""
+            textFormat: Text.RichText
+            color: Colors.orange
+            font.pixelSize: 13
+            wrapMode: Text.WrapAnywhere
+        }
+        Column {
+            id: purposeBlock
+            width: parent.width
+            spacing: 3
             GohuText {
                 width: parent.width
                 text: "PROCESS PURPOSE"
@@ -94,99 +157,163 @@ Rectangle {
                 color: Colors.white
                 font.pixelSize: 12
             }
-            Rectangle {
-                objectName: "processInformationScope"
-                width: parent.width
-                height: scopeContents.implicitHeight + 14
-                color: Colors.black
-                border.color: Colors.cyan
-                Column {
-                    id: scopeContents
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: 7
-                    spacing: 5
-                    GohuText {
-                        width: parent.width
-                        text: "PROCESS SCOPE // LIMIT = THIS PROCESS"
-                        wrapMode: Text.Wrap
-                        color: Colors.cyan
-                        font.pixelSize: 11
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: root.scopeText || "NO LIVE PROCESS SCOPE FOUND"
-                        textFormat: Text.PlainText
-                        wrapMode: Text.Wrap
-                        color: Colors.white
-                        font.pixelSize: 11
-                    }
+        }
+        Rectangle {
+            id: scopeFrame
+            objectName: "processInformationScope"
+            width: parent.width
+            readonly property real chromeHeight: scopeTitle.implicitHeight + 15
+            height: chromeHeight + root.scopeAllocation
+            color: Colors.black
+            border.color: Colors.cyan
+            clip: true
+            GohuText {
+                id: scopeTitle
+                x: 7
+                y: 5
+                width: Math.max(0, parent.width - 14)
+                text: root.semanticText("PROCESS SCOPE // LIMIT = THIS PROCESS", Colors.cyan)
+                textFormat: Text.RichText
+                wrapMode: Text.Wrap
+                color: Colors.cyan
+                font.pixelSize: 11
+            }
+            Flickable {
+                id: scopeScroll
+                objectName: "processInformationScopeScroll"
+                anchors.top: scopeTitle.bottom
+                anchors.topMargin: 3
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 7
+                anchors.left: parent.left
+                anchors.leftMargin: 7
+                anchors.right: parent.right
+                anchors.rightMargin: 19
+                contentWidth: width
+                contentHeight: scopeValue.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                interactive: contentHeight > height
+                onHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+                onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+                GohuText {
+                    id: scopeValue
+                    width: scopeScroll.width
+                    text: root.scopeText || "NO LIVE PROCESS SCOPE FOUND"
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WrapAnywhere
+                    color: Colors.white
+                    font.pixelSize: 11
                 }
             }
+            NeonScrollBar {
+                objectName: "processInformationScopeRail"
+                flickable: scopeScroll
+                geometryMode: "box"
+                geometryHost: scopeFrame
+                visible: scrollable
+                railColor: Colors.cyan
+                handleColor: Colors.magenta
+                wheelEnabled: false
+            }
+        }
+        Column {
+            id: technicalBlock
+            width: parent.width
+            spacing: 3
             GohuText {
                 width: parent.width
                 text: "TECHNICAL INFORMATION"
                 color: Colors.magenta
                 font.pixelSize: 12
             }
-            GridLayout {
-                width: parent.width
-                columns: 2
-                columnSpacing: 8
-                rowSpacing: 4
-                Repeater {
-                    model: [
-                        ["USER", root.task ? String(root.task.user || "?") : "?"],
-                        ["PPID", root.task ? String(root.task.ppid || "?") : "?"],
-                        ["VIRT", root.virtualMemory],
-                        ["STATE", root.task ? String(root.task.state || "?") : "?"]
-                    ]
-                    delegate: RowLayout {
-                        required property var modelData
-                        Layout.columnSpan: 2
+            Repeater {
+                model: [
+                    ["USER", root.task ? String(root.task.user || "?") : "?", Colors.cyan],
+                    ["PPID", root.task ? String(root.task.ppid || "?") : "?", Colors.orange],
+                    ["VIRT", root.virtualMemory, Colors.magenta],
+                    ["STATE", root.task ? String(root.task.state || "?") : "?", Colors.cyan]
+                ]
+                delegate: RowLayout {
+                    required property var modelData
+                    width: technicalBlock.width
+                    spacing: 8
+                    GohuText {
+                        Layout.preferredWidth: 64
+                        text: modelData[0]
+                        color: modelData[2]
+                        font.pixelSize: 11
+                    }
+                    GohuText {
                         Layout.fillWidth: true
-                        GohuText {
-                            Layout.preferredWidth: 64
-                            text: modelData[0]
-                            color: Colors.cyan
-                            font.pixelSize: 11
-                        }
-                        GohuText {
-                            Layout.fillWidth: true
-                            text: modelData[1]
-                            textFormat: Text.PlainText
-                            wrapMode: Text.WrapAnywhere
-                            color: Colors.white
-                            font.pixelSize: 11
-                        }
+                        text: root.semanticText(modelData[1], modelData[2])
+                        textFormat: Text.RichText
+                        wrapMode: Text.WrapAnywhere
+                        color: modelData[2]
+                        font.pixelSize: 11
                     }
                 }
             }
+        }
+        Rectangle {
+            id: argumentsFrame
+            objectName: "processInformationCommandFrame"
+            width: parent.width
+            readonly property real chromeHeight: argumentsTitle.implicitHeight + 15
+            height: chromeHeight + root.argumentsAllocation
+            color: Colors.black
+            border.color: Colors.magenta
+            clip: true
             GohuText {
-                width: parent.width
+                id: argumentsTitle
+                x: 7
+                y: 5
+                width: Math.max(0, parent.width - 14)
                 text: "COMMAND LINE"
                 color: Colors.magenta
                 font.pixelSize: 11
             }
-            GohuText {
-                objectName: "processInformationArguments"
-                width: parent.width
-                text: root.task ? String(root.task.args || "") : ""
-                textFormat: Text.PlainText
-                wrapMode: Text.WrapAnywhere
-                font.pixelSize: 10
-                color: Colors.white
-                opacity: 0.72
+            Flickable {
+                id: argumentsScroll
+                objectName: "processInformationArgumentsScroll"
+                anchors.top: argumentsTitle.bottom
+                anchors.topMargin: 3
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 7
+                anchors.left: parent.left
+                anchors.leftMargin: 7
+                anchors.right: parent.right
+                anchors.rightMargin: 19
+                contentWidth: width
+                contentHeight: argumentsValue.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                interactive: contentHeight > height
+                onHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+                onContentHeightChanged: contentY = Math.max(0, Math.min(contentY, contentHeight - height))
+                GohuText {
+                    id: argumentsValue
+                    objectName: "processInformationArguments"
+                    width: argumentsScroll.width
+                    text: root.task ? String(root.task.args || "") : ""
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WrapAnywhere
+                    font.pixelSize: 10
+                    color: Colors.white
+                }
+            }
+            NeonScrollBar {
+                objectName: "processInformationArgumentsRail"
+                flickable: argumentsScroll
+                geometryMode: "box"
+                geometryHost: argumentsFrame
+                visible: scrollable
+                railColor: Colors.magenta
+                handleColor: Colors.magenta
+                wheelEnabled: false
             }
         }
-    }
-    NeonScrollBar {
-        flickable: body
-        geometryMode: "viewport"
-        visible: scrollable
-        railColor: Colors.cyan
-        handleColor: Colors.magenta
-        wheelEnabled: false
     }
 }

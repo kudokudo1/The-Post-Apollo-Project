@@ -321,3 +321,8 @@ test("P4h: stable instrument reserves and protected review guidance",()=>{
     assert.match(recipient,/NO COMMAND HAS BEEN SENT/);
     assert.match(recipient,/workspace.gate.confirm\(\)/);
 });
+
+test("KILL startup: RectangularShadow has its required QtQuick.Effects import", () => {
+    assert.match(recipient, /^import QtQuick\.Effects$/m);
+    assert.match(recipient, /RectangularShadow\s*\{/);
+});

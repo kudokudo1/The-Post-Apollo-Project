@@ -25,7 +25,9 @@ Column {
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
-    readonly property real storageWidth: lowerInstrumentCount===3 ? Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24)) : lowerInstrumentWidth
+    readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(230,Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
+    readonly property real storageDialScale: Math.max(0,Math.min(1,(storageWidth-16)/272,(instrumentHeight-23)/160))
+    readonly property bool storageMechanical: storageDialScale>=0.55
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property int storageSample: draft.storageSampleSeconds || 1
@@ -85,9 +87,13 @@ Column {
         return Calibration.storageCadenceStep(draft.durationSeconds,storageSample,storageReport,field,direction);
     }
     function changeStorageCadence(field,direction) {
-        if (locked || !draft.selected.includes("storage")) return;
-        const pair=cadenceStep(field,direction);
-        if (!pair) return;
+        applyStorageCadence(cadenceStep(field,direction));
+    }
+    function chooseStorageCadence(field,value) {
+        applyStorageCadence(Calibration.storageCadenceChoice(draft.durationSeconds,storageSample,storageReport,field,value));
+    }
+    function applyStorageCadence(pair) {
+        if (locked || !draft.selected.includes("storage") || !pair) return;
         disarm();
         CpuPlusDiagnostics.workshopDraft=Object.assign({},draft,{
             storageCadenceExplicit:true,storageSampleSeconds:pair.sampleSeconds,storageReportSeconds:pair.reportSeconds});
@@ -303,6 +309,7 @@ Column {
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: root.lowerInstrumentCount===3 ? "STORAGE" : "STORAGE // METADATA"
+                    visible: !root.storageMechanical
                     color: Colors.blue
                     font.pixelSize: 11
                     horizontalAlignment: Text.AlignHCenter
@@ -313,6 +320,7 @@ Column {
                     model: [{key:"sample",label:"SAMPLE"},{key:"report",label:"REPORT"}]
                     Column {
                         required property var modelData
+                        visible: !root.storageMechanical
                         width: storageContents.width
                         spacing: 1
                         CpuPlusMemoryReadout {
@@ -390,6 +398,61 @@ Column {
                         }
                     }
                 }
+                Row {
+                    objectName: "cpuplusWorkshopStorageDialPair"
+                    visible: root.storageMechanical
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: visible ? 272*root.storageDialScale+2 : 0
+                    height: visible ? 160*root.storageDialScale : 0
+                    spacing: 2
+                    Repeater {
+                        model: [{key:"sample",label:"SAMPLE",max:5,marks:[0,1,2,3,4,5]},
+                                {key:"report",label:"REPORT",max:30,marks:[0,5,10,15,20,25,30]}]
+                        Item {
+                            required property var modelData
+                            width: 136*root.storageDialScale
+                            height: 160*root.storageDialScale
+                            SelectorDial {
+                                id: storageDial
+                                objectName: "cpuplusWorkshopStorage-"+parent.modelData.key+"-dial"
+                                anchors.centerIn: parent
+                                scale: root.storageDialScale
+                                readonly property string field: parent.modelData.key
+                                readonly property var countdown: root.countdown(field)
+                                labelText: parent.modelData.label
+                                selectorMode: "continuous"
+                                minimumValue: 0
+                                maximumValue: parent.modelData.max
+                                currentValue: root.storageRunning ? (countdown ? countdown.remainingMs/1000 : 0)
+                                    : field==="sample" ? root.storageSample : root.storageReport
+                                options: parent.modelData.marks.map(n=>String(n))
+                                displayOptions: options
+                                numericReferenceValues: parent.modelData.marks
+                                valueStep: 1
+                                valueDecimals: 1
+                                numericDetentInterval: 1
+                                numericDetentOrigin: 0
+                                showNumericDetentTicks: true
+                                snapContinuousToStep: true
+                                titlePixelSize: 15
+                                numericLabelPixelSize: 13
+                                readoutPixelSize: 18
+                                titleColor: Colors.blue
+                                accentColor: Colors.blue
+                                labelColor: Colors.blue
+                                markerColor: countdown && countdown.flash ? Colors.white : Colors.magenta
+                                activeDetentColor: Colors.magenta
+                                readoutGlowEnabled: true
+                                readoutColor: countdown && countdown.flash ? Colors.white : Colors.blue
+                                readoutText: root.storageRunning ? (countdown ? (countdown.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
+                                readoutUnit: root.storageRunning && !countdown ? "" : "SEC"
+                                outlinedOptionLabels: true
+                                interactive: root.storageMechanical && !root.locked && root.draft.durationSeconds<=30
+                                onValueRequested: value=>root.chooseStorageCadence(field,value)
+                            }
+                        }
+                    }
+                }
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: root.storageRunning ? (CpuPlusDiagnostics.storageProgressFault ? "CLOCK UNVERIFIED" : !CpuPlusDiagnostics.storageProgress ? "WAIT FOR CLOCK" : CpuPlusDiagnostics.storageProgress.tick+" INT / "+CpuPlusDiagnostics.storageProgress.reports+" RPT") : root.storagePreview.ok ? root.storagePreview.intervals+" INT / "+root.storagePreview.observations+" RPT" : "CHECK CADENCE"
@@ -402,7 +465,7 @@ Column {
                 GohuText {
                     width: parent.width
                     text: "FINAL INCLUDED"
-                    visible: !root.compactLayout
+                    visible: !root.compactLayout && !root.storageMechanical
                     color: Colors.white
                     font.pixelSize: 8
                     fontSizeMode: Text.HorizontalFit

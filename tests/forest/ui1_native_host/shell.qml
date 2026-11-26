@@ -53,6 +53,70 @@ ShellRoot {
         }
         return null;
     }
+    // S2a: identify the actual unchanged host rail without a shipping test ID.
+    // Constrain discovery to siblings of the known chat pane; never select
+    // a candidate by its expected width or position.
+    function directTextCount(item, value) {
+        let count = 0;
+        for (const child of item.children) {
+            if (typeof child.text === "string" && child.text === value) ++count;
+        }
+        return count;
+    }
+    function captureChatRail(result) {
+        if (!result.chat || !result.chat.parent) {
+            check(false, "missing actual rail parent");
+            return;
+        }
+        const siblings = result.chat.parent.children;
+        const rails = [], trees = [];
+        const heading = "TREES // " + String(forest.treeSlots.length).padStart(2, "0");
+        for (const item of siblings) {
+            if (item !== result.chat && typeof item.hostConnected === "boolean"
+                    && typeof item.treeKey === "string"
+                    && Array.isArray(item.sessions) && Array.isArray(item.visibleSessions))
+                rails.push(item);
+            if (directTextCount(item, heading) === 1) trees.push(item);
+        }
+        check(rails.length === 1 && trees.length === 1, "ambiguous actual rail/tree");
+        if (failed) return;
+        result.chatRail = rails[0];
+        result.treePane = trees[0];
+        const headers = [];
+        for (const child of result.chatRail.children) {
+            if (directTextCount(child, "CHATS // 00") === 1
+                    && directTextCount(child, "CHAT HOST OFFLINE") === 1)
+                headers.push(child);
+        }
+        check(headers.length === 1, "missing or ambiguous actual CHATS header");
+        if (!failed) result.chatRailHeader = headers[0];
+    }
+    function chatRailGeometry() {
+        const a = parts, rail = a.chatRail, tree = a.treePane;
+        const expected = forest.frameWidth >= 800 ? 184 : forest.frameWidth >= 680 ? 148 : 0;
+        check(rail.parent === a.chat.parent && tree.parent === a.chat.parent
+            && rail !== tree && rail !== a.chat && tree !== a.chat, "actual rail parent");
+        check(rail.width === expected && rail.visible === (expected > 0),
+            "actual rail width/visibility");
+        check(tree.x === 0 && tree.width > 0 && tree.width === forest.sideWidth
+            && rail.x === tree.x + tree.width && a.chat.x === rail.x + rail.width
+            && a.chat.x + a.chat.width === a.chat.parent.width
+            && tree.y === rail.y && rail.y === a.chat.y
+            && tree.height === rail.height && rail.height === a.chat.height
+            && a.chat.width > 0 && a.chat.height > 0, "actual Tree/rail/chat adjacency");
+        check(a.pane.width > 0 && a.pane.height > 0 && a.prompt.width > 0
+            && a.prompt.height > 0 && a.pane.x >= 0 && a.pane.y >= 0
+            && a.pane.x + a.pane.width <= a.chat.width
+            && a.pane.y + a.pane.height <= a.chat.height
+            && a.prompt.x >= 0 && a.prompt.y >= 0
+            && a.prompt.x + a.prompt.width <= a.chat.width
+            && a.prompt.y + a.prompt.height <= a.chat.height, "rail workspace/prompt bounds");
+        check(!rail.hostConnected && rail.sessions.length === 0
+            && rail.visibleSessions.length === 0 && rail.treeKey === forest.activeTree.sessionKey
+            && directTextCount(a.chatRailHeader, "CHATS // 00") === 1
+            && directTextCount(a.chatRailHeader, "CHAT HOST OFFLINE") === 1,
+            "actual disconnected CHATS state");
+    }
     function capture() {
         const names = {
             chat: "forestChatPane", heading: "forestChatHeading",
@@ -67,11 +131,13 @@ ShellRoot {
             result[key] = find(forest.contentItem, names[key]);
             if (!result[key]) check(false, "missing actual host item " + names[key]);
         }
+        if (!failed) captureChatRail(result);
         parts = result;
         return !failed;
     }
     function geometry(active) {
         const a = parts;
+        chatRailGeometry();
         check(a.pane.y >= a.heading.y + a.heading.height, "heading overlap");
         check(a.pane.y + a.pane.height <= a.prompt.y, "prompt overlap");
         check(a.pane.x + a.pane.width <= a.rail.x, "reasoning rail overlap");
@@ -862,6 +928,11 @@ ShellRoot {
                 break;
             case 1:
                 witness.geometry(false);
+                if (witness.failed) return;
+                // One measured baseline per private output, independent of
+                // the existing phase counters. Geometry also runs on resizes.
+                console.info("FOREST_HOST_CHAT_RAIL_BASELINE_PASS " + forest.frameWidth
+                    + " " + parts.chatRail.width + " " + (parts.chatRail.visible ? 1 : 0));
                 if (!witness.collectSeasonRows()) return;
                 witness.seasonRows=[];
                 console.info("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS");

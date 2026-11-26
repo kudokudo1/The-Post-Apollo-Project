@@ -142,7 +142,8 @@ def trial(width, height, count):
                      "capability_registry_b6r2.py", "runtime_stop_control_r2.py", "local_terminal_outbox_b4f.py"):
             shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
-        for relative in ("widgets/ForestW.qml", "widgets/forest/ui2/PublicConversationFixture.qml",
+        for relative in ("widgets/ForestW.qml", "widgets/ForestChatList.qml",
+                         "widgets/forest/ui2/PublicConversationFixture.qml",
                          "widgets/forest/ui2/PublicPreviewGate.qml",
                          "widgets/forest/ui2/PublicRestorationReview.qml",
                          "widgets/forest/ui2/PublicDormantTaskSelector.qml",
@@ -203,6 +204,16 @@ def trial(width, height, count):
                        for line in output.splitlines() if "FOREST_HOST_DORMANT_PHASE_PASS " in line]
             season = [line.split("FOREST_HOST_SEASON_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_SEASON_PHASE_PASS " in line]
+            rail = [line.split("FOREST_HOST_CHAT_RAIL_BASELINE_PASS ", 1)[1].strip()
+                    for line in output.splitlines() if "FOREST_HOST_CHAT_RAIL_BASELINE_PASS " in line]
+            if len(rail) != 1:
+                raise AssertionError("FOREST_HOST_CHAT_RAIL_BASELINE_MISSING_OR_DUPLICATE")
+            frame_width, rail_width, rail_visible = map(int, rail[0].split())
+            expected_rail = {1366: 184, 770: 148, 420: 0}[width]
+            if (not 0 < frame_width <= width or
+                    rail_width != expected_rail or rail_visible != int(expected_rail > 0) or
+                    rail_width != (184 if frame_width >= 800 else 148 if frame_width >= 680 else 0)):
+                raise AssertionError("FOREST_HOST_CHAT_RAIL_BASELINE_MISMATCH")
             if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
                     season != ([str(i) for i in range(9)] if width >= 770 else []) or
                     output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

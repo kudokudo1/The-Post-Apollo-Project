@@ -288,5 +288,5 @@ console.log("DIAG D3b compact Workshop and contextual controls PASS");
 assert.match(workshop,/readoutColor: Colors.cyan/);
 assert.match(workshop,/interactionGlowColor: Colors.magenta/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorageInstrument"/);
-assert.match(workshop,/outlineOnlyGlow: true/);
+assert.match(workshop,/color: Colors.black\s+softGlowEnabled: false\s+wideGlowEnabled: false/);
 assert.match(workshop,/text: "FIXED CADENCE"/);

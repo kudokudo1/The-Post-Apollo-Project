@@ -50,7 +50,9 @@ function prepare(record) {
 // behavior exactly, including the handling of zero and absent source modes.
 function buildStatic(records) {
     const rows = [];
-    const seen = Object.create(null);
+    // Preserve the donor's legacy truthy-prototype key behavior exactly.
+    // Any deduplication hardening is a separate, reviewed behavior change.
+    const seen = ({});
     const input = records || [];
     for (let i = 0; i < input.length; i++) {
         const record = prepare(input[i]);

@@ -323,3 +323,8 @@ const clockFinal=policyCtx.storageLiveProgress(clockLine(3,2,5000),clockCfg,cloc
 assert.ok(clockFinal);
 assert.equal(policyCtx.storageCountdown(clockFinal,"sample",6000).finished,true);
 console.log("DIAG D5c-a live countdown evidence contracts PASS");
+
+assert.deepEqual(plain(ctx.storageCadenceChoice(30,1,10,"sample",3)),{sampleSeconds:3,reportSeconds:9});
+assert.deepEqual(plain(ctx.storageCadenceChoice(30,2,10,"report",7)),{sampleSeconds:2,reportSeconds:6});
+assert.equal(ctx.storageCadenceChoice(31,1,10,"sample",3),null);
+console.log("DIAG D5c-a responsive mechanical cadence choices PASS");

@@ -253,3 +253,23 @@ assert.equal(policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,w
 assert.equal(policy.combineAppControl(jsonl(acRows),acModes,detailedOpen,false,work,Array(257).fill(moreWork[0])),null);
 assert.deepEqual(JSON.parse(JSON.stringify(policy.appControlMetrics(ac).work)),{});
 assert.match(policy.summarize("appcontrol",more),/APP \/ EVENT-LOOP-GAP/);
+
+const workshop=read("widgets/cpuplus/CpuPlusDiagnosticWorkshop.qml");
+const workshopSlider=read("widgets/cpuplus/CpuPlusDiagnosticSlider.qml");
+const executionFace=read("widgets/cpuplus/CpuPlusDiagnosticExecutionButton.qml");
+assert.match(ui,/sourceComponent: CpuPlusDiagnosticWorkshop\s*\{/);
+assert.match(workshopSlider,/SelectorSlider\s*\{/);
+assert.match(workshopSlider,/rotation: 90/);
+assert.match(workshopSlider,/horizontalStepPresentation: true/);
+assert.match(workshopSlider,/property color subjectColor: Colors.white/);
+assert.match(workshopSlider,/property color fillColor: Colors.omnitrix/);
+assert.match(workshop,/SelectorDial\s*\{/);
+assert.match(workshop,/markerColor: Colors.magenta/);
+assert.match(workshop,/Colors.resourceColor\(modelData.subject\)/);
+assert.match(workshop,/if \(ready\) \{[\s\S]*?requestWorkshopCapture\(frozen\)/);
+assert.match(workshop,/onPlanTextChanged: disarm\(\)/);
+assert.match(workshop,/running: root.visible && root.recording && !CpuPlusDiagnostics.cancelled/);
+assert.match(executionFace,/phase === "COMPLETE" \? Colors.omnitrix/);
+assert.match(owner,/property var workshopDraft:/);
+assert.doesNotMatch(workshop,/Process\s*\{|Component.onCompleted/);
+console.log("DIAG D3a canonical Workshop instrument and explicit activation contracts PASS");

@@ -376,3 +376,11 @@ assert.match(read("widgets/cpuplus/CpuPlusMemoryReadout.js"),/\|INT\|RPT\|/);
 assert.match(executionFace,/washStrength: 0.24/);
 assert.match(executionFace,/idleFillColor: preparationFace \? steadyWashColor : Colors.dark/);
 assert.doesNotMatch(executionFace,/model: root.preparationFace/);
+
+const stopwatchDialSource=read("components/SelectorDial.qml");
+assert.match(stopwatchDialSource,/property bool stopwatchFace: false/);
+assert.match(stopwatchDialSource,/model: dialRoot.stopwatchFace \? 0 : dialRoot.optionCount\(\)/);
+assert.match(stopwatchDialSource,/objectName: "selectorStopwatchCenter"/);
+assert.match(stopwatchDialSource,/stopwatchLitSegments: Math.ceil\(30\*stopwatchVisualFraction\)/);
+assert.equal((workshop.match(/stopwatchFace: true/g)||[]).length,2);
+assert.equal((workshop.match(/stopwatchFraction: stopwatch \? stopwatch.fraction : -1/g)||[]).length,2);

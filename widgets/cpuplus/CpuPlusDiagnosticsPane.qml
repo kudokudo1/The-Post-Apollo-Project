@@ -15,6 +15,8 @@ Column {
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
     property string viewMode: "WORK"
+    signal navigationChanged()
+    onViewModeChanged: navigationChanged()
     readonly property bool workshopOpen: viewMode === "WORK"
     function consumeReportView() {
         if (!CpuPlusDiagnostics.pendingReportView) return;
@@ -271,24 +273,11 @@ Column {
         property string mixerPage: "LIBRARY"
         property string armedQueue: ""
         onVisibleChanged: if (!visible) {deleteName="";armedQueue="";}
-        onMixerPageChanged: {deleteName="";armedQueue="";}
+        onMixerPageChanged: {deleteName="";armedQueue="";root.navigationChanged();}
         Connections {
             target: CpuPlusDiagnostics
             function onWorkshopQueueChanged() {presets.armedQueue="";}
             function onWorkshopPresetLockedChanged() {if(CpuPlusDiagnostics.workshopPresetLocked)presets.armedQueue="";}
-        }
-        Row {
-            width: parent.width; spacing: 3
-            Repeater {
-                model: ["LIBRARY","QUEUE","SETS"]
-                ActionButton {
-                    required property string modelData
-                    width: Math.floor((presets.width-6)/3);height: 25
-                    label: modelData;normalFace: true
-                    selected: presets.mixerPage===modelData
-                    onLeftClicked: presets.mixerPage=modelData
-                }
-            }
         }
         GohuText {
             width: parent.width
@@ -550,8 +539,18 @@ Column {
             width: parent.width; color: Colors.yellow; font.pixelSize: 10;wrapMode:Text.Wrap
             text: CpuPlusDiagnostics.setFeedback+" // SESSION ONLY"
         }
+        GohuText {
+            width: parent.width; color: Colors.magenta; font.pixelSize: 11
+            visible: presets.mixerPage==="RESULTS"
+            text: "SET RESULTS // LAST RUN"
+        }
+        GohuText {
+            width: parent.width; color: Colors.cyan; font.pixelSize: 10;wrapMode:Text.Wrap
+            visible: presets.mixerPage==="RESULTS" && CpuPlusDiagnostics.setRunResults.length===0
+            text: CpuPlusDiagnostics.setActive ? "WAITING FOR FIRST STEP" : "NO SET RESULTS YET"
+        }
         Repeater {
-            model: CpuPlusDiagnostics.setRunResults
+            model: presets.mixerPage==="RESULTS" ? CpuPlusDiagnostics.setRunResults : []
             GohuText {
                 required property var modelData
                 width: presets.width; font.pixelSize:10; elide:Text.ElideRight
@@ -567,6 +566,104 @@ Column {
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap
+    }
+    // Actions belong to the contextual body, not the invariant navigation footer.
+    Column {
+        objectName: "cpuplusDiagnosticReportActions"
+        width: parent.width
+        visible: ["REPORT","HISTORY","COMPARE"].includes(root.viewMode)
+        spacing: 3
+        Row {
+            id: reportRail
+            visible: root.viewMode === "REPORT"
+            width: parent.width
+            spacing: 3
+            Repeater {
+                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall"]
+                delegate: ActionButton {
+                    required property string modelData
+                    width: Math.max(0, Math.floor((reportRail.width - 21) / 8))
+                    height: 27
+                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : modelData === "stall" ? "STALL" : "STORE"
+                    labelPixelSize: 9
+                    labelFontSizeMode: Text.HorizontalFit
+                    labelMinimumPixelSize: 8
+                    contentPadding: 2
+                    selected: root.selectedReport === modelData
+                    onLeftClicked: {
+                        CpuPlusDiagnostics.selectLatest(modelData);
+                        root.showReport = false;
+                    }
+                }
+            }
+        }
+        Row {
+            id: reportActions
+            visible: root.viewMode === "REPORT"
+            width: parent.width
+            spacing: 3
+            ActionButton {
+                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                height: 26
+                available: root.report !== null && root.report.text.length > 0
+                label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
+                onLeftClicked: root.showReport = !root.showReport
+            }
+            ActionButton {
+                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                height: 26
+                available: root.showReport && root.report !== null && root.report.text.length > 0
+                label: "COPY REPORT"
+                onLeftClicked: {
+                    reportText.selectAll();
+                    reportText.copy();
+                    reportText.deselect();
+                }
+            }
+        }
+        Row {
+            id: historyActions
+            visible: root.viewMode === "HISTORY" || root.viewMode === "COMPARE"
+            width: parent.width
+            spacing: 3
+            ActionButton {
+                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
+                height: 26
+                label: "RELOAD ARCHIVE"
+                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy
+                onLeftClicked: CpuPlusDiagnostics.loadHistory()
+            }
+            ActionButton {
+                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
+                height: 26
+                label: root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE"
+                labelFontSizeMode: Text.HorizontalFit
+                labelMinimumPixelSize: 8
+                contentPadding: 2
+                available: true
+                onLeftClicked: root.selectView(root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE")
+            }
+        }
+        Row {
+            id: compareRail
+            visible: root.viewMode === "COMPARE"
+            width: parent.width
+            spacing: 4
+            ActionButton {
+                width: Math.max(0, (compareRail.width - 4) / 2)
+                height: 26
+                label: "SET BEFORE"
+                available: root.canChooseComparison
+                onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
+            }
+            ActionButton {
+                width: Math.max(0, (compareRail.width - 4) / 2)
+                height: 26
+                label: "SET AFTER"
+                available: root.canChooseComparison
+                onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
+            }
+        }
     }
     GohuText {
         width: parent.width
@@ -848,13 +945,17 @@ Column {
         objectName: "cpuplusDiagBottomControls"
         width: parent.width
         spacing: 3
+        height: 53
         Row {
             id: diagnosticIndex
-            visible: root.viewMode !== "PRESETS"
+            objectName: "cpuplusDiagnosticContextRail"
+            height: 25
             width: parent.width
             spacing: 3
             Repeater {
-                model: [{key:"QUICK",label:"QUICK"},
+                model: root.viewMode==="PRESETS" ? [{key:"LIBRARY",label:"LIBRARY"},
+                        {key:"QUEUE",label:"QUEUE"},{key:"SETS",label:"SETS"},{key:"RESULTS",label:"RESULTS"}]
+                    : [{key:"QUICK",label:"QUICK"},
                         {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
                         {key:"COMPARE",label:"CMP"}]
                 ActionButton {
@@ -868,104 +969,45 @@ Column {
                     labelPixelSize: 10
                     labelFontSizeMode: Text.HorizontalFit
                     contentPadding: 1
-                    selected: root.viewMode===modelData.key
+                    selected: root.viewMode==="PRESETS" ? presets.mixerPage===modelData.key : root.viewMode===modelData.key
                     selectedBorderColor: Colors.magenta
                     selectedForegroundColor: Colors.magenta
                     normalFace: true
                     acceptedButtons: Qt.LeftButton
-                    onLeftClicked: root.selectView(modelData.key)
-                }
-            }
-        }
-        Row {
-            id: reportRail
-            visible: root.viewMode === "REPORT"
-            width: parent.width
-            spacing: 3
-            Repeater {
-                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall"]
-                delegate: ActionButton {
-                    required property string modelData
-                    width: Math.max(0, Math.floor((reportRail.width - 21) / 8))
-                    height: 27
-                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : modelData === "stall" ? "STALL" : "STORE"
-                    labelPixelSize: 9
-                    labelFontSizeMode: Text.HorizontalFit
-                    labelMinimumPixelSize: 8
-                    contentPadding: 2
-                    selected: root.selectedReport === modelData
+                    keyboardActivationSignal: "leftClicked"
                     onLeftClicked: {
-                        CpuPlusDiagnostics.selectLatest(modelData);
-                        root.showReport = false;
+                        if(root.viewMode==="PRESETS")presets.mixerPage=modelData.key;
+                        else root.selectView(modelData.key);
                     }
                 }
             }
         }
         Row {
-            id: reportActions
-            visible: root.viewMode === "REPORT"
+            id: workspaceRail
+            objectName: "cpuplusDiagnosticWorkspaceRail"
             width: parent.width
+            height: 25
             spacing: 3
-            ActionButton {
-                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
-                height: 26
-                available: root.report !== null && root.report.text.length > 0
-                label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
-                onLeftClicked: root.showReport = !root.showReport
-            }
-            ActionButton {
-                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
-                height: 26
-                available: root.showReport && root.report !== null && root.report.text.length > 0
-                label: "COPY REPORT"
-                onLeftClicked: {
-                    reportText.selectAll();
-                    reportText.copy();
-                    reportText.deselect();
+            Repeater {
+                model: [{key:"WORK",label:"CONTROLS"},{key:"PRESETS",label:"WORKFLOWS"}]
+                ActionButton {
+                    required property var modelData
+                    objectName: "cpuplusDiagnosticWorkspace-"+modelData.key
+                    width: Math.max(0,Math.floor((workspaceRail.width-3)/2))
+                    height: 25
+                    label: modelData.label
+                    labelPixelSize: 10
+                    labelFontSizeMode: Text.HorizontalFit
+                    contentPadding: 1
+                    normalFace: true
+                    accentColor: modelData.key==="WORK" ? Colors.cyan : Colors.magenta
+                    selected: modelData.key==="PRESETS" ? root.viewMode==="PRESETS" : root.viewMode!=="PRESETS"
+                    selectedForegroundColor: accentColor
+                    selectedBorderColor: accentColor
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectView(modelData.key)
                 }
-            }
-        }
-        Row {
-            id: historyActions
-            visible: root.viewMode === "HISTORY" || root.viewMode === "COMPARE"
-            width: parent.width
-            spacing: 3
-            ActionButton {
-                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
-                height: 26
-                label: "RELOAD ARCHIVE"
-                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy
-                onLeftClicked: CpuPlusDiagnostics.loadHistory()
-            }
-            ActionButton {
-                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
-                height: 26
-                label: root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE"
-                labelFontSizeMode: Text.HorizontalFit
-                labelMinimumPixelSize: 8
-                contentPadding: 2
-                available: true
-                onLeftClicked: root.selectView(root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE")
-            }
-        }
-        Row {
-            id: compareRail
-            visible: root.viewMode === "COMPARE"
-            width: parent.width
-            spacing: 4
-            ActionButton {
-                width: Math.max(0, (compareRail.width - 4) / 2)
-                height: 26
-                label: "SET BEFORE"
-                available: root.canChooseComparison
-                onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
-            }
-            ActionButton {
-                width: Math.max(0, (compareRail.width - 4) / 2)
-                height: 26
-                label: "SET AFTER"
-                available: root.canChooseComparison
-                onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
             }
         }
     }

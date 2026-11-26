@@ -13,6 +13,7 @@ ShellRoot {
     property bool done: false
     property bool paneActive: true
     property int completions: 0
+    property string diagnosticFooterGeometry: ""
     property string completedId: ""
     Connections {
         target: CpuPlusDiagnostics
@@ -32,6 +33,18 @@ ShellRoot {
             if (found) return found;
         }
         return null;
+    }
+    function footerGeometry(paneItem, keys) {
+        const context=findItem(paneItem,"cpuplusDiagnosticContextRail");
+        const workspace=findItem(paneItem,"cpuplusDiagnosticWorkspaceRail");
+        const footer=findItem(paneItem,"cpuplusDiagBottomControls");
+        const buttons=keys.map(k=>findItem(paneItem,"cpuplusDiagnosticView-"+k))
+            .concat(["WORK","PRESETS"].map(k=>findItem(paneItem,"cpuplusDiagnosticWorkspace-"+k)));
+        if(!context||!workspace||!footer||buttons.some(b=>!b||!b.visible))return "";
+        return JSON.stringify([footer,context,workspace,...buttons].map(b=>{
+            const p=b.mapToItem(paneItem,0,0);
+            return [p.x,p.y,b.width,b.height];
+        }));
     }
     function normalFace(item, name, selected) {
         const b=findItem(item,name);
@@ -514,13 +527,27 @@ ShellRoot {
             }
             if (root.phase===27 && pane.item) {
                 pane.item.selectMenu(4);
-                const rail=root.findItem(pane.item,"cpuplusDiagnosticTopRail");
+                const rail=root.findItem(pane.item,"cpuplusDiagnosticWorkspaceRail");
+                const context=root.findItem(pane.item,"cpuplusDiagnosticContextRail");
+                const footer=root.findItem(pane.item,"cpuplusDiagBottomControls");
                 const modes=root.findItem(pane.item,"cpuplusMemoryMenuRail");
-                const controls=root.findItem(pane.item,"cpuplusDiagnosticTop-WORK");
-                const workflows=root.findItem(pane.item,"cpuplusDiagnosticTop-PRESETS");
-                if (!root.check(rail && modes && controls && workflows && rail.visible
-                    && rail.y+rail.height<=modes.y && controls.selected,
-                    "two fixed top rail buttons above memory modes")) return;
+                const controls=root.findItem(pane.item,"cpuplusDiagnosticWorkspace-WORK");
+                const workflows=root.findItem(pane.item,"cpuplusDiagnosticWorkspace-PRESETS");
+                if (!root.check(rail && context && footer && modes && controls && workflows && rail.visible
+                    && footer.parent===root.findItem(pane.item,"cpuplusWorkFooter")
+                    && footer.height===53 && context.height===25 && rail.height===25
+                    && context.y+context.height+3===rail.y && modes.y===0 && controls.selected,
+                    "fixed two-row footer with context above workspace")) return;
+                root.diagnosticFooterGeometry=root.footerGeometry(pane.item,["QUICK","REPORT","HISTORY","COMPARE"]);
+                if(!root.check(root.diagnosticFooterGeometry!=="","control footer geometry"))return;
+                root.findItem(pane.item,"cpuplusDiagnosticView-REPORT").leftClicked(null);
+                root.phase=270;
+                return;
+            }
+            if(root.phase===270 && pane.item){
+                if(!root.check(root.footerGeometry(pane.item,["QUICK","REPORT","HISTORY","COMPARE"])===root.diagnosticFooterGeometry,
+                    "report controls do not shift either navigation row"))return;
+                const workflows=root.findItem(pane.item,"cpuplusDiagnosticWorkspace-PRESETS");
                 workflows.leftClicked(null);
                 root.phase=28;
                 return;
@@ -531,6 +558,24 @@ ShellRoot {
                 const save=root.findItem(catalog,"cpuplusDiagnosticSavePreset");
                 if (!root.check(catalog && catalog.visible && !root.findItem(pane.item,"cpuplusDiagnosticWorkshop")
                     && !CpuPlusDiagnostics.busy,"workflow catalog separate from controls")) return;
+                if(!root.check(root.footerGeometry(pane.item,["LIBRARY","QUEUE","SETS","RESULTS"])===root.diagnosticFooterGeometry,
+                    "workflow navigation matches Controls geometry"))return;
+                root.findItem(pane.item,"cpuplusDiagnosticView-RESULTS").leftClicked(null);
+                root.phase=280;
+                return;
+            }
+            if(root.phase===280 && pane.item){
+                if(!root.check(root.footerGeometry(pane.item,["LIBRARY","QUEUE","SETS","RESULTS"])===root.diagnosticFooterGeometry
+                    && root.findItem(pane.item,"cpuplusDiagnosticView-RESULTS").selected,
+                    "results filter keeps both rows fixed"))return;
+                root.findItem(pane.item,"cpuplusDiagnosticView-LIBRARY").leftClicked(null);
+                root.phase=281;
+                return;
+            }
+            if(root.phase===281 && pane.item){
+                const name=root.findItem(pane.item,"cpuplusDiagnosticPresetName");
+                const save=root.findItem(pane.item,"cpuplusDiagnosticSavePreset");
+                if(!root.check(name&&save&&name.visible&&save.visible,"library restored by bottom filter"))return;
                 name.text="STALL SESSION";
                 save.leftClicked(null);
                 if (!root.check(CpuPlusDiagnostics.workshopPresets.length===1
@@ -551,7 +596,7 @@ ShellRoot {
                 const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
                 if (!workshop) return;
                 workshop.edit("stallThresholdMs",650);
-                root.findItem(pane.item,"cpuplusDiagnosticTop-PRESETS").leftClicked(null);
+                root.findItem(pane.item,"cpuplusDiagnosticWorkspace-PRESETS").leftClicked(null);
                 root.phase=31;
                 return;
             }
@@ -566,7 +611,10 @@ ShellRoot {
                 const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
                 if (!root.check(workshop && workshop.draft.stallThresholdMs===500 && !workshop.ready
                     && !CpuPlusDiagnostics.busy,"loaded calibration requires fresh prepare")) return;
+                if(!root.check(root.footerGeometry(pane.item,["QUICK","REPORT","HISTORY","COMPARE"])===root.diagnosticFooterGeometry,
+                    "footer geometry preserved after loading a preset and remount"))return;
                 console.log("CPU_D4A_NATIVE_PASS");
+                console.log("CPU_D4B_FIXED_FOOTER_PASS");
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);

@@ -114,5 +114,5 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=55, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

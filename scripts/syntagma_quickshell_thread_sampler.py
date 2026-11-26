@@ -157,7 +157,10 @@ def main(argv=None):
     parser.add_argument("--top", type=int, default=4,
                         help="Ranked entries plus main if outside rank (default 4)")
     parser.add_argument("--workshop", action="store_true", help="Bounded calibrated JSONL receipt")
+    parser.add_argument("--workshop-identity", nargs=2, type=int, metavar=("PID","START_TICKS"))
     args = parser.parse_args(argv)
+    if args.workshop_identity and (not args.workshop or min(args.workshop_identity)<=0 or args.pid is not None or args.parent_quickshell):
+        parser.error("invalid workshop identity")
     if not 0.1 <= args.interval <= 5:
         parser.error("--interval must be between 0.1 and 5 seconds")
     if not 1 <= args.duration <= 1800:
@@ -180,7 +183,8 @@ def main(argv=None):
     if args.parent_quickshell and args.pid is not None:
         parser.error("Choose one PID source")
     pid = (launching_quickshell(proc_root) if args.parent_quickshell else
-           args.pid if args.pid is not None else find_quickshell(proc_root))
+           args.pid if args.pid is not None else
+           args.workshop_identity[0] if args.workshop_identity else find_quickshell(proc_root))
     if pid is None:
         print("No same-user Quickshell process found.", file=sys.stderr)
         return 2
@@ -192,6 +196,8 @@ def main(argv=None):
         if args.workshop and identity["name"] != "quickshell":
             raise ValueError("not Quickshell")
         proc_start = identity["start"]
+        if args.workshop_identity and proc_start != args.workshop_identity[1]:
+            raise ValueError("pinned Quickshell replaced")
     except (OSError, ValueError, IndexError):
         print("Quickshell PID disappeared or cannot be inspected.", file=sys.stderr)
         return 2
@@ -210,7 +216,7 @@ def main(argv=None):
                     "durationSeconds": args.duration,
                     "note": "CPU percentages are per one logical CPU; no Qt stack traces"}
     if args.workshop:
-        start_record.update(tag, topCount=args.top)
+        start_record.update(tag, topCount=args.top, monotonicMs=round(started*1000))
     send(start_record)
     samples = 0
 
@@ -245,6 +251,7 @@ def main(argv=None):
                         or samples >= limit):
                     return 1
                 record["startTicks"] = proc_start
+                record["monotonicMs"] = round(sampled_at*1000)
             send(record)
             samples += 1
             previous = current
@@ -259,7 +266,8 @@ def main(argv=None):
         return 130
     complete = {"event": "complete", "tsMs": round(time.time() * 1000), "pid": pid}
     if args.workshop:
-        complete.update(tag, samples=samples, observedMs=round((sampled_at - started)*1000))
+        complete.update(tag, samples=samples, observedMs=round((sampled_at - started)*1000),
+                        monotonicMs=round(sampled_at*1000))
     try:
         send(complete)
     except WorkshopOutputLimit:

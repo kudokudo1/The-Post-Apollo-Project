@@ -109,6 +109,39 @@ Scope {
     // Session-owned draft, not authorization. No persistence or auto-start.
     property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350})
+    // D4a session presets. Persistence is a separate catalog milestone.
+    property var workshopPresets: []
+    property string workshopPresetFeedback: "SESSION ONLY // NO DISK SAVE"
+    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted
+    function saveWorkshopPreset(name) {
+        if (workshopPresetLocked) return false;
+        if (typeof name!=="string" || !/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(name) || name.trim()!==name) {
+            workshopPresetFeedback="NAME // 1–32 LETTERS, NUMBERS, SPACE, _ OR -"; return false;
+        }
+        if (workshopPresets.length>=12 || workshopPresets.some(p=>p.name.toLowerCase()===name.toLowerCase())) {
+            workshopPresetFeedback="NAME EXISTS OR SESSION LIMIT 12"; return false;
+        }
+        const plan=Calibration.workshopPlanFromDraft(workshopDraft);
+        if (!Calibration.workshopDraftFromPlan(plan)) {workshopPresetFeedback="INVALID CALIBRATION";return false;}
+        workshopPresets=workshopPresets.concat([{name:name,plan:JSON.parse(JSON.stringify(plan))}]);
+        workshopPresetFeedback="SAVED FOR THIS SESSION";
+        return true;
+    }
+    function loadWorkshopPreset(name) {
+        if (workshopPresetLocked) return false;
+        const p=workshopPresets.find(row=>row.name===name);
+        const next=p && Calibration.workshopDraftFromPlan(p.plan);
+        if (!next) {workshopPresetFeedback="PRESET UNAVAILABLE";return false;}
+        workshopDraft=next;
+        workshopPresetFeedback="LOADED // PREPARE REQUIRED";
+        return true;
+    }
+    function removeWorkshopPreset(name) {
+        if (workshopPresetLocked || !workshopPresets.some(row=>row.name===name)) return false;
+        workshopPresets=workshopPresets.filter(row=>row.name!==name);
+        workshopPresetFeedback="REMOVED FROM SESSION";
+        return true;
+    }
     property string workshopRunId: ""
     property string workshopRunKind: ""
     property string workshopRunPlan: ""

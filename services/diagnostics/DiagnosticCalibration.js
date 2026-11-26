@@ -179,3 +179,50 @@ function workflowLaunchPlan(input,resolvePath,dataDir) {
     return {plan:plan,args:["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B",
         resolvePath("scripts/cpuplus_diagnostic_workflow.py"),"--plan",JSON.stringify(plan),"--data-dir",dataDir]};
 }
+
+
+// Shared draft projection for Controls and Workflows. A preset is calibration
+// only, never a stored launch command, readiness token, target PID or consent.
+function workshopPlanFromDraft(d) {
+    const instruments=[];
+    for (const kind of ["threads","memory","census","storage","stall"]) {
+        if (!d.selected.includes(kind)) continue;
+        if (kind==="threads") instruments.push({kind:kind,intervalMs:d.threadIntervalMs,topCount:d.topCount});
+        else if (kind==="memory") instruments.push({kind:kind,intervalMs:d.memoryIntervalMs});
+        else if (kind==="census") instruments.push({kind:kind,intervalMs:d.censusIntervalMs});
+        else if (kind==="stall") instruments.push({kind:kind,thresholdMs:d.stallThresholdMs});
+        else instruments.push({kind:kind});
+    }
+    return {durationSeconds:d.durationSeconds,instruments:instruments};
+}
+
+function workshopDraftFromPlan(plan) {
+    try {
+        if (!plan || Object.getPrototypeOf(plan)!==Object.prototype
+                || Reflect.ownKeys(plan).length!==2 || !["durationSeconds","instruments"].every(k=>{
+                    const d=Object.getOwnPropertyDescriptor(plan,k);return d && Object.prototype.hasOwnProperty.call(d,"value");
+                }) || !Array.isArray(plan.instruments)
+                || !plan.instruments.length || plan.instruments.length>5) return null;
+        const kinds=["threads","memory","census","storage","stall"];
+        const items=plan.instruments;
+        if (Reflect.ownKeys(items).length!==items.length+1 || items.some(c=>!c || Object.getPrototypeOf(c)!==Object.prototype
+                || Reflect.ownKeys(c).some(k=>typeof k!=="string" || !Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptor(c,k),"value"))
+                || !kinds.includes(c.kind))) return null;
+        if (!Object.prototype.hasOwnProperty.call(items,0)) return null;
+        if (items.length===1) {
+            if (!previewCalibration(Object.assign({},items[0],{durationSeconds:plan.durationSeconds})).ok
+                    || Object.prototype.hasOwnProperty.call(items[0],"durationSeconds")) return null;
+        } else if (!previewWorkflow(plan).ok) return null;
+        const draft={durationSeconds:plan.durationSeconds,selected:[],
+            threadIntervalMs:1000,memoryIntervalMs:10000,censusIntervalMs:10000,
+            topCount:4,stallThresholdMs:350};
+        for (const c of items) {
+            draft.selected.push(c.kind);
+            if (c.kind==="threads") {draft.threadIntervalMs=c.intervalMs;draft.topCount=c.topCount;}
+            else if (c.kind==="memory") draft.memoryIntervalMs=c.intervalMs;
+            else if (c.kind==="census") draft.censusIntervalMs=c.intervalMs;
+            else if (c.kind==="stall") draft.stallThresholdMs=c.thresholdMs;
+        }
+        return draft;
+    } catch (_) {return null;}
+}

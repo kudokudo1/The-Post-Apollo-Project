@@ -339,12 +339,45 @@ Item {
         scroll.contentY = 0;
     }
 
+    Row {
+        id: diagnosticTopRail
+        objectName: "cpuplusDiagnosticTopRail"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        spacing: 4
+        visible: root.page === "DIAG"
+        height: visible ? 25 : 0
+        Repeater {
+            model: [{key:"WORK",label:"CONTROLS"},{key:"PRESETS",label:"WORKFLOWS"}]
+            ActionButton {
+                required property var modelData
+                objectName: "cpuplusDiagnosticTop-"+modelData.key
+                width: Math.floor((diagnosticTopRail.width-4)/2)
+                height: 25
+                label: modelData.label
+                normalFace: true
+                accentColor: modelData.key==="WORK" ? Colors.cyan : Colors.magenta
+                selected: !!diagnosticPaneLoader.item && (modelData.key==="PRESETS"
+                    ? diagnosticPaneLoader.item.viewMode==="PRESETS"
+                    : diagnosticPaneLoader.item.viewMode!=="PRESETS")
+                selectedForegroundColor: accentColor
+                selectedBorderColor: accentColor
+                onLeftClicked: {
+                    if (!diagnosticPaneLoader.item) return;
+                    diagnosticPaneLoader.item.selectView(modelData.key);
+                    scroll.contentY=0;
+                }
+            }
+        }
+    }
     Grid {
         id: menuRail
         objectName: "cpuplusMemoryMenuRail"
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: parent.top
+        anchors.top: diagnosticTopRail.bottom
+        anchors.topMargin: diagnosticTopRail.visible ? 3 : 0
         columns: width >= 240 ? 6 : 3
         spacing: 4
         height: Math.ceil(root.menus.length / columns) * 28
@@ -445,7 +478,7 @@ Item {
             GohuText {
                 width: Math.max(0,parent.width-(workRefresh.visible ? 72+parent.spacing : 0))
                 height: Math.max(workRefresh.visible ? 26 : 14,implicitHeight)
-                text: (root.page === "DIAG" ? "DIAG // " : "SOURCE // ") + root.status
+                text: root.page === "DIAG" ? root.status+" // "+CpuPlusDiagnostics.feedback : "SOURCE // "+root.status
                 color: root.sample ? Colors.cyan : Colors.orange
                 font.pixelSize: 10
                 verticalAlignment: Text.AlignVCenter
@@ -775,6 +808,7 @@ Item {
                 sourceComponent: CpuPlusProcessPane { headerTarget: workHeader; footerTarget: workFooter }
             }
             Loader {
+                id: diagnosticPaneLoader
                 width: parent.width
                 height: active && item ? item.implicitHeight : 0
                 active: root.page === "DIAG"

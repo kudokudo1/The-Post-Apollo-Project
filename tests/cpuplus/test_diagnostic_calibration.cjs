@@ -238,3 +238,21 @@ assert.equal(validateWorkflow(JSON.parse(attached),{...withStall,instruments:[..
 const damaged=JSON.parse(attached);damaged.instruments[2].records[0].ticks=[];
 assert.equal(validateWorkflow(damaged,withStall),null);
 console.log("DIAG D3e coordinated stall coverage and five-instrument calibration PASS");
+
+
+// D4a: named session presets reuse validated calibration, not launch state.
+ctx.input=JSON.stringify(allFive);
+const presetDraft=plain(vm.runInContext("workshopDraftFromPlan(JSON.parse(input))",ctx));
+assert.deepEqual(presetDraft.selected,["threads","memory","census","storage","stall"]);
+assert.equal(presetDraft.stallThresholdMs,350);
+ctx.input=JSON.stringify(presetDraft);
+assert.deepEqual(plain(vm.runInContext("workshopPlanFromDraft(JSON.parse(input))",ctx)),allFive);
+for(const bad of [{...allFive,autoStart:true},{...allFive,durationSeconds:1},{durationSeconds:5,instruments:[{kind:"stall",thresholdMs:351}]},
+                 {durationSeconds:5,instruments:[{kind:"appcontrol",intervalMs:1000,topCount:4}]},
+                 {durationSeconds:5,instruments:[{kind:"stall",thresholdMs:350,durationSeconds:5}]}]){
+    ctx.input=JSON.stringify(bad);
+    assert.equal(vm.runInContext("workshopDraftFromPlan(JSON.parse(input))",ctx),null);
+}
+ctx.input=JSON.stringify({durationSeconds:5,instruments:[{kind:"stall",thresholdMs:500}]});
+assert.equal(vm.runInContext("workshopDraftFromPlan(JSON.parse(input)).stallThresholdMs",ctx),500);
+console.log("DIAG D4a shared preset calibration PASS");

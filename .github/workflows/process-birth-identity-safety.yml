@@ -8,6 +8,7 @@ on:
       - 'tests/cpuplus/test_hunter_birth_identity.py'
       - 'tests/cpuplus/fixtures/TaskSafetyBirthNative.qml'
       - 'tests/cpuplus/fixtures/HunterSerialNative.qml'
+      - 'tests/cpuplus/fixtures/HunterProtocolNative.qml'
       - '.github/workflows/process-birth-identity-safety.yml'
   workflow_dispatch:
 permissions:
@@ -72,3 +73,22 @@ jobs:
           cat "$tmp/log"
           grep -q HUNTER_SERIAL_PASS "$tmp/log"
           ! grep -q HUNTER_SERIAL_FAIL "$tmp/log"
+
+      - name: Verify native Hunter helper output and exit correlation
+        env:
+          POST_APOLLO_HUNTER_DISPOSABLE_CI: '1'
+        run: |
+          set -eu
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/services/system" "$tmp/runtime" "$tmp/home"
+          chmod 700 "$tmp/runtime"
+          cp services/system/HunterExecutor.qml "$tmp/services/system/"
+          cp tests/cpuplus/fixtures/HunterProtocolNative.qml "$tmp/shell.qml"
+          export XDG_RUNTIME_DIR="$tmp/runtime" HOME="$tmp/home"
+          export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
+          export LIBGL_ALWAYS_SOFTWARE=1 QS_DISABLE_FILE_WATCHER=1
+          timeout 20s qs -p "$tmp/shell.qml" --no-color >"$tmp/log" 2>&1 || { cat "$tmp/log"; exit 1; }
+          cat "$tmp/log"
+          grep -q HUNTER_PROTOCOL_PASS "$tmp/log"
+          ! grep -q HUNTER_PROTOCOL_FAIL "$tmp/log"

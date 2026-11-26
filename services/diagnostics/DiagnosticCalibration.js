@@ -199,11 +199,16 @@ function workshopPlanFromDraft(d) {
 function workshopDraftFromPlan(plan) {
     try {
         if (!plan || Object.getPrototypeOf(plan)!==Object.prototype
-                || Object.keys(plan).length!==2 || !Array.isArray(plan.instruments)
+                || Reflect.ownKeys(plan).length!==2 || !["durationSeconds","instruments"].every(k=>{
+                    const d=Object.getOwnPropertyDescriptor(plan,k);return d && Object.prototype.hasOwnProperty.call(d,"value");
+                }) || !Array.isArray(plan.instruments)
                 || !plan.instruments.length || plan.instruments.length>5) return null;
         const kinds=["threads","memory","census","storage","stall"];
         const items=plan.instruments;
-        if (items.some(c=>!c || !kinds.includes(c.kind))) return null;
+        if (Reflect.ownKeys(items).length!==items.length+1 || items.some(c=>!c || Object.getPrototypeOf(c)!==Object.prototype
+                || Reflect.ownKeys(c).some(k=>typeof k!=="string" || !Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptor(c,k),"value"))
+                || !kinds.includes(c.kind))) return null;
+        if (!Object.prototype.hasOwnProperty.call(items,0)) return null;
         if (items.length===1) {
             if (!previewCalibration(Object.assign({},items[0],{durationSeconds:plan.durationSeconds})).ok
                     || Object.prototype.hasOwnProperty.call(items[0],"durationSeconds")) return null;

@@ -789,10 +789,10 @@ Item {
                 maximumHeight: Math.max(0, instrumentBay.height * 0.55)
                 contextActive: workspace.active && !!workspace.currentTask
                 task: contextActive ? workspace.currentTask : null
-                purpose: visible && task && workspace.appControlWindow.taskSimplePurpose
+                purpose: open && contextActive && task && workspace.appControlWindow.taskSimplePurpose
                     ? workspace.appControlWindow.taskSimplePurpose(task) : ""
-                scopeText: visible && task ? processView.scopeProcessText() : ""
-                virtualMemory: visible && task ? processView.formatMemory(task.vsz) : "?"
+                scopeText: open && contextActive && task ? processView.scopeProcessText() : ""
+                virtualMemory: open && contextActive && task ? processView.formatMemory(task.vsz) : "?"
             }
 
         }

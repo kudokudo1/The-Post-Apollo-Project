@@ -73,6 +73,14 @@ Rectangle {
             spacing: 8
             GohuText {
                 width: parent.width
+                text: root.task ? String(root.task.comm || "PROCESS") + " // PID " + String(root.task.pid || "?") : ""
+                textFormat: Text.PlainText
+                color: Colors.orange
+                font.pixelSize: 13
+                wrapMode: Text.WrapAnywhere
+            }
+            GohuText {
+                width: parent.width
                 text: "PROCESS PURPOSE"
                 color: Colors.orange
                 font.pixelSize: 12

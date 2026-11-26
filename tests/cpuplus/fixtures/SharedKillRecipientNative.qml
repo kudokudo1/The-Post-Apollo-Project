@@ -268,6 +268,7 @@ ShellRoot {
                 if (!smoke.check(view.isTaskFavorite(view.currentTask)
                     && fakeOwner.favoriteStore.favoriteKeys[0]==="task|synthetic-worker",
                     "shared favorite identity")) return;
+                info.open=true;
                 const initial=detail.cpuCanvas.graphRevision;
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];
                 smoke.previousRevision=initial;
@@ -275,6 +276,10 @@ ShellRoot {
                 return;
             }
             if (smoke.phase===10) {
+                const info=smoke.find(view,"cpuPlusProcessInformation");
+                if (!smoke.check(info.open && info.visible,
+                    "same birth identity refresh preserves information popup")) return;
+                info.open=false;
                 if (!smoke.check(detail.cpuCanvas.graphRevision>smoke.previousRevision,
                     "new owner sample repaints shared detail")) return;
                 const observed=detail.presentationState.taskCpuHistory;
@@ -360,10 +365,14 @@ ShellRoot {
                 if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
                     "prepare before process removal")) return;
                 smoke.lastRow = fakeOwner.taskRows[0];
+                smoke.find(view,"cpuPlusProcessInformation").open=true;
             fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }
+            if (!smoke.check(!smoke.find(view,"cpuPlusProcessInformation").open
+                && !smoke.find(view,"cpuPlusProcessInformation").visible,
+                "disappearing process closes information")) return;
             if (!smoke.check(!view.currentTask && !view.exactTargetAvailable
                 && !view.prepareAction("end") && !view.hasOwnedPending
                 && fakeGate.pending===null && fakeGate.cancels===2

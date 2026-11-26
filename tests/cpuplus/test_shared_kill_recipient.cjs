@@ -140,7 +140,7 @@ test("both process hosts share the compact information document and action secti
     for (const host of [app,recipient]) {
         assert.match(host,/ProcessInformationButton\s*\{/);
         assert.match(host,/ProcessInformationPanel\s*\{/);
-        assert.match(host,/scopeText: visible && task \?/);
+        assert.match(host,/scopeText: open && contextActive && task \?/);
         assert.match(host,/maximumHeight: Math.max\(0,/);
     }
     assert.match(info,/onTargetIdentityChanged: open = false/);

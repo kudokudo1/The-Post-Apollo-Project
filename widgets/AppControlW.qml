@@ -28908,9 +28908,9 @@ PanelWindow {
             maximumHeight: Math.max(0, (detailBottomBar.y - detailStaticHeader.y) * 0.55)
             contextActive: appControlWindow.menuOpen && appControlWindow.selectedResultIsTask()
             task: contextActive ? taskManagerBody.currentTask : null
-            purpose: visible && task ? appControlWindow.taskSimplePurpose(task) : ""
-            scopeText: visible && task ? processPresentationController.scopeProcessText() : ""
-            virtualMemory: visible && task ? processPresentationController.formatMemory(task.vsz) : "?"
+            purpose: open && contextActive && task ? appControlWindow.taskSimplePurpose(task) : ""
+            scopeText: open && contextActive && task ? processPresentationController.scopeProcessText() : ""
+            virtualMemory: open && contextActive && task ? processPresentationController.formatMemory(task.vsz) : "?"
         }
 
         Rectangle {

@@ -58,6 +58,9 @@ Item {
 
     property color accentColor: Colors.cyan
     property color markerColor: Colors.orange
+    // Opt-in independent selection and contrast; existing dial defaults retained.
+    property color activeDetentColor: Colors.orange
+    property bool outlinedOptionLabels: false
     property color labelColor: Colors.cyan
     property color readoutColor: Colors.white
     property bool readoutGlowEnabled: false
@@ -923,12 +926,12 @@ Item {
                     width: 2
                     height: 5
                     rotation: detentTick.angle - 90
-                    color: detentTick.active ? Colors.orange : dialRoot.labelColor
+                    color: detentTick.active ? dialRoot.activeDetentColor : dialRoot.labelColor
                     opacity: detentTick.active ? 1.0 : 0.66
                     layer.enabled: detentTick.active
                     layer.effect: MultiEffect {
                         shadowEnabled: true
-                        shadowColor: Colors.orange
+                        shadowColor: dialRoot.activeDetentColor
                         shadowOpacity: 0.95
                         shadowBlur: 0.82
                     }
@@ -968,15 +971,17 @@ Item {
                         : dialRoot.textLabelPixelSize
                     color: dialRoot.isOptionActive(index)
                            ? (dialRoot.selectorMode === "continuous"
-                              ? Colors.orange : dialRoot.markerColor)
+                              ? dialRoot.activeDetentColor : dialRoot.markerColor)
                            : dialRoot.labelColor
+                    style: dialRoot.outlinedOptionLabels ? Text.Outline : Text.Normal
+                    styleColor: "#08060D"
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
                         shadowColor: dialRoot.isOptionActive(optionMark.index)
                                      ? (dialRoot.selectorMode === "continuous"
-                                        ? Colors.orange : dialRoot.markerColor)
+                                        ? dialRoot.activeDetentColor : dialRoot.markerColor)
                                      : dialRoot.labelColor
                         shadowOpacity: dialRoot.optionGlowStrength(optionMark.index)
                         shadowBlur: dialRoot.isOptionActive(optionMark.index) ? 0.95 : 0.46

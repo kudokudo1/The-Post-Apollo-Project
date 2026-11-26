@@ -10,6 +10,7 @@ Column {
     objectName: "cpuplusDiagnosticControls"
     property Item headerTarget: null
     property Item footerTarget: null
+    property real workshopViewportHeight: 0
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
@@ -257,7 +258,7 @@ Column {
         height: active && item ? item.implicitHeight : 0
         active: root.workshopOpen
         visible: active
-        sourceComponent: CpuPlusDiagnosticWorkshop {}
+        sourceComponent: CpuPlusDiagnosticWorkshop { viewportHeight: root.workshopViewportHeight }
     }
     GohuText {
         width: parent.width

@@ -296,7 +296,7 @@ assert.match(workshop,/root.changeStorageCadence\(cadenceRow.field,-1\)/);
 assert.match(workshop,/storagePreview.observations/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: compactLayout \? 112 : 176/);
+assert.match(workshop,/instrumentHeight: compactLayout \? 112 : Math.min\(240,176\+/);
 assert.match(workshopSlider,/height: root.compact \? 22 : 32/);
 assert.match(workshopSlider,/width: parent.height\s+height: parent.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
@@ -410,3 +410,13 @@ assert.match(chassis,/readonly property real screwSlotWidth: Math.max\(1.5,/);
 assert.match(chassis,/c.fillRect\(x-span\/2,y-slot\/2,span,slot\)/);
 assert.match(chassis,/c.fillRect\(x-slot\/2,y-span\/2,slot,span\)/);
 assert.match(stopwatchDialSource,/objectName: "selectorDialReadableValue"/);
+
+// Inset readouts use the actual chamfer vertices and never overlap the numeric text.
+assert.match(automotive,/function insetWindowFits\(g\)/);
+assert.match(automotive,/readonly property real minimumSegmentGap: 2/);
+assert.match(automotive,/root.minimumSegmentGap\/\(inner\*u\)/);
+assert.match(automotive,/height: Math.max\(0,parent.height-2-parent.unitHeight\)/);
+assert.match(automotive,/width: Math.max\(0,parent.width-4-parent.unitWidth\)/);
+assert.match(chassis,/readonly property real screwEdgeClearance: screwInset-screwDiameter\/2/);
+assert.match(chassis,/createLinearGradient\(x-rad,y-rad,x\+rad,y\+rad\)/);
+assert.match(stopwatchDialSource,/externalUnitReadout: true/);

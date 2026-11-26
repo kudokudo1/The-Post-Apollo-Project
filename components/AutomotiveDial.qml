@@ -29,7 +29,7 @@ Item {
     readonly property string resolvedArmStyle: ["tapered","industrial","capsule"].includes(armStyle) ? armStyle : "tapered"
     readonly property real boundedFraction: Number.isFinite(fraction) ? Math.max(0,Math.min(1,fraction)) : 0
     readonly property real boundedArmReach: Number.isFinite(armReach) ? Math.max(65,Math.min(95,armReach)) : 95
-    readonly property int litSegments: Math.ceil(30*boundedFraction)
+    readonly property int litSegments: Math.ceil(segmentCount*boundedFraction)
     readonly property real actualFaceDiameter: Math.max(0,Math.min(faceDiameter,Math.min(width,height)-(showChassis?2*Math.max(0,Math.min(40,chassisClearance)):0)))
     readonly property real faceUnit: actualFaceDiameter/216
     readonly property string detailTier: actualFaceDiameter>=150?"large":actualFaceDiameter>=105?"medium":actualFaceDiameter>=72?"small":"compact"
@@ -148,9 +148,9 @@ Item {
             objectName: "automotiveValueWindow"
             visible: root.showValue
             width: Math.round(face.width*0.64)
-            height: Math.round(face.height*0.27)
+            height: Math.max(24,Math.round(face.height*0.27))
             anchors.horizontalCenter: parent.horizontalCenter
-            y: Math.round(face.height*0.18)
+            y: Math.round(face.height*0.15)
             Canvas {
                 id: valueFrame
                 anchors.fill: parent

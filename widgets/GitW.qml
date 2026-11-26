@@ -7772,6 +7772,19 @@ PanelWindow {
                                         || ""
                                     )
 
+                                pullRequestBody:
+                                    String((root.selectedPullRequest || {}).body || "")
+                                pullRequestBodyAvailable:
+                                    typeof (root.selectedPullRequest || {}).body === "string"
+                                pullRequestCheckSummary:
+                                    githubWorkItemsService.pullCheckSummary(root.selectedPullRequest)
+                                pullRequestReviewSummary:
+                                    githubWorkItemsService.pullReviewSummary(root.selectedPullRequest)
+                                pullRequestMergeSummary:
+                                    githubWorkItemsService.pullMergeSummary(root.selectedPullRequest)
+                                factsBusy: githubWorkItemsService.pullsBusy
+                                factsError: githubWorkItemsService.pullsError
+
                                 onCloseRequested:
                                     root.closePullRequestControl()
 

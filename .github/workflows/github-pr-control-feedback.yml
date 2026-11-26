@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - "widgets/GitHubPullRequestControlView.qml"
+      - "widgets/GitW.qml"
+      - "tests/git/test_pull_request_integration_contracts.py"
+      - "tests/git/test_pull_request_control_view_contracts.py"
       - "tests/git/test_pr_control_feedback_contracts.py"
       - ".github/workflows/github-pr-control-feedback.yml"
   push:
     branches: ["main"]
     paths:
       - "widgets/GitHubPullRequestControlView.qml"
+      - "widgets/GitW.qml"
+      - "tests/git/test_pull_request_integration_contracts.py"
+      - "tests/git/test_pull_request_control_view_contracts.py"
       - "tests/git/test_pr_control_feedback_contracts.py"
       - ".github/workflows/github-pr-control-feedback.yml"
 
@@ -26,3 +32,4 @@ jobs:
           python3 tests/git/test_pull_request_control_view_contracts.py
           python3 tests/git/test_pull_request_lifecycle_contracts.py
           python3 tests/git/test_pr_control_feedback_contracts.py
+          python3 tests/git/test_pull_request_integration_contracts.py

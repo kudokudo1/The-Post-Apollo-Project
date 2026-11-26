@@ -74,7 +74,8 @@ assert 'readonly property bool isMerged:' in source
 assert "&& (root.isOpen || root.isClosed)" in source
 assert "&& root.isOpen" in source
 assert "&& !root.pullRequestDraft" in source
-assert 'label:\n                            root.isMerged\n                            ? "MERGED"' in source
+assert 'label:\n                            root.isClosed' in source
+assert '? "MERGED"' not in source
 assert 'root.armOrRun(\n                            "update-branch"' in source
 assert 'root.armOrRun(\n                                "close"' in source
 assert '"merge-" + modelData' in source
@@ -124,3 +125,15 @@ for needle in (
     assert needle in service, needle
 
 print("PR CONTROL // ACTION FILL, ERROR DISPLAY, STATE & LAYOUT PASS")
+
+# Overview is readable; mutation controls remain separate and state-gated.
+assert 'property string mode: "overview"' in source
+assert 'id: overviewPane' in source
+assert 'textFormat: TextEdit.PlainText' in source
+assert 'readOnly: true' in source
+assert 'root.pullRequestBodyAvailable' in source
+assert 'visible: root.isOpen || root.isClosed' in source
+assert 'onPullRequestHeadShaChanged: clearArm()' in source
+body = source.split('id: bodyEditRow', 1)[1].split('id: metaInput', 1)[0]
+for needle in ('label: "LOAD BODY"', 'bodyEditRow.changed', 'bodyEditRow.current', 'root.armOrRun("body"', '"CONFIRM CLEAR"', 'onTextChanged: root.clearArm()'):
+    assert needle in body, needle

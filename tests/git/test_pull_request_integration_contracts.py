@@ -110,3 +110,6 @@ if errors:
 
 print("POST-APOLLO PR INTEGRATION CONTRACTS // PASS")
 print("checked PULLS list -> control navigation + readback coordination")
+
+for needle in ('pullRequestBodyAvailable:', 'pullRequestBody:', 'pullRequestCheckSummary:', 'pullRequestReviewSummary:', 'factsError: githubWorkItemsService.pullsError'):
+    assert needle in GITW, needle

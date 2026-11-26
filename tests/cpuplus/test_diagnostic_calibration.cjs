@@ -111,3 +111,26 @@ assert.equal(policyCtx.configuredEvidence("storage",encode([{...storeRow,interva
 const oldStorage={id:"old",kind:"storage",status:"COMPLETE",text:encode([storeRow,{event:"complete",schema:storeRow.schema,samples:1}]),finishedAt:"2026-11-24T00:00:00Z"};
 assert.equal(comparisonCtx.compare(oldStorage,{...oldStorage,id:"new",text:storageText,finishedAt:"2026-11-24T00:01:00Z"},policyCtx.summarize).error,"OBSERVER CALIBRATION MUST MATCH");
 console.log("DIAG D1c configured observer launch and receipt PASS");
+
+const workflowPreview=x=>{ctx.input=JSON.stringify(x);return plain(vm.runInContext("previewWorkflow(JSON.parse(input))",ctx));};
+const workflow={durationSeconds:30,instruments:[
+    {kind:"storage"},{kind:"memory",intervalMs:10000},{kind:"threads",intervalMs:1000,topCount:4},{kind:"census",intervalMs:10000}]};
+const w=workflowPreview(workflow);
+assert.equal(w.ok,true);
+assert.equal(w.launchReady,false);
+assert.deepEqual(w.instruments.map(x=>x.config.kind),["threads","memory","census","storage"]);
+assert.equal(w.sharedQuickshellIdentityRequired,true);
+assert.equal(w.maximumCombinedPayloadBytes,4*65536);
+assert.equal(w.estimatedObservations,40);
+assert.deepEqual(workflowPreview({...workflow,instruments:workflow.instruments.slice().reverse()}),w);
+assert.equal(workflowPreview({...workflow,durationSeconds:31}).ok,false);
+assert.equal(workflowPreview({...workflow,instruments:[{kind:"memory",intervalMs:10000},{kind:"memory",intervalMs:10000}]}).ok,false);
+assert.equal(workflowPreview({...workflow,instruments:[{kind:"storage"}]}).ok,false);
+assert.equal(workflowPreview({...workflow,instruments:[{kind:"storage"},{kind:"appcontrol"}]}).ok,false);
+assert.equal(workflowPreview({...workflow,instruments:[{kind:"storage"},{kind:"memory",intervalMs:10000,pid:123}]}).ok,false);
+assert.equal(workflowPreview({...workflow,instruments:[{kind:"storage"},{kind:"threads",intervalMs:100,topCount:4}]}).ok,false);
+assert.equal(workflowPreview({...workflow,instruments:[{kind:"storage"},{kind:"memory",intervalMs:10000,durationSeconds:10}]}).ok,false);
+assert.equal(workflowPreview({...workflow,autoStart:true}).ok,false);
+assert.equal(vm.runInContext('previewWorkflow({durationSeconds:30,instruments:[{kind:"storage"}, {get kind(){throw Error("getter must not run")}}]}).ok',ctx),false);
+assert.equal(vm.runInContext('previewWorkflow({durationSeconds:30,instruments:[{kind:"storage"},,]}).ok',ctx),false);
+console.log("DIAG D2a shared calibration workflow contracts PASS");

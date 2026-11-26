@@ -242,3 +242,111 @@ invocation is approved here. Require exact Heart/Mind/Spirit and Nurse
 design review and CI before operator document integration; any code
 requires separate authorization. Actual retirement/native progress
 unchanged; production HOLD.
+
+
+## R7g // Source custody and architecture decision intake (design only)
+
+DOC2F Runtime; Nurse #2161 7199720824 read-only intake, findings
+7199767419, Spirit 7199781482, Mind 7200211072; Nurse 7200194336
+authorizes this addendum only. Main 8cfd204ed46d40f8725efe5df78bd24ad12826c8
+at edit preflight. See [R7a / R7f source feasibility](RUNTIME_LIFECYCLE_RECOVERY_R7A.md)
+for the existing A/B analysis (#2876); this addendum records actual
+source limits and outstanding owner decisions, not a second lifecycle
+contract. R7d-d #2902 and R7d-e #2934 are integrated offline evidence,
+not an implemented lifecycle guard. #2934 historical premerge review
+failure remains recorded in Nurse retrospective closure 7198669788.
+
+### Observed source and custody boundary
+
+| Observed source (blob prefix) | What exists | What does not follow |
+| --- | --- | --- |
+| B5b native_host_candidate_b5b.py 1b21eb72; B5c INSTALLED_HOST_B5C.md ee7ba023; B5e disposable_launcher_b5e.py f4222a29; B5f SPLIT_UID_HOST_B5F.md 967675c2 | CI-only installed /usr/libexec/post-apollo/forest-ci/forest-host, one inherited SEQPACKET endpoint and fixed public HOLD; same-UID launcher and separately controlled split-UID experiment. | No enrolled production launcher, independent process/recipient identity or storage capability. Proposed /usr/libexec/post-apollo/forest/forest-host and /var/lib/post-apollo/forest/ are unapproved, not observed live installations. |
+| Historical bristlecone/runtime/task_session.py a2458c4e (67–103, 175–285); colony/identity.py 849a4378; runtime/session_store.py fff28521, session_identity.py 64e97968 | Frozen Forest repo 28895aaf, raw-import/2026-09-22-transfer/The-Forest/: TaskSessionManager chooses forest_root, state/active.yaml and state/tasks/winter; YAML temporary write, fsync, replace and separate flock. Semantic Tree/context/lineage/operational role and adapter session binding are distinct. | Historical Task persistence is not an enrolled principal-to-store opener, a current canonical member/Assignment registry, rollback protection or atomic lifecycle/conversation commit. Do not import caller-selected root or treat the YAML lock as a cross-store fence. |
+| B6 shared_context_b6r1.py b7fdcfc5; I6 runtime_membership_i6.py dcae58df | Typed original TaskContext reference and bounded same-owner process observations. | Neither proves durable Colony/Assignment membership, per-entity season, authenticated source or provider lifetime. |
+| B1 session_journal_v0.py d1533f15; B3 turn_bridge_b3.py c5dbbc29 | Host-injected SQLite; local BEGIN IMMEDIATE; B3 reserves after body assembly, atomically writes original reply/revision/attempt on local commit. | Owner string is a filter, not authentication; no canonical task slot/lifecycle mapping, trusted opener, prequery permission or external effect serialization. |
+| R5 runtime_public_conversation_r5.py 7dba584a; R6b runtime_public_child_r6b.py 03797786; B4a host_admission_b4a.py 5948497e; B5a host_boundary_fixture_b5a.py e1fa6615 | Disposable conversation DB, child fixture, injected admission, in-memory list fixture. | Not a real private storage owner, durable Colony roster or protected reader/writer. |
+| B2 ollama_chat_transport.py db572336 line 189; B4d recovery_inspect_b4d.py e4f4a537 | Actual first prompt-bearing HTTP request boundary; read-only local attempt inspection. | Local COMMITTED/ABORTED, EOF or STOP does not establish external effect, terminal, revoke or settlement. Lost receipt remains UNKNOWN_HOLD without independently authenticated original outcome. |
+| Connections ForestC5AuthorityBoundary.py 55949fd1; exact-session V1 preflight ccf9cdb8; native disclosure handoff 74b30180; writer custody preflight dc85f8d1 | Deny-only C5 boundary and separate reference candidates. V0 lacks signed sessionId; V1 adds exact signed sessionId, separate requester/reviewer/writer signatures. | V1 keys, B4c binding replica, history floor/predecessor and receipt are caller supplied, not enrolled source or persisted-row proof. No V0 migration/fallback, positive permit, real recipient, authenticated settlement or revocation ACK. |
+| Heart H2 heart_resource_custody_h2.py 4ec58531 | Local instance-held exact six-field AttemptRef and reference accounting. | No independent original process/terminal/quiescence proof, physical release or accelerator/residency credit. Preserve H1 digest and H15b separate evidence lineage. |
+
+### A/B feasibility and HOLD decision
+
+Both candidates require an independently enrolled original host and
+recipient, protected principal-to-store mapping, approved lifecycle
+custodian and authoritative original Task/Tree/member/Assignment
+identity. Neither is selected or qualified. Runtime owns prospective
+lifecycle semantics, not an independently administered storage or
+permission authority.
+
+| Decision point | A: same durable domain | B: separately owned durable domains |
+| --- | --- | --- |
+| Storage ownership | Explicitly approved common lifecycle/conversation domain, opener and migration/old-writer cutover; reuse actual B1/B3 transaction where feasible. | Approved opener for each domain, distinct ownership and original cross-domain identity; no implicit trust from a common UID or directory. |
+| Freeze vs new work | Exact current lifecycle slot/revision and every direct writer checked in the authoritative local transaction before protected title/body read and mutation; no wrapper-only coverage. | Durable original freeze/reservation/effect fence spanning both domains, authoritative ordering and recovery; separate YAML flock or two local commits are insufficient. |
+| Original settlement | Keep exact original operation and conditional r to r+1 reply atomic with local attempt; separate lifecycle revision and settlement evidence. | Durable joined original operation/outcome and recovery proof across stores; no split-write assumption, second reply or fabricated success. |
+| Crash/rollback/ABA | Actual writer recovery and independently current original identity/antirollback anchor, no legacy bypass. | Both stores and coordination recovery must detect rollback, replacement and lost receipt; no automatic replay or partial release. |
+| External authority (both) | Independent prequery/read/use, actual send/revoke, commit and recipient fence remain required; no SQL lock across network as substitute. | Same independent gates; cross-store local fence does not grant protected effects. |
+| Present decision | HOLD: no approved common custodian/opener/mapping. | HOLD: no approved separate custodians/openers or durable cross-store fence. |
+
+### Responsibility and ordering
+
+- Forest Core/Heart and Connections DOC2: identify an approved installed
+  original launcher/process, release, PID/start/boot, lifetime and actual
+  recipient/channel; independent custody must supply the exact principal
+  mapping and protected storage capability, never Bark or request fields.
+- Runtime: preserve original TaskContext/lifetime, lifecycle revision,
+  active claim, exact operation/attempt and B1 conversation revision.
+  Cover create/append (both roles)/resume/set_state/reserve at actual
+  writer boundary, including R5/B4a bypasses. New-work freeze is distinct
+  from exact admitted-original settlement; never blanket STOP to erase
+  eligible original evidence or revive revoked consent.
+- Spirit/Connections: authorize source/query purpose and each required
+  metadata field before enumeration/serialization, including Colony
+  coverage, titles and Warm metadata; separate read/use/generate,
+  commit, provisional/final disclosure, recipient and provider-send
+  permissions. Independently current source, policy and recipient and
+  serialized effect/revocation at actual boundary required. No hidden
+  roster query, stale cache/history attachment, legacy fallback or
+  guessed empty/season from unknown coverage.
+- Connections DOC1/DOC2 and independent custodian: F1 independent admin
+  and custody, F2 Forest-purpose enrollment, F3 rollback-resistant
+  current history/recovery; F4 original durable one-use identity,
+  F5 serialized effect/revoke and terminal receipt, F6 independent
+  native/operator qualification. See [custodian RFC](../../docs/connections-c3e-forest-purpose-custodian-producer-contract-rfc.md),
+  [V1 preflight](../../docs/connections-forest-c5-exact-session-v1-preflight.md)
+  and [native disclosure proposal](../../docs/connections-forest-c5-native-disclosure-handoff-proposal.md).
+  Actual send gate records in-flight original before submitting bytes;
+  revoke blocks new sends and accounts for drain/closure before ACK.
+  Unknown send or lost ACK is HOLD, not recall of delivered bytes.
+  F4/F5 interface preparation requires separate scope, not authority.
+- Heart: exact original H11/H2 and H1 binding, independently current
+  terminal, quiescence and subsequent attributable resource/accounting
+  evidence including retained residency; Spirit independent settlement.
+  Only then may separately authorized durable retirement proceed.
+  No physical release, retry, new admission or inferred Winter from
+  local commit, cache eviction, cleanup or replacement lifetime.
+  UI1/UI2 retain presentation only; no new roster/season producer.
+
+### Outstanding owner/operator decision record
+
+| Decision to record explicitly | Accountable owners / current disposition |
+| --- | --- |
+| Approved original installed host release, launcher, runtime identity, process/recipient observation and containment | Core/Heart, Connections DOC2, operator; no qualified production candidate. |
+| Principal-to-store capability, actual lifecycle/Assignment custodian, storage scope and A/B transaction domain; migration, old writers, sidecars, recovery and rollback policy | Runtime, Core, storage custodian, Connections and operator; unselected. |
+| Independent Forest-purpose administrative/key custody, enrollment, currentness and restore/antirollback topology | Connections DOC1/DOC2 and independent administrator/operator; F1–F3 HOLD. |
+| Original operation, source-use, recipient, send/revoke and exact terminal receipt/unknown recovery ordering | Runtime and Spirit/Connections; F4/F5 interface decisions pending, no positive authority. |
+| Original terminal/quiescence and resource release accounting; independent native acceptance and activation | Heart/Runtime/Spirit, Connections F6, Nurse and operator; HOLD, separate authorization required. |
+
+Connections #2119 decision #7132962989 expressly defers NAS/second-PC
+setup until current-system work is complete. Hardware availability is
+operator-reported, not readiness or selected topology. #7171062483
+remains unanswered at inspection. No provisioning, probing, key
+creation or enrollment request. Local development remains ACTIVE
+within separate authorized scope; no actual protected issuer, opener
+or lifecycle custodian is established by the inspected sources.
+
+No new file, code, guard, schema, registry, issuer, test, workflow,
+storage choice, native/host operation or model admission. Exact
+Heart/Mind/Spirit review, UI1/UI2 targeted compatibility if Colony/UI
+wording is affected, exact-head doc CI and final Nurse source review
+must precede separate operator integration. Native/protected/production
+remain HOLD.

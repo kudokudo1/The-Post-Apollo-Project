@@ -499,21 +499,54 @@ Item {
             canRefresh: !probe.running && root.status !== "READING"
             onRefreshRequested: root.refresh()
         }
-        CpuPlusMemoryReadout {
+        Row {
+            id: diagnosticHeaderBand
+            objectName: "cpuplusDiagnosticHeaderBand"
             width: parent.width
             visible: root.page === "DIAG"
-            text: CpuPlusDiagnostics.feedback
-            color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
-            font.pixelSize: 10
-            elide: Text.ElideRight
-        }
-        CpuPlusMemoryReadout {
-            width: parent.width
-            visible: root.page === "DIAG"
-            color: Colors.yellow
-            font.pixelSize: 9
-            text: root.displaySample ? "PSI 10s // "+root.displaySample.some.toFixed(2)+" / "+root.displaySample.full.toFixed(2)+"%" : "PSI // UNAVAILABLE"
-            elide: Text.ElideRight
+            spacing: 4
+            readonly property int toolSize: Math.max(16,Math.min(36,Math.floor((width*0.57-12)/5)))
+            Column {
+                width: Math.max(0,parent.width-(diagnosticFilterHost.visible ? diagnosticFilterHost.width+parent.spacing : 0))
+                spacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: CpuPlusDiagnostics.feedback
+                    color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
+                    font.pixelSize: 11
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 8
+                    elide: Text.ElideRight
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    color: Colors.yellow
+                    font.pixelSize: 10
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 8
+                    text: root.displaySample ? "PSI 10s // "+root.displaySample.some.toFixed(2)+" / "+root.displaySample.full.toFixed(2)+"%" : "PSI // UNAVAILABLE"
+                    elide: Text.ElideRight
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    visible: diagnosticFilterHost.visible
+                    text: diagnosticPaneLoader.item ? diagnosticPaneLoader.item.workshopTargetText : ""
+                    color: Colors.purple
+                    font.pixelSize: 9
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 8
+                    elide: Text.ElideRight
+                }
+            }
+            Item {
+                id: diagnosticFilterHost
+                objectName: "cpuplusDiagnosticFilterHost"
+                visible: root.page === "DIAG" && !!diagnosticPaneLoader.item && diagnosticPaneLoader.item.workshopOpen
+                width: visible ? 5*diagnosticHeaderBand.toolSize+12 : 0
+                height: visible ? diagnosticHeaderBand.toolSize : 0
+                anchors.verticalCenter: parent.verticalCenter
+            }
         }
     }
     Column {
@@ -766,6 +799,7 @@ Item {
                     headerTarget: workHeader
                     footerTarget: workFooter
                     workshopViewportHeight: scroll.height
+                    workshopFilterTarget: diagnosticFilterHost
                     onNavigationChanged: scroll.contentY=0
                 }
             }

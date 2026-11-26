@@ -23,6 +23,7 @@ import "widgets/cpuplus"
 ShellRoot {
     id: root
     property int requests: 0
+    property int phase: 0
     Window {
         width: 260; height: 120; visible: true
         CpuPlusSystemTargetStrip {
@@ -40,8 +41,23 @@ ShellRoot {
         return rail.children.find(item=>item.objectName==="cpuplusSystemTarget-"+key);
     }
     Timer {
-        interval: 400; running: true; repeat: false
+        interval: 400; running: true; repeat: true
         onTriggered: {
+            if (root.phase===1) { rail.visible=true; root.phase=2; return; }
+            if (root.phase===2) {
+                for (const choice of rail.choices) {
+                    const b=root.find(choice.key);
+                    if (!root.check(b && b.color===Colors.black && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled && b.selected===(choice.key==="CPU"),"reopen actual face "+choice.key)) return;
+                }
+                rail.width=220; root.phase=3; return;
+            }
+            if (root.phase===3) {
+                for (const choice of rail.choices) {
+                    const b=root.find(choice.key);
+                    if (!root.check(b && b.color===Colors.black && b.selected===(choice.key==="CPU"),"reflow face "+choice.key)) return;
+                }
+                console.log("SYSTEM_TARGET_NATIVE_PASS"); Qt.quit(); return;
+            }
             if (!root.check(rail.implicitHeight>=72,"wrapped layout")) return;
             for (const choice of rail.choices) {
                 const b=root.find(choice.key);
@@ -53,15 +69,15 @@ ShellRoot {
                     &&b.idleBorderColor===Colors.resourceColor(choice.key)
                     &&b.hoverFillColor===Colors.yellow&&b.hoverForegroundColor===Colors.orange
                     &&b.hoverBorderColor===Colors.orange&&b.pressedFillColor===Colors.magenta
-                    &&b.pressedForegroundColor===Colors.black&&b.selectedFillColor===Colors.black
-                    &&b.selectedForegroundColor===b.accentColor&&b.outlineOnlyGlow,"canonical state colors "+choice.key)) return;
+                    &&b.pressedForegroundColor===Colors.magenta&&b.selectedFillColor===Colors.black
+                    &&b.selectedForegroundColor===b.accentColor&&b.color===Colors.black
+                    &&!b.softGlowEnabled&&!b.wideGlowEnabled&&b.contentGlowEnabled,"canonical state colors "+choice.key)) return;
             }
             const all=root.find("ALL"), cpu=root.find("CPU");
             if (!root.check(all.selected&&all.accentColor===Colors.white&&root.requests===0,"initial ALL")) return;
             cpu.leftClicked(null);
             if (!root.check(rail.selectedKey==="CPU"&&cpu.selected&&!all.selected&&root.requests===1,"selection route")) return;
-            console.log("SYSTEM_TARGET_NATIVE_PASS");
-            Qt.quit();
+            rail.visible=false; root.phase=1;
         }
     }
 }

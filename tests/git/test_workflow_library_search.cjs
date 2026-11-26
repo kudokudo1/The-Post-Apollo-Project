@@ -19,3 +19,12 @@ const ui=fs.readFileSync(path.join(root,"widgets/WorkflowLibraryView.qml"),"utf8
 for(const needle of ['objectName: "gitWorkflowSearch"', 'ListView {', 'model: root.filteredWorkflows', 'root.workflowSelected(modelData.sourceIndex)', 'root.libraryStore.addWorkflow(workflow)', 'root.githubService.runWorkflow(path, "")', 'root.libraryStore.workflowAvailable(path)', 'NO MATCH IN LOADED WORKFLOWS', 'accountForContentOrigin: true', 'clickToJump: true', 'wheelEnabled: true']) assert.ok(ui.includes(needle),needle);
 assert.ok(!ui.includes("model: root.libraryStore.workflows"));
 console.log("Workflow search and stable row identity contracts PASS");
+
+// Library descendants use a parameterized shared signal; the host must not
+// call that signal without a mouse-event argument on keyboard activation.
+const host=fs.readFileSync(path.join(root,"widgets/GitW.qml"),"utf8");
+assert.ok(host.includes('if (typeof item.activateFromGitKeyboard === "function")'));
+assert.ok(host.includes("item.activateFromGitKeyboard();"));
+assert.equal((ui.match(/function activateFromGitKeyboard\(\)/g)||[]).length,2);
+assert.equal((ui.match(/triggered\(null\);/g)||[]).length,2);
+assert.ok(!ui.includes("runAction ? Colors.green : Colors.orange"));

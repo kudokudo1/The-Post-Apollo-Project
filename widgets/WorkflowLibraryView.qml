@@ -89,6 +89,10 @@ Item {
         selected: selectedAction
         acceptedButtons: Qt.LeftButton
         keyboardActivationSignal: "triggered"
+        function activateFromGitKeyboard() {
+            if (available && interactive)
+                triggered(null);
+        }
         keyboardSelected: hostSelected && root.keyboardHost.gitSelectorSource === "keyboard"
         contentKeyboardNavigationActive: !!root.keyboardHost
             && root.keyboardHost.gitSelectorSource === "keyboard"
@@ -98,14 +102,8 @@ Item {
         idleFillColor: refreshAction ? Colors.yellow : Colors.black
         idleForegroundColor: redAction ? Colors.white : refreshAction ? Colors.magenta : accentColor
         idleBorderColor: refreshAction ? Colors.orange : accentColor
-        hoverForegroundColor: redAction ? Colors.white : runAction ? Colors.green : Colors.orange
-        hoverBorderColor: redAction ? Colors.red : runAction ? Colors.green : Colors.orange
-        hoverContentGlowColor: redAction ? Colors.red : runAction ? Colors.green : Colors.orange
-        hoverSoftGlowColor: redAction ? Colors.red : runAction ? Colors.green : Colors.orange
-        keyboardSelectedForegroundColor: hoverForegroundColor
-        keyboardSelectedBorderColor: hoverBorderColor
-        keyboardSelectedContentGlowColor: hoverContentGlowColor
-        keyboardSelectedSoftGlowColor: hoverSoftGlowColor
+        // All non-red actions use the ordinary shared hover/keyboard recipe.
+        // The semantic accent identifies the resting face only.
 
         Component.onCompleted: if (root.keyboardHost) root.keyboardHost.registerGitKeyboardControl(button)
         Component.onDestruction: if (root.keyboardHost) root.keyboardHost.unregisterGitKeyboardControl(button)
@@ -115,10 +113,15 @@ Item {
 
     component LibraryInformationButton: InformationButton {
         id: button
+        hoverContentGlowColor: Colors.orange
         property bool enabledAction: true
         property bool keyboardNavigable: true
         available: enabledAction
         keyboardActivationSignal: "triggered"
+        function activateFromGitKeyboard() {
+            if (available && interactive)
+                triggered(null);
+        }
         keyboardSelected: !!root.keyboardHost
             && root.keyboardHost.gitKeyboardControl === button
             && root.keyboardHost.gitSelectorSource === "keyboard"

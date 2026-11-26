@@ -26,7 +26,20 @@ Flow {
             selectedContentGlowColor: accentColor
             selectedSoftGlowColor: accentColor
             contentGlowSelectedOpacity: 0.95
-            outlineOnlyGlow: true
+            // U9g / Angels: deterministic opaque face, no filled shadow layers.
+            color: Colors.black
+            softGlowEnabled: false
+            wideGlowEnabled: false
+            contentGlowEnabled: true
+            pressedForegroundColor: Colors.magenta
+            Rectangle {
+                anchors.fill: parent
+                color: "transparent"
+                border.width: 1
+                border.color: filter.activeBorderColor
+                opacity: 0.48
+                visible: filter.selected || filter.hovered || filter.pressed
+            }
             label: String(modelData.symbol || "")
             labelPixelSize: 24
             contentPadding: 0

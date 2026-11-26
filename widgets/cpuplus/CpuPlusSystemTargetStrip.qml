@@ -20,26 +20,12 @@ Flow {
             height: 36
             accentColor: Colors.resourceColor(modelData.key)
             selected: root.selectedKey === String(modelData.key)
-            selectedFillColor: Colors.black
             selectedForegroundColor: accentColor
             selectedBorderColor: accentColor
             selectedContentGlowColor: accentColor
             selectedSoftGlowColor: accentColor
             contentGlowSelectedOpacity: 0.95
-            // U9g / Angels: deterministic opaque face, no filled shadow layers.
-            color: Colors.black
-            softGlowEnabled: false
-            wideGlowEnabled: false
-            contentGlowEnabled: true
-            pressedForegroundColor: Colors.magenta
-            Rectangle {
-                anchors.fill: parent
-                color: "transparent"
-                border.width: 1
-                border.color: filter.activeBorderColor
-                opacity: 0.48
-                visible: filter.selected || filter.hovered || filter.pressed
-            }
+            normalFace: true
             label: String(modelData.symbol || "")
             labelPixelSize: 24
             contentPadding: 0

@@ -1,0 +1,16 @@
+name: GitW workflow library search contracts
+on:
+  pull_request:
+    paths:
+      - "widgets/WorkflowLibraryView.qml"
+      - "services/github/WorkflowSearchPolicy.js"
+      - "tests/git/test_workflow_library_search.cjs"
+      - ".github/workflows/gitw-workflow-library-search.yml"
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/git/test_workflow_library_search.cjs

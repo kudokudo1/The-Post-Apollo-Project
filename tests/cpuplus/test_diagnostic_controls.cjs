@@ -311,16 +311,20 @@ assert.match(read("services/diagnostics/DiagnosticCalibration.js"),/thresholdMs:
 assert.match(workshop,/onValueRequested: value=>root.edit\("stallThresholdMs",Math.round\(value\)\)/);
 assert.match(owner,/Policy.attachWorkflowStall\(output,expected,stallTicks,stallOverflow\)/);
 
-assert.match(parent,/objectName: "cpuplusDiagnosticTopRail"/);
-assert.match(parent,/anchors.top: diagnosticTopRail.bottom/);
-assert.match(parent,/model: \[\{key:"WORK",label:"CONTROLS"\},\{key:"PRESETS",label:"WORKFLOWS"\}\]/);
+assert.doesNotMatch(parent,/diagnosticTopRail/);
+assert.match(ui,/objectName: "cpuplusDiagnosticWorkspaceRail"/);
+assert.match(ui,/model: \[\{key:"WORK",label:"CONTROLS"\},\{key:"PRESETS",label:"WORKFLOWS"\}\]/);
 assert.match(ui,/objectName: "cpuplusDiagnosticWorkflowCatalog"/);
-assert.match(ui,/id: diagnosticIndex\s+visible: root.viewMode !== "PRESETS"/);
+assert.match(ui,/id: diagnosticIndex\s+objectName: "cpuplusDiagnosticContextRail"\s+height: 25/);
 assert.match(workshop,/Calibration.workshopPlanFromDraft\(d\)/);
 assert.match(owner,/function saveWorkshopPreset\(name\)/);
 assert.match(owner,/function loadWorkshopPreset\(name\)/);
 
-assert.match(ui,/model: \["LIBRARY","QUEUE","SETS"\]/);
+assert.match(ui,/model: root.viewMode==="PRESETS" \? \[\{key:"LIBRARY",label:"LIBRARY"\}/);
+assert.match(ui,/\{key:"RESULTS",label:"RESULTS"\}/);
+assert.match(ui,/objectName: "cpuplusDiagBottomControls"\s+width: parent.width\s+spacing: 3\s+height: 53/);
+assert.match(ui,/objectName: "cpuplusDiagnosticReportActions"\s+width: parent.width\s+visible: \["REPORT","HISTORY","COMPARE"\]/);
+assert.match(parent,/onNavigationChanged: scroll.contentY=0/);
 assert.match(ui,/label: presets.armedQueue!==""\?"CONFIRM RUN":"RUN QUEUE"/);
 assert.match(owner,/onArchiveBusyChanged: if\(setActive&&!archiveBusy\) Qt.callLater\(dispatchSetStep\)/);
 assert.match(owner,/archiveRows.find\(x=>x.id===setCurrentId&&x.kind===setCurrentKind\)/);

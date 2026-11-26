@@ -28,6 +28,7 @@ ShellRoot {
     QtObject {
         id: engine
         property bool running: false
+        property bool completionVerified: false
         property var calls: []
         function start(batch) {
             if (running || batch.length !== 1) return false;
@@ -35,11 +36,15 @@ ShellRoot {
             running = true;
             return true;
         }
-        function exit(withResult) {
+        function exit(withResult, mode) {
             const target=calls[calls.length-1];
+            completionVerified = mode !== "abnormal" && mode !== "malformed"
+                && mode !== "timeout" && withResult;
             if (withResult) {
-                controller.applyResult({pid:target.pid,name:target.name,status:"killed",detail:"FAKE"});
-                controller.applyResult({pid:target.pid,name:target.name,status:"killed",detail:"DUPLICATE"});
+                controller.applyResult({pid:target.pid,name:target.name,
+                    status:mode === "escaped" ? "escaped" : "killed",detail:"FAKE"});
+                if (mode === "duplicate")
+                    controller.applyResult({pid:target.pid,name:target.name,status:"killed",detail:"DUPLICATE"});
             }
             running=false;
             controller.finish();
@@ -90,6 +95,16 @@ ShellRoot {
                 engine.exit(false);
                 if (!check(controller.phase==="report" && controller.results.length===4
                            && engine.calls.length===3,"unknown result stops remaining dispatch")) return;
+                for (const mode of ["escaped","abnormal","malformed","timeout","duplicate"]) {
+                    const before=engine.calls.length;
+                    controller.start("kill-hogs",controller.targetsFromRows(fakeHost.taskRows));
+                    engine.exit(true,mode);
+                    if (!check(controller.phase==="report" && engine.calls.length===before+1
+                            && controller.results.length===4
+                            && controller.results[0].status==="escaped"
+                            && controller.results[1].detail.indexOf("NOT ATTEMPTED")===0,
+                            "fail closed after "+mode)) return;
+                }
                 const priorCalls=engine.calls.length;
                 controller.start("kill-all",[]);
                 if (!check(engine.calls.length===priorCalls,"empty Kill All never expands")) return;

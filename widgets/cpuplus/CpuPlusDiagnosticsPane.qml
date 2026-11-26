@@ -13,7 +13,27 @@ Column {
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
-    property bool workshopOpen: true
+    property string viewMode: "WORK"
+    readonly property bool workshopOpen: viewMode === "WORK"
+    function consumeReportView() {
+        if (!CpuPlusDiagnostics.pendingReportView) return;
+        CpuPlusDiagnostics.pendingReportView = false;
+        selectView("REPORT");
+    }
+    Component.onCompleted: consumeReportView()
+    Connections {
+        target: CpuPlusDiagnostics
+        function onPendingReportViewChanged() { root.consumeReportView(); }
+    }
+    function selectView(mode) {
+        if (!["WORK","QUICK","REPORT","HISTORY","COMPARE"].includes(mode)) return;
+        showReport=false;
+        showHistory=mode==="HISTORY" || mode==="COMPARE";
+        showComparison=mode==="COMPARE";
+        viewMode=mode;
+        if (showHistory && !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
+            CpuPlusDiagnostics.loadHistory();
+    }
     readonly property var report: CpuPlusDiagnostics.selectedArchiveId
         ? CpuPlusDiagnostics.reportFor(selectedReport, CpuPlusDiagnostics.selectedArchiveId)
         : CpuPlusDiagnostics.reports[selectedReport] || null
@@ -172,35 +192,16 @@ Column {
         spacing: 3
         GohuText {
             width: parent.width
-            text: "TROUBLESHOOT // ON DEMAND"
-            color: Colors.magenta
-            font.pixelSize: 12
-        }
-        GohuText {
-            width: parent.width
             text: CpuPlusDiagnostics.feedback
             color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
             font.pixelSize: 10
-            wrapMode: Text.WordWrap
-        }
-        ActionButton {
-            objectName: "cpuplusWorkshopToggle"
-            width: parent.width
-            height: 28
-            accentColor: Colors.magenta
-            label: root.workshopOpen ? "WORKSHOP // QUICK CAPTURES" : "OPEN DIAGNOSTIC WORKSHOP"
-            labelPixelSize: 10
-            labelFontSizeMode: Text.HorizontalFit
-            contentPadding: 2
-            selected: root.workshopOpen
-            acceptedButtons: Qt.LeftButton
-            onLeftClicked: root.workshopOpen = !root.workshopOpen
+            elide: Text.ElideRight
         }
         ActionButton {
             width: parent.width
             height: 26
-            visible: root.workshopOpen && CpuPlusDiagnostics.busy
-                && CpuPlusDiagnostics.captureId !== CpuPlusDiagnostics.workshopRunId
+            visible: CpuPlusDiagnostics.busy && (root.viewMode !== "WORK"
+                || CpuPlusDiagnostics.captureId !== CpuPlusDiagnostics.workshopRunId) && root.viewMode !== "QUICK"
             available: !CpuPlusDiagnostics.cancelled
             accentColor: Colors.red
             destructive: true
@@ -209,7 +210,7 @@ Column {
         }
         Grid {
             id: captureGrid
-            visible: !root.workshopOpen
+            visible: root.viewMode === "QUICK"
             width: parent.width
             columns: 2
             spacing: 3
@@ -260,7 +261,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        visible: !root.workshopOpen
+        visible: root.viewMode === "QUICK"
         text: "Close this menu and reproduce the issue, then return here. APPCONTROL TEST: open AppControl, spend time in APP and KILL, then close it; no process actions needed. CPU sampling runs outside Quickshell; opening markers run inside it. CANCEL stops early without a verified comparison. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
         color: Colors.white
         font.pixelSize: 10
@@ -268,6 +269,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.viewMode === "REPORT"
         text: root.report ? root.report.status + " // " + root.report.finishedAt
             + "\n" + root.report.summary : "NO CAPTURE SELECTED"
         color: root.report && root.report.status === "COMPLETE" ? Colors.cyan : Colors.orange
@@ -280,7 +282,7 @@ Column {
         objectName: "cpuplusMemoryBreakdown"
         width: parent.width
         spacing: 4
-        visible: root.selectedReport === "memory" && root.report !== null
+        visible: root.viewMode === "REPORT" && root.selectedReport === "memory" && root.report !== null
         GohuText {
             width: parent.width
             text: "QUICKSHELL // CAPTURE BREAKDOWN"
@@ -447,7 +449,7 @@ Column {
     TextEdit {
         id: reportText
         width: parent.width
-        visible: root.showReport && root.report !== null
+        visible: root.viewMode === "REPORT" && root.showReport && root.report !== null
         height: visible ? implicitHeight : 0
         text: visible && root.report ? root.report.text : ""
         readOnly: true
@@ -460,6 +462,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.viewMode === "HISTORY" || root.viewMode === "COMPARE"
         text: "LOCAL ARCHIVE // " + CpuPlusDiagnostics.archiveStatus
         color: CpuPlusDiagnostics.archiveStatus === "READY" ? Colors.cyan : Colors.orange
         font.pixelSize: 10
@@ -475,14 +478,16 @@ Column {
             labelPixelSize: 9
             selected: root.report !== null && root.report.id === modelData.id
             onLeftClicked: {
-                if (CpuPlusDiagnostics.selectExactReport(modelData.kind, modelData.id)) {
+                if (CpuPlusDiagnostics.selectExactReport(modelData.kind, modelData.id, false)) {
                     root.showReport = false;
+                    if (root.viewMode === "HISTORY") root.selectView("REPORT");
                 }
             }
         }
     }
     GohuText {
         width: parent.width
+        visible: root.viewMode === "COMPARE"
         text: "COMPARE // SELECT A COMPLETED ARCHIVE REPORT"
         color: Colors.magenta
         font.pixelSize: 11
@@ -490,6 +495,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.viewMode === "COMPARE"
         text: "BEFORE // " + root.comparisonLabel(root.beforeRecord)
             + "\nAFTER // " + root.comparisonLabel(root.afterRecord)
         color: Colors.cyan
@@ -542,7 +548,34 @@ Column {
         width: parent.width
         spacing: 3
         Row {
+            id: diagnosticIndex
+            width: parent.width
+            spacing: 3
+            Repeater {
+                model: [{key:"WORK",label:"WORK"},{key:"QUICK",label:"QUICK"},
+                        {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
+                        {key:"COMPARE",label:"CMP"}]
+                ActionButton {
+                    required property var modelData
+                    width: Math.max(0,Math.floor((diagnosticIndex.width-12)/5))
+                    height: 25
+                    label: modelData.label
+                    accentColor: Colors.cyan
+                    labelPixelSize: 10
+                    labelFontSizeMode: Text.HorizontalFit
+                    contentPadding: 1
+                    selected: root.viewMode===modelData.key
+                    selectedFillColor: Colors.black
+                    selectedBorderColor: Colors.magenta
+                    selectedForegroundColor: Colors.magenta
+                    acceptedButtons: Qt.LeftButton
+                    onLeftClicked: root.selectView(modelData.key)
+                }
+            }
+        }
+        Row {
             id: reportRail
+            visible: root.viewMode === "REPORT"
             width: parent.width
             spacing: 3
             Repeater {
@@ -566,6 +599,7 @@ Column {
         }
         Row {
             id: reportActions
+            visible: root.viewMode === "REPORT"
             width: parent.width
             spacing: 3
             ActionButton {
@@ -589,31 +623,30 @@ Column {
         }
         Row {
             id: historyActions
+            visible: root.viewMode === "HISTORY" || root.viewMode === "COMPARE"
             width: parent.width
             spacing: 3
             ActionButton {
                 width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
                 height: 26
-                label: root.showHistory ? "HIDE HISTORY" : "LOAD HISTORY"
-                available: root.showHistory || (!CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
-                onLeftClicked: {
-                    if (root.showHistory) root.showHistory = false;
-                    else if (CpuPlusDiagnostics.loadHistory()) root.showHistory = true;
-                }
+                label: "RELOAD ARCHIVE"
+                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy
+                onLeftClicked: CpuPlusDiagnostics.loadHistory()
             }
             ActionButton {
                 width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
                 height: 26
-                label: root.showComparison ? "HIDE COMPARISON" : "COMPARE CAPTURES"
+                label: root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE"
                 labelFontSizeMode: Text.HorizontalFit
                 labelMinimumPixelSize: 8
                 contentPadding: 2
-                available: root.showComparison || (root.beforeRecord !== null && root.afterRecord !== null)
-                onLeftClicked: root.showComparison = !root.showComparison
+                available: true
+                onLeftClicked: root.selectView(root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE")
             }
         }
         Row {
             id: compareRail
+            visible: root.viewMode === "COMPARE"
             width: parent.width
             spacing: 4
             ActionButton {
@@ -634,6 +667,7 @@ Column {
     }
     GohuText {
         width: parent.width
+        visible: root.viewMode === "HISTORY"
         text: "Last 8 terminal captures saved locally; oldest replaced on the next save. Session captures remain available if archive write fails. No automatic uploads or privileged actions."
         color: Colors.white
         font.pixelSize: 10

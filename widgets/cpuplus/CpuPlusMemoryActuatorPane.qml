@@ -362,8 +362,12 @@ Item {
                 selected: root.menuIndex === index
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"
-                contentGlowEnabled: false
-                softGlowEnabled: false
+                accentColor: Colors.cyan
+                selectedFillColor: Colors.black
+                selectedForegroundColor: Colors.magenta
+                selectedBorderColor: Colors.magenta
+                contentGlowEnabled: true
+                softGlowEnabled: true
                 onLeftClicked: root.selectMenu(index)
             }
         }
@@ -392,8 +396,8 @@ Item {
             width: parent.width
             spacing: 4
             GohuText {
-                width: Math.max(0,parent.width-72-parent.spacing)
-                height: Math.max(26,implicitHeight)
+                width: Math.max(0,parent.width-(workRefresh.visible ? 72+parent.spacing : 0))
+                height: Math.max(workRefresh.visible ? 26 : 14,implicitHeight)
                 text: "SOURCE // " + root.status
                 color: root.sample ? Colors.cyan : Colors.orange
                 font.pixelSize: 10
@@ -401,7 +405,9 @@ Item {
                 wrapMode: Text.Wrap
             }
             ActionButton {
+                id: workRefresh
                 objectName: "cpuplusWorkRefresh"
+                visible: !root.headerRefreshAvailable
                 width: 72
                 height: 26
                 label: "REFRESH"
@@ -412,6 +418,57 @@ Item {
                 idleBorderColor: Colors.orange
                 available: !probe.running && root.status !== "READING"
                 onLeftClicked: root.refresh()
+            }
+        }
+        // Live read-only observations from the same snapshot as CAP.
+        Column {
+            objectName: "cpuplusDiagPinnedStatus"
+            width: parent.width
+            visible: root.page === "DIAG"
+            spacing: 2
+            GohuText {
+                width: parent.width
+                color: Colors.yellow
+                font.pixelSize: 9
+                text: root.displaySample ? "PSI 10s // "+root.displaySample.some.toFixed(2)+" / "+root.displaySample.full.toFixed(2)+"%" : "PSI // UNAVAILABLE"
+                elide: Text.ElideRight
+            }
+            Repeater {
+                model: [
+                    {label:"RAM AVAIL", ink:Colors.magenta, fill:Colors.cyan,
+                        used:root.displaySample?root.displaySample.available:0,
+                        total:root.displaySample?root.displaySample.total:0},
+                    {label:"SWAP USED", ink:Colors.yellow, fill:Colors.yellow,
+                        used:root.displaySample?root.displaySample.swap-root.displaySample.free:0,
+                        total:root.displaySample?root.displaySample.swap:0}
+                ]
+                delegate: Item {
+                    required property var modelData
+                    width: workHeader.width
+                    height: 21
+                    Rectangle {
+                        anchors.fill: parent
+                        color: Colors.black
+                        border.color: modelData.ink
+                        Rectangle {
+                            x:2; y:2
+                            height: parent.height-4
+                            width: modelData.total>0 ? Math.max(0,parent.width-4)*Math.max(0,Math.min(1,modelData.used/modelData.total)) : 0
+                            color: modelData.fill
+                            opacity: 0.35
+                        }
+                    }
+                    CpuPlusMemoryReadout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 4
+                        anchors.rightMargin: 4
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 10
+                        color: Colors.white
+                        text: modelData.label+" // "+(root.displaySample?root.gib(modelData.used)+" / "+root.gib(modelData.total):"UNAVAILABLE")
+                        elide: Text.ElideRight
+                    }
+                }
             }
         }
     }
@@ -425,6 +482,7 @@ Item {
         Rectangle { width: parent.width; height: 1; color: Colors.cyan }
         CpuPlusMemoryReadout {
             width: parent.width
+            visible: root.page !== "DIAG" || MemoryOperation.busy
             text: MemoryOperation.busy ? "OPERATION // IN PROGRESS"
                 : "AUTH // EXPLICIT ONE-SHOT ONLY"
             color: Colors.orange
@@ -433,6 +491,7 @@ Item {
         }
         CpuPlusMemoryReadout {
             width: parent.width
+            visible: root.page !== "DIAG"
             text: "QUEUE // NOT CONNECTED"
             color: Colors.orange
             font.pixelSize: 10
@@ -691,15 +750,15 @@ Item {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
-        contentHeight: Math.max(height, body.implicitHeight + (root.capDetailsActive ? 4 : 18))
+        contentHeight: Math.max(height, body.implicitHeight + (root.capDetailsActive || root.page === "DIAG" ? 4 : 18))
         // Fixed instrument whenever it fits; preserve access if the operator shrinks it.
-        interactive: !root.capDetailsActive || contentHeight > height + 1
+        interactive: (root.page !== "DIAG" && !root.capDetailsActive) || contentHeight > height + 1
         Column {
             id: body
             x: 5
-            y: root.capDetailsActive ? 2 : 8
+            y: root.capDetailsActive || root.page === "DIAG" ? 2 : 8
             width: Math.max(0, scroll.width - 17)
-            spacing: 10
+            spacing: root.page === "DIAG" ? 2 : 10
             GohuText {
                 visible: root.page !== "CAP" && !root.fixedWorkPage
                 text: "MEMORY // " + root.menuTitles[root.menuIndex]
@@ -725,40 +784,6 @@ Item {
                 idleBorderColor: Colors.orange
                 available: !probe.running
                 onLeftClicked: root.refresh()
-            }
-            Repeater {
-                model: !root.sample ? []
-                    : root.page === "DIAG" ? [
-                    "PHYSICAL // " + root.gib(root.sample.total),
-                    "AVAILABLE // " + root.gib(root.sample.available),
-                    "SWAP USED // " + root.gib(root.sample.swap - root.sample.free)
-                        + " / " + root.gib(root.sample.swap),
-                    "PRESSURE SOME / FULL (10s) // " + root.sample.some.toFixed(2)
-                        + "% / " + root.sample.full.toFixed(2) + "%"
-                    ] : []
-                delegate: GohuText {
-                    required property string modelData
-                    width: body.width
-                    text: modelData
-                    color: Colors.white
-                    font.pixelSize: 11
-                    wrapMode: Text.WordWrap
-                }
-            }
-            Repeater {
-                model: root.sample && root.page === "DIAG"
-                    ? root.sample.rows : []
-                delegate: GohuText {
-                    required property var modelData
-                    width: body.width
-                    textFormat: Text.PlainText
-                    text: modelData.kind + " // " + modelData.name + "\n"
-                          + root.gib(modelData.used) + " / " + root.gib(modelData.size)
-                          + " // PRIORITY " + modelData.priority
-                    color: Colors.cyan
-                    font.pixelSize: 10
-                    wrapMode: Text.Wrap
-                }
             }
             Loader {
                 width: parent.width

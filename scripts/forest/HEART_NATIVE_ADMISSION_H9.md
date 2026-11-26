@@ -437,3 +437,87 @@ original terminal and Connections custody remain unqualified. Request
 Runtime/Spirit/Nurse exact design review before operator integration.
 Any future executable H1/P1/H2 revision, tests or native qualification
 requires separate explicit bounded approval. Production remains HOLD.
+
+
+## H15b // Original applicability evidence lifecycle (design only)
+
+Nurse #2161 7199718625 authorizes this existing document only.
+Heart 7198813100, Runtime 7198782473 and Spirit 7196776273 define
+the scope. H15 is integrated. No selected issuer, representation,
+wire schema, new evaluator, or executable exception. Existing H1
+62dc22ec and H2 4ec58531 remain unchanged: zero-demand refusal and
+all-dimension release checks still apply.
+
+### Candidate versioned vocabulary, not an API
+
+Separate immutable original lineage from fresh independent evidence.
+The six-field H11 AttemptRef and H1 TransportSettings fingerprint
+retain their exact existing meanings. A future reference would need
+a reviewed version and the following bound field groups, not merely
+a caller assertion, a configuration digest or a zero quantity.
+
+| Group | Required binding or evidence |
+| --- | --- |
+| Original operation | Exact H11 AttemptRef, task/turn/operation/attempt, model binding/settings, original claim incarnation; not a replacement context or reusable proof. |
+| Planned configuration | Exact artifact, provider/runtime release and immutable execution/workload/placement manifest commitment; explicitly planned CPU-only, not actual observation. |
+| Actual original lifetime | Independently pinned host boot, provider/process identity and start, scope and descendant boundary, actual artifact/runtime/manifest and effective placement. No invented precreation PID. |
+| Preventive controls | Independent observer/policy source and revision, actual inherited effective device policy semantics, prevention of control mutation, descriptor transfer, alternative service/network/offload and migration; actual provider as well as descendants, not client alone. |
+| Applicability and charge | Accelerator inapplicable only with independently established original exclusion and separate no-attributable-accelerator-charge evidence, including prior retained residency. Unknown applicable demand is not zero. |
+| Currentness and coverage | Exact original lineage plus independently current source, policy/effect ordering, original clock domain, observation interval and completeness; independent original terminal/quiescence and later accounting are separate observations. |
+
+Fresh observations naturally differ in timestamps, resource values
+and coverage. Do not require byte-identical changing observations or
+accept equal-value stale evidence as current. Pin the immutable lineage
+and compare each new observation to that lineage and its independently
+current source and applicable policy. A local lock can serialize local
+reference checks only; it cannot prove continuous native prevention,
+source authenticity, or revocation/effect ordering. No new issuer or
+actual authenticated observer has been identified.
+
+### Stage and custody matrix
+
+| Stage | Required evidence and ordering | Missing or contradictory evidence |
+| --- | --- | --- |
+| Plan before creation | Independently reviewed planned manifest and selected CPU-only path, conservative applicable RAM/CPU demand, explicit ceilings and fresh available capacity, approved containment plan; no actual process identity or eligibility inferred. | No progression. No automatic GPU/CPU fallback or retry. |
+| Separately authorized creation, before model/provider effect | Runtime pins actual original process/scope and provider/descendants behind trusted progression gate; establish actual preventive exclusion, independent original no-attributable-charge evidence, exact original attempt and claim incarnation. Revalidate plan and applicable resources. | Runtime retains original creation/unknown-effect custody; no successful H2 admission inferred, no progression or replacement. |
+| Prospective original resource claim | Recompute exact applicable resource fit/currentness with independently qualified applicability; retain original evidence lineage within original serialized custody before effect. Existing H1/H2 cannot yet admit this case. | No new successful claim; preserve any original outstanding creation/operation. |
+| Original progression and execution | Independently revalidate actual source/policy/placement and prevent unobserved control/FD/offload changes over the original interval. Preserve original H11 binding, one attempt and no new effect from evidence alone. | If original claim held, keep it sticky HOLD. No retry, replacement proof, reinitialization or release. |
+| Terminal and later accounting | Independent original terminal and quiescence, same original source/clock and currentness, exact applicable remaining availability, retained residency accounted and original exclusion/charge coverage through terminal. Final accounting later than terminal, never inferred from cleanup. | Hold original custody; missing or uncertain attributable device charge is not zero or free capacity. |
+| Hypothetical reference release | Only original matching custody after all prior evidence and independent settlement. No physical release credit or new permission. | No release or new admission. Existing refusal remains until a separately approved contract exists. |
+
+The planned and actual stages cannot be collapsed: no positive claim
+from planned CPU-only configuration, no model progression while actual
+evidence is still incomplete. If an original isolated creation cannot
+be qualified, its bounded cleanup and independent original outcome are
+Runtime responsibilities; do not fabricate a terminal receipt to clear
+it. H14-D's separately planned no-model startup gate and <=1s deadline
+are unchanged; its success would not establish model placement.
+P2B timing-only remains separate from H11 dispatch.
+
+### Negative matrix for a separate future design/executable decision
+
+| Case | Required result |
+| --- | --- |
+| Planned CPU-only manifest without actual original identity | No applicability exception, claim success or model progression. |
+| Matching manifest with a different provider/process/start/scope/attempt/claim incarnation | Refuse; no proof transfer even if resource quantities match. |
+| Client-only restriction, unverified inherited policy or retained/transferred accelerator FD, alternate service/offload | Refuse original applicability; no zero substitution. |
+| Current negative access observation with prior or unknown attributable device charge | Hold; no retained-residency credit. |
+| Fresh original observation with changed timestamp/value but unchanged lineage | Independently re-evaluate currentness and applicable fit, not an automatic mismatch or grant. |
+| Same-value old observation, clock regression, observer loss or unproved intervening policy change | HOLD; historical proof is not current continuous prevention. |
+| Creation succeeds but actual gate fails | Retain original Runtime creation/unknown-effect custody; no successful H2 claim, progression, fallback or retry. |
+| Already held original claim, proof changes or is lost | Sticky original HOLD; no recreation/reclaim, replacement or release by local comparison. |
+| Original terminal missing/unknown, quiescence incomplete, later accounting stale/foreign or attributable residency unresolved | Hold exact original custody; no physical release or Winter. |
+| Local SQL COMMITTED/ABORTED, STOP/EOF, cache/roster changes or benign no-model test | No inference of original native terminal, applicability, release or admission. |
+| Positive applicable requirement with unknown capacity, or zero RAM/CPU requirement | Keep existing refusal and positive applicable budget checks. |
+
+### Decision boundary
+
+No actual independently qualified original process/observer/policy
+source or retained-charge coverage is established. H15b selects no
+schema, source, dataclass, permission, implementation or native trial.
+Before any proposed executable change, require separate owner-approved
+representation and original claim/terminal/accounting compatibility
+with H11/R7 and independent evidence feasibility. Otherwise retain
+existing zero-demand refusal. Exact Runtime, Spirit and Nurse source
+review and CI before operator documentation integration; all native,
+protected and production gates remain HOLD.

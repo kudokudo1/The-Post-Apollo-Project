@@ -110,3 +110,18 @@ test("master and per-action lock state is rendered with donor glyphs and exact-o
     assert.match(recipient,/actionTarget: rightActions/);
     assert.equal((donorView.match(/parent: taskManagerBody\.actionTarget \|\| taskManagerBody/g)||[]).length,6);
 });
+
+test("PROCESS visibility increases only the existing owner sampling cadence", () => {
+    const owner=read("widgets/AppControlW.qml");
+    const shell=read("shell.qml");
+    assert.match(shell,/AppControlW\s*\{[\s\S]*?cpuPlusProcessVisible:\s*cpuPlusWindow\.menuOpen\s*&& cpuPlusWindow\.selectedModeIndex === 1/);
+    assert.match(owner,/property bool cpuPlusProcessVisible: false/);
+    assert.match(owner,/taskMiniHistoryKeepImmutable: appControlWindow\.menuOpen\s*\|\| appControlWindow\.cpuPlusProcessVisible/);
+    assert.match(owner,/function taskMiniProbeNeeded\(\) \{\s*return cpuPlusProcessVisible\s*\|\| \(menuOpen/);
+    assert.match(owner,/id: taskManagerRefreshTimer[\s\S]*?interval:\s*appControlWindow\.cpuPlusProcessVisible\s*\? 600/);
+    assert.match(owner,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: appControlWindow\.taskMiniProbeNeeded\(\)/);
+    assert.equal((owner.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,1);
+    assert.doesNotMatch(recipient,/^\s*(Timer|ProcessTelemetry)\s*\{/m);
+    assert.match(recipient,/row\.cpuInstant !== undefined \? row\.cpuInstant : row\.cpu/);
+    assert.match(recipient,/now-lastDetailSampleMs<history\.taskGraphScrollDuration/);
+});

@@ -16,6 +16,9 @@ import "../../components"
 
     // Hosts choose placement; the shared action column owns visual order.
     property Item actionTarget: null
+    property Item quickActionTarget: null
+    property Item lockTarget: null
+    readonly property bool headerActions: quickActionTarget !== null
     property real viewportHeight: 0
     readonly property bool compact: viewportHeight > 0
     readonly property int graphCount: taskCpuGraph.hunterMetricView && !taskCpuGraph.combiView ? 1 : 2
@@ -1129,6 +1132,7 @@ import "../../components"
                     Item {
                     id: taskTerminationHeaderBox
 
+                    visible: !taskManagerBody.lockTarget
                     width: parent.width
                     height: 30
 
@@ -1159,11 +1163,12 @@ import "../../components"
 
                     Row {
                         id: taskActionLockRow
-                        anchors.right: parent.right
+                        parent: taskManagerBody.lockTarget || taskTerminationHeaderBox
+                        anchors.right: taskManagerBody.lockTarget ? undefined : parent.right
                         // KILLING ACTION cards are parent.width - 10 and centered,
                         // so their right edge sits 5 px inside this column.
                         anchors.rightMargin: 5
-                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenter: taskManagerBody.lockTarget ? undefined : parent.verticalCenter
                         anchors.verticalCenterOffset: 0
                         spacing: 5
 
@@ -1236,9 +1241,10 @@ import "../../components"
 
                 ActionButton {
                     id: taskRestartAction
-                    width: parent.width - 10
-                    height: 34
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    parent: taskManagerBody.quickActionTarget || actionColumn
+                    width: taskManagerBody.headerActions ? 34 : parent.width - 10
+                    height: taskManagerBody.headerActions ? width : 34
+                    anchors.horizontalCenter: taskManagerBody.headerActions ? undefined : parent.horizontalCenter
 
                     property bool protectedTask:
                         taskManagerBody.currentTask
@@ -1257,27 +1263,37 @@ import "../../components"
                         && (processController.currentTask !== null)
                         && host.selectedDetailActionIndex === 0
                     destructive: true
-                    showLabel: false
+                    showLabel: taskManagerBody.headerActions
+                    label: taskManagerBody.headerActions ? ("↻") : ""
+                    labelPixelSize: 23
+                    labelMinimumPixelSize: 7
+                    labelFontSizeMode: Text.Fit
+                    contentPadding: taskManagerBody.headerActions ? 2 : 8
+                    Accessible.name: "Restart process"
+                    accentColor: taskManagerBody.headerActions ? Colors.yellow : Colors.cyan
+                    idleForegroundColor: taskManagerBody.headerActions ? Colors.yellow : Colors.white
+                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.orange : Colors.white
+                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.magenta : Colors.white
                     pointerCursorShape: Qt.ArrowCursor
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
                     selectedFillColor: Colors.yellow
-                    pressedFillColor: Colors.red
-                    idleBorderColor: Colors.red
-                    hoverBorderColor: Colors.red
-                    selectedBorderColor: Colors.red
+                    pressedFillColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
+                    idleBorderColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
+                    hoverBorderColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
+                    selectedBorderColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     pressedBorderColor: Colors.black
                     unavailableOpacity: 0.34
 
-                    contentGlowEnabled: false
+                    contentGlowEnabled: taskManagerBody.headerActions
                     softGlowEnabled: true
                     softGlowSpread: 4
                     softGlowMargin: 4
-                    idleSoftGlowColor: Colors.red
-                    hoverSoftGlowColor: Colors.red
-                    selectedSoftGlowColor: Colors.red
-                    pressedSoftGlowColor: Colors.red
+                    idleSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
+                    hoverSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
+                    selectedSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
+                    pressedSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     softGlowIdleOpacity: 0.30
                     softGlowHoverOpacity: 0.58
                     softGlowSelectedOpacity: 0.58
@@ -1297,6 +1313,7 @@ import "../../components"
                     }
 
                     Row {
+                        visible: !taskManagerBody.headerActions
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: 8
@@ -1745,9 +1762,10 @@ import "../../components"
                 ActionButton {
                     id: taskFreezeAction
 
-                    width: parent.width - 10
-                    height: 34
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    parent: taskManagerBody.quickActionTarget || actionColumn
+                    width: taskManagerBody.headerActions ? 34 : parent.width - 10
+                    height: taskManagerBody.headerActions ? width : 34
+                    anchors.horizontalCenter: taskManagerBody.headerActions ? undefined : parent.horizontalCenter
 
                     property bool protectedTask:
                         taskManagerBody.currentTask
@@ -1771,7 +1789,17 @@ import "../../components"
                         host.detailFocused
                         && (processController.currentTask !== null)
                         && host.selectedDetailActionIndex === 1
-                    showLabel: false
+                    showLabel: taskManagerBody.headerActions
+                    label: taskManagerBody.headerActions ? (processController.isFrozen() ? "⋆♨⋆" : "⋆❆⋆") : ""
+                    labelPixelSize: 18
+                    labelMinimumPixelSize: 7
+                    labelFontSizeMode: Text.Fit
+                    contentPadding: taskManagerBody.headerActions ? 2 : 8
+                    Accessible.name: processController.isFrozen() ? "Thaw process" : "Freeze process"
+                    accentColor: taskManagerBody.headerActions ? Colors.cyan : Colors.cyan
+                    idleForegroundColor: taskManagerBody.headerActions ? Colors.cyan : Colors.white
+                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.orange : Colors.white
+                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.magenta : Colors.white
                     pointerCursorShape: Qt.ArrowCursor
 
                     idleFillColor: Colors.black
@@ -1784,7 +1812,7 @@ import "../../components"
                     pressedBorderColor: Colors.cyan
                     unavailableOpacity: 0.34
 
-                    contentGlowEnabled: false
+                    contentGlowEnabled: taskManagerBody.headerActions
                     softGlowEnabled: true
                     softGlowSpread: 4
                     softGlowMargin: 4
@@ -1811,6 +1839,7 @@ import "../../components"
                     }
 
                     Row {
+                        visible: !taskManagerBody.headerActions
                         anchors.fill: parent
                         anchors.leftMargin: 4
                         anchors.rightMargin: 38
@@ -1897,9 +1926,10 @@ import "../../components"
                         onTriggered: taskEndAction.clickFirePulse = false
                     }
 
-                    width: parent.width - 10
-                    height: 36
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    parent: taskManagerBody.quickActionTarget || actionColumn
+                    width: taskManagerBody.headerActions ? 34 : parent.width - 10
+                    height: taskManagerBody.headerActions ? width : 36
+                    anchors.horizontalCenter: taskManagerBody.headerActions ? undefined : parent.horizontalCenter
 
                     property bool protectedTask:
                         taskManagerBody.currentTask
@@ -1924,7 +1954,17 @@ import "../../components"
                         && (processController.currentTask !== null)
                         && host.selectedDetailActionIndex === 2
                     destructive: true
-                    showLabel: false
+                    showLabel: taskManagerBody.headerActions
+                    label: taskManagerBody.headerActions ? ((taskEndAction.pressed || taskEndAction.clickFirePulse) ? "(=ᗜ=)デ╾━" : "(-_•)デ╾━") : ""
+                    labelPixelSize: 10
+                    labelMinimumPixelSize: 7
+                    labelFontSizeMode: Text.Fit
+                    contentPadding: taskManagerBody.headerActions ? 2 : 8
+                    Accessible.name: "End process (TERM)"
+                    accentColor: taskManagerBody.headerActions ? Colors.red : Colors.cyan
+                    idleForegroundColor: taskManagerBody.headerActions ? Colors.white : Colors.white
+                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.red : Colors.white
+                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.red : Colors.white
                     pointerCursorShape: Qt.ArrowCursor
 
                     idleFillColor: Colors.black
@@ -1937,7 +1977,7 @@ import "../../components"
                     pressedBorderColor: Colors.black
                     unavailableOpacity: 0.34
 
-                    contentGlowEnabled: false
+                    contentGlowEnabled: taskManagerBody.headerActions
                     softGlowEnabled: true
                     softGlowSpread: 5
                     softGlowMargin: 5
@@ -1966,6 +2006,7 @@ import "../../components"
                     }
 
                     Row {
+                        visible: !taskManagerBody.headerActions
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter

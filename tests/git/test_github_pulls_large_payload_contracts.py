@@ -50,7 +50,7 @@ assert shutil.which("jq"), "jq is required for the real PR loader and its regres
 SCRIPT = embedded_pull_script()
 
 
-def run_synthetic(payload, gh_code=0):
+def run_synthetic(payload, gh_code=0, raw=False):
     with tempfile.TemporaryDirectory(prefix="apollo-pr-regression-") as tmp:
         root = Path(tmp)
         bindir = root / "bin"
@@ -61,12 +61,36 @@ def run_synthetic(payload, gh_code=0):
         fixture.write_text(payload, encoding="utf-8")
         shim = bindir / "gh"
         shim.write_text(
-            "#!/bin/sh\n"
-            'case "$*" in\n'
-            '  *graphql*) cat "$PA_TEST_GRAPHQL_FIXTURE"; exit "$PA_TEST_GH_EXIT";;\n'
-            '  *requested_reviewers*) printf "0\\n";;\n'
-            '  *) printf "[]\\n";;\n'
-            'esac\n',
+            """#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+if "graphql" in args:
+    raw = open(os.environ["PA_TEST_GRAPHQL_FIXTURE"]).read()
+    code = int(os.environ["PA_TEST_GH_EXIT"])
+    if os.environ.get("PA_TEST_RAW") == "1":
+        sys.stdout.write(raw)
+        sys.exit(code)
+    try:
+        rows = json.loads(raw)
+    except ValueError:
+        sys.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n" + raw)
+        sys.exit(code)
+    page = 0
+    for arg in args:
+        if arg.startswith("cursor="):
+            page = int(arg.split("=", 1)[1])
+    chunk = rows[page * 25:(page + 1) * 25]
+    more = len(rows) > (page + 1) * 25
+    body = {"data":{"repository":{"pullRequests":{"nodes":chunk,"pageInfo":{
+        "hasNextPage":more,"endCursor":str(page + 1) if more else None}}}}}
+    sys.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\n\\r\\n")
+    json.dump(body, sys.stdout)
+    sys.exit(code)
+if any("requested_reviewers" in arg for arg in args):
+    print("0")
+else:
+    print("[]")
+""",
             encoding="utf-8",
         )
         shim.chmod(0o755)
@@ -77,6 +101,7 @@ def run_synthetic(payload, gh_code=0):
             "TMPDIR": str(tmpdir),
             "PA_TEST_GRAPHQL_FIXTURE": str(fixture),
             "PA_TEST_GH_EXIT": str(gh_code),
+            "PA_TEST_RAW": "1" if raw else "0",
         })
         # The production service uses bash -lc. Run its identical script with
         # bash -c here, so the test's fake gh PATH is not reset by login files.
@@ -146,5 +171,26 @@ assert bad_json.returncode != 0, "Invalid JSON must not look like READY // 0"
 
 failed_api = run_synthetic("[]", gh_code=42)
 assert failed_api.returncode != 0, "Failed GraphQL must not look like READY // 0"
+
+
+# Preserve transport vs parse vs GraphQL errors without exposing body or credentials.
+for response, diagnostic in [
+    ("HTTP/2.0 502 Bad Gateway\r\nContent-Type: text/html\r\n\r\n<html>private</html>", "HTTP 502"),
+    ("HTTP/2.0 200 OK\r\nContent-Type: text/html\r\n\r\n<html>private</html>", "NON-JSON CONTENT TYPE"),
+    ("HTTP/2.0 200 OK\r\nContent-Type: application/json\r\n\r\n", "EMPTY OR INVALID JSON"),
+    ("HTTP/2.0 200 OK\r\nContent-Type: application/json\r\n\r\n{\"data\":", "EMPTY OR INVALID JSON"),
+    ("HTTP/2.0 401 Unauthorized\r\nContent-Type: application/json\r\n\r\n{}", "AUTHENTICATION REQUIRED"),
+    ("HTTP/2.0 200 OK\r\nContent-Type: application/json\r\n\r\n{\"errors\":[{\"message\":\"private\"}]}", "PROVIDER REPORTED ERRORS"),
+    ("HTTP/2.0 200 OK\r\nContent-Type: application/json\r\n\r\n{\"data\":{\"repository\":null}}", "INVALID RESULT SHAPE"),
+    ("", "NO COMPLETE HTTP HEADERS"),
+]:
+    failure = run_synthetic(response, raw=True)
+    assert failure.returncode != 0, diagnostic
+    assert diagnostic in failure.stderr, failure.stderr
+    assert "private" not in failure.stderr and not failure.stdout
+
+assert 'JSON.parse(output);' in SOURCE
+assert 'throw new Error("EMPTY RESPONSE")' in SOURCE
+assert 'throw new Error("EXPECTED PR ARRAY")' in SOURCE
 
 print("GitHub PULLS large-payload and error-propagation regression: PASS")

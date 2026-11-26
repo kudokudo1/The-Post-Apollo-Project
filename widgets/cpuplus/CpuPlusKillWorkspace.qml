@@ -322,7 +322,7 @@ Item {
         history.taskMemHistory=[Math.max(0,Number(row.mem || 0))];
         detailGraph.seedHunterDetailHistories(row);
         repaintDetail(true);
-        detailsScroll.contentY=0;
+        actuatorScroll.contentY=0;
         return true;
     }
 
@@ -551,7 +551,7 @@ Item {
             if (!workspace.exactTargetAvailable) return;
             workspace.stagedLimitPercent =
                 Math.max(0, Math.min(100, Math.round(Number(percent || 0))));
-            // Preview only. Right bay requires APPLY then CONFIRM.
+            // Preview only. Existing actuator review requires APPLY then CONFIRM.
         }
         function setLimitMiB(mib) {
             if (!currentTask || !presentation) return;
@@ -656,13 +656,16 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 8
-                height: 54
+                height: identityContent.implicitHeight + 16
                 color: Colors.black
                 border.color: Colors.cyan
                 border.width: 1
                 visible: !!workspace.currentTask
                 Column {
-                    anchors.fill: parent
+                    id: identityContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
                     anchors.margins: 8
                     anchors.rightMargin: 38
                     spacing: 4
@@ -685,6 +688,26 @@ Item {
                         font.pixelSize: 12
                         color: Colors.white
                         elide: Text.ElideRight
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        objectName: "cpuPlusProcessExactIdentity"
+                        text: workspace.exactTargetAvailable
+                            ? "EXACT LIVE PID + START TICKS + NAME"
+                            : workspace.currentTask && !workspace.selectedTargetVisible
+                            ? "TARGET OUTSIDE CURRENT FILTER // CONTROLS LOCKED"
+                            : "TARGET IDENTITY NOT VERIFIED // CONTROLS LOCKED"
+                        color: workspace.exactTargetAvailable ? Colors.white : Colors.orange
+                        font.pixelSize: 10
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        objectName: "cpuPlusProcessLiveOwner"
+                        text: "Live owner • explicit review before dispatch"
+                        color: Colors.white
+                        font.pixelSize: 10
                     }
                 }
                 ProcessInformationButton {
@@ -735,6 +758,7 @@ Item {
             }
             Flickable {
                 id: actuatorScroll
+                objectName: "cpuPlusKillInstrumentViewport"
                 anchors.top: workspace.currentTask ? processStateHeader.bottom : instrumentTitle.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -749,7 +773,7 @@ Item {
                 spacing: 6
                 GohuText {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "PROCESS // ACTUATORS"
+                    text: "PROCESS // INSTRUMENTS"
                     color: Colors.magenta
                     font.pixelSize: 12
                 }
@@ -803,34 +827,32 @@ Item {
                         }
                     }
                 }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: workspace.currentTask
-                        ? (String(workspace.currentTask.comm)
-                           + " // PID " + workspace.selectedPid)
-                        : "NO LIVE PROCESS SELECTED"
-                    color: Colors.cyan
-                    font.pixelSize: 12
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: workspace.exactTargetAvailable
-                        ? "EXACT LIVE PID + START TICKS + NAME"
-                        : workspace.currentTask && !workspace.selectedTargetVisible
-                        ? "TARGET OUTSIDE CURRENT FILTER // CONTROLS LOCKED"
-                        : "TARGET IDENTITY NOT VERIFIED // CONTROLS LOCKED"
-                    color: workspace.exactTargetAvailable ? Colors.white : Colors.orange
-                    font.pixelSize: 10
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: "Live owner • explicit review before dispatch"
-                    color: Colors.white
-                    font.pixelSize: 10
-                }
+            GohuText {
+                id: emptyTarget
+                visible: !workspace.currentTask
+                                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
+                color: Colors.cyan
+                font.pixelSize: 12
+            }
+            TaskManagerView {
+                id: details
+                objectName: "cpuPlusKillSharedTaskView"
+                                width: parent.width
+                visible: !!workspace.currentTask
+                host: taskHost
+                presentationState: history
+                processController: processView
+                graphGeometry: graphGeometry
+                hunterGraph: hunterGraph
+                searchInputTarget: processSearch
+                safetyLockComponent: safetyLock
+                actionTarget: leftActions
+                viewportHeight: actuatorScroll.height - 12
+            }
+
                 Column {
                     id: leftActions
                     objectName: "cpuPlusSharedActionTarget"
@@ -1100,69 +1122,12 @@ Item {
 
         Rectangle {
             id: resourceBay
-            objectName: "cpuPlusProcessResourceBay"
+            objectName: "cpuPlusProcessReservedBay"
             width: Math.max(0,bays.width-instrumentBay.width-targetBay.width)
             height: bays.height
             color: Colors.dark
             border.width: 1
             border.color: Colors.orange
-            GohuText {
-                id: resourceTitle
-                anchors.top: parent.top
-                anchors.topMargin: 14
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "PROCESS // RESOURCES"
-                color: Colors.magenta
-                font.pixelSize: 12
-            }
-            GohuText {
-                id: emptyTarget
-                visible: !workspace.currentTask
-                anchors.centerIn: parent
-                width: parent.width - 25
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
-                color: Colors.cyan
-                font.pixelSize: 12
-            }
-            Flickable {
-                id: detailsScroll
-                anchors.top: resourceTitle.bottom
-                anchors.topMargin: 8
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                anchors.margins: 6
-                clip: true
-                visible: !!workspace.currentTask
-                contentWidth: width
-                contentHeight: details.implicitHeight + 20
-                TaskManagerView {
-                    id: details
-                    objectName: "cpuPlusKillSharedTaskView"
-                    x: 8
-                    width: Math.max(0,detailsScroll.width - 20)
-                    host: taskHost
-                    presentationState: history
-                    processController: processView
-                    graphGeometry: graphGeometry
-                    hunterGraph: hunterGraph
-                    searchInputTarget: processSearch
-                    safetyLockComponent: safetyLock
-                    actionTarget: leftActions
-                    viewportHeight: detailsScroll.height - 12
-                }
-            }
-            NeonScrollBar {
-                objectName: "cpuPlusKillDetailScroll"
-                flickable: detailsScroll
-                geometryMode: "viewport"
-                visible: detailsScroll.visible && scrollable
-                railColor: Colors.red
-                handleColor: Colors.magenta
-                wheelEnabled: false
-            }
         }
     }
 }

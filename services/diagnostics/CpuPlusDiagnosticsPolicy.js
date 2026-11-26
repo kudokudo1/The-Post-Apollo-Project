@@ -731,3 +731,41 @@ function attachWorkflowStall(text,expected,ticks,overflow) {
         return workflowEvidence(result,expected)?result:null;
     } catch (_) {return null;}
 }
+
+/* D5c-a live presentation side channel, never completion authority. */
+function storageLiveProgress(line, config, previous, requestWallMs, receiveWallMs) {
+    try {
+        if (typeof line!=="string"||line.length>512||!line.startsWith("STORAGE_PROGRESS ")) return null;
+        const c=storageCadence(config), p=JSON.parse(line.slice(17));
+        const keys=["tick","reports","elapsedMs","startWallMs","wallMs","durationSeconds","sampleSeconds","reportSeconds"];
+        const int=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
+        if (!c||!p||Object.keys(p).length!==keys.length||keys.some(k=>!Object.prototype.hasOwnProperty.call(p,k))
+                ||p.durationSeconds!==config.durationSeconds||p.sampleSeconds!==c.sample||p.reportSeconds!==c.report
+                ||!int(p.tick,0,Math.ceil(config.durationSeconds/c.sample))
+                ||!int(p.reports,0,6)||!int(p.elapsedMs,0,145000)
+                ||!int(p.startWallMs,requestWallMs,receiveWallMs+250)
+                ||!int(p.wallMs,p.startWallMs,receiveWallMs+250)
+                ||Math.abs(p.wallMs-p.startWallMs-p.elapsedMs)>250) return null;
+        const scheduled=Math.min(p.tick*c.sample,config.durationSeconds);
+        const reports=scheduled===config.durationSeconds?Math.ceil(scheduled/c.report):Math.floor(scheduled/c.report);
+        if (p.reports!==reports||p.elapsedMs<scheduled*1000
+                ||(!previous&&(p.tick!==0||p.elapsedMs!==0))
+                ||(previous&&(p.tick!==previous.tick+1||p.startWallMs!==previous.startWallMs
+                    ||p.elapsedMs<previous.elapsedMs||p.wallMs<previous.wallMs))) return null;
+        return Object.assign({},p,{receivedWallMs:receiveWallMs,
+            reportReceivedWallMs:!previous||p.reports>previous.reports?receiveWallMs:previous.reportReceivedWallMs});
+    } catch (_) {return null;}
+}
+function storageCountdown(p,field,now) {
+    if (!p||!["sample","report"].includes(field)||!Number.isFinite(now)||now<p.receivedWallMs) return null;
+    const period=field==="sample"?p.sampleSeconds:p.reportSeconds;
+    const count=field==="sample"?p.tick:p.reports;
+    const target=Math.min(p.durationSeconds,(count+1)*period);
+    const finished=field==="sample"?p.tick>=Math.ceil(p.durationSeconds/p.sampleSeconds)
+        :p.reports>=Math.ceil(p.durationSeconds/p.reportSeconds);
+    const previous=Math.min(p.durationSeconds,count*period);
+    const remaining=finished?0:Math.max(0,target*1000-(now-p.startWallMs));
+    const span=Math.max(1,(target-previous)*1000);
+    return {remainingMs:remaining,fraction:Math.min(1,remaining/span),finished:finished,
+        waiting:!finished&&remaining===0,flash:count>0&&now-(field==="sample"?p.receivedWallMs:p.reportReceivedWallMs)<350};
+}

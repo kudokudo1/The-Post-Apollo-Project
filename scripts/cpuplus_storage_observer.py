@@ -117,8 +117,19 @@ def main(argv=None):
     previous = {key: observe(path, uid) for key, path in targets}
     rows = {key: begin(key, previous[key]) for key, path in targets}
     start = time.monotonic()
+    start_wall = round(time.time()*1000)
     samples = 0
+
+    def progress(tick, reports, elapsed):
+        # Presentation-only side channel, never archived evidence.
+        if args.workshop:
+            print("STORAGE_PROGRESS "+json.dumps({"tick":tick,"reports":reports,
+                  "elapsedMs":elapsed,"startWallMs":start_wall,"wallMs":round(time.time()*1000),
+                  "durationSeconds":args.duration,"sampleSeconds":sample,"reportSeconds":report},
+                  separators=(",",":")),file=sys.stderr,flush=True)
+
     try:
+        progress(0,0,0)
         intervals = (args.duration + sample - 1)//sample
         for tick in range(1, intervals + 1):
             scheduled = min(tick * sample, args.duration)
@@ -135,6 +146,7 @@ def main(argv=None):
                 send({**timeline, "schema": SCHEMA, "event": "storage", "sequence": samples,
                       "intervals": tick, "elapsedMs": elapsed_ms,
                       "rows": list(rows.values())})
+            progress(tick,samples,round((time.monotonic()-start)*1000))
     except output_errors:
         return 1
     except KeyboardInterrupt:

@@ -300,3 +300,20 @@ function storageCadenceStep(duration,sample,report,field,direction) {
     }
     return null;
 }
+
+/* Dial selection snaps to a legal cadence, without changing capture duration. */
+function storageCadenceChoice(duration,sample,report,field,value) {
+    if (!Number.isFinite(value)) return null;
+    const nearest=(choices,n)=>choices.length?choices.reduce((a,b)=>Math.abs(b-n)<Math.abs(a-n)?b:a):null;
+    if (field==="sample") {
+        const choices=Array.from({length:5},(_,i)=>i+1).filter(n=>storageReportChoices(duration,n).length);
+        const s=nearest(choices,value);
+        if (s===null) return null;
+        return {sampleSeconds:s,reportSeconds:nearest(storageReportChoices(duration,s),report)};
+    }
+    if (field==="report") {
+        const r=nearest(storageReportChoices(duration,sample),value);
+        return r===null?null:{sampleSeconds:sample,reportSeconds:r};
+    }
+    return null;
+}

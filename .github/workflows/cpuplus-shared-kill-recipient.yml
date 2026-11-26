@@ -11,6 +11,7 @@ on:
       - 'widgets/appcontrol/HunterControls.qml'
       - 'widgets/appcontrol/TaskGraphController.qml'
       - 'widgets/appcontrol/ProcessTargetRow.qml'
+      - 'widgets/appcontrol/ProcessMiniGraph.qml'
       - 'widgets/appcontrol/ProcessSafetyLock.qml'
       - 'widgets/appcontrol/AppControlHubActionGate.qml'
       - 'tests/cpuplus/test_shared_kill_recipient.cjs'

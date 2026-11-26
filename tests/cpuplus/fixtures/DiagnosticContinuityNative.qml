@@ -577,8 +577,19 @@ ShellRoot {
                 };
                 if (!root.check(pair && pair.visible && workshop.storageMechanical && workshop.storageDialScale>=0.55
                     && rendered(sampleDial,workshop.storageSample,"#ed981a")
-                    && rendered(reportDial,workshop.storageReport,"#c74ec7"),
+                    && rendered(reportDial,workshop.storageReport,"#c74ec7")
+                    && [sampleDial,reportDial].every(d=>d.stopwatchFace && d.stopwatchLitSegments===30
+                        && root.findItem(d,"selectorStopwatchFace").visible
+                        && root.findItem(d,"selectorStopwatchCenter").visible
+                        && root.findItem(d,"selectorStopwatchSegment-29").visible)
+                    && !root.findItem(workshop,"cpuplusWorkshopStallThreshold").stopwatchFace
+                    && !root.findItem(workshop,"cpuplusWorkshopTopThreads").stopwatchFace,
                     "both mechanical dials have visible nonzero scaled geometry, actual values and semantic colors")) return;
+                // Check the actual rotary request still reaches the shared draft.
+                sampleDial.valueRequested(2);
+                if (!root.check(workshop.storageSample===2 && !CpuPlusDiagnostics.busy,"stopwatch winding edits cadence only")) return;
+                sampleDial.valueRequested(1);
+                if (!root.check(workshop.storageSample===1 && workshop.storageReport===10,"stopwatch setting restored")) return;
                 nativeWindow.width=320;
                 nativeWindow.height=620;
                 root.phase=244;

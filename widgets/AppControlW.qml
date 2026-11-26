@@ -864,6 +864,13 @@ PanelWindow {
     readonly property var processPresentationState: KillBackend.KillStore.graphState
     readonly property var hunterPresentation: KillBackend.KillStore.hunterPresentation
     readonly property var taskGraphController: KillBackend.KillStore.graphController
+    readonly property var killDetailSession: KillBackend.KillStore.detailSession
+    Binding {
+        target: appControlWindow.killDetailSession
+        property: "donorActive"
+        value: appControlWindow.menuOpen && !appControlWindow.killViewSwitchPending
+            && appControlWindow.selectedResultIsTask()
+    }
 
     // Preserve the existing visible/hidden history policy.
     Binding {
@@ -893,23 +900,15 @@ PanelWindow {
             appControlWindow.applyTaskMiniProbeRows(rows);
         }
 
-        function onDetailProbeReady(sample) {
-            appControlWindow.applyTaskDetailProbe(sample);
-        }
-
-        function onDetailProbeRetryRequested() {
-            Qt.callLater(function() {
-                if (appControlWindow.menuOpen
-                        && appControlWindow.selectedResultIsTask())
-                    appControlWindow.refreshSelectedTaskGraph();
-            });
-        }
+        // Selected-detail samples are routed by KillStore, not this widget.
     }
 
     Connections {
         target: appControlWindow.taskGraphController
 
         function onPrepareCpuMemAppend() {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(true);
             if (taskManagerBody.memCanvas)
@@ -917,11 +916,15 @@ PanelWindow {
         }
 
         function onPrepareCombiAppend() {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.combiScoreCanvas)
                 taskManagerBody.combiScoreCanvas.requestPaint(true);
         }
 
         function onRepaintCpuMem(forceReset) {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
             if (taskManagerBody.memCanvas)
@@ -929,11 +932,15 @@ PanelWindow {
         }
 
         function onRepaintCpu(forceReset) {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
         }
 
         function onRepaintAll(forceReset) {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
             if (taskManagerBody.memCanvas)
@@ -942,11 +949,7 @@ PanelWindow {
                 taskManagerBody.combiScoreCanvas.requestPaint(false, !!forceReset);
         }
 
-        function onRetryRequested() {
-            if (appControlWindow.menuOpen
-                    && appControlWindow.selectedResultIsTask())
-                appControlWindow.refreshSelectedTaskGraph();
-        }
+        // The service's existing one-second detail cadence handles retries.
     }
 
     TaskSafety {
@@ -1564,12 +1567,14 @@ PanelWindow {
     }
 
     function seedHunterDetailHistories(entry) {
+        if (killDetailSession.cpuActive) return;
         taskGraphController.seedHunterDetailHistories(entry);
     }
 
     function appendSelectedTaskHunterHistories(entry, cpuPercent, rssKiB,
                                                memPercent, ioRateBytes,
                                                ageSeconds) {
+        if (killDetailSession.cpuActive) return;
         taskGraphController.appendSelectedTaskHunterHistories(
             entry, cpuPercent, rssKiB, memPercent, ioRateBytes, ageSeconds
         );
@@ -1639,7 +1644,7 @@ PanelWindow {
     }
 
     function clearTaskDetailHistory() {
-        taskGraphController.clearDetailHistory();
+        killDetailSession.selectDonor(null);
     }
 
     function rebindTaskDetailGraph(forceReset) {
@@ -1666,43 +1671,27 @@ PanelWindow {
 
     function resetTaskHistoryForSelection(forceReset) {
         const entry = selectedTask();
-        const preloadedCpu = entry ? taskGraphController.miniCpuHistory(entry) : [];
-        taskGraphController.resetForSelection(
-            entry,
-            preloadedCpu,
-            !!forceReset
-        );
+        killDetailSession.selectDonor(entry);
+        if (forceReset && killDetailSession.matches(entry)) {
+            taskGraphController.repaintAll(true);
+        }
     }
 
     function appendTaskHistoryValues(cpuValue, memValue) {
+        if (killDetailSession.cpuActive) return;
         taskGraphController.appendTaskHistoryValues(cpuValue, memValue);
     }
 
     function appendTaskHistory(entry) {
+        if (killDetailSession.cpuActive) return;
         taskGraphController.appendTaskHistory(entry);
     }
 
     function refreshSelectedTaskGraph() {
-        taskGraphController.refreshDetailProbe(selectedTask());
+        killDetailSession.selectDonor(selectedTask());
     }
 
-    function applyTaskDetailProbe(sample) {
-        taskGraphController.applyDetailProbe(sample, selectedTask());
-    }
-
-    Timer {
-        id: taskGraphProbeTimer
-        // v31: slow the whole live telemetry presentation down.  The graph now
-        // advances smoothly once per sample instead of sliding across the panel
-        // too quickly.
-        interval: 1000
-        repeat: true
-        running:
-            appControlWindow.menuOpen
-            && !appControlWindow.killViewSwitchPending
-            && appControlWindow.selectedResultIsTask()
-        onTriggered: appControlWindow.refreshSelectedTaskGraph()
-    }
+    // The single selected-detail timer and sample acceptance live in KillStore.
 
     function refreshTaskManager() {
         processTelemetry.refreshSnapshot();
@@ -21165,6 +21154,7 @@ PanelWindow {
                 id: taskManagerBody
                 host: taskManagerHost
                 presentationState: processPresentationState
+                graphDataAvailable: appControlWindow.killDetailSession.matches(currentTask)
                 processController: processPresentationController
                 graphGeometry: graphHistory
                 hunterGraph: hunterPresentation

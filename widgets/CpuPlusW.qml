@@ -3373,6 +3373,8 @@ PanelWindow {
         visible: active
         sourceComponent: CpuPlusKillWorkspace {
             graphSource: KillBackend.KillStore.graphState
+            graphController: KillBackend.KillStore.graphController
+            graphSession: KillBackend.KillStore.detailSession
             instrumentWidth: sharedInstrumentPane.width
             targetWidth: targetPane.width
             appControlWindow: cpuPlusWindow.appControlWindow

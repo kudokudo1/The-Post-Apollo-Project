@@ -204,6 +204,7 @@ QtObject {
 
         telemetry.refreshDetailProbe({
             pid: Number(entry.pid || 0),
+            startTicks: Number(entry.startTicks || 0),
             fallbackCpu:
                 Math.max(0, Math.min(100, Number(entry.cpu || 0))),
             fallbackIoRate:

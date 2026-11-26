@@ -15,6 +15,10 @@ Item {
     objectName: "cpuPlusSharedKillWorkspace"
     required property var appControlWindow
     required property var graphSource
+    required property var graphController
+    required property var graphSession
+    readonly property var history: graphSource
+    readonly property var detailGraph: graphController
     property bool active: true
 
     readonly property var gate: appControlWindow
@@ -313,7 +317,6 @@ Item {
     property bool locallyPending: false
     property var ownedPendingRef: null
     property int stagedLimitPercent: -1
-    property double lastDetailSampleMs: 0
 
     function matchingRow() {
         for (let i = 0; i < taskRows.length; i++) {
@@ -357,46 +360,21 @@ Item {
                 })) return false;
         if (sameTarget(row)) return true; // hovering over the current row must not reset graphs
         stagedLimitPercent=-1;
-        lastDetailSampleMs=0;
         selectedPid=Number(row.pid || 0);
         selectedStartTicks=Number(row.startTicks || 0);
         selectedComm=String(row.comm || "");
         taskHost.detailFocused=false;
         taskHost.selectedDetailActionIndex=-1;
-        history.resetDetailHistories();
-        history.taskHistoryPid=selectedPid;
-        const preload=detailGraph.miniCpuHistoryByIdentity("",row);
-        history.taskCpuHistory=preload.slice(-history.taskHistoryLimit);
-        history.taskMemHistory=[Math.max(0,Number(row.mem || 0))];
-        detailGraph.seedHunterDetailHistories(row);
-        repaintDetail(true);
+        graphSession.selectCpu(row);
         actuatorScroll.contentY=0;
         return true;
     }
 
     function repaintDetail(reset) {
-        if (!ready || !details) return;
+        if (!ready || !active || !details || !graphSession.matches(currentTask)) return;
         details.cpuCanvas.requestPaint(false,!!reset);
         details.memCanvas.requestPaint(false,!!reset);
         details.combiScoreCanvas.requestPaint(false,!!reset);
-    }
-    function appendCurrentHistory() {
-        const row=matchingRow();
-        if (!row || !active || !ready) return;
-        // The single owner now publishes rows every 600ms when either
-        // Kill consumer is visible. Coalesce detail samples so the existing
-        // 920ms scroll animation can finish; never invent intermediate points.
-        const now=Date.now();
-        if (lastDetailSampleMs && now>=lastDetailSampleMs
-                && now-lastDetailSampleMs<history.taskGraphScrollDuration) return;
-        lastDetailSampleMs=now;
-        // ps CPU is a lifetime average; cpuInstant is the owner-observed
-        // delta between snapshots and is the appropriate live graph input.
-        const cpu=Number(row.cpuInstant !== undefined ? row.cpuInstant : row.cpu || 0);
-        const mem=Number(row.mem || 0);
-        detailGraph.appendTaskHistoryValues(cpu,mem);
-        detailGraph.appendSelectedTaskHunterHistories(row,cpu,
-            Number(row.rss || 0),mem);
     }
     function cycleTarget(direction) {
         if (!active || locallyPending || modelBlank) return;
@@ -485,18 +463,22 @@ Item {
     onTaskRowsChanged: {
         if (!ready || !active) return;
         if (!modelBlank) updateOrder(false);
-        appendCurrentHistory();
     }
     onActiveChanged: {
+        if (ready) graphSession.setCpuActive(active);
         if (!active) { cancelOwned(); cancelBulk(); }
-        else if (ready) requestRefresh();
+        else if (ready) {
+            graphSession.selectCpu(currentTask);
+            requestRefresh();
+        }
     }
     Component.onCompleted: {
         ready=true;
+        graphSession.setCpuActive(active);
         updateOrder(true);
         requestRefresh();
     }
-    Component.onDestruction: { cancelOwned(); cancelBulk(); }
+    Component.onDestruction: { graphSession.setCpuActive(false); cancelOwned(); cancelBulk(); }
     // The existing AppControl timer already samples in all modes; do not
     // create a competing periodic refresh request from the recipient.
     Connections {
@@ -511,42 +493,29 @@ Item {
     }
 
     GraphHistory { id: graphGeometry }
-    ProcessPresentationState {
-        id: history
-        taskMiniCpuHistories: workspace.graphSource
-            ? (workspace.graphSource.taskMiniCpuHistories || ({})) : ({})
-        taskMiniHunterMetricHistories: workspace.graphSource
-            ? (workspace.graphSource.taskMiniHunterMetricHistories || ({})) : ({})
-        taskMiniCpuIdentityHistories: workspace.graphSource
-            ? (workspace.graphSource.taskMiniCpuIdentityHistories || ({})) : ({})
-        taskMiniHistoryRevision: workspace.miniHistoryRevision
-    }
     HunterPresentation {
         id: hunterGraph
         presentationState: history
         metricMode: workspace.hunterMetricMode
     }
-    KillBackend.TaskGraphController {
-        id: detailGraph
-        presentationState: history
-        hunterPresentation: hunterGraph
-        // Only append/seed presentation methods are used. The donor owns
-        // process acquisition and its selected-detail probe.
-        telemetry: null
-        onPrepareCpuMemAppend: {
-            if (workspace.ready) {
+    Connections {
+        target: workspace.graphController
+        function onPrepareCpuMemAppend() {
+            if (workspace.ready && workspace.graphSession.matches(workspace.currentTask)) {
                 details.cpuCanvas.requestPaint(true);
                 details.memCanvas.requestPaint(true);
             }
         }
-        onPrepareCombiAppend: {
-            if (workspace.ready) details.combiScoreCanvas.requestPaint(true);
+        function onPrepareCombiAppend() {
+            if (workspace.ready && workspace.graphSession.matches(workspace.currentTask))
+                details.combiScoreCanvas.requestPaint(true);
         }
-        onRepaintCpuMem: function(reset) { workspace.repaintDetail(reset); }
-        onRepaintCpu: function(reset) {
-            if (workspace.ready) details.cpuCanvas.requestPaint(false,!!reset);
+        function onRepaintCpuMem(reset) { workspace.repaintDetail(reset); }
+        function onRepaintCpu(reset) {
+            if (workspace.ready && workspace.active && workspace.graphSession.matches(workspace.currentTask))
+                details.cpuCanvas.requestPaint(false,!!reset);
         }
-        onRepaintAll: function(reset) { workspace.repaintDetail(reset); }
+        function onRepaintAll(reset) { workspace.repaintDetail(reset); }
     }
     ScriptModel {
         id: liveTargetModel
@@ -941,6 +910,7 @@ Item {
                     visible: !!workspace.currentTask
                     host: taskHost
                     presentationState: history
+                    graphDataAvailable: workspace.graphSession.matches(workspace.currentTask)
                     processController: processView
                     graphGeometry: graphGeometry
                     hunterGraph: hunterGraph

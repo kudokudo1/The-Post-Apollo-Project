@@ -87,13 +87,14 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
 
 test("recipient restores existing owner graph and favorite semantics", () => {
     const row = read("widgets/appcontrol/ProcessTargetRow.qml");
-    assert.match(recipient,/TaskGraphController\s*\{/);
+    assert.match(recipient,/readonly property var detailGraph: graphController/);
     assert.match(recipient,/details\.cpuCanvas\.requestPaint\(true\)/);
     assert.match(recipient,/details\.combiScoreCanvas\.requestPaint\(true\)/);
-    assert.match(recipient,/detailGraph\.appendSelectedTaskHunterHistories/);
+    assert.doesNotMatch(recipient,/detailGraph\.appendSelectedTaskHunterHistories/);
     assert.match(host,/graphSource: KillBackend\.KillStore\.graphState/);
-    assert.match(recipient,/graphSource\.taskMiniCpuHistories/);
-    assert.match(recipient,/graphSource\.taskMiniHunterMetricHistories/);
+    assert.match(recipient,/readonly property var history: graphSource/);
+    assert.match(host,/graphController: KillBackend\.KillStore\.graphController/);
+    assert.match(host,/graphSession: KillBackend\.KillStore\.detailSession/);
     assert.doesNotMatch(recipient,/appControlWindow\.taskMini(?:CpuHistories|HunterMetricHistories|DisplayRevision)/);
     assert.match(row,/width: 82/);
     assert.match(row,/mini\.combi/);
@@ -141,8 +142,11 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.match(owner,/KillBackend\.KillStore\.publishSnapshot\(snapshotRows\)/);
     assert.match(read("services/kill/qmldir"),/singleton KillStore 1\.0 KillStore\.qml/);
     assert.doesNotMatch(recipient,/^\s*(Timer|ProcessTelemetry)\s*\{/m);
-    assert.match(recipient,/row\.cpuInstant !== undefined \? row\.cpuInstant : row\.cpu/);
-    assert.match(recipient,/now-lastDetailSampleMs<history\.taskGraphScrollDuration/);
+    assert.doesNotMatch(recipient,/appendCurrentHistory|lastDetailSampleMs/);
+    const session=read("services/kill/KillDetailSession.qml");
+    assert.match(session,/interval: 1000/);
+    assert.match(session,/graph\.refreshDetailProbe\(currentEntry\)/);
+    assert.doesNotMatch(owner,/id: taskGraphProbeTimer/);
 });
 
 test("both process hosts share the compact information document and action section", () => {
@@ -413,7 +417,47 @@ test("K2a: service owns donor graph controller and history; views consume the sa
     assert.match(owner,/target: appControlWindow\.taskGraphController/);
     assert.match(legacy,/KillBackend\.TaskGraphController \{\}/);
     assert.doesNotMatch(legacy,/function updateMiniCpuHistories/);
-    assert.match(recipient,/KillBackend\.TaskGraphController\s*\{/);
+    assert.doesNotMatch(recipient,/TaskGraphController\s*\{/);
     assert.match(recipient,/required property var graphSource/);
     assert.match(recipient,/Number\(graphSource\.taskMiniDisplayRevision/);
+});
+
+test("K2b: exact detail identity, one probe, shared state and donor masking", () => {
+    const session=read("services/kill/KillDetailSession.qml");
+    const store=read("services/kill/KillStore.qml");
+    const telemetry=read("services/system/ProcessTelemetry.qml");
+    assert.match(session,/cpuActive \? cpuTarget : donorActive \? donorTarget/);
+    assert.match(session,/JSON.stringify\(\[pid,birth,comm\]\)/);
+    assert.match(session,/graph.clearDetailHistory\(\)/);
+    assert.match(session,/Number\(sample.startTicks\)!==Number\(currentEntry.startTicks\)/);
+    assert.match(store,/onDetailProbeReady: function\(sample\) \{ selectedDetail.accept\(sample\); \}/);
+    assert.match(telemetry,/startTicks !== Number\(request.startTicks\)/);
+    assert.match(donorView,/property bool graphDataAvailable: true/);
+    assert.match(recipient,/graphDataAvailable: workspace.graphSession.matches\(workspace.currentTask\)/);
+    assert.doesNotMatch(recipient,/ProcessPresentationState\s*\{|appendCurrentHistory|telemetry: null/);
+});
+
+test("detail parser refuses wrong birth and generation before advancing counters", () => {
+    const source=read("services/system/ProcessTelemetry.qml");
+    const begin=source.indexOf("    function parseDetailProbe(output) {");
+    const end=source.indexOf("\n    Process {",begin);
+    assert.ok(begin>=0 && end>begin);
+    const make=new Function("Date",`
+        let detailProbeGeneration=2, detailProbeActiveGeneration=2;
+        let detailProbePid=4321, detailProbeLastTicks=-1, detailProbeLastIoBytes=-1, detailProbeLastMs=0;
+        let detailProbeRequest={pid:4321,startTicks:98765,fallbackCpu:11,fallbackIoRate:4};
+        `+source.slice(begin,end)+`
+        return {parseDetailProbe, stale:()=>detailProbeActiveGeneration=1,
+            counters:()=>[detailProbeLastTicks,detailProbeLastIoBytes,detailProbeLastMs]};
+    `);
+    const p=make({now:()=>1000});
+    assert.equal(p.parseDetailProbe("4321 100 2048 100000 100 4 1000 98764 1000"),null);
+    assert.deepEqual(p.counters(),[-1,-1,0]);
+    const sample=p.parseDetailProbe("4321 100 2048 100000 100 4 1000 98765 1000");
+    assert.equal(sample.startTicks,98765);
+    assert.equal(sample.cpuPercent,11);
+    assert.deepEqual(p.counters(),[100,1000,1000]);
+    p.stale();
+    assert.equal(p.parseDetailProbe("4321 200 2048 100000 100 4 2000 98765 1001"),null);
+    assert.deepEqual(p.counters(),[100,1000,1000]);
 });

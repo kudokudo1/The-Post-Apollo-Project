@@ -434,6 +434,7 @@ Scope {
         detailProbeActiveGeneration = detailProbeGeneration;
         detailProbeRequest = {
             pid: pid,
+            startTicks: Number(item.startTicks || 0),
             fallbackCpu: Math.max(0, Number(item.fallbackCpu || 0)),
             fallbackIoRate: Math.max(0, Number(item.fallbackIoRate || 0)),
             fallbackAgeSeconds: Math.max(0, Number(item.fallbackAgeSeconds || 0))
@@ -444,13 +445,15 @@ Scope {
             "-lc",
             "pid=" + String(pid) + "; "
             + "[ -r /proc/$pid/stat ] || exit 0; "
-            + "ticks=$(awk '{print $14+$15}' /proc/$pid/stat 2>/dev/null) || exit 0; "
+            + "stat=$(awk '{sub(/^.*[)] /,\"\"); print $12+$13, $20}' /proc/$pid/stat 2>/dev/null) || exit 0; "
+            + "set -- $stat; [ \"$#\" -eq 2 ] || exit 0; ticks=$1; start=$2; "
             + "rss=$(awk '/^VmRSS:/{print $2; exit}' /proc/$pid/status 2>/dev/null); "
             + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
             + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
             + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
             + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2} END{print sum+0}' /proc/$pid/io 2>/dev/null); "
-            + "start=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null); "
+            + "birth=$(awk '{sub(/^.*[)] /,\"\"); print $20}' /proc/$pid/stat 2>/dev/null); "
+            + "[ \"$birth\" = \"$start\" ] || exit 0; "
             + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "
             + "printf '%s %s %s %s %s %s %s %s %s\\n' "
             + "\"$pid\" \"$ticks\" \"${rss:-0}\" \"${total:-1}\" \"$clk\" \"$cores\" "
@@ -478,7 +481,10 @@ Scope {
         const nowMs = Date.now();
         const request = detailProbeRequest || ({});
 
-        if (pid <= 1 || pid !== Number(request.pid || 0))
+        if (pid <= 1 || pid !== Number(request.pid || 0)
+                || !Number.isSafeInteger(startTicks) || startTicks <= 0
+                || (Number(request.startTicks || 0)>0
+                    && startTicks !== Number(request.startTicks)))
             return null;
 
         let cpuPercent = Math.max(
@@ -523,6 +529,7 @@ Scope {
 
         return {
             pid: pid,
+            startTicks: startTicks,
             cpuPercent: cpuPercent,
             memPercent: memPercent,
             rssKiB: rssKiB,

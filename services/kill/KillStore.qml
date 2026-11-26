@@ -5,8 +5,8 @@ import Quickshell
 import "../system"
 
 // Authoritative runtime acquisition store. No widget dependency, persistence,
-// process mutation, or additional timer. K1 preserves the existing acquisition
-// implementation and lets the temporary donor adapter drive its cadence.
+// process mutation, or extra polling loop. The original detail cadence is
+// now here; the temporary donor adapter still drives snapshot/mini cadence.
 Scope {
     id: root
 
@@ -20,6 +20,7 @@ Scope {
     readonly property var graphState: histories
     readonly property var graphController: graph
     readonly property var hunterPresentation: hunter
+    readonly property var detailSession: selectedDetail
 
     ProcessPresentationState {
         id: histories
@@ -40,11 +41,19 @@ Scope {
         taskRows: root.rows
     }
 
+    KillDetailSession {
+        id: selectedDetail
+        graph: root.graphController
+        state: histories
+        rows: root.rows
+    }
+
     function publishSnapshot(rows) {
         sampler.rows = Array.isArray(rows) ? rows : [];
     }
 
     ProcessTelemetry {
         id: sampler
+        onDetailProbeReady: function(sample) { selectedDetail.accept(sample); }
     }
 }

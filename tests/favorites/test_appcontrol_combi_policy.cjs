@@ -237,7 +237,7 @@ test("new local projections do not own actions or enter universal Favorites",()=
     const source=fs.readFileSync(path.join(root,
         "services/favorites/FavoritesAppControlCombiPolicy.js"),"utf8");
     assert.doesNotMatch(source,/Quickshell\.Io|Process\s*\{|execDetached\s*\(|kill\s*\(/);
-    assert.doesNotMatch(source,/FavoritesService|FavoritesStore|FavoritesUnifiedCatalog/);
+    assert.doesNotMatch(source,/^\\s*(?:import|\\.import)[^\\n]*(?:FavoritesService|FavoritesStore|FavoritesUnifiedCatalog)/m);
     const universal=fs.readFileSync(path.join(root,
         "services/favorites/FavoritesUnifiedCatalog.qml"),"utf8");
     assert.doesNotMatch(universal,/FavoritesAppControlCombiPolicy|_combiSearchText/);

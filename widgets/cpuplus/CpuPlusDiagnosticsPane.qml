@@ -568,6 +568,7 @@ Column {
                     selectedFillColor: Colors.black
                     selectedBorderColor: Colors.magenta
                     selectedForegroundColor: Colors.magenta
+                    outlineOnlyGlow: true
                     acceptedButtons: Qt.LeftButton
                     onLeftClicked: root.selectView(modelData.key)
                 }

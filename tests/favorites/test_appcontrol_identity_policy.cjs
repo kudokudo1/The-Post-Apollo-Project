@@ -7,7 +7,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname,"../..");
-const host = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
+const liveHost = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
+const host = fs.readFileSync(path.join(root,"tests/favorites/fixtures/AppControlFavoritesDonorBeforeC4.js.txt"),"utf8");
 const hunter = fs.readFileSync(path.join(root,
     "widgets/appcontrol/HunterOperationController.qml"),"utf8");
 const source = fs.readFileSync(path.join(root,
@@ -145,3 +146,8 @@ test("adapter is pure and never assumes provider execution or storage",()=>{
     assert.doesNotMatch(source,/FavoritesStore\.favoriteKeys\s*=|favoritesService\.toggle/i);
     assert.doesNotMatch(source,/\bkill\s*\(|\bspawn\s*\(|\bfilesystem\b.*\bstat\s*\(/i);
 });
+
+
+test("live host delegates extracted Identity policy without replacing independent baseline",()=>{
+    for(const call of ["FavoriteIdentity.sourceItem(entry)","FavoriteIdentity.taskIdentity(entry)","FavoriteIdentity.taskKey(entry)","FavoriteIdentity.taskIdentityFromKey(key)","FavoriteIdentity.taskMetricKey(entry, metricId)","FavoriteIdentity.taskMetricData(key)","FavoriteIdentity.monitorBoxKey(entry, boxId, modeName)","FavoriteIdentity.hasMonitorBoxFavorite(entry, modeName,"]) assert.ok(liveHost.includes(call),call);
+ });

@@ -7,7 +7,8 @@ const vm = require("node:vm");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
-const host = fs.readFileSync(path.join(root, "widgets/AppControlW.qml"), "utf8");
+const liveHost = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
+const host = fs.readFileSync(path.join(root,"tests/favorites/fixtures/AppControlFavoritesDonorBeforeC4.js.txt"),"utf8");
 const source = fs.readFileSync(path.join(root,
     "services/favorites/FavoritesAppControlRunIdentityPolicy.js"), "utf8");
 const policy = {};
@@ -98,3 +99,9 @@ test("legacy codec remains private and has no execution or store authority",()=>
     assert.doesNotMatch(display,/FavoritesAppControlRunIdentityPolicy/);
     assert.doesNotMatch(source,/\bconsole\.(?:log|warn|error)\s*\(/);
 });
+
+
+test("live host delegates extracted RunIdentity policy without replacing independent baseline",()=>{
+    for(const call of ["FavoriteRunIdentity.key(command, prefixMode)","FavoriteRunIdentity.dataFromKey(key)","FavoriteRunIdentity.commandFromKey(key)"]) assert.ok(liveHost.includes(call),call);
+    assert.doesNotMatch(liveHost,/invalid RUN favorite key:/);
+ });

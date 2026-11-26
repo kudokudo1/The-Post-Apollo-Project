@@ -7,7 +7,8 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "../..");
-const host = fs.readFileSync(path.join(root, "widgets/AppControlW.qml"), "utf8");
+const liveHost = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
+const host = fs.readFileSync(path.join(root,"tests/favorites/fixtures/AppControlFavoritesDonorBeforeC4.js.txt"),"utf8");
 const src = fs.readFileSync(path.join(root,
     "services/favorites/FavoritesAppControlRecordPolicy.js"), "utf8");
 const policy = {};
@@ -108,3 +109,8 @@ test("local wrappers neither perform commands nor write Favorites storage", () =
     assert.doesNotMatch(catalog,/FavoritesAppControlRecordPolicy|_sourceItem\.commandText/);
     assert.doesNotMatch(management,/FavoritesAppControlRecordPolicy|_sourceItem\.commandText/);
 });
+
+
+test("live host delegates extracted Record policy without replacing independent baseline",()=>{
+    for(const call of ["FavoriteRecord.appRecord(entry, key, appsModeIndex","FavoriteRecord.runRecord(sourceItem, key, resolvedPrefix"]) assert.ok(liveHost.includes(call),call);
+ });

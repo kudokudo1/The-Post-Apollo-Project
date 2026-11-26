@@ -20,7 +20,14 @@ Rectangle {
     property string pullRequestHeadRef: ""
     property bool externallyManagedTarget: false
 
-    property string mode: "control"
+    property string pullRequestBody: ""
+    property bool pullRequestBodyAvailable: false
+    property string pullRequestCheckSummary: "UNKNOWN"
+    property string pullRequestReviewSummary: "UNKNOWN"
+    property string pullRequestMergeSummary: "UNKNOWN"
+    property bool factsBusy: false
+    property string factsError: ""
+    property string mode: "overview"
     property string armedAction: ""
     property int selectedThreadIndex: -1
     property string activeLifecycleAction: ""
@@ -137,20 +144,28 @@ Rectangle {
     }
 
     onRepositorySlugChanged: {
+        mode = "overview";
         clearArm();
         selectedThreadIndex = -1;
     }
 
     onPullRequestNumberChanged: {
+        mode = "overview";
         clearArm();
         selectedThreadIndex = -1;
         activeLifecycleAction = "";
         completedLifecycleAction = "";
     }
 
+    onPullRequestHeadShaChanged: clearArm()
+    onPullRequestStateChanged: clearArm()
+    onPullRequestDraftChanged: clearArm()
+    onPullRequestBodyChanged: clearArm()
     onVisibleChanged: {
-        if (visible && hasTarget)
+        if (visible && hasTarget) {
+            mode = "overview";
             refreshFacts();
+        }
     }
 
     Connections {
@@ -531,12 +546,12 @@ Rectangle {
                 }
 
                 Repeater {
-                    model: ["control", "queue", "threads"]
+                    model: ["overview", "control", "queue", "threads"]
 
                     delegate: ActionButton {
                         required property string modelData
 
-                        width: 86
+                        width: 65
                         label: modelData.toUpperCase()
                         selectedAction: root.mode === modelData
                         accent:
@@ -567,7 +582,7 @@ Rectangle {
             width: parent.width
             detail: !!root.lifecycleService.lastError
                     || root.lifecycleService.busy
-                    || root.isClosed || root.isMerged
+                    || !!root.factsError
             text:
                 root.armedAction
                 ? "ARMED // "
@@ -590,11 +605,19 @@ Rectangle {
                       + String(root.lifecycleService.operation || "").toUpperCase()
                       + " // " + String(root.lifecycleService.phase || "")
                       + " // AWAITING VERIFIED RESULT"
+                    : root.factsError
+                    ? "PR DETAILS // " + root.factsError
                     : root.isMerged
-                    ? "PR MERGED // READ-ONLY LIFECYCLE // THIS PR CANNOT BE REOPENED"
+                    ? "PR MERGED // READ-ONLY LIFECYCLE // ALREADY INTEGRATED; METADATA AND COMMENTS MAY STILL BE EDITED"
                     : root.isClosed
                     ? "PR CLOSED // REOPEN TO REVIEW, UPDATE BRANCH OR MERGE // METADATA EDITS MAY STILL BE POSSIBLE"
-                    : String(root.lifecycleService.status || "READY")
+                    : root.factsBusy
+                    ? "READING PR DETAILS"
+                    : root.pullRequestDraft
+                    ? "DRAFT // MARK READY BEFORE MERGING"
+                    : root.isOpen
+                    ? "OPEN // CONTROL FOR ACTIONS; OVERVIEW FOR FACTS"
+                    : "PR STATE UNKNOWN // REFRESH BEFORE ACTIONS"
                   )
             accent:
                 root.lifecycleService.lastError ? Colors.red
@@ -608,6 +631,7 @@ Rectangle {
         }
 
         Loader {
+            id: detailPaneLoader
             width: parent.width
             height: Math.max(0, parent.height - 52 - prActionStatus.height - 14)
             sourceComponent:
@@ -615,7 +639,86 @@ Rectangle {
                 ? queuePane
                 : root.mode === "threads"
                 ? threadsPane
+                : root.mode === "overview"
+                ? overviewPane
                 : controlPane
+        }
+    }
+
+    Component {
+        id: overviewPane
+
+        Flickable {
+            id: overviewScroll
+            clip: true
+            contentWidth: width
+            contentHeight: overviewColumn.height
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: overviewColumn
+                width: Math.max(0, overviewScroll.width - 20)
+                spacing: 7
+
+                GohuText {
+                    width: parent.width
+                    text: root.isMerged ? "MERGED // COMPLETE"
+                          : root.isClosed ? "CLOSED // NOT MERGED"
+                          : root.pullRequestDraft ? "OPEN // DRAFT"
+                          : root.isOpen ? "OPEN // ACTIVE" : "UNKNOWN STATE"
+                    font.pixelSize: 13
+                    color: root.isMerged ? Colors.magenta : Colors.cyan
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: root.isMerged
+                        ? "This PR has already been merged. Branch updates, reviews and merge actions are no longer available."
+                        : root.isClosed
+                        ? "Reopen from CONTROL if work should continue. Closing is not merging."
+                        : root.pullRequestDraft
+                        ? "Mark ready in CONTROL before merging. Update Branch brings the base branch into this PR; it does not merge the PR."
+                        : "CONTROL contains branch updates, reviews and merge actions. GitHub still enforces permissions and branch rules."
+                    font.pixelSize: 10
+                    color: Colors.white
+                    wrapMode: Text.Wrap
+                }
+                GohuText {
+                    width: parent.width
+                    text: "CHECKS // " + root.pullRequestCheckSummary
+                        + "\nREVIEW // " + root.pullRequestReviewSummary
+                        + "\nMERGE STATE // " + root.pullRequestMergeSummary
+                        + "\nHEAD // " + (root.pullRequestHeadSha || "UNKNOWN")
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                    wrapMode: Text.WrapAnywhere
+                }
+                GohuText {
+                    text: "DESCRIPTION"
+                    font.pixelSize: 11
+                    color: Colors.magenta
+                }
+                TextEdit {
+                    width: parent.width
+                    readOnly: true
+                    selectByMouse: true
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextEdit.Wrap
+                    text: root.pullRequestBodyAvailable
+                        ? (root.pullRequestBody || "No description supplied.")
+                        : root.factsError ? "Description unavailable. Refresh to retry."
+                        : root.factsBusy ? "Loading description..."
+                        : "Description not loaded. Refresh to retry."
+                    font.family: "GohuFont 11 Nerd Font Mono"
+                    font.pixelSize: 11
+                    color: Colors.white
+                }
+            }
+            NeonScrollBar {
+                flickable: overviewScroll
+                handleStyle: "star"
+                visible: overviewScroll.visible && scrollable
+            }
         }
     }
 
@@ -635,12 +738,25 @@ Rectangle {
                 width: Math.max(0, syntagmaPane2.width - 20)
                 spacing: 7
 
+                GohuText {
+                    width: parent.width
+                    text: root.isMerged
+                        ? "MERGED // Metadata and comments only. No branch or merge actions."
+                        : root.isClosed
+                        ? "CLOSED // Reopen to resume work. Enter values to enable edit buttons."
+                        : "BRANCH / LIFECYCLE // Update Branch incorporates the base branch. Update Rebase replays commits on it. Neither merges this PR."
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                    wrapMode: Text.Wrap
+                }
                 Row {
                     width: parent.width
-                    height: 31
+                    visible: root.isOpen || root.isClosed
+                    height: visible ? 31 : 0
                     spacing: 6
 
                     ActionButton {
+                        visible: root.isOpen
                         width: 100
                         actionToken: "draft-toggle"
                         label:
@@ -675,6 +791,7 @@ Rectangle {
 
                     ActionButton {
                         width: 110
+                        visible: root.isOpen
                         actionToken: "update-branch"
                         label:
                             root.armedAction === "update-branch"
@@ -704,6 +821,7 @@ Rectangle {
 
                     ActionButton {
                         width: 112
+                        visible: root.isOpen
                         actionToken: "update-rebase"
                         label:
                             root.armedAction === "update-rebase"
@@ -735,9 +853,7 @@ Rectangle {
                         width: 100
                         actionToken: "close-reopen"
                         label:
-                            root.isMerged
-                            ? "MERGED"
-                            : root.isClosed
+                            root.isClosed
                             ? "REOPEN"
                             : root.armedAction === "close"
                             ? "CONFIRM CLOSE"
@@ -854,6 +970,7 @@ Rectangle {
                         accent: Colors.cyan
                         enabledAction:
                             root.hasTarget
+                            && root.isOpen
                             && baseInput.text.trim().length > 0
                             && !root.lifecycleService.busy
                         onTriggered: {
@@ -871,38 +988,63 @@ Rectangle {
                     }
                 }
 
-                Row {
+                GohuText {
                     width: parent.width
-                    height: 72
+                    text: "DESCRIPTION // Load existing text, edit, then confirm replacement. Clearing requires the same confirmation."
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                    wrapMode: Text.Wrap
+                }
+                Row {
+                    id: bodyEditRow
+                    width: parent.width
+                    height: 96
                     spacing: 6
-
+                    property bool editing: false
+                    property string originalBody: ""
+                    readonly property bool changed: editing && bodyInput.text !== originalBody
+                    readonly property bool current: root.pullRequestBodyAvailable
+                        && root.pullRequestBody === originalBody
                     MultiLineField {
                         id: bodyInput
                         width: parent.width - 116
                         height: parent.height
-                        placeholder: "REPLACEMENT PR BODY // EMPTY CLEARS BODY"
+                        enabled: bodyEditRow.editing
+                        placeholder: bodyEditRow.editing ? "EMPTY WILL CLEAR DESCRIPTION" : "LOAD BODY TO EDIT"
+                        onTextChanged: root.clearArm()
                     }
-
-                    ActionButton {
+                    Column {
                         width: 110
-                        anchors.verticalCenter: parent.verticalCenter
-                        actionToken: "body"
-                        label: "SET BODY"
-                        accent: Colors.cyan
-                        enabledAction:
-                            root.hasTarget
-                            && !root.lifecycleService.busy
-                        onTriggered: {
-                            root.clearArm();
-                            root.startLifecycleAction("body", function() {
+                        spacing: 5
+                        ActionButton {
+                            width: parent.width
+                            label: "LOAD BODY"
+                            enabledAction: root.hasTarget && root.pullRequestBodyAvailable
+                                && !root.lifecycleService.busy && !root.factsBusy && !root.factsError
+                            onTriggered: {
+                                root.clearArm();
+                                bodyEditRow.originalBody = root.pullRequestBody;
+                                bodyInput.text = bodyEditRow.originalBody;
+                                bodyEditRow.editing = true;
+                            }
+                        }
+                        ActionButton {
+                            width: parent.width
+                            actionToken: "body"
+                            label: root.armedAction === "body"
+                                ? (bodyInput.text.length === 0 ? "CONFIRM CLEAR" : "CONFIRM SET")
+                                : "SET BODY"
+                            accent: Colors.cyan
+                            enabledAction: root.hasTarget && bodyEditRow.changed
+                                && bodyEditRow.current && !root.lifecycleService.busy && !root.factsBusy && !root.factsError
+                            onTriggered: root.armOrRun("body", function() {
+                                root.startLifecycleAction("body", function() {
                                     return root.lifecycleService.editPullRequest(
-                                        root.repositorySlug,
-                                        root.pullRequestNumber,
-                                        null,
-                                        bodyInput.text,
-                                        null
+                                        root.repositorySlug, root.pullRequestNumber,
+                                        null, bodyInput.text, null
                                     );
                                 });
+                            })
                         }
                     }
                 }
@@ -935,6 +1077,14 @@ Rectangle {
                         })
                     }
 
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: "METADATA // Enter a label, login or milestone, then choose the corresponding action."
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                    wrapMode: Text.Wrap
                 }
 
                 // A single row of 552px fixed buttons made the entry unusable.
@@ -1049,7 +1199,7 @@ Rectangle {
                             id: reviewInput
                             width: parent.width
                             height: 58
-                            placeholder: "COMMENT OR REVIEW BODY"
+                            placeholder: "TYPE COMMENT OR REVIEW TEXT"
                             accent: Colors.magenta
                         }
 
@@ -1077,6 +1227,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 94
+                                visible: root.isOpen
                                 actionToken: "review-approve"
                                 label: "APPROVE"
                                 accent: Colors.green
@@ -1094,6 +1245,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 106
+                                visible: root.isOpen
                                 actionToken: "review-comment"
                                 label: "REVIEW COMMENT"
                                 accent: Colors.cyan
@@ -1113,6 +1265,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 126
+                                visible: root.isOpen
                                 actionToken: "review-changes"
                                 label: "REQUEST CHANGES"
                                 accent: Colors.orange
@@ -1133,9 +1286,21 @@ Rectangle {
                     }
                 }
 
+                GohuText {
+                    width: parent.width
+                    visible: root.isOpen
+                    height: visible ? implicitHeight : 0
+                    text: root.pullRequestDraft
+                        ? "MERGE // Mark ready first."
+                        : "MERGE // Merge preserves commits; squash combines them; rebase replays them. Press again to confirm."
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                    wrapMode: Text.Wrap
+                }
                 SectionFrame {
                     width: parent.width
-                    height: 78
+                    visible: root.isOpen
+                    height: visible ? 78 : 0
                     fillColor: Colors.black
                     borderWidth: 1
                     borderColor: Colors.red

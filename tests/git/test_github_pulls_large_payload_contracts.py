@@ -92,6 +92,7 @@ if "graphql" in args:
     # Simulate the actual lightweight selection: no nested review/check lists.
     for row in chunk:
         row.pop("reviews", None)
+        row.pop("body", None)
         for node in row.get("commits", {}).get("nodes", []):
             rollup = node.get("commit", {}).get("statusCheckRollup", {})
             rollup.pop("contexts", None)
@@ -174,6 +175,7 @@ assert success.rest_calls == 0
 # fallback may be empty, but it must still produce the original PR record.
 fallback_row = dict(rows[0])
 fallback_row["state"] = "OPEN"
+fallback_row["body"] = "Actual PR description\nwith multiple lines"
 fallback_row["reviewDecision"] = ""
 fallback_row["reviews"] = {"nodes": []}
 fallback_row["commits"] = {"nodes": [{"commit": {
@@ -187,6 +189,7 @@ fallback_rows = fallback_frames[-1]
 assert len(fallback_rows) == 1 and fallback_rows[0]["number"] == 1
 assert fallback_rows[0]["checkDetailsDeferred"] is True
 assert fallback_rows[0]["reviewDetailsDeferred"] is True
+assert "body" not in fallback_rows[0]
 assert fallback.rest_calls == 0
 selected = run_synthetic(json.dumps([fallback_row]), target=1)
 assert selected.returncode == 0, selected.stderr
@@ -194,6 +197,7 @@ selected_rows = json.loads(selected.stdout)
 assert len(selected_rows) == 1 and selected_rows[0]["number"] == 1
 assert selected_rows[0]["checkEvidenceLoaded"] is True
 assert selected_rows[0]["reviewEvidenceLoaded"] is True
+assert selected_rows[0]["body"] == fallback_row["body"]
 assert selected_rows[0]["reviewRequestCount"] == 0
 assert selected.rest_calls == 5
 

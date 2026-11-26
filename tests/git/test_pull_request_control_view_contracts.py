@@ -27,12 +27,12 @@ for needle, label in (
     ("required property var queueLifecycleService", "queue lifecycle injection"),
     ("required property var threadProvider", "thread provider injection"),
     ("required property var threadLifecycleService", "thread lifecycle injection"),
-    ('property string mode: "control"', "standalone mode state"),
+    ('property string mode: "overview"', "overview-first mode state"),
 ):
     require(view, needle, label)
 
 # Three first-class modes should exist without modifying GitW/WorkItems.
-for mode in ('"control"', '"queue"', '"threads"'):
+for mode in ('"overview"', '"control"', '"queue"', '"threads"'):
     require(view, mode, f"mode {mode}")
 
 # Ordinary PR lifecycle controls.

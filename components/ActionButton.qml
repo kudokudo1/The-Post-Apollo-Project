@@ -62,15 +62,19 @@ Rectangle {
     property color accentColor: Colors.cyan
     property color destructiveColor: Colors.red
 
-    // Normal-face selectors opt into the historical Angels/U9g no-wash rule.
-    // Filled actions retain the original state palette and effects.
+    // Compatibility flag for contextual selectors: use the wash-safe
+    // outline, without suppressing intentional interaction fills.
     property bool normalFace: false
 
     // Red actions have their own filled-state recipe. Close × and specialized
     // controls may explicitly opt out; normal-face selectors stay separate.
     property bool redActionFace: !normalFace && Qt.colorEqual(accentColor, Colors.red)
-    property bool perimeterGlowEnabled: normalFace
-    property real perimeterGlowOpacity: 0.38
+    // Ordinary actions sample an outline, never a filled shadow surface.
+    // Red actions and explicitly wide/composite recipes retain their original
+    // broad halos by default. Specialized callers may explicitly opt out.
+    property bool washSafePerimeter: normalFace || (!redActionFace && !wideGlowEnabled)
+    property bool perimeterGlowEnabled: normalFace || (washSafePerimeter && softGlowEnabled)
+    property real perimeterGlowOpacity: effectiveSoftGlowOpacity
 
     property color idleFillColor: Colors.black
     property color hoverFillColor: Colors.yellow
@@ -79,12 +83,12 @@ Rectangle {
     property color secondaryHoverFillColor: idleFillColor
     property color pressedFillColor:
         destructive ? destructiveColor : Colors.magenta
-    property color selectedFillColor: normalFace || redActionFace ? Colors.black : Colors.yellow
+    property color selectedFillColor: redActionFace ? Colors.black : Colors.yellow
     property color keyboardSelectedFillColor: redActionFace ? Colors.yellow : selectedFillColor
 
     property color idleForegroundColor: redActionFace ? Colors.white : accentColor
     property color hoverForegroundColor: redActionFace ? Colors.white : Colors.orange
-    property color pressedForegroundColor: normalFace ? Colors.magenta : Colors.black
+    property color pressedForegroundColor: Colors.black
     property color selectedForegroundColor: redActionFace ? Colors.red : Colors.magenta
     property color keyboardSelectedForegroundColor: hoverForegroundColor
 
@@ -207,7 +211,6 @@ Rectangle {
         selected || keyboardSelected
 
     readonly property color fillColor:
-        normalFace ? Colors.black :
         pressed
         ? pressedFillColor
         : cursorPrimaryNotActivated
@@ -343,7 +346,7 @@ Rectangle {
         : unavailableOpacity
 
     color:
-        normalFace ? Colors.black : actionButton.withOpacity(
+        actionButton.withOpacity(
             fillColor,
             available ? 1.0 : unavailableFillOpacity
         )
@@ -529,7 +532,7 @@ Rectangle {
         objectName: "actionButtonNormalPerimeter"
         anchors.fill: parent
         z: -1
-        active: actionButton.normalFace && actionButton.perimeterGlowEnabled
+        active: actionButton.washSafePerimeter && actionButton.perimeterGlowEnabled
             && actionButton.perimeterGlowOpacity > 0 && actionButton.available && actionButton.visible
         visible: active
         sourceComponent: Rectangle {
@@ -539,7 +542,7 @@ Rectangle {
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: actionButton.contentGlowColor
+                shadowColor: actionButton.softGlowColor
                 shadowOpacity: actionButton.perimeterGlowOpacity
                 shadowBlur: 0.5
                 shadowHorizontalOffset: 0
@@ -549,6 +552,7 @@ Rectangle {
     }
 
     RectangularShadow {
+        objectName: "actionButtonBroadSoftGlow"
         anchors.fill: parent
         anchors.margins: -actionButton.softGlowMargin
 
@@ -556,7 +560,7 @@ Rectangle {
         z: -1
 
         visible:
-            !actionButton.normalFace && actionButton.softGlowEnabled
+            !actionButton.washSafePerimeter && actionButton.softGlowEnabled
             && actionButton.effectiveSoftGlowOpacity > 0.0
 
         opacity: actionButton.effectiveSoftGlowOpacity
@@ -564,13 +568,14 @@ Rectangle {
     }
 
     RectangularShadow {
+        objectName: "actionButtonBroadWideGlow"
         anchors.fill: parent
 
         spread: actionButton.wideGlowSpread
         z: -2
 
         visible:
-            !actionButton.normalFace && actionButton.wideGlowEnabled
+            !actionButton.washSafePerimeter && actionButton.wideGlowEnabled
             && actionButton.effectiveWideGlowOpacity > 0.0
 
         opacity: actionButton.effectiveWideGlowOpacity

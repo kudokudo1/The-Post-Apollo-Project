@@ -13,7 +13,9 @@ ActionButton {
     accentColor: Colors.cyan
     // Filled red-accent actions automatically use the red-action face.
     // selected must follow the owner's actual open state, not a click latch.
-    // Specialized recipes can override the state colors or opt out.
+    // Ordinary actions use a wash-safe outline independently of fill state.
+    // Deliberate broad-halo designs can set washSafePerimeter: false.
+    // Explicit state color overrides are reserved for intentional exceptions.
 
     // Availability is semantic and may fade as a whole...
     available: true

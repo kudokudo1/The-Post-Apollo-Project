@@ -36,9 +36,60 @@ ShellRoot {
     function normalFace(item, name, selected) {
         const b=findItem(item,name);
         const glow=b && findItem(b,"actionButtonNormalPerimeter");
-        return b && b.normalFace && b.selected===selected && String(b.color).toLowerCase()==="#1b0623"
+        const broadSoft=b && findItem(b,"actionButtonBroadSoftGlow");
+        const broadWide=b && findItem(b,"actionButtonBroadWideGlow");
+        // Independent palette oracle: selection is asserted by the caller,
+        // and transient pointer/keyboard state is observed separately.
+        const state = !b ? "missing" : b.pressed ? "pressed"
+            : selected ? "selected"
+            : (b.keyboardSelected || b.contentKeyboardPrimary) ? "keyboard-preview"
+            : b.hovered && !(b.contentKeyboardNavigationActive
+                && !b.contentKeyboardPrimary && !b.keyboardSelected) ? "primary-hover"
+            : "idle-or-secondary";
+        const expectedColor = state === "pressed" ? "#c74ec7"
+            : ["selected", "keyboard-preview", "primary-hover"].includes(state)
+                ? "#f2be4e" : "#1b0623";
+        const ok = b && b.normalFace && b.washSafePerimeter && b.selected===selected
+            && b.available && b.visible && b.color.a===1
+            && String(b.color).toLowerCase()===expectedColor
             && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
+            && broadSoft && !broadSoft.visible && broadWide && !broadWide.visible
             && glow && glow.active && glow.z===-1 && glow.item && glow.item.color.a===0;
+        // On any mismatch, retain exact runtime evidence.
+        if (!ok) {
+            console.log("CPU_DIAG_FACE_EVIDENCE // " + JSON.stringify({
+                name: name, phase: root.phase, exists: !!b,
+                expectedSelected: selected,
+                expectedColor: expectedColor, expectedState: state,
+                actual: b ? {
+                    color: String(b.color), alpha: b.color.a,
+                    fillColor: String(b.fillColor),
+                    idleFillColor: String(b.idleFillColor),
+                    hoverFillColor: String(b.hoverFillColor),
+                    selectedFillColor: String(b.selectedFillColor),
+                    normalFace: b.normalFace, washSafePerimeter: b.washSafePerimeter,
+                    selected: b.selected, hovered: b.hovered, pressed: b.pressed,
+                    keyboardSelected: b.keyboardSelected,
+                    contentKeyboardPrimary: b.contentKeyboardPrimary,
+                    cursorPrimaryNotActivated: b.cursorPrimaryNotActivated,
+                    pointerSecondaryHovered: b.pointerSecondaryHovered,
+                    available: b.available, visible: b.visible,
+                    softGlowEnabled: b.softGlowEnabled, wideGlowEnabled: b.wideGlowEnabled,
+                    contentGlowEnabled: b.contentGlowEnabled,
+                    perimeterGlowEnabled: b.perimeterGlowEnabled,
+                    perimeterGlowOpacity: b.perimeterGlowOpacity
+                } : null,
+                broadSoft: broadSoft ? {visible: broadSoft.visible} : null,
+                broadWide: broadWide ? {visible: broadWide.visible} : null,
+                perimeter: glow ? {
+                    active: glow.active, visible: glow.visible, z: glow.z,
+                    itemExists: !!glow.item,
+                    itemColor: glow.item ? String(glow.item.color) : null,
+                    itemAlpha: glow.item ? glow.item.color.a : null
+                } : null
+            }));
+        }
+        return ok;
     }
     function check(ok, message) {
         if (!ok) {

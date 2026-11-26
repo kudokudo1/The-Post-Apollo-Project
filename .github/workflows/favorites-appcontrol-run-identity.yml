@@ -1,0 +1,27 @@
+name: Favorites AppControl RUN identity compatibility
+
+on:
+  push:
+    paths:
+      - "services/favorites/FavoritesAppControlRunIdentityPolicy.js"
+      - "tests/favorites/test_appcontrol_run_identity_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-run-identity.yml"
+      - "widgets/AppControlW.qml"
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesAppControlRunIdentityPolicy.js"
+      - "tests/favorites/test_appcontrol_run_identity_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-run-identity.yml"
+      - "widgets/AppControlW.qml"
+
+permissions:
+  contents: read
+
+jobs:
+  donor-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify AppControl legacy RUN key codec donor parity
+        run: node --test tests/favorites/test_appcontrol_run_identity_policy.cjs

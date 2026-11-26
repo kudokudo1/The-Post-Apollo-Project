@@ -562,6 +562,35 @@ from this fixture alone.
 Numerical QML implementation stays here, not copied into that grammar.
 
 
-### Normal-face ActionButton profile (D3c)
+### Normal-face ActionButton profile (D3c) — historical, superseded below
 
-For selectors whose **intentional** resting, selected, hovered and pressed face is opaque black, set `normalFace: true` on the shared `ActionButton`. Do not copy local face bindings or recreate the shadow stack. The profile fixes final face paint and fill resolution to opaque black, gates both filled RectangularShadow layers, preserves source-local glyph glow (including magenta press feedback), and optionally loads a transparent-outline perimeter effect **behind** the opaque face. `perimeterGlowEnabled` defaults to the profile; `perimeterGlowOpacity` defaults to 0.38. The outline samples only a border, not a filled rectangle. Its color follows the existing state-dependent content glow. No timer or state mutation is required, and the perimeter source is unloaded when the control is hidden or unavailable. Existing ActionButton consumers retain `normalFace: false`; do not migrate intentionally filled hover/selected/open states, special category washes, or progress/tank controls automatically. U9g's yellow-open and Angels' deliberate category washes remain valid. Do not override the profile's final face or reintroduce broad shadow layers in descendants. Verify actual color, glyph glow, perimeter source, and unchanged legacy fill across hide/show, remount and reflow. Offscreen native state assertions do not establish desktop GPU pixel appearance.
+D3c introduced a transparent outline-only perimeter to prevent a filled
+RectangularShadow from washing the face on remount. It also forced every
+normalFace fill to black. The latter behavior is superseded by the
+operator-approved correction below.
+
+### Wash-safe perimeter is independent of interaction state (2026-11-26)
+
+Ordinary ActionButton defaults to black idle, yellow primary hover,
+magenta press, and yellow selected/open with magenta ink/border. The
+selected state belongs to the actual owner, not a click latch. Keyboard
+preview follows hover; secondary pointer preview retains its existing
+non-primary behavior. Release returns directly to the current semantic
+state. Content illumination remains 35/65/85/100 with original radius
+and samples. The wash-safe outline is a separate rendering policy:
+`washSafePerimeter` defaults true for ordinary controls, including
+legacy `normalFace: true` consumers, and suppresses broad filled shadow
+layers. A transparent outline samples only its stroke, stays behind
+the face, follows the existing perimeter color/strength and unloads
+when hidden or unavailable. No forced-black interaction fill.
+
+Red actions, Close X and deliberate wide/composite recipes retain their
+established palette and broad halos. Specialized callers can explicitly
+opt out of the outline policy or override individual state colors.
+Existing explicit no-glow bindings remain respected. Do not use the
+wash policy to disable intentional hover/open fill, or add a timer.
+Existing locally authored fill overrides (e.g. Favorites++) require
+separate owner review. Modules and ModeButton composition are unchanged.
+Verify both actual Rectangle color and effect visibility through
+hover, press, release, selection, keyboard preview and hide/show/remount.
+Offscreen state tests do not establish GPU pixel appearance.

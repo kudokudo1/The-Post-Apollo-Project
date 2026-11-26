@@ -36,8 +36,12 @@ ShellRoot {
     function normalFace(item, name, selected) {
         const b=findItem(item,name);
         const glow=b && findItem(b,"actionButtonNormalPerimeter");
-        return b && b.normalFace && b.selected===selected && String(b.color).toLowerCase()==="#1b0623"
+        const broadSoft=b && findItem(b,"actionButtonBroadSoftGlow");
+        const broadWide=b && findItem(b,"actionButtonBroadWideGlow");
+        return b && b.normalFace && b.washSafePerimeter && b.selected===selected
+            && String(b.color).toLowerCase()===(selected ? "#f2be4e" : "#1b0623")
             && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
+            && broadSoft && !broadSoft.visible && broadWide && !broadWide.visible
             && glow && glow.active && glow.z===-1 && glow.item && glow.item.color.a===0;
     }
     function check(ok, message) {

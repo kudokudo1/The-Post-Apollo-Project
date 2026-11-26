@@ -780,7 +780,7 @@ for needle in (
     "property color idleForegroundColor: redActionFace ? Colors.white : accentColor",
     "property color hoverForegroundColor: redActionFace ? Colors.white : Colors.orange",
     "property color selectedForegroundColor: redActionFace ? Colors.red : Colors.magenta",
-    "property color selectedFillColor: normalFace || redActionFace ? Colors.black : Colors.yellow",
+    "property color selectedFillColor: redActionFace ? Colors.black : Colors.yellow",
     "property color hoverBorderColor: redActionFace ? Colors.red : Colors.orange",
     "property color selectedBorderColor: redActionFace ? Colors.red : Colors.magenta",
     "property color selectedContentGlowColor: redActionFace ? Colors.red : Colors.magenta",
@@ -816,3 +816,20 @@ for needle in (
 require(COMPONENT, "contentGlowKeyboardSelectedOpacity: contentGlowHoverOpacity",
         "keyboard preview equals hover")
 assert "Timer {" not in COMPONENT, "no artificial release flash"
+
+# Wash protection is a rendering policy, not a selection or fill policy.
+for needle in (
+    "property bool washSafePerimeter: normalFace || (!redActionFace && !wideGlowEnabled)",
+    "property bool perimeterGlowEnabled: normalFace || (washSafePerimeter && softGlowEnabled)",
+    "property real perimeterGlowOpacity: effectiveSoftGlowOpacity",
+    "active: actionButton.washSafePerimeter && actionButton.perimeterGlowEnabled",
+    "!actionButton.washSafePerimeter && actionButton.softGlowEnabled",
+    "!actionButton.washSafePerimeter && actionButton.wideGlowEnabled",
+    "shadowColor: actionButton.softGlowColor",
+    "property color pressedForegroundColor: Colors.black",
+):
+    require(COMPONENT, needle, "wash-safe state separation")
+assert "normalFace ? Colors.black :" not in COMPONENT
+assert "normalFace ? Colors.magenta :" not in COMPONENT
+assert "normalFace || redActionFace ? Colors.black" not in COMPONENT
+print("Wash-safe perimeter independent of action fill: PASS")

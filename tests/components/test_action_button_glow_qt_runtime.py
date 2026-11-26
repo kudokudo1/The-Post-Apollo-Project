@@ -91,6 +91,63 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
         assert red.property("redActionFace") is True
         assert close.property("redActionFace") is False
         assert normal.property("redActionFace") is False
+        def outline(item):
+            return item.findChild(QObject, "actionButtonNormalPerimeter")
+        def broad(item, name):
+            return item.findChild(QObject, name)
+        def check_safe(item):
+            assert item.property("washSafePerimeter") is True
+            assert outline(item).property("active") is True
+            assert not broad(item, "actionButtonBroadSoftGlow").property("visible")
+            assert not broad(item, "actionButtonBroadWideGlow").property("visible")
+        for item, point in ((button, (40, 30)), (normal, (240, 95))):
+            check_safe(item)
+            assert color(item, "color") == color(item, "idleFillColor")
+            move(*point)
+            assert item.property("hovered")
+            assert color(item, "color") == color(item, "hoverFillColor")
+            assert color(item, "activeBorderColor") == color(item, "hoverBorderColor")
+            assert abs(item.property("stateContentGlowOpacity") - .65) < .001
+            QTest.mousePress(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(*point))
+            app.processEvents()
+            assert item.property("pressed")
+            assert color(item, "color") == color(item, "pressedFillColor")
+            assert abs(item.property("stateContentGlowOpacity") - .85) < .001
+            QTest.mouseRelease(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(*point))
+            app.processEvents()
+            assert color(item, "color") == color(item, "hoverFillColor")
+            assert item.setProperty("selected", True)
+            app.processEvents()
+            assert color(item, "color") == color(item, "selectedFillColor")
+            assert abs(item.property("stateContentGlowOpacity") - 1.0) < .001
+            check_safe(item)
+            move(450,210)
+            assert item.setProperty("visible", False)
+            app.processEvents()
+            assert not outline(item).property("active")
+            assert item.setProperty("visible", True)
+            app.processEvents()
+            assert color(item, "color") == color(item, "selectedFillColor")
+            check_safe(item)
+            assert item.setProperty("selected", False)
+            app.processEvents()
+            assert color(item, "color") == color(item, "idleFillColor")
+            assert item.setProperty("keyboardSelected", True)
+            app.processEvents()
+            assert color(item, "color") == color(item, "keyboardSelectedFillColor")
+            assert item.setProperty("keyboardSelected", False)
+            app.processEvents()
+            assert color(item, "color") == color(item, "idleFillColor")
+        special = window.findChild(QObject, "deliberateBroadComparison")
+        quiet = window.findChild(QObject, "quietComparison")
+        for item in (red, close, special):
+            assert item.property("washSafePerimeter") is False
+            assert not outline(item).property("active")
+            assert broad(item, "actionButtonBroadSoftGlow").property("visible")
+        assert quiet.property("washSafePerimeter") is True
+        assert not outline(quiet).property("active")
+        assert not broad(quiet, "actionButtonBroadSoftGlow").property("visible")
+        assert not quiet.property("contentGlowEnabled")
         assert color(custom, "foregroundColor") == color(custom, "idleForegroundColor")
         assert color(red, "foregroundColor") == color(red, "idleForegroundColor")
         assert color(red, "foregroundColor") != color(red, "accentColor")

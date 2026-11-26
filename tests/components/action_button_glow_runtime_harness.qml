@@ -66,6 +66,19 @@ Window {
         accentColor: Shared.Colors.red
         idleForegroundColor: Shared.Colors.cyan
     }
+    Shared.ActionButton {
+        objectName: "deliberateBroadComparison"
+        x: 350; y: 80; width: 100; height: 30
+        label: "SPECIAL"
+        washSafePerimeter: false
+    }
+    Shared.ActionButton {
+        objectName: "quietComparison"
+        x: 350; y: 130; width: 100; height: 30
+        label: "QUIET"
+        softGlowEnabled: false
+        contentGlowEnabled: false
+    }
     Shared.ModeButton {
         objectName: "hierarchyModeButton"
         x: 15; y: 160; width: 110; height: 50

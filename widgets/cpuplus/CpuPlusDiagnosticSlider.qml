@@ -14,6 +14,8 @@ Column {
     property color fillColor: Colors.omnitrix
     property bool adjustable: true
     property bool compact: false
+    // Cool white hardware with a restrained semantic tint, not saturated ink.
+    readonly property color hardwareFace: Qt.rgba(0.72+subjectColor.r*0.28,0.72+subjectColor.g*0.28,0.72+subjectColor.b*0.28,1)
     signal valueRequested(real value)
     spacing: compact ? 0 : 2
     CpuPlusMemoryReadout {
@@ -42,11 +44,13 @@ Column {
             valueDecimals: 0
             enabledSlider: root.adjustable && validStepDomain
             accentColor: root.subjectColor
-            frameColor: Colors.white
+            frameColor: "#FFFFFF"
+            responsiveHardware: true
+            energizedValueFill: true
             frameGlowColor: root.fillColor
             valueFillColor: root.fillColor
-            handleColor: root.subjectColor
-            handleGradientBaseColor: root.subjectColor
+            handleColor: root.hardwareFace
+            handleGradientBaseColor: root.hardwareFace
             handleGradientAccentColor: root.subjectColor
             handleGlowColor: root.fillColor
             activityGlowColor: root.fillColor

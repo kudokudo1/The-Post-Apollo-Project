@@ -332,7 +332,7 @@ assert.match(owner,/if\(setStopRequested\)\{finishSet\("SET CANCELLED"\);return;
 console.log("DIAG D4b ordered set session contracts PASS");
 
 for(const color of ["cyan","magenta","orange"])assert.ok(workshop.includes("subjectColor: Colors."+color));
-assert.match(workshopSlider,/handleColor: root.subjectColor/);
+assert.match(workshopSlider,/handleColor: root.hardwareFace/);
 assert.match(workshopSlider,/font.pixelSize: 12/);
 assert.match(workshopSlider,/semanticGlowColor: root.fillColor/);
 assert.match(workshop,/idleRingGlowStrength: 0.65/);
@@ -341,7 +341,7 @@ assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopTopThreads"')<workshop.i
 assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"')<workshop.indexOf('objectName: "cpuplusWorkshopStallThreshold"'));
 assert.doesNotMatch(workshop,/selected(Foreground|Border|ContentGlow|SoftGlow)Color: accentColor/);
 
-assert.match(workshopSlider,/frameColor: Colors.white/);
+assert.match(workshopSlider,/frameColor: "#FFFFFF"/);
 assert.match(workshopSlider,/accentColor: root.subjectColor/);
 assert.match(workshop,/activeDetentColor: Colors.magenta/);
 assert.match(workshop,/outlinedOptionLabels: true/);
@@ -352,3 +352,10 @@ assert.match(workshopSlider,/frameGlowColor: root.fillColor/);
 assert.match(workshopSlider,/handleGlowColor: root.fillColor/);
 assert.match(workshopSlider,/activityGlowColor: root.fillColor/);
 assert.match(read("components/SelectorSlider.qml"),/property color frameGlowColor: frameColor/);
+
+assert.match(workshopSlider,/responsiveHardware: true/);
+assert.match(workshopSlider,/energizedValueFill: true/);
+assert.match(workshop,/parent: root.filterTarget \|\| root/);
+assert.match(ui,/filterTarget: root.workshopFilterTarget/);
+assert.match(read("components/SelectorSlider.qml"),/property bool responsiveHardware: false/);
+assert.match(read("components/SelectorSlider.qml"),/property bool energizedValueFill: false/);

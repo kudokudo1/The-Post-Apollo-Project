@@ -15,6 +15,10 @@ ShellRoot {
     property int completions: 0
     property string diagnosticFooterGeometry: ""
     property string completedId: ""
+    property real compactThumbLength: 0
+    property real mediumThumbLength: 0
+    property real lowFillOpacity: 0
+    property real lowHaloOpacity: 0
     Connections {
         target: CpuPlusDiagnostics
         function onCaptureFinished(job, reportId) {
@@ -113,6 +117,7 @@ ShellRoot {
         return ok;
     }
     Window {
+        id: nativeWindow
         width: 320
         height: 620
         visible: true
@@ -377,13 +382,20 @@ ShellRoot {
                     && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
                     && workshop.phase==="PREPARE" && dial.options.length===12 && dial.readoutGlowEnabled && String(dial.markerColor).toLowerCase()==="#ed981a"
                     && dial.numericDetentInterval===1,"actual Workshop hardware and no automatic launch")) return;
+                const host=root.findItem(pane.item,"cpuplusDiagnosticFilterHost");
+                const rail=root.findItem(pane.item,"cpuplusWorkshopFilterRail");
+                if (!root.check(host && rail && rail.parent===host && rail.width===host.width
+                    && ["threads","memory","census","storage","stall"].every(k=>{
+                        const b=root.findItem(rail,"cpuplusWorkshopInstrument-"+k);
+                        return b && b.visible && b.width===b.height && b.height===host.height;
+                    }),"five equal square tools mounted in the header")) return;
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!root.check(viewport && viewport.contentHeight<=viewport.height+1,
                     "default Workshop fits native 320x620 viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
                 if (!root.check(root.normalFace(pane.item,"cpuplusMemoryMode-DIAG",true)
                     && root.normalFace(pane.item,"cpuplusMemoryMode-CAP",false)
-                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",true)
-                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-storage",false), "normal opaque faces before unload")) return;
+                    && root.normalFace(pane.item,"cpuplusWorkshopInstrument-threads",true)
+                    && root.normalFace(pane.item,"cpuplusWorkshopInstrument-storage",false), "normal opaque faces before unload")) return;
                 workshop.edit("selected",["threads","memory","census","storage"]);
                 root.phase=171;
                 return;
@@ -395,13 +407,16 @@ ShellRoot {
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
                 const storage=root.findItem(workshop,"cpuplusWorkshopStorageInstrument");
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
-                if (!root.check(storage && storage.visible && storage.height===workshop.instrumentHeight && dial.visible
+                if (!root.check(storage && storage.visible && storage.height<=workshop.instrumentHeight && storage.y>0 && dial.visible
                     && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>root.findItem(workshop,"cpuplusWorkshopCensusInterval").mapToItem(workshop,0,0).y
                     && ["Duration","ThreadInterval","MemoryInterval","CensusInterval"].every(name=>{
                         const slider=root.findItem(workshop,"cpuplusWorkshop"+name+"-hardware");
                         return slider && slider.visible && slider.height===workshop.width
                             && String(slider.border.color)===String(duration.border.color)
-                            && String(slider.border.color)===String(duration.accentColor)
+                            && String(slider.border.color).toLowerCase()==="#ffffff"
+                            && slider.responsiveHardware && slider.energizedValueFill
+                            && slider.hardwareThumbWidth<=slider.width
+                            && slider.hardwareThumbLength<52
                             && String(slider.frameGlowColor)===String(slider.valueFillColor)
                             && String(slider.handleGlowColor)===String(slider.valueFillColor)
                             && String(slider.activityGlowColor)===String(slider.valueFillColor);
@@ -455,8 +470,8 @@ ShellRoot {
                     && !workshop.ready && !CpuPlusDiagnostics.busy,"draft and terminal continuity without rearming")) return;
                 if (!root.check(root.normalFace(pane.item,"cpuplusMemoryMode-DIAG",true)
                     && root.normalFace(pane.item,"cpuplusMemoryMode-CAP",false)
-                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-census",true)
-                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",false), "normal opaque faces after actual remount")) return;
+                    && root.normalFace(pane.item,"cpuplusWorkshopInstrument-census",true)
+                    && root.normalFace(pane.item,"cpuplusWorkshopInstrument-threads",false), "normal opaque faces after actual remount")) return;
                 console.log("CPU_D3A_NATIVE_PASS");
                 if (!root.check(CpuPlusDiagnostics.requestConfigured({kind:"stall",durationSeconds:5,thresholdMs:350})
                     && CpuPlusDiagnostics.stallCaptureActive && !CpuPlusDiagnostics.request("inventory"),
@@ -496,7 +511,7 @@ ShellRoot {
                     && dial.numericDetentInterval===50 && dial.markerColor.toString().toLowerCase()==="#c74ec7"
                     && String(dial.activeDetentColor)===String(dial.markerColor)
                     && String(dial.accentColor).toLowerCase()==="#f2be4e" && dial.outlinedOptionLabels
-                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-stall",true),
+                    && root.normalFace(pane.item,"cpuplusWorkshopInstrument-stall",true),
                     "actual second dial and fifth normal-face selector")) return;
                 const storageContents=root.findItem(storage,"cpuplusWorkshopStorageContents");
                 if (!root.check(storageContents && storageContents.y>=0
@@ -505,6 +520,62 @@ ShellRoot {
                     "storage contents fit card with all five instruments")) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,
                     "all five instruments fit // "+viewport.contentHeight+" / "+viewport.height)) return;
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const fill=root.findItem(duration,"selectorNumericFill");
+                const halo=root.findItem(duration,"selectorNumericFillHalo");
+                if (!duration || !fill || !halo || Math.abs(duration.liveFillFraction-29/119)>0.02) return;
+                if (!root.check(fill.width>4 && halo.visible && duration.hardwareThumbLength<52,
+                    "compact thumb and widened energized fill")) return;
+                root.compactThumbLength=duration.hardwareThumbLength;
+                root.lowFillOpacity=fill.opacity;
+                root.lowHaloOpacity=halo.opacity;
+                workshop.edit("durationSeconds",100);
+                root.phase=241;
+                return;
+            }
+            if (root.phase===241 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                if (!duration || duration.liveFillFraction<0.82) return;
+                const fill=root.findItem(duration,"selectorNumericFill");
+                const halo=root.findItem(duration,"selectorNumericFillHalo");
+                if (!root.check(fill.opacity>root.lowFillOpacity && halo.opacity>root.lowHaloOpacity
+                    && !CpuPlusDiagnostics.busy,"fill and halo intensify without launching capture")) return;
+                nativeWindow.width=400;
+                nativeWindow.height=700;
+                root.phase=242;
+                return;
+            }
+            if (root.phase===242 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!duration || duration.hardwareThumbLength<=root.compactThumbLength) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"medium instruments fit")) return;
+                root.mediumThumbLength=duration.hardwareThumbLength;
+                nativeWindow.width=500;
+                nativeWindow.height=800;
+                root.phase=243;
+                return;
+            }
+            if (root.phase===243 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!duration || duration.hardwareThumbLength<=root.mediumThumbLength) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"large instruments fit")) return;
+                nativeWindow.width=320;
+                nativeWindow.height=620;
+                root.phase=244;
+                return;
+            }
+            if (root.phase===244 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const dial=root.findItem(workshop,"cpuplusWorkshopStallThreshold");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!duration || duration.hardwareThumbLength!==root.compactThumbLength) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"compact instruments fit after resize")) return;
                 workshop.edit("selected",["storage","stall"]);
                 workshop.edit("durationSeconds",5);
                 dial.valueRequested(500);

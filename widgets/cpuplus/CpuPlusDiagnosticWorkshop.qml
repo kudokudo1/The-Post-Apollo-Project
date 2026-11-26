@@ -10,6 +10,12 @@ Column {
     objectName: "cpuplusDiagnosticWorkshop"
     spacing: compactLayout ? 1 : 2
     property real viewportHeight: 0
+    property Item filterTarget: null
+    readonly property string targetText: {
+        const qs=draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
+        const system=draft.selected.some(k=>k==="census"||k==="storage");
+        return qs && system ? "TARGET // QS + USER" : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
+    }
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
     readonly property int instrumentHeight: compactLayout ? 112 : 176
     readonly property int filterSize: compactLayout ? 24 : 32
@@ -109,9 +115,11 @@ Column {
 
     Row {
         objectName: "cpuplusWorkshopFilterRail"
+        parent: root.filterTarget || root
         width: parent.width
-        height: root.filterSize
-        spacing: root.filterGap
+        height: root.filterTarget ? parent.height : root.filterSize
+        spacing: root.filterTarget ? 3 : root.filterGap
+        visible: root.visible
         Repeater {
             model: [{kind:"threads",symbol:"≋",subject:"THREADS"},
                 {kind:"memory",symbol:"",subject:"MEMORY"},
@@ -122,11 +130,11 @@ Column {
                 id: instrumentFilter
                 required property var modelData
                 objectName: "cpuplusWorkshopInstrument-"+modelData.kind
-                width: root.filterWidth
-                height: root.filterSize
+                width: root.filterTarget ? parent.height : root.filterWidth
+                height: root.filterTarget ? parent.height : root.filterSize
                 accentColor: Colors.resourceColor(modelData.subject)
                 label: modelData.symbol
-                labelPixelSize: root.compactLayout ? 18 : 24
+                labelPixelSize: Math.max(16,Math.round(width*0.72))
                 labelElide: Text.ElideNone
                 contentPadding: 0
                 selected: root.draft.selected.includes(modelData.kind)
@@ -141,15 +149,11 @@ Column {
             }
         }
         GohuText {
+            visible: !root.filterTarget
             width: Math.max(0,parent.width-5*(root.filterWidth+root.filterGap))
             height: parent.height
             verticalAlignment: Text.AlignVCenter
-            text: {
-                const qs=root.draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
-                const system=root.draft.selected.some(k=>k==="census"||k==="storage");
-                return qs && system ? "TARGET // QS + USER"
-                    : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
-            }
+            text: root.targetText
             color: Colors.purple
             font.pixelSize: 10
             wrapMode: Text.WordWrap
@@ -257,19 +261,24 @@ Column {
             }
         }
 
-        Rectangle {
-            objectName: "cpuplusWorkshopStorageInstrument"
+        Item {
             visible: root.draft.selected.includes("storage")
             width: root.storageWidth
             height: root.instrumentHeight
+            Rectangle {
+            objectName: "cpuplusWorkshopStorageInstrument"
+            anchors.centerIn: parent
+            width: Math.max(0,parent.width-4)
+            height: storageContents.implicitHeight+8
             color: Colors.black
             border.color: Colors.blue
             clip: true
             Column {
+                id: storageContents
                 objectName: "cpuplusWorkshopStorageContents"
                 anchors.centerIn: parent
                 width: Math.max(0,parent.width-(root.compactLayout ? 4 : 8))
-                spacing: root.compactLayout ? 1 : 5
+                spacing: root.compactLayout ? 1 : 3
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: root.lowerInstrumentCount===3 ? "STORAGE" : "STORAGE // METADATA"
@@ -335,6 +344,7 @@ Column {
                     minimumPixelSize: 7
                     horizontalAlignment: Text.AlignHCenter
                 }
+            }
             }
         }
         Item {

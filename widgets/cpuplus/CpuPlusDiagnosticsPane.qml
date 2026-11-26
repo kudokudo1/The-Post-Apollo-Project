@@ -9,6 +9,8 @@ Column {
     id: root
     objectName: "cpuplusDiagnosticControls"
     property Item headerTarget: null
+    property Item workshopFilterTarget: null
+    readonly property string workshopTargetText: workshopLoader.item ? workshopLoader.item.targetText : ""
     property Item footerTarget: null
     property real workshopViewportHeight: 0
     spacing: 6
@@ -257,11 +259,15 @@ Column {
         }
     }
     Loader {
+        id: workshopLoader
         width: parent.width
         height: active && item ? item.implicitHeight : 0
         active: root.workshopOpen
         visible: active
-        sourceComponent: CpuPlusDiagnosticWorkshop { viewportHeight: root.workshopViewportHeight }
+        sourceComponent: CpuPlusDiagnosticWorkshop {
+            viewportHeight: root.workshopViewportHeight
+            filterTarget: root.workshopFilterTarget
+        }
     }
     Column {
         id: presets

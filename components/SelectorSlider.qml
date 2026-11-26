@@ -14,6 +14,13 @@ Rectangle {
     // Optional numeric fill ink; existing controls inherit their original accent.
     property color valueFillColor: accentColor
     property color handleColor: Colors.white
+    // Diagnostic hardware opts in; existing vertical controls remain unchanged.
+    property bool responsiveHardware: false
+    property bool energizedValueFill: false
+    readonly property real hardwareThumbWidth: responsiveHardware ? Math.min(28, Math.max(10, Math.round(width*0.78))) : 28
+    readonly property real hardwareThumbLength: responsiveHardware ? Math.min(52, Math.max(22, Math.round(height*0.105))) : 52
+    readonly property real liveFillFraction: numericMode && handleTravel()>0
+        ? Math.max(0,Math.min(1,1-thumb.y/handleTravel())) : 0
     // Opt-in palette only: Git/Hospital and every existing consumer keep
     // their white hardware thumb and current interaction behavior.
     property bool handleGradientEnabled: false
@@ -570,14 +577,29 @@ Rectangle {
             Rectangle {
                 id: valueFill
                 visible: slider.numericMode
-                width: 4
+                objectName: "selectorNumericFill"
+                width: slider.energizedValueFill ? Math.max(4,slot.width-4) : 4
                 x: (parent.width - width) / 2
                 y: Math.max(0, Math.min(slot.height,
                     thumb.y + thumb.height / 2))
-                height: Math.max(0, slot.height - y)
+                height: slider.energizedValueFill && slider.liveFillFraction<=0 ? 0 : Math.max(0, slot.height - y)
                 radius: 2
-                color: slider.valueFillColor
-                opacity: slider.enabledSlider ? 0.72 : 0.20
+                color: slider.energizedValueFill
+                    ? Qt.rgba(slider.valueFillColor.r+(1-slider.valueFillColor.r)*slider.liveFillFraction*0.20,
+                              slider.valueFillColor.g+(1-slider.valueFillColor.g)*slider.liveFillFraction*0.20,
+                              slider.valueFillColor.b+(1-slider.valueFillColor.b)*slider.liveFillFraction*0.20,1)
+                    : slider.valueFillColor
+                opacity: slider.enabledSlider ? (slider.energizedValueFill ? 0.80+0.20*slider.liveFillFraction : 0.72) : 0.20
+                RectangularShadow {
+                    objectName: "selectorNumericFillHalo"
+                    visible: slider.energizedValueFill && slider.enabledSlider && valueFill.height>0
+                    anchors.fill: parent
+                    z: -1
+                    radius: valueFill.radius
+                    spread: 2+3*slider.liveFillFraction
+                    color: slider.valueFillColor
+                    opacity: 0.25+0.55*slider.liveFillFraction
+                }
             }
 
             Repeater {
@@ -663,8 +685,9 @@ Rectangle {
             Rectangle {
                 id: thumb
 
-                width: 28
-                height: 52
+                objectName: "selectorHardwareThumb"
+                width: slider.hardwareThumbWidth
+                height: slider.hardwareThumbLength
                 radius: 3
                 anchors.horizontalCenter: parent.horizontalCenter
                 z: 3
@@ -768,14 +791,14 @@ Rectangle {
 
                 Column {
                     anchors.centerIn: parent
-                    spacing: 4
+                    spacing: slider.responsiveHardware ? Math.max(1,Math.min(4,(thumb.height-14)/5)) : 4
 
                     Repeater {
                         model: 5
 
                         Rectangle {
-                            width: 16
-                            height: 2
+                            width: slider.responsiveHardware ? Math.max(6,Math.min(16,thumb.width-8)) : 16
+                            height: slider.responsiveHardware && thumb.height<34 ? 1 : 2
                             radius: 1
                             color: dragArea.pressed
                                    ? Colors.black

@@ -98,7 +98,8 @@ class ArchiveTests(unittest.TestCase):
             archive.validate_rows([record(1),record(1)])
 
     def test_workflow_limit_and_aggregate_retention(self):
-        large = dict(record(1, "\\\\"*300000), kind="workflow")
+        large = dict(record(1, chr(92)*300000), kind="workflow")
+        self.assertEqual(len(large["text"]),300000)
         self.save(large)
         self.assertEqual(self.read()["rows"], [large])
         with self.assertRaises(ValueError):

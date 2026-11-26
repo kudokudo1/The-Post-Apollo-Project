@@ -527,6 +527,10 @@ ShellRoot {
             }
             if (root.phase===27 && pane.item) {
                 pane.item.selectMenu(4);
+                root.phase=271;
+                return;
+            }
+            if(root.phase===271 && pane.item){
                 const rail=root.findItem(pane.item,"cpuplusDiagnosticWorkspaceRail");
                 const context=root.findItem(pane.item,"cpuplusDiagnosticContextRail");
                 const footer=root.findItem(pane.item,"cpuplusDiagBottomControls");
@@ -537,7 +541,7 @@ ShellRoot {
                     && footer.parent===root.findItem(pane.item,"cpuplusWorkFooter")
                     && footer.height===53 && context.height===25 && rail.height===25
                     && context.y+context.height+3===rail.y && modes.y===0 && controls.selected,
-                    "fixed two-row footer with context above workspace")) return;
+                    "fixed two-row footer with context above workspace // "+JSON.stringify({footer:footer?footer.height:null,context:context?{y:context.y,h:context.height}:null,rail:rail?{y:rail.y,h:rail.height,v:rail.visible}:null,modes:modes?modes.y:null,selected:controls?controls.selected:null,parent:footer?footer.parent.objectName:null}))) return;
                 root.diagnosticFooterGeometry=root.footerGeometry(pane.item,["QUICK","REPORT","HISTORY","COMPARE"]);
                 if(!root.check(root.diagnosticFooterGeometry!=="","control footer geometry"))return;
                 root.findItem(pane.item,"cpuplusDiagnosticView-REPORT").leftClicked(null);

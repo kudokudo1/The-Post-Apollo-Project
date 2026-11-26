@@ -11,7 +11,7 @@ Column {
     spacing: 2
     property real viewportHeight: 0
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
-    readonly property int instrumentHeight: compactLayout ? 120 : 176
+    readonly property int instrumentHeight: compactLayout ? 128 : 176
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
@@ -218,7 +218,7 @@ Column {
             SelectorDial {
                 objectName: "cpuplusWorkshopTopThreads"
                 anchors.centerIn: parent
-                scale: Math.min(1, parent.width/width, parent.height/height)
+                scale: Math.min(1.1, parent.width/width, parent.height/height)
                 labelText: "TOP THREADS"
                 options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
                 displayOptions: options
@@ -330,7 +330,7 @@ Column {
             SelectorDial {
                 objectName: "cpuplusWorkshopStallThreshold"
                 anchors.centerIn: parent
-                scale: Math.min(1,parent.width/width,parent.height/height)
+                scale: Math.min(1.1,parent.width/width,parent.height/height)
                 labelText: "STALL THRESHOLD"
                 options: ["150","500","1000","1500","2000"]
                 displayOptions: options

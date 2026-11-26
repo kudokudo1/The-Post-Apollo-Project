@@ -10,6 +10,7 @@ from model_form_routing_i1 import (
     TurnScope, ReasoningReference, SemanticEvidence, RoutingInput,
     ModelFormRecommendation, RoutingRefusal, recommend,
     preserve_recommendation, presentation_reference,
+    FormControlReference, controlled_routing_input,
 )
 
 
@@ -165,6 +166,105 @@ class ModelFormRoutingTests(unittest.TestCase):
             r.form = "big"
         with self.assertRaises(FrozenInstanceError):
             self.reasoning.mode = "deep"
+
+
+
+class FormControlReferenceTests(unittest.TestCase):
+    def setUp(self):
+        self.scope = TurnScope(TaskContext("owner-a", "bristlecone", None,
+                                "task-a", "context-a", 1, "INTERACTIVE"), "turn-a")
+        self.reasoning = ReasoningReference(self.scope, "normal", "explicit")
+        self.base = FormControlReference(self.scope, 1, "COMPLETE", baseline="auto")
+        self.high = (SemanticEvidence(self.scope, "task_complexity", "high", "fixture"),)
+
+    def route(self, control, current=None):
+        return controlled_routing_input(control, control if current is None else current,
+                                       reasoning=self.reasoning, evidence=self.high)
+
+    def test_original_form_precedence(self):
+        task = replace(self.base, task_form="small", task_context=self.scope.context,
+                       baseline="big", tree_default="big")
+        exact = replace(task, exact_form="big")
+        self.assertEqual(recommend(self.route(exact)).form, "big")
+        self.assertEqual(recommend(self.route(task)).form, "small")
+        self.assertEqual(recommend(self.route(replace(task, task_form=None,
+                                                     task_context=None))).form, "big")
+        self.assertEqual(recommend(self.route(self.base)).form, "big")
+
+    def test_context_auto_does_not_inherit_tree_pin(self):
+        control = replace(self.base, tree_default="small")
+        self.assertEqual(self.route(control).requested_form, "auto")
+        self.assertEqual(recommend(self.route(control)).form, "big")
+
+    def test_authorized_absent_baseline_uses_tree_default_only(self):
+        control = replace(self.base, baseline=None, tree_default="small")
+        self.assertEqual(recommend(self.route(control)).form, "small")
+        with self.assertRaisesRegex(RoutingRefusal, "CONTROL_COVERAGE_HOLD"):
+            self.route(replace(control, tree_default=None))
+
+    def test_unknown_coverage_never_falls_through_even_exact(self):
+        for exact in (None, "big"):
+            control = replace(self.base, coverage="UNKNOWN", exact_form=exact,
+                              tree_default="small")
+            with self.assertRaisesRegex(RoutingRefusal, "CONTROL_COVERAGE_HOLD"):
+                self.route(control)
+        with self.assertRaises(RoutingRefusal):
+            controlled_routing_input(self.base, None, reasoning=self.reasoning)
+
+    def test_changed_control_revision_or_content_refused(self):
+        for changed in (replace(self.base, revision=2),
+                        replace(self.base, baseline="small"),
+                        replace(self.base, coverage="UNKNOWN")):
+            with self.assertRaisesRegex(RoutingRefusal, "CONTROL_REFERENCE_CHANGED"):
+                self.route(self.base, changed)
+
+    def test_foreign_task_or_incarnation_not_treated_as_absence(self):
+        for context in (replace(self.scope.context, task_id="task-b"),
+                        replace(self.scope.context, generation=2),
+                        replace(self.scope.context, clone_key="clone-a")):
+            with self.assertRaisesRegex(RoutingRefusal, "CONTROL_SCOPE_MISMATCH"):
+                replace(self.base, task_form="small", task_context=context)
+        other = replace(self.scope, turn_id="turn-b")
+        with self.assertRaises(RoutingRefusal):
+            self.route(replace(self.base, scope=other))
+
+    def test_malformed_lower_priority_controls_refused(self):
+        for fields in ({"baseline": "BIG"}, {"tree_default": True},
+                       {"task_form": "auto", "task_context": self.scope.context},
+                       {"task_form": "big"}, {"revision": True},
+                       {"revision": 2**53}, {"coverage": False}):
+            with self.assertRaises(RoutingRefusal):
+                replace(self.base, exact_form="small", **fields)
+
+    def test_control_lineage_retained_even_when_selected_form_unchanged(self):
+        original = self.route(replace(self.base, exact_form="small"))
+        decision = recommend(original)
+        self.assertIs(preserve_recommendation(decision, original), decision)
+        changed = self.route(replace(original.control, revision=2))
+        self.assertEqual(recommend(changed).form, decision.form)
+        with self.assertRaisesRegex(RoutingRefusal, "ROUTING_INPUT_CHANGED"):
+            preserve_recommendation(decision, changed)
+        with self.assertRaisesRegex(RoutingRefusal, "ROUTING_INPUT_CHANGED"):
+            preserve_recommendation(decision, replace(original, control=None))
+        with self.assertRaisesRegex(RoutingRefusal, "CONTROL_FORM_MISMATCH"):
+            replace(original, requested_form="big")
+
+    def test_existing_evidence_validation_and_non_authority_preserved(self):
+        bad = (SemanticEvidence(self.scope, "task_complexity", "extreme", "fixture"),)
+        controlled = controlled_routing_input(
+            replace(self.base, exact_form="small"),
+            replace(self.base, exact_form="small"), reasoning=self.reasoning, evidence=bad)
+        with self.assertRaisesRegex(RoutingRefusal, "INVALID_RECOGNIZED_EVIDENCE"):
+            recommend(controlled)
+        decision = recommend(self.route(self.base))
+        view = presentation_reference(decision)
+        self.assertEqual(view["status"], "UNKNOWN_HOLD")
+        self.assertFalse(view["sourceAuthenticated"])
+        self.assertFalse(view["permissionGranted"])
+        self.assertFalse(view["modelExecutionPermitted"])
+        self.assertIsNone(view["resolvedBinding"])
+        self.assertNotIn("control", view)
+        self.assertNotIn("owner-a", str(view))
 
 
 if __name__ == "__main__":

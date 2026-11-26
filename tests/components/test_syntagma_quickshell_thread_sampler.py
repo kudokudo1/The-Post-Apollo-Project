@@ -89,3 +89,67 @@ for forbidden in ('ptrace(', 'os.kill(', 'subprocess.', 'sudo ', 'systemctl ',
     assert forbidden not in text
 
 print("SYNTAGMA THREAD SAMPLER // SYNTHETIC CHECKS PASS; RUNTIME UNTESTED")
+
+# Bounded ASCII JSONL includes newline and escape expansion.
+lines = []
+writer = sampler.WorkshopOutput(lines.append)
+writer.emit({"name": "é"})
+assert writer.size == len(lines[0].encode("ascii")) + 1
+before = writer.size
+try:
+    writer.emit({"value": "x" * 65536})
+    raise AssertionError("oversized output accepted")
+except sampler.WorkshopOutputLimit:
+    pass
+assert len(lines) == 1 and writer.size == before
+
+# Exercise actual main on synthetic procfs, with a deterministic clock.
+import contextlib
+import io
+import json
+from unittest.mock import patch
+with TemporaryDirectory() as d:
+    proc = Path(d)
+    process = proc / "123"
+    task = process / "task" / "123"
+    task.mkdir(parents=True)
+    (process / "comm").write_text("quickshell\n")
+    (process / "stat").write_text(stat(123, "quickshell", start=456))
+    (task / "stat").write_text(stat(123, "quickshell", start=456))
+    (task / "wchan").write_text("do_epoll_wait\n")
+    clock = [0.0]
+    def advance(seconds):
+        clock[0] += seconds
+    output = io.StringIO()
+    with patch.object(sampler, "Path", lambda _: proc), \
+            patch.object(sampler.time, "monotonic", lambda: clock[0]), \
+            patch.object(sampler.time, "sleep", advance), contextlib.redirect_stdout(output):
+        assert sampler.main(["--workshop", "--duration", "2", "--interval", "0.5", "--top", "2"]) == 0
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    assert records[0]["topCount"] == 2 and records[0]["startTicks"] == 456
+    assert records[-1]["samples"] == 4 and records[-1]["observedMs"] == 2000
+    assert all(r["startTicks"] == 456 for r in records)
+    assert len(output.getvalue().encode("ascii")) <= 65536
+    # PID reuse midway must fail without a complete receipt.
+    clock[0] = 0.0
+    output = io.StringIO()
+    def replace_pid(seconds):
+        advance(seconds)
+        (process / "stat").write_text(stat(123, "quickshell", start=999))
+    with patch.object(sampler, "Path", lambda _: proc), \
+            patch.object(sampler.time, "monotonic", lambda: clock[0]), \
+            patch.object(sampler.time, "sleep", replace_pid), contextlib.redirect_stdout(output):
+        assert sampler.main(["--workshop", "--duration", "2", "--interval", "0.5", "--top", "2"]) != 0
+    assert all(json.loads(line)["event"] != "complete" for line in output.getvalue().splitlines())
+for argv in [
+    ["--workshop", "--duration", "30", "--interval", "0.1"],
+    ["--workshop", "--duration", "2", "--pid", "123"],
+    ["--workshop", "--duration", "2", "--parent-quickshell"],
+]:
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            sampler.main(argv)
+        raise AssertionError("invalid configured args accepted")
+    except SystemExit as error:
+        assert error.code == 2
+print("DIAG D1b configured sampler synthetic procfs and output cap PASS")

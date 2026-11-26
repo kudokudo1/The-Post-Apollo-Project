@@ -608,13 +608,15 @@ Item {
         width: 116
         height: 116
 
-        InstrumentChassis {
+        Loader {
             anchors.centerIn: parent
-            visible: dialRoot.showInstrumentChassis && !dialRoot.stopwatchFace
-            faceDiameter: 106
-            clearance: dialRoot.chassisClearance
-            chassisStyle: dialRoot.chassisStyle
-            showScrews: dialRoot.showChassisScrews
+            active: dialRoot.showInstrumentChassis && !dialRoot.stopwatchFace
+            sourceComponent: InstrumentChassis {
+                faceDiameter: 106
+                clearance: dialRoot.chassisClearance
+                chassisStyle: dialRoot.chassisStyle
+                showScrews: dialRoot.showChassisScrews
+            }
         }
 
         // Deep dock well.
@@ -1079,7 +1081,7 @@ Item {
                 flash: dialRoot.stopwatchFlash
                 valueText: dialRoot.readoutText
                 valueUnit: dialRoot.readoutUnit
-                setText: "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds
+                setText: "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds+" <font color='"+Colors.white+"'>SEC</font>"
                 scaleMinimum: dialRoot.minimumValue
                 scaleMaximum: dialRoot.maximumValue
             }

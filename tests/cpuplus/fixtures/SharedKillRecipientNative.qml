@@ -270,9 +270,9 @@ ShellRoot {
                 if (!smoke.check(info && infoButton && !info.visible && header.height>54 && smoke.find(header,"cpuPlusProcessExactIdentity") && smoke.find(header,"cpuPlusProcessLiveOwner"),
                     "compact identity with hidden shared information")) return;
                 if (!smoke.check(!help.visible && !help.open && helpButton.available, "lock help initially hidden")) return;
-                helpButton.leftClicked();
+                helpButton.leftClicked(null);
                 if (!smoke.check(help.visible && helpButton.selected, "eye opens lock instructions")) return;
-                helpButton.leftClicked();
+                helpButton.leftClicked(null);
                 if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===0, "eye closes without action")) return;
                 info.open=true;
                 if (!smoke.check(info.visible && infoButton.selected

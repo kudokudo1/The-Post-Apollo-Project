@@ -127,6 +127,62 @@ function configuredThreadEvidence(text, expected) {
     } catch (_) { return null; }
 }
 
+// Observer receipts extend the terminal record rather than prepend a row,
+// keeping existing memory, census and storage projections compatible.
+function configuredEvidence(kind,text,expected) {
+    if (kind==="threads") return configuredThreadEvidence(text,expected);
+    try {
+        if (!["memory","census","storage"].includes(kind) || typeof text!=="string" || text.length>65536) return null;
+        const rows=text.trim().split("\n").map(line=>JSON.parse(line)), end=rows.pop();
+        const c=end && end.calibration;
+        const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        if (!end || end.event!=="complete" || end.workshopSchema!=="post-apollo-observer-calibration-v1"
+                || !c || c.kind!==kind || !integer(c.durationSeconds,1,120)
+                || !integer(end.observedMs,c.durationSeconds*1000,145000)
+                || end.samples!==rows.length || !rows.length
+                || rows.some(r=>!r || r.event!==kind)) return null;
+        const keys=kind==="storage"?["kind","durationSeconds"]:["kind","durationSeconds","intervalMs"];
+        if (Object.keys(c).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(c,k))
+                || (expected && keys.some(k=>expected[k]!==c[k]))) return null;
+        if (kind==="storage") {
+            if (c.durationSeconds>30 || rows.length!==Math.ceil(c.durationSeconds/10)
+                    || rows.some((r,i)=>r.intervals!==Math.min((i+1)*10,c.durationSeconds))
+                    || rows[rows.length-1].elapsedMs!==end.observedMs) return null;
+        } else {
+            const min=kind==="memory"?5000:1000;
+            if (!integer(c.intervalMs,min,Math.min(60000,c.durationSeconds*1000)) || c.intervalMs%1000!==0) return null;
+            const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+            if (kind==="census") {
+                if (c.durationSeconds>60 || n>3 || rows.length>n
+                        || rows.some((r,i)=>r.sequence!==i+1 || r.scope!=="same-user")) return null;
+            } else {
+                if (n>12 || rows.length<2 || rows.length>n+1 || !integer(end.pid,1,Number.MAX_SAFE_INTEGER)
+                        || !integer(end.startTicks,1,Number.MAX_SAFE_INTEGER)
+                        || rows.some(r=>r.pid!==end.pid || r.startTicks!==end.startTicks)
+                        || rows[0].sampleIntervalMs!==null || rows[0].cpuPct!==null) return null;
+                let elapsed=0;
+                for (let i=1;i<rows.length;i++) {
+                    if (!integer(rows[i].sampleIntervalMs,1,145000)||!numeric(rows[i].cpuPct)) return null;
+                    elapsed+=rows[i].sampleIntervalMs;
+                }
+                if (Math.abs(elapsed-end.observedMs)>rows.length+1) return null;
+            }
+        }
+        return c;
+    } catch (_) { return null; }
+}
+
+function observerCalibrationSuffix(kind,text) {
+    const lines=text.trim().split("\n");
+    const final=JSON.parse(lines[lines.length-1]);
+    if (!Object.prototype.hasOwnProperty.call(final,"workshopSchema")
+            && !Object.prototype.hasOwnProperty.call(final,"calibration")) return "";
+    const c=configuredEvidence(kind,text,null);
+    if (!c) return null;
+    return "\nCALIBRATION // "+c.durationSeconds+" s"
+        +(kind==="storage"?" / 1000 ms metadata cadence":" / "+c.intervalMs+" ms");
+}
+
 function numeric(value) {
     return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
@@ -356,12 +412,14 @@ function summarize(kind, text) {
                 .sort((a,b) => b.changedIntervals - a.changedIntervals);
             const unavailable = last.rows.filter(row => row.unavailableIntervals > 0).length;
             const absent = last.rows.filter(row => row.finalState === "absent").length;
+            const calibration=observerCalibrationSuffix(kind,text);
+            if (calibration===null) return null;
             return "STORAGE METADATA // " + last.intervals + " intervals / " + ids.length + " targets"
                 + "\nCHANGED TARGETS // " + changed.length + "   ABSENT AT END // " + absent
                 + "\nUNAVAILABLE INTERVALS IN // " + unavailable + " targets"
                 + (changed.length ? "\n" + changed.slice(0,5).map(row =>
                     row.id + " // " + row.changedIntervals + " changed intervals").join("\n") : "")
-                + "\nNOT WRITE COUNTS OR WRITER IDENTITY";
+                + "\nNOT WRITE COUNTS OR WRITER IDENTITY" + calibration;
         }
         if (kind === "census") {
             const records = text.trim().split("\n").map(line => JSON.parse(line));
@@ -393,13 +451,15 @@ function summarize(kind, text) {
             const cpu = top("cpuPct"), ram = top("rssKiB"), write = top("writeBps");
             const label = row => row.name.replace(/[\x00-\x1f\x7f]/g, "?") + " #" + row.pid;
             const limited = records.some(row => row.coverage.truncated || row.previousCoverage.truncated);
+            const calibration=observerCalibrationSuffix(kind,text);
+            if (calibration===null) return null;
             return "SAME-USER // " + last.observed + " observed / " + records.length + " samples"
                 + (limited ? " // SCAN LIMIT REACHED" : "")
                 + "\nCPU / I-O COVERAGE // " + last.cpuMeasured + " / " + last.ioMeasured
                 + "\nTOP CPU // " + (cpu ? label(cpu) + " " + cpu.cpuPct.toFixed(1) + "%" : "UNAVAILABLE")
                 + "\nTOP RSS // " + (ram ? label(ram) + " " + (ram.rssKiB / 1048576).toFixed(2) + " GiB" : "UNAVAILABLE")
                 + "\nTOP WRITE // " + (write ? label(write) + " " + (write.writeBps / 1024).toFixed(1) + " KiB/s" : "UNAVAILABLE")
-                + "\nLAST INTERVAL // RSS IS NOT UNIQUE RAM";
+                + "\nLAST INTERVAL // RSS IS NOT UNIQUE RAM" + calibration;
         }
         if (kind !== "memory" && kind !== "threads") return null;
         const records = text.trim().split("\n").map(line => JSON.parse(line));
@@ -416,11 +476,13 @@ function summarize(kind, text) {
             const peak = Math.max(...rows.map(row => row.memoryKiB.Pss));
             const swap = Math.max(...rows.map(row => row.memoryKiB.SwapPss));
             const cpu = Math.max(0, ...rows.map(row => row.cpuPct || 0));
+            const calibration=observerCalibrationSuffix(kind,text);
+            if (calibration===null) return null;
             return "PID // " + final.pid + "   SAMPLES // " + rows.length
                 + "\nPSS START / PEAK / FINAL // " + gib(rows[0].memoryKiB.Pss)
                 + " / " + gib(peak) + " / " + gib(rows[rows.length - 1].memoryKiB.Pss)
                 + " GiB\nSWAP PSS PEAK // " + gib(swap)
-                + " GiB   CPU PEAK // " + cpu.toFixed(1) + "%" + hostMemorySummary(rows);
+                + " GiB   CPU PEAK // " + cpu.toFixed(1) + "%" + hostMemorySummary(rows) + calibration;
         }
         if (rows.some(row => !numeric(row.totalCpuPct))) return null;
         const configured = records.some(row=>Object.prototype.hasOwnProperty.call(row,"workshopSchema"));

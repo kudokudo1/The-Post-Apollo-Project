@@ -33,6 +33,11 @@ ShellRoot {
         }
         return null;
     }
+    function normalFace(item, name, selected) {
+        const b=findItem(item,name);
+        return b && b.selected===selected && String(b.color).toLowerCase()==="#1b0623"
+            && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled;
+    }
     function check(ok, message) {
         if (!ok) {
             console.error("CPU_DIAG_NATIVE_FAIL // " + message);
@@ -303,6 +308,10 @@ ShellRoot {
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!root.check(viewport && viewport.contentHeight<=viewport.height+1,
                     "default Workshop fits native 320x620 viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
+                if (!root.check(root.normalFace(pane.item,"cpuplusMemoryMode-DIAG",true)
+                    && root.normalFace(pane.item,"cpuplusMemoryMode-CAP",false)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",true)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-storage",false), "normal opaque faces before unload")) return;
                 workshop.edit("selected",["threads","memory","census","storage"]);
                 root.phase=171;
                 return;
@@ -363,6 +372,10 @@ ShellRoot {
                 if (!workshop) return;
                 if (!root.check(workshop.draft.durationSeconds===1 && workshop.phase==="COMPLETE"
                     && !workshop.ready && !CpuPlusDiagnostics.busy,"draft and terminal continuity without rearming")) return;
+                if (!root.check(root.normalFace(pane.item,"cpuplusMemoryMode-DIAG",true)
+                    && root.normalFace(pane.item,"cpuplusMemoryMode-CAP",false)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-census",true)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",false), "normal opaque faces after actual remount")) return;
                 console.log("CPU_D3A_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;

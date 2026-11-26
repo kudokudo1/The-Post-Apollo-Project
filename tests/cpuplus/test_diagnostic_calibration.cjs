@@ -269,3 +269,26 @@ for(const bad of [[],Array(5).fill(setPlan[0]),[{...setPlan[0],autoStart:true}],
     assert.equal(vm.runInContext("validatedWorkshopSet(JSON.parse(input))",ctx),null);
 }
 console.log("DIAG D4b detached bounded ordered sets PASS");
+
+const explicitStorage={kind:"storage",durationSeconds:5,sampleSeconds:2,reportSeconds:4};
+assert.equal(run(explicitStorage).ok,true);
+assert.equal(run(explicitStorage).intervals,3);
+assert.equal(run(explicitStorage).observations,2);
+for(const bad of [{...explicitStorage,sampleSeconds:0},{...explicitStorage,reportSeconds:3},
+    {...explicitStorage,durationSeconds:30,sampleSeconds:1,reportSeconds:4},
+    {kind:"storage",durationSeconds:5,sampleSeconds:2}]) assert.equal(run(bad).ok,false);
+const extendedRow=(seq,intervals,elapsedMs)=>({...storeRow,sequence:seq,intervals,elapsedMs,
+    rows:storeRow.rows.map(r=>({...r,comparableIntervals:intervals}))});
+const extendedEnd={...storeEnd,calibration:explicitStorage,samples:2,observedMs:5000};
+const explicitText=encode([extendedRow(1,2,4000),extendedRow(2,3,5000),extendedEnd]);
+assert.deepEqual(plain(policyCtx.configuredEvidence("storage",explicitText,explicitStorage)),explicitStorage);
+assert.match(policyCtx.summarize("storage",explicitText),/2 s metadata cadence \/ 4 s reports/);
+assert.equal(policyCtx.configuredEvidence("storage",explicitText,{kind:"storage",durationSeconds:5}),null);
+assert.equal(policyCtx.configuredEvidence("storage",explicitText,{...explicitStorage,reportSeconds:2}),null);
+assert.equal(policyCtx.configuredEvidence("storage",encode([extendedRow(1,2,3999),extendedRow(2,3,5000),extendedEnd]),explicitStorage),null);
+const cadencePlan={durationSeconds:5,instruments:[{kind:"storage",sampleSeconds:2,reportSeconds:4},{kind:"stall",thresholdMs:350}]};
+assert.equal(workflowPreview(cadencePlan).ok,true);
+ctx.input=JSON.stringify(cadencePlan);
+assert.deepEqual(plain(vm.runInContext("workshopPlanFromDraft(workshopDraftFromPlan(JSON.parse(input)))",ctx)),
+    cadencePlan);
+console.log("DIAG D5a bounded storage cadence and legacy evidence contracts PASS");

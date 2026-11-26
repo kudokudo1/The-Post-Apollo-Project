@@ -21,7 +21,7 @@ Column {
         text: root.title + " // " + root.readout
         color: root.subjectColor
         font.pixelSize: 12
-        semanticGlowColor: root.subjectColor
+        semanticGlowColor: root.fillColor
         elide: Text.ElideRight
     }
     Item {
@@ -43,12 +43,13 @@ Column {
             enabledSlider: root.adjustable && validStepDomain
             accentColor: root.subjectColor
             frameColor: Colors.white
+            frameGlowColor: root.fillColor
             valueFillColor: root.fillColor
             handleColor: root.subjectColor
             handleGradientBaseColor: root.subjectColor
             handleGradientAccentColor: root.subjectColor
-            handleGlowColor: root.subjectColor
-            activityGlowColor: root.subjectColor
+            handleGlowColor: root.fillColor
+            activityGlowColor: root.fillColor
             onValueRequested: value => root.valueRequested(value)
         }
     }

@@ -7,6 +7,7 @@ function archiveResponse(doc, submitted) {
                 || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(row.status) < 0
                 || typeof row.summary !== "string" || row.summary.length > 4096
                 || typeof row.text !== "string" || row.text.length > reportLimit(row.kind)
+                || (row.kind === "workflow" && /[^\x00-\x7f]/.test(row.text))
                 || typeof row.finishedAt !== "string"
                 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.finishedAt)) return null;
         ids.push(row.id);

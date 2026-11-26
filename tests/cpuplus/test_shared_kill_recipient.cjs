@@ -347,3 +347,8 @@ test("P4i: same animated writing cursor, donor search geometry and star list rai
     assert.equal((donorView.match(/contentGlowIdleOpacity: taskManagerBody.headerActions \? 0\.82 : 0/g)||[]).length,3);
     assert.match(recipient,/layer.effect: DropShadow \{ radius: 6; samples: 7; opacity: 0.60; color: lockRiskText.color/);
 });
+
+test("P4i startup: animated cursor is registered in the shared QML module", () => {
+    assert.match(read("components/qmldir"), /^AnimatedTextCursor 1\.0 AnimatedTextCursor\.qml$/m);
+    assert.match(read("components/AnimatedTextCursor.qml"), /required property TextInput input/);
+});

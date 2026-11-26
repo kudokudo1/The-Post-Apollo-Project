@@ -515,10 +515,19 @@ console.log("CPU++ M11h compact transport palette and pinned diagnostics header 
  assert.match(targetStripSource,/label: String\(modelData.symbol \|\| ""\)/);
  assert.match(targetStripSource,/labelPixelSize: 24/);
  assert.doesNotMatch(targetStripSource,/(hover|pressed)(Fill|Border|SoftGlow|ContentGlow)Color:/);
- assert.match(targetStripSource,/selectedFillColor: Colors.black/);
+ assert.match(targetStripSource,/normalFace: true/);
  assert.match(targetStripSource,/selectedContentGlowColor: accentColor/);
  console.log("CPU++ SYSTEM and KILL semantic palette source contracts PASS");
 
 assert.match(pane,/component LiveCapacityBars: Column/);
 assert.equal((pane.match(/LiveCapacityBars\s*\{/g)||[]).length,2);
-assert.match(targetStripSource,/color: Colors.black\s+softGlowEnabled: false\s+wideGlowEnabled: false/);
+assert.match(targetStripSource,/normalFace: true/);
+
+const normalFaceComponent=fs.readFileSync(path.join(__dirname,"../components/ActionButton.qml"),"utf8");
+assert.match(normalFaceComponent,/property bool normalFace: false/);
+assert.match(normalFaceComponent,/color:\s+normalFace \? Colors.black : actionButton.withOpacity/);
+assert.match(normalFaceComponent,/!actionButton.normalFace && actionButton.softGlowEnabled/);
+assert.match(normalFaceComponent,/!actionButton.normalFace && actionButton.wideGlowEnabled/);
+assert.match(normalFaceComponent,/objectName: "actionButtonNormalPerimeter"[\s\S]*?z: -1[\s\S]*?sourceComponent: Rectangle\s*\{\s*color: "transparent"/);
+assert.match(normalFaceComponent,/property bool perimeterGlowEnabled: normalFace/);
+assert.match(normalFaceComponent,/property bool contentGlowEnabled: true/);

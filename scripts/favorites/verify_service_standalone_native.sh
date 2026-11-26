@@ -86,6 +86,11 @@ echo "FB_PASS // WIDGET_INDEPENDENT_MEMBERSHIP_LIFECYCLE"
 # Native QML integration of the exact current AppControl Favorites binding
 # and wrappers, against synthetic provider rows and an independent data dir.
 install -d -m 700 "$work/binding-data"
+# The CPU++ projection imports the pure Weather HOME rules transitively.
+# Copy only that dependency, after standalone lifecycle verification.
+install -d -m 700 "$work/config/services/weather"
+cp "$repo/services/weather/WeatherHomeFavoritesPolicy.js" \
+  "$work/config/services/weather/"
 node - "$repo/widgets/AppControlW.qml" "$repo/tests/favorites/fixtures/FavoritesAppControlBindingNative.qml" "$work/config/binding.qml" <<'NODE'
 const fs=require("node:fs");
 const [source,template,out]=process.argv.slice(2);
@@ -113,3 +118,4 @@ fs.writeFileSync(out,fixture.replace("// INSERT_APP_CONTROL_BINDING",
   wrappers.join("\n\n")+"\n\n"+model.replace("DesktopEntries.applications.values","fixtureDesktopEntries.applications.values")));
 NODE
 run_phase binding "FB_PASS // APP_CONTROL_EXACT_BINDING_REACTIVE" "$work/config/binding.qml" "$work/binding-data"
+grep -F "FB_PASS // SHARED_STORE_CPU_PROJECTION_REACTIVE_READ_ONLY" "$work/binding.log" >/dev/null

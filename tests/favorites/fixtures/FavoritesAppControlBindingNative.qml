@@ -5,6 +5,8 @@ import "services/favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIden
 import "services/favorites/FavoritesAppControlRunIdentityPolicy.js" as FavoriteRunIdentity
 import "services/favorites/FavoritesAppControlRecordPolicy.js" as FavoriteRecord
 import "services/favorites/FavoritesAppControlCombiPolicy.js" as FavoriteCombi
+import "services/favorites/FavoritesManagementPolicy.js" as Management
+import "services/favorites/FavoritesAppControlDisplayPolicy.js" as Display
 
 // Exact AppControl Favorites binding and adapter wrappers are inserted from
 // the current production source by the CI runner. Other providers are
@@ -42,6 +44,41 @@ ShellRoot {
         property var applications: ({values:[{id:"synthetic.desktop",name:"Synthetic"}]})
     }
     QtObject { id: windowResults; property var values: [] }
+
+    // The actual CPU++ projection receives the same live store's four
+    // arrays, plus a display-only owner projection. No second writer.
+    Favorites.FavoritesUnifiedCatalog {
+        id: sharedCatalog
+        appControlSource: appControlWindow.favoriteStore
+    }
+    readonly property var cpuSnapshot: ({
+        favoriteKeys: sharedCatalog.copyValues(favoriteStore.favoriteKeys),
+        favoriteDetailActionKeys: sharedCatalog.copyValues(favoriteStore.favoriteDetailActionKeys),
+        favoriteMonitorBoxKeys: sharedCatalog.copyValues(favoriteStore.favoriteMonitorBoxKeys),
+        favoriteTaskMetricKeys: sharedCatalog.copyValues(favoriteStore.favoriteTaskMetricKeys)
+    })
+    readonly property var cpuDisplay: Display.build(cpuSnapshot, {
+        apps: fixtureDesktopEntries.applications.values,
+        thermalRows: thermalRows, fanRows: fanRows,
+        systemRows: systemRows, taskRows: taskRows,
+        swayWindows: [], appTabs: []
+    })
+    readonly property var cpuProjection: Management.list([], [], [], [],
+        cpuSnapshot, favoriteStore.favoriteDisplayLabels, cpuDisplay)
+    function cpuRowsSafe(expected) {
+        const rows = cpuProjection.rows;
+        if (rows.length !== expected) return false;
+        for (const row of rows) {
+            if (row.provider !== "appcontrol" || row.readOnly !== true
+                    || row.isFavorite !== true || row.capabilities.length !== 0
+                    || Object.prototype.hasOwnProperty.call(row, "resourceId")
+                    || Object.prototype.hasOwnProperty.call(row, "_sourceItem")
+                    || Object.prototype.hasOwnProperty.call(row, "execute"))
+                return false;
+        }
+        return true;
+    }
+
 
     function appEntryKey(entry) { return String(entry.id || ""); }
     function runCommandText(entry) { return entry.commandText; }
@@ -124,8 +161,26 @@ ShellRoot {
                 root.phase=5;
             } else if (root.phase === 5) {
                 if (favoriteResults.values.length !== 5) return;
-                root.finished=true;
+                if (!root.cpuRowsSafe(5)) return;
+                const groups=root.cpuProjection.rows.filter(r=>r.category==="CPU++");
+                if (groups.length !== 3) { root.fail("CPU_CLASSIFICATION"); return; }
                 console.log("FB_PASS // APP_CONTROL_EXACT_BINDING_REACTIVE");
+                const before=JSON.stringify(root.cpuSnapshot);
+                // Re-reading the consumer cannot mutate membership.
+                if (!root.cpuRowsSafe(5) || JSON.stringify(root.cpuSnapshot)!==before) {
+                    root.fail("CPU_PROJECTION_MUTATION"); return;
+                }
+                if (service.toggleFavoriteKey("task|fox") !== false) {
+                    root.fail("REMOVE_TASK"); return;
+                }
+                root.phase=6;
+            } else if (root.phase === 6) {
+                if (favoriteResults.values.length !== 4 || !root.cpuRowsSafe(4)) return;
+                if (root.byKey("task|fox") || root.cpuProjection.rows.filter(r=>r.category==="CPU++").length!==2) {
+                    root.fail("CPU_REACTIVE_REMOVAL"); return;
+                }
+                root.finished=true;
+                console.log("FB_PASS // SHARED_STORE_CPU_PROJECTION_REACTIVE_READ_ONLY");
                 Qt.quit();
             }
         }

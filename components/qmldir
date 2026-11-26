@@ -7,6 +7,8 @@ AnimatedTextCursor 1.0 AnimatedTextCursor.qml
 NotoText 1.0 NotoText.qml
 ConversationFeed 1.0 ConversationFeed.qml
 SelectorDial 1.0 SelectorDial.qml
+InstrumentChassis 1.0 InstrumentChassis.qml
+AutomotiveDial 1.0 AutomotiveDial.qml
 
 BranchMap 1.0 BranchMap.qml
 IndexRail 1.0 IndexRail.qml

@@ -17,6 +17,7 @@ ShellRoot {
     property string completedId: ""
     property real compactThumbLength: 0
     property real mediumThumbLength: 0
+    property int automotiveVariantIndex: 0
     property real lowFillOpacity: 0
     property real lowHaloOpacity: 0
     Connections {
@@ -568,6 +569,8 @@ ShellRoot {
                 const sampleDial=root.findItem(pair,"cpuplusWorkshopStorage-sample-dial");
                 const reportDial=root.findItem(pair,"cpuplusWorkshopStorage-report-dial");
                 if (!sampleDial || !reportDial) return;
+                const instruments=[sampleDial,reportDial].map(d=>root.findItem(d,"selectorAutomotiveDial"));
+                if (instruments.some(d=>!d || !root.findItem(d,"automotiveGauge")?.hasPainted || !root.findItem(d,"automotiveArm")?.hasPainted)) return;
                 const rendered=(d,value,color)=>{
                     const a=d.mapToItem(pair,0,0), b=d.mapToItem(pair,d.width,d.height);
                     return d.visible && d.opacity>0 && a.x>=-1 && a.y>=-1
@@ -581,10 +584,24 @@ ShellRoot {
                     && [sampleDial,reportDial].every(d=>d.stopwatchFace && d.stopwatchLitSegments===30
                         && root.findItem(d,"selectorStopwatchFace").visible
                         && root.findItem(d,"selectorStopwatchCenter").visible
-                        && root.findItem(d,"selectorStopwatchSegment-29").visible)
+                        && root.findItem(d,"automotiveGauge").visible
+                        && root.findItem(d,"automotiveArm").visible
+                        && root.findItem(d,"selectorAutomotiveDial").boundedArmReach===95
+                        && root.findItem(d,"instrumentChassis").width===136)
                     && !root.findItem(workshop,"cpuplusWorkshopStallThreshold").stopwatchFace
                     && !root.findItem(workshop,"cpuplusWorkshopTopThreads").stopwatchFace,
                     "both mechanical dials have visible nonzero scaled geometry, actual values and semantic colors")) return;
+                // Exercise the configurable variants on real mounted instruments.
+                const combinations=[["industrial","continuous","numbers","chamfered"],["capsule","dualRail","sparse","rounded"],["tapered","radialTeeth","none","square"],["tapered","segmented","ticks","square"]];
+                if(root.automotiveVariantIndex<combinations.length){
+                    const v=combinations[root.automotiveVariantIndex++];
+                    sampleDial.stopwatchArmStyle=v[0]; sampleDial.stopwatchGaugeStyle=v[1];
+                    sampleDial.stopwatchScaleStyle=v[2]; sampleDial.chassisStyle=v[3];
+                    sampleDial.stopwatchArmReach=120;
+                    if(!root.check(instruments[0].boundedArmReach===95 && instruments[0].armStyle===v[0] && instruments[0].gaugeStyle===v[1] && instruments[0].scaleStyle===v[2] && instruments[0].chassisStyle===v[3],"automotive variant and reach bound "+v.join("/"))) return;
+                    sampleDial.stopwatchArmReach=95;
+                    return;
+                }
                 // Use a valid storage duration for winding; the preceding
                 // resize witness intentionally used an invalid 100s plan.
                 workshop.edit("durationSeconds",30);
@@ -681,7 +698,9 @@ ShellRoot {
                     && CpuPlusDiagnostics.captureId===CpuPlusDiagnostics.workshopRunId
                     && [sample,report].every(d=>d.visible && !d.interactive && d.stopwatchFraction>=0
                         && d.stopwatchFraction<=1 && d.stopwatchLitSegments===Math.ceil(d.stopwatchFraction*30)
-                        && root.findItem(d,"selectorStopwatchCenter").text===d.readoutText)
+                        && root.findItem(d,"selectorStopwatchCenter").text===d.readoutText
+                        && root.findItem(d,"selectorAutomotiveDial").boundedFraction===d.stopwatchFraction
+                        && root.findItem(d,"selectorAutomotiveDial").rotationDegrees===360*d.stopwatchFraction)
                     && sample.stopwatchSetSeconds===2 && report.stopwatchSetSeconds===4,
                     "live mechanical countdown face retains exact capture and independent cadence after resize")) return;
                 nativeWindow.width=320;

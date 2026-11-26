@@ -567,23 +567,9 @@ Column {
                     labelFontSizeMode: Text.HorizontalFit
                     contentPadding: 1
                     selected: root.viewMode===modelData.key
-                    selectedFillColor: Colors.black
                     selectedBorderColor: Colors.magenta
                     selectedForegroundColor: Colors.magenta
-                    // U9g / Angels: deterministic opaque face, no filled shadow layers.
-                    color: Colors.black
-                    softGlowEnabled: false
-                    wideGlowEnabled: false
-                    contentGlowEnabled: true
-                    pressedForegroundColor: Colors.magenta
-                    Rectangle {
-                        anchors.fill: parent
-                        color: "transparent"
-                        border.width: 1
-                        border.color: diagnosticViewFilter.activeBorderColor
-                        opacity: 0.48
-                        visible: diagnosticViewFilter.selected || diagnosticViewFilter.hovered || diagnosticViewFilter.pressed
-                    }
+                    normalFace: true
                     acceptedButtons: Qt.LeftButton
                     onLeftClicked: root.selectView(modelData.key)
                 }

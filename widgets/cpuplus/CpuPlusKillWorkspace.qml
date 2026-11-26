@@ -1424,30 +1424,49 @@ Item {
                             layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.65; color: Colors.red; transparentBorder: true }
                         }
                         Rectangle { width: parent.width; height: 1; color: Colors.red }
-                        Item {
-                            width: parent.width
-                            height: capturedCount.implicitHeight
-                            visible: reviewPanel.capture
-                        GohuText {
-                            id: capturedCount
+                        Row {
                             objectName: "cpuPlusCapturedTargetCount"
                             width: parent.width
                             visible: reviewPanel.capture
-                            text: reviewPanel.capture
-                                ? workspace.reviewInk(String(workspace.bulkReview.targets.length),Colors.magenta)
-                                    + workspace.reviewInk(" CAPTURED TARGETS",Colors.red) : ""
-                            textFormat: Text.RichText
-                            font.pixelSize: 13
-                        }
-                        GaussianBlur {
-                            anchors.fill: capturedCount
-                            source: capturedCount
-                            radius: 4
-                            samples: 9
-                            opacity: 0.65
-                            z: -1
-                            visible: reviewPanel.capture
-                        }
+                            spacing: 6
+                            Item {
+                                width: capturedCount.implicitWidth
+                                height: capturedCount.implicitHeight
+                                GohuText {
+                                    id: capturedCount
+                                    objectName: "cpuPlusCapturedTargetNumber"
+                                    text: reviewPanel.capture ? String(workspace.bulkReview.targets.length) : ""
+                                    color: Colors.magenta
+                                    font.pixelSize: 13
+                                }
+                                SafeDropShadow {
+                                    anchors.fill: capturedCount
+                                    safeSource: capturedCount
+                                    requestedVisible: reviewPanel.capture
+                                    radius: 6; samples: 7; opacity: 0.75
+                                    color: Colors.magenta
+                                    transparentBorder: true
+                                }
+                            }
+                            Item {
+                                width: capturedLabel.implicitWidth
+                                height: capturedLabel.implicitHeight
+                                GohuText {
+                                    id: capturedLabel
+                                    objectName: "cpuPlusCapturedTargetLabel"
+                                    text: "CAPTURED TARGETS"
+                                    color: Colors.red
+                                    font.pixelSize: 13
+                                }
+                                SafeDropShadow {
+                                    anchors.fill: capturedLabel
+                                    safeSource: capturedLabel
+                                    requestedVisible: reviewPanel.capture
+                                    radius: 6; samples: 7; opacity: 0.75
+                                    color: Colors.red
+                                    transparentBorder: true
+                                }
+                            }
                         }
                         GohuText {
                             width: parent.width
@@ -1456,6 +1475,8 @@ Item {
                             wrapMode: Text.Wrap
                             color: Colors.white
                             font.pixelSize: 11
+                            layer.enabled: visible
+                            layer.effect: DropShadow { radius: 5; samples: 7; opacity: 0.45; color: Colors.white; transparentBorder: true }
                         }
                         Item {
                             width: parent.width
@@ -1532,7 +1553,6 @@ Item {
                             textFormat: Text.PlainText
                             text: reviewPanel.single
                                 ? ("CONFIRM " + String(reviewPanel.singleTarget.action).toUpperCase()
-                                    + " FOR PID " + String(reviewPanel.singleTarget.pid)
                                     + "\nNO COMMAND HAS BEEN SENT"
                                     + (workspace.isProtected(workspace.currentTask)
                                         ? "\nWARNING // PROTECTED PROCESS\n" + workspace.protectedProcessRisk(workspace.currentTask)
@@ -1541,6 +1561,8 @@ Item {
                                 : reviewPanel.report ? workspace.appControlWindow.cpuBulkMessage : ""
                             color: reviewPanel.report ? Colors.white : Colors.red
                             font.pixelSize: 12
+                            layer.enabled: reviewTextScroll.visible
+                            layer.effect: DropShadow { radius: 5; samples: 7; opacity: 0.45; color: reviewMessage.color; transparentBorder: true }
                         }
                     }
                     Column {

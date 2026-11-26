@@ -130,3 +130,115 @@ test("linear pin partition keeps source order, does not execute callbacks",()=>{
     assert.equal(rows[0].id,"a");
     assert.equal(rows[2].id,"c");
 });
+
+
+// Test the actual AppControl donor implementation, not merely a hand-written
+// copy of the desired result transformation.
+function donorTaskCatalog(tasks, identityFor, recordFor) {
+    const factory = new Function(
+        "taskRows", "taskPersistentIdentity", "favoriteRecordForTaskIdentity",
+        "prepareCombiRecord", [
+            "let combiTaskCatalog = [];",
+            "let combiTaskIdentitySignature = '';",
+            "const selectedModeIndex = -1;",
+            "const favoritesModeIndex = 0;",
+            "const favoritesScopeMode = 0;",
+            "const favoritesScopeCombi = 1;",
+            body("rebuildCombiTaskCatalog"),
+            "rebuildCombiTaskCatalog();",
+            "return {rows:combiTaskCatalog,signature:combiTaskIdentitySignature};"
+        ].join("\n")
+    );
+    return factory(tasks,identityFor,recordFor,donor.prepareCombiRecord);
+}
+
+test("task COMBI catalog preserves exact donor identities and row structure",()=>{
+    const cases=[
+        [],
+        [{comm:"firefox",name:"Firefox"}],
+        [
+            {comm:"sshd",name:"SSH"},
+            {comm:"firefox",name:"Firefox",pid:1},
+            {comm:"sshd",name:"Duplicate",pid:99},
+            {comm:"quickshell",name:"Quickshell",pid:4},
+            {comm:"__proto__",name:"Reserved prototype"}
+        ]
+    ];
+    const identityFor=task=>task&&task.comm||"";
+    const recordFor=(identity,task)=>({
+        _favoriteRecord:true,
+        _sourceItem:task,
+        id:"task|"+encodeURIComponent(identity),
+        _favoriteKey:"task|"+encodeURIComponent(identity),
+        _sourceModeIndex:7,
+        name:task.name,
+        label:task.name
+    });
+    for(const rows of cases){
+        const expected=donorTaskCatalog(copy(rows),identityFor,recordFor);
+        const actual=policy.buildTasks(copy(rows),identityFor,recordFor);
+        assert.deepEqual(plain(actual.rows),plain(expected.rows));
+        assert.equal(actual.signature,expected.signature);
+        assert.ok(!actual.rows.some(x=>x._favoriteKey==="task|__proto__"));
+    }
+});
+
+function donorVisibleRows(rows,settings) {
+    const start=host.indexOf("const visibleRows = rows.filter(function(entry) {",
+        host.indexOf("id: favoriteResults"));
+    assert.ok(start>=0,"missing AppControl donor visible-row projection");
+    const end=host.indexOf("return visibleRows;",start);
+    assert.ok(end>start,"missing donor return");
+    const donorBody=host.slice(start,end+"return visibleRows;".length);
+    const controller={
+        favoritesFilterMode:settings.filterMode,
+        favoritesFilterAll:settings.filterAll,
+        favoriteEntryMatchesCopiedSubmodes:settings.matchesCopiedSubmode,
+        favoriteSourceItem:donor.favoriteSourceItem,
+        favoritesModeIndex:0,
+        isFavoriteItem:settings.isFavorite
+    };
+    return new Function("rows","query","inCombi","appControlWindow",donorBody)(
+        rows,settings.query,settings.inCombi,controller);
+}
+
+test("visible Favorites/COMBI search and filter match donor in all scopes",()=>{
+    const rows=[
+        {_sourceModeIndex:3,name:"Terminal",args:"--hidden",_combiSearchText:"terminal --hidden",starred:false},
+        {_sourceModeIndex:1,name:"Alpha",genericName:"Browser",starred:true},
+        {_sourceModeIndex:7,name:"Quickshell",_favoriteRecord:true,
+            _sourceItem:{args:"--foo",pid:123,metric:"CPU"},starred:false},
+        {_sourceModeIndex:3,name:"Editor",_combiSearchText:"editor notes",starred:true},
+        {_sourceModeIndex:1,name:"Hidden",visible:false,starred:true},
+        {_sourceModeIndex:8,name:"CPU",metric:"mem",starred:false}
+    ];
+    const cases=[
+        {query:"",inCombi:true,filterMode:-1,filterAll:-1},
+        {query:"",inCombi:false,filterMode:-1,filterAll:-1},
+        {query:"terminal",inCombi:true,filterMode:-1,filterAll:-1},
+        {query:"--foo",inCombi:false,filterMode:-1,filterAll:-1},
+        {query:"",inCombi:true,filterMode:3,filterAll:-1},
+        {query:"browser",inCombi:false,filterMode:1,filterAll:-1},
+        {query:"cpu",inCombi:true,filterMode:7,filterAll:-1}
+    ];
+    for(const c of cases){
+        const options={
+            ...c,
+            matchesCopiedSubmode:row=>row.visible!==false,
+            isFavorite:row=>row.starred===true
+        };
+        const expected=donorVisibleRows(copy(rows),options);
+        const actual=policy.visibleRows(copy(rows),options);
+        assert.deepEqual(plain(actual),plain(expected),JSON.stringify(c));
+    }
+});
+
+test("new local projections do not own actions or enter universal Favorites",()=>{
+    const source=fs.readFileSync(path.join(root,
+        "services/favorites/FavoritesAppControlCombiPolicy.js"),"utf8");
+    assert.doesNotMatch(source,/Quickshell\.Io|Process\s*\{|execDetached\s*\(|kill\s*\(/);
+    assert.doesNotMatch(source,/FavoritesService|FavoritesStore|FavoritesUnifiedCatalog/);
+    const universal=fs.readFileSync(path.join(root,
+        "services/favorites/FavoritesUnifiedCatalog.qml"),"utf8");
+    assert.doesNotMatch(universal,/FavoritesAppControlCombiPolicy|_combiSearchText/);
+});

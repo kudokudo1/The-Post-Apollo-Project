@@ -1187,7 +1187,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         font.pixelSize: dialRoot.readoutPixelSize
-        color: dialRoot.interactive ? dialRoot.readoutColor : Colors.orange
+        color: dialRoot.interactive || dialRoot.readoutGlowEnabled ? dialRoot.readoutColor : Colors.orange
         opacity: dialRoot.interactive ? 1.0 : 0.78
         layer.enabled: dialRoot.readoutGlowEnabled
         layer.effect: MultiEffect {

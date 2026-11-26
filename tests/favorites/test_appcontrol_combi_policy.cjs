@@ -54,7 +54,8 @@ test("source item and search text preserve exact AppControl donor behavior",()=>
     for(const original of inputs){
         const a=copy(original),b=copy(original);
         assert.equal(policy.searchText(a),donor.combiSearchTextForRecord(b));
-        assert.equal(policy.sourceItem(a),donor.favoriteSourceItem(b));
+        assert.deepEqual(plain(policy.sourceItem(a)),
+                         plain(donor.favoriteSourceItem(b)));
         const x=policy.prepare(a),y=donor.prepareCombiRecord(b);
         assert.equal(x===null,y===null);
         assert.deepEqual(plain(x),plain(y));
@@ -125,7 +126,7 @@ test("linear pin partition keeps source order, does not execute callbacks",()=>{
         {id:"d"},{id:"e"}
     ];
     const result=policy.partitionPinned(rows,r=>r.id==="b"||r.id==="d");
-    assert.deepEqual(result.map(r=>r.id),["b","d","a","c","e"]);
+    assert.deepEqual(plain(result.map(r=>r.id)),["b","d","a","c","e"]);
     assert.equal(rows[0].id,"a");
     assert.equal(rows[2].id,"c");
 });

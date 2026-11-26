@@ -35,8 +35,13 @@ Scope {
                      .trim().toLowerCase();
         const user = String(entry.user || "").trim().toLowerCase();
 
-        return pid > 1
-               ? ("pid:" + String(pid) + ":" + name + ":" + user)
+        // A sticky or one-shot permission is for one Linux process birth,
+        // never a replacement that happens to reuse its PID/name/user.
+        const born = Number(entry.startTicks || 0);
+        return Number.isSafeInteger(pid) && pid > 1
+               && Number.isSafeInteger(born) && born > 0
+               ? ("pid:" + String(pid) + ":born:" + String(born)
+                  + ":" + name + ":" + user)
                : "";
     }
 

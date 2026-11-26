@@ -1,6 +1,7 @@
 import QtQuick
 import qs.services.diagnostics
 import "../../services/diagnostics/DiagnosticCalibration.js" as Calibration
+import "../../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as DiagnosticPolicy
 import "../../components"
 
 // Mounted only by the existing DIAG pane. Draft survives pane destruction;
@@ -29,6 +30,11 @@ Column {
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property int storageSample: draft.storageSampleSeconds || 1
     readonly property int storageReport: draft.storageReportSeconds || 10
+    readonly property bool storageRunning: recording && draft.selected.includes("storage") && !CpuPlusDiagnostics.cancelled
+    function countdown(field) {
+        return storageRunning && !CpuPlusDiagnostics.storageProgressFault
+            ? DiagnosticPolicy.storageCountdown(CpuPlusDiagnostics.storageProgress,field,Math.max(displayNow,Date.now())) : null;
+    }
     readonly property var storagePreview: Calibration.previewCalibration({kind:"storage",durationSeconds:draft.durationSeconds,
         sampleSeconds:storageSample,reportSeconds:storageReport})
     readonly property bool locked: CpuPlusDiagnostics.workshopPresetLocked
@@ -121,7 +127,7 @@ Column {
     onPlanTextChanged: disarm()
     onRecordingChanged: if (recording) displayNow=Date.now()
     Timer {
-        interval: 250
+        interval: root.storageRunning ? 100 : 250
         repeat: true
         running: root.visible && root.recording && !CpuPlusDiagnostics.cancelled
         onTriggered: root.displayNow=Date.now()
@@ -319,10 +325,11 @@ Column {
                         Row {
                             id: cadenceRow
                             width: parent.width
-                            height: root.compactLayout ? 19 : 26
+                            height: root.compactLayout ? (root.storageRunning ? 16 : 19) : 26
                             spacing: 2
                             readonly property string field: parent.modelData.key
                             readonly property int seconds: field==="sample" ? root.storageSample : root.storageReport
+                            readonly property var countdown: root.countdown(field)
                             readonly property real buttonSize: Math.min(height,Math.max(12,Math.floor((width-24)/2)))
                             ActionButton {
                                 objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-minus"
@@ -343,8 +350,9 @@ Column {
                             CpuPlusMemoryReadout {
                                 width: Math.max(0,cadenceRow.width-2*cadenceRow.buttonSize-2*cadenceRow.spacing)
                                 height: cadenceRow.height
-                                text: cadenceRow.seconds+" SEC"
-                                color: Colors.blue
+                                objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-clock"
+                                text: !root.storageRunning ? cadenceRow.seconds+" SEC" : !cadenceRow.countdown ? "WAIT" : (cadenceRow.countdown.remainingMs/1000).toFixed(1)+" SEC"
+                                color: cadenceRow.countdown && cadenceRow.countdown.flash ? Colors.white : Colors.blue
                                 semanticGlowColor: Colors.blue
                                 font.pixelSize: root.compactLayout ? 12 : 16
                                 fontSizeMode: Text.HorizontalFit
@@ -369,11 +377,22 @@ Column {
                                 onLeftClicked: root.changeStorageCadence(cadenceRow.field,1)
                             }
                         }
+                        Rectangle {
+                            width: parent.width
+                            height: root.storageRunning ? 3 : 0
+                            visible: root.storageRunning
+                            color: Colors.dark
+                            Rectangle {
+                                width: parent.width*(cadenceRow.countdown ? cadenceRow.countdown.fraction : 0)
+                                height: parent.height
+                                color: cadenceRow.countdown && cadenceRow.countdown.flash ? Colors.white : Colors.blue
+                            }
+                        }
                     }
                 }
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    text: root.storagePreview.ok ? root.storagePreview.intervals+" INT / "+root.storagePreview.observations+" RPT" : "CHECK CADENCE"
+                    text: root.storageRunning ? (CpuPlusDiagnostics.storageProgressFault ? "CLOCK UNVERIFIED" : !CpuPlusDiagnostics.storageProgress ? "WAIT FOR CLOCK" : CpuPlusDiagnostics.storageProgress.tick+" INT / "+CpuPlusDiagnostics.storageProgress.reports+" RPT") : root.storagePreview.ok ? root.storagePreview.intervals+" INT / "+root.storagePreview.observations+" RPT" : "CHECK CADENCE"
                     color: root.storagePreview.ok ? Colors.blue : Colors.yellow
                     font.pixelSize: root.compactLayout ? 9 : 11
                     fontSizeMode: Text.HorizontalFit

@@ -1,0 +1,37 @@
+name: EnergyProgress native laboratory
+on:
+  pull_request:
+    paths:
+      - 'components/EnergyProgress*'
+      - 'components/qmldir'
+      - 'tests/fixtures/EnergyProgress*'
+      - 'tests/components/energy-progress-motion.test.cjs'
+      - '.github/workflows/energy-progress-native.yml'
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    timeout-minutes: 12
+    steps:
+      - name: Install disposable native runtime
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qt5compat xorg-x11-server-Xvfb xorg-x11-xauth nodejs git mesa-dri-drivers dbus-daemon
+      - uses: actions/checkout@v4
+      - name: Motion contracts
+        run: node --test tests/components/energy-progress-motion.test.cjs
+      - name: Native QML smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_RUNTIME_DIR="$(mktemp -d)"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          export QT_QPA_PLATFORM=xcb
+          export QSG_RHI_BACKEND=opengl
+          export LIBGL_ALWAYS_SOFTWARE=1
+          timeout 25s xvfb-run -a quickshell -p "$PWD/tests/fixtures/EnergyProgressNative.qml" 2>&1 | tee /tmp/energy-native.log
+          grep -F 'ENERGY_NATIVE_PASS' /tmp/energy-native.log
+          if grep -E 'ENERGY_NATIVE_FAIL|ReferenceError:|TypeError:|SyntaxError:|Binding loop detected|Failed to load configuration' /tmp/energy-native.log; then exit 1; fi

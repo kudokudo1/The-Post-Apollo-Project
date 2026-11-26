@@ -786,7 +786,7 @@ Item {
                 anchors.right: parent.right
                 anchors.top: processStateHeader.bottom
                 anchors.margins: 6
-                maximumHeight: Math.max(0, instrumentBay.height * 0.55)
+                maximumHeight: Math.max(0, instrumentBay.height - processStateHeader.y - processStateHeader.height - 12)
                 contextActive: workspace.active && !!workspace.currentTask
                 task: contextActive ? workspace.currentTask : null
                 purpose: open && contextActive && task && workspace.appControlWindow.taskSimplePurpose

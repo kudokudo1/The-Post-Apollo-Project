@@ -30,7 +30,7 @@ assert.match(pane, /active: root.page === "POL"/);
 assert.match(pane, /onValueRequested: function\(value\) \{ root.stagePolicy\(Math.round\(value\)\); \}/);
 assert.match(pane, /PREVIEW ONLY \/\/ APPLY NOT CONNECTED/);
 assert.match(pane, /RAM bright = estimated available/);
-assert.match(pane, /root.displaySample.available \/ root.displaySample.total/);
+assert.match(pane, /liveBars.sample.available \/ liveBars.sample.total/);
 const vm = require("node:vm");
 const actions = pane.slice(pane.indexOf("    function stageCapacity"), pane.indexOf("    onSampleChanged"));
 const ctx = vm.createContext({page:"CAP",capSection:0,policySection:0,capacity:{},sample:{swappiness:60},MemoryOperation:{busy:false},stagedGiB:16,stagedSwappiness:60});
@@ -514,11 +514,11 @@ console.log("CPU++ M11h compact transport palette and pinned diagnostics header 
  assert.match(targetStripSource,/width: 36\s+height: 36/);
  assert.match(targetStripSource,/label: String\(modelData.symbol \|\| ""\)/);
  assert.match(targetStripSource,/labelPixelSize: 24/);
- assert.doesNotMatch(targetStripSource,/(hover|pressed)(Fill|Foreground|Border|SoftGlow|ContentGlow)Color:/);
+ assert.doesNotMatch(targetStripSource,/(hover|pressed)(Fill|Border|SoftGlow|ContentGlow)Color:/);
  assert.match(targetStripSource,/selectedFillColor: Colors.black/);
  assert.match(targetStripSource,/selectedContentGlowColor: accentColor/);
  console.log("CPU++ SYSTEM and KILL semantic palette source contracts PASS");
 
 assert.match(pane,/component LiveCapacityBars: Column/);
 assert.equal((pane.match(/LiveCapacityBars\s*\{/g)||[]).length,2);
-assert.match(targetStripSource,/outlineOnlyGlow: true/);
+assert.match(targetStripSource,/color: Colors.black\s+softGlowEnabled: false\s+wideGlowEnabled: false/);

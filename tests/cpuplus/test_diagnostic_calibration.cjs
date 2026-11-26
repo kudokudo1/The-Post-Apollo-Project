@@ -1,0 +1,38 @@
+const assert=require("node:assert/strict");
+const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
+const ctx=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../../services/diagnostics/DiagnosticCalibration.js"),"utf8"),ctx);
+const run=x=>{ctx.input=JSON.stringify(x);return vm.runInContext("previewCalibration(JSON.parse(input))",ctx)};
+const plain=x=>JSON.parse(JSON.stringify(x));
+for(const k of ["threads","memory","census","storage","inventory","appcontrol"]){
+    const d=plain(ctx.defaultsFor(k));
+    assert.equal(run(d).ok,true,k);
+}
+const t=plain(ctx.defaultsFor("threads"));
+assert.equal(run({...t,durationSeconds:10,intervalMs:500,topCount:6}).ok,true);
+assert.equal(run({...t,intervalMs:100}).ok,false);
+assert.equal(run({...t,topCount:12}).ok,false);
+assert.equal(run({...t,durationSeconds:120,intervalMs:5000}).ok,true);
+assert.equal(run({...t,topCount:"4"}).ok,false);
+assert.equal(run({...t,pid:12}).ok,false);
+assert.equal(run({...t,command:"anything"}).ok,false);
+assert.equal(run({...t,durationSeconds:0}).ok,false);
+assert.equal(run({...t,durationSeconds:121}).ok,false);
+assert.equal(run({...t,intervalMs:333}).ok,false);
+assert.equal(run({...t,intervalMs:5000,durationSeconds:1}).ok,false);
+assert.equal(run({...plain(ctx.defaultsFor("memory")),intervalMs:5000}).ok,false);
+assert.equal(run({...plain(ctx.defaultsFor("memory")),durationSeconds:60,intervalMs:5000}).observations,13);
+assert.equal(run({...plain(ctx.defaultsFor("census")),durationSeconds:60,intervalMs:20000}).ok,true);
+assert.equal(run({...plain(ctx.defaultsFor("census")),intervalMs:5000}).ok,false);
+assert.equal(run({...plain(ctx.defaultsFor("storage")),durationSeconds:31}).ok,false);
+assert.equal(run({...plain(ctx.defaultsFor("appcontrol")),topCount:3}).ok,false);
+assert.equal(run(plain(ctx.defaultsFor("appcontrol"))).fixed,true);
+assert.equal(run({kind:"gpu"}).ok,false);
+assert.equal(run({kind:"inventory",detail:true}).ok,false);
+assert.equal(run(null).ok,false);
+assert.equal(vm.runInContext('previewCalibration({kind:"threads",get durationSeconds(){throw Error("must not read")},intervalMs:1000,topCount:4}).ok',ctx),false);
+assert.equal(vm.runInContext('previewCalibration(Object.create({kind:"inventory"})).ok',ctx),false);
+assert.equal(vm.runInContext('previewCalibration({kind:"inventory",[Symbol("extra")]:1}).ok',ctx),false);
+const d=plain(ctx.defaultsFor("threads"));d.topCount=12;
+assert.equal(ctx.defaultsFor("threads").topCount,4);
+console.log("DIAG D1a calibration preview contracts PASS");

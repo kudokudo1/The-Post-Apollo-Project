@@ -50,6 +50,7 @@ Rectangle {
     onTargetIdentityChanged: open = false
     onContextActiveChanged: if (!contextActive) open = false
     onOpenChanged: if (open) {
+        if (!contextActive || !task) { open = false; return }
         sizeLevel = 0
         scopeScroll.contentY = 0
         argumentsScroll.contentY = 0

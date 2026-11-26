@@ -18,6 +18,10 @@ import "../../components"
     property Item actionTarget: null
     property Item quickActionTarget: null
     property Item lockTarget: null
+    property Item killActionTarget: null
+    property Item freezeActionTarget: null
+    property Item killLockTarget: null
+    property Item freezeLockTarget: null
     readonly property bool headerActions: quickActionTarget !== null
     property real viewportHeight: 0
     readonly property bool compact: viewportHeight > 0
@@ -1164,10 +1168,10 @@ import "../../components"
                     Row {
                         id: taskActionLockRow
                         parent: taskManagerBody.lockTarget || taskTerminationHeaderBox
-                        anchors.right: taskManagerBody.lockTarget ? undefined : parent.right
+                        anchors.right: parent.right
                         // KILLING ACTION cards are parent.width - 10 and centered,
                         // so their right edge sits 5 px inside this column.
-                        anchors.rightMargin: 5
+                        anchors.rightMargin: taskManagerBody.lockTarget ? 0 : 5
                         anchors.verticalCenter: taskManagerBody.lockTarget ? undefined : parent.verticalCenter
                         anchors.verticalCenterOffset: 0
                         spacing: 5
@@ -1195,6 +1199,8 @@ import "../../components"
 
                         Loader {
                             id: taskFreezeSafetyLockLoader
+                            parent: taskManagerBody.freezeLockTarget || taskActionLockRow
+                            anchors.horizontalCenter: taskManagerBody.freezeLockTarget ? parent.horizontalCenter : undefined
                             width: 30
                             height: 26
                             visible:
@@ -1216,6 +1222,8 @@ import "../../components"
 
                         Loader {
                             id: taskKillSafetyLockLoader
+                            parent: taskManagerBody.killLockTarget || taskActionLockRow
+                            anchors.horizontalCenter: taskManagerBody.killLockTarget ? parent.horizontalCenter : undefined
                             width: 30
                             height: 26
                             visible:
@@ -1239,7 +1247,7 @@ import "../../components"
 
 
 
-                ActionButton {
+                ReloadButton {
                     id: taskRestartAction
                     parent: taskManagerBody.quickActionTarget || actionColumn
                     width: taskManagerBody.headerActions ? 34 : parent.width - 10
@@ -1262,23 +1270,23 @@ import "../../components"
                         host.detailFocused
                         && (processController.currentTask !== null)
                         && host.selectedDetailActionIndex === 0
-                    destructive: true
+                    destructive: !taskManagerBody.headerActions
                     showLabel: taskManagerBody.headerActions
-                    label: taskManagerBody.headerActions ? ("↻") : ""
-                    labelPixelSize: 23
+                    label: taskManagerBody.headerActions ? "⟳" : ""
+                    labelPixelSize: 22
                     labelMinimumPixelSize: 7
-                    labelFontSizeMode: Text.Fit
-                    contentPadding: taskManagerBody.headerActions ? 2 : 8
+                    labelFontSizeMode: taskManagerBody.headerActions ? Text.FixedSize : Text.Fit
+                    contentPadding: taskManagerBody.headerActions ? 3 : 8
                     Accessible.name: "Restart process"
                     accentColor: taskManagerBody.headerActions ? Colors.yellow : Colors.cyan
                     idleForegroundColor: taskManagerBody.headerActions ? Colors.yellow : Colors.white
-                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.orange : Colors.white
-                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.magenta : Colors.white
+                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.yellow : Colors.white
+                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.yellow : Colors.white
                     pointerCursorShape: Qt.ArrowCursor
 
                     idleFillColor: Colors.black
-                    hoverFillColor: Colors.yellow
-                    selectedFillColor: Colors.yellow
+                    hoverFillColor: taskManagerBody.headerActions ? hoverSurfaceColor : Colors.yellow
+                    selectedFillColor: taskManagerBody.headerActions ? hoverSurfaceColor : Colors.yellow
                     pressedFillColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     idleBorderColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     hoverBorderColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
@@ -1288,17 +1296,17 @@ import "../../components"
 
                     contentGlowEnabled: taskManagerBody.headerActions
                     softGlowEnabled: true
-                    softGlowSpread: 4
-                    softGlowMargin: 4
+                    softGlowSpread: taskManagerBody.headerActions ? 3 : 4
+                    softGlowMargin: taskManagerBody.headerActions ? 0 : 4
                     idleSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     hoverSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     selectedSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     pressedSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
-                    softGlowIdleOpacity: 0.30
-                    softGlowHoverOpacity: 0.58
-                    softGlowSelectedOpacity: 0.58
-                    softGlowPressedOpacity: 0.58
-                    wideGlowEnabled: false
+                    softGlowIdleOpacity: taskManagerBody.headerActions ? 0.48 : 0.30
+                    softGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0.58
+                    softGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0.58
+                    softGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0.58
+                    wideGlowEnabled: taskManagerBody.headerActions
 
                     onHoverEntered: {
                         host.setKeyboardActive(false);
@@ -1762,7 +1770,7 @@ import "../../components"
                 ActionButton {
                     id: taskFreezeAction
 
-                    parent: taskManagerBody.quickActionTarget || actionColumn
+                    parent: taskManagerBody.freezeActionTarget || taskManagerBody.quickActionTarget || actionColumn
                     width: taskManagerBody.headerActions ? 34 : parent.width - 10
                     height: taskManagerBody.headerActions ? width : 34
                     anchors.horizontalCenter: taskManagerBody.headerActions ? undefined : parent.horizontalCenter
@@ -1814,17 +1822,24 @@ import "../../components"
 
                     contentGlowEnabled: taskManagerBody.headerActions
                     softGlowEnabled: true
-                    softGlowSpread: 4
+                    softGlowSpread: taskManagerBody.headerActions ? 5 : 4
                     softGlowMargin: 4
                     idleSoftGlowColor: Colors.cyan
                     hoverSoftGlowColor: Colors.cyan
                     selectedSoftGlowColor: Colors.cyan
                     pressedSoftGlowColor: Colors.cyan
-                    softGlowIdleOpacity: 0.28
-                    softGlowHoverOpacity: 0.54
-                    softGlowSelectedOpacity: 0.54
-                    softGlowPressedOpacity: 0.54
-                    wideGlowEnabled: false
+                    softGlowIdleOpacity: taskManagerBody.headerActions ? 0.48 : 0.28
+                    softGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0.54
+                    softGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0.54
+                    softGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0.54
+                    wideGlowEnabled: taskManagerBody.headerActions
+                    idleWideGlowColor: Colors.cyan
+                    hoverWideGlowColor: Colors.cyan
+                    selectedWideGlowColor: Colors.cyan
+                    pressedWideGlowColor: Colors.cyan
+                    idleContentGlowColor: Colors.cyan
+                    hoverContentGlowColor: Colors.cyan
+                    selectedContentGlowColor: Colors.cyan
 
                     onHoverEntered: {
                         host.setKeyboardActive(false);
@@ -1926,9 +1941,9 @@ import "../../components"
                         onTriggered: taskEndAction.clickFirePulse = false
                     }
 
-                    parent: taskManagerBody.quickActionTarget || actionColumn
-                    width: taskManagerBody.headerActions ? 34 : parent.width - 10
-                    height: taskManagerBody.headerActions ? width : 36
+                    parent: taskManagerBody.killActionTarget || taskManagerBody.quickActionTarget || actionColumn
+                    width: taskManagerBody.headerActions ? parent.width : parent.width - 10
+                    height: taskManagerBody.headerActions ? 34 : 36
                     anchors.horizontalCenter: taskManagerBody.headerActions ? undefined : parent.horizontalCenter
 
                     property bool protectedTask:
@@ -1955,8 +1970,8 @@ import "../../components"
                         && host.selectedDetailActionIndex === 2
                     destructive: true
                     showLabel: taskManagerBody.headerActions
-                    label: taskManagerBody.headerActions ? ((taskEndAction.pressed || taskEndAction.clickFirePulse) ? "(=ᗜ=)デ╾━" : "(-_•)デ╾━") : ""
-                    labelPixelSize: 10
+                    label: taskManagerBody.headerActions ? ((taskEndAction.pressed || taskEndAction.clickFirePulse) ? "(=ᗜ=)デ╾━ ๋࣭⭑" : taskEndAction.hovered || taskEndAction.selected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━") : ""
+                    labelPixelSize: taskManagerBody.headerActions ? 14 : 10
                     labelMinimumPixelSize: 7
                     labelFontSizeMode: Text.Fit
                     contentPadding: taskManagerBody.headerActions ? 2 : 8

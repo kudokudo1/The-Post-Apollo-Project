@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import "../../components"
 
 // Read-only information overlay. Selection and action authority remain host-owned.
@@ -72,6 +73,26 @@ Rectangle {
         }).join("")
     }
 
+    function helpInk(word) {
+        switch (String(word).toUpperCase()) {
+        case "CPU": return Colors.orange
+        case "MEM": case "MEMORY": return Colors.magenta
+        case "I/O": case "FREEZE": case "THAW": case "RESUME": return Colors.cyan
+        case "LIMIT": case "RESTART": case "RESET": return Colors.yellow
+        case "KILL": case "END": case "TERMINATE": case "TERM": return Colors.red
+        default: return Colors.white
+        }
+    }
+    function helpText(value) {
+        const tokens = String(value).match(/I\/O|[A-Za-z]+|[^A-Za-z]+/gi) || []
+        return tokens.map(function(token) {
+            const safe = token.replace(/&/g,"&amp;").replace(/</g,"&lt;")
+                .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")
+                .replace(/\n/g,"<br/>")
+            return '<font color="' + helpInk(token) + '">' + safe + '</font>'
+        }).join("")
+    }
+
     visible: contextActive && open && !!task && height > 0
     // Compact fits its content when possible; upper/full are actual viewport
     // escalations, not merely larger caps on the same natural document height.
@@ -134,15 +155,30 @@ Rectangle {
                 onCloseRequested: root.open = false
             }
         }
-        GohuText {
+        Column {
             id: identity
             width: parent.width
-            text: root.task ? root.semanticText(String(root.task.comm || "PROCESS")
-                + " // PID " + String(root.task.pid || "?"), Colors.orange) : ""
-            textFormat: Text.RichText
-            color: Colors.orange
-            font.pixelSize: 13
-            wrapMode: Text.WrapAnywhere
+            spacing: 3
+            GohuText {
+                width: parent.width
+                text: root.task ? root.semanticText(String(root.task.comm || "PROCESS")
+                    + " // PID " + String(root.task.pid || "?")
+                    + " • " + String(root.task.user || "?")
+                    + " • " + String(root.task.state || "?"), Colors.orange) : ""
+                textFormat: Text.RichText
+                color: Colors.orange
+                font.pixelSize: 13
+                wrapMode: Text.WrapAnywhere
+            }
+            GohuText {
+                objectName: "processInformationBirthIdentity"
+                width: parent.width
+                text: root.task ? "START TICKS " + String(root.task.startTicks || "?") + " • PID + START TICKS + NAME verify process identity. State: S sleeping, R running, L locked pages, l multithreaded." : ""
+                textFormat: Text.PlainText
+                color: Colors.white
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
         }
         Column {
             id: purposeBlock
@@ -154,14 +190,20 @@ Rectangle {
                 color: Colors.orange
                 font.pixelSize: 12
             }
-            GohuText {
-                objectName: "processInformationPurpose"
+            Item {
                 width: parent.width
-                text: root.purpose || "NO DESCRIPTION AVAILABLE"
-                textFormat: Text.PlainText
-                wrapMode: Text.Wrap
-                color: Colors.white
-                font.pixelSize: 12
+                height: purposeText.implicitHeight
+                GohuText {
+                    id: purposeText
+                    objectName: "processInformationPurpose"
+                    width: parent.width
+                    text: root.helpText(root.purpose || "NO DESCRIPTION AVAILABLE")
+                    textFormat: Text.RichText
+                    wrapMode: Text.Wrap
+                    color: Colors.white
+                    font.pixelSize: 12
+                }
+                GaussianBlur { anchors.fill: purposeText; source: purposeText; radius: 4; samples: 9; opacity: 0.55; z: -1 }
             }
         }
         Rectangle {
@@ -178,7 +220,7 @@ Rectangle {
                 x: 7
                 y: 5
                 width: Math.max(0, parent.width - 14)
-                text: root.semanticText("PROCESS SCOPE // LIMIT = THIS PROCESS", Colors.cyan)
+                text: root.semanticText("PROCESS SCOPE //", Colors.cyan) + " " + root.helpText("LIMIT") + " " + root.semanticText("= THIS PROCESS", Colors.cyan)
                 textFormat: Text.RichText
                 wrapMode: Text.Wrap
                 color: Colors.cyan
@@ -206,12 +248,13 @@ Rectangle {
                 GohuText {
                     id: scopeValue
                     width: scopeScroll.width
-                    text: root.scopeText || "NO LIVE PROCESS SCOPE FOUND"
-                    textFormat: Text.PlainText
+                    text: root.helpText(root.scopeText || "NO LIVE PROCESS SCOPE FOUND")
+                    textFormat: Text.RichText
                     wrapMode: Text.WrapAnywhere
                     color: Colors.white
                     font.pixelSize: 11
                 }
+                GaussianBlur { anchors.fill: scopeValue; source: scopeValue; radius: 4; samples: 9; opacity: 0.55; z: -1 }
             }
             NeonScrollBar {
                 objectName: "processInformationScopeRail"

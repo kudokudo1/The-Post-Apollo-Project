@@ -145,7 +145,7 @@ test("both process hosts share the compact information document and action secti
     }
     assert.match(info,/onTargetIdentityChanged: open = false/);
     assert.match(info,/onContextActiveChanged: if \(!contextActive\) open = false/);
-    assert.match(info,/text: "PROCESS PURPOSE"[\s\S]*semanticText\("PROCESS SCOPE \/\/ LIMIT = THIS PROCESS"[\s\S]*text: "TECHNICAL INFORMATION"[\s\S]*text: "COMMAND LINE"/);
+    assert.match(info,/text: "PROCESS PURPOSE"[\s\S]*semanticText\("PROCESS SCOPE \/\/"[\s\S]*text: "TECHNICAL INFORMATION"[\s\S]*text: "COMMAND LINE"/);
     assert.match(info,/textFormat: Text.PlainText/);
     assert.match(app,/anchors.bottom: pinnedTaskActions.visible \? pinnedTaskActions.top : detailBottomBar.top/);
     assert.match(app,/actionTarget: pinnedTaskActions/);
@@ -213,15 +213,30 @@ test("P4e: CPU++ mounts the same three action instances in its floating identity
     assert.match(recipient,/Item\s*\{\s*id: processIdentity/);
     assert.doesNotMatch(recipient,/text: "PROCESS \/\/ INSTRUMENTS"/);
     assert.match(recipient,/quickActionTarget: headerActions/);
-    assert.match(recipient,/lockTarget: headerActionLocks/);
+    assert.match(recipient,/lockTarget: limitLockSlot/);
     assert.match(recipient,/item.parent === headerActions/);
-    assert.equal((donorView.match(/parent: taskManagerBody.quickActionTarget \|\| actionColumn/g)||[]).length,3);
+    assert.equal((donorView.match(/parent: taskManagerBody\.(?:(?:killActionTarget|freezeActionTarget) \|\| taskManagerBody\.)?quickActionTarget \|\| actionColumn/g)||[]).length,3);
     assert.match(donorView,/parent: taskManagerBody.lockTarget \|\| taskTerminationHeaderBox/);
     assert.match(donorView,/id: taskRestartAction[\s\S]*?accentColor: taskManagerBody.headerActions \? Colors.yellow/);
     assert.match(donorView,/⋆❆⋆/);
-    assert.match(recipient,/objectName: "cpuPlusProcessLockHelpButton"[\s\S]*?onLeftClicked: lockHelp.open = !lockHelp.open/);
-    assert.match(recipient,/id: lockHelp[\s\S]*?visible: open && lockHelpButton.available && workspace.active[\s\S]*?Left click lock: one-shot/);
+    assert.match(recipient,/ProcessInformationButton\s*\{\s*id: lockHelpButton/);
+    assert.match(recipient,/id: lockHelp[\s\S]*?open: lockHelpButton.hovered && lockHelpButton.available && workspace.active[\s\S]*?Left click lock: one-shot/);
     assert.equal((recipient.match(/Left click lock: one-shot/g)||[]).length,1);
     for (const action of ["requestRestart", "toggleFreeze", "requestTerminate"])
         assert.equal((donorView.match(new RegExp("processController\\."+action+"\\(\\)","g"))||[]).length,1);
+});
+
+test("P4f: aligned safety slots and semantic information", () => {
+    const info=read("widgets/appcontrol/ProcessInformationPanel.qml");
+    assert.match(recipient,/id: headerLocks[\s\S]*?cpuPlusProcessMasterLock[\s\S]*?id: killSlot[\s\S]*?id: headerActions[\s\S]*?id: freezeSlot[\s\S]*?id: lockHelpButton/);
+    assert.match(recipient,/killLockTarget: killLockSlot/);
+    assert.match(recipient,/freezeLockTarget: freezeLockSlot/);
+    assert.match(recipient,/visible: !workspace.exactTargetAvailable/);
+    assert.match(donorView,/ReloadButton\s*\{\s*id: taskRestartAction/);
+    assert.match(donorView,/label: taskManagerBody.headerActions \? "⟳"/);
+    assert.match(info,/PID \+ START TICKS \+ NAME verify process identity/);
+    assert.match(info,/case "CPU": return Colors.orange/);
+    assert.match(info,/case "MEM": case "MEMORY": return Colors.magenta/);
+    assert.match(info,/case "I\/O": case "FREEZE"/);
+    assert.match(info,/GaussianBlur \{ anchors.fill: purposeText; source: purposeText/);
 });

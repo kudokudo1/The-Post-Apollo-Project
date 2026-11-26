@@ -495,7 +495,8 @@ class VersionedTests(unittest.TestCase):
             self.remember(self.sel,(self.user,self.op))
 
     def m7h_assemble(self, s, use, final):
-        return self.cache.assemble_versioned(s,**self.args(s,use),final_use=final)
+        return self.cache.assemble_versioned(s,current=s,
+            dependencies=HotDependencies.from_route(s.route),use=use,final_use=final)
 
     def test_m7h_initial_unknown_final_revoke_both_contexts(self):
         for context in (CONTEXT,PUBLIC_RESTORATION_CONTEXT):

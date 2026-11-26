@@ -671,36 +671,49 @@ class AdmittedOriginalSettlementTests(unittest.TestCase):
     def recover(self, state):
         from recovery_inspect_b4d import ForestLocalRecoveryInspector
         before = self.rows()
-        with sqlite3.connect(self.path.as_uri()+"?mode=ro", uri=True) as reader:
-            try:
-                reader.execute("PRAGMA query_only=ON")
-                inspector = ForestLocalRecoveryInspector(ForestSessionJournal(reader))
-                result = inspector.inspect(owner=self.ctx.principal_key,
-                    session_id=self.sid, attempt_id=self.original.attempt.attempt_id)
-                self.assertEqual(result["attemptId"], self.original.attempt.attempt_id)
-                self.assertEqual(result["forestWriteState"], "FOREST_"+state)
-                self.assertEqual(result["c5Settlement"], "UNKNOWN_HOLD")
-                for key in ("c5EvidenceAuthenticated", "terminalReceiptAuthenticated",
-                            "safeToRetryInference", "safeToReleaseRevocation",
-                            "productionAuthority"):
-                    self.assertIs(result[key], False)
-            finally:
-                reader.close()
+        reader = sqlite3.connect(self.path.as_uri()+"?mode=ro", uri=True)
+        try:
+            reader.execute("PRAGMA query_only=ON")
+            inspector = ForestLocalRecoveryInspector(ForestSessionJournal(reader))
+            result = inspector.inspect(owner=self.ctx.principal_key,
+                session_id=self.sid, attempt_id=self.original.attempt.attempt_id)
+            self.assertEqual(result["attemptId"], self.original.attempt.attempt_id)
+            self.assertEqual(result["forestWriteState"], "FOREST_"+state)
+            self.assertEqual(result["c5Settlement"], "UNKNOWN_HOLD")
+            for key in ("c5EvidenceAuthenticated", "terminalReceiptAuthenticated",
+                        "safeToRetryInference", "safeToReleaseRevocation",
+                        "productionAuthority"):
+                self.assertIs(result[key], False)
+        finally:
+            reader.close()
         self.assertEqual(self.rows(), before)
         self.assert_held()
 
     def test_r7de_freeze_before_reserve_does_not_install_guard(self):
         # Fixture freeze is intentionally pre-attempt, so there is no H2
         # original claim yet. Actual B3 still bypasses this modeled refusal.
-        pre_reserve_freeze = (self.op, "original-lifetime", 2, 20)
-        self.assertEqual(pre_reserve_freeze[0], self.op)
+        pre_reserve_freeze = self.Freeze(
+            self.op, "original-retirement-intent", 2, 20)
+        current_freeze = replace(pre_reserve_freeze)
+        # The owner-supplied freeze already exists before the reservation.
+        # A matching pending pre-attempt intent models denial of new work;
+        # its absence/mismatch would not constitute positive authorization.
+        def modeled_pre_reserve(notice, current):
+            if (type(notice) is self.Freeze and notice == current
+                    and notice.original == self.op
+                    and notice.intent == "original-retirement-intent"
+                    and notice.lifecycle_revision == 2):
+                return "MODELED_NEW_WORK_BLOCKED"
+            return "MODELED_HOLD"
+        self.assertEqual(modeled_pre_reserve(pre_reserve_freeze, current_freeze),
+                         "MODELED_NEW_WORK_BLOCKED")
         self.assertEqual(self.rows()[2], [])
         self.assertEqual(self.calls, [])
         self.assertEqual(self.custody.status()["status"], "IDLE")
         generator = self.exchange()
         self.reserve_and_hold(generator)
         intent = self.freeze()
-        self.assertEqual(intent.observed, pre_reserve_freeze[3])
+        self.assertEqual(intent.observed, pre_reserve_freeze.observed)
         self.assertEqual(self.modeled_decision(
             None, intent, self.original, intent), "MODELED_HOLD")
         # Direct B3 reservation happened despite modeled freeze: no actual guard.

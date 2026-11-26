@@ -204,7 +204,7 @@ def receipt(config, raw, pinned):
         raise ValueError("missing terminal receipt")
     if kind=="threads":
         start=rows[0]
-        if (start.get("event")!="start" or start.get("workshopSchema")!="post-apollo-thread-calibration-v1"
+        if (len(rows)<3 or start.get("event")!="start" or start.get("workshopSchema")!="post-apollo-thread-calibration-v1"
                 or end.get("workshopSchema")!=start.get("workshopSchema")
                 or any(start.get(k)!=config[k] for k in ("durationSeconds","intervalMs","topCount"))
                 or end.get("samples")!=len(rows)-2
@@ -216,6 +216,8 @@ def receipt(config, raw, pinned):
                 or end.get("calibration")!=config or end.get("samples")!=len(rows)-1
                 or any(row.get("event")!=kind for row in rows[:-1])):
             raise ValueError("observer receipt mismatch")
+        if kind=="memory" and len(rows)<3:
+            raise ValueError("missing memory baseline or interval")
         first=rows[0].get("monotonicMs") if kind=="memory" else end.get("startedMonotonicMs")
     if kind in ("threads","memory"):
         if not pinned or any(row.get("pid")!=pinned["pid"] or row.get("startTicks")!=pinned["startTicks"] for row in rows):

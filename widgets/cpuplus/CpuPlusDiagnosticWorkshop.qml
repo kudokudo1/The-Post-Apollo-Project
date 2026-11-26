@@ -131,7 +131,7 @@ Column {
                 selectedContentGlowColor: accentColor
                 selectedSoftGlowColor: accentColor
                 contentGlowSelectedOpacity: 0.95
-                softGlowSelectedOpacity: 0.8
+                outlineOnlyGlow: true
                 available: !root.locked
                 acceptedButtons: Qt.LeftButton
                 Accessible.name: modelData.kind.toUpperCase()
@@ -148,83 +148,71 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.Wrap
     }
-    Flow {
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopDuration"
+        width: parent.width
+        title: "DURATION"
+        readout: root.draft.durationSeconds+" SEC"
+        minimumValue: 1
+        maximumValue: 120
+        currentValue: root.draft.durationSeconds
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("durationSeconds",value)
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopThreadInterval"
+        width: parent.width
+        fillColor: Colors.cyan
+        visible: root.draft.selected.includes("threads")
+        title: "THREAD INTERVAL"
+        readout: root.draft.threadIntervalMs+" MS"
+        minimumValue: 0
+        maximumValue: 5
+        currentValue: root.threadIntervals.indexOf(root.draft.threadIntervalMs)
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("threadIntervalMs",root.threadIntervals[Math.round(value)])
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopMemoryInterval"
+        width: parent.width
+        fillColor: Colors.magenta
+        visible: root.draft.selected.includes("memory")
+        title: "MEMORY INTERVAL"
+        readout: root.draft.memoryIntervalMs/1000+" SEC"
+        minimumValue: 5
+        maximumValue: 60
+        currentValue: root.draft.memoryIntervalMs/1000
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("memoryIntervalMs",value*1000)
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopCensusInterval"
+        width: parent.width
+        fillColor: Colors.orange
+        visible: root.draft.selected.includes("census")
+        title: "PROCESS INTERVAL"
+        readout: root.draft.censusIntervalMs/1000+" SEC"
+        minimumValue: 1
+        maximumValue: 60
+        currentValue: root.draft.censusIntervalMs/1000
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
+    }
+    Row {
         width: parent.width
         spacing: 4
-        Column {
-            width: root.draft.selected.includes("threads") && parent.width>=270 ? parent.width-140 : parent.width
-            spacing: 2
-            CpuPlusDiagnosticSlider {
-                objectName: "cpuplusWorkshopDuration"
-                width: parent.width
-                title: "DURATION"
-                readout: root.draft.durationSeconds+" SEC"
-                minimumValue: 1
-                maximumValue: 120
-                currentValue: root.draft.durationSeconds
-                adjustable: !root.locked
-                onValueRequested: value=>root.edit("durationSeconds",value)
-            }
-            CpuPlusDiagnosticSlider {
-                objectName: "cpuplusWorkshopThreadInterval"
-                width: parent.width
-                fillColor: Colors.cyan
-                visible: root.draft.selected.includes("threads")
-                title: "THREAD INTERVAL"
-                readout: root.draft.threadIntervalMs+" MS"
-                minimumValue: 0
-                maximumValue: 5
-                currentValue: root.threadIntervals.indexOf(root.draft.threadIntervalMs)
-                adjustable: !root.locked
-                onValueRequested: value=>root.edit("threadIntervalMs",root.threadIntervals[Math.round(value)])
-            }
-            CpuPlusDiagnosticSlider {
-                objectName: "cpuplusWorkshopMemoryInterval"
-                width: parent.width
-                fillColor: Colors.magenta
-                visible: root.draft.selected.includes("memory")
-                title: "MEMORY INTERVAL"
-                readout: root.draft.memoryIntervalMs/1000+" SEC"
-                minimumValue: 5
-                maximumValue: 60
-                currentValue: root.draft.memoryIntervalMs/1000
-                adjustable: !root.locked
-                onValueRequested: value=>root.edit("memoryIntervalMs",value*1000)
-            }
-            CpuPlusDiagnosticSlider {
-                objectName: "cpuplusWorkshopCensusInterval"
-                width: parent.width
-                fillColor: Colors.orange
-                visible: root.draft.selected.includes("census")
-                title: "PROCESS INTERVAL"
-                readout: root.draft.censusIntervalMs/1000+" SEC"
-                minimumValue: 1
-                maximumValue: 60
-                currentValue: root.draft.censusIntervalMs/1000
-                adjustable: !root.locked
-                onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
-            }
-            GohuText {
-                width: parent.width
-                visible: root.draft.selected.includes("storage")
-                text: "STORAGE // FIXED 1 SEC METADATA CADENCE"
-                color: Colors.blue
-                font.pixelSize: 10
-                wrapMode: Text.Wrap
-            }
-        
-        }
+        visible: root.draft.selected.includes("threads") || root.draft.selected.includes("storage")
         Item {
-            width: 136
+            width: root.draft.selected.includes("storage") ? Math.floor((parent.width-4)/2) : parent.width
             height: 160
             visible: root.draft.selected.includes("threads")
             SelectorDial {
                 objectName: "cpuplusWorkshopTopThreads"
                 anchors.centerIn: parent
                 labelText: "TOP THREADS"
-                options: ["1","4","8","12"]
+                options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
                 displayOptions: options
-                numericLabelPixelSize: 12
+                numericLabelPixelSize: 10
                 numericDetentInterval: 1
                 numericDetentOrigin: 1
                 selectorMode: "continuous"
@@ -235,15 +223,87 @@ Column {
                 valueDecimals: 0
                 snapContinuousToStep: true
                 showNumericDetentTicks: true
-                numericReferenceValues: [1,4,8,12]
+                numericReferenceValues: [1,2,3,4,5,6,7,8,9,10,11,12]
                 accentColor: Colors.cyan
-                markerColor: Colors.magenta
+                markerColor: Colors.orange
+                readoutColor: Colors.cyan
+                readoutGlowEnabled: true
+                interactionGlowColor: Colors.magenta
                 labelColor: Colors.cyan
                 interactive: !root.locked
                 onValueRequested: value=>root.edit("topCount",Math.round(value))
             }
         }
-    
+
+        Rectangle {
+            objectName: "cpuplusWorkshopStorageInstrument"
+            visible: root.draft.selected.includes("storage")
+            width: root.draft.selected.includes("threads") ? Math.floor((parent.width-4)/2) : parent.width
+            height: 160
+            color: Colors.black
+            border.color: Colors.blue
+            Column {
+                anchors.centerIn: parent
+                width: parent.width-8
+                spacing: 5
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: "STORAGE // METADATA"
+                    color: Colors.blue
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 8
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: "1 SEC"
+                    color: Colors.blue
+                    font.pixelSize: 24
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 14
+                    color: Colors.black
+                    border.color: Colors.blue
+                    Row {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        spacing: 2
+                        Repeater {
+                            model: 10
+                            Rectangle {
+                                width: Math.max(0,(parent.width-18)/10)
+                                height: parent.height
+                                color: Colors.blue
+                            }
+                        }
+                    }
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: "FIXED CADENCE"
+                    color: Colors.white
+                    font.pixelSize: 10
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                CpuPlusMemoryReadout {
+                    width: parent.width
+                    text: root.draft.durationSeconds+" INTERVALS"
+                    color: Colors.blue
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                GohuText {
+                    width: parent.width
+                    text: "10s / FINAL REPORT"
+                    color: Colors.white
+                    font.pixelSize: 9
+                    horizontalAlignment: Text.AlignHCenter
+                }
+            }
+        }
     }
     GohuText {
         width: parent.width

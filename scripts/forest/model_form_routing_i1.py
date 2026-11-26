@@ -94,11 +94,62 @@ class SemanticEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class FormControlReference:
+    """H16b fixed reference to an already scoped control projection.
+
+    COMPLETE is a synthetic observation, not proof of authorization.
+    None denotes absence only in the complete original projection.
+    Task override is either absent or explicitly bound to this TaskContext.
+    No durable control reader/writer, lease or provider action.
+    """
+    scope: TurnScope
+    revision: int
+    coverage: str
+    exact_form: str | None = None
+    task_form: str | None = None
+    task_context: TaskContext | None = None
+    baseline: str | None = None
+    tree_default: str | None = None
+
+    def __post_init__(self):
+        if type(self.scope) is not TurnScope:
+            raise RoutingRefusal("INVALID_CONTROL_REFERENCE")
+        if type(self.revision) is not int or not 1 <= self.revision <= 2**53 - 1:
+            raise RoutingRefusal("INVALID_CONTROL_REFERENCE")
+        _choice(self.coverage, ("COMPLETE", "UNKNOWN"), "INVALID_CONTROL_REFERENCE")
+        for value in (self.exact_form, self.task_form):
+            if value is not None:
+                _choice(value, ("small", "big"), "INVALID_CONTROL_REFERENCE")
+        for value in (self.baseline, self.tree_default):
+            if value is not None:
+                _choice(value, ("auto", "small", "big"), "INVALID_CONTROL_REFERENCE")
+        if self.task_form is None:
+            if self.task_context is not None:
+                raise RoutingRefusal("INVALID_CONTROL_REFERENCE")
+        elif (type(self.task_context) is not TaskContext
+              or self.task_context != self.scope.context):
+            raise RoutingRefusal("CONTROL_SCOPE_MISMATCH")
+
+
+def _effective_form(control):
+    if type(control) is not FormControlReference:
+        raise RoutingRefusal("INVALID_CONTROL_REFERENCE")
+    if control.coverage != "COMPLETE":
+        raise RoutingRefusal("CONTROL_COVERAGE_HOLD")
+    for value in (control.exact_form, control.task_form, control.baseline,
+                  control.tree_default):
+        if value is not None:
+            return value
+    raise RoutingRefusal("CONTROL_COVERAGE_HOLD")
+
+
+@dataclass(frozen=True, slots=True)
 class RoutingInput:
     scope: TurnScope
     requested_form: str
     reasoning: ReasoningReference
     evidence: tuple[SemanticEvidence, ...] = ()
+    control: FormControlReference | None = None
 
     def __post_init__(self):
         if type(self.scope) is not TurnScope:
@@ -108,6 +159,11 @@ class RoutingInput:
         form = self.requested_form.strip().lower()
         _choice(form, ("auto", "small", "big"), "INVALID_FORM_CONTROL")
         object.__setattr__(self, "requested_form", form)
+        if self.control is not None:
+            if type(self.control) is not FormControlReference or self.control.scope != self.scope:
+                raise RoutingRefusal("CONTROL_SCOPE_MISMATCH")
+            if _effective_form(self.control) != form:
+                raise RoutingRefusal("CONTROL_FORM_MISMATCH")
         if type(self.reasoning) is not ReasoningReference or self.reasoning.scope != self.scope:
             raise RoutingRefusal("REASONING_SCOPE_MISMATCH")
         if type(self.evidence) is not tuple or len(self.evidence) > _MAX_EVIDENCE:
@@ -115,6 +171,23 @@ class RoutingInput:
         for item in self.evidence:
             if type(item) is not SemanticEvidence or item.scope != self.scope:
                 raise RoutingRefusal("EVIDENCE_SCOPE_MISMATCH")
+
+
+def controlled_routing_input(original, current, *, reasoning, evidence=()):
+    """Compare original and current fixture references before I1 routing.
+
+    Independent real observations are not produced here. Retain original
+    control revision/scope in RoutingInput so existing I1/I2 equality
+    comparisons cannot silently drop it. Legacy direct I1 inputs remain
+    non-authoritative. No currentness or permission claim from equality.
+    """
+    if (type(original) is not FormControlReference
+            or type(current) is not FormControlReference):
+        raise RoutingRefusal("INVALID_CONTROL_REFERENCE")
+    if original != current:
+        raise RoutingRefusal("CONTROL_REFERENCE_CHANGED")
+    form = _effective_form(original)
+    return RoutingInput(original.scope, form, reasoning, evidence, original)
 
 
 @dataclass(frozen=True, slots=True)

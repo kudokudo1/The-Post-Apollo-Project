@@ -292,8 +292,8 @@ assert.match(ui,/normalFace: true/);
 assert.match(workshop,/text: "FIXED CADENCE"/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: compactLayout \? 128 : 176/);
-assert.match(workshopSlider,/height: root.compact \? 24 : 32/);
+assert.match(workshop,/instrumentHeight: compactLayout \? 112 : 176/);
+assert.match(workshopSlider,/height: root.compact \? 22 : 32/);
 assert.match(workshopSlider,/width: parent.height\s+height: parent.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
 console.log("DIAG D3c adaptive full-width layout contracts PASS");
@@ -340,3 +340,9 @@ assert.match(workshop,/titleColor: accentColor/);
 assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopTopThreads"')<workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"'));
 assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"')<workshop.indexOf('objectName: "cpuplusWorkshopStallThreshold"'));
 assert.doesNotMatch(workshop,/selected(Foreground|Border|ContentGlow|SoftGlow)Color: accentColor/);
+
+assert.match(workshopSlider,/accentColor: Colors.white/);
+assert.match(workshop,/activeDetentColor: Colors.magenta/);
+assert.match(workshop,/outlinedOptionLabels: true/);
+assert.match(workshop,/accentColor: Colors.yellow\s+markerColor: Colors.magenta/);
+assert.match(workshop,/objectName: "cpuplusWorkshopStorageContents"/);

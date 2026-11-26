@@ -56,7 +56,8 @@ Item {
             surface.requestPaint();
         }
     }
-    onProgressChanged: if (initialized && phase === "running") lastFraction = visualFrame.fraction
+    onProgressChanged: if (initialized && phase === "running")
+        lastFraction = Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion).fraction
     onEnergyColorChanged: if (initialized) surface.requestPaint()
     onChassisColorChanged: if (initialized) surface.requestPaint()
     onVariantChanged: if (initialized) surface.requestPaint()
@@ -66,7 +67,8 @@ Item {
         running: root.animationActive
         onTriggered: {
             root.elapsed = Math.max(0, (Date.now()-root.startedAt)/1000);
-            if (root.phase === "running") root.lastFraction = root.visualFrame.fraction;
+            if (root.phase === "running") root.lastFraction = Motion.frame(root.phase,
+                root.progressMode, root.progress, root.elapsed, root.finishFrom, root.reducedMotion).fraction;
         }
     }
 
@@ -168,10 +170,10 @@ Item {
                 const rx=Math.min(h*(tron?.55:.78)*scale,w*.45);
                 const ry=Math.min(h*.66,h*.47*(1+(scale-1)*.18));
                 orb(rx*1.6,Math.min(h*.91,ry*1.55),[
-                    [0,tint(ink,Math.min(.8,.38+f.intensity*.35))],
+                    [0,tint(ink,Math.min(.95,.35*f.brightness))],
                     [.55,tint(ink,.22)],[1,tint(ink,0)]]);
-                orb(rx,ry,[[0,Colors.white],[.18,Colors.white],
-                    [.38,mix(ink,Colors.white,.48)],[.57,tint(ink,.84)],
+                orb(rx,ry,[[0,Colors.white],[Math.min(.34,.12*f.brightness),Colors.white],
+                    [.38,mix(ink,Colors.white,Math.min(.95,.4*f.brightness))],[.57,tint(ink,.84)],
                     [1,tint(ink,0)]]);
                 if (f.intensity>.08) {
                     const flare=c.createLinearGradient(edge-rx*1.4,mid,edge+rx*1.4,mid);

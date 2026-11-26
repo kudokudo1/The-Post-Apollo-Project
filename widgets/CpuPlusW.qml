@@ -3353,4 +3353,30 @@ PanelWindow {
             anchors.bottomMargin: 10
         }
     }
+
+    // PROCESS recipient: the extracted AppControl Kill detail, live task
+    // selection, and the existing birth-time-verified action gate. All three
+    // bays stay inside CPU++; the historical diagnostic census is not an
+    // actuator source. Deactivated on mode exit to prevent hidden refreshes.
+    Loader {
+        id: sharedKillWorkspaceLoader
+        objectName: "cpuPlusSharedKillLoader"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: modeRail.bottom
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        anchors.bottomMargin: cpuPlusWindow.chassisBottomInset
+        z: 1200
+        active: cpuPlusWindow.menuOpen
+                && cpuPlusWindow.selectedModeIndex === 1
+                && !!cpuPlusWindow.appControlWindow
+        visible: active
+        sourceComponent: CpuPlusKillWorkspace {
+            appControlWindow: cpuPlusWindow.appControlWindow
+            active: cpuPlusWindow.menuOpen
+                    && cpuPlusWindow.selectedModeIndex === 1
+        }
+    }
 }

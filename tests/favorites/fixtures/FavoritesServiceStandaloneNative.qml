@@ -20,6 +20,7 @@ ShellRoot {
     readonly property string preferredNew: "app|synthetic.desktop|desktop|Open"
 
     property bool finished: false
+    property int churnStep: 0
 
     function fail(reason) {
         if (finished)
@@ -79,7 +80,8 @@ ShellRoot {
                     return;
                 }
                 console.log("FB_PENDING // SERVICE_MUTATIONS_QUEUED");
-                settleTimer.start();
+                churnStep = 0;
+                churnTimer.start();
             } else if (root.phase === "read") {
                 // FileView reads asynchronously. Do not treat the first
                 // timer callback as proof that the backing JSON has loaded.
@@ -104,6 +106,32 @@ ShellRoot {
             root.finished = true;
             console.log("FB_PASS // STANDALONE_RESTART_READ_ONLY");
             Qt.quit();
+        }
+    }
+
+    // Real UI taps arrive in different QML turns. Unfavorite and re-favorite
+    // two keys on separate turns, exercising watchChanges and write scheduling
+    // without changing the final expected persisted membership.
+    Timer {
+        id: churnTimer
+        interval: 45
+        repeat: true
+        onTriggered: {
+            root.churnStep++;
+            if (root.churnStep === 1) {
+                service.toggleFavoriteKey(root.fileKey);
+                service.toggleTaskMetricKey(root.taskMetricKey);
+                console.log("FB_CHURN // REMOVED_IN_NEXT_EVENT");
+            } else if (root.churnStep === 2) {
+                service.toggleFavoriteKey(root.fileKey);
+                service.toggleTaskMetricKey(root.taskMetricKey);
+                console.log("FB_CHURN // RESTORED_IN_THIRD_EVENT");
+                churnTimer.stop();
+                settleTimer.start();
+            } else {
+                churnTimer.stop();
+                root.fail("CHURN_STATE_OVERFLOW");
+            }
         }
     }
 

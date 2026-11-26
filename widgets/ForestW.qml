@@ -736,6 +736,7 @@ PanelWindow {
             // Presentation key only; Forest Core must approve canonical Tree
             // scope before ever supplying protected session metadata.
             treeKey: root.activeTree.sessionKey
+            treeName: root.activeTree.name
             inventoryStatus: localInventory.status
             discoveredModels: localInventory.modelCount
             selectedModel: root.selectedLocalModel

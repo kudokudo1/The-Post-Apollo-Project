@@ -84,11 +84,11 @@ ShellRoot {
         result.treePane = trees[0];
         const headers = [];
         for (const child of result.chatRail.children) {
-            if (directTextCount(child, "CHATS // 00") === 1
-                    && directTextCount(child, "CHAT HOST OFFLINE") === 1)
+            if (directTextCount(child, forest.activeTree.name) === 1
+                    && directTextCount(child, "COLONY UNAVAILABLE") === 1)
                 headers.push(child);
         }
-        check(headers.length === 1, "missing or ambiguous actual CHATS header");
+        check(headers.length === 1, "missing or ambiguous actual Colony header");
         if (!failed) result.chatRailHeader = headers[0];
     }
     function chatRailGeometry() {
@@ -113,9 +113,54 @@ ShellRoot {
             && a.prompt.y + a.prompt.height <= a.chat.height, "rail workspace/prompt bounds");
         check(!rail.hostConnected && rail.sessions.length === 0
             && rail.visibleSessions.length === 0 && rail.treeKey === forest.activeTree.sessionKey
-            && directTextCount(a.chatRailHeader, "CHATS // 00") === 1
-            && directTextCount(a.chatRailHeader, "CHAT HOST OFFLINE") === 1,
-            "actual disconnected CHATS state");
+            && rail.treeName === forest.activeTree.name,
+            "actual disconnected chat source state");
+        unifiedRailPresentation();
+    }
+    // S4-U1: public presentation, not a Colony source or a native AT client.
+    function unifiedRailPresentation() {
+        const rail = parts.chatRail, header = parts.chatRailHeader;
+        const name = header.children.filter(x => x.text === forest.activeTree.name);
+        const status = header.children.filter(x => x.text === "COLONY UNAVAILABLE");
+        const offline = rail.children.filter(x => x.text === "CHAT HOST OFFLINE");
+        const inventory = rail.inventoryStatus === "REACHABLE"
+            ? "OLLAMA // " + rail.discoveredModels + " FOUND"
+            : rail.inventoryStatus === "CHECKING" ? "OLLAMA // SCANNING"
+            : rail.inventoryStatus === "NOT_CHECKED" ? "OLLAMA // NOT SCANNED" : "OLLAMA // OFFLINE";
+        const model = rail.selectedModel ? "MODEL // " + rail.selectedModel : "MODEL // NOT SELECTED";
+        const strips = rail.children.filter(x => directTextCount(x, inventory) === 1
+            && directTextCount(x, model) === 1);
+        check(header.height === 55 && name.length === 1 && status.length === 1
+            && offline.length === 1 && strips.length === 1 && strips[0].height === 56,
+            "unified heading/status and independent B0");
+        if (failed) return;
+        check(name[0].textFormat === Text.PlainText && name[0].elide === Text.ElideRight
+            && status[0].textFormat === Text.PlainText
+            && offline[0].textFormat === Text.PlainText
+            && directTextCount(header, "CHATS // 00") === 0,
+            "unified plain labels without false count");
+        const lists = rail.children.filter(x => typeof x.count === "number"
+            && x.contentItem !== undefined && x.model !== undefined);
+        check(lists.length === 1 && lists[0].count === 0
+            && offline[0].visible === rail.visible,
+            "unavailable chat, no fabricated member or session");
+        if (failed) return;
+        function inspect(item) {
+            if (typeof item.text === "string")
+                check(!/CHATS \/\/|NO ACTIVE CHATS|Clone [0-9]/.test(item.text),
+                    "false count, empty state or member");
+            if (!rail.visible)
+                check(!item.visible && !item.enabled && !item.activeFocus,
+                    "hidden rail descendant activation");
+            for (const child of item.children || []) inspect(child);
+        }
+        check(rail.enabled === rail.visible && !rail.activeFocusOnTab
+            && rail.Accessible.ignored === !rail.visible
+            && name[0].Accessible.ignored === !rail.visible
+            && status[0].Accessible.ignored === !rail.visible
+            && offline[0].Accessible.ignored === !rail.visible,
+            "unified rail accessibility properties");
+        inspect(rail);
     }
     function capture() {
         const names = {
@@ -773,6 +818,8 @@ ShellRoot {
         const original=forest.selectedTreeIndex;
         for (let i=0;i<forest.treeSlots.length;i++) {
             forest.selectedTreeIndex=i;
+            unifiedRailPresentation();
+            if (failed) return false;
             const row=forest.selectedTreeButton, slot=forest.treeSlots[i];
             const name=treeLabel(row,slot.name,12), role=treeLabel(row,slot.role,9);
             check(row && name && role && name.parent.height===26,"actual Tree row lookup "+i);
@@ -792,6 +839,7 @@ ShellRoot {
         }
         seasonRows=entries;
         forest.selectedTreeIndex=original;
+        unifiedRailPresentation();
         seasonGeometry();
         return !failed;
     }
@@ -935,6 +983,7 @@ ShellRoot {
                     + " " + parts.chatRail.width + " " + (parts.chatRail.visible ? 1 : 0));
                 if (!witness.collectSeasonRows()) return;
                 witness.seasonRows=[];
+                console.info("FOREST_HOST_UNIFIED_RAIL_PASS " + parts.chatRail.width);
                 console.info("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS");
                 if (witness.small) {
                     witness.check(!parts.preview.interactive, "small viewport eligible");

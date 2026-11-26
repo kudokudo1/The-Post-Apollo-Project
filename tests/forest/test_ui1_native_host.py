@@ -214,6 +214,10 @@ def trial(width, height, count):
                     rail_width != expected_rail or rail_visible != int(expected_rail > 0) or
                     rail_width != (184 if frame_width >= 800 else 148 if frame_width >= 680 else 0)):
                 raise AssertionError("FOREST_HOST_CHAT_RAIL_BASELINE_MISMATCH")
+            unified = [line.split("FOREST_HOST_UNIFIED_RAIL_PASS ", 1)[1].strip()
+                       for line in output.splitlines() if "FOREST_HOST_UNIFIED_RAIL_PASS " in line]
+            if unified != [str(expected_rail)]:
+                raise AssertionError("FOREST_HOST_UNIFIED_RAIL_MISSING_OR_MISMATCH")
             if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
                     season != ([str(i) for i in range(9)] if width >= 770 else []) or
                     output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

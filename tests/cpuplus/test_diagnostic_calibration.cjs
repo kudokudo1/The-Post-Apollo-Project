@@ -182,3 +182,32 @@ const archiveWorkflow={kind:"workflow",id:"session-abc-def-1",status:"COMPLETE",
 assert.ok(policyCtx.archiveResponse({schema:"post-apollo-diagnostic-archive-v1",rows:[archiveWorkflow],savedId:null},{action:"list"}));
 assert.equal(policyCtx.archiveResponse({schema:"post-apollo-diagnostic-archive-v1",rows:[{...archiveWorkflow,text:"x".repeat(300001)}],savedId:null},{action:"list"}),null);
 console.log("DIAG D2c combined evidence and report capacity PASS");
+
+
+// D3d: calibration selects real shell heartbeat gaps, never arbitrary commands.
+const stall={kind:"stall",durationSeconds:5,thresholdMs:350};
+assert.equal(run(stall).ok,true);
+for(const bad of [{...stall,durationSeconds:4},{...stall,thresholdMs:100},
+                  {...stall,thresholdMs:351},{...stall,thresholdMs:2050},{...stall,pid:123}])
+    assert.equal(run(bad).ok,false);
+ctx.input=JSON.stringify(stall);
+assert.deepEqual(plain(vm.runInContext('observerLaunchPlan(JSON.parse(input),p=>"/local/"+p,"/data")',ctx)).args,
+    ["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B","/local/scripts/cpuplus_stall_clock_witness.py","--duration","5"]);
+const witness={schema:"post-apollo-stall-clock-v1",durationSeconds:5,startWallMs:10000,endWallMs:15000,elapsedMs:5000};
+const ticks=Array.from({length:49},(_,i)=>10100+i*100);
+const stalled=ticks.filter(t=>t<12000||t>=12400);
+const combinedStall=policyCtx.combineStall(JSON.stringify(witness),stalled,stall);
+assert.ok(combinedStall);
+let evidenceStall=plain(policyCtx.stallEvidence(combinedStall,stall));
+assert.equal(evidenceStall.gaps.length,1);
+assert.equal(evidenceStall.maxGapMs,500);
+assert.equal(evidenceStall.coverageMs,4800);
+assert.match(policyCtx.summarize("stall",combinedStall),/GAPS \/\/ 1/);
+const cleanStall=policyCtx.combineStall(JSON.stringify(witness),ticks,stall);
+assert.equal(policyCtx.stallEvidence(cleanStall,stall).gaps.length,0);
+assert.equal(policyCtx.stallEvidence(combinedStall,{...stall,thresholdMs:400}),null);
+for(const bad of [[],[10100],[10100,10000],ticks.slice(10),ticks.slice(0,-10),Array(1501).fill(10100)])
+    assert.equal(policyCtx.combineStall(JSON.stringify(witness),bad,stall),null);
+assert.equal(policyCtx.combineStall(JSON.stringify({...witness,elapsedMs:6000}),ticks,stall),null);
+assert.equal(policyCtx.combineStall(JSON.stringify({...witness,durationSeconds:6}),ticks,stall),null);
+console.log("DIAG D3d stall calibration, threshold and coverage contracts PASS");

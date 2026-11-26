@@ -98,7 +98,7 @@ PanelWindow {
         id: syntagmaEventLoopProbe
         interval: 100
         repeat: true
-        running: shellRoot.syntagmaLagProbeEnabled || CpuPlusDiagnostics.appControlCaptureActive
+        running: shellRoot.syntagmaLagProbeEnabled || CpuPlusDiagnostics.appControlCaptureActive || CpuPlusDiagnostics.stallCaptureActive
         property double previousTickMs: 0
 
         onRunningChanged: {
@@ -110,6 +110,8 @@ PanelWindow {
             const now = Date.now();
             const elapsed = now - previousTickMs;
             previousTickMs = now;
+            if (CpuPlusDiagnostics.stallCaptureActive)
+                CpuPlusDiagnostics.recordStallTick(now);
 
             if (elapsed >= 350) {
                 if (CpuPlusDiagnostics.appControlCaptureActive)

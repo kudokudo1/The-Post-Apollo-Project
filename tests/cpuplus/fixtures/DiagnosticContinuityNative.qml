@@ -62,9 +62,15 @@ ShellRoot {
     Timer {
         interval: 100
         repeat: true
+        running: CpuPlusDiagnostics.stallCaptureActive
+        onTriggered: CpuPlusDiagnostics.recordStallTick(Date.now())
+    }
+    Timer {
+        interval: 100
+        repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 150) {
+            if (++root.ticks > 260) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -383,6 +389,21 @@ ShellRoot {
                     && root.normalFace(workshop,"cpuplusWorkshopInstrument-census",true)
                     && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",false), "normal opaque faces after actual remount")) return;
                 console.log("CPU_D3A_NATIVE_PASS");
+                if (!root.check(CpuPlusDiagnostics.requestConfigured({kind:"stall",durationSeconds:5,thresholdMs:350})
+                    && CpuPlusDiagnostics.stallCaptureActive && !CpuPlusDiagnostics.request("inventory"),
+                    "explicit stall capture owns existing single-flight")) return;
+                root.paneActive=false;
+                root.phase=22;
+                return;
+            }
+            if (root.phase===22) {
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.stall;
+                if (!root.check(report && report.status==="COMPLETE" && !CpuPlusDiagnostics.stallCaptureActive
+                    && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id)
+                    && report.summary.indexOf("THRESHOLD // 350 ms")>=0,
+                    "real clock witness plus fixture heartbeat, archive and unload // "+CpuPlusDiagnostics.feedback)) return;
+                console.log("CPU_D3D_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

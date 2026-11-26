@@ -8,6 +8,7 @@ function defaultsFor(kind) {
     case "census": return {kind:kind,durationSeconds:30,intervalMs:10000};
     case "storage": return {kind:kind,durationSeconds:30};
     case "inventory": return {kind:kind};
+    case "stall": return {kind:kind,durationSeconds:30,thresholdMs:350};
     case "appcontrol": return {kind:kind,durationSeconds:30,intervalMs:1000,topCount:4};
     default: return null;
     }
@@ -34,6 +35,13 @@ function previewCalibration(input) {
     const duration=input.durationSeconds;
     if (!integer(duration,1,120)) return refuse("DURATION OUTSIDE PREVIEW LIMIT");
     d.durationSeconds=duration;
+    if (kind==="stall") {
+        if (duration<5 || !integer(input.thresholdMs,150,2000) || input.thresholdMs%50!==0)
+            return refuse("STALL LIMIT // 5–120 SEC / 150–2000 MS");
+        d.thresholdMs=input.thresholdMs;
+        return {ok:true,config:d,intervals:duration*10,observations:duration*10,
+            scope:"launching-quickshell-event-loop",fixed:false};
+    }
     if (kind==="storage") {
         if (duration>30) return refuse("STORAGE LIMIT 30 SECONDS");
         return {ok:true,config:d,intervals:duration,observations:Math.ceil(duration/10),
@@ -92,6 +100,10 @@ function observerLaunchPlan(input, resolvePath, dataDir) {
     if (!preview.ok) return null;
     const config=preview.config;
     if (config.kind==="threads") return threadLaunchPlan(config,resolvePath);
+    if (config.kind==="stall")
+        return {config:config,args:["/usr/bin/timeout","--kill-after=3s","145s",
+            "/usr/bin/python3","-B",resolvePath("scripts/cpuplus_stall_clock_witness.py"),
+            "--duration",String(config.durationSeconds)]};
     const scripts={memory:"cpuplus_quickshell_memory_observer.py",
         census:"cpuplus_process_census.py",storage:"cpuplus_storage_observer.py"};
     if (!Object.prototype.hasOwnProperty.call(scripts,config.kind)) return null;

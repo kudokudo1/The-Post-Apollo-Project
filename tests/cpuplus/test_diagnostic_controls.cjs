@@ -297,3 +297,10 @@ assert.match(workshopSlider,/height: root.compact \? 24 : 32/);
 assert.match(workshopSlider,/width: parent.height\s+height: parent.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
 console.log("DIAG D3c adaptive full-width layout contracts PASS");
+
+assert.match(owner,/stallCaptureActive: busy && kind === "stall" && !cancelled && !exited/);
+assert.match(owner,/stallTicks.push\(timestampMs\)/);
+assert.match(read("shell.qml"),/running: shellRoot.syntagmaLagProbeEnabled \|\| CpuPlusDiagnostics.appControlCaptureActive \|\| CpuPlusDiagnostics.stallCaptureActive/);
+assert.match(read("shell.qml"),/CpuPlusDiagnostics.recordStallTick\(now\)/);
+assert.match(owner,/Policy.combineStall\(output, stallTicks, JSON.parse\(activeCalibration\)\)/);
+console.log("DIAG D3d reuse existing shell heartbeat contract PASS");

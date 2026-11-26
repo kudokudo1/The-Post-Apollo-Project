@@ -21,7 +21,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall"].indexOf(kind) >= 0;
 }
 
 function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
@@ -36,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -350,6 +350,12 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind === "stall") {
+        const d=stallEvidence(text,null);
+        return d ? "UI HEARTBEAT // "+d.coverageMs+" ms observed / "+d.durationSeconds+" s requested"
+            +"\nTHRESHOLD // "+d.thresholdMs+" ms   GAPS // "+d.gaps.length+"   MAX // "+d.maxGapMs+" ms"
+            +"\n100 ms nominal cadence; wall-clock callback intervals, not CPU attribution or proof of responsiveness." : null;
+    }
     if (kind === "workflow") {
         const evidence=workflowEvidence(text,null);
         return evidence && evidence.status==="COLLECTED" ? evidence.summary : null;
@@ -585,5 +591,56 @@ function workflowEvidence(text, expected) {
         return {status:d.status,complete:complete,summary:"WORKFLOW // "+complete+" / "+seen.length+" VERIFIED"
             +"\nDURATION // "+d.durationSeconds+" s   OVERLAP // "+(overlap===null?"N/A":overlap+" ms")
             +"\n"+summaries.join("\n")};
+    } catch (_) { return null; }
+}
+
+
+// Standalone shell heartbeat evidence. The external witness establishes an
+// independent monotonic duration; QML wall-clock samples are checked only
+// inside its wall-time window. Do not invent gaps at the capture boundaries.
+function stallEvidence(text,expected) {
+    try {
+        if (typeof text!=="string" || text.length>65536) return null;
+        const d=JSON.parse(text), integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        if (!d || d.schema!=="post-apollo-ui-stall-v1" || !integer(d.durationSeconds,5,120)
+                || !integer(d.thresholdMs,150,2000) || d.thresholdMs%50!==0
+                || d.cadenceMs!==100
+                || (expected && (expected.kind!=="stall" || expected.durationSeconds!==d.durationSeconds
+                    || expected.thresholdMs!==d.thresholdMs))) return null;
+        const w=d.witness;
+        if (!w || w.schema!=="post-apollo-stall-clock-v1" || w.durationSeconds!==d.durationSeconds
+                || !integer(w.startWallMs,1,Number.MAX_SAFE_INTEGER)
+                || !integer(w.endWallMs,w.startWallMs,Number.MAX_SAFE_INTEGER)
+                || !integer(w.elapsedMs,d.durationSeconds*1000,d.durationSeconds*1000+5000)
+                || Math.abs(w.endWallMs-w.startWallMs-w.elapsedMs)>250) return null;
+        if (!Array.isArray(d.ticks) || d.ticks.length<2 || d.ticks.length>1500
+                || d.ticks.some((t,i)=>!integer(t,w.startWallMs,w.endWallMs)
+                    || (i>0 && t<=d.ticks[i-1]))) return null;
+        const coverage=d.ticks[d.ticks.length-1]-d.ticks[0];
+        // Refuse sparse or missing endpoint coverage, rather than report zero stalls.
+        if (d.ticks[0]-w.startWallMs>500 || w.endWallMs-d.ticks[d.ticks.length-1]>500
+                || coverage<d.durationSeconds*1000-1000) return null;
+        const gaps=[];
+        let maxGapMs=0;
+        for (let i=1;i<d.ticks.length;i++) {
+            const elapsed=d.ticks[i]-d.ticks[i-1];
+            maxGapMs=Math.max(maxGapMs,elapsed);
+            if (elapsed>=d.thresholdMs) gaps.push({startMs:d.ticks[i-1],endMs:d.ticks[i],elapsedMs:elapsed});
+        }
+        return {durationSeconds:d.durationSeconds,thresholdMs:d.thresholdMs,coverageMs:coverage,
+            maxGapMs:maxGapMs,gaps:gaps};
+    } catch (_) { return null; }
+}
+
+function combineStall(witnessText,ticks,config) {
+    try {
+        if (typeof witnessText!=="string" || witnessText.length>2048 || !Array.isArray(ticks)
+                || ticks.length>1500 || !config || config.kind!=="stall"
+                || ticks.some((t,i)=>!Number.isSafeInteger(t)||t<=0||(i>0&&t<=ticks[i-1]))) return null;
+        const witness=JSON.parse(witnessText);
+        const text=JSON.stringify({schema:"post-apollo-ui-stall-v1",durationSeconds:config.durationSeconds,
+            thresholdMs:config.thresholdMs,cadenceMs:100,witness:witness,
+            ticks:ticks.filter(t=>t>=witness.startWallMs&&t<=witness.endWallMs)});
+        return stallEvidence(text,config) ? text : null;
     } catch (_) { return null; }
 }

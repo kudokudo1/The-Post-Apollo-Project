@@ -399,5 +399,499 @@ class VersionResolutionTests(unittest.TestCase):
         self.assertEqual(cache.counts(), (1, 0))
 
 
+
+# M7i-b: a separate fixed-public metadata-only witness. No real producer,
+# decoder, permission, body reader, store, cache or downstream invocation.
+WARM_MAX_SIGNALS = 32
+WARM_MAX_SIGNAL_BYTES = 4096
+WARM_MAX_FIELD = 128
+WARM_MAX_PROVENANCE = 256
+WARM_MAX_ROWS = 128
+WARM_MAX_ASSOCIATIONS = 512
+WARM_MAX_COMPARISONS = 16384
+WARM_MAX_PROJECTION_BYTES = 65536
+WARM_USER_KINDS = KINDS - {"operational-learning"}
+
+
+@dataclass(frozen=True, slots=True)
+class WarmBinding:
+    context: TaskContext
+    input_generation: int
+    input_commitment: str
+    policy_generation: int
+    revocation_generation: int
+    domain_generation: int
+    source: str
+    domain: str
+    purpose: str
+    recipient: str
+    signals: tuple
+
+
+@dataclass(frozen=True, slots=True)
+class WarmObservation:
+    binding: WarmBinding
+    current: bool
+    canonical: bool
+    enumeration_allowed: bool
+    tags_allowed: bool
+    ids_allowed: bool
+    types_allowed: bool
+    strength_allowed: bool
+    provenance_allowed: bool
+    completeness_allowed: bool
+    mode_allowed: bool
+    relevant_complete: bool
+    mandatory_known: bool
+    mandatory_match: bool
+
+
+@dataclass(frozen=True, slots=True)
+class WarmRow:
+    record_id: str
+    kind: str
+    strength: str
+    provenance: str
+    generation: int
+    tags: tuple
+
+
+@dataclass(frozen=True, slots=True)
+class WarmProjection:
+    binding: WarmBinding
+    rows: tuple
+
+
+@dataclass(frozen=True, slots=True)
+class WarmResult:
+    mode: str
+    matched: tuple = ()
+    unmatched: tuple = ()
+    mandatory: tuple = ()
+    record_ids: tuple = ()
+
+
+WARM_HOLD = WarmResult("HOLD")
+
+
+class WarmFixtureOwner:
+    """Two independent supplied observations; no callbacks or hidden scan."""
+    def __init__(self, initial, final, projection):
+        self.initial = initial
+        self.final = final
+        self.projection = projection
+        self.initial_reads = 0
+        self.final_reads = 0
+        self.projection_reads = 0
+
+    def observe_initial(self):
+        self.initial_reads += 1
+        return self.initial
+
+    def observe_final(self):
+        self.final_reads += 1
+        return self.final
+
+    def enumerate_public_projection(self):
+        self.projection_reads += 1
+        return self.projection
+
+
+def warm_text_bytes(value, limit):
+    # Fixture canonical tokens: no whitespace, controls, surrogate or bidi
+    # controls. No trimming, case folding, normalization or synonym expansion.
+    # Bound character count before scanning or encoding. Not a wire decoder.
+    if type(value) is not str or not 1 <= len(value) <= limit:
+        return None
+    if any(c.isspace() or ord(c) < 32 or 0x7f <= ord(c) <= 0x9f
+           or 0xd800 <= ord(c) <= 0xdfff or 0x202a <= ord(c) <= 0x202e
+           or 0x2066 <= ord(c) <= 0x2069 for c in value):
+        return None
+    size = len(value.encode("utf-8"))
+    return size if size <= limit else None
+
+
+def warm_generation(value, minimum=0):
+    return type(value) is int and minimum <= value <= MAX_GENERATION
+
+
+def warm_binding_bytes(binding):
+    """Logical test framing: four-byte lengths/counts, eight-byte clocks,
+    one-byte optional-clone marker; every occurrence counts. No serialization.
+    """
+    if type(binding) is not WarmBinding or type(binding.context) is not TaskContext:
+        return None
+    ctx = binding.context
+    if not warm_generation(ctx.generation, 1):
+        return None
+    if any(not warm_generation(v) for v in (
+            binding.input_generation, binding.policy_generation,
+            binding.revocation_generation, binding.domain_generation)):
+        return None
+    size = 5 * 8 + 1
+    for value in (ctx.principal_key, ctx.tree_key, ctx.task_id,
+                  ctx.execution_context_id, ctx.origin, binding.input_commitment,
+                  binding.source, binding.domain, binding.purpose, binding.recipient):
+        n = warm_text_bytes(value, WARM_MAX_PROVENANCE)
+        if n is None:
+            return None
+        size += 4 + n
+    if ctx.clone_key is not None:
+        n = warm_text_bytes(ctx.clone_key, WARM_MAX_PROVENANCE)
+        if n is None:
+            return None
+        size += 4 + n
+    if (ctx.origin not in ("INTERACTIVE", "BACKGROUND")
+            or len(binding.input_commitment) != 64
+            or any(c not in "0123456789abcdef" for c in binding.input_commitment)
+            or binding.source != SOURCE or binding.domain != "user-context"
+            or binding.purpose != "fixture-warm-route" or binding.recipient != RECIPIENT):
+        return None
+    signals = binding.signals
+    if type(signals) is not tuple or len(signals) > WARM_MAX_SIGNALS:
+        return None
+    raw = 0
+    for signal in signals:
+        n = warm_text_bytes(signal, WARM_MAX_FIELD)
+        if n is None:
+            return None
+        raw += n
+    if raw > WARM_MAX_SIGNAL_BYTES:
+        return None
+    return size + 4 + 4 * len(signals) + raw
+
+
+def warm_observation_matches(observation, binding):
+    if (type(observation) is not WarmObservation
+            or warm_binding_bytes(observation.binding) is None
+            or observation.binding != binding):
+        return False
+    # A complete visible subset or a caller claim cannot substitute for
+    # independent relevance and mandatory applicability observations.
+    return (all(flag is True for flag in (
+        observation.current, observation.canonical,
+        observation.enumeration_allowed, observation.tags_allowed,
+        observation.ids_allowed, observation.types_allowed,
+        observation.strength_allowed, observation.provenance_allowed,
+        observation.completeness_allowed, observation.mode_allowed,
+        observation.relevant_complete, observation.mandatory_known))
+        and type(observation.mandatory_match) is bool)
+
+
+def warm_match(binding, owner):
+    """Bound and select candidate references only, or return one neutral HOLD."""
+    binding_size = warm_binding_bytes(binding)
+    if binding_size is None or type(owner) is not WarmFixtureOwner:
+        return WARM_HOLD
+    initial = owner.observe_initial()
+    if not warm_observation_matches(initial, binding):
+        return WARM_HOLD
+    # Authorization and currentness precede even simulated enumeration.
+    projection = owner.enumerate_public_projection()
+    if (type(projection) is not WarmProjection
+            or warm_binding_bytes(projection.binding) is None
+            or projection.binding != binding or type(projection.rows) is not tuple
+            or len(projection.rows) > WARM_MAX_ROWS):
+        return WARM_HOLD
+    size = binding_size + 4  # projection's row count framing
+    associations = 0
+    # Validate raw inputs BEFORE deduplication or matching. Repeated bytes,
+    # rows and associations are all charged. No arbitrary iterable access.
+    for row in projection.rows:
+        if (type(row) is not WarmRow
+                or type(row.tags) is not tuple
+                or not warm_generation(row.generation)
+                or row.generation > binding.domain_generation):
+            return WARM_HOLD
+        associations += len(row.tags)
+        if (associations > WARM_MAX_ASSOCIATIONS
+                or len(binding.signals) * associations > WARM_MAX_COMPARISONS):
+            return WARM_HOLD
+        size += 8 + 4  # record generation and tag count
+        for value, limit in ((row.record_id, WARM_MAX_FIELD),
+                             (row.kind, WARM_MAX_FIELD),
+                             (row.strength, WARM_MAX_PROVENANCE),
+                             (row.provenance, WARM_MAX_PROVENANCE)):
+            n = warm_text_bytes(value, limit)
+            if n is None:
+                return WARM_HOLD
+            size += 4 + n
+        if row.kind not in WARM_USER_KINDS or row.strength not in ("soft", "hard"):
+            return WARM_HOLD
+        for tag in row.tags:
+            n = warm_text_bytes(tag, WARM_MAX_FIELD)
+            if n is None:
+                return WARM_HOLD
+            size += 4 + n
+        if size > WARM_MAX_PROJECTION_BYTES:
+            return WARM_HOLD
+    if size > WARM_MAX_PROJECTION_BYTES:
+        return WARM_HOLD
+    by_id = {}
+    for row in projection.rows:
+        if row.record_id in by_id and by_id[row.record_id] != row:
+            return WARM_HOLD
+        by_id[row.record_id] = row
+    matched, unmatched, mandatory = [], [], []
+    selected = set()
+    for signal in dict.fromkeys(binding.signals):
+        found = hard = False
+        for row in by_id.values():
+            if signal not in row.tags:
+                continue
+            found = True
+            if row.record_id not in selected:
+                if len(selected) == MAX_RECORDS:
+                    return WARM_HOLD
+                selected.add(row.record_id)
+            hard |= row.kind == "user-constraint" and row.strength == "hard"
+        (matched if found else unmatched).append(signal)
+        if hard:
+            mandatory.append(signal)
+    # Contradictory independent mandatory evidence cannot become CHECK/NONE.
+    if bool(mandatory) != initial.mandatory_match:
+        return WARM_HOLD
+    final = owner.observe_final()
+    if (not warm_observation_matches(final, binding)
+            or final.mandatory_match != initial.mandatory_match):
+        return WARM_HOLD
+    return WarmResult("must-check" if mandatory else "check" if matched else "none",
+                      tuple(matched), tuple(unmatched), tuple(mandatory),
+                      tuple(sorted(selected)))
+
+
+class WarmMatcherWitnessTests(unittest.TestCase):
+    def setUp(self):
+        self.binding = WarmBinding(CONTEXT, 4, digest("public fixture input"),
+                                   2, 1, 3, SOURCE, "user-context",
+                                   "fixture-warm-route", RECIPIENT,
+                                   ("food", "shopping", "food", "other"))
+        self.preference = WarmRow("z-pref", "user-preference", "soft",
+                                  "public-origin", 2, ("food", "shopping"))
+        self.constraint = WarmRow("a-hard", "user-constraint", "hard",
+                                  "public-origin", 3, ("shopping",))
+        self.rows = (self.preference, self.constraint)
+
+    def observation(self, binding, mandatory):
+        # Explicit independent fixture claims; never derived by the matcher.
+        return WarmObservation(binding, True, True, True, True, True, True,
+                               True, True, True, True, True, True, mandatory)
+
+    def trial(self, binding=None, rows=None, *, mandatory=False,
+              initial=None, final=None, projection=None):
+        binding = self.binding if binding is None else binding
+        rows = self.rows if rows is None else rows
+        owner = WarmFixtureOwner(
+            self.observation(binding, mandatory) if initial is None else initial,
+            self.observation(binding, mandatory) if final is None else final,
+            WarmProjection(binding, rows) if projection is None else projection)
+        return warm_match(binding, owner), owner
+
+    def held(self, *args, reads=1, **kwargs):
+        result, owner = self.trial(*args, **kwargs)
+        self.assertIs(result, WARM_HOLD)
+        self.assertEqual(owner.projection_reads, reads)
+        return owner
+
+    def test_exact_first_occurrence_union_and_mandatory(self):
+        result, owner = self.trial(rows=self.rows + (self.preference,), mandatory=True)
+        self.assertEqual(result, WarmResult("must-check", ("food", "shopping"),
+                                           ("other",), ("shopping",),
+                                           ("a-hard", "z-pref")))
+        self.assertEqual((owner.initial_reads, owner.projection_reads,
+                          owner.final_reads), (1, 1, 1))
+
+    def test_optional_strength_type_and_exact_case_unicode(self):
+        binding = replace(self.binding, signals=("Food", "food", "café", "cafe\u0301"))
+        rows = (replace(self.preference, strength="hard", tags=("food", "café")),
+                replace(self.constraint, strength="soft", tags=("food",)))
+        result, _ = self.trial(binding, rows)
+        self.assertEqual(result, WarmResult("check", ("food", "café"),
+                                           ("Food", "cafe\u0301"), (),
+                                           ("a-hard", "z-pref")))
+
+    def test_complete_empty_and_no_match_require_final(self):
+        for binding, rows in ((replace(self.binding, signals=()), self.rows),
+                              (self.binding, ()),
+                              (replace(self.binding, signals=("unmatched",)), self.rows)):
+            with self.subTest(signals=binding.signals):
+                result, owner = self.trial(binding, rows)
+                self.assertEqual(result, WarmResult("none", unmatched=tuple(
+                    dict.fromkeys(binding.signals))))
+                self.assertEqual(owner.final_reads, 1)
+                stale = replace(self.observation(binding, False), current=False)
+                self.assertEqual(self.held(binding, rows, final=stale).final_reads, 1)
+
+    def test_initial_denial_before_enumeration_and_neutral_hold(self):
+        for field in ("current", "canonical", "enumeration_allowed", "tags_allowed",
+                      "ids_allowed", "types_allowed", "strength_allowed",
+                      "provenance_allowed", "completeness_allowed", "mode_allowed",
+                      "relevant_complete", "mandatory_known"):
+            for value in (False, None, 1):
+                with self.subTest(field=field, value=value):
+                    initial = replace(self.observation(self.binding, True), **{field: value})
+                    for rows in (self.rows, (), (self.constraint,)):
+                        owner = self.held(rows=rows, initial=initial, reads=0)
+                        self.assertEqual((owner.initial_reads, owner.final_reads), (1, 0))
+        self.held(initial=replace(self.observation(self.binding, True),
+                                  mandatory_match=None), reads=0)
+
+    def test_independent_final_denial_or_unknown_discards_entire_route(self):
+        for field in ("current", "canonical", "enumeration_allowed", "tags_allowed",
+                      "ids_allowed", "types_allowed", "strength_allowed",
+                      "provenance_allowed", "completeness_allowed", "mode_allowed",
+                      "relevant_complete", "mandatory_known", "mandatory_match"):
+            for value in (False, None, 1):
+                with self.subTest(field=field, value=value):
+                    final = replace(self.observation(self.binding, True), **{field: value})
+                    self.assertEqual(self.held(mandatory=True, final=final).final_reads, 1)
+        self.held(mandatory=True, final=object())
+
+    def test_independent_binding_changes_at_each_boundary(self):
+        b = self.binding
+        changes = [replace(b, **{field: value}) for field, value in (
+            ("input_generation", 5), ("input_commitment", digest("different")),
+            ("domain_generation", 4), ("policy_generation", 3),
+            ("revocation_generation", 2), ("recipient", "other"),
+            ("purpose", "other"), ("source", "other"), ("domain", "other"),
+            ("signals", ("shopping",)))]
+        changes += [replace(b, context=replace(b.context, **{field: value}))
+                    for field, value in (("principal_key", "other"), ("tree_key", "maple"),
+                    ("clone_key", "clone-a"), ("task_id", "task-b"),
+                    ("execution_context_id", "ctx-b"), ("generation", 2),
+                    ("origin", "BACKGROUND"))]
+        for changed in changes:
+            with self.subTest(binding=changed):
+                obs = self.observation(changed, True)
+                self.held(initial=obs, reads=0)
+                self.assertEqual(self.held(mandatory=True, final=obs).final_reads, 1)
+                self.held(projection=WarmProjection(changed, self.rows))
+
+    def test_mandatory_coverage_contradiction_and_no_hidden_fallback(self):
+        self.held(mandatory=False)  # visible hard contradicts independent absence
+        self.held(rows=(self.preference,), mandatory=True)
+        self.held(rows=(), mandatory=True)
+        empty = replace(self.binding, signals=())
+        self.held(empty, (), mandatory=True)
+        self.held(empty, (), initial=replace(self.observation(empty, False),
+                                            mandatory_known=False), reads=0)
+
+    def test_raw_signal_limits_and_noncanonical_input(self):
+        binding = replace(self.binding, signals=("s" * 128,) * 32)
+        result, _ = self.trial(binding, ())
+        self.assertEqual(result.mode, "none")
+        for signals in (binding.signals + ("s",), ("s" * 129,),
+                        ("é" * 65,), ("",), (" food",), ("food ",),
+                        ("raw prompt",), ("\ud800",), ("a\u0000",),
+                        ("a\u202e",), ["food"], "food", iter(("food",)), (1,)):
+            self.held(replace(binding, signals=signals), (), reads=0)
+        self.assertEqual(self.trial(replace(binding, signals=("é" * 64,)), ())[0].mode,
+                         "none")
+
+    def test_row_association_comparison_caps_and_duplicate_flood(self):
+        binding = replace(self.binding, signals=("food",) * 32)
+        row = replace(self.preference, tags=("food",) * 4)
+        rows = (row,) * 128  # 512 raw associations; 16384 raw comparison ceiling
+        self.assertEqual(self.trial(binding, rows)[0].record_ids, ("z-pref",))
+        self.held(binding, rows + (row,))
+        self.held(binding, rows[:-1] + (replace(row, tags=row.tags + ("food",)),))
+        self.held(binding, (replace(row, tags=("food",) * 513),))
+        self.held(binding, list(rows))
+        self.held(binding, iter(rows))
+        self.held(binding, (replace(row, tags=list(row.tags)),))
+
+    def test_union_selected_limit_before_publication(self):
+        rows = tuple(replace(self.preference, record_id="id-%02d" % i,
+                             tags=("food",) if i % 2 else ("food", "shopping"))
+                     for i in range(33))
+        result, _ = self.trial(rows=rows[:32])
+        self.assertEqual(result.record_ids, tuple(r.record_id for r in rows[:32]))
+        self.held(rows=rows)
+        # A different signal must not get its own separate allowance.
+        self.held(rows=rows[:32] + (replace(rows[32], tags=("shopping",)),))
+
+    def test_field_bytes_conflicts_and_malformed_projection(self):
+        row = replace(self.preference, record_id="é" * 64,
+                      provenance="é" * 128, tags=("é" * 64,))
+        binding = replace(self.binding, signals=row.tags)
+        self.assertEqual(self.trial(binding, (row,))[0].record_ids, (row.record_id,))
+        for change in ({"record_id": "é" * 65}, {"provenance": "é" * 129},
+                       {"tags": ("é" * 65,)}, {"kind": "x" * 129},
+                       {"kind": "operational-learning"}, {"strength": "unknown"},
+                       {"generation": True}, {"generation": 4},
+                       {"record_id": "\ud800"}, {"tags": (" food",)}):
+            self.held(binding, (replace(row, **change),))
+        for field, value in (("strength", "hard"), ("provenance", "other"),
+                             ("kind", "user-correction"), ("generation", 1),
+                             ("tags", ("other",))):
+            self.held(rows=(self.preference, replace(self.preference, **{field: value})))
+        self.held(projection=object())
+        self.held(rows=(object(),))
+
+    def test_projection_aggregate_includes_framing_and_repeated_bytes(self):
+        binding = replace(self.binding, signals=())
+        # Independent arithmetic for the declared logical framing, not an
+        # encoded object or real memory footprint. Construct exactly 65536.
+        ctx = binding.context
+        header = 5 * 8 + 1 + 4 + 4 + sum(4 + len(s.encode("utf-8")) for s in (
+            ctx.principal_key, ctx.tree_key, ctx.task_id, ctx.execution_context_id,
+            ctx.origin, binding.input_commitment, binding.source, binding.domain,
+            binding.purpose, binding.recipient))
+        row = WarmRow("id", "user-preference", "soft", "p", 1, ("t" * 128,) * 3)
+        row_base = 8 + 4 + sum(4 + len(s.encode("utf-8")) for s in (
+            row.record_id, row.kind, row.strength, *row.tags)) + 4
+        remaining = WARM_MAX_PROJECTION_BYTES - header - 128 * row_base
+        self.assertTrue(128 <= remaining < 128 * WARM_MAX_PROVENANCE)
+        quotient, extra = divmod(remaining, 128)
+        rows = tuple(replace(row, record_id="id", provenance="p" * quotient)
+                     for _ in range(128))
+        # Same ID with differing provenance is a conflict. Use unique
+        # fixed-width IDs and adjust the independently calculated budget.
+        remaining -= 2 * 128
+        quotient, extra = divmod(remaining, 128)
+        rows = tuple(replace(row, record_id="%04d" % i,
+                             provenance="p" * (quotient + (i < extra)))
+                     for i in range(128))
+        self.assertEqual(self.trial(binding, rows)[0], WarmResult("none"))
+        self.held(binding, rows[:-1] + (replace(rows[-1],
+                                               provenance=rows[-1].provenance + "p"),))
+        # Repeated identical metadata remains chargeable before dedup.
+        self.held(binding, (replace(row, provenance="p" * 256),) * 128)
+
+    def test_generation_bounds_and_bool_not_integer(self):
+        fields = ("input_generation", "policy_generation", "revocation_generation",
+                  "domain_generation")
+        for field in fields:
+            for value in (MAX_GENERATION + 1, -1, True, 1.0):
+                self.held(replace(self.binding, **{field: value}), (), reads=0)
+            for value in (0, MAX_GENERATION):
+                self.assertEqual(self.trial(replace(self.binding, **{field: value}), ())[0].mode,
+                                 "none")
+        b = replace(self.binding, domain_generation=MAX_GENERATION)
+        self.assertEqual(self.trial(b, (replace(self.preference,
+                                              generation=MAX_GENERATION),))[0].mode, "check")
+        self.held(b, (replace(self.preference, generation=MAX_GENERATION + 1),))
+
+    def test_warm_success_does_not_invoke_or_authorize_downstream(self):
+        from unittest.mock import patch
+        with patch(__name__ + ".resolve") as resolver, \
+                patch(__name__ + ".assemble_hot_context") as assembler, \
+                patch.object(FixtureOwner, "body") as body:
+            self.assertEqual(self.trial(mandatory=True)[0].mode, "must-check")
+            resolver.assert_not_called()
+            assembler.assert_not_called()
+            body.assert_not_called()
+        route = HotRouteStamp(CONTEXT, 4, 2, 3, 2, ("preference",), ())
+        plan = Selection(route, SOURCE, PURPOSE, RECIPIENT, (CATALOG[1],))
+        owner = FixtureOwner(Observation(plan, True, ()))
+        with self.assertRaisesRegex(ContextRefusal, "USE_NOT_ELIGIBLE"):
+            resolve(plan, owner)
+        self.assertEqual(owner.body_reads, [])
+        empty = replace(plan, route=replace(route, user_record_ids=()), versions=())
+        owner = FixtureOwner(Observation(plan, True, ()))
+        with self.assertRaisesRegex(ContextRefusal, "CURRENTNESS_CHANGED"):
+            resolve(empty, owner)
+        self.assertEqual(owner.body_reads, [])
+
 if __name__ == "__main__":
     unittest.main()

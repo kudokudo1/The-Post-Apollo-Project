@@ -1362,7 +1362,8 @@ PanelWindow {
             if (entry)
                 relockTaskDangerAction(
                     entry,
-                    cancelKind.indexOf("freeze") !== -1 ? "freeze" : "kill"
+                    cancelKind.indexOf("freeze") !== -1 ? "freeze"
+                    : cancelKind.indexOf("restart") !== -1 ? "restart" : "kill"
                 );
         }
 

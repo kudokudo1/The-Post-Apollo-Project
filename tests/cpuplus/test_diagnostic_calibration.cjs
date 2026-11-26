@@ -211,3 +211,30 @@ for(const bad of [[],[10100],[10100,10000],ticks.slice(10),ticks.slice(0,-10),Ar
 assert.equal(policyCtx.combineStall(JSON.stringify({...witness,elapsedMs:6000}),ticks,stall),null);
 assert.equal(policyCtx.combineStall(JSON.stringify({...witness,durationSeconds:6}),ticks,stall),null);
 console.log("DIAG D3d stall calibration, threshold and coverage contracts PASS");
+
+
+const withStall={durationSeconds:5,instruments:[...pairedPlan.instruments,{kind:"stall",thresholdMs:350}]};
+assert.equal(workflowPreview(withStall).ok,true);
+assert.equal(workflowPreview({...withStall,instruments:[...withStall.instruments,{kind:"stall",thresholdMs:350}]}).ok,false);
+const allFive={durationSeconds:10,instruments:[{kind:"threads",intervalMs:1000,topCount:2},
+    {kind:"memory",intervalMs:5000},{kind:"census",intervalMs:5000},{kind:"storage"},{kind:"stall",thresholdMs:350}]};
+assert.equal(workflowPreview(allFive).maximumCombinedPayloadBytes,4*65536+24000);
+const workflowWitness={...witness,startedMonotonicMs:1000,monotonicMs:6000};
+const transportStall=plain(combined);
+transportStall.instruments.push(collected(stall,[workflowWitness],1000,6000));
+const attached=policyCtx.attachWorkflowStall(JSON.stringify(transportStall),withStall,stalled,false);
+assert.ok(attached);
+assert.equal(validateWorkflow(JSON.parse(attached),withStall).complete,3);
+assert.equal(JSON.parse(attached).overlapMs,4300);
+assert.match(policyCtx.summarize("workflow",attached),/STALL \/\/ 1 GAPS/);
+assert.equal(validateWorkflow(transportStall,withStall),null);
+const missing=policyCtx.attachWorkflowStall(JSON.stringify(transportStall),withStall,[],false);
+assert.equal(validateWorkflow(JSON.parse(missing),withStall).complete,2);
+assert.equal(JSON.parse(missing).status,"NOT VERIFIED");
+assert.equal(policyCtx.summarize("workflow",missing),null);
+assert.equal(JSON.parse(policyCtx.attachWorkflowStall(JSON.stringify(transportStall),withStall,stalled,true)).status,"NOT VERIFIED");
+assert.equal(policyCtx.attachWorkflowStall(JSON.stringify({...transportStall,overlapMs:999}),withStall,stalled,false),null);
+assert.equal(validateWorkflow(JSON.parse(attached),{...withStall,instruments:[...pairedPlan.instruments,{kind:"stall",thresholdMs:400}]}),null);
+const damaged=JSON.parse(attached);damaged.instruments[2].records[0].ticks=[];
+assert.equal(validateWorkflow(damaged,withStall),null);
+console.log("DIAG D3e coordinated stall coverage and five-instrument calibration PASS");

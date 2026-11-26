@@ -365,8 +365,16 @@ ShellRoot {
                     && Number.isInteger(a.revision) && a.revision > 0
                     && Number.isInteger(b.revision) && a.revision === b.revision;
             }
+            function pin(ref) {
+                // Copy the literal identity fields. Caller mutation cannot
+                // replace the independently pinned fixture incarnation.
+                if (!same(ref,ref)) return null;
+                return {principal:ref.principal, tree:ref.tree, member:ref.member,
+                    task:ref.task, recipient:ref.recipient, view:ref.view,
+                    generation:ref.generation, revision:ref.revision};
+            }
             function enter(ref) {
-                original = ref; // Literal fixture pin, not protected query.
+                original = pin(ref); // Test-local copy, not authority.
                 suppliedOutcome = "UNAVAILABLE";
                 selection = null;
                 localReviewVisible = false;
@@ -390,8 +398,8 @@ ShellRoot {
             function choose(ref) {
                 if (!same(ref,original) || suppliedOutcome !== "AUTHORIZED_ROWS")
                     return false;
-                selection = ref;
-                return true;
+                selection = pin(ref);
+                return selection !== null;
             }
             function showLocalReview(ref) {
                 // A fixture illustration, NOT R1/R2 or Cleaning authorization.
@@ -402,6 +410,9 @@ ShellRoot {
             }
             function withdraw(ref) {
                 if (!same(ref,original)) return false;
+                // Unlike temporary UNAVAILABLE/PARTIAL, explicit withdrawal
+                // ends this exact view. A delayed reply cannot resurrect it.
+                original = null;
                 suppliedOutcome = "UNAVAILABLE";
                 selection = null;
                 localReviewVisible = false;
@@ -501,8 +512,35 @@ ShellRoot {
         check(item.receive(replacement,"AUTHORIZED_ROWS") && item.choose(replacement)
             && item.showLocalReview(replacement) && item.withdraw(replacement)
             && !item.localReviewVisible && item.selection===null
-            && status.text==="COLONY UNAVAILABLE",
-            "S3 current withdrawal affects only original fixture");
+            && item.original===null && status.text==="COLONY UNAVAILABLE",
+            "S3 current withdrawal retires original fixture");
+        check(!item.receive(replacement,"AUTHORIZED_ROWS")
+            && !item.choose(replacement) && !item.showLocalReview(replacement)
+            && !item.withdraw(replacement) && item.original===null
+            && item.publicStatus==="COLONY UNAVAILABLE",
+            "S3 withdrawn same-original reply cannot resurrect selection or review");
+        const fresh=s3Scope("fresh-view",3);
+        item.enter(fresh);
+        check(item.receive(fresh,"AUTHORIZED_ROWS") && item.choose(fresh)
+            && item.showLocalReview(fresh) && !item.receive(replacement,"AUTHORIZED_ROWS")
+            && !item.withdraw(replacement) && item.localReviewVisible
+            && item.publicStatus==="PUBLIC MEMBER",
+            "S3 separately pinned fresh view survives stale original replies");
+        const mutable=s3Scope("mutable-view",4);
+        item.enter(mutable);
+        mutable.view="changed-by-caller";
+        check(item.original.view==="mutable-view"
+            && !item.receive(mutable,"AUTHORIZED_ROWS")
+            && item.publicStatus==="COLONY UNAVAILABLE",
+            "S3 copied original pin ignores external alias mutation");
+        const copied=s3Scope("mutable-view",4);
+        check(item.receive(copied,"AUTHORIZED_ROWS") && item.choose(copied),
+            "S3 matching original fixture accepted after copy");
+        copied.task="changed-by-caller";
+        check(item.selection.task==="PUBLIC TASK"
+            && !item.showLocalReview(copied)
+            && item.showLocalReview(s3Scope("mutable-view",4)),
+            "S3 selection pin resists externally changed task");
         check(item.chatMode==="CHATS" && item.chatDraft==="PUBLIC DRAFT"
             && item.chatHistory==="PUBLIC HISTORY" && season.season==="UNKNOWN"
             && !season.syntheticOwner && !item.permissionGranted,

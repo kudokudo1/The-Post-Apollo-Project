@@ -237,3 +237,15 @@ assert "pullsCacheMaxAgeMs: 30000" in SOURCE
 assert "pullsFirstPageMs = Math.max" in SOURCE
 assert "pullsFullLoadMs = Math.max" in SOURCE
 print("GitHub PULLS lightweight progressive pages, large payload and error propagation: PASS")
+
+# Remote-view prewarm is bounded, visibility-gated and cannot displace details.
+widget = (ROOT / "widgets/GitW.qml").read_text(encoding="utf-8")
+prewarm = widget.split("id: pullsPrewarmTimer", 1)[1].split("function showGithubPage()", 1)[0]
+assert "repeat: false" in prewarm
+assert "!root.menuOpen" in prewarm and 'root.activePage !== "github"' in prewarm
+assert "root.pullRequestControlOpen" in prewarm
+assert "repository !== gitService.repoRemoteSlug" in prewarm
+assert "githubWorkItemsService.pullsBusy" in prewarm
+assert "githubWorkItemsService.ensurePulls(repository)" in prewarm
+assert "pullsPrewarmTimer.stop();" in widget.split("function showGithubPulls()", 1)[1].split("function openPullRequestControl", 1)[0]
+print("GitW bounded remote-view PULLS prewarm contracts: PASS")

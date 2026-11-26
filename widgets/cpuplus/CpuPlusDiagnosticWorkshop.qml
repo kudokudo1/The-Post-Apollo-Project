@@ -402,6 +402,8 @@ Column {
                     }
                 }
                 Row {
+                    id: storageDialPair
+                    readonly property Item workshopOwner: root
                     objectName: "cpuplusWorkshopStorageDialPair"
                     visible: root.storageMechanical
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -414,7 +416,7 @@ Column {
                         Item {
                             id: storageDialCell
                             required property var modelData
-                            readonly property Item workshopOwner: root
+                            readonly property Item workshopOwner: storageDialPair.workshopOwner
                             readonly property string field: modelData.key
                             readonly property color selectorColor: field==="sample" ? Colors.orange : Colors.magenta
                             width: 136*root.storageDialScale
@@ -423,14 +425,14 @@ Column {
                                 id: storageDial
                                 objectName: "cpuplusWorkshopStorage-"+storageDialCell.modelData.key+"-dial"
                                 anchors.centerIn: parent
-                                scale: storageDialCell.workshopOwner.storageDialScale
+                                scale: storageDialCell.workshopOwner ? storageDialCell.workshopOwner.storageDialScale : 0
                                 readonly property string field: storageDialCell.field
                                 readonly property var countdown: storageDialCell.workshopOwner ? storageDialCell.workshopOwner.countdown(field) : null
                                 labelText: storageDialCell.modelData.label
                                 selectorMode: "continuous"
                                 minimumValue: 0
                                 maximumValue: storageDialCell.modelData.max
-                                currentValue: storageDialCell.workshopOwner.storageRunning ? (countdown ? countdown.remainingMs/1000 : 0)
+                                currentValue: !storageDialCell.workshopOwner ? 0 : storageDialCell.workshopOwner.storageRunning ? (countdown ? countdown.remainingMs/1000 : 0)
                                     : field==="sample" ? storageDialCell.workshopOwner.storageSample : storageDialCell.workshopOwner.storageReport
                                 options: storageDialCell.modelData.marks.map(n=>String(n))
                                 displayOptions: options
@@ -451,11 +453,11 @@ Column {
                                 activeDetentColor: storageDialCell.selectorColor
                                 readoutGlowEnabled: true
                                 readoutColor: countdown && countdown.flash ? Colors.white : storageDialCell.selectorColor
-                                readoutText: storageDialCell.workshopOwner.storageRunning ? (countdown ? (countdown.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
-                                readoutUnit: storageDialCell.workshopOwner.storageRunning && !countdown ? "" : "SEC"
+                                readoutText: storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageRunning ? (countdown ? (countdown.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
+                                readoutUnit: storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageRunning && !countdown ? "" : "SEC"
                                 outlinedOptionLabels: true
-                                interactive: storageDialCell.workshopOwner.storageMechanical && !storageDialCell.workshopOwner.locked && storageDialCell.workshopOwner.draft.durationSeconds<=30
-                                onValueRequested: value=>storageDialCell.workshopOwner.chooseStorageCadence(field,value)
+                                interactive: !!storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageMechanical && !storageDialCell.workshopOwner.locked && storageDialCell.workshopOwner.draft.durationSeconds<=30
+                                onValueRequested: value=>{if (storageDialCell.workshopOwner) storageDialCell.workshopOwner.chooseStorageCadence(field,value)}
                             }
                         }
                     }

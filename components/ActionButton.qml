@@ -62,6 +62,12 @@ Rectangle {
     property color accentColor: Colors.cyan
     property color destructiveColor: Colors.red
 
+    // Normal-face selectors opt into the historical Angels/U9g no-wash rule.
+    // Filled actions retain the original state palette and effects.
+    property bool normalFace: false
+    property bool perimeterGlowEnabled: normalFace
+    property real perimeterGlowOpacity: 0.38
+
     property color idleFillColor: Colors.black
     property color hoverFillColor: Colors.yellow
     // Stationary secondary hover shows orange artwork/border/glow on black,
@@ -69,12 +75,12 @@ Rectangle {
     property color secondaryHoverFillColor: idleFillColor
     property color pressedFillColor:
         destructive ? destructiveColor : Colors.magenta
-    property color selectedFillColor: Colors.yellow
+    property color selectedFillColor: normalFace ? Colors.black : Colors.yellow
     property color keyboardSelectedFillColor: selectedFillColor
 
     property color idleForegroundColor: accentColor
     property color hoverForegroundColor: Colors.orange
-    property color pressedForegroundColor: Colors.black
+    property color pressedForegroundColor: normalFace ? Colors.magenta : Colors.black
     property color selectedForegroundColor: Colors.magenta
     property color keyboardSelectedForegroundColor: hoverForegroundColor
 
@@ -139,7 +145,7 @@ Rectangle {
 
     property real contentGlowIdleOpacity: 0.34
     property real contentGlowHoverOpacity: 0.72
-    property real contentGlowPressedOpacity: 0.0
+    property real contentGlowPressedOpacity: normalFace ? 0.60 : 0.0
     property real contentGlowSelectedOpacity: 0.72
     property real contentGlowKeyboardSelectedOpacity: 0.72
 
@@ -147,7 +153,7 @@ Rectangle {
     property int contentGlowSamples: 7
 
     // Primary action halo. AppControl commonly uses one rectangular halo.
-    property bool softGlowEnabled: true
+    property bool softGlowEnabled: !normalFace
     property real softGlowSpread: 3
     property real softGlowMargin: 0
 
@@ -197,6 +203,7 @@ Rectangle {
         selected || keyboardSelected
 
     readonly property color fillColor:
+        normalFace ? Colors.black :
         pressed
         ? pressedFillColor
         : cursorPrimaryNotActivated
@@ -332,7 +339,7 @@ Rectangle {
         : unavailableOpacity
 
     color:
-        actionButton.withOpacity(
+        normalFace ? Colors.black : actionButton.withOpacity(
             fillColor,
             available ? 1.0 : unavailableFillOpacity
         )
@@ -511,6 +518,29 @@ Rectangle {
         z: 20
     }
 
+    // Only the perimeter is sampled, and the result is behind the opaque
+    // parent face. No full-rectangle color source, no imperative state writes.
+    Rectangle {
+        id: normalPerimeter
+        objectName: "actionButtonNormalPerimeter"
+        anchors.fill: parent
+        z: -1
+        color: "transparent"
+        border.width: 1
+        border.color: actionButton.activeBorderColor
+        visible: actionButton.normalFace && actionButton.perimeterGlowEnabled
+            && actionButton.perimeterGlowOpacity > 0 && actionButton.available
+        layer.enabled: visible
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: actionButton.contentGlowColor
+            shadowOpacity: actionButton.perimeterGlowOpacity
+            shadowBlur: 0.5
+            shadowHorizontalOffset: 0
+            shadowVerticalOffset: 0
+        }
+    }
+
     RectangularShadow {
         anchors.fill: parent
         anchors.margins: -actionButton.softGlowMargin
@@ -519,7 +549,7 @@ Rectangle {
         z: -1
 
         visible:
-            actionButton.softGlowEnabled
+            !actionButton.normalFace && actionButton.softGlowEnabled
             && actionButton.effectiveSoftGlowOpacity > 0.0
 
         opacity: actionButton.effectiveSoftGlowOpacity
@@ -533,7 +563,7 @@ Rectangle {
         z: -2
 
         visible:
-            actionButton.wideGlowEnabled
+            !actionButton.normalFace && actionButton.wideGlowEnabled
             && actionButton.effectiveWideGlowOpacity > 0.0
 
         opacity: actionButton.effectiveWideGlowOpacity

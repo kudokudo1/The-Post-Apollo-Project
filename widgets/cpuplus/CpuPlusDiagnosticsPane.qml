@@ -556,6 +556,8 @@ Column {
                         {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
                         {key:"COMPARE",label:"CMP"}]
                 ActionButton {
+                    id: diagnosticViewFilter
+                    objectName: "cpuplusDiagnosticView-"+modelData.key
                     required property var modelData
                     width: Math.max(0,Math.floor((diagnosticIndex.width-12)/5))
                     height: 25
@@ -568,7 +570,20 @@ Column {
                     selectedFillColor: Colors.black
                     selectedBorderColor: Colors.magenta
                     selectedForegroundColor: Colors.magenta
-                    outlineOnlyGlow: true
+                    // U9g / Angels: deterministic opaque face, no filled shadow layers.
+                    color: Colors.black
+                    softGlowEnabled: false
+                    wideGlowEnabled: false
+                    contentGlowEnabled: true
+                    pressedForegroundColor: Colors.magenta
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "transparent"
+                        border.width: 1
+                        border.color: diagnosticViewFilter.activeBorderColor
+                        opacity: 0.48
+                        visible: diagnosticViewFilter.selected || diagnosticViewFilter.hovered || diagnosticViewFilter.pressed
+                    }
                     acceptedButtons: Qt.LeftButton
                     onLeftClicked: root.selectView(modelData.key)
                 }

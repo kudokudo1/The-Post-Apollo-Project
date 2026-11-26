@@ -334,7 +334,7 @@ console.log("DIAG D4b ordered set session contracts PASS");
 for(const color of ["cyan","magenta","orange"])assert.ok(workshop.includes("subjectColor: Colors."+color));
 assert.match(workshopSlider,/handleColor: root.subjectColor/);
 assert.match(workshopSlider,/font.pixelSize: 12/);
-assert.match(workshopSlider,/semanticGlowColor: root.subjectColor/);
+assert.match(workshopSlider,/semanticGlowColor: root.fillColor/);
 assert.match(workshop,/idleRingGlowStrength: 0.65/);
 assert.match(workshop,/titleColor: accentColor/);
 assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopTopThreads"')<workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"'));
@@ -347,3 +347,8 @@ assert.match(workshop,/activeDetentColor: Colors.magenta/);
 assert.match(workshop,/outlinedOptionLabels: true/);
 assert.match(workshop,/accentColor: Colors.yellow\s+markerColor: Colors.magenta/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorageContents"/);
+
+assert.match(workshopSlider,/frameGlowColor: root.fillColor/);
+assert.match(workshopSlider,/handleGlowColor: root.fillColor/);
+assert.match(workshopSlider,/activityGlowColor: root.fillColor/);
+assert.match(read("components/SelectorSlider.qml"),/property color frameGlowColor: frameColor/);

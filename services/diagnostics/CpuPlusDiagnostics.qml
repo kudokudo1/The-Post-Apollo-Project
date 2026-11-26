@@ -105,6 +105,16 @@ Scope {
 
     // Detached serialization freezes the submitted calibration for completion validation.
     property string activeCalibration: ""
+    property var storageProgress: null
+    property bool storageProgressFault: false
+    property double storageRequestWallMs: 0
+    property var activeStorageConfig: null
+    function acceptStorageProgress(line) {
+        if (!busy || cancelled || !activeStorageConfig || storageProgressFault || !line.startsWith("STORAGE_PROGRESS ")) return;
+        const p=Policy.storageLiveProgress(line,activeStorageConfig,storageProgress,storageRequestWallMs,Date.now());
+        if (!p) { storageProgressFault=true; storageProgress=null; return; }
+        storageProgress=p;
+    }
 
     // Session-owned draft, not authorization. No persistence or auto-start.
     property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
@@ -284,6 +294,11 @@ Scope {
         const args = plan ? plan.args : Policy.argumentsFor(job, path => Quickshell.shellPath(path), Quickshell.dataDir);
         if (!args) return false;
         activeCalibration = plan ? JSON.stringify(job === "workflow" ? plan.plan : plan.config) : "";
+        storageProgress=null;
+        storageProgressFault=false;
+        storageRequestWallMs=Date.now();
+        activeStorageConfig=plan && job==="storage" ? plan.config : plan && job==="workflow"
+            ? (()=>{const c=plan.plan.instruments.find(x=>x.kind==="storage");return c?Object.assign({},c,{durationSeconds:plan.plan.durationSeconds}):null;})() : null;
         kind = job;
         captureSequence += 1;
         captureId = sessionTag + "-" + captureSequence;
@@ -344,6 +359,7 @@ Scope {
         feedback = status + " // " + kind.toUpperCase();
         output = "";
         activeCalibration = "";
+        activeStorageConfig=null;
         busy = false;
         captureFinished(kind, captureId);
         if(setActive&&!archiveBusy)Qt.callLater(dispatchSetStep);
@@ -399,6 +415,9 @@ Scope {
 
     Process {
         id: worker
+        stderr: SplitParser {
+            onRead: data => owner.acceptStorageProgress(data)
+        }
         stdout: StdioCollector {
             onStreamFinished: {
                 if (!owner.busy) return;

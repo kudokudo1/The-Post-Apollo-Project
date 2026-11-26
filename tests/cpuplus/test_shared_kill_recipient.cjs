@@ -326,3 +326,24 @@ test("KILL startup: RectangularShadow has its required QtQuick.Effects import", 
     assert.match(recipient, /^import QtQuick\.Effects$/m);
     assert.match(recipient, /RectangularShadow\s*\{/);
 });
+
+test("P4i: same animated writing cursor, donor search geometry and star list rail", () => {
+    const app=read("widgets/AppControlW.qml");
+    const cursor=read("components/AnimatedTextCursor.qml");
+    assert.match(app,/AnimatedTextCursor\s*\{\s*id: searchCursorOverlay\s*input: searchInput/);
+    assert.match(recipient,/AnimatedTextCursor\s*\{[\s\S]*?input: processSearch/);
+    assert.match(cursor,/cursor.input.x \+ cursor.input.cursorRectangle.x - 1/);
+    for (const interval of [500,420,360]) assert.match(cursor,new RegExp("interval: "+interval));
+    assert.match(cursor,/text: "✍︎"/);
+    assert.match(cursor,/onTextChanged\(\)/);
+    assert.match(recipient,/id: searchHeader[\s\S]*?height: 70[\s\S]*?font.pixelSize: 19[\s\S]*?id: processSearch[\s\S]*?font.pixelSize: 18/);
+    assert.match(recipient,/id: processSearch[\s\S]*?cursorDelegate: Item \{ width: 0; height: 0; visible: false/);
+    assert.match(recipient,/objectName: "cpuPlusKillTargetScroll"[\s\S]*?handleStyle: "star"[\s\S]*?y: searchHeader.height \+ hunterControls.topSelectorHeight[\s\S]*?height: Math.max\(0, targetBay.height - y - hunterControls.bottomSelectorHeight\)/);
+    assert.match(recipient,/readonly property int displayedTargetCount: filteredRows.length/);
+    assert.doesNotMatch(recipient,/String\(workspace.filteredRows.length\)\+" TARGETS"/);
+    assert.match(host,/selectedModeIndex === 1\s*\? "KILL \/\/ ".*displayedTargetCount/);
+    assert.match(host,/cpuHeaderColor: selectedModeIndex === 1 \? Colors.red/);
+    assert.match(donorView,/id: taskEndAction[\s\S]*?idleForegroundColor: taskManagerBody.headerActions \? Colors.red/);
+    assert.equal((donorView.match(/contentGlowIdleOpacity: taskManagerBody.headerActions \? 0\.82 : 0/g)||[]).length,3);
+    assert.match(recipient,/layer.effect: DropShadow \{ radius: 6; samples: 7; opacity: 0.60; color: lockRiskText.color/);
+});

@@ -44,7 +44,7 @@ QtObject {
     }
 
     function operationLabel() {
-        return kind === "kill-mice" ? "MICE" : "HOGS";
+        return kind === "kill-all" ? "ALL" : kind === "kill-mice" ? "MICE" : "HOGS";
     }
 
     function operationStatusLine(result) {
@@ -133,7 +133,7 @@ QtObject {
         // broaden malformed captures or let duplicate PIDs authorize a signal.
         const captured = [];
         const seen = new Set();
-        if (operationKind !== "kill-hogs" && operationKind !== "kill-mice")
+        if (operationKind !== "kill-all" && operationKind !== "kill-hogs" && operationKind !== "kill-mice")
             return;
         if (!Array.isArray(operationTargets) || operationTargets.length === 0)
             return;
@@ -169,7 +169,8 @@ QtObject {
         host.destructiveConfirmKind = kind;
         host.destructiveConfirmChoice = 0;
         host.destructiveConfirmTitle =
-            kind === "kill-mice"
+            kind === "kill-all" ? "⚠︎ KILL ALL • CHECKING CAPTURES… ⚠︎"
+            : kind === "kill-mice"
             ? "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  HUNTING MICE…  ⚠︎"
             : "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  HUNTING HOGS…  ⚠︎";
         host.destructiveConfirmOpen = true;
@@ -275,7 +276,8 @@ QtObject {
             return;
         phase = "report";
         host.destructiveConfirmTitle =
-            kind === "kill-mice"
+            kind === "kill-all" ? "⚠︎ KILL ALL • REPORT ⚠︎"
+            : kind === "kill-mice"
             ? "⚠︎ (-_•)デ╾━  (ᐢ××ᐢ)౨  MICE HUNT COMPLETE  ⚠︎"
             : "⚠︎ (-_•)デ╾━  ₍˄×⚇×˄₎  HOG HUNT COMPLETE  ⚠︎";
         host.destructiveConfirmKind = kind;

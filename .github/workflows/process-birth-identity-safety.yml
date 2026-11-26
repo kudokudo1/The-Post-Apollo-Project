@@ -5,6 +5,9 @@ on:
       - 'services/system/TaskSafety.qml'
       - 'services/system/HunterExecutor.qml'
       - 'widgets/appcontrol/HunterOperationController.qml'
+      - 'widgets/appcontrol/GlobalTaskActionController.qml'
+      - 'widgets/AppControlW.qml'
+      - 'services/system/ProcessControl.qml'
       - 'tests/cpuplus/test_hunter_birth_identity.py'
       - 'tests/cpuplus/fixtures/TaskSafetyBirthNative.qml'
       - 'tests/cpuplus/fixtures/HunterSerialNative.qml'
@@ -19,6 +22,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Audit tracked executable sources for obsolete PID-only bulk entry points
+        run: |
+          set -eu
+          set +e
+          git grep -n -E 'executeBulkTaskTermination|sendSignalMany|executeKillAllEligibleTasks' -- '*.qml' '*.js' '*.mjs' '*.ts'
+          rc=$?
+          set -e
+          test "$rc" -eq 1
       - name: Test exact captured birth identity against disposable children
         env:
           POST_APOLLO_HUNTER_DISPOSABLE_CI: '1'

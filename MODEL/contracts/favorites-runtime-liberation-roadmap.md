@@ -8,7 +8,7 @@
 >
 > OWNER / COORDINATION // Existing Favorites (historical T2) lane, with current Hospital assignment and shared host owners to be reverified before surgery.
 >
-> EVIDENCE BASE // GitHub main \`233857518c2b213d05325421d933aff182c92d22\` (2026-11-26); inspected AppControl blob \`bbea088bbfb686da95d36a3b0d43d4376e07cf2a\`. Exact current code must be reacquired before implementation.
+> EVIDENCE BASE // GitHub main `233857518c2b213d05325421d933aff182c92d22` (2026-11-26); inspected AppControl blob `bbea088bbfb686da95d36a3b0d43d4376e07cf2a`. Exact current code must be reacquired before implementation.
 
 ## 1. Operator objective and definition
 
@@ -24,14 +24,14 @@ A Quickshell singleton/service can be widget-independent while still executing i
 
 ### Already extracted / shared
 
-- \`services/favorites/FavoritesStore.qml\` owns \`appcontrol-favorites.json\` and its four original arrays: \`favoriteKeys\`, \`favoriteDetailActionKeys\`, \`favoriteMonitorBoxKeys\`, \`favoriteTaskMetricKeys\`.
-- \`services/favorites/FavoritesService.qml\` already has generic membership, monitor, task-watch and preferred-action toggle APIs.
-- \`FavoritesDefaultStore.qml\` and \`FavoritesCollectionsStore.qml\` independently own default-provider and collection metadata; do not merge these schemas or silently migrate existing owner files.
-- \`FavoritesResourcePolicy.js\`, read-only provider projections, \`FavoritesUnifiedCatalog.qml\`, management/search/selection policies and shared UI components exist.
-- \`widgets/cpuplus/CpuPlusFavoritesHubPane.qml\` is the current universal Favorites management surface.
+- `services/favorites/FavoritesStore.qml` owns `appcontrol-favorites.json` and its four original arrays: `favoriteKeys`, `favoriteDetailActionKeys`, `favoriteMonitorBoxKeys`, `favoriteTaskMetricKeys`.
+- `services/favorites/FavoritesService.qml` already has generic membership, monitor, task-watch and preferred-action toggle APIs.
+- `FavoritesDefaultStore.qml` and `FavoritesCollectionsStore.qml` independently own default-provider and collection metadata; do not merge these schemas or silently migrate existing owner files.
+- `FavoritesResourcePolicy.js`, read-only provider projections, `FavoritesUnifiedCatalog.qml`, management/search/selection policies and shared UI components exist.
+- `widgets/cpuplus/CpuPlusFavoritesHubPane.qml` is the current universal Favorites management surface.
 - Existing provider-specific owners, e.g. Clock/Time, Weather HOME, Radio, Places, Notifications and Hospital, retain their own durable facts and action permissions.
 
-### Still embedded in \`widgets/AppControlW.qml\`
+### Still embedded in `widgets/AppControlW.qml`
 
 The audit identified these source families (line numbers refer to the pinned blob, not a future head):
 
@@ -47,13 +47,13 @@ The audit identified these source families (line numbers refer to the pinned blo
 | Exact owner navigation and preferred detail selection | 8722–8940, 9153–9476 | Split generic checks from AppControl-local navigation and action semantics |
 | Favorites rail, scope selection, submodes, visual/input states | around 120–170, 3231–3418, 16470–17620 | **Remain in AppControl** as local UI, except reusable pure filtering policies |
 
-One important negative finding: the inspected AppControl blob had no \`FileFavoritesAdapter\`, \`FileFavoriteResolutionClient\`, \`fileService.resolveFavoriteIdentity\` or \`FavoritesUnifiedCatalog\` reference. Old T2/T3-F branch work is not proof of integration into the current patient.
+One important negative finding: the inspected AppControl blob had no `FileFavoritesAdapter`, `FileFavoriteResolutionClient`, `fileService.resolveFavoriteIdentity` or `FavoritesUnifiedCatalog` reference. Old T2/T3-F branch work is not proof of integration into the current patient.
 
 These are **source audit findings**, not runtime measurements. References mentioning Favorites are not all backend code; 1,061 matching lines cannot be used as a line count of extractable logic.
 
 ## 3. Target ownership and data flow
 
-\`\`\`text
+```text
                     shared Favorites contracts/services
                membership · catalog · collection references
                resolution coordination · read-only projections
@@ -75,7 +75,7 @@ These are **source audit findings**, not runtime measurements. References mentio
                          │
                  no duplicate writer
                  no implicit authority
-\`\`\`
+```
 
 *Service ownership is independent of widget lifetime.* Specifically test that closing AppControl leaves underlying shared membership available, and that any genuinely background watches continue only if their owning service's intentional lifecycle supports them.
 
@@ -94,16 +94,16 @@ Provider identity is never inferred from a display label, temporary PID, window 
 
 ### Phase B // Membership mutation liberation
 
-- Replace AppControl's four direct array-mutation sites with existing \`FavoritesService\` APIs after verifying exact behavioral equivalence.
+- Replace AppControl's four direct array-mutation sites with existing `FavoritesService` APIs after verifying exact behavioral equivalence.
 - Preserve prepend/removal ordering, one preferred action per context, same-star clearing, HUNTER-compatible serialized keys and callback/UI refresh timing.
-- Keep \`FavoritesStore\` as the single existing AppControl data writer. Do not migrate the JSON or replace the newer U1/U3 writers.
+- Keep `FavoritesStore` as the single existing AppControl data writer. Do not migrate the JSON or replace the newer U1/U3 writers.
 - Keep AppControl-specific selection restoration and immediate feedback in the widget.
 
 **Gate B:** saved bytes/identities and UI behavior are equivalent; no regression in HUNTER protected-target refusal; close/reopen persistence works.
 
 ### Phase C // Provider identity and reconstruction
 
-- Define/consume provider-specific identity adapters; move shared key matching and wrapper normalization out of \`AppControlW.qml\`.
+- Define/consume provider-specific identity adapters; move shared key matching and wrapper normalization out of `AppControlW.qml`.
 - APPS identity/launch stays with APPS; RUN command format and execution with RUN; FILES stat/record resolution and navigation with FILES; WINDOWS/TABS with their owners; PROCESS/HUNTER retains kill safety.
 - Treat older T2/T3-F FILE resolver work as historical until current service contracts/branches are verified and safely integrated.
 - Preserve exact legacy key compatibility or provide tested, non-destructive, owner-approved migrations; never guess on ambiguity.
@@ -114,7 +114,7 @@ Provider identity is never inferred from a display label, temporary PID, window 
 ### Phase D // Catalog and filtering liberation
 
 - Extract reusable FAVORITES/COMBI record aggregation, dedupe, snapshot handling, filtering, search preparation and watch selection policies into the existing service family where appropriate.
-- Reuse \`FavoritesUnifiedCatalog\`, \`FavoritesManagementPolicy\`, existing projections and owner-specific policies rather than creating a second universal catalog by default.
+- Reuse `FavoritesUnifiedCatalog`, `FavoritesManagementPolicy`, existing projections and owner-specific policies rather than creating a second universal catalog by default.
 - Retain AppControl-specific filters, view selection, scrolling, keyboard focus, hover, animations, and rail behavior in the local widget.
 - Protect performance properties: avoid full catalog rebuild on telemetry-only changes, preserve list scroll position and source snapshot freshness.
 
@@ -131,8 +131,8 @@ Provider identity is never inferred from a display label, temporary PID, window 
 
 ### Phase F // CPU++ as universal home and acceptance
 
-- Keep \`CPU++ → FAVORITES\` as the primary cross-widget management/control surface using the shared coordinator and provider-owned action routing.
-- Keep \`AppControl → FAVORITES/COMBI\` as an AppControl-local browsing experience, not an authority-bearing universal backend.
+- Keep `CPU++ → FAVORITES` as the primary cross-widget management/control surface using the shared coordinator and provider-owned action routing.
+- Keep `AppControl → FAVORITES/COMBI` as an AppControl-local browsing experience, not an authority-bearing universal backend.
 - Confirm UI remains within current Post-Apollo component/icon/focus contracts; no wholesale restyling is implied.
 - Verify source tests, native Fedora synthetic tests and actual operator-run desktop flows. Require owner review for privileged operations and independent review where Hospital assigns it.
 
@@ -142,7 +142,7 @@ Provider identity is never inferred from a display label, temporary PID, window 
 
 - No unapproved live-machine writes, Quickshell restart, host relaunch, production enablement or PR merge.
 - Do not cross an active AppControl/CPU++/PROCESS/FILES host slot or concurrent worker assignment.
-- Preserve existing \`appcontrol-favorites.json\`, \`favorites-default-v1.json\`, \`favorites-collections-v1.json\` and provider-owned stores; never merge them implicitly.
+- Preserve existing `appcontrol-favorites.json`, `favorites-default-v1.json`, `favorites-collections-v1.json` and provider-owned stores; never merge them implicitly.
 - Preserve protected HUNTER favorite semantics; Favorites does not authorize killing, launching or navigating.
 - Implement one bounded phase per reviewed branch/PR, with exact-base verification, no mass rewrite and focused regression suites.
 - Rollback via a phase-specific source revert. Do not erase or silently repair user favorite data.

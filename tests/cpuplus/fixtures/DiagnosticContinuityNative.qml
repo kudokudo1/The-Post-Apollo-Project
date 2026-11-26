@@ -35,8 +35,10 @@ ShellRoot {
     }
     function normalFace(item, name, selected) {
         const b=findItem(item,name);
-        return b && b.selected===selected && String(b.color).toLowerCase()==="#1b0623"
-            && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled;
+        const glow=b && findItem(b,"actionButtonNormalPerimeter");
+        return b && b.normalFace && b.selected===selected && String(b.color).toLowerCase()==="#1b0623"
+            && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
+            && glow && glow.active && glow.z===-1 && glow.item && glow.item.color.a===0;
     }
     function check(ok, message) {
         if (!ok) {
@@ -326,7 +328,7 @@ ShellRoot {
                 if (!root.check(storage && storage.visible && storage.height===160 && dial.visible
                     && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>duration.mapToItem(workshop,0,0).y,
                     "full-length sliders above storage/thread instrument row")) return;
-                if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport")) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("censusIntervalMs",1000);
                 duration.valueRequested(1);

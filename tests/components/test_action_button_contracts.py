@@ -111,7 +111,7 @@ for needle, message in (
     ("readonly property bool pressed:", "press state contract"),
     ("property Item contentGlowSource:", "exact content glow targeting"),
     ("property real softGlowMargin: 0", "lossless halo-margin preservation"),
-    ("property bool wideGlowEnabled: false", "optional richer second halo"),
+    ("property bool wideGlowEnabled: redActionFace", "red-action wide halo default"),
     ("signal triggered(var mouseEvent)", "primary action signal"),
     ("signal leftClicked(var mouseEvent)", "left-click signal"),
     ("signal rightClicked(var mouseEvent)", "right-click signal"),
@@ -773,3 +773,21 @@ assert "toggleFanControlUnlocked(" in FAN_LOCK, "green safety lock must remain"
 assert "FanSafetyLock" not in FAN_SECTION, "lock cannot be flattened into an action"
 
 print("Temperature fan action family: PASS // four guarded shared actions")
+
+# Red-action defaults do not modify Close, normal-face or explicit recipes.
+for needle in (
+    "property bool redActionFace: !normalFace && Qt.colorEqual(accentColor, Colors.red)",
+    "property color idleForegroundColor: redActionFace ? Colors.white : accentColor",
+    "property color hoverForegroundColor: redActionFace ? Colors.white : Colors.orange",
+    "property color selectedForegroundColor: redActionFace ? Colors.red : Colors.magenta",
+    "property color selectedFillColor: normalFace || redActionFace ? Colors.black : Colors.yellow",
+    "property color hoverBorderColor: redActionFace ? Colors.red : Colors.orange",
+    "property color selectedBorderColor: redActionFace ? Colors.red : Colors.magenta",
+    "property color selectedContentGlowColor: redActionFace ? Colors.red : Colors.magenta",
+    "property real softGlowSelectedOpacity: redActionFace ? 0.70 : 0.56",
+    "property real wideGlowSelectedOpacity: redActionFace ? 0.32 : 0.07",
+):
+    require(COMPONENT, needle, "red action state contract")
+require((ROOT / "components/CloseButton.qml").read_text(encoding="utf-8"),
+        "redActionFace: false", "Close X remains distinct")
+print("Red action state contracts: PASS")

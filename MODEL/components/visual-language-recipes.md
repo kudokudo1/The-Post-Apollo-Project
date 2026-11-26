@@ -43,6 +43,26 @@ It is not a directive to replace all QML shadows or normalize every widget.
   source-attached text/icon effects. Do not replace it with unguarded
   `layer.effect: DropShadow` during cleanup.
 
+## Red action face // operator decision (2026-11-26)
+
+For ordinary filled red-accent `ActionButton` controls, the default face
+is independent of the Close × recipe:
+
+| State | Fill | Foreground | Border / glow |
+| --- | --- | --- | --- |
+| Idle | Black | White | Red |
+| Hover / keyboard focus | Yellow | White | Red |
+| Press | Existing pressed recipe | Existing pressed recipe | Existing pressed recipe |
+| Selected / held open | Black | Red | Red, stronger selected glow |
+
+The selected state is supplied by the owner of the actual open surface;
+a one-shot action does not latch selected. The open state uses the existing
+selected glow intensity (content .72, soft .70, wide .32) versus idle
+(.34, .48, .22). Close × keeps its separate red glyph and original
+interaction colors. Normal-face selectors and explicitly specialized
+recipes keep their own contracts. This changes presentation defaults,
+not action authority, click signals, or execution.
+
 ## Default sampled-glow alignment // ActionButton rollout (2026-10-22)
 
 **Owner:** Post-Apollo shared controls. **Status:** first implementation stage;

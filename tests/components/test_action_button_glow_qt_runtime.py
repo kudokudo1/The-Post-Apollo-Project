@@ -8,7 +8,8 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
-from PySide6.QtCore import QObject, QUrl
+from PySide6.QtCore import QObject, QUrl, QPoint, Qt
+from PySide6.QtTest import QTest
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
@@ -68,6 +69,49 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
         inspect("unavailable")
         assert button.setProperty("available", True)
         inspect("available")
+
+        red = window.findChild(QObject, "redActionButton")
+        close = window.findChild(QObject, "redActionCloseComparison")
+        normal = window.findChild(QObject, "redNormalComparison")
+        custom = window.findChild(QObject, "redExplicitComparison")
+        assert red and close and normal and custom
+        def color(obj, prop):
+            return obj.property(prop).name()
+        def move(x, y):
+            QTest.mouseMove(window, QPoint(x, y))
+            app.processEvents()
+        move(450, 210)
+        assert red.property("redActionFace") is True
+        assert close.property("redActionFace") is False
+        assert normal.property("redActionFace") is False
+        assert color(custom, "foregroundColor") == color(custom, "idleForegroundColor")
+        assert color(red, "foregroundColor") == color(red, "idleForegroundColor")
+        assert color(red, "foregroundColor") != color(red, "accentColor")
+        assert color(red, "activeBorderColor") == color(red, "accentColor")
+        assert color(red, "contentGlowColor") == color(red, "accentColor")
+        idle = [red.property(k) for k in ("stateContentGlowOpacity", "stateSoftGlowOpacity", "stateWideGlowOpacity")]
+        move(240, 30)
+        assert red.property("hovered") is True
+        assert color(red, "fillColor") == color(red, "hoverFillColor")
+        assert color(red, "foregroundColor") == color(red, "idleForegroundColor")
+        assert color(red, "activeBorderColor") == color(red, "accentColor")
+        QTest.mousePress(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(240,30))
+        app.processEvents()
+        assert red.property("pressed") is True
+        assert color(red, "fillColor") == color(red, "pressedFillColor")
+        assert color(red, "foregroundColor") == color(red, "pressedForegroundColor")
+        QTest.mouseRelease(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(240,30))
+        move(450,210)
+        assert red.setProperty("selected", True)
+        app.processEvents()
+        assert color(red, "foregroundColor") == color(red, "accentColor")
+        assert color(red, "fillColor") == color(red, "idleFillColor")
+        assert all(red.property(k) > v for k,v in zip(
+            ("stateContentGlowOpacity", "stateSoftGlowOpacity", "stateWideGlowOpacity"),idle))
+        assert red.setProperty("selected", False)
+        app.processEvents()
+        assert color(red, "foregroundColor") == color(red, "idleForegroundColor")
+        assert color(close, "foregroundColor") == color(close, "accentColor")
     finally:
         window.close()
         window.deleteLater()

@@ -65,6 +65,10 @@ Rectangle {
     // Normal-face selectors opt into the historical Angels/U9g no-wash rule.
     // Filled actions retain the original state palette and effects.
     property bool normalFace: false
+
+    // Red actions have their own filled-state recipe. Close × and specialized
+    // controls may explicitly opt out; normal-face selectors stay separate.
+    property bool redActionFace: !normalFace && Qt.colorEqual(accentColor, Colors.red)
     property bool perimeterGlowEnabled: normalFace
     property real perimeterGlowOpacity: 0.38
 
@@ -75,21 +79,21 @@ Rectangle {
     property color secondaryHoverFillColor: idleFillColor
     property color pressedFillColor:
         destructive ? destructiveColor : Colors.magenta
-    property color selectedFillColor: normalFace ? Colors.black : Colors.yellow
-    property color keyboardSelectedFillColor: selectedFillColor
+    property color selectedFillColor: normalFace || redActionFace ? Colors.black : Colors.yellow
+    property color keyboardSelectedFillColor: redActionFace ? Colors.yellow : selectedFillColor
 
-    property color idleForegroundColor: accentColor
-    property color hoverForegroundColor: Colors.orange
+    property color idleForegroundColor: redActionFace ? Colors.white : accentColor
+    property color hoverForegroundColor: redActionFace ? Colors.white : Colors.orange
     property color pressedForegroundColor: normalFace ? Colors.magenta : Colors.black
-    property color selectedForegroundColor: Colors.magenta
+    property color selectedForegroundColor: redActionFace ? Colors.red : Colors.magenta
     property color keyboardSelectedForegroundColor: hoverForegroundColor
 
     property color idleBorderColor: accentColor
-    property color hoverBorderColor: Colors.orange
+    property color hoverBorderColor: redActionFace ? Colors.red : Colors.orange
     property color pressedBorderColor:
         destructive ? Colors.black : Colors.magenta
-    property color selectedBorderColor: Colors.magenta
-    property color keyboardSelectedBorderColor: Colors.orange
+    property color selectedBorderColor: redActionFace ? Colors.red : Colors.magenta
+    property color keyboardSelectedBorderColor: redActionFace ? Colors.red : Colors.orange
 
     property int idleBorderWidth: 1
     property int hoverBorderWidth: 1
@@ -137,11 +141,11 @@ Rectangle {
     property bool trackLabelGlowLocally: true
 
     property color idleContentGlowColor: accentColor
-    property color hoverContentGlowColor: Colors.orange
+    property color hoverContentGlowColor: redActionFace ? Colors.red : Colors.orange
     property color pressedContentGlowColor:
         destructive ? destructiveColor : Colors.magenta
-    property color selectedContentGlowColor: Colors.magenta
-    property color keyboardSelectedContentGlowColor: Colors.orange
+    property color selectedContentGlowColor: redActionFace ? Colors.red : Colors.magenta
+    property color keyboardSelectedContentGlowColor: redActionFace ? Colors.red : Colors.orange
 
     property real contentGlowIdleOpacity: 0.34
     property real contentGlowHoverOpacity: 0.72
@@ -158,21 +162,21 @@ Rectangle {
     property real softGlowMargin: 0
 
     property color idleSoftGlowColor: accentColor
-    property color hoverSoftGlowColor: Colors.orange
+    property color hoverSoftGlowColor: redActionFace ? Colors.red : Colors.orange
     property color pressedSoftGlowColor:
         destructive ? destructiveColor : Colors.magenta
-    property color selectedSoftGlowColor: Colors.magenta
-    property color keyboardSelectedSoftGlowColor: Colors.orange
+    property color selectedSoftGlowColor: redActionFace ? Colors.red : Colors.magenta
+    property color keyboardSelectedSoftGlowColor: redActionFace ? Colors.red : Colors.orange
 
-    property real softGlowIdleOpacity: 0.22
-    property real softGlowHoverOpacity: 0.56
+    property real softGlowIdleOpacity: redActionFace ? 0.48 : 0.22
+    property real softGlowHoverOpacity: redActionFace ? 0.70 : 0.56
     property real softGlowPressedOpacity: 0.60
-    property real softGlowSelectedOpacity: 0.56
-    property real softGlowKeyboardSelectedOpacity: 0.56
+    property real softGlowSelectedOpacity: redActionFace ? 0.70 : 0.56
+    property real softGlowKeyboardSelectedOpacity: redActionFace ? 0.70 : 0.56
 
     // Optional second halo for richer descendants such as GitW's local
     // ActionButton. Disabled by default so compact controls stay lightweight.
-    property bool wideGlowEnabled: false
+    property bool wideGlowEnabled: redActionFace
     property real wideGlowSpread: 10
 
     property color idleWideGlowColor: idleSoftGlowColor
@@ -182,11 +186,11 @@ Rectangle {
     property color keyboardSelectedWideGlowColor:
         keyboardSelectedSoftGlowColor
 
-    property real wideGlowIdleOpacity: 0.015
-    property real wideGlowHoverOpacity: 0.08
+    property real wideGlowIdleOpacity: redActionFace ? 0.22 : 0.015
+    property real wideGlowHoverOpacity: redActionFace ? 0.32 : 0.08
     property real wideGlowPressedOpacity: 0.10
-    property real wideGlowSelectedOpacity: 0.07
-    property real wideGlowKeyboardSelectedOpacity: 0.08
+    property real wideGlowSelectedOpacity: redActionFace ? 0.32 : 0.07
+    property real wideGlowKeyboardSelectedOpacity: redActionFace ? 0.32 : 0.08
 
     readonly property bool pointerActive:
         interactive || hoverWhenUnavailable

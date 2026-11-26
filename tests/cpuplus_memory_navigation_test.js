@@ -6,7 +6,7 @@ assert.match(pane, /menus: \["CAP", "POL", "PROC", "AUTO", "DIAG", "PROF"\]/);
 assert.match(pane, /readonly property int menuIndex: CpuPlusDiagnostics\.memoryMenuIndex/);
 assert.match(pane, /onLeftClicked: root.selectMenu\(index\)/);
 assert.match(pane, /anchors.top: menuRail.bottom/);
-assert.match(pane, /anchors.top: root.page === "CAP" \? capInstrument.bottom : root.fixedWorkPage \? workHeader.bottom : menuRail.bottom/);
+assert.match(pane, /anchors.top: root.page === "CAP" \? capInstrument.bottom : workHeader.bottom/);
 assert.match(pane, /visible: root.page !== "CAP" \|\| root.capSection !== 0/);
 assert.match(pane, /anchors.bottom: footer.top/);
 assert.match(pane, /visible: root.page === "CAP" && root.capSection === 1\s+enabled: visible/);
@@ -81,10 +81,11 @@ assert.match(fn, /CpuPlusDiagnostics\.memoryMenuIndex = index;\s*scroll.contentY
 assert.doesNotMatch(fn, /stagedGiB\s*=|refresh\(|running\s*=|MemoryOperation\.\w/);
 assert.match(pane, /id: footer[\s\S]*?anchors.bottom: parent.bottom[\s\S]*?id: capBottomRail[\s\S]*?model: \["TARGET", "ACTIONS", "DETAILS"\][\s\S]*?id: capInstrument/);
 assert.match(pane, /id: policyInstrument[\s\S]*?SelectorDial\s*\{[\s\S]*?id: policyActions[\s\S]*?label: "RESET TARGET"/);
-for (const name of ["cpuplusCapRefresh", "cpuplusPolicyRefresh"]) {
-    const button = pane.split('objectName: "' + name + '"')[1].split("onLeftClicked:")[0];
-    assert.match(button, /idleFillColor: Colors.yellow/);
-}
+const sharedHeaderSource=pane.slice(pane.indexOf("component LiveCapacityHeader"),pane.indexOf("readonly property bool fixedWorkPage"));
+assert.match(sharedHeaderSource,/objectName: sharedHeader.refreshName[\s\S]*?idleFillColor: Colors.yellow/);
+assert.match(pane,/refreshName: "cpuplusCapRefresh"/);
+const policyRefresh=pane.split('objectName: "cpuplusPolicyRefresh"')[1].split("onLeftClicked:")[0];
+assert.match(policyRefresh,/idleFillColor: Colors.yellow/);
 const zctx = vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusZramPolicy.js"),"utf8"),zctx);
 assert.equal(zctx.parseAlgorithms("lzo [lz4] zstd\n").actual,"lz4");
@@ -446,7 +447,7 @@ console.log("CPU++ M11d punctuation escaping, inset bars and info contract PASS"
 
 assert.match(pane,/readonly property int detailMeterHeight: Math.max\(12, Math.round\(12\*detailScale\)\)/);
 assert.doesNotMatch(pane,/spacing: root.capDetailsActive \? 3 : 5|height: root.capDetailsActive \? 34 : 40|height: root.capDetailsActive \? 22 : 25/);
-assert.match(pane,/visible: !root.headerRefreshAvailable/);
+assert.match(pane,/showRefresh: !root.headerRefreshAvailable/);
 assert.match(cpuWindowM9,/objectName: "cpuplusHeaderReload"/);
 assert.match(cpuWindowM9,/if\(activeMemoryPane\) activeMemoryPane.refresh\(\)/);
 assert.match(cpuWindowM9,/text: "CPU\+\+ \/\/ "\+cpuPlusWindow.cpuHeaderStatus/);
@@ -516,18 +517,26 @@ console.log("CPU++ M11h compact transport palette and pinned diagnostics header 
  assert.match(targetStripSource,/labelPixelSize: 24/);
  assert.doesNotMatch(targetStripSource,/(hover|pressed)(Fill|Border|SoftGlow|ContentGlow)Color:/);
  assert.match(targetStripSource,/normalFace: true/);
- assert.match(targetStripSource,/selectedContentGlowColor: accentColor/);
+ assert.doesNotMatch(targetStripSource,/selected(Foreground|Border|ContentGlow|SoftGlow)Color:/);
  console.log("CPU++ SYSTEM and KILL semantic palette source contracts PASS");
 
 assert.match(pane,/component LiveCapacityBars: Column/);
-assert.equal((pane.match(/LiveCapacityBars\s*\{/g)||[]).length,2);
+assert.equal((pane.match(/LiveCapacityBars\s*\{/g)||[]).length,1);
+assert.equal((pane.match(/LiveCapacityHeader\s*\{/g)||[]).length,2);
+assert.match(sharedHeaderSource,/spacing: 5[\s\S]*?height: 25[\s\S]*?objectName: "cpuplusSharedCapacityDivider"[\s\S]*?height: 1/);
 assert.match(targetStripSource,/normalFace: true/);
 
 const normalFaceComponent=fs.readFileSync(path.join(__dirname,"../components/ActionButton.qml"),"utf8");
 assert.match(normalFaceComponent,/property bool normalFace: false/);
-assert.match(normalFaceComponent,/color:\s+normalFace \? Colors.black : actionButton.withOpacity/);
-assert.match(normalFaceComponent,/!actionButton.normalFace && actionButton.softGlowEnabled/);
-assert.match(normalFaceComponent,/!actionButton.normalFace && actionButton.wideGlowEnabled/);
+assert.match(normalFaceComponent,/color:\s+actionButton.withOpacity\(\s*fillColor,/);
+assert.match(normalFaceComponent,/property color pressedFillColor:\s*destructive \? destructiveColor : Colors.magenta/);
+assert.match(normalFaceComponent,/property color selectedFillColor: redActionFace \? Colors.black : Colors.yellow/);
+assert.match(normalFaceComponent,/!actionButton.washSafePerimeter && actionButton.softGlowEnabled/);
+assert.match(normalFaceComponent,/!actionButton.washSafePerimeter && actionButton.wideGlowEnabled/);
 assert.match(normalFaceComponent,/objectName: "actionButtonNormalPerimeter"[\s\S]*?z: -1[\s\S]*?sourceComponent: Rectangle\s*\{\s*color: "transparent"/);
-assert.match(normalFaceComponent,/property bool perimeterGlowEnabled: normalFace/);
+assert.match(normalFaceComponent,/property bool perimeterGlowEnabled: normalFace \|\| \(washSafePerimeter && softGlowEnabled\)/);
 assert.match(normalFaceComponent,/property bool contentGlowEnabled: true/);
+
+const unitGrammar=readoutM11d.format("THREAD // 1000MS / 10 SEC / 5s","#abc","#fff");
+for(const unit of ["MS","SEC","s"]) assert.ok(unitGrammar.includes('<font color="#fff">'+unit+'</font>'));
+assert.ok(unitGrammar.includes('<font color="#abc">1000</font>'));

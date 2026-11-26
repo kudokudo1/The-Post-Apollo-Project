@@ -167,15 +167,17 @@ QtObject {
         total = captured.length;
         pendingTargets = [];
 
-        host.destructiveConfirmTargetPids = [];
-        host.destructiveConfirmKind = kind;
-        host.destructiveConfirmChoice = 0;
-        host.destructiveConfirmTitle =
-            kind === "kill-all" ? "⚠︎ KILL ALL • CHECKING CAPTURES… ⚠︎"
-            : kind === "kill-mice"
-            ? "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  HUNTING MICE…  ⚠︎"
-            : "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  HUNTING HOGS…  ⚠︎";
-        if (!recipientOwned) host.destructiveConfirmOpen = true;
+        if (!recipientOwned) {
+            host.destructiveConfirmTargetPids = [];
+            host.destructiveConfirmKind = kind;
+            host.destructiveConfirmChoice = 0;
+            host.destructiveConfirmTitle =
+                kind === "kill-all" ? "⚠︎ KILL ALL • CHECKING CAPTURES… ⚠︎"
+                : kind === "kill-mice"
+                ? "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  HUNTING MICE…  ⚠︎"
+                : "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  HUNTING HOGS…  ⚠︎";
+            host.destructiveConfirmOpen = true;
+        }
         refreshMessage();
 
         dispatchNext();
@@ -269,13 +271,15 @@ QtObject {
         if (phase !== "running" || activeTarget)
             return;
         phase = "report";
-        host.destructiveConfirmTitle =
-            kind === "kill-all" ? "⚠︎ KILL ALL • REPORT ⚠︎"
-            : kind === "kill-mice"
-            ? "⚠︎ (-_•)デ╾━  (ᐢ××ᐢ)౨  MICE HUNT COMPLETE  ⚠︎"
-            : "⚠︎ (-_•)デ╾━  ₍˄×⚇×˄₎  HOG HUNT COMPLETE  ⚠︎";
-        host.destructiveConfirmKind = kind;
-        if (!recipientOwned) host.destructiveConfirmOpen = true;
+        if (!recipientOwned) {
+            host.destructiveConfirmTitle =
+                kind === "kill-all" ? "⚠︎ KILL ALL • REPORT ⚠︎"
+                : kind === "kill-mice"
+                ? "⚠︎ (-_•)デ╾━  (ᐢ××ᐢ)౨  MICE HUNT COMPLETE  ⚠︎"
+                : "⚠︎ (-_•)デ╾━  ₍˄×⚇×˄₎  HOG HUNT COMPLETE  ⚠︎";
+            host.destructiveConfirmKind = kind;
+            host.destructiveConfirmOpen = true;
+        }
         refreshMessage();
         refreshTimer.restart();
     }

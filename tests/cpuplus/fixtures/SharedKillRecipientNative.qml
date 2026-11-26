@@ -11,6 +11,7 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property int previousRevision: 0
+    property var lastRow: null
 
     QtObject {
         id: fakePresentation
@@ -339,7 +340,8 @@ ShellRoot {
                     return;
                 if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
                     "prepare before process removal")) return;
-                fakeOwner.taskRows = [];
+                smoke.lastRow = fakeOwner.taskRows[0];
+            fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }
@@ -348,6 +350,7 @@ ShellRoot {
                 && fakeGate.pending===null && fakeGate.cancels===2
                 && fakeGate.confirmations===1, "stale selection refusal and owned review cancelled"))
                 return;
+            fakeOwner.taskRows = [smoke.lastRow];
             if (!smoke.check(view.requestKillHogs() && view.hasBulkReview
                     && fakeOwner.bulkConfirmed===0
                     && fakeOwner.cpuBulkReview.metric===view.hunterMetricMode,

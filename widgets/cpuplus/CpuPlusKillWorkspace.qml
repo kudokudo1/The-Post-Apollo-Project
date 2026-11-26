@@ -1133,7 +1133,6 @@ Item {
                         width: parent.width
                         height: 24
                         GohuText {
-                            id: helpGlowText1
                             width: parent.width
                             height: parent.height
                             text: "LOCK // HELP"
@@ -1145,6 +1144,7 @@ Item {
                         }
                     }
                     GohuText {
+                        id: lockRiskText
                         objectName: "cpuPlusLockRiskHelp"
                         width: parent.width
                         text: lockRail.protectedTarget
@@ -1154,8 +1154,8 @@ Item {
                         textFormat: Text.PlainText
                         color: lockRail.protectedTarget ? Colors.red : Colors.white
                         font.pixelSize: 11
-                            layer.enabled: lockHelp.visible
-                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText1.color; transparentBorder: true }
+                        layer.enabled: lockHelp.visible
+                        layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: lockRiskText.color; transparentBorder: true }
                     }
                     Rectangle { width: parent.width; height: 1; color: Colors.orange; opacity: 0.7 }
                     Repeater {

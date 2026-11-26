@@ -302,3 +302,24 @@ assert.equal(stepStorage(31,1,10,"sample",1),null);
 assert.equal(stepStorage(1,1,10,"sample",1),null);
 assert.deepEqual(plain(ctx.storageReportChoices(30,5)),[5,10,15,20,25,30]);
 console.log("DIAG D5b calibrated storage controls PASS");
+
+const clockCfg={kind:"storage",durationSeconds:5,sampleSeconds:2,reportSeconds:4};
+const clockLine=(tick,reports,elapsedMs)=>"STORAGE_PROGRESS "+JSON.stringify({tick,reports,elapsedMs,startWallMs:1000,
+    wallMs:1000+elapsedMs,durationSeconds:5,sampleSeconds:2,reportSeconds:4});
+const clockStart=policyCtx.storageLiveProgress(clockLine(0,0,0),clockCfg,null,900,1000);
+assert.ok(clockStart);
+assert.equal(policyCtx.storageCountdown(clockStart,"sample",3000).waiting,true);
+assert.equal(policyCtx.storageCountdown(clockStart,"sample",3100).remainingMs,0);
+const clockTick=policyCtx.storageLiveProgress(clockLine(1,0,2000),clockCfg,clockStart,900,3000);
+assert.ok(clockTick);
+assert.equal(policyCtx.storageCountdown(clockTick,"sample",3000).remainingMs,2000);
+assert.equal(policyCtx.storageCountdown(clockTick,"report",3000).remainingMs,2000);
+assert.equal(policyCtx.storageLiveProgress(clockLine(2,1,4000),clockCfg,clockStart,900,5000),null);
+assert.equal(policyCtx.storageLiveProgress(clockLine(1,1,2000),clockCfg,clockStart,900,3000),null);
+const clockReport=policyCtx.storageLiveProgress(clockLine(2,1,4000),clockCfg,clockTick,900,5000);
+assert.ok(clockReport);
+assert.equal(policyCtx.storageCountdown(clockReport,"report",5000).remainingMs,1000);
+const clockFinal=policyCtx.storageLiveProgress(clockLine(3,2,5000),clockCfg,clockReport,900,6000);
+assert.ok(clockFinal);
+assert.equal(policyCtx.storageCountdown(clockFinal,"sample",6000).finished,true);
+console.log("DIAG D5c-a live countdown evidence contracts PASS");

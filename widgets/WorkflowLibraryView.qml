@@ -17,7 +17,7 @@ Item {
     property string workflowQuery: ""
     property bool workflowHelpOpen: false
     readonly property var filteredWorkflows: WorkflowSearch.filter(root.libraryStore.workflows, workflowQuery)
-    onWorkflowQueryChanged: { clearSetArm(); workflowFlick.positionViewAtBeginning(); }
+    onWorkflowQueryChanged: { clearSetArm(); if (workflowFlick) workflowFlick.positionViewAtBeginning(); }
     onVisibleChanged: if (!visible) clearSetArm()
 
     signal workflowSelected(int index)
@@ -1124,6 +1124,7 @@ Item {
 
                                         LibraryButton {
                                             width: 62
+                                            objectName: "gitWorkflowControl"
                                             label: "CONTROL"
 
                                             onTriggered: root.workflowSelected(modelData.sourceIndex)
@@ -1131,6 +1132,7 @@ Item {
 
                                         LibraryButton {
                                             width: 54
+                                            objectName: "gitWorkflowRun"
                                             label: root.setActionArmed("run-workflow", String(workflow.path || "")) ? "GO?" : "RUN"
                                             enabledAction: !!workflow.path && workflow.state === "active"
                                                 && root.githubService.available && !root.githubService.refreshing
@@ -1149,6 +1151,7 @@ Item {
 
                                         LibraryButton {
                                             width: 68
+                                            objectName: "gitWorkflowQueue"
                                             label: "+ QUEUE"
 
                                             onTriggered: root.libraryStore.addWorkflow(workflow)

@@ -565,9 +565,20 @@ ShellRoot {
                 if (!duration || duration.hardwareThumbLength<=root.mediumThumbLength) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,"large instruments fit")) return;
                 const pair=root.findItem(workshop,"cpuplusWorkshopStorageDialPair");
+                const sampleDial=root.findItem(pair,"cpuplusWorkshopStorage-sample-dial");
+                const reportDial=root.findItem(pair,"cpuplusWorkshopStorage-report-dial");
+                if (!sampleDial || !reportDial) return;
+                const rendered=(d,value,color)=>{
+                    const a=d.mapToItem(pair,0,0), b=d.mapToItem(pair,d.width,d.height);
+                    return d.visible && d.opacity>0 && a.x>=-1 && a.y>=-1
+                        && b.x<=pair.width+1 && b.y<=pair.height+1
+                        && b.x-a.x>=74 && b.y-a.y>=87
+                        && d.currentValue===value && String(d.accentColor).toLowerCase()===color;
+                };
                 if (!root.check(pair && pair.visible && workshop.storageMechanical && workshop.storageDialScale>=0.55
-                    && root.findItem(pair,"cpuplusWorkshopStorage-sample-dial") && root.findItem(pair,"cpuplusWorkshopStorage-report-dial"),
-                    "large storage slot mounts two mechanical countdown dials")) return;
+                    && rendered(sampleDial,workshop.storageSample,"#ed981a")
+                    && rendered(reportDial,workshop.storageReport,"#c74ec7"),
+                    "both mechanical dials have visible nonzero scaled geometry, actual values and semantic colors")) return;
                 nativeWindow.width=320;
                 nativeWindow.height=620;
                 root.phase=244;
@@ -593,6 +604,10 @@ ShellRoot {
                     && String(reportMinus.accentColor).toLowerCase()==="#d16041"
                     && samplePlus.width===samplePlus.height && samplePlus.height<19,
                     "smallest storage stays digital with compact green plus and red minus")) return;
+                const prepare=root.findItem(workshop,"cpuplusWorkshopExecute");
+                if (!root.check(prepare && prepare.preparationFace && prepare.washStrength===0.24
+                    && String(prepare.color)===String(prepare.steadyWashColor) && !prepare.softGlowEnabled && !prepare.wideGlowEnabled,
+                    "prepare uses stable opaque special wash, not broad shadow or ornament")) return;
                 samplePlus.leftClicked(null);
                 reportMinus.leftClicked(null);
                 if (!root.check(workshop.draft.storageCadenceExplicit && workshop.draft.storageSampleSeconds===2

@@ -586,10 +586,55 @@ Scope {
                 'repo="$1"',
                 'owner="${repo%%/*}"',
                 'name="${repo#*/}"',
-                "query='query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){ pullRequests(first:100,orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } } }'",
-                'tmpdir="$(mktemp -d)"',
+                "[[ \"$repo\" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo \"PULLS REQUEST // INVALID REPOSITORY\" >&2; exit 1; }",
+                "query='query($owner:String!,$name:String!,$cursor:String){ repository(owner:$owner,name:$name){ pullRequests(first:25,after:$cursor,orderBy:{field:UPDATED_AT,direction:DESC}){ pageInfo{hasNextPage endCursor} nodes{ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } } }'",
+                "tmpdir=\"$(mktemp -d)\"",
                 "trap 'rm -rf \"$tmpdir\"' EXIT",
-                'gh api graphql -F owner="$owner" -F name="$name" -f query="$query" --jq ".data.repository.pullRequests.nodes" > "$tmpdir/rows.json"',
+                "cursor=\"\"",
+                "for page in 1 2 3 4; do",
+                "  args=(); [ -z \"$cursor\" ] || args+=(-f cursor=\"$cursor\")",
+                "  rc=0",
+                "  gh api graphql --include -f owner=\"$owner\" -f name=\"$name\" -f query=\"$query\" \"${args[@]}\" > \"$tmpdir/response\" 2> \"$tmpdir/gh-error\" || rc=$?",
+                "  status=\"\"; content_type=\"\"; header_end=0",
+                "  {",
+                "    IFS= read -r line || true",
+                "    status=\"$(printf \"%s\\n\" \"$line\" | awk '{print $2}')\"",
+                "    if [[ \"$line\" == HTTP/* && \"$status\" =~ ^[0-9]{3}$ ]]; then",
+                "      while IFS= read -r line; do",
+                "        line=\"${line%$'\\r'}\"",
+                "        if [ -z \"$line\" ]; then header_end=1; break; fi",
+                "        case \"${line,,}\" in",
+                "          content-type:*) content_type=\"${line#*:}\";;",
+                "        esac",
+                "      done",
+                "      cat > \"$tmpdir/body.json\"",
+                "    fi",
+                "  } < \"$tmpdir/response\"",
+                "  if [ \"$header_end\" -ne 1 ]; then",
+                "    echo \"PULLS TRANSPORT // PAGE $page // NO COMPLETE HTTP HEADERS // GH EXIT $rc\" >&2; exit 1",
+                "  fi",
+                "  if [ \"$status\" != 200 ]; then",
+                "    case \"$status\" in 401) reason=\"AUTHENTICATION REQUIRED\";; 403|429) reason=\"ACCESS OR RATE LIMIT\";; 5??) reason=\"GITHUB OR UPSTREAM FAILURE\";; *) reason=\"REQUEST REJECTED\";; esac",
+                "    echo \"PULLS HTTP $status // PAGE $page // $reason\" >&2; exit 1",
+                "  fi",
+                "  case \"${content_type,,}\" in *application/json*|*application/*+json*) ;; *) echo \"PULLS RESPONSE // PAGE $page // NON-JSON CONTENT TYPE\" >&2; exit 1;; esac",
+                "  if ! jq -e -s 'length == 1 and (.[0] | type == \"object\")' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
+                "    echo \"PULLS RESPONSE // PAGE $page // EMPTY OR INVALID JSON\" >&2; exit 1",
+                "  fi",
+                "  if jq -e '(.errors // []) | length > 0' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
+                "    echo \"PULLS GRAPHQL // PAGE $page // PROVIDER REPORTED ERRORS\" >&2; exit 1",
+                "  fi",
+                "  if [ \"$rc\" -ne 0 ]; then echo \"PULLS TRANSPORT // PAGE $page // GH EXIT $rc\" >&2; exit 1; fi",
+                "  if ! jq -e '.data.repository.pullRequests | (type == \"object\") and (.nodes | type == \"array\" and length <= 25) and (.pageInfo.hasNextPage | type == \"boolean\") and (if .pageInfo.hasNextPage then (.pageInfo.endCursor | type == \"string\" and length > 0) else true end) and all(.nodes[]; (.number | type == \"number\" and . > 0 and floor == .) and (.headRefOid | type == \"string\" and test(\"^[0-9a-fA-F]{40}$\")))' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
+                "    echo \"PULLS RESPONSE // PAGE $page // INVALID RESULT SHAPE\" >&2; exit 1",
+                "  fi",
+                "  jq -c \".data.repository.pullRequests.nodes\" \"$tmpdir/body.json\" > \"$tmpdir/page-$page.json\"",
+                "  [ \"$(jq -r \".data.repository.pullRequests.pageInfo.hasNextPage\" \"$tmpdir/body.json\")\" = true ] || break",
+                "  next=\"$(jq -r \".data.repository.pullRequests.pageInfo.endCursor\" \"$tmpdir/body.json\")\"",
+                "  [ \"$next\" != \"$cursor\" ] || { echo \"PULLS PAGINATION // REPEATED CURSOR\" >&2; exit 1; }",
+                "  cursor=\"$next\"",
+                "done",
+                "jq -c -s 'add | if (map(.number) | unique | length) != length then error(\"duplicate pull request across pages\") else . end' \"$tmpdir\"/page-*.json > \"$tmpdir/rows.json\"",
                 "jq -c '[.[] | . + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])}]' \"$tmpdir/rows.json\" > \"$tmpdir/normalized.json\"",
                 "jq -c '.[] | select((((.checkContexts // []) | length) == 0) or ((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0)))' \"$tmpdir/normalized.json\" > \"$tmpdir/fallback.ndjson\"",
                 'while IFS= read -r row; do',
@@ -707,11 +752,16 @@ Scope {
         }
 
         try {
-            const parsed = JSON.parse(output || "[]");
-            pulls = Array.isArray(parsed) ? parsed : [];
+            if (!output)
+                throw new Error("EMPTY RESPONSE");
+            const parsed = JSON.parse(output);
+            if (!Array.isArray(parsed))
+                throw new Error("EXPECTED PR ARRAY");
+            pulls = parsed;
             pullsStateText =
                 "PULLS READY // "
-                + String(pulls.length);
+                + String(pulls.length)
+                + (pulls.length >= 100 ? " // LATEST 100" : "");
             pullsError = "";
         } catch (parseError) {
             pulls = [];

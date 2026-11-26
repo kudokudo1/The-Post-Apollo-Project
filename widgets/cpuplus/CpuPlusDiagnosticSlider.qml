@@ -26,7 +26,7 @@ Column {
     }
     Item {
         width: parent.width
-        height: root.compact ? 24 : 32
+        height: root.compact ? 22 : 32
         SelectorSlider {
             objectName: root.objectName + "-hardware"
             anchors.centerIn: parent
@@ -41,7 +41,7 @@ Column {
             valueStep: root.valueStep
             valueDecimals: 0
             enabledSlider: root.adjustable && validStepDomain
-            accentColor: root.subjectColor
+            accentColor: Colors.white
             valueFillColor: root.fillColor
             handleColor: root.subjectColor
             handleGradientBaseColor: root.subjectColor

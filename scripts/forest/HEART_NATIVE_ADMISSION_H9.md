@@ -323,3 +323,117 @@ No normal H9 admission, H1 zero-demand revision, guaranteed demand,
 GPU readiness or production release follows from a successful capped
 CPU experiment. No new CI job, runner script, source or host action
 in this amendment.
+
+
+## H15 // Resource dimension applicability (design only)
+
+Nurse #2161 7189221566 authorizes this document only; Heart
+7189047023, Runtime 7189169544 and Spirit 7189174213 agree.
+Main d351c035 at intake. No change to H1/P1/H2 code, test, schema,
+issuer or authority. No actual host or model qualification.
+
+### Existing seam and representation gap
+
+H1 62dc22ec _evaluate requires an explicit ceiling and positive
+requirement in every P1 dimension; zero is ZERO_DEMAND_UNESTABLISHED.
+P1 38f1723b uses None for unknown requirement, zero for no incremental
+requirement beyond the exact baseline, and skips availability comparison
+when requirement is zero. P1 approve is modeled fit only. H2 4ec58531
+account_release_reference requires all three availability values known,
+same source and clock, exact original AttemptRef, a separate terminal
+reference and active_workload=False. These are local disposable reference
+checks, not independent evidence or physical accounting.
+
+H1 TransportSettings covers only B2 endpoint/model/context/output;
+its digest is not a complete provider manifest. The existing six-field
+H2 AttemptRef binds context, turn, operation, attempt, binding and
+settings; it does not attest actual placement or device exclusion.
+Do not change those meanings silently or invent a second governor.
+
+| Resource state | Candidate interpretation (not an API or present acceptance) |
+| --- | --- |
+| Positive RAM/CPU requirement | Exact conservative demand, explicit budget and independently current availability required; existing arithmetic preserved. |
+| Applicable accelerator, positive demand | Exact mapped accelerator requirement, budget, availability, placement and currentness required. |
+| Applicable accelerator with measured zero free capacity | Known zero availability; cannot meet positive demand. |
+| Unknown applicable demand or availability | HOLD for admission; no zero substitution or dummy positive demand. |
+| Independently proven accelerator-inapplicable | Zero incremental accelerator demand only for the exact CPU-only execution under the proof below. Host VRAM availability may be unknown; do not fabricate measured zero. |
+| Unproved CPU-only claim, uncertain retained charge or changed evidence | HOLD, including original custody at release; no inference from absent observed usage. |
+
+No general zero RAM/CPU exception or new positive outcome. A known
+budget violation remains a denial under P1. A modeled fit is never
+authorization. The inapplicable case is a proposed narrower reference
+meaning, not a presently accepted H1/H2 input or a new wire value.
+
+### Independent evidence needed before any exception
+
+Bind applicability to an independently established original H11 attempt
+and exact model artifact, immutable provider/runner release and instance,
+execution manifest, actual original process and descendants, placement,
+configuration/workload commitment, boot/scope/lifetime and H2 accounting
+reference. Reuse existing identity seams; an eventual representation
+change needs separate coordinated review. CPU-only placement must be
+selected before admission, never substituted after GPU admission.
+
+Require independently verified preventive accelerator exclusion across
+the relevant original lifetime, including effective inherited device
+policy semantics and mutation prevention; no retained/inherited or
+transferred accelerator descriptors, alternate provider/service socket,
+network/offload or migration route. Local client restriction does not
+qualify the actual provider/runner. Exact effective runtime behavior
+and complete original descendants must be established. A requested
+num_gpu=0, configuration flag, inventory, BPF ID/tag, absent device
+node, no observed GPU usage or test-only CPU configuration is insufficient.
+H14-D benign no-model isolation, even if later qualified, cannot prove
+actual model execution placement. Unknown or inconsistent proof refuses.
+
+Independently establish that no accelerator residency/charge is
+attributable to this attempt, including startup, prior retained state
+and terminal accounting. A negative access observation now cannot erase
+an earlier or unknown charge. Other unrelated host device charges do
+not become free capacity or resource credit. Do not unload, restart,
+reclaim, or subtract historical resident bytes to manufacture proof.
+
+### Temporal and custody boundary
+
+For any future separately approved native path, establish the exact
+preventive applicability evidence before the actual send and original
+claim under independently current execution/effect fencing; preserve
+H1 reference comparison/currentness and exact settings digest. Recheck
+original identity, policy, placement and coverage through execution,
+terminal and original accounting. Any unknown, change or observer loss
+holds the original attempt; no retry, fallback, replacement identity or
+automatic clearance. The no-model hosted qualification and separate P2B
+timing-only trial do not supply H11 admission evidence.
+
+Keep positive applicable dimensions, source/clock checks, original
+terminal and independent quiescence, retained-residency accounting and
+Spirit settlement separate. Release only the exact original custody
+after independent qualifying evidence; a future inapplicable dimension
+could remove a need for host VRAM measurement only if its original
+proof and absence of attributable retained charge remain established.
+Never change unknown applicable capacity into zero. Neither SQL
+COMMITTED/ABORTED, STOP/EOF, cache close, roster absence nor a synthetic
+reference establishes terminal or physical release. No new resource
+credit, admission, restore or Winter inference.
+
+### Negative acceptance matrix for separate future review
+
+| Case | Required refusal or distinction |
+| --- | --- |
+| Zero accelerator demand with missing, stale, foreign or replaced original proof | HOLD; no exception from caller flag or settings digest. |
+| CPU-only client but provider/descendant can use accelerator, inherited FD or alternate service/offload | HOLD; qualify actual execution lifetime, not client. |
+| Effective policy opaque, mutable or incompletely observed | HOLD; matching tag/node absence not proof. |
+| GPU-enabled placement, prior or unknown attributable device charge | Applicable/unknown dimension; no zero exception or release credit. |
+| Positive applicable requirement, unknown or zero available quantity | Preserve unknown/insufficient refusal; no substitution. |
+| Zero RAM or CPU demand | Preserve current H1 refusal; no general relaxation. |
+| Original proof valid at intake but changes before send or terminal | HOLD original custody; no fallback/retry or replacement. |
+| Exact CPU-only proof for another H2 attempt, stale terminal or uncertain quiescence | No release, no inherited accounting or automatic Winter. |
+| Local commit/abort/STOP, logical cache removal or benign no-model test | No actual terminal, physical release or model admission. |
+
+Candidate acceptance would require exact original independent evidence
+and all existing applicable checks, not just a passing fixture. Actual
+issuer, effective policy/observer feasibility, placement, demand bound,
+original terminal and Connections custody remain unqualified. Request
+Runtime/Spirit/Nurse exact design review before operator integration.
+Any future executable H1/P1/H2 revision, tests or native qualification
+requires separate explicit bounded approval. Production remains HOLD.

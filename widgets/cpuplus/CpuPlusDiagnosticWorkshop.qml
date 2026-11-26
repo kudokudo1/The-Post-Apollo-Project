@@ -216,7 +216,7 @@ Column {
         }
         Item {
             width: 136
-            height: 150
+            height: 160
             visible: root.draft.selected.includes("threads")
             SelectorDial {
                 objectName: "cpuplusWorkshopTopThreads"

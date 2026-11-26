@@ -6254,11 +6254,7 @@ PanelWindow {
         const key = taskMetricFavoriteKey(entry, metricId);
         if (!key)
             return;
-        const next = favoriteStore.favoriteTaskMetricKeys.slice();
-        const index = next.indexOf(key);
-        if (index >= 0) next.splice(index, 1);
-        else next.unshift(key);
-        favoriteStore.favoriteTaskMetricKeys = next;
+        FavoritesService.toggleTaskMetricKey(key);
     }
 
     function taskHasMetricFavorite(entry) {
@@ -6434,15 +6430,7 @@ PanelWindow {
         if (!key)
             return;
 
-        const next = favoriteStore.favoriteMonitorBoxKeys.slice();
-        const index = next.indexOf(key);
-
-        if (index >= 0)
-            next.splice(index, 1);
-        else
-            next.unshift(key);
-
-        favoriteStore.favoriteMonitorBoxKeys = next;
+        FavoritesService.toggleMonitorBoxKey(key);
     }
 
     function monitorEntryHasBoxFavorite(entry, modeIndex) {
@@ -6689,15 +6677,7 @@ PanelWindow {
         if (!key)
             return;
 
-        const next = favoriteStore.favoriteKeys.slice();
-        const existingIndex = next.indexOf(key);
-
-        if (existingIndex >= 0)
-            next.splice(existingIndex, 1);
-        else
-            next.unshift(key);
-
-        favoriteStore.favoriteKeys = next;
+        FavoritesService.toggleFavoriteKey(key);
 
         // APPS still remembers the desktop entry across mode changes.
         if (favoriteSourceMode(entry, modeIndex) === appsModeIndex)
@@ -9530,26 +9510,7 @@ PanelWindow {
         if (!context || !key)
             return;
 
-        const prefix = context + "|";
-        const oldKeys = favoriteStore.favoriteDetailActionKeys;
-        const next = [];
-
-        // Keep favorites belonging to every OTHER app/command.
-        for (let i = 0; i < oldKeys.length; i++) {
-            const existing = String(oldKeys[i]);
-
-            if (existing.indexOf(prefix) !== 0)
-                next.push(existing);
-        }
-
-        const wasFavorite = oldKeys.indexOf(key) !== -1;
-
-        // Clicking a different star replaces the old preferred action.
-        // Clicking the same filled star clears it.
-        if (!wasFavorite)
-            next.push(key);
-
-        favoriteStore.favoriteDetailActionKeys = next;
+        const wasFavorite = !FavoritesService.togglePreferredActionKey(context, key);
 
         // Force a fresh detail-selection pass after the JsonAdapter property
         // has changed. This makes the favorite immediately become the keyboard
@@ -9568,7 +9529,6 @@ PanelWindow {
         console.log(
             "AppControl: detail favorite",
             wasFavorite ? "CLEARED" : "SET",
-            key,
             "stored-count",
             favoriteStore.favoriteDetailActionKeys.length
         );

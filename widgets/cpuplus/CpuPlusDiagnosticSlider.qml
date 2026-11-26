@@ -41,7 +41,8 @@ Column {
             valueStep: root.valueStep
             valueDecimals: 0
             enabledSlider: root.adjustable && validStepDomain
-            accentColor: Colors.white
+            accentColor: root.subjectColor
+            frameColor: Colors.white
             valueFillColor: root.fillColor
             handleColor: root.subjectColor
             handleGradientBaseColor: root.subjectColor

@@ -139,7 +139,7 @@ Item {
         });
     }
     function changeView(kind,value) {
-        if (locallyPending || (gate && gate.busy)) return;
+        if (locallyPending || (gate && (gate.pending || gate.busy))) return;
         const serial=++viewSerial;
         hoveredIndex=-1;
         // Donor blank/reset strategy: no live rowsMoved storm on filter changes.
@@ -166,10 +166,28 @@ Item {
             ? appControlWindow.monitorResultIcon(row) : "(╭ర_•́)";
     }
     function taskRowMetric(row) {
-        return killViewMode===killViewHunter
-            ? hunterGraph.metricGraphValue(row)+" • PID "+row.pid
-            : "CPU "+Number(row.cpu || 0).toFixed(1)+"% • MEM "
-               +Number(row.mem || 0).toFixed(1)+"%";
+        if (!row) return "NO METRIC";
+        if (killViewMode !== killViewHunter)
+            return "CPU "+Number(row.cpu || 0).toFixed(1)+"% • MEM "
+                +Number(row.mem || 0).toFixed(1)+"%";
+
+        // Donor hunterMetricReason semantics, with the recipient's metric
+        // mode. Never call metricGraphValue here: it reads selected-detail
+        // history, not the identity of this individual selector row.
+        const revision=miniHistoryRevision;
+        if (hunterMetricMode===hunterMetricCpu)
+            return "CPU HOG • "+hunterGraph.taskPeak(row).toFixed(1)
+                +"% PEAK • "+hunterGraph.taskAverage(row).toFixed(1)+"% RECENT";
+        if (hunterMetricMode===hunterMetricMemory)
+            return "MEMORY HOG • "+hunterGraph.taskMemoryMiB(row).toFixed(0)+" MiB RSS";
+        if (hunterMetricMode===hunterMetricIo)
+            return "I/O HOG • R "+hunterGraph.formatBytesPerSecond(row.ioReadRate)
+                +" • W "+hunterGraph.formatBytesPerSecond(row.ioWriteRate);
+        if (hunterMetricMode===hunterMetricAge)
+            return "OLD PROCESS • "+hunterGraph.formatAge(hunterGraph.elapsedSeconds(row.elapsed));
+        return hunterCombiIcon+" • CPU "+hunterGraph.taskPeak(row).toFixed(1)
+            +"% • MEM "+hunterGraph.taskMemoryMiB(row).toFixed(0)
+            +" MiB • I/O "+hunterGraph.formatBytesPerSecond(hunterGraph.taskIoRate(row));
     }
     function taskFavoriteKey(row) {
         return appControlWindow && appControlWindow.taskFavoriteKey
@@ -226,7 +244,10 @@ Item {
         return null;
     }
     readonly property var currentTask: matchingRow()
+    readonly property bool selectedTargetVisible: !modelBlank
+        && !!currentTask && filteredRows.some(sameTarget)
     readonly property bool exactTargetAvailable: !!gate && !!currentTask
+        && selectedTargetVisible
         && !!gate.exactRow(selectedPid, selectedStartTicks, selectedComm)
     readonly property bool hasOwnedPending: !!gate && locallyPending
         && !!ownedPendingRef && gate.pending === ownedPendingRef && !gate.busy
@@ -245,7 +266,12 @@ Item {
             && String(row.comm || "")===selectedComm;
     }
     function selectTarget(row) {
-        if (!row || !active || locallyPending || (gate && gate.busy)) return false;
+        if (!row || !active || modelBlank || locallyPending
+                || (gate && gate.busy) || !filteredRows.some(function(candidate) {
+                    return Number(candidate.pid)===Number(row.pid)
+                        && Number(candidate.startTicks)===Number(row.startTicks)
+                        && String(candidate.comm || "")===String(row.comm || "");
+                })) return false;
         if (sameTarget(row)) return true; // hovering over the current row must not reset graphs
         stagedLimitPercent=-1;
         selectedPid=Number(row.pid || 0);
@@ -744,6 +770,7 @@ Item {
                     selectedTextColor: Colors.black
                     clip: true
                     selectByMouse: true
+                    readOnly: workspace.locallyPending || (!!workspace.gate && workspace.gate.busy)
                 }
                 GohuText {
                     anchors.left: parent.left
@@ -873,6 +900,8 @@ Item {
                     wrapMode: Text.Wrap
                     text: workspace.exactTargetAvailable
                         ? "EXACT LIVE PID + START TICKS + NAME"
+                        : workspace.currentTask && !workspace.selectedTargetVisible
+                        ? "TARGET OUTSIDE CURRENT FILTER // CONTROLS LOCKED"
                         : "TARGET IDENTITY NOT VERIFIED // CONTROLS LOCKED"
                     color: workspace.exactTargetAvailable ? Colors.white : Colors.orange
                     font.pixelSize: 10
@@ -890,6 +919,7 @@ Item {
                     width: parent.width
                     spacing: 12
                     visible: !!workspace.currentTask
+                    enabled: workspace.exactTargetAvailable && !workspace.locallyPending
                 }
                 GohuText {
                     width: parent.width

@@ -13,6 +13,7 @@ Item {
     property string setNameDraft: ""
     property string armedSetAction: ""
     property string armedSetName: ""
+    property string armedSetRepository: ""
     property string workflowQuery: ""
     property bool workflowHelpOpen: false
     readonly property var filteredWorkflows: WorkflowSearch.filter(root.libraryStore.workflows, workflowQuery)
@@ -23,17 +24,20 @@ Item {
 
     function setActionArmed(action, nameValue) {
         return root.armedSetAction === String(action || "")
-            && root.armedSetName === String(nameValue || "");
+            && root.armedSetName === String(nameValue || "")
+            && root.armedSetRepository === root.libraryStore.repoSlug;
     }
 
     function armSetAction(action, nameValue) {
         root.armedSetAction = String(action || "");
         root.armedSetName = String(nameValue || "");
+        root.armedSetRepository = root.libraryStore.repoSlug;
     }
 
     function clearSetArm() {
         root.armedSetAction = "";
         root.armedSetName = "";
+        root.armedSetRepository = "";
     }
 
     function batchStateColor(stateValue) {
@@ -51,6 +55,9 @@ Item {
 
     Connections {
         target: root.libraryStore
+
+        function onRepoSlugChanged() { root.clearSetArm(); }
+        function onWorkflowsChanged() { root.clearSetArm(); }
 
         function onQueueRefChanged() {
             if (!queueRefInput.activeFocus
@@ -1049,13 +1056,13 @@ Item {
 
                 Item {
                     width: parent.width
-                    height:
+                    height: Math.max(0,
                         parent.height
                         - 31 - workflowSearchRow.height - 7
                         - workflowInventoryNotice.height - 7
                         - (workflowHelp.visible ? workflowHelp.height + 7 : 0)
                         - workflowActionStatus.height
-                        - (workflowActionStatus.visible ? 7 : 0)
+                        - (workflowActionStatus.visible ? 7 : 0))
 
                     ListView {
                         id: workflowFlick
@@ -1125,8 +1132,7 @@ Item {
                                         LibraryButton {
                                             width: 54
                                             label: root.setActionArmed("run-workflow", String(workflow.path || "")) ? "GO?" : "RUN"
-                                            enabledAction: !!workflow.path && workflow.state !== "disabled_manually"
-                                                && workflow.state !== "disabled_inactivity"
+                                            enabledAction: !!workflow.path && workflow.state === "active"
                                                 && root.githubService.available && !root.githubService.refreshing
                                                 && !root.githubService.actionBusy && !root.githubService.factoryBusy
                                             onTriggered: {
@@ -1209,7 +1215,7 @@ Item {
                         x: parent.width - width
                         y: 0
                         height: parent.height
-                        z: 0
+                        z: 2
 
                         barAreaWidth: 9
                         railWidth: 9

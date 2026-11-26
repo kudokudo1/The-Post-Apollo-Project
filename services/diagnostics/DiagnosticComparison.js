@@ -155,6 +155,16 @@ function compare(before, after, validate, appMetrics) {
     if (!Number.isFinite(firstTime) || !Number.isFinite(secondTime) || secondTime <= firstTime)
         return fail("AFTER MUST BE NEWER THAN BEFORE");
     try {
+        if (before.kind==="threads") {
+            const first=JSON.parse(before.text.trim().split("\n",1)[0]);
+            const second=JSON.parse(after.text.trim().split("\n",1)[0]);
+            if (first.workshopSchema || second.workshopSchema) {
+                if (first.workshopSchema!==second.workshopSchema
+                        || first.durationSeconds!==second.durationSeconds
+                        || first.intervalMs!==second.intervalMs || first.topCount!==second.topCount)
+                    return fail("THREAD CALIBRATION MUST MATCH");
+            }
+        }
         const a = extract(before, validate, appMetrics), b = extract(after, validate, appMetrics);
         if (!a || !b || a.length !== b.length) return fail("INCOMPLETE OR UNSUPPORTED EVIDENCE");
         const rows = a.map((left, i) => {

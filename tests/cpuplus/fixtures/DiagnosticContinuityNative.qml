@@ -585,11 +585,14 @@ ShellRoot {
                     && !root.findItem(workshop,"cpuplusWorkshopStallThreshold").stopwatchFace
                     && !root.findItem(workshop,"cpuplusWorkshopTopThreads").stopwatchFace,
                     "both mechanical dials have visible nonzero scaled geometry, actual values and semantic colors")) return;
-                // Check the actual rotary request still reaches the shared draft.
+                // Use a valid storage duration for winding; the preceding
+                // resize witness intentionally used an invalid 100s plan.
+                workshop.edit("durationSeconds",30);
                 sampleDial.valueRequested(2);
                 if (!root.check(workshop.storageSample===2 && !CpuPlusDiagnostics.busy,"stopwatch winding edits cadence only")) return;
                 sampleDial.valueRequested(1);
                 if (!root.check(workshop.storageSample===1 && workshop.storageReport===10,"stopwatch setting restored")) return;
+                workshop.edit("durationSeconds",100);
                 nativeWindow.width=320;
                 nativeWindow.height=620;
                 root.phase=244;
@@ -664,6 +667,25 @@ ShellRoot {
                 if (!root.check(p.tick===1 && p.reports===0 && workshop.countdown("sample")
                     && workshop.countdown("sample").remainingMs>0 && workshop.countdown("sample").remainingMs<=2000,
                     "observed sample resets scheduled countdown before report")) return;
+                nativeWindow.width=500;
+                nativeWindow.height=800;
+                root.phase=253;
+                return;
+            }
+            if (root.phase===253 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const sample=root.findItem(workshop,"cpuplusWorkshopStorage-sample-dial");
+                const report=root.findItem(workshop,"cpuplusWorkshopStorage-report-dial");
+                if (!sample || !report || !sample.stopwatchActive || !report.stopwatchActive) return;
+                if (!root.check(workshop.recording && !CpuPlusDiagnostics.storageProgressFault
+                    && CpuPlusDiagnostics.captureId===CpuPlusDiagnostics.workshopRunId
+                    && [sample,report].every(d=>d.visible && !d.interactive && d.stopwatchFraction>=0
+                        && d.stopwatchFraction<=1 && d.stopwatchLitSegments===Math.ceil(d.stopwatchFraction*30)
+                        && root.findItem(d,"selectorStopwatchCenter").text===d.readoutText)
+                    && sample.stopwatchSetSeconds===2 && report.stopwatchSetSeconds===4,
+                    "live mechanical countdown face retains exact capture and independent cadence after resize")) return;
+                nativeWindow.width=320;
+                nativeWindow.height=620;
                 root.paneActive=false;
                 root.phase=26;
                 return;

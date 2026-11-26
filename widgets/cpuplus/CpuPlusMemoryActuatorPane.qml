@@ -365,23 +365,10 @@ Item {
                 acceptedButtons: Qt.LeftButton
                 keyboardActivationSignal: "leftClicked"
                 accentColor: Colors.cyan
-                selectedFillColor: Colors.black
                 selectedForegroundColor: Colors.magenta
                 selectedBorderColor: Colors.magenta
                 contentGlowEnabled: true
-                // U9g / Angels: deterministic opaque face, no filled shadow layers.
-                color: Colors.black
-                softGlowEnabled: false
-                wideGlowEnabled: false
-                pressedForegroundColor: Colors.magenta
-                Rectangle {
-                    anchors.fill: parent
-                    color: "transparent"
-                    border.width: 1
-                    border.color: memoryModeFilter.activeBorderColor
-                    opacity: 0.48
-                    visible: memoryModeFilter.selected || memoryModeFilter.hovered || memoryModeFilter.pressed
-                }
+                normalFace: true
                 onLeftClicked: root.selectMenu(index)
             }
         }

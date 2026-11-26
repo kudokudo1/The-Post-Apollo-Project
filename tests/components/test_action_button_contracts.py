@@ -674,11 +674,14 @@ for control_id, component_type in (
     ("taskFreezeAction", "ActionButton"),
     ("taskEndAction", "ActionButton"),
 ):
-    declaration = component_type + " {\\n                    id: " + control_id
-    assert declaration in TASK_MANAGER, (
+    declaration = re.search(
+        rf"(?m)^[ \t]*{component_type}[ \t]*\{{[ \t]*\n[ \t]*id:[ \t]*{control_id}\b",
+        TASK_MANAGER,
+    )
+    assert declaration is not None, (
         f"{control_id} must use {component_type} and inherit ActionButton"
     )
-    block_start = TASK_MANAGER.index(declaration)
+    block_start = declaration.start()
     rectangle_start = TASK_MANAGER.rfind("Rectangle {", 0, block_start)
     assert rectangle_start < block_start, f"{control_id} fell back to a private Rectangle"
 

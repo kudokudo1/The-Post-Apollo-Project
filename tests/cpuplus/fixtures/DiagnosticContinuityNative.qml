@@ -401,7 +401,10 @@ ShellRoot {
                         const slider=root.findItem(workshop,"cpuplusWorkshop"+name+"-hardware");
                         return slider && slider.visible && slider.height===workshop.width
                             && String(slider.border.color)===String(duration.border.color)
-                            && String(slider.border.color)===String(duration.accentColor);
+                            && String(slider.border.color)===String(duration.accentColor)
+                            && String(slider.frameGlowColor)===String(slider.valueFillColor)
+                            && String(slider.handleGlowColor)===String(slider.valueFillColor)
+                            && String(slider.activityGlowColor)===String(slider.valueFillColor);
                     }),
                     "full-length sliders above storage/thread instrument row")) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport // "+viewport.contentHeight+" / "+viewport.height)) return;

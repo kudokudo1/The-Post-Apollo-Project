@@ -616,6 +616,18 @@ ShellRoot {
                 workshop.activate();
                 if (!root.check(CpuPlusDiagnostics.kind==="workflow" && CpuPlusDiagnostics.stallCaptureActive,
                     "second click starts coordinated stall capture")) return;
+                root.phase=252;
+                return;
+            }
+            if (root.phase===252 && pane.item) {
+                if (!root.check(!CpuPlusDiagnostics.storageProgressFault && CpuPlusDiagnostics.busy,
+                    "storage live side channel remains valid")) return;
+                const p=CpuPlusDiagnostics.storageProgress;
+                if (!p || p.tick<1) return;
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!root.check(p.tick===1 && p.reports===0 && workshop.countdown("sample")
+                    && workshop.countdown("sample").remainingMs>0 && workshop.countdown("sample").remainingMs<=2000,
+                    "observed sample resets scheduled countdown before report")) return;
                 root.paneActive=false;
                 root.phase=26;
                 return;
@@ -626,7 +638,7 @@ ShellRoot {
                 if (!root.check(report && report.status==="COMPLETE" && report.id===CpuPlusDiagnostics.workshopRunId
                     && !CpuPlusDiagnostics.stallCaptureActive && report.summary.indexOf("THRESHOLD 500 ms")>=0
                     && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id),
-                    "real coordinated storage/clock witness and fixture heartbeat // "+CpuPlusDiagnostics.feedback)) return;
+                    "real coordinated storage/clock witness and fixture heartbeat // "+CpuPlusDiagnostics.feedback+" / "+(report?report.summary:"NO REPORT"))) return;
                 const storageEvidence=JSON.parse(report.text).instruments.find(i=>i.config.kind==="storage");
                 if (!root.check(storageEvidence && storageEvidence.config.sampleSeconds===2 && storageEvidence.config.reportSeconds===4
                     && storageEvidence.records[0].intervals===2 && storageEvidence.records[1].intervals===3,

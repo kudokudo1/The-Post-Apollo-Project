@@ -26,7 +26,7 @@ Flow {
             selectedContentGlowColor: accentColor
             selectedSoftGlowColor: accentColor
             contentGlowSelectedOpacity: 0.95
-            softGlowSelectedOpacity: 0.8
+            outlineOnlyGlow: true
             label: String(modelData.symbol || "")
             labelPixelSize: 24
             contentPadding: 0

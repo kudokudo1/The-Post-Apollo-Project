@@ -45,18 +45,7 @@ Column {
         : terminal ? "RETRY" : "PREPARE"
     readonly property var threadIntervals: [100,250,500,1000,2000,5000]
 
-    function makePlan(d) {
-        const instruments=[];
-        for (const kind of ["threads","memory","census","storage","stall"]) {
-            if (!d.selected.includes(kind)) continue;
-            if (kind==="threads") instruments.push({kind:kind,intervalMs:d.threadIntervalMs,topCount:d.topCount});
-            else if (kind==="memory") instruments.push({kind:kind,intervalMs:d.memoryIntervalMs});
-            else if (kind==="census") instruments.push({kind:kind,intervalMs:d.censusIntervalMs});
-            else if (kind==="stall") instruments.push({kind:kind,thresholdMs:d.stallThresholdMs});
-            else instruments.push({kind:kind});
-        }
-        return {durationSeconds:d.durationSeconds,instruments:instruments};
-    }
+    function makePlan(d) { return Calibration.workshopPlanFromDraft(d); }
     function disarm() {
         preparationGeneration++;
         calibrating=false;

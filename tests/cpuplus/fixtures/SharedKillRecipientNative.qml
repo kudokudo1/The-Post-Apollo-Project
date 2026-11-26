@@ -240,7 +240,9 @@ ShellRoot {
                 return;
             }
             if (smoke.phase===11) {
-                if (!smoke.check(targets.count===0,"search filters actual live model")) return;
+                if (!smoke.check(targets.count===0 && !view.exactTargetAvailable
+                    && !view.prepareAction("end"),
+                    "search hides selected target and locks actuation")) return;
                 smoke.find(view,"cpuPlusKillSearch").text="synthetic";
                 view.setKillViewMode(view.killViewHunter);
                 view.setHunterVisibilityMode(view.hunterVisibilityAll);
@@ -259,13 +261,20 @@ ShellRoot {
                 if (!smoke.check(targets.count===1
                     && view.hunterMetricMode===view.hunterMetricCombined,
                     "shared Hunter / COMBI / ALL filters")) return;
+                const different={pid:9999,comm:"other",cpuInstant:42,rss:1048576,ioRate:0};
+                if (!smoke.check(view.taskRowMetric(different).indexOf("42.0%")>=0
+                    && view.taskRowMetric(different).indexOf("1024 MiB")>=0
+                    && view.taskRowMetric(different)!==view.taskRowMetric(view.currentTask),
+                    "Hunter row label comes from that row, not selected detail")) return;
                 view.setHunterVisibilityMode(view.hunterVisibilityTargets);
                 smoke.phase=13;
                 return;
             }
             if (smoke.phase===13) {
                 if (view.modelBlank) return;
-                if (!smoke.check(targets.count===0,"protected row excluded by TARGETS")) return;
+                if (!smoke.check(targets.count===0 && !view.exactTargetAvailable
+                    && !view.prepareAction("end"),
+                    "protected row excluded by TARGETS and not actionable")) return;
                 view.setHunterVisibilityMode(view.hunterVisibilityProtected);
                 smoke.phase=14;
                 return;

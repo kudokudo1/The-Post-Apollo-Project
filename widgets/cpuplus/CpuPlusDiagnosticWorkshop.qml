@@ -27,6 +27,10 @@ Column {
     readonly property real storageWidth: lowerInstrumentCount===3 ? Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24)) : lowerInstrumentWidth
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
+    readonly property int storageSample: draft.storageSampleSeconds || 1
+    readonly property int storageReport: draft.storageReportSeconds || 10
+    readonly property var storagePreview: Calibration.previewCalibration({kind:"storage",durationSeconds:draft.durationSeconds,
+        sampleSeconds:storageSample,reportSeconds:storageReport})
     readonly property bool locked: CpuPlusDiagnostics.workshopPresetLocked
     readonly property var plan: makePlan(draft)
     readonly property string planText: JSON.stringify(plan)
@@ -70,6 +74,17 @@ Column {
         const next=Object.assign({},draft);
         next[key]=value;
         CpuPlusDiagnostics.workshopDraft=next;
+    }
+    function cadenceStep(field,direction) {
+        return Calibration.storageCadenceStep(draft.durationSeconds,storageSample,storageReport,field,direction);
+    }
+    function changeStorageCadence(field,direction) {
+        if (locked || !draft.selected.includes("storage")) return;
+        const pair=cadenceStep(field,direction);
+        if (!pair) return;
+        disarm();
+        CpuPlusDiagnostics.workshopDraft=Object.assign({},draft,{
+            storageCadenceExplicit:true,storageSampleSeconds:pair.sampleSeconds,storageReportSeconds:pair.reportSeconds});
     }
     function toggle(kind) {
         if (locked) return;
@@ -288,58 +303,89 @@ Column {
                     fontSizeMode: Text.HorizontalFit
                     minimumPixelSize: 8
                 }
-                CpuPlusMemoryReadout {
-                    width: parent.width
-                    text: "1 SEC"
-                    semanticGlowColor: Colors.blue
-                    color: Colors.blue
-                    font.pixelSize: root.compactLayout ? 17 : 24
-                    fontSizeMode: Text.HorizontalFit
-                    minimumPixelSize: 10
-                    horizontalAlignment: Text.AlignHCenter
-                }
-                Rectangle {
-                    width: parent.width
-                    height: root.compactLayout ? 10 : 14
-                    color: Colors.black
-                    border.color: Colors.blue
-                    Row {
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 2
-                        Repeater {
-                            model: 10
-                            Rectangle {
-                                width: Math.max(0,(parent.width-18)/10)
-                                height: parent.height
+                Repeater {
+                    model: [{key:"sample",label:"SAMPLE",value:root.storageSample},
+                            {key:"report",label:"REPORT",value:root.storageReport}]
+                    Column {
+                        required property var modelData
+                        width: storageContents.width
+                        spacing: 1
+                        CpuPlusMemoryReadout {
+                            width: parent.width
+                            text: parent.modelData.label
+                            color: Colors.blue
+                            font.pixelSize: root.compactLayout ? 9 : 11
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                        Row {
+                            id: cadenceRow
+                            width: parent.width
+                            height: root.compactLayout ? 20 : 26
+                            spacing: 2
+                            readonly property string field: parent.modelData.key
+                            readonly property int seconds: parent.modelData.value
+                            readonly property real buttonSize: Math.min(height,Math.max(12,Math.floor((width-24)/2)))
+                            ActionButton {
+                                objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-minus"
+                                width: cadenceRow.buttonSize
+                                height: cadenceRow.height
+                                accentColor: Colors.blue
+                                normalFace: true
+                                label: "−"
+                                labelPixelSize: 15
+                                contentPadding: 0
+                                acceptedButtons: Qt.LeftButton
+                                available: !root.locked && root.cadenceStep(cadenceRow.field,-1)!==null
+                                Accessible.name: "Decrease storage "+cadenceRow.field+" interval"
+                                Accessible.role: Accessible.Button
+                                Accessible.onPressAction: root.changeStorageCadence(cadenceRow.field,-1)
+                                onLeftClicked: root.changeStorageCadence(cadenceRow.field,-1)
+                            }
+                            CpuPlusMemoryReadout {
+                                width: Math.max(0,cadenceRow.width-2*cadenceRow.buttonSize-2*cadenceRow.spacing)
+                                height: cadenceRow.height
+                                text: cadenceRow.seconds+" SEC"
                                 color: Colors.blue
+                                semanticGlowColor: Colors.blue
+                                font.pixelSize: root.compactLayout ? 12 : 16
+                                fontSizeMode: Text.HorizontalFit
+                                minimumPixelSize: 7
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            ActionButton {
+                                objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-plus"
+                                width: cadenceRow.buttonSize
+                                height: cadenceRow.height
+                                accentColor: Colors.blue
+                                normalFace: true
+                                label: "+"
+                                labelPixelSize: 15
+                                contentPadding: 0
+                                acceptedButtons: Qt.LeftButton
+                                available: !root.locked && root.cadenceStep(cadenceRow.field,1)!==null
+                                Accessible.name: "Increase storage "+cadenceRow.field+" interval"
+                                Accessible.role: Accessible.Button
+                                Accessible.onPressAction: root.changeStorageCadence(cadenceRow.field,1)
+                                onLeftClicked: root.changeStorageCadence(cadenceRow.field,1)
                             }
                         }
                     }
                 }
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    text: "FIXED CADENCE"
-                    color: Colors.white
-                    font.pixelSize: root.compactLayout ? 9 : 10
+                    text: root.storagePreview.ok ? root.storagePreview.intervals+" INT / "+root.storagePreview.observations+" RPT" : "CHECK CADENCE"
+                    color: root.storagePreview.ok ? Colors.blue : Colors.yellow
+                    font.pixelSize: root.compactLayout ? 9 : 11
                     fontSizeMode: Text.HorizontalFit
                     minimumPixelSize: 7
                     horizontalAlignment: Text.AlignHCenter
                 }
-                CpuPlusMemoryReadout {
-                    width: parent.width
-                    text: root.draft.durationSeconds+" INTERVALS"
-                    color: Colors.blue
-                    font.pixelSize: 11
-                    fontSizeMode: Text.HorizontalFit
-                    minimumPixelSize: 8
-                    horizontalAlignment: Text.AlignHCenter
-                }
                 GohuText {
                     width: parent.width
-                    text: root.lowerInstrumentCount===3 ? "10s / FINAL" : "10s / FINAL REPORT"
+                    text: "FINAL INCLUDED"
                     color: Colors.white
-                    font.pixelSize: 9
+                    font.pixelSize: 8
                     fontSizeMode: Text.HorizontalFit
                     minimumPixelSize: 7
                     horizontalAlignment: Text.AlignHCenter

@@ -132,3 +132,11 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.match(recipient,/row\.cpuInstant !== undefined \? row\.cpuInstant : row\.cpu/);
     assert.match(recipient,/now-lastDetailSampleMs<history\.taskGraphScrollDuration/);
 });
+
+test("bulk review scrolls independently and keeps confirmation outside scroll content", () => {
+    assert.match(recipient,/objectName: "cpuPlusSingleActuatorBody"\s*visible: !workspace\.destructiveConfirmOpen\s*enabled: visible/);
+    assert.match(recipient,/id: bulkFooter[\s\S]*?anchors\.bottom: parent\.bottom[\s\S]*?objectName: "cpuPlusBulkCancel"[\s\S]*?objectName: "cpuPlusBulkConfirm"/);
+    assert.match(recipient,/id: bulkScroll[\s\S]*?anchors\.bottom: bulkFooter\.top/);
+    assert.match(recipient,/objectName: "cpuPlusBulkReviewRail"[\s\S]*?flickable: bulkScroll/);
+    assert.match(recipient,/t\.startTicks/);
+});

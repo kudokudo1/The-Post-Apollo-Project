@@ -237,12 +237,12 @@ Item {
     function requestBulk(kind) {
         if (!active || !bulkAvailable) return false;
         if (bulkOperation || hasBulkReview) {
-            actuatorScroll.contentY = 0;
+            bulkScroll.contentY = 0;
             return true;
         }
         if (locallyPending || modelBlank || (gate && (gate.pending || gate.busy))) return false;
         bulkReview = appControlWindow.prepareCpuBulkReview(kind,hunterMetricMode,hunterVisibilityMode);
-        if (hasBulkReview) actuatorScroll.contentY = 0;
+        if (hasBulkReview) bulkScroll.contentY = 0;
         return hasBulkReview;
     }
     function requestKillAllEligibleTasks() { return requestBulk("kill-all"); }
@@ -923,6 +923,9 @@ Item {
             border.color: Colors.orange
             Flickable {
                 id: actuatorScroll
+                objectName: "cpuPlusSingleActuatorBody"
+                visible: !workspace.destructiveConfirmOpen
+                enabled: visible
                 anchors.fill: parent
                 anchors.margins: 8
                 clip: true
@@ -937,56 +940,6 @@ Item {
                     text: "PROCESS // ACTUATORS"
                     color: Colors.magenta
                     font.pixelSize: 12
-                }
-                Column {
-                    objectName: "cpuPlusBulkReview"
-                    width: parent.width
-                    visible: workspace.hasBulkReview || workspace.bulkOperation
-                    spacing: 8
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Colors.red
-                        text: workspace.hasBulkReview
-                            ? "REVIEW // " + workspace.bulkReview.label
-                            : workspace.bulkOperation
-                            ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase() : ""
-                    }
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Colors.white
-                        font.pixelSize: 11
-                        text: workspace.hasBulkReview
-                            ? String(workspace.bulkReview.targets.length) + " CAPTURED TARGETS"
-                              + "\nGLOBAL SCOPE • NOT SEARCH RESULTS"
-                              + "\nNO COMMAND SENT • PROTECTION RECHECKED BEFORE DISPATCH\n\n"
-                              + workspace.bulkReview.targets.map(t => t.name + " [PID " + t.pid + "]").join("\n")
-                            : workspace.bulkOperation ? workspace.appControlWindow.cpuBulkMessage : ""
-                    }
-                    Rectangle {
-                        objectName: "cpuPlusBulkConfirm"
-                        width: parent.width; height: 38
-                        visible: workspace.hasBulkReview
-                        color: Colors.black; border.color: Colors.red; border.width: 1
-                        GohuText { anchors.centerIn: parent; text: "CONFIRM CAPTURE"; color: Colors.red }
-                        MouseArea { anchors.fill: parent; enabled: workspace.hasBulkReview; onClicked: workspace.confirmBulk() }
-                    }
-                    Rectangle {
-                        objectName: "cpuPlusBulkCancel"
-                        width: parent.width; height: 34
-                        visible: workspace.hasBulkReview || (workspace.bulkOperation
-                            && workspace.appControlWindow.hunterOperationPhase === "report")
-                        color: Colors.black; border.color: Colors.cyan; border.width: 1
-                        GohuText { anchors.centerIn: parent; text: workspace.hasBulkReview ? "CANCEL" : "ACKNOWLEDGE"; color: Colors.cyan }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (workspace.hasBulkReview) workspace.cancelBulk();
-                                else if (workspace.bulkOperation) workspace.appControlWindow.acknowledgeCpuBulkReport();
-                            }
-                        }
-                    }
                 }
                 GohuText {
                     width: parent.width
@@ -1126,10 +1079,157 @@ Item {
                 objectName: "cpuPlusKillActuatorScroll"
                 flickable: actuatorScroll
                 geometryMode: "viewport"
-                visible: scrollable
+                visible: actuatorScroll.visible && scrollable
                 railColor: Colors.red
                 handleColor: Colors.magenta
                 wheelEnabled: false
+            }
+            Item {
+                id: bulkPanel
+                objectName: "cpuPlusBulkReview"
+                anchors.fill: parent
+                anchors.margins: 8
+                visible: workspace.destructiveConfirmOpen
+                enabled: visible
+                onVisibleChanged: if (visible) bulkScroll.contentY = 0
+
+                Column {
+                    id: bulkHeader
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 5
+                    GohuText {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "PROCESS // BULK ACTION"
+                        color: Colors.magenta
+                        font.pixelSize: 12
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Colors.red
+                        font.pixelSize: 12
+                        text: workspace.hasBulkReview
+                            ? "REVIEW // " + workspace.bulkReview.label
+                            : workspace.bulkOperation
+                            ? String(workspace.appControlWindow.hunterOperationKind).toUpperCase()
+                              + (workspace.hunterOperationActive ? " // RUNNING" : " // REPORT") : ""
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        text: workspace.hasBulkReview
+                            ? String(workspace.bulkReview.targets.length) + " CAPTURED TARGETS"
+                              + "\nGLOBAL SCOPE • NOT SEARCH RESULTS"
+                              + "\nNO COMMAND SENT"
+                            : workspace.hunterOperationActive
+                            ? "OWNER EXECUTING REVIEWED CAPTURE • NO AUTOMATIC RETRY"
+                            : workspace.bulkOperation ? "OWNER REPORT • REVIEW EVERY OUTCOME" : ""
+                    }
+                    Rectangle { width: parent.width; height: 1; color: Colors.cyan }
+                }
+
+                Item {
+                    id: bulkFooter
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 52
+                    Rectangle {
+                        anchors.top: parent.top
+                        width: parent.width
+                        height: 1
+                        color: Colors.cyan
+                    }
+                    Row {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 42
+                        spacing: 6
+                        ActionButton {
+                            objectName: "cpuPlusBulkCancel"
+                            width: workspace.hasBulkReview ? (parent.width-parent.spacing)/2 : parent.width
+                            height: parent.height
+                            visible: workspace.hasBulkReview || (workspace.bulkOperation
+                                && workspace.appControlWindow.hunterOperationPhase === "report")
+                            available: visible
+                            acceptedButtons: Qt.LeftButton
+                            label: workspace.hasBulkReview ? "CANCEL" : "ACKNOWLEDGE"
+                            accentColor: Colors.cyan
+                            labelFontSizeMode: Text.Fit
+                            onLeftClicked: {
+                                if (workspace.hasBulkReview) workspace.cancelBulk();
+                                else if (workspace.bulkOperation) workspace.appControlWindow.acknowledgeCpuBulkReport();
+                            }
+                        }
+                        ActionButton {
+                            objectName: "cpuPlusBulkConfirm"
+                            width: (parent.width-parent.spacing)/2
+                            height: parent.height
+                            visible: workspace.hasBulkReview
+                            available: visible
+                            acceptedButtons: Qt.LeftButton
+                            destructive: true
+                            accentColor: Colors.red
+                            label: "CONFIRM CAPTURE"
+                            labelFontSizeMode: Text.Fit
+                            onLeftClicked: workspace.confirmBulk()
+                        }
+                    }
+                    GohuText {
+                        anchors.centerIn: parent
+                        width: parent.width
+                        visible: workspace.hunterOperationActive
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        color: Colors.orange
+                        font.pixelSize: 10
+                        text: "RUNNING • REPORT WILL REMAIN WITH OWNER"
+                    }
+                }
+
+                Flickable {
+                    id: bulkScroll
+                    objectName: "cpuPlusBulkReviewScroll"
+                    anchors.top: bulkHeader.bottom
+                    anchors.topMargin: 6
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: bulkFooter.top
+                    anchors.bottomMargin: 6
+                    clip: true
+                    contentWidth: width
+                    contentHeight: bulkText.height + 8
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+                    GohuText {
+                        id: bulkText
+                        objectName: "cpuPlusBulkReviewText"
+                        width: Math.max(0,bulkScroll.width-14)
+                        wrapMode: Text.WrapAnywhere
+                        color: Colors.white
+                        font.pixelSize: 11
+                        text: workspace.hasBulkReview
+                            ? "FAVORITES AND PROTECTION RECHECKED BEFORE DISPATCH\n\n"
+                              + workspace.bulkReview.targets.map(t => t.name + " [PID " + t.pid
+                                  + "] • BIRTH " + t.startTicks).join("\n")
+                            : workspace.bulkOperation ? workspace.appControlWindow.cpuBulkMessage : ""
+                    }
+                }
+                NeonScrollBar {
+                    objectName: "cpuPlusBulkReviewRail"
+                    flickable: bulkScroll
+                    geometryMode: "viewport"
+                    visible: bulkPanel.visible && scrollable
+                    railColor: Colors.red
+                    handleColor: Colors.magenta
+                    wheelEnabled: false
+                }
             }
         }
     }

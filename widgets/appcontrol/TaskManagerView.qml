@@ -48,12 +48,12 @@ import "../../components"
                             if (!task) return [];
 
                             return [
-                                { id: "cpu", label: "CPU", value: Number(task.cpu || 0).toFixed(1) + "%", baseAccent: Colors.orange, critical: processController.metricIsCritical(task, "cpu") },
-                                { id: "mem", label: "MEM", value: Number(task.mem || 0).toFixed(1) + "%", baseAccent: Colors.magenta, critical: processController.metricIsCritical(task, "mem") },
-                                { id: "rss", label: "RSS", value: processController.formatMemory(task.rss), baseAccent: Colors.cyan, critical: processController.metricIsCritical(task, "rss") },
-                                { id: "threads", label: "THREADS", value: String(task.threads || 0), baseAccent: Colors.omnitrix, critical: processController.metricIsCritical(task, "threads") },
-                                { id: "pid", label: "PID", value: String(task.pid || "?"), baseAccent: Colors.yellow, critical: false },
-                                { id: "uptime", label: "UPTIME", value: String(task.elapsed || "?"), baseAccent: Colors.white, critical: false }
+                                { id: "cpu", label: "CPU", value: Number(task.cpu || 0).toFixed(1) + "%", baseAccent: Colors.resourceColor("cpu"), critical: processController.metricIsCritical(task, "cpu") },
+                                { id: "mem", label: "MEM", value: Number(task.mem || 0).toFixed(1) + "%", baseAccent: Colors.resourceColor("mem"), critical: processController.metricIsCritical(task, "mem") },
+                                { id: "rss", label: "RSS", value: processController.formatMemory(task.rss), baseAccent: Colors.resourceColor("rss"), critical: processController.metricIsCritical(task, "rss") },
+                                { id: "threads", label: "THREADS", value: String(task.threads || 0), baseAccent: Colors.resourceColor("threads"), critical: processController.metricIsCritical(task, "threads") },
+                                { id: "pid", label: "PID", value: String(task.pid || "?"), baseAccent: Colors.resourceColor("pid"), critical: false },
+                                { id: "uptime", label: "UPTIME", value: String(task.elapsed || "?"), baseAccent: Colors.resourceColor("uptime"), critical: false }
                             ];
                         }
 

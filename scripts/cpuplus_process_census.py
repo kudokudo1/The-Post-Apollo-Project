@@ -184,7 +184,8 @@ def main(argv=None):
             rows = compare(previous, current, hz)
             selected, focus_count = select_rows(rows)
             count += 1
-            send({"schema": SCHEMA, "event": "census", "sequence": count,
+            timeline = {"monotonicMs": round(time.monotonic()*1000)} if args.workshop else {}
+            send({**timeline, "schema": SCHEMA, "event": "census", "sequence": count,
                   "tsMs": round(time.time() * 1000), "scope": "same-user",
                   "observed": len(rows), "cpuMeasured": sum(r["cpuPct"] is not None for r in rows),
                   "ioMeasured": sum(r["readBps"] is not None and r["writeBps"] is not None for r in rows),
@@ -213,7 +214,8 @@ def main(argv=None):
     if args.workshop:
         end.update(workshopSchema="post-apollo-observer-calibration-v1",
                    calibration={"kind":"census","durationSeconds":args.duration,"intervalMs":args.interval*1000},
-                   observedMs=round((time.monotonic()-started)*1000))
+                   observedMs=round((time.monotonic()-started)*1000),
+                   monotonicMs=round(time.monotonic()*1000), startedMonotonicMs=round(started*1000))
     try:
         send(end)
     except output_errors:

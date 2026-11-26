@@ -6,6 +6,7 @@ import Quickshell.I3
 import Quickshell.Io
 import "../components"
 import "../services/system"
+import "../services/kill" as KillBackend
 import "../services/files"
 import "../services/remote"
 import qs.services.favorites
@@ -848,10 +849,13 @@ PanelWindow {
         beginKillPresentationChange("visibility", mode);
     }
 
-    property alias taskRows: processTelemetry.rows
-    property alias taskSnapshotLoading: processTelemetry.snapshotLoading
-    property alias taskSnapshotError: processTelemetry.snapshotError
-    property alias taskProcessCount: processTelemetry.processCount
+    // K1: the independent KillStore owns acquisition; this host retains
+    // its existing presentation callbacks until the graph/operation cutover.
+    readonly property var processTelemetry: KillBackend.KillStore.telemetry
+    readonly property var taskRows: KillBackend.KillStore.rows
+    readonly property bool taskSnapshotLoading: processTelemetry.snapshotLoading
+    readonly property string taskSnapshotError: processTelemetry.snapshotError
+    readonly property int taskProcessCount: processTelemetry.processCount
 
     GraphHistory {
         id: graphHistory
@@ -877,22 +881,22 @@ PanelWindow {
         controller: appControlWindow
     }
 
-    ProcessTelemetry {
-        id: processTelemetry
+    Connections {
+        target: appControlWindow.processTelemetry
 
-        onSnapshotReady: function(rows) {
+        function onSnapshotReady(rows) {
             appControlWindow.applyTaskSnapshot(rows);
         }
 
-        onMiniProbeReady: function(rows) {
+        function onMiniProbeReady(rows) {
             appControlWindow.applyTaskMiniProbeRows(rows);
         }
 
-        onDetailProbeReady: function(sample) {
+        function onDetailProbeReady(sample) {
             appControlWindow.applyTaskDetailProbe(sample);
         }
 
-        onDetailProbeRetryRequested: {
+        function onDetailProbeRetryRequested() {
             Qt.callLater(function() {
                 if (appControlWindow.menuOpen
                         && appControlWindow.selectedResultIsTask())
@@ -1540,7 +1544,7 @@ PanelWindow {
     property alias taskHunterDetailHistoryRevision: processPresentationState.taskHunterDetailHistoryRevision
     property alias taskMiniCpuIdentityHistories: processPresentationState.taskMiniCpuIdentityHistories
     property alias taskMiniHistoryRevision: processPresentationState.taskMiniHistoryRevision
-    property alias taskMiniProbeLoading: processTelemetry.miniProbeLoading
+    readonly property bool taskMiniProbeLoading: processTelemetry.miniProbeLoading
     property alias taskMiniDisplayRevision: processPresentationState.taskMiniDisplayRevision
     readonly property int taskMiniHistoryLimit: processPresentationState.taskMiniHistoryLimit
     property alias taskMiniPreloadSnapshots: processPresentationState.taskMiniPreloadSnapshots
@@ -1574,7 +1578,7 @@ PanelWindow {
         );
     }
 
-    property alias taskGraphProbeLoading: processTelemetry.detailProbeLoading
+    readonly property bool taskGraphProbeLoading: processTelemetry.detailProbeLoading
 
     function refreshKillMonitor() {
         systemTelemetry.refresh();
@@ -1805,7 +1809,7 @@ PanelWindow {
         traceTaskSnapshotDuration("task-order", traceSequence, stageStart, traceRowCount);
 
         stageStart = traceSequence ? Date.now() : 0;
-        taskRows = snapshotRows;
+        KillBackend.KillStore.publishSnapshot(snapshotRows);
         traceTaskSnapshotDuration("task-rows", traceSequence, stageStart, traceRowCount);
 
         if (menuOpen

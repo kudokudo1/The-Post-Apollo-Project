@@ -129,7 +129,15 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.match(owner,/function taskMiniProbeNeeded\(\) \{\s*return cpuPlusProcessVisible\s*\|\| \(menuOpen/);
     assert.match(owner,/id: taskManagerRefreshTimer[\s\S]*?interval:\s*appControlWindow\.cpuPlusProcessVisible\s*\? 600/);
     assert.match(owner,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: appControlWindow\.taskMiniProbeNeeded\(\)/);
-    assert.equal((owner.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,1);
+    const store=read("services/kill/KillStore.qml");
+    assert.match(store,/^pragma Singleton/m);
+    assert.equal((store.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,1);
+    assert.doesNotMatch(owner,/^\s*ProcessTelemetry\s*\{/m);
+    assert.match(owner,/readonly property var processTelemetry: KillBackend\.KillStore\.telemetry/);
+    assert.match(owner,/readonly property var taskRows: KillBackend\.KillStore\.rows/);
+    assert.match(owner,/Connections\s*\{\s*target: appControlWindow\.processTelemetry/);
+    assert.match(owner,/KillBackend\.KillStore\.publishSnapshot\(snapshotRows\)/);
+    assert.match(read("services/kill/qmldir"),/singleton KillStore 1\.0 KillStore\.qml/);
     assert.doesNotMatch(recipient,/^\s*(Timer|ProcessTelemetry)\s*\{/m);
     assert.match(recipient,/row\.cpuInstant !== undefined \? row\.cpuInstant : row\.cpu/);
     assert.match(recipient,/now-lastDetailSampleMs<history\.taskGraphScrollDuration/);

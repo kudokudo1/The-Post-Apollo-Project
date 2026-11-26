@@ -56,3 +56,30 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
             or "CPU_KILL_NATIVE_PASS" not in proc.stdout
             or "CPU_KILL_NATIVE_FAIL" in proc.stdout):
         raise SystemExit("CPU++ shared Kill native mount failed")
+
+# Independent KillStore proof: no donor or recipient widget is loaded.
+with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
+    base = Path(tmp)
+    config = base / "scene"
+    (config / "services/system").mkdir(parents=True)
+    shutil.copytree(ROOT / "services/kill", config / "services/kill")
+    shutil.copy2(ROOT / "services/system/ProcessTelemetry.qml",
+                 config / "services/system")
+    shutil.copy2(ROOT / "tests/cpuplus/fixtures/KillStoreStandaloneNative.qml",
+                 config / "smoke.qml")
+    env = os.environ.copy()
+    for key in ("HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
+                "XDG_DATA_HOME", "XDG_RUNTIME_DIR"):
+        directory = base / key
+        directory.mkdir(mode=0o700)
+        env[key] = str(directory)
+    env.update(QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
+               LIBGL_ALWAYS_SOFTWARE="1", QS_DISABLE_FILE_WATCHER="1",
+               WAYLAND_DISPLAY="", DISPLAY="")
+    proc = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
+                          cwd=config, env=env, text=True, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, timeout=20, check=False)
+    print(proc.stdout)
+    if (proc.returncode or "KILL_STORE_NATIVE_PASS" not in proc.stdout
+            or "KILL_STORE_NATIVE_FAIL" in proc.stdout):
+        raise SystemExit("Independent KillStore native mount failed")

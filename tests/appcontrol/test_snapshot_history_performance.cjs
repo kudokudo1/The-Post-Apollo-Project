@@ -275,8 +275,8 @@ test('AppControl six stage markers remain opt-in and preserve model assignment',
         assert.ok(ix > prev, 'ordered stage: ' + step);
         prev = ix;
     }
-    assert.ok(body.indexOf('taskRows = snapshotRows;') > body.indexOf('traceTaskSnapshotDuration("task-order"'));
-    assert.ok(body.indexOf('taskRows = snapshotRows;') < body.indexOf('traceTaskSnapshotDuration("task-rows"'));
+    assert.ok(body.indexOf('KillBackend.KillStore.publishSnapshot(snapshotRows);') > body.indexOf('traceTaskSnapshotDuration("task-order"'));
+    assert.ok(body.indexOf('KillBackend.KillStore.publishSnapshot(snapshotRows);') < body.indexOf('traceTaskSnapshotDuration("task-rows"'));
     assert.ok(body.includes('Qt.callLater(function() {'));
     assert.ok(body.includes('checkTaskMetricAlerts(snapshotRows);'));
     assert.ok(body.includes('taskMiniHistoryRevision += 1;'));
@@ -355,7 +355,7 @@ test('mini graph lookup preserves old scan results and rebuilds on snapshot repl
     assert.equal(indexed.resolve(stale), first);
     assert.match(graph, /readonly property var miniTaskLookup:\s*buildMiniTaskLookup\(taskRows\)/);
     assert.match(app, /taskRows:\s*appControlWindow\.taskRows/);
-    assert.match(app, /taskRows = snapshotRows;/);
+    assert.match(app, /KillBackend\.KillStore\.publishSnapshot\(snapshotRows\);/);
 });
 
 test('mini COMBI histories align once on demand and preserve snapshot isolation', () => {

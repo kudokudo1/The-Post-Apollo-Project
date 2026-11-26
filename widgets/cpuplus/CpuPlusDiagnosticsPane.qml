@@ -10,6 +10,7 @@ Column {
     objectName: "cpuplusDiagnosticControls"
     property Item headerTarget: null
     property Item footerTarget: null
+    property real workshopViewportHeight: 0
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
@@ -257,7 +258,7 @@ Column {
         height: active && item ? item.implicitHeight : 0
         active: root.workshopOpen
         visible: active
-        sourceComponent: CpuPlusDiagnosticWorkshop {}
+        sourceComponent: CpuPlusDiagnosticWorkshop { viewportHeight: root.workshopViewportHeight }
     }
     GohuText {
         width: parent.width
@@ -556,6 +557,8 @@ Column {
                         {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
                         {key:"COMPARE",label:"CMP"}]
                 ActionButton {
+                    id: diagnosticViewFilter
+                    objectName: "cpuplusDiagnosticView-"+modelData.key
                     required property var modelData
                     width: Math.max(0,Math.floor((diagnosticIndex.width-12)/5))
                     height: 25
@@ -565,9 +568,9 @@ Column {
                     labelFontSizeMode: Text.HorizontalFit
                     contentPadding: 1
                     selected: root.viewMode===modelData.key
-                    selectedFillColor: Colors.black
                     selectedBorderColor: Colors.magenta
                     selectedForegroundColor: Colors.magenta
+                    normalFace: true
                     acceptedButtons: Qt.LeftButton
                     onLeftClicked: root.selectView(modelData.key)
                 }

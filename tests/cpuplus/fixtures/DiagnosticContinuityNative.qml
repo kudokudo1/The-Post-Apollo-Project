@@ -33,6 +33,13 @@ ShellRoot {
         }
         return null;
     }
+    function normalFace(item, name, selected) {
+        const b=findItem(item,name);
+        const glow=b && findItem(b,"actionButtonNormalPerimeter");
+        return b && b.normalFace && b.selected===selected && String(b.color).toLowerCase()==="#1b0623"
+            && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
+            && glow && glow.active && glow.z===-1 && glow.item && glow.item.color.a===0;
+    }
     function check(ok, message) {
         if (!ok) {
             console.error("CPU_DIAG_NATIVE_FAIL // " + message);
@@ -296,13 +303,36 @@ ShellRoot {
                 const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
                 const execute=root.findItem(workshop,"cpuplusWorkshopExecute");
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
-                if (!root.check(duration && execute && dial && duration.width===32
+                if (!root.check(duration && execute && dial && duration.width===(workshop.compactLayout?24:32)
                     && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
-                    && workshop.phase==="PREPARE" && dial.options.length===4
+                    && workshop.phase==="PREPARE" && dial.options.length===12 && dial.readoutGlowEnabled && String(dial.markerColor).toLowerCase()==="#ed981a"
                     && dial.numericDetentInterval===1,"actual Workshop hardware and no automatic launch")) return;
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!root.check(viewport && viewport.contentHeight<=viewport.height+1,
                     "default Workshop fits native 320x620 viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
+                if (!root.check(root.normalFace(pane.item,"cpuplusMemoryMode-DIAG",true)
+                    && root.normalFace(pane.item,"cpuplusMemoryMode-CAP",false)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",true)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-storage",false), "normal opaque faces before unload")) return;
+                workshop.edit("selected",["threads","memory","census","storage"]);
+                root.phase=171;
+                return;
+            }
+            if (root.phase===171 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const execute=root.findItem(workshop,"cpuplusWorkshopExecute");
+                const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
+                const storage=root.findItem(workshop,"cpuplusWorkshopStorageInstrument");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!root.check(storage && storage.visible && storage.height===workshop.instrumentHeight && dial.visible
+                    && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>root.findItem(workshop,"cpuplusWorkshopCensusInterval").mapToItem(workshop,0,0).y
+                    && ["Duration","ThreadInterval","MemoryInterval","CensusInterval"].every(name=>{
+                        const slider=root.findItem(workshop,"cpuplusWorkshop"+name+"-hardware");
+                        return slider && slider.visible && slider.height===workshop.width;
+                    }),
+                    "full-length sliders above storage/thread instrument row")) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("censusIntervalMs",1000);
                 duration.valueRequested(1);
@@ -348,6 +378,10 @@ ShellRoot {
                 if (!workshop) return;
                 if (!root.check(workshop.draft.durationSeconds===1 && workshop.phase==="COMPLETE"
                     && !workshop.ready && !CpuPlusDiagnostics.busy,"draft and terminal continuity without rearming")) return;
+                if (!root.check(root.normalFace(pane.item,"cpuplusMemoryMode-DIAG",true)
+                    && root.normalFace(pane.item,"cpuplusMemoryMode-CAP",false)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-census",true)
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-threads",false), "normal opaque faces after actual remount")) return;
                 console.log("CPU_D3A_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;

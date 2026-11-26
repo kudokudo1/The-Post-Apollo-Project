@@ -20,13 +20,12 @@ Flow {
             height: 36
             accentColor: Colors.resourceColor(modelData.key)
             selected: root.selectedKey === String(modelData.key)
-            selectedFillColor: Colors.black
             selectedForegroundColor: accentColor
             selectedBorderColor: accentColor
             selectedContentGlowColor: accentColor
             selectedSoftGlowColor: accentColor
             contentGlowSelectedOpacity: 0.95
-            softGlowSelectedOpacity: 0.8
+            normalFace: true
             label: String(modelData.symbol || "")
             labelPixelSize: 24
             contentPadding: 0

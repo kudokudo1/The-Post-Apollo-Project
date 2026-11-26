@@ -510,3 +510,8 @@ from this fixture alone.
 
 **Semantic rule owner:** [Syntagma OPERATE // Post-Apollo icon grammar](https://github.com/kudokudo1/Meta-Apollo-Logos-Syntagma/blob/main/OPERATE/POST-APOLLO-ICON-GRAMMAR.md).
 Numerical QML implementation stays here, not copied into that grammar.
+
+
+### Normal-face ActionButton profile (D3c)
+
+For selectors whose **intentional** resting, selected, hovered and pressed face is opaque black, set `normalFace: true` on the shared `ActionButton`. Do not copy local face bindings or recreate the shadow stack. The profile fixes final face paint and fill resolution to opaque black, gates both filled RectangularShadow layers, preserves source-local glyph glow (including magenta press feedback), and optionally loads a transparent-outline perimeter effect **behind** the opaque face. `perimeterGlowEnabled` defaults to the profile; `perimeterGlowOpacity` defaults to 0.38. The outline samples only a border, not a filled rectangle. Its color follows the existing state-dependent content glow. No timer or state mutation is required, and the perimeter source is unloaded when the control is hidden or unavailable. Existing ActionButton consumers retain `normalFace: false`; do not migrate intentionally filled hover/selected/open states, special category washes, or progress/tank controls automatically. U9g's yellow-open and Angels' deliberate category washes remain valid. Do not override the profile's final face or reintroduce broad shadow layers in descendants. Verify actual color, glyph glow, perimeter source, and unchanged legacy fill across hide/show, remount and reflow. Offscreen native state assertions do not establish desktop GPU pixel appearance.

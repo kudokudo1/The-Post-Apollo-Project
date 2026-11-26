@@ -19,6 +19,8 @@ ShellRoot {
     property real previousScopeHeight: 0
     property real previousArgumentsHeight: 0
     property var lastRow: null
+    property var protectedGeometry: null
+    property bool stableLayoutChecked: false
 
     QtObject {
         id: fakePresentation
@@ -49,10 +51,10 @@ ShellRoot {
             }
             return null;
         }
-        function isProtected(pid, ticks, name) { return !!exactRow(pid,ticks,name); }
+        function isProtected(pid, ticks, name) { return fakeOwner.taskRequiresDangerUnlock(exactRow(pid,ticks,name)); }
         function isUnlocked(pid, ticks, name, action) {
-            return !!exactRow(pid,ticks,name) && fakeOwner.taskDangerActionUnlockMode(
-                exactRow(pid,ticks,name),action)!=="";
+            return !!exactRow(pid,ticks,name) && (!isProtected(pid,ticks,name) || fakeOwner.taskDangerActionUnlockMode(
+                exactRow(pid,ticks,name),action)!=="");
         }
         function currentLimitPercent(pid, ticks, name) { return 100; }
         function toggleOneShotUnlock(pid, ticks, name) {
@@ -133,7 +135,9 @@ ShellRoot {
         }
         property string masterMode: ""
         property var actionModes: ({})
-        function taskRequiresDangerUnlock(row) { return !!row; }
+        property bool protectTargets: true
+        function taskRequiresDangerUnlock(row) { return !!row && protectTargets; }
+        function taskDangerReason(row) { return "SYNTHETIC SESSION-CRITICAL PROCESS"; }
         function taskDangerUnlockMode(row) { return masterMode; }
         function taskDangerActionLocalUnlockMode(row,action) { return String(actionModes[action] || ""); }
         function taskDangerActionUnlockMode(row,action) {
@@ -178,6 +182,19 @@ ShellRoot {
                 active: smoke.armed
             }
         }
+    }
+
+    function instrumentGeometry(view) {
+        const names=["cpuPlusProcessIdentity","cpuPlusProcessStateHeader",
+            "cpuPlusProcessKillSlot","cpuPlusProcessHeaderActions","cpuPlusProcessFreezeSlot",
+            "cpuPlusProcessIndependentLockRail","cpuPlusProcessLockHelpButton",
+            "cpuPlusKillInstrumentViewport","cpuPlusKillSharedTaskView","cpuPlusProcessLimitLockSlot",
+            "cpuPlusSharedActionTarget"];
+        return names.map(function(name) {
+            const item=smoke.find(view,name);
+            const p=item.mapToItem(view,0,0);
+            return [p.x,p.y,item.width,item.height].map(v=>Math.round(v*100)/100);
+        });
     }
 
     function find(item, name) {
@@ -230,7 +247,31 @@ ShellRoot {
                 smoke.phase = 1;
                 return;
             }
+            if (smoke.phase === 18) {
+                if (!smoke.check(!smoke.find(view,"cpuPlusProcessMasterLock").visible
+                    && smoke.find(view,"cpuPlusLockRiskHelp").text.indexOf("ORDINARY TARGET")>=0
+                    && JSON.stringify(smoke.instrumentGeometry(view))===JSON.stringify(smoke.protectedGeometry),
+                    "unprotected target keeps identical instrument and lock-slot geometry")) return;
+                fakeOwner.protectTargets=true;
+                smoke.phase=19;
+                return;
+            }
+            if (smoke.phase === 19) {
+                if (!smoke.check(smoke.find(view,"cpuPlusProcessMasterLock").visible
+                    && smoke.find(view,"cpuPlusLockRiskHelp").text.indexOf("PROTECTED TARGET")>=0
+                    && JSON.stringify(smoke.instrumentGeometry(view))===JSON.stringify(smoke.protectedGeometry),
+                    "protected target restores locks without moving instruments")) return;
+                smoke.stableLayoutChecked=true;
+                smoke.phase=1;
+                return;
+            }
             if (smoke.phase === 1) {
+                if (!smoke.stableLayoutChecked) {
+                    smoke.protectedGeometry=smoke.instrumentGeometry(view);
+                    fakeOwner.protectTargets=false;
+                    smoke.phase=18;
+                    return;
+                }
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
@@ -465,7 +506,10 @@ ShellRoot {
                 if (!smoke.check(view.prepareAction("end")
                     && fakeGate.preparations===1
                     && fakeGate.confirmations===0
-                    && view.hasOwnedPending, "prepare without execution"))
+                    && view.hasOwnedPending
+                    && smoke.find(view,"cpuPlusProcessReviewWarning").text.indexOf("WARNING // PROTECTED PROCESS")>=0
+                    && smoke.find(view,"cpuPlusProcessReviewWarning").text.indexOf("SYNTHETIC SESSION-CRITICAL PROCESS")>=0,
+                    "prepare protected review with risk warning, without execution"))
                     return;
                 view.cancelOwned();
                 smoke.phase = 2;

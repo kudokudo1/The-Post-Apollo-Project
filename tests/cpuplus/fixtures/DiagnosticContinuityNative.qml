@@ -70,7 +70,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 360) {
+            if (++root.ticks > 420) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -516,6 +516,49 @@ ShellRoot {
                 if (!root.check(workshop && workshop.draft.stallThresholdMs===500 && !workshop.ready
                     && !CpuPlusDiagnostics.busy,"loaded calibration requires fresh prepare")) return;
                 console.log("CPU_D4A_NATIVE_PASS");
+                workshop.edit("selected",["census","storage"]);
+                workshop.edit("durationSeconds",1);
+                workshop.edit("censusIntervalMs",1000);
+                if (!root.check(CpuPlusDiagnostics.saveWorkshopPreset("QUICK A")
+                    && CpuPlusDiagnostics.saveWorkshopPreset("QUICK B")
+                    && CpuPlusDiagnostics.queueWorkshop("QUICK A")
+                    && CpuPlusDiagnostics.queueWorkshop("QUICK B")
+                    && CpuPlusDiagnostics.moveWorkshopQueue(1,-1)
+                    && CpuPlusDiagnostics.saveWorkshopSet("ORDERED")
+                    && CpuPlusDiagnostics.clearWorkshopQueue()
+                    && CpuPlusDiagnostics.removeWorkshopPreset("QUICK A")
+                    && CpuPlusDiagnostics.loadWorkshopSet("ORDERED")
+                    && CpuPlusDiagnostics.workshopQueue[0].name==="QUICK B"
+                    && CpuPlusDiagnostics.workshopQueue[1].name==="QUICK A"
+                    && !CpuPlusDiagnostics.busy,"set snapshots retain ordered independent calibrations")) return;
+                if (!root.check(!CpuPlusDiagnostics.startWorkshopSet("[]")
+                    && CpuPlusDiagnostics.startWorkshopSet(JSON.stringify(CpuPlusDiagnostics.queuePreview.items))
+                    && CpuPlusDiagnostics.setActive && !CpuPlusDiagnostics.request("inventory"),
+                    "explicit set launch holds shared single-flight")) return;
+                root.paneActive=false;
+                root.phase=33;
+                return;
+            }
+            if (root.phase===33) {
+                if(CpuPlusDiagnostics.setActive||CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const rows=CpuPlusDiagnostics.setRunResults;
+                if(!root.check(rows.length===2 && rows[0].name==="QUICK B" && rows[1].name==="QUICK A"
+                    && rows[0].id!==rows[1].id && rows.every(x=>x.status==="COMPLETE"
+                       && CpuPlusDiagnostics.archiveRows.some(r=>r.id===x.id))
+                    && CpuPlusDiagnostics.setFeedback.startsWith("SET COMPLETE"),
+                    "ordered set archives each exact step across unload // "+CpuPlusDiagnostics.setFeedback))return;
+                if(!root.check(CpuPlusDiagnostics.startWorkshopSet(JSON.stringify(CpuPlusDiagnostics.queuePreview.items)),
+                    "explicit second set launch"))return;
+                CpuPlusDiagnostics.stopWorkshopSet();
+                root.phase=34;
+                return;
+            }
+            if(root.phase===34){
+                if(CpuPlusDiagnostics.setActive||CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                if(!root.check(CpuPlusDiagnostics.setRunResults.length===1
+                    && CpuPlusDiagnostics.setFeedback.startsWith("SET CANCELLED"),
+                    "cancel prevents next queued capture // "+CpuPlusDiagnostics.setFeedback))return;
+                console.log("CPU_D4B_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

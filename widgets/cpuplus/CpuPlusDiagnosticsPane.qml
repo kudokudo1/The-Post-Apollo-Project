@@ -397,8 +397,9 @@ Column {
                         label: "+ QUEUE"
                         normalFace: true
                         accentColor: Colors.cyan
+                        objectName: "cpuplusDiagnosticQueuePreset-"+modelData.name
                         available: !CpuPlusDiagnostics.workshopPresetLocked
-                        onLeftClicked: if(CpuPlusDiagnostics.queueWorkshop(modelData.name))presets.mixerPage="QUEUE"
+                        onLeftClicked: CpuPlusDiagnostics.queueWorkshop(modelData.name)
                     }
                     ActionButton {
                         width: Math.floor((parent.width-8)/3)
@@ -430,6 +431,7 @@ Column {
             Repeater {
                 model: presets.mixerPage==="QUEUE"?CpuPlusDiagnostics.workshopQueue:[]
                 Row {
+                    id: queueRow
                     required property int index
                     required property var modelData
                     width: presets.width;spacing: 3
@@ -443,9 +445,9 @@ Column {
                         ActionButton {
                             required property string modelData
                             width: 26;height: 24;label:modelData;normalFace:true
-                            available: !CpuPlusDiagnostics.workshopPresetLocked
+                            available: !CpuPlusDiagnostics.workshopPresetLocked && (modelData==="X" || (modelData==="↑"?queueRow.index>0:queueRow.index<CpuPlusDiagnostics.workshopQueue.length-1))
                             onLeftClicked: {
-                                const i=parent.index;
+                                const i=queueRow.index;
                                 if(modelData==="X")CpuPlusDiagnostics.removeWorkshopQueue(i);
                                 else CpuPlusDiagnostics.moveWorkshopQueue(i,modelData==="↑"?-1:1);
                             }

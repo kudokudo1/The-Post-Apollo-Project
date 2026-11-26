@@ -103,3 +103,52 @@ function observerLaunchPlan(input, resolvePath, dataDir) {
     } else args.push("--interval",String(config.intervalMs/1000));
     return {config:config,args:args};
 }
+
+
+// D2a: one shared calibration, independent per-instrument cadences.
+// This pure preview never starts collectors or reserves an execution slot.
+function previewWorkflow(input) {
+    const refuse=reason=>({ok:false,reason:reason});
+    const fields=(object,expected)=>{
+        if (!object || Object.getPrototypeOf(object)!==Object.prototype) return false;
+        const keys=Reflect.ownKeys(object);
+        return keys.length===expected.length && keys.every(k=>expected.includes(k)
+            && Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptor(object,k),"value"));
+    };
+    if (!fields(input,["durationSeconds","instruments"])) return refuse("INVALID WORKFLOW");
+    const duration=input.durationSeconds, instruments=input.instruments;
+    if (!Number.isSafeInteger(duration)||duration<1||duration>120)
+        return refuse("INVALID SHARED DURATION");
+    if (!Array.isArray(instruments)||instruments.length<2||instruments.length>4
+            || Reflect.ownKeys(instruments).length!==instruments.length+1)
+        return refuse("SELECT TWO TO FOUR DISTINCT INSTRUMENTS");
+    const seen=[], entries=[];
+    for (let i=0;i<instruments.length;i++) {
+        const descriptor=Object.getOwnPropertyDescriptor(instruments,String(i));
+        if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor,"value"))
+            return refuse("INVALID INSTRUMENT");
+        const item=descriptor.value;
+        if (!item || Object.getPrototypeOf(item)!==Object.prototype) return refuse("INVALID INSTRUMENT");
+        const kd=Object.getOwnPropertyDescriptor(item,"kind");
+        if (!kd || !Object.prototype.hasOwnProperty.call(kd,"value")) return refuse("INVALID INSTRUMENT");
+        const kind=kd.value;
+        if (!["threads","memory","census","storage"].includes(kind)||seen.includes(kind))
+            return refuse("UNSUPPORTED OR DUPLICATE INSTRUMENT");
+        const keys=kind==="threads"?["kind","intervalMs","topCount"]:
+            kind==="storage"?["kind"]:["kind","intervalMs"];
+        if (!fields(item,keys)) return refuse("UNSUPPORTED INSTRUMENT FIELDS");
+        const preview=previewCalibration(Object.assign({},item,{durationSeconds:duration}));
+        if (!preview.ok) return refuse(kind.toUpperCase()+" // "+preview.reason);
+        seen.push(kind);
+        entries.push({config:preview.config,scope:preview.scope,estimatedIntervals:preview.intervals,
+            estimatedObservations:preview.observations,maximumReportBytes:65536});
+    }
+    // Canonical ordering is stable across UI selection order and saved presets.
+    const order=["threads","memory","census","storage"];
+    entries.sort((a,b)=>order.indexOf(a.config.kind)-order.indexOf(b.config.kind));
+    return {ok:true,schema:"post-apollo-diagnostic-workflow-plan-v1",durationSeconds:duration,
+        instruments:entries,estimatedObservations:entries.reduce((sum,e)=>sum+e.estimatedObservations,0),
+        maximumCombinedPayloadBytes:entries.length*65536,
+        sharedQuickshellIdentityRequired:seen.includes("threads")&&seen.includes("memory"),
+        launchReady:false};
+}

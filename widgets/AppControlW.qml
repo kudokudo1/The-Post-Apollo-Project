@@ -2401,12 +2401,15 @@ PanelWindow {
     }
 
     function requestKillHogs() {
-        // Repeated clicks during an active hunt are view actions only. They
-        // reopen the single live progress window and never send another TERM.
-        if (hunterOperationActive) {
+        // Repeated clicks during an active hunt or unacknowledged report
+        // reopen the single shared window and never send another TERM.
+        if (hunterOperationPhase !== "idle") {
             showHunterOperationWindow();
             return;
         }
+
+        if (destructiveConfirmOpen || hubProcessActionGate.pending)
+            return;
 
         const rows = hunterHogCandidates();
         if (rows.length === 0)
@@ -2433,10 +2436,12 @@ PanelWindow {
     }
 
     function requestKillMice() {
-        if (hunterOperationActive) {
+        if (hunterOperationPhase !== "idle") {
             showHunterOperationWindow();
             return;
         }
+        if (destructiveConfirmOpen || hubProcessActionGate.pending)
+            return;
 
         const rows = hunterMouseCandidates();
         if (rows.length === 0)

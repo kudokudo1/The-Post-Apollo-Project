@@ -1,0 +1,23 @@
+name: CPU++ shared Kill recipient source contract
+on:
+  pull_request:
+    paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusKillWorkspace.qml'
+      - 'widgets/appcontrol/TaskManagerView.qml'
+      - 'widgets/appcontrol/AppControlHubActionGate.qml'
+      - 'tests/cpuplus/test_shared_kill_recipient.cjs'
+      - '.github/workflows/cpuplus-shared-kill-recipient.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify shared Kill recipient source boundaries
+        run: node --test tests/cpuplus/test_shared_kill_recipient.cjs

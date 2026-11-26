@@ -12,7 +12,11 @@ Item {
     required property var controller
     property bool selected: false
     property bool hovered: false
+    property real leftInset: 6
+    property real rightInset: 6
     signal selectedRequested()
+    signal favoriteSelectedRequested()
+    signal favoriteHovered()
     height: 50
 
     readonly property bool hunter: controller.killViewMode === controller.killViewHunter
@@ -26,8 +30,8 @@ Item {
     Rectangle {
         id: plate
         anchors.fill: parent
-        anchors.leftMargin: 6
-        anchors.rightMargin: 6
+        anchors.leftMargin: root.leftInset
+        anchors.rightMargin: root.rightInset
         color: clicker.pressed ? Colors.magenta
                : root.selected || root.hovered ? Colors.yellow : Colors.dark
 
@@ -55,7 +59,7 @@ Item {
                 radius: 6
                 samples: 5
                 opacity: 0.46
-                color: glyph.color
+                color: root.selected || root.hovered ? Colors.orange : Colors.red
                 transparentBorder: true
             }
         }
@@ -78,6 +82,8 @@ Item {
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             spacing: 0
+            layer.enabled: !clicker.pressed && !root.selected && !root.hovered
+            layer.effect: DropShadow { radius: 6; samples: 6; opacity: 0.38; color: Colors.red; transparentBorder: true }
             GohuText {
                 width: parent.width
                 text: root.controller.taskDisplayName(root.entry)
@@ -92,6 +98,7 @@ Item {
                 text: root.controller.taskRowMetric(root.entry) + " • PID " + String(root.entry.pid || "?")
                     + (root.hunter && root.protectedTask ? " • ⚠︎ PROTECTED" : "")
                 font.pixelSize: 10
+                opacity: 0.90
                 elide: Text.ElideRight
                 color: clicker.pressed ? Colors.black
                      : root.selected || root.hovered ? Colors.orange : root.accent
@@ -149,31 +156,38 @@ Item {
             anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
             z: 500
+            id: star
+            property bool removalFlash: false
+            Timer { id: removalFlashTimer; interval: 240; onTriggered: star.removalFlash = false }
             GohuText {
                 anchors.centerIn: parent
                 text: root.favorite ? "✦" : "✧"
                 font.pixelSize: 19
                 color: root.favorite ? (root.accent === Colors.red ? Colors.magenta : root.accent)
-                      : Colors.white
-                opacity: root.favorite ? 1 : 0.62
+                      : star.removalFlash ? Colors.black : Colors.white
+                opacity: root.favorite || star.removalFlash ? 1 : 0.62
                 layer.enabled: true
                 layer.effect: DropShadow {
-                    radius: root.favorite ? 8 : 5
+                    radius: root.favorite || star.removalFlash ? 8 : 5
                     samples: 5
-                    opacity: root.favorite ? 0.58 : 0.12
-                    color: root.accent
+                    opacity: root.favorite ? 0.58 : star.removalFlash ? 0.72 : starMouse.containsMouse ? 0.20 : 0.08
+                    color: root.favorite ? (root.accent === Colors.red ? Colors.magenta : root.accent) : star.removalFlash ? Colors.red : Colors.white
                     transparentBorder: true
                 }
             }
             MouseArea {
+                id: starMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
                 preventStealing: true
+                onEntered: root.favoriteHovered()
                 onClicked: function(event) {
                     event.accepted = true;
-                    root.selectedRequested();
+                    root.favoriteSelectedRequested();
+                    const wasFavorite = root.favorite;
                     root.controller.toggleTaskFavorite(root.entry);
+                    if (wasFavorite) { star.removalFlash = true; removalFlashTimer.restart() }
                 }
             }
         }

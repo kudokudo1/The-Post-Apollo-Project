@@ -373,7 +373,7 @@ ShellRoot {
                 const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
                 const execute=root.findItem(workshop,"cpuplusWorkshopExecute");
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
-                if (!root.check(duration && execute && dial && duration.width===(workshop.compactLayout?24:32)
+                if (!root.check(duration && execute && dial && duration.width===(workshop.compactLayout?22:32)
                     && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
                     && workshop.phase==="PREPARE" && dial.options.length===12 && dial.readoutGlowEnabled && String(dial.markerColor).toLowerCase()==="#ed981a"
                     && dial.numericDetentInterval===1,"actual Workshop hardware and no automatic launch")) return;
@@ -399,7 +399,9 @@ ShellRoot {
                     && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>root.findItem(workshop,"cpuplusWorkshopCensusInterval").mapToItem(workshop,0,0).y
                     && ["Duration","ThreadInterval","MemoryInterval","CensusInterval"].every(name=>{
                         const slider=root.findItem(workshop,"cpuplusWorkshop"+name+"-hardware");
-                        return slider && slider.visible && slider.height===workshop.width;
+                        return slider && slider.visible && slider.height===workshop.width
+                            && String(slider.border.color)===String(duration.border.color)
+                            && String(slider.border.color)===String(duration.accentColor);
                     }),
                     "full-length sliders above storage/thread instrument row")) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
@@ -488,9 +490,16 @@ ShellRoot {
                 const storage=root.findItem(workshop,"cpuplusWorkshopStorageInstrument");
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!root.check(dial && dial.visible && threads.visible && storage.visible
-                    && dial.numericDetentInterval===50 && dial.markerColor.toString().toLowerCase()==="#ed981a"
+                    && dial.numericDetentInterval===50 && dial.markerColor.toString().toLowerCase()==="#c74ec7"
+                    && String(dial.activeDetentColor)===String(dial.markerColor)
+                    && String(dial.accentColor).toLowerCase()==="#f2be4e" && dial.outlinedOptionLabels
                     && root.normalFace(workshop,"cpuplusWorkshopInstrument-stall",true),
                     "actual second dial and fifth normal-face selector")) return;
+                const storageContents=root.findItem(storage,"cpuplusWorkshopStorageContents");
+                if (!root.check(storageContents && storageContents.y>=0
+                    && storageContents.y+storageContents.height<=storage.height+1
+                    && storageContents.children.every(c=>c.x>=0 && c.x+c.width<=storageContents.width+1),
+                    "storage contents fit card with all five instruments")) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,
                     "all five instruments fit // "+viewport.contentHeight+" / "+viewport.height)) return;
                 workshop.edit("selected",["storage","stall"]);

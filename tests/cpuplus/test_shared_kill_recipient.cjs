@@ -301,3 +301,23 @@ test("P4g: restart lock is checked and consumed at all existing authorization se
     assert.match(recipient,/restartLockTarget: restartLockSlot/);
     assert.match(donorView,/item.actionKind = "restart"/);
 });
+
+test("P4h: stable instrument reserves and protected review guidance",()=>{
+    assert.match(host,/name: "PROCESS", displayName: "KILL"/);
+    assert.match(host,/text: modelData.displayName \|\| modelData.name/);
+    assert.match(recipient,/id: instrumentTitle[\s\S]*?text: "KILL \/\/ TASK MANAGER"/);
+    assert.match(recipient,/id: instrumentHeaderLine[\s\S]*?height: 2\s+color: Colors.red/);
+    assert.match(recipient,/height: Math.max\(48, lockRail.reservedHeight/);
+    assert.match(recipient,/reservedHeight: 3 \* 23 \+ 3 \* spacing \+ 22/);
+    assert.doesNotMatch(recipient,/visible: lockRail.protectedTarget/);
+    assert.match(recipient,/id: limitLockSlot[\s\S]*?height: 26\s+visible: !!workspace.currentTask/);
+    assert.match(recipient,/name: "MASTER", ink: Colors.magenta/);
+    assert.match(recipient,/name: "KILL", ink: Colors.red/);
+    assert.match(recipient,/name: "RESTART", ink: Colors.yellow/);
+    assert.match(recipient,/name: "FREEZE \/ THAW", ink: Colors.cyan/);
+    assert.match(recipient,/name: "LIMIT", ink: Colors.yellow/);
+    assert.match(recipient,/WARNING \/\/ PROTECTED PROCESS/);
+    assert.match(recipient,/workspace.protectedProcessRisk\(workspace.currentTask\)/);
+    assert.match(recipient,/NO COMMAND HAS BEEN SENT/);
+    assert.match(recipient,/workspace.gate.confirm\(\)/);
+});

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.components
+import "../services/github/WorkflowSearchPolicy.js" as WorkflowSearch
 
 Item {
     id: root
@@ -12,22 +13,31 @@ Item {
     property string setNameDraft: ""
     property string armedSetAction: ""
     property string armedSetName: ""
+    property string armedSetRepository: ""
+    property string workflowQuery: ""
+    property bool workflowHelpOpen: false
+    readonly property var filteredWorkflows: WorkflowSearch.filter(root.libraryStore.workflows, workflowQuery)
+    onWorkflowQueryChanged: { clearSetArm(); if (workflowFlick) workflowFlick.positionViewAtBeginning(); }
+    onVisibleChanged: if (!visible) clearSetArm()
 
     signal workflowSelected(int index)
 
     function setActionArmed(action, nameValue) {
         return root.armedSetAction === String(action || "")
-            && root.armedSetName === String(nameValue || "");
+            && root.armedSetName === String(nameValue || "")
+            && root.armedSetRepository === root.libraryStore.repoSlug;
     }
 
     function armSetAction(action, nameValue) {
         root.armedSetAction = String(action || "");
         root.armedSetName = String(nameValue || "");
+        root.armedSetRepository = root.libraryStore.repoSlug;
     }
 
     function clearSetArm() {
         root.armedSetAction = "";
         root.armedSetName = "";
+        root.armedSetRepository = "";
     }
 
     function batchStateColor(stateValue) {
@@ -45,6 +55,9 @@ Item {
 
     Connections {
         target: root.libraryStore
+
+        function onRepoSlugChanged() { root.clearSetArm(); }
+        function onWorkflowsChanged() { root.clearSetArm(); }
 
         function onQueueRefChanged() {
             if (!queueRefInput.activeFocus
@@ -923,7 +936,7 @@ Item {
                     height: 24
 
                     GohuText {
-                        width: parent.width - 100
+                        width: Math.max(0, parent.width - 144)
                         text: "ALL WORKFLOWS"
                         font.pixelSize: 12
                         color: Colors.magenta
@@ -931,11 +944,70 @@ Item {
 
                     GohuText {
                         width: 100
-                        text: String(root.libraryStore.workflows.length) + " MACHINES"
+                        text: String(root.filteredWorkflows.length) + " / " + String(root.libraryStore.workflows.length) + " LOADED"
                         horizontalAlignment: Text.AlignRight
                         font.pixelSize: 8
                         color: Colors.orange
                     }
+                    LibraryButton {
+                        width: 44; height: 24; label: "INFO"
+                        selectedAction: root.workflowHelpOpen
+                        onTriggered: root.workflowHelpOpen = !root.workflowHelpOpen
+                    }
+                }
+
+                Row {
+                    id: workflowSearchRow
+                    width: parent.width; height: 32; spacing: 5
+                    Rectangle {
+                        width: Math.max(0, parent.width - 120); height: 32
+                        color: Colors.black; border.width: 1
+                        border.color: workflowSearchInput.activeFocus ? Colors.magenta : Colors.cyan
+                        GohuText {
+                            anchors.fill: parent; anchors.margins: 6
+                            verticalAlignment: Text.AlignVCenter
+                            visible: !workflowSearchInput.text.length && !workflowSearchInput.activeFocus
+                            text: "SEARCH WORKFLOW NAME / PATH"; color: Colors.cyan; font.pixelSize: 10
+                        }
+                        TextInput {
+                            id: workflowSearchInput
+                            objectName: "gitWorkflowSearch"
+                            anchors.fill: parent; anchors.margins: 6
+                            activeFocusOnPress: true; selectByMouse: true; clip: true
+                            verticalAlignment: TextInput.AlignVCenter
+                            font.family: "GohuFont 11 Nerd Font Mono"; font.pixelSize: 11
+                            color: Colors.white; selectionColor: Colors.magenta; selectedTextColor: Colors.black
+                            text: root.workflowQuery
+                            onTextChanged: root.workflowQuery = text
+                            onActiveFocusChanged: {
+                                if (!root.keyboardHost) return;
+                                if (activeFocus) root.keyboardHost.activeTextEditor = workflowSearchInput;
+                                else if (root.keyboardHost.activeTextEditor === workflowSearchInput)
+                                    root.keyboardHost.activeTextEditor = null;
+                            }
+                            Keys.onEscapePressed: function(event) {
+                                focus = false;
+                                if (root.keyboardHost) root.keyboardHost.restoreGitKeyboardFocus(false);
+                                event.accepted = true;
+                            }
+                        }
+                    }
+                    LibraryButton { width: 48; height: 32; label: "CLEAR"; onTriggered: { workflowSearchInput.text = ""; } }
+                    LibraryButton { width: 62; height: 32; label: "REFRESH"; enabledAction: !root.githubService.refreshing && !root.githubService.actionBusy && !root.githubService.factoryBusy; onTriggered: root.githubService.refresh() }
+                }
+                GohuText {
+                    id: workflowHelp
+                    width: parent.width; visible: root.workflowHelpOpen
+                    height: visible ? implicitHeight : 0
+                    wrapMode: Text.WordWrap; font.pixelSize: 10; color: Colors.cyan
+                    text: "SEARCH // matches loaded names and paths. RUN // confirm the exact workflow on the default branch; no queue required. CONTROL // open the existing selector. + QUEUE // append to ordered batch. X // two-click delete. REFRESH // fetch repository workflows."
+                }
+                GohuText {
+                    id: workflowInventoryNotice
+                    width: parent.width; height: implicitHeight
+                    wrapMode: Text.WordWrap; font.pixelSize: 9; color: Colors.orange
+                    text: root.githubService.refreshing ? "REFRESHING WORKFLOW INVENTORY"
+                        : "SEARCHING LOADED WORKFLOWS // older PX may limit inventory to 50; absence is not proof a workflow is missing remotely."
                 }
 
                 Rectangle {
@@ -944,7 +1016,7 @@ Item {
                     width: parent.width
                     height: visible ? 34 : 0
                     visible:
-                        root.githubService.actionKind === "delete-workflow"
+                        (root.githubService.actionKind === "delete-workflow" || root.githubService.actionKind === "run")
                         && root.githubService.actionResult !== "READY"
 
                     color: Colors.black
@@ -984,15 +1056,17 @@ Item {
 
                 Item {
                     width: parent.width
-                    height:
+                    height: Math.max(0,
                         parent.height
-                        - 31
+                        - 31 - workflowSearchRow.height - 7
+                        - workflowInventoryNotice.height - 7
+                        - (workflowHelp.visible ? workflowHelp.height + 7 : 0)
                         - workflowActionStatus.height
-                        - (workflowActionStatus.visible ? 7 : 0)
+                        - (workflowActionStatus.visible ? 7 : 0))
 
-                    Flickable {
+                    ListView {
                         id: workflowFlick
-
+                        objectName: "gitWorkflowResults"
                         anchors {
                             left: parent.left
                             right: workflowScrollTrack.left
@@ -1000,26 +1074,17 @@ Item {
                             bottom: parent.bottom
                             rightMargin: 7
                         }
-
                         clip: true
-                        contentWidth: width
-                        contentHeight: workflowColumn.height
+                        spacing: 5
+                        cacheBuffer: 0
+                        reuseItems: false
                         boundsBehavior: Flickable.StopAtBounds
-
-                        Column {
-                            id: workflowColumn
-
-                            width: parent.width
-                            spacing: 5
-
-                            Repeater {
-                                model: root.libraryStore.workflows
-
-                                Rectangle {
-                                    required property int index
+                        model: root.filteredWorkflows
+                                delegate: Rectangle {
                                     required property var modelData
 
-                                    width: workflowColumn.width
+                                    readonly property var workflow: modelData.workflow
+                                    width: workflowFlick.width
                                     height: 48
 
                                     color: Colors.black
@@ -1035,13 +1100,13 @@ Item {
                                         spacing: 6
 
                                         Column {
-                                            width: parent.width - 182
+                                            width: Math.max(0, parent.width - 242)
                                             anchors.verticalCenter: parent.verticalCenter
                                             spacing: 2
 
                                             GohuText {
                                                 width: parent.width
-                                                text: String(modelData.name || modelData.path || "UNKNOWN")
+                                                text: String(workflow.name || workflow.path || "UNKNOWN")
                                                 font.pixelSize: 9
                                                 color: Colors.white
                                                 elide: Text.ElideRight
@@ -1049,7 +1114,7 @@ Item {
 
                                             GohuText {
                                                 width: parent.width
-                                                text: String(modelData.path || "")
+                                                text: String(workflow.path || "")
                                                 font.pixelSize: 9
                                                 color: Colors.orange
                                                 opacity: 0.78
@@ -1059,16 +1124,37 @@ Item {
 
                                         LibraryButton {
                                             width: 62
-                                            label: "LOAD"
+                                            objectName: "gitWorkflowControl"
+                                            label: "CONTROL"
 
-                                            onTriggered: root.workflowSelected(index)
+                                            onTriggered: root.workflowSelected(modelData.sourceIndex)
+                                        }
+
+                                        LibraryButton {
+                                            width: 54
+                                            objectName: "gitWorkflowRun"
+                                            label: root.setActionArmed("run-workflow", String(workflow.path || "")) ? "GO?" : "RUN"
+                                            enabledAction: !!workflow.path && workflow.state === "active"
+                                                && root.githubService.available && !root.githubService.refreshing
+                                                && !root.githubService.actionBusy && !root.githubService.factoryBusy
+                                            onTriggered: {
+                                                const path = String(workflow.path || "");
+                                                if (!root.setActionArmed("run-workflow", path)) {
+                                                    root.armSetAction("run-workflow", path);
+                                                    return;
+                                                }
+                                                if (root.libraryStore.workflowAvailable(path))
+                                                    root.githubService.runWorkflow(path, "");
+                                                root.clearSetArm();
+                                            }
                                         }
 
                                         LibraryButton {
                                             width: 68
+                                            objectName: "gitWorkflowQueue"
                                             label: "+ QUEUE"
 
-                                            onTriggered: root.libraryStore.addWorkflow(modelData)
+                                            onTriggered: root.libraryStore.addWorkflow(workflow)
                                         }
 
                                         LibraryButton {
@@ -1077,7 +1163,7 @@ Item {
                                                 root.setActionArmed(
                                                     "delete-workflow",
                                                     String(
-                                                        modelData.path
+                                                        workflow.path
                                                         || ""
                                                     )
                                                 )
@@ -1090,7 +1176,7 @@ Item {
                                             onTriggered: {
                                                 const path =
                                                     String(
-                                                        modelData.path
+                                                        workflow.path
                                                         || ""
                                                     );
 
@@ -1112,19 +1198,14 @@ Item {
                                         }
                                     }
                                 }
-                            }
-
-                            GohuText {
-                                width: parent.width
-                                visible: root.libraryStore.workflows.length === 0
-
-                                text: "NO SAVED WORKFLOWS"
-                                horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 9
-                                color: Colors.cyan
-                                opacity: 0.42
-                            }
-                        }
+                    }
+                    GohuText {
+                        anchors.centerIn: workflowFlick
+                        visible: root.filteredWorkflows.length === 0
+                        text: root.githubService.refreshing ? "LOADING WORKFLOWS" :
+                            root.workflowQuery.trim().length ? "NO MATCH IN LOADED WORKFLOWS" : "NO LOADED WORKFLOWS"
+                        color: Colors.cyan
+                        font.pixelSize: 10
                     }
 
                     NeonScrollBar {
@@ -1137,7 +1218,7 @@ Item {
                         x: parent.width - width
                         y: 0
                         height: parent.height
-                        z: 0
+                        z: 2
 
                         barAreaWidth: 9
                         railWidth: 9
@@ -1163,7 +1244,9 @@ Item {
 
                         interactive: scrollable
                         preserveDragOffset: true
-                        wheelEnabled: false
+                        accountForContentOrigin: true
+                        clickToJump: true
+                        wheelEnabled: true
                         pointerCursorShape: Qt.ArrowCursor
                     }
                 }

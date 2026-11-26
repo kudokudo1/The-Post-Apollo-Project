@@ -1,0 +1,38 @@
+name: GitW workflow library search contracts
+on:
+  pull_request:
+    paths:
+      - "widgets/WorkflowLibraryView.qml"
+      - "services/github/WorkflowSearchPolicy.js"
+      - "tests/git/test_workflow_library_search.cjs"
+      - "tests/git/test_workflow_library_native.py"
+      - "tests/git/fixtures/WorkflowLibraryNative.qml"
+      - ".github/workflows/gitw-workflow-library-search.yml"
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/git/test_workflow_library_search.cjs
+
+  native-library:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install existing GitW native test runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
+            qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Exercise real Library scene with disposable remote service
+        env:
+          POST_APOLLO_WORKFLOW_LIBRARY_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/git/test_workflow_library_native.py

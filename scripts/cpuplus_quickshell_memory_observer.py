@@ -7,7 +7,8 @@ from pathlib import Path
 import sys
 import time
 
-from syntagma_quickshell_thread_sampler import find_quickshell, parse_stat_line
+from syntagma_quickshell_thread_sampler import (find_quickshell, parse_stat_line,
+                                               WorkshopOutput, WorkshopOutputLimit)
 
 FIELDS = ("Rss", "Pss", "Pss_Anon", "Pss_File", "Pss_Shmem",
           "Private_Clean", "Private_Dirty", "Swap", "SwapPss")
@@ -111,11 +112,17 @@ def main(argv=None):
     p.add_argument("--pid", type=int)
     p.add_argument("--duration", type=int, default=120)
     p.add_argument("--interval", type=int, default=10)
+    p.add_argument("--workshop", action="store_true")
     a = p.parse_args(argv)
     if not 1 <= a.duration <= 1800 or not 5 <= a.interval <= 60:
         p.error("duration 1..1800 seconds; interval 5..60 seconds")
     if a.pid is not None and a.pid <= 0:
         p.error("PID must be positive")
+    if a.workshop and (a.pid is not None or a.duration > 120
+                       or a.interval > a.duration
+                       or (a.duration + a.interval - 1) // a.interval > 12):
+        p.error("workshop calibration budget")
+    send = WorkshopOutput().emit if a.workshop else emit
     uid = os.getuid()
     root = Path("/proc")
     pid = a.pid if a.pid is not None else find_quickshell(root, uid)
@@ -132,6 +139,8 @@ def main(argv=None):
     deadline = time.monotonic() + a.duration
     previous = None
     previous_time = None
+    first_time = None
+    samples = 0
     try:
         while True:
             record = observe(path, uid, start)
@@ -145,20 +154,43 @@ def main(argv=None):
                     raise ValueError("inconsistent CPU counter")
                 record["cpuPct"] = round(100 * delta / hz / elapsed, 1)
                 record["sampleIntervalMs"] = round(elapsed * 1000)
-            emit(record)
+            if first_time is None:
+                first_time = now
+                if a.workshop:
+                    deadline = now + a.duration
+            if a.workshop and samples >= (a.duration + a.interval - 1) // a.interval + 1:
+                return 1
+            send(record)
+            samples += 1
             previous, previous_time = record, now
             remaining = deadline - now
             if remaining <= 0:
                 break
             time.sleep(min(a.interval, remaining))
+    except WorkshopOutputLimit:
+        return 1
     except (OSError, ValueError, IndexError):
-        emit({"event": "stopped", "pid": pid, "startTicks": start,
-              "reason": "identity-or-observation-unavailable"})
+        try:
+            send({"event": "stopped", "pid": pid, "startTicks": start,
+                  "reason": "identity-or-observation-unavailable"})
+        except WorkshopOutputLimit:
+            pass
         return 1
     except KeyboardInterrupt:
-        emit({"event": "stopped", "pid": pid, "reason": "user-interrupt"})
+        try:
+            send({"event": "stopped", "pid": pid, "reason": "user-interrupt"})
+        except WorkshopOutputLimit:
+            pass
         return 130
-    emit({"event": "complete", "pid": pid, "startTicks": start})
+    end = {"event": "complete", "pid": pid, "startTicks": start}
+    if a.workshop:
+        end.update(workshopSchema="post-apollo-observer-calibration-v1",
+                   calibration={"kind":"memory","durationSeconds":a.duration,"intervalMs":a.interval*1000},
+                   samples=samples, observedMs=round((previous_time-first_time)*1000))
+    try:
+        send(end)
+    except WorkshopOutputLimit:
+        return 1
     return 0
 
 

@@ -10,6 +10,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..', '..');
 const graph = fs.readFileSync(path.join(root, 'widgets/appcontrol/TaskGraphController.qml'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'widgets/AppControlW.qml'), 'utf8');
+const miniSource = fs.readFileSync(path.join(root, 'widgets/appcontrol/ProcessMiniGraph.qml'), 'utf8');
 
 const begin = graph.indexOf('    function updateMiniHunterMetricHistories(rows) {');
 const finish = graph.indexOf('\n    function miniCpuHistoryByIdentity(', begin);
@@ -358,11 +359,11 @@ test('mini graph lookup preserves old scan results and rebuilds on snapshot repl
 });
 
 test('mini COMBI histories align once on demand and preserve snapshot isolation', () => {
-    const start = app.indexOf('                            function snapshotCombiHistory(live) {');
-    const end = app.indexOf('                            function refreshHistory(animateScroll) {', start);
+    const start = miniSource.indexOf('    function snapshotCombiHistory() {');
+    const end = miniSource.indexOf('    function refreshHistory(animate) {', start);
     assert.ok(start >= 0 && end > start, 'locate exact mini canvas helper');
     const create = new Function('combiView', 'emptyCombiHistories', 'taskGraphController',
-        app.slice(start, end) + '\nreturn snapshotCombiHistory;');
+        'function readMetricHistory(metric){return taskGraphController.miniHunterHistoryForMetric({pid:99},metric);}' + miniSource.slice(start, end) + '\nreturn snapshotCombiHistory;');
     const empty = {cpu: [], mem: [], io: [], age: []};
     const source = {cpu: [1, 2, 3], mem: [4, 5], io: [0], age: [9, 10]};
     const entry = {pid: 99};
@@ -370,7 +371,7 @@ test('mini COMBI histories align once on demand and preserve snapshot isolation'
     let copies = 0;
     const controller = {
         miniHunterHistoryForMetric: (live, metric) => {
-            assert.equal(live, entry);
+            assert.deepStrictEqual(live, entry);
             calls.push(metric);
             return new Proxy(source[metric], {
                 get(target, key, receiver) {
@@ -408,16 +409,16 @@ test('mini COMBI histories align once on demand and preserve snapshot isolation'
         assert.deepStrictEqual(on(entry),legacyVisible(),'aligned length '+length);
         assert.equal(copies,length===0?0:4);
     }
-    const refresh = app.slice(end, app.indexOf('// Keep the same three-quarter grid', end));
-    assert.match(refresh, /const nextCombi = snapshotCombiHistory\(live\);/);
-    assert.match(refresh, /historyFrame = \{\s*values: Array.isArray\(next\) \? next.slice\(\) : \[\],\s*combi: nextCombi\s*\};/);
-    assert.match(refresh, /onCombiViewChanged:\s*\{\s*if \(graphReady\)\s*refreshHistory\(false\);/);
-    assert.match(refresh, /Component\.onCompleted:\s*\{\s*graphReady = true;\s*refreshHistory\(false\);/);
+    const refresh = miniSource.slice(end, miniSource.indexOf('// Keep the same three-quarter grid', end));
+    assert.match(refresh, /const combi = snapshotCombiHistory\(\)/);
+    assert.match(refresh, /historyFrame = \{values:Array.isArray\(next\)\?next.slice\(\):\[\],combi:combi\}/);
+    assert.match(refresh, /onCombiViewChanged: refreshHistory\(false\)/);
+    assert.match(refresh, /Component.onCompleted: \{ graphReady=true; refreshHistory\(false\) \}/);
     assert.match(refresh, /onHistoryRevisionChanged: refreshHistory\(true\)/);
-    assert.match(refresh, /onTaskIdentityChanged\(\)/);
-    assert.match(refresh, /onRowItemChanged\(\)/);
-    const traceStart=app.indexOf('readonly property var metricHistory:',app.indexOf('id: miniCombiTrace'));
-    const trace=app.slice(traceStart,app.indexOf('readonly property var metricPoints:',traceStart));
+    assert.match(refresh, /onTaskIdentityChanged: refreshHistory\(false\)/);
+    assert.match(refresh, /onMetricKeyChanged: refreshHistory\(false\)/);
+    const traceStart=miniSource.indexOf('readonly property var metricHistory:',miniSource.indexOf('id: miniCombiTrace'));
+    const trace=miniSource.slice(traceStart,miniSource.indexOf('readonly property var metricPoints:',traceStart));
     assert.match(trace,/combiHistories\[modelData.metric\]/);
     assert.doesNotMatch(trace,/\.slice\(|commonLength|for\s*\(/);
 });
@@ -426,17 +427,17 @@ test('mini graph scroll moves one trace layer, not every rectangle', () => {
     const start = app.indexOf('id: killMiniCpuCanvas');
     const stop = app.indexOf('id: selectorAppIconBox', start);
     assert.ok(start >= 0 && stop > start);
-    const mini = app.slice(start, stop);
+    const mini = miniSource;
     const layerStart = mini.indexOf('id: miniTraceLayer');
     assert.ok(layerStart > 0);
     const controls = mini.slice(0, layerStart);
     const trace = mini.slice(layerStart);
     assert.match(controls, /clip: true/);
-    assert.match(controls, /duration: appControlWindow.taskMiniGraphScrollDuration/);
+    assert.match(controls, /duration: root.scrollDuration/);
     assert.match(controls, /model: 3\s+delegate: Rectangle/);
     assert.match(controls, /readonly property bool fillReady:\s*graphPoints.length >= 2/);
     assert.match(trace, /anchors.fill: parent\s+transform: Translate \{\s*x: killMiniCpuCanvas.graphScrollOffset\s*\}/);
-    assert.equal((mini.match(/killMiniCpuCanvas\.graphScrollOffset/g) || []).length, 1,
+    assert.equal((mini.match(/root\.graphScrollOffset/g) || []).length, 1,
         'only one animated geometry dependency per mini graph');
     assert.match(trace, /model:\s*killMiniCpuCanvas.combiView\s*\? killMiniCpuCanvas.combiSeries : \[\]/);
     assert.match(trace, /x:\s*graphPoint.x\s*- width \/ 2\s+y: graphPoint.y/);
@@ -444,7 +445,7 @@ test('mini graph scroll moves one trace layer, not every rectangle', () => {
     assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y: parent\.p1\.y/g) || []).length, 4);
     assert.match(trace, /rotation: parent.segmentAngle/);
     assert.match(trace, /transformOrigin: Item.Left/);
-    assert.match(trace, /killMiniCpuCanvas\.graphPoints.length - 1/);
+    assert.match(trace, /root\.graphPoints.length - 1/);
     // The polling, history and destructive-action owners remain outside this
     // presentation change. Never reduce safety refreshes to improve rendering.
     assert.match(app, /\? 600\s*:\s*appControlWindow.menuOpen/);
@@ -678,18 +679,17 @@ test('opening substages and runtime KILL work remain opt-in and keep existing op
 
 
 test('mini graph publishes isolated equal-length frames and skips non-task refreshes', () => {
-    const start=app.indexOf('                            function refreshHistory(animateScroll) {');
-    const end=app.indexOf('                            onHistoryRevisionChanged:',start);
+    const start=miniSource.indexOf('    function refreshHistory(animate) {');
+    const end=miniSource.indexOf('    onHistoryRevisionChanged:',start);
     assert.ok(start>=0&&end>start);
-    // Execute the actual refresh function with QML-like owned properties.
-    const body=app.slice(start,end);
+    const body=miniSource.slice(start,end);
     const create=new Function('state',
-        'let graphReady=true; const killMiniGraphBox=state.box; const emptyCombiHistories=state.empty;'+
-        'let historyFrame={values:[],combi:emptyCombiHistories}; let historyValues=historyFrame.values,combiHistories=historyFrame.combi;'+
-        'const appControlWindow={selectedModeIndex:1,killModeIndex:7,killViewMode:0,killViewHunter:1};'+
-        'const taskGraphController={liveTaskForMiniGraph(){state.lookups++;return state.box.rowItem;},miniCpuHistoryByIdentity(){return state.values;},miniHunterHistoryForEntry(){return state.values;}};'+
-        'function snapshotCombiHistory(){return emptyCombiHistories;} function startGraphScroll(){state.starts++;} function stopGraphScroll(){state.stops++;}'+body+
-        '\nreturn {run(animate){refreshHistory(animate);historyValues=historyFrame.values;combiHistories=historyFrame.combi;return historyFrame;},ready(v){graphReady=v;}};');
+        'let graphReady=true; const emptyCombiHistories=state.empty;'+
+        'let showingTask=false; let historyFrame={values:[],combi:emptyCombiHistories}; let historyValues=historyFrame.values,combiHistories=historyFrame.combi;'+
+        'let graphScrollOffset=0; const width=82, historyLimit=48;'+
+        'function readHistory(){state.lookups++;return state.values;} function snapshotCombiHistory(){return emptyCombiHistories;}'+
+        'const motion={stop(){state.stops++;},restart(){state.starts++;}};'+body+
+        '\nreturn {run(animate){showingTask=state.box.showingTask;refreshHistory(animate);historyValues=historyFrame.values;combiHistories=historyFrame.combi;return historyFrame;},ready(v){graphReady=v;}};');
     const state={box:{showingTask:false,rowItem:{pid:10},taskIdentity:'task'},empty:{cpu:[],mem:[],io:[],age:[]},values:[1,2],lookups:0,starts:0,stops:0};
     const graph=create(state);
     const empty=graph.run(true);
@@ -713,12 +713,11 @@ test('mini graph publishes isolated equal-length frames and skips non-task refre
     assert.equal(state.lookups,2);
     state.box.showingTask=true;
     assert.deepStrictEqual(graph.run(false).values,[2,3]);
-    const mini=app.slice(app.indexOf('id: killMiniCpuCanvas'),app.indexOf('id: selectorAppIconBox',app.indexOf('id: killMiniCpuCanvas')));
-    assert.doesNotMatch(mini,/graphEpoch/);
-    assert.match(mini,/property int historyRevision:\s*killMiniGraphBox.showingTask\s*\? appControlWindow.taskMiniDisplayRevision : -1/);
-    assert.match(mini,/onShowingTaskChanged\(\)/);
-    assert.match(mini,/readonly property point p1:\s*killMiniCpuCanvas.graphPoints\[index\]/);
-    assert.match(mini,/readonly property point p2:\s*killMiniCpuCanvas.graphPoints\[index \+ 1\]/);
+    assert.doesNotMatch(miniSource,/graphEpoch/);
+    assert.match(app,/historyRevision: showingTask \? appControlWindow.taskMiniDisplayRevision : -1/);
+    assert.match(miniSource,/onShowingTaskChanged: refreshHistory\(false\)/);
+    assert.match(miniSource,/readonly property point p1:\s*root.graphPoints\[index\]/);
+    assert.match(miniSource,/readonly property point p2:\s*root.graphPoints\[index \+ 1\]/);
 });
 
 

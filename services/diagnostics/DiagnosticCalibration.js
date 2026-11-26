@@ -131,9 +131,9 @@ function previewWorkflow(input) {
     const duration=input.durationSeconds, instruments=input.instruments;
     if (!Number.isSafeInteger(duration)||duration<1||duration>120)
         return refuse("INVALID SHARED DURATION");
-    if (!Array.isArray(instruments)||instruments.length<2||instruments.length>4
+    if (!Array.isArray(instruments)||instruments.length<2||instruments.length>5
             || Reflect.ownKeys(instruments).length!==instruments.length+1)
-        return refuse("SELECT TWO TO FOUR DISTINCT INSTRUMENTS");
+        return refuse("SELECT TWO TO FIVE DISTINCT INSTRUMENTS");
     const seen=[], entries=[];
     for (let i=0;i<instruments.length;i++) {
         const descriptor=Object.getOwnPropertyDescriptor(instruments,String(i));
@@ -144,23 +144,23 @@ function previewWorkflow(input) {
         const kd=Object.getOwnPropertyDescriptor(item,"kind");
         if (!kd || !Object.prototype.hasOwnProperty.call(kd,"value")) return refuse("INVALID INSTRUMENT");
         const kind=kd.value;
-        if (!["threads","memory","census","storage"].includes(kind)||seen.includes(kind))
+        if (!["threads","memory","census","storage","stall"].includes(kind)||seen.includes(kind))
             return refuse("UNSUPPORTED OR DUPLICATE INSTRUMENT");
         const keys=kind==="threads"?["kind","intervalMs","topCount"]:
-            kind==="storage"?["kind"]:["kind","intervalMs"];
+            kind==="storage"?["kind"]:kind==="stall"?["kind","thresholdMs"]:["kind","intervalMs"];
         if (!fields(item,keys)) return refuse("UNSUPPORTED INSTRUMENT FIELDS");
         const preview=previewCalibration(Object.assign({},item,{durationSeconds:duration}));
         if (!preview.ok) return refuse(kind.toUpperCase()+" // "+preview.reason);
         seen.push(kind);
         entries.push({config:preview.config,scope:preview.scope,estimatedIntervals:preview.intervals,
-            estimatedObservations:preview.observations,maximumReportBytes:65536});
+            estimatedObservations:preview.observations,maximumReportBytes:kind==="stall"?24000:65536});
     }
     // Canonical ordering is stable across UI selection order and saved presets.
-    const order=["threads","memory","census","storage"];
+    const order=["threads","memory","census","storage","stall"];
     entries.sort((a,b)=>order.indexOf(a.config.kind)-order.indexOf(b.config.kind));
     return {ok:true,schema:"post-apollo-diagnostic-workflow-plan-v1",durationSeconds:duration,
         instruments:entries,estimatedObservations:entries.reduce((sum,e)=>sum+e.estimatedObservations,0),
-        maximumCombinedPayloadBytes:entries.length*65536,
+        maximumCombinedPayloadBytes:entries.reduce((sum,e)=>sum+e.maximumReportBytes,0),
         sharedQuickshellIdentityRequired:seen.includes("threads")&&seen.includes("memory"),
         launchReady:false};
 }

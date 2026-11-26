@@ -199,3 +199,47 @@ test("C6 preferred action identity matches original donor and preserves lazy pro
     assert.ok(liveHost.includes("FavoriteIdentity.detailActionId(selectedResult(),"));
     assert.ok(liveHost.includes("FavoriteIdentity.detailKey(context, actionId)"));
 });
+
+test("C10 residual membership and preferred selection match immutable donors",()=>{
+    for(const keys of [[],["task|"],["task|fox","system|cpu"],["thermal|"],[null,7,"other"],["task|%ZZ"]])
+    for(const metricKeys of [[],["taskmetric|fox|cpu"],["taskmetric|a%7Cb|rss"],["invalid"]])
+    for(const monitorKeys of [[],["invalid"]]) {
+        const store={favoriteKeys:keys,favoriteTaskMetricKeys:metricKeys,favoriteMonitorBoxKeys:monitorKeys};
+        const old=new Function("favoriteStore","taskPersistentIdentity",[
+            ...["taskHasMetricFavorite","hasTaskFavorites","hasMonitorFavorites"].map(donorFunction),
+            "return {taskHasMetricFavorite,hasTaskFavorites,hasMonitorFavorites};"
+        ].join("\n"))(store,adapter.taskIdentity);
+        let reads=0;
+        const readKeys=()=>{reads++;return keys;};
+        assert.equal(adapter.hasTaskFavorites(metricKeys,readKeys),old.hasTaskFavorites());
+        assert.equal(reads,metricKeys.length?0:1);
+        reads=0;
+        assert.equal(adapter.hasMonitorFavorites(monitorKeys,readKeys),old.hasMonitorFavorites());
+        assert.equal(reads,monitorKeys.length?0:1);
+        for(const entry of [null,{}, {comm:"FOX"}, {comm:"a|b"}, {name:"other"}]){
+            let metricReads=0;
+            const identity=adapter.taskIdentity(entry);
+            assert.equal(adapter.hasTaskMetricFavorite(identity,()=>{metricReads++;return metricKeys;}),
+                old.taskHasMetricFavorite(entry));
+            assert.equal(metricReads,identity?1:0);
+        }
+    }
+    for(const context of ["","app|x","run|x"])
+    for(const keys of [[],["app|other|launch"],["app|x|duplicate"],["run|x|duplicate","app|x|last"],["app|x|missing"]])
+    for(const count of [undefined,0,2,4]) {
+        const actions=["first","duplicate","duplicate","last"];
+        let expectedReads=[],actualReads=[];
+        const old=new Function("detailFavoriteContextKey","favoriteStore","detailActionCount","selectedResult","selectedResultIsApplication","appDesktopActions","favoriteSourceItem","detailActionStableId",
+            donorFunction("favoriteDetailActionIndex")+"\nreturn favoriteDetailActionIndex;")(
+                ()=>context,{favoriteDetailActionKeys:keys},()=>{expectedReads.push("count");return 4;},
+                ()=>({}),()=>true,()=>{expectedReads.push("actions");return actions;},e=>e,
+                (i,a)=>{expectedReads.push(i);return a[i]||"";});
+        const result=adapter.preferredActionIndex(context,keys,count,
+            ()=>{actualReads.push("count");return 4;},()=>{actualReads.push("actions");return actions;},
+            (i,a)=>{actualReads.push(i);return a[i]||"";});
+        assert.equal(result,old(count));
+        assert.deepEqual(actualReads,expectedReads);
+    }
+    for(const name of ["hasTaskMetricFavorite","hasTaskFavorites","hasMonitorFavorites","preferredActionIndex"])
+        assert.ok(liveHost.includes("FavoriteIdentity."+name+"("),name);
+});

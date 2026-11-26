@@ -627,8 +627,8 @@ test('preferred detail selection reuses action snapshots without changing favori
     ].join('\n');
     const identitySource=fs.readFileSync(path.join(root,'services/favorites/FavoritesAppControlIdentityPolicy.js'),'utf8');
     const identity=new Function(identitySource.replace(/^\.pragma library\s*$/m,'')+
-        '\nreturn {detailContextKey,detailActionId,detailKey};')();
-    const hostStub="const appControlWindow={selectedResultIsApplication,selectedResultIsRun,appEntryKey,favoriteKeyFor,runModeIndex,appDesktopActions};";
+        '\nreturn {detailContextKey,detailActionId,detailKey,preferredActionIndex};')();
+    const hostStub="const appControlWindow={selectedResultIsApplication,selectedResultIsRun,appEntryKey,favoriteKeyFor,runModeIndex,appDesktopActions,detailActionCount,selectedResult,favoriteSourceItem,detailActionStableId};";
     const make=new Function('state','counts','favoriteStore','FavoriteIdentity',stubs+'\n'+hostStub+'\n'+code+
         '\nreturn {pick:favoriteDetailActionIndex,key:detailFavoriteKeyFor,legacy:function(){const n=detailActionCount();for(let i=0;i<n;i++)if(isDetailActionFavorite(i))return i;return -1;}};');
     const cases=[

@@ -249,3 +249,66 @@ function detailKey(context, actionId) {
 
     return context + "|" + actionId;
 }
+
+// Local membership queries. Lazy key readers preserve the original QML
+// dependencies: no general-membership read when a watch already exists.
+function hasTaskMetricFavorite(identity, keysFor) {
+    if (!identity)
+        return false;
+    const prefix = "taskmetric|" + encodeURIComponent(identity) + "|";
+    const keys = keysFor();
+    for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i] || "").indexOf(prefix) === 0)
+            return true;
+    }
+    return false;
+}
+
+function hasTaskFavorites(metricKeys, keysFor) {
+    if (metricKeys.length > 0)
+        return true;
+    const keys = keysFor();
+    for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i] || "").indexOf("task|") === 0)
+            return true;
+    }
+    return false;
+}
+
+function hasMonitorFavorites(monitorKeys, keysFor) {
+    if (monitorKeys.length > 0)
+        return true;
+    const keys = keysFor();
+    for (let i = 0; i < keys.length; i++) {
+        const key = String(keys[i] || "");
+        if (key.indexOf("thermal|") === 0 || key.indexOf("system|") === 0)
+            return true;
+    }
+    return false;
+}
+
+// Selection only. A stored preferred identity is not permission to execute.
+// Snapshot callbacks run only for a relevant context; duplicate actions retain
+// the first matching action index, with availability checked by the host.
+function preferredActionIndex(context, keys, knownCount, countFor, actionsFor, idFor) {
+    if (!context)
+        return -1;
+    const prefix = context + "|";
+    let relevant = false;
+    for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i]).indexOf(prefix) === 0) {
+            relevant = true;
+            break;
+        }
+    }
+    if (!relevant)
+        return -1;
+    const count = knownCount === undefined ? countFor() : knownCount;
+    const actions = actionsFor();
+    for (let i = 0; i < count; i++) {
+        const id = idFor(i, actions);
+        if (id && keys.indexOf(prefix + id) !== -1)
+            return i;
+    }
+    return -1;
+}

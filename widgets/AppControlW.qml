@@ -6154,25 +6154,13 @@ PanelWindow {
     }
 
     function taskHasMetricFavorite(entry) {
-        const identity = taskPersistentIdentity(entry);
-        if (!identity)
-            return false;
-        const prefix = "taskmetric|" + encodeURIComponent(identity) + "|";
-        for (let i = 0; i < favoriteStore.favoriteTaskMetricKeys.length; i++) {
-            if (String(favoriteStore.favoriteTaskMetricKeys[i] || "").indexOf(prefix) === 0)
-                return true;
-        }
-        return false;
+        return FavoriteIdentity.hasTaskMetricFavorite(taskPersistentIdentity(entry),
+            function() { return favoriteStore.favoriteTaskMetricKeys; });
     }
 
     function hasTaskFavorites() {
-        if (favoriteStore.favoriteTaskMetricKeys.length > 0)
-            return true;
-        for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
-            if (String(favoriteStore.favoriteKeys[i] || "").indexOf("task|") === 0)
-                return true;
-        }
-        return false;
+        return FavoriteIdentity.hasTaskFavorites(favoriteStore.favoriteTaskMetricKeys,
+            function() { return favoriteStore.favoriteKeys; });
     }
 
     function taskMetricValue(entry, metricId) {
@@ -6296,18 +6284,8 @@ PanelWindow {
     }
 
     function hasMonitorFavorites() {
-        if (favoriteStore.favoriteMonitorBoxKeys.length > 0)
-            return true;
-
-        for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
-            const key = String(favoriteStore.favoriteKeys[i] || "");
-
-            if (key.indexOf("thermal|") === 0
-                    || key.indexOf("system|") === 0)
-                return true;
-        }
-
-        return false;
+        return FavoriteIdentity.hasMonitorFavorites(favoriteStore.favoriteMonitorBoxKeys,
+            function() { return favoriteStore.favoriteKeys; });
     }
 
     // Kept as a small compatibility helper for app sorting.
@@ -8929,38 +8907,20 @@ PanelWindow {
     }
 
     function favoriteDetailActionIndex(knownCount) {
-        // Resolve the selected context once. Most rows have no preferred
-        // action; do not rebuild desktop actions to discover that fact.
         const context = detailFavoriteContextKey();
         if (!context)
             return -1;
 
-        const keys = favoriteStore.favoriteDetailActionKeys;
-        const prefix = context + "|";
-        let relevant = false;
-        for (let i = 0; i < keys.length; i++) {
-            if (String(keys[i]).indexOf(prefix) === 0) {
-                relevant = true;
-                break;
-            }
-        }
-        if (!relevant)
-            return -1;
-
-        const count = knownCount === undefined ? detailActionCount() : knownCount;
-        const entry = selectedResult();
-        const actions = selectedResultIsApplication()
-            ? appDesktopActions(favoriteSourceItem(entry) || entry) : undefined;
-
-        // Preserve first matching action-index order, including duplicate
-        // desktop action IDs. Availability is still checked by the caller.
-        for (let i = 0; i < count; i++) {
-            const id = detailActionStableId(i, actions);
-            if (id && keys.indexOf(prefix + id) !== -1)
-                return i;
-        }
-
-        return -1;
+        return FavoriteIdentity.preferredActionIndex(context, favoriteStore.favoriteDetailActionKeys,
+            knownCount,
+            function() { return appControlWindow.detailActionCount(); },
+            function() {
+                const entry = appControlWindow.selectedResult();
+                return appControlWindow.selectedResultIsApplication()
+                    ? appControlWindow.appDesktopActions(appControlWindow.favoriteSourceItem(entry) || entry)
+                    : undefined;
+            },
+            function(i, actions) { return appControlWindow.detailActionStableId(i, actions); });
     }
 
     function toggleDetailActionFavorite(actionIndex) {

@@ -44,12 +44,20 @@ Scope {
         return row ? safetyOwner.requiresDangerUnlock(row) : true;
     }
 
+    function actionLockKind(action) {
+        if (action === "freeze" || action === "resume") return "freeze";
+        if (action === "restart") return "restart";
+        if (action === "limit") return "limit";
+        if (action === "end" || action === "kill") return "kill";
+        return "";
+    }
+
     function isUnlocked(pid, startTicks, name, action) {
         const row = exactRow(pid, startTicks, name);
         if (!row) return false;
         if (!safetyOwner.requiresDangerUnlock(row)) return true;
-        const kind = action === "freeze" || action === "resume" ? "freeze"
-                     : action === "limit" ? "limit" : "kill";
+        const kind = actionLockKind(action);
+        if (!kind) return false;
         return safetyOwner.dangerActionUnlocked(row, kind);
     }
 
@@ -87,8 +95,7 @@ Scope {
         if (action === "resume" && !presentationOwner.isFrozen(row)) {
             feedback = "NOT STOPPED"; return false;
         }
-        const key = action === "freeze" || action === "resume"
-                    ? "freeze" : action === "limit" ? "limit" : "kill";
+        const key = actionLockKind(action);
         if (safetyOwner.requiresDangerUnlock(row)
                 && !safetyOwner.dangerActionUnlocked(row, key)) {
             feedback = "PROTECTED PROCESS // UNLOCK ONCE FIRST"; return false;
@@ -105,8 +112,7 @@ Scope {
             const row = exactRow(pending.pid,pending.startTicks,pending.name);
             if (row)
                 safetyOwner.relockDangerAction(row,
-                    pending.action === "freeze" || pending.action === "resume"
-                    ? "freeze" : pending.action === "limit" ? "limit" : "kill");
+                    actionLockKind(pending.action));
         }
         pending = null;
         feedback = "CANCELLED // NO ACTION";
@@ -118,8 +124,8 @@ Scope {
         const req = pending;
         const row = exactRow(req.pid,req.startTicks,req.name);
         if (!row) { pending=null; feedback="PROCESS CHANGED // REFUSED"; return false; }
-        const kind = req.action === "freeze" || req.action === "resume" ? "freeze"
-                     : req.action === "limit" ? "limit" : "kill";
+        const kind = actionLockKind(req.action);
+        if (!kind) { pending=null; feedback="UNSUPPORTED ACTION"; return false; }
         if (safetyOwner.requiresDangerUnlock(row)
                 && !safetyOwner.dangerActionUnlocked(row,kind)) {
             pending=null; feedback="SAFETY LOCK RE-ENGAGED // REFUSED"; return false;
@@ -159,8 +165,8 @@ Scope {
         }
         const row = exactRow(req.pid,req.startTicks,req.name);
         if (!row) { feedback="PROCESS CHANGED SINCE VERIFICATION // REFUSED"; return; }
-        const kind = req.action === "freeze" || req.action === "resume" ? "freeze"
-                     : req.action === "limit" ? "limit" : "kill";
+        const kind = actionLockKind(req.action);
+        if (!kind) { pending=null; feedback="UNSUPPORTED ACTION"; return false; }
         if (safetyOwner.requiresDangerUnlock(row)
                 && !safetyOwner.dangerActionUnlocked(row,kind)) {
             feedback="SAFETY LOCK LOST // REFUSED"; return;

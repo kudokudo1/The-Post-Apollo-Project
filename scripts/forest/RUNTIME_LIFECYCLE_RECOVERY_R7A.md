@@ -243,3 +243,115 @@ registry, schema, signer, native source, new UI action or production
 authority are introduced here. Request exact Heart/Mind/Spirit/UI1/UI2
 compatibility and Nurse independent document review; any implementation
 requires new explicitly bounded authorization and actual source evidence.
+
+## R7f // Durable source and custody feasibility (design only)
+
+Nurse #2161 comment 7179545956 approves this bounded comparison, not
+a source selection. Inventory 7179482880 and owner dispositions:
+UI1 7179486984, UI2 7179493060, Heart 7179502122, Mind 7179503811,
+Spirit 7179508274. Main at intake db49916c; R7e is integrated.
+Neither candidate below has an actual qualified issuer or complete
+membership source. No schema, private data, API or executable change.
+
+### Existing evidence and limits
+
+| Actual source at intake | What exists | Why it cannot issue R7e |
+| --- | --- | --- |
+| B6r1 b7fdcfc5, TaskContext | Frozen principal/Tree/optional Clone/task/execution/generation/origin reference | No durable creator, enumeration, independent revision or authority. |
+| B1 d1533f15, sessions and turns | SQLite conversation and revision; _write uses BEGIN IMMEDIATE, rejects nesting | No member/Assignment lifecycle mapping, independent custody or complete roster. |
+| B3 c5dbbc29, reserve/commit | Exact attempt and user/reply lineage, atomic conversation commit | Reservation is not provider admission, member creation or authoritative currentness. |
+| R7c ef44829b, fixed-public transaction fixture | One Cherry slot; ACTIVE/PENDING/WINTER and exact recovery | Literal fixture, not general membership or protected lifecycle issuer. |
+| I6 dcae58df, process diagnostic | Bounded selected PID/cgroup correlation | Not complete process membership or canonical Colony lineage. |
+| Historical original task/session storage | Original active/dormant continuity semantics | Missing/skipped YAML and binding slots cannot prove completeness or current custody. |
+
+Connections' existing storage-independent authority boundary
+(9b541eaa) deliberately refuses protected operations; its separate
+Forest-purpose custodian RFC (e32e0a8f) leaves actual enrollment,
+original installed producer, DB opener, recipient channel and independent
+rollback/currentness custody unresolved. Neither Identity keys nor
+local fixtures can be reused as a Forest-purpose issuer. Spirit owns
+the protected seam and F1–F6 coordination; Runtime does not supply it.
+
+### Candidate/evidence matrix (no selection)
+
+| Requirement | A: one owner-approved durable lifecycle/member/Assignment transaction domain | B: separate durable source with independently reviewed reconciliation/fencing |
+| --- | --- | --- |
+| Actual owner, issuer and issuance path | Candidate Runtime-owned lifecycle writer co-designed with Mind for continuity; independently authorized installed writer/opener and issuer not identified. Existing B1/B3 transaction seam is evidence to investigate, not the selected database. | Runtime retains membership semantics; actual independent persistence owner/issuer/transport not identified. Requires named authorized source and original writer custody, not a second guessed registry. |
+| Original creation, replacement and retirement | An agreed writer must atomically bind original member address, lifetime and exact Assignment to its lifecycle/continuity mapping; freeze, terminal settlement and retirement must preserve original identity and separate conversation revision. No such general writer exists. | Each source must establish exact original identity and operation lineage. Durable reconciliation must serialize conflicting transitions and settle original outcome before publishing; neither source can declare completion from the other's optimistic response. No such protocol exists. |
+| Snapshot and completeness | A consistent read in the approved domain must bind complete membership and Assignment relations to one immutable revision and exact lifetime; all writers must advance it atomically. Separate independent custody must prove currentness and rollback resistance. No current roster revision exists. | Obtain independently pinned revisions from each required source under a proven common fence or equivalent consistency contract. Inconsistent, pending, missing or independently unverified source is unavailable; no join of unrelated latest rows. No common fence or recovery proof exists. |
+| Restart, replacement, lost ACK and rollback | Persist original transition/outcome and lifecycle generation; prove current independent floor on restart before exposing data. An older valid database image, equal-value alias or reused process cannot reestablish a retired lifetime. | Durable original operation identity and independently current source heads must survive interruption, rollback or replacement; recovery reads exact outcome, does not replay a write or pick newest by timestamp. Pending split outcomes stay held. |
+| B1/B3 writer compatibility | One actual transaction boundary must enforce lifecycle mapping before title/body access or new work without nested _write; preserve B3 original admitted settlement and atomic reply/session/attempt update. | Same B1/B3 invariants apply; an external check before SQL is insufficient. A separately reviewed durable fence must prevent conflicting writers from progressing between source check and mutation. No cross-store atomicity assumption. |
+| Disclosure and independent currentness | Shared SQL does not authenticate requester/recipient or serialize external delivery and revocation. Independent prequery and final effect fence remain required. | Same requirements plus independent cross-source currentness at delivery; loss of any required evidence refuses output. |
+| Feasibility disposition | Preferred investigation because R7c/R7d already require one coherent lifecycle/continuity boundary; actual storage and protected custody remain unproven. | Alternative only if separation is justified by actual owner/custody constraints and durable fencing/recovery is demonstrable. No existing qualified candidate established. |
+
+### Writer and projection separation
+
+R7d identifies actual B1 create/append/state and B3 reserve bypasses.
+B1 _owned can read a title; B3 _reserve reads M2 or legacy bodies before
+the RESERVED insert. Any eventual lifecycle-aware mode must independently
+resolve original mapping before those reads and check the actual writer
+transaction before mutation. R5 start_next/reopen and B4a generate may
+not bypass it. The original B3 admitted attempt alone may settle its
+exact operation and lineage; never treat RESERVED as admission. Do not
+pause, delete or rekey B1 to indicate Winter, and do not attach a new
+generation to an old grant. Preserve B3's existing reply, revision and
+attempt atomic unit. SQL serialization is not a provider send fence:
+B2's actual request effect and independent terminal receipt remain
+separate protected boundaries. Do not hold a SQL transaction across
+network IO as a substitute for that proof.
+
+For either candidate, the R7e owner projection must:
+
+1. Resolve the original principal, Tree, member (when required),
+   requester/recipient, purpose and view incarnation independently;
+   authorize enumeration before querying even metadata.
+2. Obtain a complete, immutable, independently current scoped source
+   snapshot with original lifetimes and revision; no conversation
+   body/title/history access, B3 reserve, cache admission or mutation.
+3. Apply independent row, alias, lineage, role, season, completeness,
+   count and action disclosure before assembly/serialization. No raw
+   identities, hidden counts, ordinal gaps or unapproved reason signal.
+4. At delivery, require independently current source, recipient/view and
+   policy under a separately approved effect/revocation fence. If revoke
+   wins, withhold; if an effect wins, revoke cannot be acknowledged as
+   complete until its permitted original outcome is independently
+   accounted for. A callback, local comparison or valid old signature
+   cannot prove this ordering. Unknown remains HOLD.
+5. Distinguish authorized complete-empty from partial, refused, missing
+   and unavailable; expose distinctions only when authorized. Withdraw
+   only the exact original view on stale/lost evidence; old callbacks
+   cannot clear or repopulate replacements. Restart never resurrects a
+   prior alias or selection. No automatic action, history or restoration.
+
+### Evidence required before a candidate can be selected
+
+- Named owner and independently enrolled Forest-purpose source/issuer,
+  original installed writer/opener and recipient channel; no same-UID,
+  fixture, Identity-purpose credential or local SQL as authority.
+- Actual creation/association/replacement/retirement writer coverage,
+  including concurrent claim and pending retirement, exact admitted
+  attempt settlement, and independent proof of scope completeness.
+- Original snapshot revision/lifetime and protected currentness across
+  restart, rollback and ABA (old equal-value record reappearing);
+  interrupted transaction/lost ACK exact outcome and no replay.
+- For B, explicit multi-source serialization, durable recovery, split
+  outcome refusal and proof a stale source cannot authorize a writer
+  or delivery. Otherwise retain HOLD rather than assert atomicity.
+- Independently reviewed deny-before-query and final effect ordering;
+  revoked, wrong scope, hidden metadata, partial snapshot, lost source
+  and replacement-view negative acceptance cases per R7e.
+- Heart resource/attempt/H2 custody remains independent; no physical
+  resource credit from a roster. Mind history, cache and retrieval
+  remain separately authorized. UI1/2 retain CHATS default, neutral
+  Tree and unavailable roster until a real source is approved.
+
+### Decision requested
+
+No existing store meets the full contract on inspected evidence.
+Request owner and Nurse exact design review of this comparison. A is
+a candidate for further architecture selection, not an approval to use
+B1 or to add a table. B requires a demonstrated need and separately
+approved fence/custody design. If no candidate meets the requirements,
+seek a new bounded architecture decision with the actual owner and
+Connections before proposing a writer, schema, migration or UI producer.
+Native execution, protected operations and production remain HOLD.

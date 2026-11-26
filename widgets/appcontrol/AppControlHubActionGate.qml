@@ -15,6 +15,7 @@ Scope {
     required property var limitsOwner
     required property var refreshOwner
 
+    property bool bulkBlocked: false
     property var pending: null
     property bool busy: false
     property string feedback: ""
@@ -59,7 +60,7 @@ Scope {
 
     function toggleOneShotUnlock(pid, startTicks, name) {
         const row = exactRow(pid, startTicks, name);
-        if (!row || busy || pending || !safetyOwner.requiresDangerUnlock(row))
+        if (!row || busy || pending || bulkBlocked || !safetyOwner.requiresDangerUnlock(row))
             return false;
         safetyOwner.toggleDangerUnlock(row); // existing AppControl safety state
         feedback = safetyOwner.dangerUnlocked(row)
@@ -69,7 +70,7 @@ Scope {
     }
 
     function prepare(pid, startTicks, name, action, percent) {
-        if (busy || pending) { feedback = "AN ACTION IS ALREADY PENDING"; return false; }
+        if (busy || pending || bulkBlocked) { feedback = "AN ACTION IS ALREADY PENDING"; return false; }
         const row = exactRow(pid, startTicks, name);
         if (!row) { feedback = "STALE PROCESS IDENTITY // SELECT AGAIN"; return false; }
         if (["freeze","resume","end","restart","limit"].indexOf(action) === -1) {
@@ -113,7 +114,7 @@ Scope {
     }
 
     function confirm() {
-        if (!pending || busy) return false;
+        if (!pending || busy || bulkBlocked) return false;
         const req = pending;
         const row = exactRow(req.pid,req.startTicks,req.name);
         if (!row) { pending=null; feedback="PROCESS CHANGED // REFUSED"; return false; }

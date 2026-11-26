@@ -74,8 +74,15 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     assert.match(recipient,/if \(sameTarget\(row\)\) return true/);
     for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillDetailScroll","cpuPlusKillActuatorScroll"])
         assert.ok(recipient.includes(name));
-    assert.match(recipient,/function killAllEligibleTasks\(\) \{ return \[\]; \}/);
-    assert.match(recipient,/BULK HOLD/);
+    assert.match(recipient,/function killAllEligibleTasks\(\) \{ return bulkCandidates\("kill-all"\); \}/);
+    assert.match(recipient,/appControlWindow\.prepareCpuBulkReview\(kind,hunterMetricMode,hunterVisibilityMode\)/);
+    assert.match(recipient,/appControlWindow\.confirmCpuBulkReview\(bulkReview\)/);
+    assert.match(recipient,/objectName: "cpuPlusBulkReview"/);
+    const owner=read("widgets/AppControlW.qml");
+    assert.match(owner,/cpuBulkReview !== review/);
+    assert.match(owner,/hunterOperationController\.start\(review\.kind, review\.targets, true\)/);
+    assert.match(owner,/hunterHogCandidates\(metric\)/);
+    assert.match(owner,/onCpuPlusProcessVisibleChanged: if \(!cpuPlusProcessVisible\) cpuBulkReview = null/);
 });
 
 test("recipient restores existing owner graph and favorite semantics", () => {

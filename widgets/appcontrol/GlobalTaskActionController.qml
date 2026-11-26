@@ -83,7 +83,8 @@ QtObject {
             host.showHunterOperationWindow();
             return;
         }
-        if (host.destructiveConfirmOpen || host.hubProcessActionGate.pending)
+        if (host.cpuBulkReview || host.destructiveConfirmOpen || host.hubProcessActionGate.pending
+                || host.hubProcessActionGate.busy)
             return;
         const rows = host.killAllEligibleTasks().filter(function(row) {
             const capture = host.hunterTargetsFromRows([row])[0];

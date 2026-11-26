@@ -1,4 +1,5 @@
 import QtQuick
+// P3c3 main-lineage native qualification: exercise the recipient after the P3c2 parent merge.
 import QtQuick.Window
 import Quickshell
 import "widgets/cpuplus"
@@ -11,6 +12,7 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property int previousRevision: 0
+    property var lastRow: null
 
     QtObject {
         id: fakePresentation
@@ -96,6 +98,33 @@ ShellRoot {
         property int taskMiniDisplayRevision: 1
         property var favoriteStore: QtObject { property var favoriteKeys: [] }
         property bool destructiveConfirmOpen: false
+        property var cpuBulkReview: null
+        property bool cpuBulkOperation: false
+        property string hunterOperationPhase: "idle"
+        property string hunterOperationKind: ""
+        property string cpuBulkMessage: ""
+        property int bulkConfirmed: 0
+        property int bulkCancelled: 0
+        function cpuBulkCandidates(kind,metric,visibility) { return taskRows; }
+        function prepareCpuBulkReview(kind,metric,visibility) {
+            if (cpuBulkReview || cpuBulkOperation) return null;
+            cpuBulkReview={kind:kind,metric:metric,visibility:visibility,label:"FAKE",
+                targets:[{pid:3442,startTicks:967833,name:"synthetic-worker"}]};
+            return cpuBulkReview;
+        }
+        function cancelCpuBulkReview(review) {
+            if (review !== cpuBulkReview) return false;
+            cpuBulkReview=null; bulkCancelled++; return true;
+        }
+        function confirmCpuBulkReview(review) {
+            if (review !== cpuBulkReview) return false;
+            hunterOperationKind=review.kind; cpuBulkReview=null;
+            cpuBulkOperation=true; hunterOperationPhase="running"; bulkConfirmed++;
+            return true;
+        }
+        function acknowledgeCpuBulkReport() {
+            cpuBulkOperation=false; hunterOperationPhase="idle"; return true;
+        }
         property string masterMode: ""
         property var actionModes: ({})
         function taskRequiresDangerUnlock(row) { return !!row; }
@@ -312,7 +341,8 @@ ShellRoot {
                     return;
                 if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
                     "prepare before process removal")) return;
-                fakeOwner.taskRows = [];
+                smoke.lastRow = fakeOwner.taskRows[0];
+            fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }
@@ -321,6 +351,18 @@ ShellRoot {
                 && fakeGate.pending===null && fakeGate.cancels===2
                 && fakeGate.confirmations===1, "stale selection refusal and owned review cancelled"))
                 return;
+            fakeOwner.taskRows = [smoke.lastRow];
+            if (!smoke.check(view.requestKillHogs() && view.hasBulkReview
+                    && fakeOwner.bulkConfirmed===0
+                    && fakeOwner.cpuBulkReview.metric===view.hunterMetricMode,
+                    "bulk click prepares only, uses recipient metric")) return;
+            view.cancelBulk();
+            if (!smoke.check(fakeOwner.bulkCancelled===1 && !view.hasBulkReview
+                    && fakeOwner.bulkConfirmed===0,"bulk cancellation sends no command")) return;
+            if (!smoke.check(view.requestKillMice() && view.confirmBulk()
+                    && fakeOwner.bulkConfirmed===1 && view.bulkOperation
+                    && !view.hasBulkReview && !view.confirmBulk(),
+                    "bulk review consumed once, progress remains owner-owned")) return;
             console.log("CPU_KILL_NATIVE_PASS");
             smoke.done = true;
             Qt.quit();

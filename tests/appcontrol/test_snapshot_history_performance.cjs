@@ -185,7 +185,7 @@ test('hidden CPU sampling preserves PID and FAVORITES identity histories', () =>
 });
 
 test('Hunter display short circuits preserve thresholds and protection classes', () => {
-    const start=app.indexOf('    function hunterTaskActive(entry) {');
+    const start=app.indexOf('    function hunterTaskActive(entry, requestedMetric) {');
     const end=app.indexOf('    function hunterMetricAccent()',start);
     assert.ok(start>=0&&end>start);
     const create=new Function('counts',app.slice(start,end)+`
@@ -224,7 +224,11 @@ test('Hunter display short circuits preserve thresholds and protection classes',
     }
     for(let mode=0;mode<5;mode++){
         model.metric(mode);
-        for(const row of rows)assert.equal(model.active(row),oldActive(row,mode));
+        for(const row of rows) {
+            assert.equal(model.active(row),oldActive(row,mode));
+            for(let requested=0;requested<5;requested++)
+                assert.equal(model.active(row,requested),oldActive(row,requested));
+        }
     }
     for(let mode=0;mode<3;mode++){
         model.visibility(mode);

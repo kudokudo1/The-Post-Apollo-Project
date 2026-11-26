@@ -1136,7 +1136,7 @@ import "../../components"
                     Item {
                     id: taskTerminationHeaderBox
 
-                    visible: !taskManagerBody.lockTarget || taskLimitSafetyLockLoader.visible
+                    visible: !taskManagerBody.lockTarget
                     width: parent.width
                     height: 30
 
@@ -1168,10 +1168,10 @@ import "../../components"
                     Row {
                         id: taskActionLockRow
                         parent: taskManagerBody.lockTarget || taskTerminationHeaderBox
-                        anchors.right: taskManagerBody.lockTarget ? undefined : parent.right
+                        anchors.right: parent.right
                         // KILLING ACTION cards are parent.width - 10 and centered,
                         // so their right edge sits 5 px inside this column.
-                        anchors.rightMargin: 5
+                        anchors.rightMargin: taskManagerBody.lockTarget ? 0 : 5
                         anchors.verticalCenter: taskManagerBody.lockTarget ? undefined : parent.verticalCenter
                         anchors.verticalCenterOffset: 0
                         spacing: 5
@@ -1275,7 +1275,7 @@ import "../../components"
                     label: taskManagerBody.headerActions ? "⟳" : ""
                     labelPixelSize: 22
                     labelMinimumPixelSize: 7
-                    labelFontSizeMode: Text.Fit
+                    labelFontSizeMode: taskManagerBody.headerActions ? Text.FixedSize : Text.Fit
                     contentPadding: taskManagerBody.headerActions ? 3 : 8
                     Accessible.name: "Restart process"
                     accentColor: taskManagerBody.headerActions ? Colors.yellow : Colors.cyan
@@ -1296,8 +1296,8 @@ import "../../components"
 
                     contentGlowEnabled: taskManagerBody.headerActions
                     softGlowEnabled: true
-                    softGlowSpread: 4
-                    softGlowMargin: 4
+                    softGlowSpread: taskManagerBody.headerActions ? 3 : 4
+                    softGlowMargin: taskManagerBody.headerActions ? 0 : 4
                     idleSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     hoverSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red
                     selectedSoftGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.red

@@ -518,12 +518,23 @@ Column {
                     Row {
                         width:parent.width;spacing:4
                         ActionButton {
-                            width:Math.floor((parent.width-4)/2);height:26;label:"LOAD SET";normalFace:true
+                            width:Math.floor((parent.width-8)/3);height:26;label:"LOAD SET";normalFace:true
                             available: !CpuPlusDiagnostics.workshopPresetLocked
                             onLeftClicked: if(CpuPlusDiagnostics.loadWorkshopSet(modelData.name))presets.mixerPage="QUEUE"
                         }
                         ActionButton {
-                            width:Math.floor((parent.width-4)/2);height:26;normalFace:true;accentColor:Colors.red
+                            width:Math.floor((parent.width-8)/3);height:26;label:"RUN SET";normalFace:true
+                            accentColor:Colors.orange
+                            available: !CpuPlusDiagnostics.workshopPresetLocked
+                            onLeftClicked: {
+                                if(CpuPlusDiagnostics.loadWorkshopSet(modelData.name)){
+                                    presets.mixerPage="QUEUE";
+                                    presets.armedQueue=JSON.stringify(CpuPlusDiagnostics.queuePreview.items);
+                                }
+                            }
+                        }
+                        ActionButton {
+                            width:Math.floor((parent.width-8)/3);height:26;normalFace:true;accentColor:Colors.red
                             label:presets.deleteName==="SET:"+modelData.name?"CONFIRM":"REMOVE"
                             available: !CpuPlusDiagnostics.workshopPresetLocked
                             onLeftClicked: {

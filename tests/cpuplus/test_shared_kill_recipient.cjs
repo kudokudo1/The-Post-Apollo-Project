@@ -436,3 +436,28 @@ test("K2b: exact detail identity, one probe, shared state and donor masking", ()
     assert.match(recipient,/graphDataAvailable: workspace.graphSession.matches\(workspace.currentTask\)/);
     assert.doesNotMatch(recipient,/ProcessPresentationState\s*\{|appendCurrentHistory|telemetry: null/);
 });
+
+test("detail parser refuses wrong birth and generation before advancing counters", () => {
+    const source=read("services/system/ProcessTelemetry.qml");
+    const begin=source.indexOf("    function parseDetailProbe(output) {");
+    const end=source.indexOf("\n    Process {",begin);
+    assert.ok(begin>=0 && end>begin);
+    const make=new Function("Date",`
+        let detailProbeGeneration=2, detailProbeActiveGeneration=2;
+        let detailProbePid=4321, detailProbeLastTicks=-1, detailProbeLastIoBytes=-1, detailProbeLastMs=0;
+        let detailProbeRequest={pid:4321,startTicks:98765,fallbackCpu:11,fallbackIoRate:4};
+        `+source.slice(begin,end)+`
+        return {parseDetailProbe, stale:()=>detailProbeActiveGeneration=1,
+            counters:()=>[detailProbeLastTicks,detailProbeLastIoBytes,detailProbeLastMs]};
+    `);
+    const p=make({now:()=>1000});
+    assert.equal(p.parseDetailProbe("4321 100 2048 100000 100 4 1000 98764 1000"),null);
+    assert.deepEqual(p.counters(),[-1,-1,0]);
+    const sample=p.parseDetailProbe("4321 100 2048 100000 100 4 1000 98765 1000");
+    assert.equal(sample.startTicks,98765);
+    assert.equal(sample.cpuPercent,11);
+    assert.deepEqual(p.counters(),[100,1000,1000]);
+    p.stale();
+    assert.equal(p.parseDetailProbe("4321 200 2048 100000 100 4 2000 98765 1001"),null);
+    assert.deepEqual(p.counters(),[100,1000,1000]);
+});

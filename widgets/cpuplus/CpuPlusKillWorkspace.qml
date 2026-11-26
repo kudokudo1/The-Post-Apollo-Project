@@ -371,7 +371,7 @@ Item {
     }
 
     function repaintDetail(reset) {
-        if (!ready || !details) return;
+        if (!ready || !active || !details || !graphSession.matches(currentTask)) return;
         details.cpuCanvas.requestPaint(false,!!reset);
         details.memCanvas.requestPaint(false,!!reset);
         details.combiScoreCanvas.requestPaint(false,!!reset);
@@ -512,7 +512,8 @@ Item {
         }
         function onRepaintCpuMem(reset) { workspace.repaintDetail(reset); }
         function onRepaintCpu(reset) {
-            if (workspace.ready) details.cpuCanvas.requestPaint(false,!!reset);
+            if (workspace.ready && workspace.active && workspace.graphSession.matches(workspace.currentTask))
+                details.cpuCanvas.requestPaint(false,!!reset);
         }
         function onRepaintAll(reset) { workspace.repaintDetail(reset); }
     }

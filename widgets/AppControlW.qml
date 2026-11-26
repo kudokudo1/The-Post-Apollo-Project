@@ -907,6 +907,8 @@ PanelWindow {
         target: appControlWindow.taskGraphController
 
         function onPrepareCpuMemAppend() {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(true);
             if (taskManagerBody.memCanvas)
@@ -914,11 +916,15 @@ PanelWindow {
         }
 
         function onPrepareCombiAppend() {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.combiScoreCanvas)
                 taskManagerBody.combiScoreCanvas.requestPaint(true);
         }
 
         function onRepaintCpuMem(forceReset) {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
             if (taskManagerBody.memCanvas)
@@ -926,11 +932,15 @@ PanelWindow {
         }
 
         function onRepaintCpu(forceReset) {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
         }
 
         function onRepaintAll(forceReset) {
+            if (!appControlWindow.menuOpen
+                    || !killDetailSession.matches(selectedTask())) return;
             if (taskManagerBody.cpuCanvas)
                 taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
             if (taskManagerBody.memCanvas)

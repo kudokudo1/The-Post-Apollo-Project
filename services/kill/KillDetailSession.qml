@@ -25,7 +25,10 @@ Scope {
     readonly property string requestedKey: cpuActive ? cpuTarget : donorActive ? donorTarget : ""
     readonly property var currentEntry: {
         if (!requestedKey) return null;
-        return rows.find(row => identity(row) === requestedKey) || null;
+        const expected=JSON.parse(requestedKey);
+        return rows.find(row => row && row._taskRecord === true
+            && Number(row.pid)===expected[0] && Number(row.startTicks)===expected[1]
+            && String(row.comm || "")===expected[2]) || null;
     }
     readonly property string activeKey: identity(currentEntry)
 

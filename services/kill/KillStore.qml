@@ -5,8 +5,8 @@ import Quickshell
 import "../system"
 
 // Authoritative runtime acquisition store. No widget dependency, persistence,
-// process mutation, or additional timer. K1 preserves the existing acquisition
-// implementation and lets the temporary donor adapter drive its cadence.
+// process mutation, or extra polling loop. The original detail cadence is
+// now here; the temporary donor adapter still drives snapshot/mini cadence.
 Scope {
     id: root
 

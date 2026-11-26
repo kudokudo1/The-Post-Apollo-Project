@@ -26,6 +26,7 @@ on:
       - "widgets/cpuplus/CpuPlusQueueHistoryPane.qml"
       - "widgets/cpuplus/CpuPlusAutoWorkspace.qml"
       - "services/memory/MemoryQueueSessionHost.js"
+      - "tests/cpuplus/test_diagnostic_calibration.cjs"
       - "tests/cpuplus/test_diagnostic_controls.cjs"
       - "tests/cpuplus/test_diagnostic_comparison.cjs"
       - "tests/cpuplus/test_diagnostic_notifications.cjs"
@@ -51,6 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_diagnostic_calibration.cjs
       - run: node tests/cpuplus/test_diagnostic_controls.cjs
       - run: node tests/cpuplus/test_diagnostic_comparison.cjs
       - run: node tests/cpuplus/test_diagnostic_notifications.cjs

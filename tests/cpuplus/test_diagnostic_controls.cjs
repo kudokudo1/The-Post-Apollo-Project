@@ -341,7 +341,8 @@ assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopTopThreads"')<workshop.i
 assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"')<workshop.indexOf('objectName: "cpuplusWorkshopStallThreshold"'));
 assert.doesNotMatch(workshop,/selected(Foreground|Border|ContentGlow|SoftGlow)Color: accentColor/);
 
-assert.match(workshopSlider,/accentColor: Colors.white/);
+assert.match(workshopSlider,/frameColor: Colors.white/);
+assert.match(workshopSlider,/accentColor: root.subjectColor/);
 assert.match(workshop,/activeDetentColor: Colors.magenta/);
 assert.match(workshop,/outlinedOptionLabels: true/);
 assert.match(workshop,/accentColor: Colors.yellow\s+markerColor: Colors.magenta/);

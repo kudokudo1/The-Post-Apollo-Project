@@ -72,6 +72,33 @@ Item {
     function keyOf(row) {
         return String(row.id || ("task:" + row.pid));
     }
+    // Presentation only: capture identity, eligibility and dispatch remain owner-owned.
+    // Linux comm is not a reliable application catalog. Recognize explicit
+    // program families, treating other names as ordinary process names.
+    function reviewProcessColor(name) {
+        const key=String(name || "").toLowerCase().trim();
+        if (/^(sway($|[-_])|quickshell($|[-_])|kitty($|[-_])|foot($|[-_])|alacritty($|[-_])|wezterm($|[-_])|ghostty($|[-_])|konsole($|[-_])|gnome-terminal|xterm($|[-_])|xwayland|xorg($|[-_])|waybar($|[-_])|hyprland($|[-_])|weston($|[-_])|wlr-randr|swaybg|swayidle|swaylock|mako($|[-_])|bash$|zsh$|fish$|sh$|zellij($|[-_])|tmux($|[-_]))/.test(key))
+            return Colors.omnitrix;
+        if (/^(brave|firefox|chromium|chrome|vivaldi|opera|thunderbird|vesktop|discord|spotify|code($|[-_])|codium|obsidian|libreoffice|soffice|gimp|krita|blender|vlc($|[-_])|mpv($|[-_])|steam($|[-_])|nautilus|dolphin|thunar|telegram|signal-desktop|obs($|[-_])|proton-mail)/.test(key))
+            return Colors.cyan;
+        return Colors.green;
+    }
+    function escapeReviewText(value) {
+        return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+            .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    }
+    function reviewInk(value, ink) {
+        return '<font color="' + String(ink) + '">' + escapeReviewText(value) + '</font>';
+    }
+    function reviewTargetText(target, ink) {
+        const name=String(target.name || target.comm || "PROCESS");
+        const tokens=name.split(/([ \t.,:;_\/\\()[\]{}+\-!?@#$%&*=|<>’'"]+)/);
+        return tokens.map(function(token,i) {
+            return reviewInk(token,i%2 ? Colors.white : ink);
+        }).join("") + reviewInk(" [PID ",Colors.white)
+            + reviewInk(String(target.pid || "?"),ink) + reviewInk("]",Colors.white);
+    }
+
     function protectedProcessRisk(row) {
         const reason = row && appControlWindow && appControlWindow.taskDangerReason
             ? String(appControlWindow.taskDangerReason(row) || "") : "";
@@ -259,13 +286,9 @@ Item {
     function hunterMouseCandidates() { return bulkCandidates("kill-mice"); }
     function requestBulk(kind) {
         if (!active || !bulkAvailable) return false;
-        if (bulkOperation || hasBulkReview) {
-            actuatorScroll.contentY = 0;
-            return true;
-        }
+        if (bulkOperation || hasBulkReview) return true;
         if (locallyPending || modelBlank || (gate && (gate.pending || gate.busy))) return false;
         bulkReview = appControlWindow.prepareCpuBulkReview(kind,hunterMetricMode,hunterVisibilityMode);
-        if (hasBulkReview) actuatorScroll.contentY = 0;
         return hasBulkReview;
     }
     function requestKillAllEligibleTasks() { return requestBulk("kill-all"); }
@@ -404,10 +427,6 @@ Item {
         if (ok) {
             ownedPendingRef = gate.pending;
             locallyPending = !!ownedPendingRef;
-            if (locallyPending) Qt.callLater(function() {
-                if (workspace.hasOwnedPending)
-                    actuatorScroll.contentY = Math.max(0,actuatorScroll.contentHeight-actuatorScroll.height);
-            });
         }
         return !!ok;
     }
@@ -901,56 +920,6 @@ Item {
                 id: actuatorBody
                 width: Math.max(0,actuatorScroll.width-14)
                 spacing: 6
-                Column {
-                    objectName: "cpuPlusBulkReview"
-                    width: parent.width
-                    visible: workspace.hasBulkReview || workspace.bulkOperation
-                    spacing: 8
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Colors.red
-                        text: workspace.hasBulkReview
-                            ? "REVIEW // " + workspace.bulkReview.label
-                            : workspace.bulkOperation
-                            ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase() : ""
-                    }
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Colors.white
-                        font.pixelSize: 11
-                        text: workspace.hasBulkReview
-                            ? String(workspace.bulkReview.targets.length) + " CAPTURED TARGETS"
-                              + "\nGLOBAL SCOPE • NOT SEARCH RESULTS"
-                              + "\nNO COMMAND SENT • PROTECTION RECHECKED BEFORE DISPATCH\n\n"
-                              + workspace.bulkReview.targets.map(t => t.name + " [PID " + t.pid + "]").join("\n")
-                            : workspace.bulkOperation ? workspace.appControlWindow.cpuBulkMessage : ""
-                    }
-                    Rectangle {
-                        objectName: "cpuPlusBulkConfirm"
-                        width: parent.width; height: 38
-                        visible: workspace.hasBulkReview
-                        color: Colors.black; border.color: Colors.red; border.width: 1
-                        GohuText { anchors.centerIn: parent; text: "CONFIRM CAPTURE"; color: Colors.red }
-                        MouseArea { anchors.fill: parent; enabled: workspace.hasBulkReview; onClicked: workspace.confirmBulk() }
-                    }
-                    Rectangle {
-                        objectName: "cpuPlusBulkCancel"
-                        width: parent.width; height: 34
-                        visible: workspace.hasBulkReview || (workspace.bulkOperation
-                            && workspace.appControlWindow.hunterOperationPhase === "report")
-                        color: Colors.black; border.color: Colors.cyan; border.width: 1
-                        GohuText { anchors.centerIn: parent; text: workspace.hasBulkReview ? "CANCEL" : "ACKNOWLEDGE"; color: Colors.cyan }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (workspace.hasBulkReview) workspace.cancelBulk();
-                                else if (workspace.bulkOperation) workspace.appControlWindow.acknowledgeCpuBulkReport();
-                            }
-                        }
-                    }
-                }
                 GohuText {
                     id: emptyTarget
                     visible: !workspace.currentTask
@@ -1035,64 +1004,7 @@ Item {
                     color: Colors.orange
                     font.pixelSize: 10
                 }
-                GohuText {
-                    width: parent.width
-                    visible: workspace.hasOwnedPending
-                    wrapMode: Text.Wrap
-                    objectName: "cpuPlusProcessReviewWarning"
-                    text: workspace.hasOwnedPending
-                        ? ("CONFIRM " + String(workspace.gate.pending.action).toUpperCase()
-                           + " FOR PID " + String(workspace.gate.pending.pid)
-                           + "\nNO COMMAND HAS BEEN SENT"
-                           + (workspace.isProtected(workspace.currentTask)
-                               ? "\nWARNING // PROTECTED PROCESS\n"
-                                 + workspace.protectedProcessRisk(workspace.currentTask)
-                               : ""))
-                        : ""
-                    color: Colors.red
-                    font.pixelSize: 12
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 38
-                    visible: workspace.hasOwnedPending
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.red
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "CONFIRM REQUEST"
-                        color: Colors.red
-                        font.pixelSize: 12
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: workspace.hasOwnedPending
-                        onClicked: {
-                            if (workspace.gate && workspace.hasOwnedPending
-                                    && workspace.exactTargetAvailable)
-                                workspace.gate.confirm()
-                        }
-                    }
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 34
-                    visible: workspace.hasOwnedPending
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.cyan
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "CANCEL"
-                        color: Colors.cyan
-                        font.pixelSize: 12
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: workspace.cancelOwned()
-                    }
-                }
+
                 }
             }
             NeonScrollBar {
@@ -1452,6 +1364,307 @@ Item {
             color: Colors.dark
             border.width: 1
             border.color: Colors.orange
+
+            // A separate, top-aligned review surface. Only the captured list
+            // or report body scrolls; the resource viewport and footer do not.
+            Rectangle {
+                id: reviewPanel
+                objectName: "cpuPlusRightReviewPanel"
+                readonly property bool capture: workspace.hasBulkReview
+                readonly property bool single: workspace.hasOwnedPending
+                readonly property bool report: workspace.bulkOperation
+                readonly property bool reportReady: report
+                    && workspace.appControlWindow.hunterOperationPhase === "report"
+                readonly property bool verifying: workspace.locallyPending && !!workspace.gate
+                    && workspace.gate.busy && workspace.gate.pending === workspace.ownedPendingRef
+                readonly property var singleTarget: single || verifying ? workspace.ownedPendingRef : null
+                readonly property color panelInk: singleTarget
+                    ? workspace.reviewProcessColor(singleTarget.name) : Colors.red
+                readonly property real bodyRoom: Math.max(0, resourceBay.height - 20
+                    - reviewHeading.implicitHeight - reviewFooter.implicitHeight
+                    - 2 * reviewContent.spacing)
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 5
+                height: Math.min(Math.max(0, resourceBay.height - 10), reviewContent.implicitHeight + 10)
+                visible: capture || single || report || verifying
+                color: Colors.black
+                border.width: 1
+                border.color: panelInk
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: 0.45
+                    color: reviewPanel.panelInk
+                }
+                Column {
+                    id: reviewContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 5
+                    spacing: 7
+                    Column {
+                        id: reviewHeading
+                        width: parent.width
+                        spacing: 5
+                        GohuText {
+                            id: reviewTitle
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            color: Colors.red
+                            font.pixelSize: 13
+                            text: reviewPanel.capture ? "REVIEW // " + workspace.bulkReview.label
+                                : reviewPanel.report ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase()
+                                : reviewPanel.singleTarget ? "REVIEW // " + String(reviewPanel.singleTarget.action).toUpperCase() : ""
+                            layer.enabled: reviewPanel.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.65; color: Colors.red; transparentBorder: true }
+                        }
+                        Rectangle { width: parent.width; height: 1; color: Colors.red }
+                        Row {
+                            objectName: "cpuPlusCapturedTargetCount"
+                            width: parent.width
+                            visible: reviewPanel.capture
+                            spacing: 6
+                            Item {
+                                width: capturedCount.implicitWidth
+                                height: capturedCount.implicitHeight
+                                GohuText {
+                                    id: capturedCount
+                                    objectName: "cpuPlusCapturedTargetNumber"
+                                    text: reviewPanel.capture ? String(workspace.bulkReview.targets.length) : ""
+                                    color: Colors.magenta
+                                    font.pixelSize: 13
+                                }
+                                SafeDropShadow {
+                                    anchors.fill: capturedCount
+                                    safeSource: capturedCount
+                                    requestedVisible: reviewPanel.capture
+                                    radius: 6; samples: 7; opacity: 0.75
+                                    color: Colors.magenta
+                                    transparentBorder: true
+                                }
+                            }
+                            Item {
+                                width: capturedLabel.implicitWidth
+                                height: capturedLabel.implicitHeight
+                                GohuText {
+                                    id: capturedLabel
+                                    objectName: "cpuPlusCapturedTargetLabel"
+                                    text: "CAPTURED TARGETS"
+                                    color: Colors.red
+                                    font.pixelSize: 13
+                                }
+                                SafeDropShadow {
+                                    anchors.fill: capturedLabel
+                                    safeSource: capturedLabel
+                                    requestedVisible: reviewPanel.capture
+                                    radius: 6; samples: 7; opacity: 0.75
+                                    color: Colors.red
+                                    transparentBorder: true
+                                }
+                            }
+                        }
+                        GohuText {
+                            width: parent.width
+                            visible: reviewPanel.capture
+                            text: "GLOBAL SCOPE • NOT SEARCH RESULTS\nNO COMMAND SENT • PROTECTION RECHECKED BEFORE DISPATCH"
+                            wrapMode: Text.Wrap
+                            color: Colors.white
+                            font.pixelSize: 11
+                            layer.enabled: visible
+                            layer.effect: DropShadow { radius: 5; samples: 7; opacity: 0.45; color: Colors.white; transparentBorder: true }
+                        }
+                        Item {
+                            width: parent.width
+                            height: singleIdentity.implicitHeight
+                            visible: !!reviewPanel.singleTarget
+                            GohuText {
+                                id: singleIdentity
+                                objectName: "cpuPlusSingleReviewIdentity"
+                                width: parent.width
+                                wrapMode: Text.WrapAnywhere
+                                textFormat: Text.RichText
+                                text: reviewPanel.singleTarget ? workspace.reviewTargetText(reviewPanel.singleTarget,reviewPanel.panelInk) : ""
+                                font.pixelSize: 13
+                            }
+                            SafeDropShadow {
+                                anchors.fill: singleIdentity
+                                safeSource: singleIdentity
+                                requestedVisible: parent.visible
+                                radius: 6; samples: 7; opacity: 0.65
+                                color: reviewPanel.panelInk
+                                transparentBorder: true
+                            }
+                        }
+                    }
+                    ListView {
+                        id: captureList
+                        objectName: "cpuPlusBulkReview"
+                        width: parent.width
+                        height: visible ? Math.min(reviewPanel.bodyRoom, count * 36) : 0
+                        visible: reviewPanel.capture
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: reviewPanel.capture ? workspace.bulkReview.targets : []
+                        onModelChanged: contentY = 0
+                        delegate: Item {
+                            required property var modelData
+                            readonly property color processInk: workspace.reviewProcessColor(modelData.name)
+                            width: captureList.width - (captureScroll.visible ? 18 : 0)
+                            height: 36
+                            GohuText {
+                                id: capturedIdentity
+                                width: parent.width
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: workspace.reviewTargetText(modelData,parent.processInk)
+                                textFormat: Text.RichText
+                                font.pixelSize: 12
+                                wrapMode: Text.WrapAnywhere
+                            }
+                            SafeDropShadow {
+                                anchors.fill: capturedIdentity
+                                safeSource: capturedIdentity
+                                requestedVisible: reviewPanel.capture
+                                radius: 6; samples: 7; opacity: 0.65
+                                color: parent.processInk
+                                transparentBorder: true
+                            }
+                        }
+                    }
+                    Flickable {
+                        id: reviewTextScroll
+                        width: parent.width
+                        height: visible ? Math.min(reviewPanel.bodyRoom, reviewMessage.implicitHeight) : 0
+                        visible: reviewPanel.single || reviewPanel.report || reviewPanel.verifying
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        contentWidth: width
+                        contentHeight: reviewMessage.implicitHeight
+                        onVisibleChanged: if (visible) contentY = 0
+                        GohuText {
+                            id: reviewMessage
+                            objectName: "cpuPlusProcessReviewWarning"
+                            width: Math.max(0,reviewTextScroll.width - (messageScroll.visible ? 18 : 0))
+                            wrapMode: Text.Wrap
+                            textFormat: Text.PlainText
+                            text: reviewPanel.single
+                                ? ("CONFIRM " + String(reviewPanel.singleTarget.action).toUpperCase()
+                                    + "\nNO COMMAND HAS BEEN SENT"
+                                    + (workspace.isProtected(workspace.currentTask)
+                                        ? "\nWARNING // PROTECTED PROCESS\n" + workspace.protectedProcessRisk(workspace.currentTask)
+                                        : ""))
+                                : reviewPanel.verifying ? workspace.gate.feedback
+                                : reviewPanel.report ? workspace.appControlWindow.cpuBulkMessage : ""
+                            color: reviewPanel.report ? Colors.white : Colors.red
+                            font.pixelSize: 12
+                            layer.enabled: reviewTextScroll.visible
+                            layer.effect: DropShadow { radius: 5; samples: 7; opacity: 0.45; color: reviewMessage.color; transparentBorder: true }
+                        }
+                    }
+                    Column {
+                        id: reviewFooter
+                        width: parent.width
+                        spacing: 6
+                        ActionButton {
+                            id: reviewConfirm
+                            objectName: reviewPanel.capture ? "cpuPlusBulkConfirm" : "cpuPlusSingleConfirm"
+                            width: parent.width
+                            height: 38
+                            visible: reviewPanel.capture || reviewPanel.single
+                            available: workspace.active && (reviewPanel.capture
+                                ? workspace.hasBulkReview : workspace.hasOwnedPending && workspace.exactTargetAvailable)
+                            label: reviewPanel.capture ? "CONFIRM CAPTURE" : "CONFIRM REQUEST"
+                            labelPixelSize: 12
+                            accentColor: Colors.red
+                            destructive: true
+                            acceptedButtons: Qt.LeftButton
+                            idleForegroundColor: Colors.red
+                            hoverForegroundColor: Colors.red
+                            idleContentGlowColor: Colors.red
+                            hoverContentGlowColor: Colors.red
+                            contentGlowIdleOpacity: 0.82
+                            contentGlowHoverOpacity: 1.0
+                            softGlowIdleOpacity: 0.55
+                            softGlowHoverOpacity: 0.9
+                            onLeftClicked: {
+                                if (workspace.hasBulkReview) workspace.confirmBulk();
+                                else if (workspace.gate && workspace.hasOwnedPending
+                                        && workspace.exactTargetAvailable)
+                                    workspace.gate.confirm();
+                            }
+                        }
+                        ActionButton {
+                            id: reviewCancel
+                            objectName: reviewPanel.capture || reviewPanel.report ? "cpuPlusBulkCancel" : "cpuPlusSingleCancel"
+                            width: parent.width
+                            height: 34
+                            visible: reviewPanel.capture || reviewPanel.single || reviewPanel.reportReady
+                            available: workspace.active && visible
+                            label: reviewPanel.reportReady ? "ACKNOWLEDGE" : "CANCEL"
+                            labelPixelSize: 12
+                            normalFace: true
+                            accentColor: Colors.red
+                            acceptedButtons: Qt.LeftButton
+                            idleForegroundColor: Colors.white
+                            hoverForegroundColor: Colors.white
+                            pressedForegroundColor: Colors.white
+                            hoverFillColor: Colors.red
+                            pressedFillColor: Colors.dark
+                            idleBorderColor: Colors.red
+                            hoverBorderColor: Colors.red
+                            pressedBorderColor: Colors.red
+                            idleContentGlowColor: Colors.red
+                            hoverContentGlowColor: Colors.red
+                            pressedContentGlowColor: Colors.red
+                            contentGlowIdleOpacity: 0.72
+                            contentGlowHoverOpacity: 1.0
+                            softGlowEnabled: true
+                            idleSoftGlowColor: Colors.red
+                            hoverSoftGlowColor: Colors.red
+                            pressedSoftGlowColor: Colors.red
+                            softGlowIdleOpacity: 0.55
+                            softGlowHoverOpacity: 0.9
+                            onLeftClicked: {
+                                if (workspace.hasBulkReview) workspace.cancelBulk();
+                                else if (workspace.hasOwnedPending) workspace.cancelOwned();
+                                else if (reviewPanel.reportReady) workspace.appControlWindow.acknowledgeCpuBulkReport();
+                            }
+                        }
+                    }
+                }
+                NeonScrollBar {
+                    id: captureScroll
+                    objectName: "cpuPlusCaptureReviewScroll"
+                    flickable: captureList
+                    geometryMode: "viewport"
+                    accountForContentOrigin: true
+                    topInset: 0; bottomInset: 0
+                    x: reviewPanel.width - width - 4
+                    y: reviewContent.y + captureList.y
+                    visible: reviewPanel.capture && scrollable
+                    handleStyle: "star"
+                    railColor: Colors.red
+                    handleColor: Colors.magenta
+                    wheelEnabled: false
+                }
+                NeonScrollBar {
+                    id: messageScroll
+                    flickable: reviewTextScroll
+                    geometryMode: "viewport"
+                    topInset: 0; bottomInset: 0
+                    x: reviewPanel.width - width - 4
+                    y: reviewContent.y + reviewTextScroll.y
+                    visible: reviewTextScroll.visible && scrollable
+                    handleStyle: "star"
+                    railColor: Colors.red
+                    handleColor: Colors.magenta
+                    wheelEnabled: false
+                }
+            }
         }
     }
 }

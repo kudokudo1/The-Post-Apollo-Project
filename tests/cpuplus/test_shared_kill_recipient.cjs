@@ -188,7 +188,8 @@ test("P4c: expansion crosses state header and moves controls without duplicating
     const right=recipient.slice(recipient.indexOf("id: resourceBay"));
     assert.match(left,/id: actuatorScroll/);
     assert.match(left,/id: leftActions/);
-    assert.match(left,/cpuPlusBulkConfirm/);
+    assert.doesNotMatch(left,/cpuPlusBulkConfirm|cpuPlusProcessReviewWarning/);
+    assert.match(right,/cpuPlusBulkConfirm/);
     assert.match(left,/id: cpuProcessInformation/);
     assert.match(left,/id: details/);
     assert.match(left,/actionTarget: leftActions/);
@@ -351,4 +352,40 @@ test("P4i: same animated writing cursor, donor search geometry and star list rai
 test("P4i startup: animated cursor is registered in the shared QML module", () => {
     assert.match(read("components/qmldir"), /^AnimatedTextCursor 1\.0 AnimatedTextCursor\.qml$/m);
     assert.match(read("components/AnimatedTextCursor.qml"), /required property TextInput input/);
+});
+
+test("P4j: single and captured review live on the right, with bounded body and independent footer", () => {
+    const left=recipient.slice(recipient.indexOf("id: instrumentBay"),recipient.indexOf("id: targetBay"));
+    const right=recipient.slice(recipient.indexOf("id: resourceBay"));
+    assert.doesNotMatch(left,/cpuPlusBulkReview|cpuPlusBulkConfirm|cpuPlusProcessReviewWarning/);
+    assert.match(right,/id: reviewPanel[\s\S]*?anchors.top: parent.top/);
+    assert.match(right,/height: visible \? Math.min\(reviewPanel.bodyRoom, count \* 36\) : 0/);
+    assert.match(right,/id: reviewFooter[\s\S]*?ActionButton \{\s*id: reviewConfirm[\s\S]*?ActionButton \{\s*id: reviewCancel/);
+    assert.match(right,/model: reviewPanel.capture \? workspace.bulkReview.targets : \[\]/);
+    assert.match(right,/id: capturedCount[\s\S]*?color: Colors.magenta/);
+    assert.match(right,/id: capturedLabel[\s\S]*?text: "CAPTURED TARGETS"\s+color: Colors.red/);
+    assert.match(right,/id: reviewCancel[\s\S]*?normalFace: true[\s\S]*?idleForegroundColor: Colors.white[\s\S]*?hoverForegroundColor: Colors.white/);
+    assert.match(right,/workspace.gate.confirm\(\)/);
+    assert.match(right,/workspace.confirmBulk\(\)/);
+    assert.match(right,/workspace.cancelOwned\(\)/);
+    assert.match(right,/workspace.cancelBulk\(\)/);
+    const prep=recipient.slice(recipient.indexOf("function requestBulk("),recipient.indexOf("function requestKillAllEligibleTasks("));
+    const single=recipient.slice(recipient.indexOf("function prepareAction("),recipient.indexOf("function lockMode("));
+    assert.doesNotMatch(prep+single,/actuatorScroll.contentY/);
+});
+test("P4j: presentation classification and escaped rich-text identity preserve semantic colors", () => {
+    const start=recipient.indexOf("    function reviewProcessColor(");
+    const stop=recipient.indexOf("    function protectedProcessRisk(",start);
+    assert.ok(start>=0&&stop>start);
+    const Colors={omnitrix:"#00F782",cyan:"#55CFCA",green:"#9ECE6A",white:"#DCF3FA"};
+    const policy=new Function("Colors",recipient.slice(start,stop)+"\nreturn {reviewProcessColor, reviewTargetText};")(Colors);
+    for(const name of ["sway","kitty","quickshell","zsh","tmux"]) assert.equal(policy.reviewProcessColor(name),Colors.omnitrix);
+    for(const name of ["brave","firefox","code-oss","vesktop"]) assert.equal(policy.reviewProcessColor(name),Colors.cyan);
+    for(const name of ["systemd","pipewire","dbus-daemon","unknown-worker"]) assert.equal(policy.reviewProcessColor(name),Colors.green);
+    const text=policy.reviewTargetText({name:"dbus-daemon<&",pid:314},Colors.green);
+    assert.ok(text.includes('<font color="#DCF3FA">-</font>'));
+    assert.ok(text.includes('&lt;&amp;'));
+    assert.ok(text.includes('<font color="#9ECE6A">314</font>'));
+    assert.ok(text.includes('<font color="#DCF3FA"> [PID </font>'));
+    assert.ok(!text.includes("<&"));
 });

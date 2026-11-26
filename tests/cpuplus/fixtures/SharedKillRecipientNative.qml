@@ -21,6 +21,9 @@ ShellRoot {
     property var lastRow: null
     property var protectedGeometry: null
     property bool stableLayoutChecked: false
+    property real priorInstrumentY: 0
+    property var priorReviewGeometry: null
+    property real priorCancelY: 0
 
     QtObject {
         id: fakePresentation
@@ -117,7 +120,9 @@ ShellRoot {
         function prepareCpuBulkReview(kind,metric,visibility) {
             if (cpuBulkReview || cpuBulkOperation) return null;
             cpuBulkReview={kind:kind,metric:metric,visibility:visibility,label:"FAKE",
-                targets:[{pid:3442,startTicks:967833,name:"synthetic-worker"}]};
+                targets:Array.from({length:60},function(_,i) {
+                    return {pid:3442+i,startTicks:967833+i,name:["brave","systemd","kitty"][i%3]};
+                })};
             return cpuBulkReview;
         }
         function cancelCpuBulkReview(review) {
@@ -519,6 +524,8 @@ ShellRoot {
             if (smoke.phase===14) {
                 if (view.modelBlank) return;
                 if (!smoke.check(targets.count===1,"PROTECTED filter uses owner policy")) return;
+                smoke.priorInstrumentY=smoke.find(view,"cpuPlusKillInstrumentViewport").contentY;
+                smoke.priorReviewGeometry=smoke.instrumentGeometry(view);
                 if (!smoke.check(view.prepareAction("end")
                     && fakeGate.preparations===1
                     && fakeGate.confirmations===0
@@ -527,7 +534,22 @@ ShellRoot {
                     && smoke.find(view,"cpuPlusProcessReviewWarning").text.indexOf("SYNTHETIC SESSION-CRITICAL PROCESS")>=0,
                     "prepare protected review with risk warning, without execution"))
                     return;
-                view.cancelOwned();
+                smoke.phase=24;
+                return;
+            }
+            if (smoke.phase===24) {
+                const panel=smoke.find(view,"cpuPlusRightReviewPanel");
+                const right=smoke.find(view,"cpuPlusProcessReservedBay");
+                const cancel=smoke.find(view,"cpuPlusSingleCancel");
+                const confirm=smoke.find(view,"cpuPlusSingleConfirm");
+                if (!smoke.check(panel.visible && panel.parent===right && panel.y===5
+                    && detail.visible && confirm.available && cancel.available && cancel.normalFace
+                    && Qt.colorEqual(cancel.idleForegroundColor,"#DCF3FA")
+                    && Math.abs(panel.height-cancel.mapToItem(panel,0,cancel.height).y-5)<1
+                    && smoke.find(view,"cpuPlusKillInstrumentViewport").contentY===smoke.priorInstrumentY
+                    && JSON.stringify(smoke.instrumentGeometry(view))===JSON.stringify(smoke.priorReviewGeometry),
+                    "single review top aligned, ends at cancel and leaves resource viewport unchanged")) return;
+                cancel.leftClicked(null);
                 smoke.phase = 2;
                 return;
             }
@@ -538,7 +560,7 @@ ShellRoot {
                     return;
                 if (!smoke.check(view.prepareAction("freeze")
                     && view.hasOwnedPending, "freeze prepared")) return;
-                fakeGate.confirm();
+                smoke.find(view,"cpuPlusSingleConfirm").leftClicked(null);
                 smoke.phase = 3;
                 return;
             }
@@ -558,6 +580,44 @@ ShellRoot {
                 smoke.phase = 4;
                 return;
             }
+            if (smoke.phase===20) {
+                const panel=smoke.find(view,"cpuPlusRightReviewPanel");
+                const right=smoke.find(view,"cpuPlusProcessReservedBay");
+                const list=smoke.find(view,"cpuPlusBulkReview");
+                const cancel=smoke.find(view,"cpuPlusBulkCancel");
+                const confirm=smoke.find(view,"cpuPlusBulkConfirm");
+                const count=smoke.find(view,"cpuPlusCapturedTargetNumber");
+                if (!smoke.check(panel.visible && panel.parent===right && panel.y===5
+                    && list.count===60 && list.contentHeight>list.height
+                    && count.text==="60" && Qt.colorEqual(count.color,"#C74EC7")
+                    && confirm.available && cancel.available
+                    && Math.abs(panel.height-cancel.mapToItem(panel,0,cancel.height).y-5)<1
+                    && fakeOwner.bulkConfirmed===0,
+                    "long captured list scrolls independently of fixed confirm/cancel footer")) return;
+                smoke.priorCancelY=cancel.mapToItem(right,0,0).y;
+                list.contentY=100;
+                smoke.phase=21;
+                return;
+            }
+            if (smoke.phase===21) {
+                const cancel=smoke.find(view,"cpuPlusBulkCancel");
+                const right=smoke.find(view,"cpuPlusProcessReservedBay");
+                if (!smoke.check(Math.abs(cancel.mapToItem(right,0,0).y-smoke.priorCancelY)<0.1
+                    && smoke.find(view,"cpuPlusBulkReview").contentY>0,
+                    "captured list scroll does not move footer")) return;
+                cancel.leftClicked(null);
+                if (!smoke.check(fakeOwner.bulkCancelled===1 && !view.hasBulkReview
+                    && fakeOwner.bulkConfirmed===0,"bulk cancellation sends no command")) return;
+                if (!smoke.check(view.requestKillMice(),"prepare second captured review")) return;
+                smoke.find(view,"cpuPlusBulkConfirm").leftClicked(null);
+                if (!smoke.check(fakeOwner.bulkConfirmed===1 && view.bulkOperation
+                    && !view.hasBulkReview && !view.confirmBulk(),
+                    "bulk review consumed once, progress remains owner-owned")) return;
+                console.log("CPU_KILL_NATIVE_PASS");
+                smoke.done=true;
+                Qt.quit();
+                return;
+            }
             if (!smoke.check(!smoke.find(view,"cpuPlusProcessInformation").open
                 && !smoke.find(view,"cpuPlusProcessInformation").visible,
                 "disappearing process closes information")) return;
@@ -571,16 +631,8 @@ ShellRoot {
                     && fakeOwner.bulkConfirmed===0
                     && fakeOwner.cpuBulkReview.metric===view.hunterMetricMode,
                     "bulk click prepares only, uses recipient metric")) return;
-            view.cancelBulk();
-            if (!smoke.check(fakeOwner.bulkCancelled===1 && !view.hasBulkReview
-                    && fakeOwner.bulkConfirmed===0,"bulk cancellation sends no command")) return;
-            if (!smoke.check(view.requestKillMice() && view.confirmBulk()
-                    && fakeOwner.bulkConfirmed===1 && view.bulkOperation
-                    && !view.hasBulkReview && !view.confirmBulk(),
-                    "bulk review consumed once, progress remains owner-owned")) return;
-            console.log("CPU_KILL_NATIVE_PASS");
-            smoke.done = true;
-            Qt.quit();
+            smoke.phase=20;
+            return;
         }
     }
 

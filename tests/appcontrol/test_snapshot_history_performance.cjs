@@ -625,7 +625,11 @@ test('preferred detail selection reuses action snapshots without changing favori
         "function appDesktopActions(e){counts.actions++;return e._hiddenCommand?[]:e.actions.slice();}",
         "function detailActionCount(){counts.count++;if(!state.entry)return 0;const e=favoriteSourceItem(state.entry);return state.mode==='app'?(e._hiddenCommand?7:6+appDesktopActions(e).length):state.mode==='run'?6:3;}"
     ].join('\n');
-    const make=new Function('state','counts','favoriteStore',stubs+'\n'+code+
+    const identitySource=fs.readFileSync(path.join(root,'services/favorites/FavoritesAppControlIdentityPolicy.js'),'utf8');
+    const identity=new Function(identitySource.replace(/^\.pragma library\s*$/m,'')+
+        '\nreturn {detailContextKey,detailActionId,detailKey};')();
+    const hostStub="const appControlWindow={selectedResultIsApplication,selectedResultIsRun,appEntryKey,favoriteKeyFor,runModeIndex,appDesktopActions};";
+    const make=new Function('state','counts','favoriteStore','FavoriteIdentity',stubs+'\n'+hostStub+'\n'+code+
         '\nreturn {pick:favoriteDetailActionIndex,key:detailFavoriteKeyFor,legacy:function(){const n=detailActionCount();for(let i=0;i<n;i++)if(isDetailActionFavorite(i))return i;return -1;}};');
     const cases=[
         {mode:'app',entry:{id:'browser|a',actions:[{name:'New window'},{name:'New window'},{_appControlBuiltin:'history'},{}]}},
@@ -637,7 +641,7 @@ test('preferred detail selection reuses action snapshots without changing favori
     ];
     for(const state of cases){
         const counts={actions:0,count:0}, store={favoriteDetailActionKeys:[]};
-        const model=make(state,counts,store);
+        const model=make(state,counts,store,identity);
         const ids=Array.from({length:16},(_,i)=>model.key(i)).filter(Boolean);
         for(const keys of [[],['app|unrelated|launch'],ids.slice().reverse(),ids.slice(-1),ids.slice(1,3),['bad|key',...ids]]){
             store.favoriteDetailActionKeys=keys;

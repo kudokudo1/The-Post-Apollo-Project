@@ -284,6 +284,66 @@ ShellRoot {
                     && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id&&row.text===report.text),
                     "workflow exact archive readback")) return;
                 console.log("CPU_D2C_NATIVE_PASS");
+                root.paneActive=true;
+                root.phase=17;
+                return;
+            }
+            if (root.phase===17 && pane.item) {
+                pane.item.selectMenu(4);
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop) return;
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const execute=root.findItem(workshop,"cpuplusWorkshopExecute");
+                const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
+                if (!root.check(duration && execute && dial && duration.width===32
+                    && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
+                    && workshop.phase==="PREPARE","actual Workshop hardware and no automatic launch")) return;
+                workshop.edit("selected",["census","storage"]);
+                workshop.edit("censusIntervalMs",1000);
+                duration.valueRequested(1);
+                if (!root.check(workshop.preview.ok && workshop.draft.durationSeconds===1,"valid calibrated slider")) return;
+                execute.leftClicked(null);
+                if (!root.check(!CpuPlusDiagnostics.busy,"prepare never launches")) return;
+                root.phase=18;
+                return;
+            }
+            if (root.phase===18 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop || workshop.calibrating) return;
+                if (!root.check(workshop.ready,"second click armed")) return;
+                workshop.edit("durationSeconds",2);
+                if (!root.check(!workshop.ready && !CpuPlusDiagnostics.busy,"edit disarms")) return;
+                workshop.edit("durationSeconds",1);
+                workshop.activate();
+                root.phase=19;
+                return;
+            }
+            if (root.phase===19 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop || workshop.calibrating) return;
+                if (!root.check(workshop.ready,"reprepared")) return;
+                root.findItem(workshop,"cpuplusWorkshopExecute").leftClicked(null);
+                if (!root.check(CpuPlusDiagnostics.busy && workshop.recording
+                    && CpuPlusDiagnostics.kind==="workflow","explicit second-click launch")) return;
+                root.paneActive=false;
+                root.phase=20;
+                return;
+            }
+            if (root.phase===20) {
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.workflow;
+                if (!root.check(report && report.status==="COMPLETE"
+                    && report.id===CpuPlusDiagnostics.workshopRunId,"Workshop capture survives unload")) return;
+                root.paneActive=true;
+                root.phase=21;
+                return;
+            }
+            if (root.phase===21 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop) return;
+                if (!root.check(workshop.draft.durationSeconds===1 && workshop.phase==="COMPLETE"
+                    && !workshop.ready && !CpuPlusDiagnostics.busy,"draft and terminal continuity without rearming")) return;
+                console.log("CPU_D3A_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

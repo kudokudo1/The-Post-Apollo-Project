@@ -364,10 +364,15 @@ assert.match(ui,/filterTarget: root.workshopFilterTarget/);
 assert.match(read("components/SelectorSlider.qml"),/property bool responsiveHardware: false/);
 assert.match(read("components/SelectorSlider.qml"),/property bool energizedValueFill: false/);
 
-assert.match(workshop,/storageMechanical: width>=340 && storageDialScale>=0.55/);
+assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialScale>=0.55/);
+assert.match(workshop,/objectName: "cpuplusWorkshopStorage-sample-dial"/);
+assert.match(workshop,/objectName: "cpuplusWorkshopStorage-report-dial"/);
+assert.doesNotMatch(workshop,/storageDialCell/);
 assert.match(workshop,/selectorColor: field==="sample" \? Colors.orange : Colors.magenta/);
 assert.match(workshop,/accentColor: Colors.red\s+normalFace: true\s+label: "−"/);
 assert.match(workshop,/accentColor: Colors.green\s+normalFace: true\s+label: "\+"/);
 assert.match(workshop,/objectName: "cpuplusWorkshopCalibrationStatus"/);
 assert.match(read("widgets/cpuplus/CpuPlusMemoryReadout.js"),/\|INT\|RPT\|/);
-assert.match(executionFace,/idleBorderWidth: preparationFace \? 2 : 1/);
+assert.match(executionFace,/washStrength: 0.24/);
+assert.match(executionFace,/idleFillColor: preparationFace \? steadyWashColor : Colors.dark/);
+assert.doesNotMatch(executionFace,/model: root.preparationFace/);

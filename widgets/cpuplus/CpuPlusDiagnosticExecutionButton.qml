@@ -14,10 +14,17 @@ ActionButton {
         : phase === "RECORDING" ? Colors.green
         : phase === "COMPLETE" ? Colors.omnitrix : Colors.red
     height: 34
-    // Dedicated execution hardware, not an ordinary filter/action face.
+    // Intentional special-button wash follows AngelActionButton's opaque
+    // 24% semantic tint, not an accidental full-rectangle shadow.
     readonly property bool preparationFace: phase === "PREPARE" || phase === "RETRY"
-    idleBorderWidth: preparationFace ? 2 : 1
-    softGlowIdleOpacity: preparationFace ? 0.46 : 0.22
+    readonly property real washStrength: 0.24
+    readonly property color steadyWashColor: Qt.rgba(
+        Colors.black.r*(1-washStrength)+stateColor.r*washStrength,
+        Colors.black.g*(1-washStrength)+stateColor.g*washStrength,
+        Colors.black.b*(1-washStrength)+stateColor.b*washStrength,1)
+    softGlowEnabled: !preparationFace
+    wideGlowEnabled: !preparationFace && redActionFace
+    washSafePerimeter: preparationFace || (!redActionFace && !wideGlowEnabled)
     accentColor: stateColor
     showLabel: false
     acceptedButtons: Qt.LeftButton
@@ -26,27 +33,16 @@ ActionButton {
     Accessible.onPressAction: if (interactive) leftClicked(null)
     contentGlowSource: captionText
     contentGlowEnabled: !pressed
-    idleFillColor: Colors.dark
+    idleFillColor: preparationFace ? steadyWashColor : Colors.dark
     GohuText {
         id: captionText
         anchors.fill: parent
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        font.pixelSize: root.preparationFace ? 13 : 11
+        font.pixelSize: 11
         color: root.pressed ? Colors.black : root.hovered ? Colors.orange : root.stateColor
         text: root.caption
         elide: Text.ElideRight
-    }
-    Repeater {
-        model: root.preparationFace ? 2 : 0
-        Rectangle {
-            required property int index
-            width: 4
-            height: Math.max(0,root.height-12)
-            x: index===0 ? 6 : root.width-width-6
-            y: 6
-            color: root.pressed ? Colors.black : root.hovered ? Colors.orange : root.stateColor
-        }
     }
     Rectangle {
         x: 1; y: 1

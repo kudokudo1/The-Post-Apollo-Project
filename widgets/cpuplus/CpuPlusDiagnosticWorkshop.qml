@@ -25,9 +25,10 @@ Column {
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
-    readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(230,Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
+    readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(288,Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
     readonly property real storageDialScale: Math.max(0,Math.min(1,(storageWidth-16)/272,(instrumentHeight-23)/160))
-    readonly property bool storageMechanical: width>=340 && storageDialScale>=0.55
+    readonly property bool smallestStorageLayout: width<340 && viewportHeight<380
+    readonly property bool storageMechanical: !smallestStorageLayout && storageDialScale>=0.55
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property int storageSample: draft.storageSampleSeconds || 1
@@ -403,40 +404,34 @@ Column {
                 }
                 Row {
                     id: storageDialPair
-                    readonly property Item workshopOwner: root
                     objectName: "cpuplusWorkshopStorageDialPair"
                     visible: root.storageMechanical
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: visible ? 272*root.storageDialScale+2 : 0
                     height: visible ? 160*root.storageDialScale : 0
                     spacing: 2
-                    Repeater {
-                        model: root.storageMechanical ? [{key:"sample",label:"SAMPLE",max:5,marks:[0,1,2,3,4,5]},
-                                {key:"report",label:"REPORT",max:30,marks:[0,5,10,15,20,25,30]}] : []
-                        Item {
-                            id: storageDialCell
-                            required property var modelData
-                            readonly property Item workshopOwner: storageDialPair.workshopOwner
-                            readonly property string field: modelData.key
-                            readonly property color selectorColor: field==="sample" ? Colors.orange : Colors.magenta
-                            width: 136*root.storageDialScale
-                            height: 160*root.storageDialScale
-                            SelectorDial {
-                                id: storageDial
-                                objectName: "cpuplusWorkshopStorage-"+storageDialCell.modelData.key+"-dial"
-                                anchors.centerIn: parent
-                                scale: storageDialCell.workshopOwner ? storageDialCell.workshopOwner.storageDialScale : 0
-                                readonly property string field: storageDialCell.field
-                                readonly property var countdown: storageDialCell.workshopOwner ? storageDialCell.workshopOwner.countdown(field) : null
-                                labelText: storageDialCell.modelData.label
+                    // Fixed instruments, not model delegates. Each sourceComponent
+                    // closes over the workshop itself and has a real sized loader.
+                    Item {
+                        width: 136*root.storageDialScale
+                        height: 160*root.storageDialScale
+                        Loader {
+                            anchors.centerIn: parent
+                            active: root.storageMechanical && root.draft.selected.includes("storage")
+                            width: 136
+                            height: 160
+                            scale: root.storageDialScale
+                            sourceComponent: SelectorDial {
+                                objectName: "cpuplusWorkshopStorage-sample-dial"
+                                readonly property var stopwatch: root.countdown("sample")
+                                labelText: "SAMPLE"
                                 selectorMode: "continuous"
                                 minimumValue: 0
-                                maximumValue: storageDialCell.modelData.max
-                                currentValue: !storageDialCell.workshopOwner ? 0 : storageDialCell.workshopOwner.storageRunning ? (countdown ? countdown.remainingMs/1000 : 0)
-                                    : field==="sample" ? storageDialCell.workshopOwner.storageSample : storageDialCell.workshopOwner.storageReport
-                                options: storageDialCell.modelData.marks.map(n=>String(n))
+                                maximumValue: 5
+                                currentValue: root.storageRunning ? (stopwatch ? stopwatch.remainingMs/1000 : 0) : root.storageSample
+                                options: [0,1,2,3,4,5].map(n=>String(n))
                                 displayOptions: options
-                                numericReferenceValues: storageDialCell.modelData.marks
+                                numericReferenceValues: [0,1,2,3,4,5]
                                 valueStep: 1
                                 valueDecimals: 1
                                 numericDetentInterval: 1
@@ -446,18 +441,62 @@ Column {
                                 titlePixelSize: 15
                                 numericLabelPixelSize: 13
                                 readoutPixelSize: 18
-                                titleColor: storageDialCell.selectorColor
-                                accentColor: storageDialCell.selectorColor
-                                labelColor: storageDialCell.selectorColor
-                                markerColor: countdown && countdown.flash ? Colors.white : storageDialCell.selectorColor
-                                activeDetentColor: storageDialCell.selectorColor
+                                titleColor: Colors.orange
+                                accentColor: Colors.orange
+                                labelColor: Colors.orange
+                                markerColor: stopwatch && stopwatch.flash ? Colors.white : Colors.orange
+                                activeDetentColor: Colors.orange
                                 readoutGlowEnabled: true
-                                readoutColor: countdown && countdown.flash ? Colors.white : storageDialCell.selectorColor
-                                readoutText: storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageRunning ? (countdown ? (countdown.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
-                                readoutUnit: storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageRunning && !countdown ? "" : "SEC"
+                                readoutColor: stopwatch && stopwatch.flash ? Colors.white : Colors.orange
+                                readoutText: root.storageRunning ? (stopwatch ? (stopwatch.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
+                                readoutUnit: root.storageRunning && !stopwatch ? "" : "SEC"
                                 outlinedOptionLabels: true
-                                interactive: !!storageDialCell.workshopOwner && storageDialCell.workshopOwner.storageMechanical && !storageDialCell.workshopOwner.locked && storageDialCell.workshopOwner.draft.durationSeconds<=30
-                                onValueRequested: value=>{if (storageDialCell.workshopOwner) storageDialCell.workshopOwner.chooseStorageCadence(field,value)}
+                                interactive: root.storageMechanical && !root.locked && root.draft.durationSeconds<=30
+                                onValueRequested: value=>root.chooseStorageCadence("sample",value)
+                            }
+                        }
+                    }
+                    Item {
+                        width: 136*root.storageDialScale
+                        height: 160*root.storageDialScale
+                        Loader {
+                            anchors.centerIn: parent
+                            active: root.storageMechanical && root.draft.selected.includes("storage")
+                            width: 136
+                            height: 160
+                            scale: root.storageDialScale
+                            sourceComponent: SelectorDial {
+                                objectName: "cpuplusWorkshopStorage-report-dial"
+                                readonly property var stopwatch: root.countdown("report")
+                                labelText: "REPORT"
+                                selectorMode: "continuous"
+                                minimumValue: 0
+                                maximumValue: 30
+                                currentValue: root.storageRunning ? (stopwatch ? stopwatch.remainingMs/1000 : 0) : root.storageReport
+                                options: [0,5,10,15,20,25,30].map(n=>String(n))
+                                displayOptions: options
+                                numericReferenceValues: [0,5,10,15,20,25,30]
+                                valueStep: 1
+                                valueDecimals: 1
+                                numericDetentInterval: 1
+                                numericDetentOrigin: 0
+                                showNumericDetentTicks: true
+                                snapContinuousToStep: true
+                                titlePixelSize: 15
+                                numericLabelPixelSize: 13
+                                readoutPixelSize: 18
+                                titleColor: Colors.magenta
+                                accentColor: Colors.magenta
+                                labelColor: Colors.magenta
+                                markerColor: stopwatch && stopwatch.flash ? Colors.white : Colors.magenta
+                                activeDetentColor: Colors.magenta
+                                readoutGlowEnabled: true
+                                readoutColor: stopwatch && stopwatch.flash ? Colors.white : Colors.magenta
+                                readoutText: root.storageRunning ? (stopwatch ? (stopwatch.remainingMs/1000).toFixed(1) : "WAIT") : String(Math.round(previewNumericValue))
+                                readoutUnit: root.storageRunning && !stopwatch ? "" : "SEC"
+                                outlinedOptionLabels: true
+                                interactive: root.storageMechanical && !root.locked && root.draft.durationSeconds<=30
+                                onValueRequested: value=>root.chooseStorageCadence("report",value)
                             }
                         }
                     }

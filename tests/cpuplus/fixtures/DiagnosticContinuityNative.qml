@@ -579,6 +579,15 @@ ShellRoot {
                 workshop.edit("selected",["storage","stall"]);
                 workshop.edit("durationSeconds",5);
                 dial.valueRequested(500);
+                const samplePlus=root.findItem(workshop,"cpuplusWorkshopStorage-sample-plus");
+                const reportMinus=root.findItem(workshop,"cpuplusWorkshopStorage-report-minus");
+                if (!root.check(samplePlus && samplePlus.available && reportMinus && reportMinus.available,
+                    "editable storage controls mounted")) return;
+                samplePlus.leftClicked(null);
+                reportMinus.leftClicked(null);
+                if (!root.check(workshop.draft.storageCadenceExplicit && workshop.draft.storageSampleSeconds===2
+                    && workshop.draft.storageReportSeconds===8 && !CpuPlusDiagnostics.busy,
+                    "storage controls change real detached calibration without launch")) return;
                 if (!root.check(workshop.preview.ok && workshop.plan.instruments[1].thresholdMs===500,
                     "stall dial changes submitted calibration")) return;
                 workshop.activate();
@@ -589,6 +598,21 @@ ShellRoot {
                 const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
                 if (!workshop || workshop.calibrating) return;
                 if (!root.check(workshop.ready && !CpuPlusDiagnostics.busy,"stall prepare does not launch")) return;
+                const reportMinus=root.findItem(workshop,"cpuplusWorkshopStorage-report-minus");
+                if (!root.check(reportMinus && reportMinus.available,"prepared storage report control available")) return;
+                reportMinus.leftClicked(null);
+                if (!root.check(!workshop.ready && !CpuPlusDiagnostics.busy && workshop.draft.storageReportSeconds===6,
+                    "cadence edit invalidates prepared capture")) return;
+                reportMinus.leftClicked(null);
+                if (!root.check(workshop.draft.storageReportSeconds===4,"nondefault report interval")) return;
+                workshop.activate();
+                root.phase=251;
+                return;
+            }
+            if (root.phase===251 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop || workshop.calibrating) return;
+                if (!root.check(workshop.ready && !CpuPlusDiagnostics.busy,"cadence reprepare never launches")) return;
                 workshop.activate();
                 if (!root.check(CpuPlusDiagnostics.kind==="workflow" && CpuPlusDiagnostics.stallCaptureActive,
                     "second click starts coordinated stall capture")) return;
@@ -603,6 +627,10 @@ ShellRoot {
                     && !CpuPlusDiagnostics.stallCaptureActive && report.summary.indexOf("THRESHOLD 500 ms")>=0
                     && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id),
                     "real coordinated storage/clock witness and fixture heartbeat // "+CpuPlusDiagnostics.feedback)) return;
+                const storageEvidence=JSON.parse(report.text).instruments.find(i=>i.config.kind==="storage");
+                if (!root.check(storageEvidence && storageEvidence.config.sampleSeconds===2 && storageEvidence.config.reportSeconds===4
+                    && storageEvidence.records[0].intervals===2 && storageEvidence.records[1].intervals===3,
+                    "edited storage calibration reaches actual coordinated receipt")) return;
                 console.log("CPU_D3E_NATIVE_PASS");
                 root.paneActive=true;
                 root.phase=27;

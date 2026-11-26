@@ -1,0 +1,9 @@
+# First native image promotion
+
+Qualified candidate: pilot run 45816601818 attempt 2, exact source c78bc77615713ab6cedafcba4afd196280a0db02. Both jobs passed, and artifact 15116892285 contains the exact image verified on a fresh offline runner. The artifact expires 2026-11-29 12:30:08 UTC.
+
+The publication workflow is manual and main-only, with no pull_request or pull_request_target trigger. After independent review and operator-authorized merge, run **Publish qualified native Fedora Xvfb image** on main. The workflow checks the exact successful run, attempt, jobs, artifact metadata, ZIP digest, inner archive digest and local image ID. It pushes the verified image without executing it in the package-write job. A separate fresh runner with read-only package access pulls by immutable registry manifest digest, verifies the same image ID, and runs U1/U2/U3 offline again. No package-install or production activation is performed by consumers. No workflow is switched to this image until this registry qualification passes and the owner approves a pilot consumer.
+
+The unique tag is a discovery aid, not an immutable consumer reference. Record the manifest digest from the summary and use that digest for subsequent consumers. The workflow does not change registry visibility or grant package access to other repositories. Publication may fail if the repository token lacks package-write permission, a package namespace collision exists, or the short-lived artifact has expired. Do not weaken the identity checks or substitute a rebuilt image without qualifying the new bytes.
+
+Measured baseline: U1/U2/U3 preparation including checkout 31.6/21.3/21.8 seconds; native probes 2.9/1.0/1.9 seconds. Qualified archive download 4.3s, docker load 8.94s; offline probes 2.79/1.12/2.05s. These measurements omit other startup/cleanup overhead. The cold-pull job records the registry pull duration for comparison.

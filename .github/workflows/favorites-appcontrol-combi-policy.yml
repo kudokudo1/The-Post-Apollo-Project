@@ -1,0 +1,27 @@
+name: Favorites local COMBI catalog extraction policy
+
+on:
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesAppControlCombiPolicy.js"
+      - "tests/favorites/test_appcontrol_combi_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-combi-policy.yml"
+      - "widgets/AppControlW.qml"
+  push:
+    paths:
+      - "services/favorites/FavoritesAppControlCombiPolicy.js"
+      - "tests/favorites/test_appcontrol_combi_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-combi-policy.yml"
+      - "widgets/AppControlW.qml"
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare shared COMBI policy against current AppControl donor
+        run: node --test tests/favorites/test_appcontrol_combi_policy.cjs

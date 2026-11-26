@@ -1,0 +1,27 @@
+name: Favorites AppControl local record donor parity
+
+on:
+  push:
+    paths:
+      - "services/favorites/FavoritesAppControlRecordPolicy.js"
+      - "tests/favorites/test_appcontrol_record_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-record-policy.yml"
+      - "widgets/AppControlW.qml"
+  pull_request:
+    paths:
+      - "services/favorites/FavoritesAppControlRecordPolicy.js"
+      - "tests/favorites/test_appcontrol_record_policy.cjs"
+      - ".github/workflows/favorites-appcontrol-record-policy.yml"
+      - "widgets/AppControlW.qml"
+
+permissions:
+  contents: read
+
+jobs:
+  donor-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare app and RUN local record wrappers to donor
+        run: node --test tests/favorites/test_appcontrol_record_policy.cjs

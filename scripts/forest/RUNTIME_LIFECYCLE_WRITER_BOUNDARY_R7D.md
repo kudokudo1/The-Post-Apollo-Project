@@ -125,3 +125,120 @@ custody, no release or new admission inference. UI1/UI2: per-entity
 normal-location indicators and no legacy inference. Nurse2F:
 exact R7d-b coverage scope and separate later guard integration review.
 No executable changes, host actions, inference or production authority.
+
+## Admitted-original settlement feasibility (design only)
+
+Nurse #2161 7189013536 authorizes this supplement only; Runtime intake
+7187656566/7188900285, Heart 7188905278, Mind 7188906015 and Spirit
+7188911920. Main d351c035 at intake. R7d-b #2832 and R7d-c #2849
+already cover existing direct-writer and separate R5/B4a negative paths.
+They are not guards. R7f #2876 technical review closed 7189005120,
+with historical review-order exception retained; neither source A nor B
+selected. This design does not depend on selecting either.
+
+### Exact original reference and currentness
+
+R7b 566a7116 _scope requires RetirementRef.session_revision equal to
+operation.context_ref.expected_revision+1. R7c ef44829b _continuity
+requires original COMMITTED and latest user/assistant lineage; its
+test setup consumes the exchange before retirement. Neither can
+represent an admitted still-running attempt. Preserve both unchanged.
+
+A future separate fixed-public witness would require independently
+supplied, immutable, test-only original admission evidence, NOT a
+Boolean, RESERVED row, fake STARTED/DELTA or caller grant. Bind:
+
+- Exact original principal/Tree/member execution context and lifetime,
+  TaskContext including task, generation and origin, original lifecycle
+  revision and active claim, exact OperationRef and H11 AttemptRef,
+  original session/user turn, attempt and binding/TransportSettings
+  including model/runtime identity and configuration commitment.
+- Original modeled admission/effect identity and ordering reference,
+  original H2 accounting reference, and distinct retirement intent
+  identity/revision. Admission must precede the freeze to qualify for
+  original-only settlement; unknown ordering cannot qualify.
+- Pre-commit conversation revision r and conditional post-commit r+1
+  (only on a successful original reply commit). Local ABORTED does not
+  advance r; a lost receipt does not imply either revision. Neither
+  revision is the lifecycle revision or a currentness credential.
+
+Independently compare current exact original evidence at each boundary;
+a replacement lifetime, reused alias, changed binding, stale policy or
+equal-value rolled-back state cannot inherit the old admission. The
+fixture reference is not an issuer, native admission, send permission,
+resource grant or protected receipt. Actual issuer and rollback/fence
+custody remain missing under R7f and Connections F1–F6.
+
+### Desired future ordering (not implemented)
+
+| Retirement timing / state | New work | Exact original operation |
+| --- | --- | --- |
+| Freeze before reserve | Refuse before title/body access, append or reserve | No admission or settlement inferred. |
+| RESERVED before freeze, no proved admission | Refuse before further read/send/mutation | No new send; local reservation alone cannot establish no external effect, terminal or clearance. Resolve original evidence only. |
+| Independently modeled original admission before freeze | Refuse conflicting work | Only independently eligible original settlement; no additional send, new attempt, history retrieval or disclosure grant. |
+| Admission or effect unknown, conflicting, stale or replaced | Refuse | Retain original HOLD and recover exact evidence; no replay or replacement custody. |
+
+New-work eligibility must be distinct from original-only settlement.
+Actual B3 exchange c5dbbc29 yields RESERVED before fake stream and
+checks current context/STOP again before commit (483–568). Invalidating
+every context or automatically issuing STOP at freeze can abort the
+original too. Do not bypass those checks: the future original settlement
+path must establish its own exact independently current eligibility,
+including any applicable revocation, not revive expired consent.
+Retirement does not itself authorize or revoke a provider effect.
+
+The eventual lifecycle-aware writer must resolve exact independently
+authorized scope and check the actual transaction before B1 title/body
+access, claim/create, both append roles, state/resume and B3 reserve;
+R5/B4a must not bypass it. No wrapper-only protection or legacy fallback.
+For settlement, verify the original admission and pending intent, OPEN
+session at r, exact original latest user/RESERVED attempt, binding and
+effect under the actual writer boundary before any unauthorized access
+or mutation. Preserve the existing B3 _commit (282–368) atomic assistant
+INSERT, session revision r+1, attempt COMMITTED and optional synthetic
+outbox when enabled. No nested _write, second reply writer or added
+ledger. The existing pre_commit callback is after metadata access and
+is not this lifecycle guard. The independent source-use, actual send,
+commit permission, recipient disclosure and revocation/effect fences
+remain separate; no SQL lock across network IO as a substitute.
+
+B3 _commit_fenced (242–280) may commit locally and lose its independent
+synthetic terminal receipt, returning UNKNOWN_HOLD; _abort (372–397)
+only updates RESERVED. B4d e4f4a537 recovery distinguishes local states,
+not external C5 settlement. Local COMMITTED is not proof of provider
+terminal or quiescence; local ABORTED/EOF/STOP is not proof of no effect.
+On receipt loss inspect exact original durable outcome read-only; do
+not roll back a committed reply, insert another, advance r+1 by guess
+or replay. If revocation wins, deny new protected effects/disclosure;
+already admitted effects must be accounted for under independently
+established original outcome/settlement rules, not old consent.
+Unknown effect or revoke ordering retains original HOLD.
+
+Final retirement requires separately current original terminal,
+quiescence, Heart accounting including retained residency, and Spirit
+settlement, then the separately approved durable transition. Preserve
+original H2 custody until independently justified; local commit, cache
+eviction or a dormant label confers no release or Winter. Restoration
+is a new explicit claim with independent currentness/admission.
+
+### Negative acceptance cases for a later separate executable decision
+
+| Case | Required distinction / observation |
+| --- | --- |
+| Freeze before reserve; pending conflict at direct B1/R5/B4a/B3 entry | No new title/body access, append/reserve or send in desired guarded path. Existing negative fixtures instead demonstrate missing guards; no false PASS via wrapper. |
+| Freeze after RESERVED before modeled admission; unknown admission | No progression or inferred non-effect; retain exact original pending identity. |
+| Freeze after modeled admission, exact original settlement | Only original atomic reply/revision/attempt/outbox; new work still refused. No new consent or external effect. |
+| Foreign task/attempt/recipient, stale revision or binding, replacement/ABA, revoke | No original-only bypass or inherited custody; no unrelated mutation or stale disclosure. Unknown remains HOLD. |
+| Exact local commit then lost receipt; duplicate settlement | One original reply and revision advance only; read-only reconciliation, no second insert/retry. |
+| Local abort or uncertain terminal | No fabricated r+1 or ABORTED from uncertainty; actual local abort leaves r, independent effect/terminal unresolved. |
+| Missing terminal/quiescence/accounting/settlement | No final retirement, physical release, new admission or UI season inference. |
+
+Future tests must independently inspect exact attempt/reply count,
+revision and original held H2 state, distinguish actual SQL behavior
+from modeled admission and desired enforcement, and preserve existing
+R7b/c/d regressions. No executable witness, helper, schema, ledger,
+guard, issuer, A/B selection, protected operation, provider or native
+invocation is approved here. Require exact Heart/Mind/Spirit and Nurse
+design review and CI before operator document integration; any code
+requires separate authorization. Actual retirement/native progress
+unchanged; production HOLD.

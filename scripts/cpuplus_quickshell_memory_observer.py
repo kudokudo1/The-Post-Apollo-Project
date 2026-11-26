@@ -113,7 +113,10 @@ def main(argv=None):
     p.add_argument("--duration", type=int, default=120)
     p.add_argument("--interval", type=int, default=10)
     p.add_argument("--workshop", action="store_true")
+    p.add_argument("--workshop-identity", nargs=2, type=int, metavar=("PID","START_TICKS"))
     a = p.parse_args(argv)
+    if a.workshop_identity and (not a.workshop or min(a.workshop_identity)<=0 or a.pid is not None):
+        p.error("invalid workshop identity")
     if not 1 <= a.duration <= 1800 or not 5 <= a.interval <= 60:
         p.error("duration 1..1800 seconds; interval 5..60 seconds")
     if a.pid is not None and a.pid <= 0:
@@ -125,13 +128,15 @@ def main(argv=None):
     send = WorkshopOutput().emit if a.workshop else emit
     uid = os.getuid()
     root = Path("/proc")
-    pid = a.pid if a.pid is not None else find_quickshell(root, uid)
+    pid = a.pid if a.pid is not None else (a.workshop_identity[0] if a.workshop_identity else find_quickshell(root, uid))
     if pid is None:
         print("No same-user Quickshell found.", file=sys.stderr)
         return 2
     path = root / str(pid)
     try:
         start = identity(path, uid)["start"]
+        if a.workshop_identity and start != a.workshop_identity[1]:
+            raise ValueError("pinned Quickshell replaced")
     except (OSError, ValueError, IndexError):
         print("Quickshell identity unavailable.", file=sys.stderr)
         return 2
@@ -160,6 +165,8 @@ def main(argv=None):
                     deadline = now + a.duration
             if a.workshop and samples >= (a.duration + a.interval - 1) // a.interval + 1:
                 return 1
+            if a.workshop:
+                record["monotonicMs"] = round(now*1000)
             send(record)
             samples += 1
             previous, previous_time = record, now
@@ -186,7 +193,8 @@ def main(argv=None):
     if a.workshop:
         end.update(workshopSchema="post-apollo-observer-calibration-v1",
                    calibration={"kind":"memory","durationSeconds":a.duration,"intervalMs":a.interval*1000},
-                   samples=samples, observedMs=round((previous_time-first_time)*1000))
+                   samples=samples, observedMs=round((previous_time-first_time)*1000),
+                   monotonicMs=round(previous_time*1000))
     try:
         send(end)
     except WorkshopOutputLimit:

@@ -134,3 +134,11 @@ assert.equal(workflowPreview({...workflow,autoStart:true}).ok,false);
 assert.equal(vm.runInContext('previewWorkflow({durationSeconds:30,instruments:[{kind:"storage"}, {get kind(){throw Error("getter must not run")}}]}).ok',ctx),false);
 assert.equal(vm.runInContext('previewWorkflow({durationSeconds:30,instruments:[{kind:"storage"},,]}).ok',ctx),false);
 console.log("DIAG D2a shared calibration workflow contracts PASS");
+
+ctx.input=JSON.stringify(workflow);
+const workflowLaunch=plain(vm.runInContext('workflowLaunchPlan(JSON.parse(input),p=>"/local/"+p,"/data")',ctx));
+assert.deepEqual(workflowLaunch.args.slice(0,7),["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B","/local/scripts/cpuplus_diagnostic_workflow.py","--plan"]);
+assert.deepEqual(JSON.parse(workflowLaunch.args[7]),workflowLaunch.plan);
+assert.deepEqual(workflowLaunch.plan.instruments.map(x=>x.kind),["threads","memory","census","storage"]);
+assert.equal(vm.runInContext('workflowLaunchPlan(JSON.parse(input),p=>p,"relative")',ctx),null);
+console.log("DIAG D2b fixed workflow command contract PASS");

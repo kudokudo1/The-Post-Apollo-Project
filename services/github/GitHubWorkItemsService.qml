@@ -13,6 +13,20 @@ Scope {
 
     property var issues: []
     property var pulls: []
+    property string pullsRequestRepo: ""
+    property int pullsRequestNumber: 0
+    property string pullsPublishedRepo: ""
+    property string pullsPendingRepo: ""
+    property int pullsPendingNumber: 0
+
+    onRepoSlugChanged: {
+        pulls = [];
+        pullsPublishedRepo = "";
+        pullsPendingRepo = "";
+        pullsPendingNumber = 0;
+        pullsError = "";
+        pullsStateText = "PULLS // READY";
+    }
 
     property string issuesStateText: "ISSUES // READY"
     property string pullsStateText: "PULLS // READY"
@@ -310,7 +324,7 @@ Scope {
                 || String(source.suiteError || "").trim())
             return "ERROR";
 
-        return "NONE";
+        return source.checkDetailsDeferred ? "UNKNOWN" : "NONE";
     }
 
     function pullCheckSummary(row) {
@@ -357,7 +371,7 @@ Scope {
                     || String(source.suiteError || "").trim())
                 return "ERROR";
 
-            return "NONE";
+            return source.checkDetailsDeferred ? "DETAILS NOT LOADED" : "NONE";
         }
 
         if (suiteCounts.startupFailed > 0
@@ -481,7 +495,7 @@ Scope {
                 || String(source.reviewRequestError || "").trim())
             return "ERROR";
 
-        return "NONE";
+        return source.reviewDetailsDeferred ? "UNKNOWN" : "NONE";
     }
 
     function pullReviewSummary(row) {
@@ -497,6 +511,8 @@ Scope {
 
         if (state === "ERROR")
             return "ERROR // REVIEW EVIDENCE";
+        if (state === "UNKNOWN")
+            return "DETAILS NOT LOADED";
 
         return state + " // " + countText;
     }
@@ -557,11 +573,19 @@ Scope {
         return true;
     }
 
-    function refreshPulls(repo) {
+    function refreshPulls(repo, number) {
         const cleanRepo = String(repo || repoSlug || "").trim();
-
-        if (pullsBusy)
+        const target = Number(number || 0);
+        if (!Number.isSafeInteger(target) || target < 0 || target > 2147483647)
             return false;
+        if (cleanRepo.toLowerCase() !== repoSlug.toLowerCase())
+            return false;
+        if (pullsBusy || pullsProcess.running) {
+            // Last requested target wins; never publish another repository.
+            pullsPendingRepo = cleanRepo;
+            pullsPendingNumber = target;
+            return false;
+        }
 
         if (!cleanRepo) {
             pullsError = "PULLS UNAVAILABLE // ACTIVE REPOSITORY MISSING";
@@ -570,9 +594,13 @@ Scope {
             return false;
         }
 
+        pullsRequestRepo = cleanRepo;
+        pullsRequestNumber = target;
+        pullsPendingRepo = "";
+        pullsPendingNumber = 0;
         pullsBusy = true;
         pullsError = "";
-        pullsStateText = "READING PULL REQUESTS";
+        pullsStateText = target > 0 ? "READING PR #" + target : "READING PULL REQUESTS";
         pullsStdoutSeen = false;
         pullsStderrSeen = false;
         pullsExitSeen = false;
@@ -588,13 +616,16 @@ Scope {
                 'name="${repo#*/}"',
                 "[[ \"$repo\" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo \"PULLS REQUEST // INVALID REPOSITORY\" >&2; exit 1; }",
                 "query='query($owner:String!,$name:String!,$cursor:String){ repository(owner:$owner,name:$name){ pullRequests(first:25,after:$cursor,orderBy:{field:UPDATED_AT,direction:DESC}){ pageInfo{hasNextPage endCursor} nodes{ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } } }'",
+                "target=\"${2:-0}\"",
+                "detail_query='query($owner:String!,$name:String!,$number:Int!){ repository(owner:$owner,name:$name){ pullRequest(number:$number){ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } }'",
                 "tmpdir=\"$(mktemp -d)\"",
                 "trap 'rm -rf \"$tmpdir\"' EXIT",
                 "cursor=\"\"",
                 "for page in 1 2 3 4; do",
-                "  args=(); [ -z \"$cursor\" ] || args+=(-f cursor=\"$cursor\")",
+                "  args=(); active_query=\"$query\"; [ -z \"$cursor\" ] || args+=(-f cursor=\"$cursor\")",
+                "  if [ \"$target\" -gt 0 ]; then active_query=\"$detail_query\"; args=(-F number=\"$target\"); fi",
                 "  rc=0",
-                "  gh api graphql --include -f owner=\"$owner\" -f name=\"$name\" -f query=\"$query\" \"${args[@]}\" > \"$tmpdir/response\" 2> \"$tmpdir/gh-error\" || rc=$?",
+                "  gh api graphql --include -f owner=\"$owner\" -f name=\"$name\" -f query=\"$active_query\" \"${args[@]}\" > \"$tmpdir/response\" 2> \"$tmpdir/gh-error\" || rc=$?",
                 "  status=\"\"; content_type=\"\"; header_end=0",
                 "  {",
                 "    IFS= read -r line || true",
@@ -625,6 +656,13 @@ Scope {
                 "    echo \"PULLS GRAPHQL // PAGE $page // PROVIDER REPORTED ERRORS\" >&2; exit 1",
                 "  fi",
                 "  if [ \"$rc\" -ne 0 ]; then echo \"PULLS TRANSPORT // PAGE $page // GH EXIT $rc\" >&2; exit 1; fi",
+                "  if [ \"$target\" -gt 0 ]; then",
+                "    if ! jq -e --argjson target \"$target\" '.data.repository.pullRequest | (type == \"object\") and (.number == $target) and (.headRefOid | type == \"string\" and test(\"^[0-9a-fA-F]{40}$\"))' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
+                "      echo \"PULLS RESPONSE // INVALID TARGET RESULT\" >&2; exit 1",
+                "    fi",
+                "    jq -c \"[.data.repository.pullRequest]\" \"$tmpdir/body.json\" > \"$tmpdir/page-$page.json\"",
+                "    break",
+                "  fi",
                 "  if ! jq -e '.data.repository.pullRequests | (type == \"object\") and (.nodes | type == \"array\" and length <= 25) and (.pageInfo.hasNextPage | type == \"boolean\") and (if .pageInfo.hasNextPage then (.pageInfo.endCursor | type == \"string\" and length > 0) else true end) and all(.nodes[]; (.number | type == \"number\" and . > 0 and floor == .) and (.headRefOid | type == \"string\" and test(\"^[0-9a-fA-F]{40}$\")))' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
                 "    echo \"PULLS RESPONSE // PAGE $page // INVALID RESULT SHAPE\" >&2; exit 1",
                 "  fi",
@@ -636,6 +674,10 @@ Scope {
                 "done",
                 "jq -c -s 'add | if (map(.number) | unique | length) != length then error(\"duplicate pull request across pages\") else . end' \"$tmpdir\"/page-*.json > \"$tmpdir/rows.json\"",
                 "jq -c '[.[] | . + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])}]' \"$tmpdir/rows.json\" > \"$tmpdir/normalized.json\"",
+                "if [ \"$target\" -eq 0 ]; then",
+                "  jq -c 'map(. + {checkDetailsDeferred:(((.checkContexts // []) | length) == 0),reviewDetailsDeferred:((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0))})' \"$tmpdir/normalized.json\"",
+                "  exit 0",
+                "fi",
                 "jq -c '.[] | select((((.checkContexts // []) | length) == 0) or ((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0)))' \"$tmpdir/normalized.json\" > \"$tmpdir/fallback.ndjson\"",
                 'while IFS= read -r row; do',
                 '  number="$(printf "%s" "$row" | jq -r ".number")"',
@@ -687,7 +729,7 @@ Scope {
                 '# cleanup handled by EXIT trap',
             ].join("\n"),
             "pa-github-pulls-graphql",
-            [cleanRepo]
+            [cleanRepo, String(target)]
         ));
         pullsWatchdog.restart();
         return true;
@@ -730,6 +772,15 @@ Scope {
         issuesRefreshed();
     }
 
+    function resumePendingPulls() {
+        const repo = pullsPendingRepo;
+        const target = pullsPendingNumber;
+        pullsPendingRepo = "";
+        pullsPendingNumber = 0;
+        if (repo && repo.toLowerCase() === repoSlug.toLowerCase())
+            Qt.callLater(function() { root.refreshPulls(repo, target); });
+    }
+
     function maybeFinishPulls() {
         if (!pullsBusy
                 || !pullsStdoutSeen
@@ -739,15 +790,22 @@ Scope {
 
         pullsBusy = false;
         pullsWatchdog.stop();
+        const requestRepo = pullsRequestRepo;
+        const target = pullsRequestNumber;
+        if (requestRepo.toLowerCase() !== repoSlug.toLowerCase()) {
+            resumePendingPulls();
+            return;
+        }
 
         const output = String(pullsStdout || "").trim();
         const error = String(pullsStderr || "").trim();
 
         if (pullsExitCode !== 0) {
-            pullsError = error || output || "PULL REQUEST LIST FAILED";
+            pullsError = error || "PULL REQUEST LIST FAILED";
             pullsStateText = "ERROR // " + pullsError;
-            pulls = [];
+            // Preserve same-repository last-known rows, never another repo.
             pullsRefreshed();
+            resumePendingPulls();
             return;
         }
 
@@ -757,19 +815,31 @@ Scope {
             const parsed = JSON.parse(output);
             if (!Array.isArray(parsed))
                 throw new Error("EXPECTED PR ARRAY");
-            pulls = parsed;
-            pullsStateText =
-                "PULLS READY // "
-                + String(pulls.length)
+            if (target > 0) {
+                if (parsed.length !== 1 || rowNumber(parsed[0]) !== target)
+                    throw new Error("WRONG PR TARGET");
+                if (pullsPublishedRepo.toLowerCase() !== requestRepo.toLowerCase())
+                    throw new Error("PR LIST NOT LOADED");
+                const next = pulls.slice();
+                const index = next.findIndex(function(row) { return root.rowNumber(row) === target; });
+                if (index < 0)
+                    throw new Error("PR NO LONGER IN LIST");
+                next[index] = parsed[0];
+                pulls = next;
+            } else {
+                pullsPublishedRepo = requestRepo;
+                pulls = parsed;
+            }
+            pullsStateText = "PULLS READY // " + String(pulls.length)
                 + (pulls.length >= 100 ? " // LATEST 100" : "");
             pullsError = "";
         } catch (parseError) {
-            pulls = [];
             pullsError = "PULL RESPONSE PARSE // " + String(parseError);
             pullsStateText = "ERROR // " + pullsError;
         }
 
         pullsRefreshed();
+        resumePendingPulls();
     }
 
     Process {

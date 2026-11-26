@@ -8,7 +8,10 @@ import "../../components"
 Column {
     id: root
     objectName: "cpuplusDiagnosticWorkshop"
-    spacing: 3
+    spacing: 2
+    property real viewportHeight: 0
+    readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
+    readonly property int instrumentHeight: compactLayout ? 120 : 160
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property bool locked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy || CpuPlusDiagnostics.faulted
     readonly property var plan: makePlan(draft)
@@ -140,17 +143,25 @@ Column {
                 onLeftClicked: root.toggle(modelData.kind)
             }
         }
-    }
-    GohuText {
-        width: parent.width
-        text: "TARGET // " + (root.draft.selected.some(k=>k==="threads"||k==="memory") ? "SAME-USER QUICKSHELL" : "SYSTEM")
-        color: Colors.purple
-        font.pixelSize: 10
-        wrapMode: Text.Wrap
+        GohuText {
+            width: parent.width >= 224 ? parent.width - 144 : parent.width
+            height: parent.width >= 224 ? 32 : implicitHeight
+            verticalAlignment: Text.AlignVCenter
+            text: {
+                const qs=root.draft.selected.some(k=>k==="threads"||k==="memory");
+                const system=root.draft.selected.some(k=>k==="census"||k==="storage");
+                return qs && system ? "TARGET // QS + USER"
+                    : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
+            }
+            color: Colors.purple
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
     }
     CpuPlusDiagnosticSlider {
         objectName: "cpuplusWorkshopDuration"
         width: parent.width
+        compact: root.compactLayout
         title: "DURATION"
         readout: root.draft.durationSeconds+" SEC"
         minimumValue: 1
@@ -162,6 +173,7 @@ Column {
     CpuPlusDiagnosticSlider {
         objectName: "cpuplusWorkshopThreadInterval"
         width: parent.width
+        compact: root.compactLayout
         fillColor: Colors.cyan
         visible: root.draft.selected.includes("threads")
         title: "THREAD INTERVAL"
@@ -175,6 +187,7 @@ Column {
     CpuPlusDiagnosticSlider {
         objectName: "cpuplusWorkshopMemoryInterval"
         width: parent.width
+        compact: root.compactLayout
         fillColor: Colors.magenta
         visible: root.draft.selected.includes("memory")
         title: "MEMORY INTERVAL"
@@ -188,6 +201,7 @@ Column {
     CpuPlusDiagnosticSlider {
         objectName: "cpuplusWorkshopCensusInterval"
         width: parent.width
+        compact: root.compactLayout
         fillColor: Colors.orange
         visible: root.draft.selected.includes("census")
         title: "PROCESS INTERVAL"
@@ -204,15 +218,17 @@ Column {
         visible: root.draft.selected.includes("threads") || root.draft.selected.includes("storage")
         Item {
             width: root.draft.selected.includes("storage") ? Math.floor((parent.width-4)/2) : parent.width
-            height: 160
+            height: root.instrumentHeight
             visible: root.draft.selected.includes("threads")
             SelectorDial {
                 objectName: "cpuplusWorkshopTopThreads"
                 anchors.centerIn: parent
+                scale: Math.min(1, parent.width/width, parent.height/height)
                 labelText: "TOP THREADS"
                 options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
                 displayOptions: options
-                numericLabelPixelSize: 10
+                numericLabelPixelSize: root.compactLayout ? 13 : 10
+                readoutPixelSize: root.compactLayout ? 15 : 11
                 numericDetentInterval: 1
                 numericDetentOrigin: 1
                 selectorMode: "continuous"
@@ -239,13 +255,13 @@ Column {
             objectName: "cpuplusWorkshopStorageInstrument"
             visible: root.draft.selected.includes("storage")
             width: root.draft.selected.includes("threads") ? Math.floor((parent.width-4)/2) : parent.width
-            height: 160
+            height: root.instrumentHeight
             color: Colors.black
             border.color: Colors.blue
             Column {
                 anchors.centerIn: parent
                 width: parent.width-8
-                spacing: 5
+                spacing: root.compactLayout ? 2 : 5
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: "STORAGE // METADATA"
@@ -259,7 +275,7 @@ Column {
                     width: parent.width
                     text: "1 SEC"
                     color: Colors.blue
-                    font.pixelSize: 24
+                    font.pixelSize: root.compactLayout ? 20 : 24
                     horizontalAlignment: Text.AlignHCenter
                 }
                 Rectangle {
@@ -307,10 +323,12 @@ Column {
     }
     GohuText {
         width: parent.width
-        text: root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
+        text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
+            : root.ready ? "SECOND CLICK STARTS CAPTURE"
+            : root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
             : root.preview.reason
         // Multi-instrument previews have a separate aggregate observation field.
-        color: root.preview.ok ? Colors.omnitrix : Colors.yellow
+        color: root.recording ? Colors.green : root.ready ? Colors.orange : root.preview.ok ? Colors.omnitrix : Colors.yellow
         font.pixelSize: 10
         wrapMode: Text.Wrap
     }
@@ -345,14 +363,5 @@ Column {
             Accessible.onPressAction: if (available) CpuPlusDiagnostics.cancel()
             onLeftClicked: CpuPlusDiagnostics.cancel()
         }
-    }
-    GohuText {
-        width: parent.width
-        text: root.recording ? "TIME ELAPSED // NOT COMPLETION" :
-            root.ready ? "SECOND CLICK STARTS CAPTURE" :
-            "PREPARE VALIDATES SETTINGS // NO AUTOMATIC START"
-        color: Colors.white
-        font.pixelSize: 9
-        wrapMode: Text.Wrap
     }
 }

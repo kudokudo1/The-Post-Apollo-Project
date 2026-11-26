@@ -113,27 +113,6 @@ QtObject {
     }
 
 
-    function executeBulkTaskTermination(targetPids, label) {
-        const wanted = Array.isArray(targetPids) ? targetPids : [];
-        if (wanted.length === 0)
-            return;
-
-        const rows = host.taskRows.filter(function(entry) {
-            return host.taskEligibleForKillAll(entry)
-                   && wanted.indexOf(Number(entry.pid || 0)) !== -1;
-        });
-        if (rows.length === 0)
-            return;
-
-        console.log("AppControl:", label || "BULK TERM", rows.length);
-        processControlObject.sendSignalMany(
-            rows.map(function(entry) { return Number(entry.pid || 0); }),
-            "-TERM"
-        );
-        refreshTimer.restart();
-    }
-
-
     function toggleSelectedTaskFreeze() {
         processControllerObject.toggleFreeze();
     }

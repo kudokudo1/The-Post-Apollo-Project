@@ -1964,10 +1964,7 @@ PanelWindow {
         globalTaskActionController.requestKillAllEligibleTasks();
     }
 
-     function executeBulkTaskTermination(targetPids, label) {
-        globalTaskActionController.executeBulkTaskTermination(targetPids, label);
-    }
-
+ 
     function hunterTargetsFromRows(rows) {
         return hunterOperationController.targetsFromRows(rows);
     }

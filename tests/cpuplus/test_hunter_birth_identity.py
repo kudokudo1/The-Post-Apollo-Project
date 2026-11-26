@@ -66,6 +66,22 @@ class HunterBirthIdentity(unittest.TestCase):
         self.assertNotIn("os.kill(", SCRIPT)
         self.assertIn("ticks != born", SCRIPT)
 
+    def test_term_survivor_is_unresolved(self):
+        self.child.terminate()
+        self.child.wait(timeout=5)
+        self.child = subprocess.Popen([sys.executable, "-u", "-c",
+            "import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); print('ready',flush=True); time.sleep(60)"],
+            stdout=subprocess.PIPE, text=True)
+        self.assertEqual(self.child.stdout.readline().strip(), "ready")
+        try:
+            output = execute([identity(self.child.pid)])
+            self.assertEqual(output[0]["status"], "escaped")
+            self.assertIsNone(self.child.poll())
+        finally:
+            self.child.kill()
+            self.child.wait(timeout=5)
+            self.child.stdout.close()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

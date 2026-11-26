@@ -8,13 +8,23 @@ Scope {
     // Execution engine only. Candidate selection, favorites protection,
     // confirmation UI, and report presentation remain with AppControl.
     property bool running: false
+    property bool completionVerified: false
+    property var expectedTarget: null
+    property bool timedOut: false
+    property bool exited: false
+    property bool stdoutDone: false
+    property bool stderrDone: false
+    property int helperExitCode: -1
+    property int helperExitStatus: -1
+    property string stdoutText: ""
+    property string stderrText: ""
 
     signal resultReady(var result)
     signal finished()
     signal errorRaised(string message)
 
     function script() {
-        return "import json\nimport os\nimport select\nimport signal\nimport sys\n\ntargets = json.loads(sys.argv[1]) if len(sys.argv) > 1 else []\n\ndef emit(payload):\n    print(json.dumps(payload), flush=True)\n\ndef result(pid, name, status, detail):\n    emit({\"type\":\"result\",\"pid\":pid,\"name\":name,\"status\":status,\"detail\":detail})\n\ndef snapshot(pid):\n    try:\n        with open(f\"/proc/{pid}/stat\", \"r\", encoding=\"utf-8\") as handle:\n            stat = handle.read().strip()\n        first = stat.index(\"(\")\n        close = stat.rindex(\")\")\n        rest = stat[close + 2:].split()\n        return stat[first + 1:close], rest[0], int(rest[19])\n    except (OSError, ValueError, IndexError):\n        return None, None, None\n\ndef run_target(target):\n    pid = target.get(\"pid\")\n    born = target.get(\"startTicks\")\n    name = target.get(\"name\")\n    if (type(pid) is not int or pid <= 1 or pid == os.getpid()\n            or type(born) is not int or born <= 0\n            or not isinstance(name, str) or not name):\n        result(pid, name, \"escaped\", \"INVALID OR MISSING BIRTH IDENTITY\")\n        return\n    if not hasattr(os, \"pidfd_open\") or not hasattr(signal, \"pidfd_send_signal\"):\n        result(pid, name, \"escaped\", \"PIDFD UNAVAILABLE • NO SIGNAL\")\n        return\n    try:\n        fd = os.pidfd_open(pid)\n    except ProcessLookupError:\n        result(pid, name, \"gone\", \"ALREADY GONE\")\n        return\n    except OSError:\n        result(pid, name, \"escaped\", \"PIDFD OPEN REFUSED • NO SIGNAL\")\n        return\n    try:\n        comm, state, ticks = snapshot(pid)\n        if comm is None or state == \"Z\":\n            result(pid, name, \"gone\", \"ORIGINAL PROCESS GONE OR UNOBSERVABLE\")\n            return\n        if comm != name or ticks != born:\n            result(pid, name, \"gone\", \"ORIGINAL PROCESS GONE; IDENTITY CHANGED\")\n            return\n        try:\n            if os.stat(f\"/proc/{pid}\").st_uid != os.getuid():\n                result(pid, name, \"escaped\", \"PROCESS OWNER CHANGED • NO SIGNAL\")\n                return\n            # The handle pins the observed process; never fall back to numeric\n            # PID signaling if that process exits or the PID is recycled.\n            signal.pidfd_send_signal(fd, signal.SIGTERM)\n        except ProcessLookupError:\n            result(pid, name, \"gone\", \"ALREADY GONE\")\n            return\n        except OSError:\n            result(pid, name, \"escaped\", \"SIGNAL REFUSED\")\n            return\n        poll = select.poll()\n        poll.register(fd, select.POLLIN)\n        if poll.poll(1600):\n            result(pid, name, \"killed\", \"EXIT OBSERVED AFTER TERM\")\n        else:\n            result(pid, name, \"escaped\", \"GOT AWAY • STILL RUNNING\")\n    finally:\n        os.close(fd)\n\nseen = set()\nfor target in targets:\n    if not isinstance(target, dict):\n        continue\n    key = (str(target.get(\"pid\")), str(target.get(\"startTicks\")), str(target.get(\"name\")))\n    if key in seen:\n        continue\n    seen.add(key)\n    run_target(target)\n\nemit({\"type\":\"done\",\"count\":len(targets)})\n";
+        return "import json\nimport os\nimport select\nimport signal\nimport sys\n\ntargets = json.loads(sys.argv[1]) if len(sys.argv) > 1 else []\n\ndef emit(payload):\n    print(json.dumps(payload), flush=True)\n\ndef result(pid, name, status, detail):\n    emit({\"type\":\"result\",\"pid\":pid,\"name\":name,\"status\":status,\"detail\":detail})\n\ndef snapshot(pid):\n    try:\n        with open(f\"/proc/{pid}/stat\", \"r\", encoding=\"utf-8\") as handle:\n            stat = handle.read().strip()\n        first = stat.index(\"(\")\n        close = stat.rindex(\")\")\n        rest = stat[close + 2:].split()\n        return stat[first + 1:close], rest[0], int(rest[19])\n    except (OSError, ValueError, IndexError):\n        return None, None, None\n\ndef run_target(target):\n    pid = target.get(\"pid\")\n    born = target.get(\"startTicks\")\n    name = target.get(\"name\")\n    if (type(pid) is not int or pid <= 1 or pid == os.getpid()\n            or type(born) is not int or born <= 0\n            or not isinstance(name, str) or not name):\n        result(pid, name, \"escaped\", \"INVALID OR MISSING BIRTH IDENTITY\")\n        return\n    if not hasattr(os, \"pidfd_open\") or not hasattr(signal, \"pidfd_send_signal\"):\n        result(pid, name, \"escaped\", \"PIDFD UNAVAILABLE • NO SIGNAL\")\n        return\n    try:\n        fd = os.pidfd_open(pid)\n    except ProcessLookupError:\n        result(pid, name, \"gone\", \"ALREADY GONE\")\n        return\n    except OSError:\n        result(pid, name, \"escaped\", \"PIDFD OPEN REFUSED • NO SIGNAL\")\n        return\n    try:\n        comm, state, ticks = snapshot(pid)\n        if comm is None:\n            result(pid, name, \"escaped\", \"PROCESS IDENTITY UNOBSERVABLE\")\n            return\n        if ticks != born:\n            result(pid, name, \"gone\", \"ORIGINAL PROCESS GONE; BIRTH CHANGED\")\n            return\n        if comm != name:\n            result(pid, name, \"escaped\", \"PROCESS NAME CHANGED; NO SIGNAL\")\n            return\n        if state == \"Z\":\n            result(pid, name, \"gone\", \"ORIGINAL PROCESS EXITED\")\n            return\n        try:\n            if os.stat(f\"/proc/{pid}\").st_uid != os.getuid():\n                result(pid, name, \"escaped\", \"PROCESS OWNER CHANGED • NO SIGNAL\")\n                return\n            # The handle pins the observed process; never fall back to numeric\n            # PID signaling if that process exits or the PID is recycled.\n            signal.pidfd_send_signal(fd, signal.SIGTERM)\n        except ProcessLookupError:\n            result(pid, name, \"gone\", \"ALREADY GONE\")\n            return\n        except OSError:\n            result(pid, name, \"escaped\", \"SIGNAL REFUSED\")\n            return\n        poll = select.poll()\n        poll.register(fd, select.POLLIN)\n        events = poll.poll(1600)\n        if any(mask & (select.POLLIN | select.POLLHUP) and not mask & (select.POLLERR | select.POLLNVAL)\n               for _, mask in events):\n            result(pid, name, \"killed\", \"EXIT OBSERVED AFTER TERM\")\n        else:\n            result(pid, name, \"escaped\", \"GOT AWAY • STILL RUNNING\")\n    finally:\n        os.close(fd)\n\nseen = set()\nfor target in targets:\n    if not isinstance(target, dict):\n        continue\n    key = (str(target.get(\"pid\")), str(target.get(\"startTicks\")), str(target.get(\"name\")))\n    if key in seen:\n        continue\n    seen.add(key)\n    run_target(target)\n\nemit({\"type\":\"done\",\"count\":len(targets)})\n";
     }
 
     function start(targets) {
@@ -27,6 +37,16 @@ Scope {
         if (captured.length !== 1)
             return false;
 
+        expectedTarget = captured[0];
+        completionVerified = false;
+        timedOut = false;
+        exited = false;
+        stdoutDone = false;
+        stderrDone = false;
+        helperExitCode = -1;
+        helperExitStatus = -1;
+        stdoutText = "";
+        stderrText = "";
         running = true;
         watchdog.restart();
 
@@ -41,52 +61,64 @@ Scope {
         return true;
     }
 
-    function finish() {
-        if (!running)
-            return;
-
-        running = false;
-        watchdog.stop();
-        finished();
+    // No intermediate stdout line confers authority. Validate the complete
+    // transcript only after both streams drain and the helper actually exits.
+    function validatedResult(target, output, errors, code, status, timeout) {
+        if (!target || timeout || code !== 0 || status !== 0 || errors.length !== 0)
+            return null;
+        const lines = output.trim().split("\n");
+        if (lines.length !== 2) return null;
+        try {
+            const result = JSON.parse(lines[0]);
+            const done = JSON.parse(lines[1]);
+            if (!result || result.type !== "result" || result.pid !== target.pid
+                    || result.name !== target.name
+                    || ["killed", "gone", "escaped"].indexOf(result.status) < 0
+                    || typeof result.detail !== "string" || !result.detail
+                    || !done || done.type !== "done" || done.count !== 1)
+                return null;
+            return result;
+        } catch (error) {
+            return null;
+        }
     }
 
-    function consumeLine(line) {
-        const raw = String(line || "").trim();
-
-        if (!raw || !running)
-            return;
-
-        try {
-            const payload = JSON.parse(raw);
-
-            if (payload.type === "result")
-                resultReady(payload);
-            // A "done" line is not proof that the child has exited.
-            // Keep the executor occupied until Process.onExited.
-        } catch (error) {
-            errorRaised("HUNTER progress parse: " + String(error));
-        }
+    function maybeFinish() {
+        if (!running || !exited || !stdoutDone || !stderrDone) return;
+        watchdog.stop();
+        const result = validatedResult(expectedTarget, stdoutText, stderrText,
+            helperExitCode, helperExitStatus, timedOut);
+        completionVerified = result !== null;
+        if (result) resultReady(result);
+        else errorRaised("HUNTER HELPER COMPLETION UNVERIFIED");
+        running = false;
+        expectedTarget = null;
+        finished();
     }
 
     Process {
         id: process
 
         onExited: function(exitCode, exitStatus) {
-            hunterExecutor.finish();
+            hunterExecutor.exited = true;
+            hunterExecutor.helperExitCode = exitCode;
+            hunterExecutor.helperExitStatus = exitStatus;
+            hunterExecutor.maybeFinish();
         }
 
-        stdout: SplitParser {
-            onRead: function(line) {
-                hunterExecutor.consumeLine(line);
+        stdout: StdioCollector {
+            onStreamFinished: {
+                hunterExecutor.stdoutText = String(text || "");
+                hunterExecutor.stdoutDone = true;
+                hunterExecutor.maybeFinish();
             }
         }
 
-        stderr: SplitParser {
-            onRead: function(line) {
-                const message = String(line || "").trim();
-
-                if (message.length > 0)
-                    hunterExecutor.errorRaised(message);
+        stderr: StdioCollector {
+            onStreamFinished: {
+                hunterExecutor.stderrText = String(text || "");
+                hunterExecutor.stderrDone = true;
+                hunterExecutor.maybeFinish();
             }
         }
     }
@@ -98,6 +130,10 @@ Scope {
 
         // Stop the helper, but do not publish completion or admit a new
         // dispatch until its exit is observed.
-        onTriggered: process.running = false
+        onTriggered: {
+            hunterExecutor.timedOut = true;
+            process.running = false;
+            hunterExecutor.maybeFinish();
+        }
     }
 }

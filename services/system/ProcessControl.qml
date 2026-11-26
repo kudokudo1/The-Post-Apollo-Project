@@ -32,28 +32,6 @@ Scope {
         return true;
     }
 
-    function sendSignalMany(pids, signalName) {
-        const signal = normalizedSignal(signalName);
-
-        if (!signal || !Array.isArray(pids))
-            return false;
-
-        const command = ["kill", signal];
-
-        for (let i = 0; i < pids.length; i++) {
-            const pid = Number(pids[i] || 0);
-
-            if (pid > 1)
-                command.push(String(pid));
-        }
-
-        if (command.length <= 2)
-            return false;
-
-        Quickshell.execDetached(command);
-        return true;
-    }
-
     function restart(pid) {
         const targetPid = Number(pid || 0);
 

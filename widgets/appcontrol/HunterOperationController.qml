@@ -17,7 +17,8 @@ QtObject {
     property var pendingTargets: []
     property int cursor: 0
     property var activeTarget: null
-    property bool activeResultReceived: false
+    property var activeResult: null
+    property bool activeProtocolError: false
 
     function targetsFromRows(rows) {
         return rows.map(function(entry) {
@@ -159,7 +160,8 @@ QtObject {
         completed = 0;
         cursor = 0;
         activeTarget = null;
-        activeResultReceived = false;
+        activeResult = null;
+        activeProtocolError = false;
         total = captured.length;
         pendingTargets = [];
 
@@ -218,7 +220,8 @@ QtObject {
                 continue;
             }
             activeTarget = target;
-            activeResultReceived = false;
+            activeResult = null;
+        activeProtocolError = false;
             if (!executor.start([target])) {
                 record(target, "escaped", "EXECUTOR REFUSED • NO RETRY");
                 activeTarget = null;
@@ -230,13 +233,15 @@ QtObject {
     }
 
     function applyResult(result) {
-        if (phase !== "running" || !activeTarget || activeResultReceived
-                || !result || result.pid !== activeTarget.pid
+        if (phase !== "running" || !activeTarget) return;
+        if (activeResult || !result || result.pid !== activeTarget.pid
                 || result.name !== activeTarget.name
-                || ["killed", "gone", "escaped"].indexOf(result.status) < 0)
+                || ["killed", "gone", "escaped"].indexOf(result.status) < 0
+                || typeof result.detail !== "string" || !result.detail) {
+            activeProtocolError = true;
             return;
-        activeResultReceived = true;
-        record(activeTarget, result.status, String(result.detail || ""));
+        }
+        activeResult = {status:result.status, detail:result.detail};
     }
 
     function stopRemaining() {
@@ -247,14 +252,19 @@ QtObject {
 
     // Only called by the executor after the child process has exited.
     function finish() {
-        if (phase !== "running" || !activeTarget)
+        if (phase !== "running" || !activeTarget || executor.running)
             return;
-        const verified = activeResultReceived;
-        if (!verified)
-            record(activeTarget, "escaped", "NO VERIFIED RESULT • NOT RETRIED");
+        const valid = executor.completionVerified === true && !!activeResult
+            && !activeProtocolError;
+        const advance = valid && (activeResult.status === "killed" || activeResult.status === "gone");
+        if (valid)
+            record(activeTarget, activeResult.status, activeResult.detail);
+        else
+            record(activeTarget, "escaped", "HELPER COMPLETION UNVERIFIED • NOT RETRIED");
         activeTarget = null;
-        activeResultReceived = false;
-        if (!verified) {
+        activeResult = null;
+        activeProtocolError = false;
+        if (!advance) {
             stopRemaining();
             return;
         }

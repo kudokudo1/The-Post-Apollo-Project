@@ -288,6 +288,18 @@ ShellRoot {
                 const rightBay=smoke.find(view,"cpuPlusProcessReservedBay");
                 const search=smoke.find(view,"cpuPlusKillSearch");
                 const hunter=smoke.find(view,"cpuPlusSharedHunterControls");
+                const cursor=smoke.find(view,"cpuPlusKillAnimatedCursor");
+                const searchHeader=smoke.find(view,"cpuPlusKillSearchHeader");
+                const scroll=smoke.find(view,"cpuPlusKillTargetScroll");
+                const top=smoke.find(view,"cpuPlusKillListTopDivider");
+                const bottom=smoke.find(view,"cpuPlusKillListBottomDivider");
+                if (!smoke.check(cursor && cursor.input===search && searchHeader.height===70
+                    && search.height===22 && search.font.pixelSize===18
+                    && view.displayedTargetCount===1
+                    && scroll && scroll.starStyle && top && bottom
+                    && Math.abs(scroll.y-top.y)<0.01
+                    && Math.abs(scroll.y+scroll.height-bottom.y)<0.01,
+                    "shared cursor mounted, donor search geometry and star track reaches both dividers")) return;
                 if (!smoke.check(view.currentTask && view.currentTask.pid===3442
                     && detail.visible && header && header.visible
                     && master && master.visible && actionTarget
@@ -457,6 +469,10 @@ ShellRoot {
                     "hover same target does not reset graph")) return;
                 const search=smoke.find(view,"cpuPlusKillSearch");
                 search.text="not-present";
+                const cursor=smoke.find(view,"cpuPlusKillAnimatedCursor");
+                if (!smoke.check(cursor.typingRecently && cursor.cursorStarsVisible
+                    && cursor.trailingStarPhase===0,
+                    "text change resets original animated cursor phase")) return;
                 smoke.phase=11;
                 return;
             }

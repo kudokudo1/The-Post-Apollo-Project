@@ -18,8 +18,15 @@ Scope {
     property string pullsPublishedRepo: ""
     property string pullsPendingRepo: ""
     property int pullsPendingNumber: 0
+    property int pullsRepoEpoch: 0
+    property int pullsRequestEpoch: 0
+    property int pullsPageCount: 0
+    property int pullsStreamOffset: 0
+    property string pullsStreamError: ""
+    property bool pullsTimedOut: false
 
     onRepoSlugChanged: {
+        pullsRepoEpoch += 1;
         pulls = [];
         pullsPublishedRepo = "";
         pullsPendingRepo = "";
@@ -596,6 +603,11 @@ Scope {
 
         pullsRequestRepo = cleanRepo;
         pullsRequestNumber = target;
+        pullsRequestEpoch = pullsRepoEpoch;
+        pullsPageCount = 0;
+        pullsStreamOffset = 0;
+        pullsStreamError = "";
+        pullsTimedOut = false;
         pullsPendingRepo = "";
         pullsPendingNumber = 0;
         pullsBusy = true;
@@ -667,6 +679,7 @@ Scope {
                 "    echo \"PULLS RESPONSE // PAGE $page // INVALID RESULT SHAPE\" >&2; exit 1",
                 "  fi",
                 "  jq -c \".data.repository.pullRequests.nodes\" \"$tmpdir/body.json\" > \"$tmpdir/page-$page.json\"",
+                "  jq -c 'map(. + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // []),checkDetailsDeferred:(((.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // []) | length) == 0),reviewDetailsDeferred:((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0))}) | {page: ., kind:\"page\"}' \"$tmpdir/page-$page.json\"",
                 "  [ \"$(jq -r \".data.repository.pullRequests.pageInfo.hasNextPage\" \"$tmpdir/body.json\")\" = true ] || break",
                 "  next=\"$(jq -r \".data.repository.pullRequests.pageInfo.endCursor\" \"$tmpdir/body.json\")\"",
                 "  [ \"$next\" != \"$cursor\" ] || { echo \"PULLS PAGINATION // REPEATED CURSOR\" >&2; exit 1; }",
@@ -772,6 +785,59 @@ Scope {
         issuesRefreshed();
     }
 
+    // The collector exposes its buffer before EOF. Only complete lines
+    // may be decoded, and only for the current repository generation.
+    function consumePullsOutput(value) {
+        const buffer = String(value || "");
+        if (buffer.length < pullsStreamOffset) {
+            pullsStreamError = "RESPONSE BUFFER RESET";
+            return;
+        }
+        while (true) {
+            const end = buffer.indexOf("\n", pullsStreamOffset);
+            if (end < 0)
+                break;
+            const line = buffer.slice(pullsStreamOffset, end).trim();
+            pullsStreamOffset = end + 1;
+            if (!line)
+                continue;
+            if (pullsRequestEpoch !== pullsRepoEpoch
+                    || pullsRequestRepo.toLowerCase() !== repoSlug.toLowerCase()
+                    || pullsTimedOut || pullsStreamError)
+                continue;
+            try {
+                const frame = JSON.parse(line);
+                if (Array.isArray(frame)) {
+                    if (pullsStdout)
+                        throw new Error("DUPLICATE FINAL RESPONSE");
+                    pullsStdout = line;
+                    continue;
+                }
+                if (pullsStdout || pullsRequestNumber !== 0 || !frame || frame.kind !== "page"
+                        || !Array.isArray(frame.page) || frame.page.length > 25
+                        || pullsPageCount >= 4)
+                    throw new Error("INVALID PAGE FRAME");
+                const next = pullsPageCount ? pulls.slice() : [];
+                const seen = new Set(next.map(function(row) { return root.rowNumber(row); }));
+                for (const row of frame.page) {
+                    const number = rowNumber(row);
+                    if (!Number.isSafeInteger(number) || number <= 0 || seen.has(number)
+                            || !/^[0-9a-fA-F]{40}$/.test(String(row.headRefOid || "")))
+                        throw new Error("INVALID OR DUPLICATE PR");
+                    seen.add(number);
+                    next.push(row);
+                }
+                pullsPageCount += 1;
+                pullsPublishedRepo = pullsRequestRepo;
+                pulls = next;
+                pullsStateText = "PULLS // " + next.length + " LOADED // LOADING MORE";
+                pullsRefreshed();
+            } catch (e) {
+                pullsStreamError = "PULL RESPONSE FRAME // " + String(e);
+            }
+        }
+    }
+
     function resumePendingPulls() {
         const repo = pullsPendingRepo;
         const target = pullsPendingNumber;
@@ -792,7 +858,7 @@ Scope {
         pullsWatchdog.stop();
         const requestRepo = pullsRequestRepo;
         const target = pullsRequestNumber;
-        if (requestRepo.toLowerCase() !== repoSlug.toLowerCase()) {
+        if (pullsRequestEpoch !== pullsRepoEpoch || requestRepo.toLowerCase() !== repoSlug.toLowerCase()) {
             resumePendingPulls();
             return;
         }
@@ -800,8 +866,8 @@ Scope {
         const output = String(pullsStdout || "").trim();
         const error = String(pullsStderr || "").trim();
 
-        if (pullsExitCode !== 0) {
-            pullsError = error || "PULL REQUEST LIST FAILED";
+        if (pullsExitCode !== 0 || pullsStreamError || pullsTimedOut) {
+            pullsError = pullsTimedOut ? "PULL REQUEST LIST TIMEOUT" : (pullsStreamError || error || "PULL REQUEST LIST FAILED");
             pullsStateText = "ERROR // " + pullsError;
             // Preserve same-repository last-known rows, never another repo.
             pullsRefreshed();
@@ -827,6 +893,8 @@ Scope {
                 next[index] = parsed[0];
                 pulls = next;
             } else {
+                if (pullsPageCount === 0 || JSON.stringify(parsed) !== JSON.stringify(pulls))
+                    throw new Error("FINAL RESPONSE DOES NOT MATCH VALIDATED PAGES");
                 pullsPublishedRepo = requestRepo;
                 pulls = parsed;
             }
@@ -872,8 +940,15 @@ Scope {
         id: pullsProcess
 
         stdout: StdioCollector {
+            waitForEnd: false
+            onTextChanged: {
+                if (root.pullsBusy)
+                    root.consumePullsOutput(this.text);
+            }
             onStreamFinished: {
-                root.pullsStdout = this.text;
+                root.consumePullsOutput(this.text);
+                if (this.text.length !== root.pullsStreamOffset)
+                    root.pullsStreamError = "INCOMPLETE RESPONSE FRAME";
                 root.pullsStdoutSeen = true;
                 root.maybeFinishPulls();
             }
@@ -917,14 +992,10 @@ Scope {
         repeat: false
 
         onTriggered: {
-            root.pullsBusy = false;
-            root.pullsError = "PULL REQUEST LIST TIMEOUT";
-            root.pullsStateText = "ERROR // " + root.pullsError;
-
+            // Drain the old process/collectors before starting any queued request.
+            root.pullsTimedOut = true;
             if (pullsProcess.running)
                 pullsProcess.running = false;
-
-            root.pullsRefreshed();
         }
     }
 }

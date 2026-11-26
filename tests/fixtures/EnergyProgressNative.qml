@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Quickshell
-import "../../components"
+import qs.components
 
 ShellRoot {
     Window {
@@ -12,7 +12,6 @@ ShellRoot {
         color: Colors.dark
         property int stage: 0
         property double started: Date.now()
-        property int paints: 0
         property bool failed: false
         function require(ok, message) {
             if (!ok) {

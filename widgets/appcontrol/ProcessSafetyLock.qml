@@ -18,6 +18,8 @@ Item {
         ? controller.lockMode(taskItem, actionKind) : ""
     readonly property bool masterUnlocked: isProtected && !master
         && controller.lockMode(taskItem, "") !== ""
+    readonly property string localMode: !master && controller.localLockMode
+        ? controller.localLockMode(taskItem, actionKind) : ""
     readonly property bool stickyUnlocked: mode === "sticky"
     readonly property bool unlocked: mode === "once" || stickyUnlocked
     visible: isProtected
@@ -54,6 +56,14 @@ Item {
             color: root.accentColor
             transparentBorder: true
         }
+    }
+    GohuText {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        text: root.localMode === "sticky" ? "" : "+"
+        font.pixelSize: 8
+        color: root.accentColor
+        visible: root.masterUnlocked && root.localMode !== ""
     }
     MouseArea {
         id: mouse

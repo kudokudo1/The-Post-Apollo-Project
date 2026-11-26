@@ -97,6 +97,25 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             archive.validate_rows([record(1),record(1)])
 
+    def test_workflow_limit_and_aggregate_retention(self):
+        large = dict(record(1, chr(92)*300000), kind="workflow")
+        self.assertEqual(len(large["text"]),300000)
+        self.save(large)
+        self.assertEqual(self.read()["rows"], [large])
+        with self.assertRaises(ValueError):
+            self.save(dict(record(2,"x"*300001),kind="workflow"))
+        with self.assertRaises(ValueError):
+            self.save(dict(record(2,"é"),kind="workflow"))
+        for i in range(2,10):
+            self.save(dict(large,id=record(i)["id"]))
+        result=self.read()
+        self.assertEqual(result["rows"][0]["id"],record(9)["id"])
+        self.assertLess(len(archive.encode(result)),archive.MAX_FILE)
+        self.assertLess(len(result["rows"]),archive.LIMIT)
+        self.assertEqual(len({r["id"] for r in result["rows"]}),len(result["rows"]))
+        self.save(record(10))
+        self.assertEqual(self.read()["rows"][0],record(10))
+
 
 if __name__ == "__main__":
     unittest.main()

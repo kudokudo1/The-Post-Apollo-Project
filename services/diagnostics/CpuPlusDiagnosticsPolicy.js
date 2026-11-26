@@ -6,7 +6,8 @@ function archiveResponse(doc, submitted) {
         if (!row || !validKind(row.kind) || !validReportId(row.id) || ids.indexOf(row.id) >= 0
                 || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(row.status) < 0
                 || typeof row.summary !== "string" || row.summary.length > 4096
-                || typeof row.text !== "string" || row.text.length > 65536
+                || typeof row.text !== "string" || row.text.length > reportLimit(row.kind)
+                || (row.kind === "workflow" && /[^\x00-\x7f]/.test(row.text))
                 || typeof row.finishedAt !== "string"
                 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.finishedAt)) return null;
         ids.push(row.id);
@@ -20,8 +21,10 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow"].indexOf(kind) >= 0;
 }
+
+function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
 
 function validReportId(id) {
     return typeof id === "string" && /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*$/.test(id)
@@ -33,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -347,6 +350,10 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind === "workflow") {
+        const evidence=workflowEvidence(text,null);
+        return evidence && evidence.status==="COLLECTED" ? evidence.summary : null;
+    }
     try {
         if (kind === "appcontrol") {
             const d=appControlMetrics(text);
@@ -495,4 +502,88 @@ function summarize(kind, text) {
     } catch (error) {
         return null;
     }
+}
+
+
+// Validate the transport against the exact submitted calibration, independently
+// of the subprocess's exit/status claim. Retain no invalid child metric data.
+function workflowEvidence(text, expected) {
+    try {
+        if (typeof text!=="string" || text.length>reportLimit("workflow") || /[^\x00-\x7f]/.test(text)) return null;
+        const d=JSON.parse(text), int=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        if (!d || d.schema!=="post-apollo-diagnostic-workflow-transport-v1"
+                || !["COLLECTED","NOT VERIFIED","CANCELLED"].includes(d.status)
+                || !int(d.durationSeconds,1,120) || !Array.isArray(d.instruments)
+                || d.instruments.length<2 || d.instruments.length>4
+                || !int(d.startedMonotonicMs,0,Number.MAX_SAFE_INTEGER)
+                || !int(d.finishedMonotonicMs,d.startedMonotonicMs,Number.MAX_SAFE_INTEGER)
+                || d.finishedMonotonicMs-d.startedMonotonicMs>145000) return null;
+        if (expected && (expected.durationSeconds!==d.durationSeconds
+                || expected.instruments.length!==d.instruments.length)) return null;
+        const order=["threads","memory","census","storage"], seen=[], summaries=[];
+        let first=0,last=Number.MAX_SAFE_INTEGER, complete=0;
+        const pin=d.pinnedQuickshell;
+        for (let i=0;i<d.instruments.length;i++) {
+            const item=d.instruments[i], c=item && item.config, kind=c && c.kind;
+            if (!c || !order.includes(kind) || seen.includes(kind)
+                    || (seen.length && order.indexOf(kind)<=order.indexOf(seen[seen.length-1]))
+                    || c.durationSeconds!==d.durationSeconds) return null;
+            const keys=kind==="threads"?["kind","durationSeconds","intervalMs","topCount"]:
+                kind==="storage"?["kind","durationSeconds"]:["kind","durationSeconds","intervalMs"];
+            if (Object.keys(c).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(c,k))) return null;
+            if (expected && keys.some(k=>k!=="durationSeconds" && expected.instruments[i][k]!==c[k])) return null;
+            if (kind==="storage") { if (c.durationSeconds>30) return null; }
+            else {
+                if (!int(c.intervalMs,100,Math.min(60000,c.durationSeconds*1000))) return null;
+                const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+                if (kind==="threads" && (![100,250,500,1000,2000,5000].includes(c.intervalMs)
+                        || !int(c.topCount,1,12) || n>30 || n*(c.topCount+1)>150)) return null;
+                if (kind==="memory" && (c.intervalMs<5000 || c.intervalMs%1000 || n>12)) return null;
+                if (kind==="census" && (c.durationSeconds>60 || c.intervalMs%1000 || n>3)) return null;
+            }
+            seen.push(kind);
+            if (!int(item.payloadBytes,0,65536) || !Array.isArray(item.records)
+                    || typeof item.error!=="string" || item.error.length>80
+                    || !["COLLECTED","NOT VERIFIED"].includes(item.status)
+                    || (item.launchMonotonicMs!==null && !int(item.launchMonotonicMs,d.startedMonotonicMs,d.finishedMonotonicMs))
+                    || (item.exitCode!==null && !int(item.exitCode,-255,255))) return null;
+            if (kind==="memory" || kind==="threads") {
+                if (!pin || !int(pin.pid,1,Number.MAX_SAFE_INTEGER)
+                        || !int(pin.startTicks,1,Number.MAX_SAFE_INTEGER)) return null;
+            }
+            if (item.status!=="COLLECTED") {
+                if (item.records.length || !item.error) return null;
+                summaries.push(kind.toUpperCase()+" // NOT VERIFIED / "+item.error);
+                continue;
+            }
+            if (item.exitCode!==0 || item.error!=="" || item.launchMonotonicMs===null || !item.payloadBytes
+                    || !int(item.firstMonotonicMs,item.launchMonotonicMs,d.finishedMonotonicMs)
+                    || !int(item.lastMonotonicMs,item.firstMonotonicMs,d.finishedMonotonicMs)
+                    || !item.records.length || item.records.length>32) return null;
+            const rows=item.records, end=rows[rows.length-1];
+            if (!end || end.monotonicMs!==item.lastMonotonicMs
+                    || Math.abs(item.lastMonotonicMs-item.firstMonotonicMs-end.observedMs)>2
+                    || (kind==="memory" || kind==="threads" ? rows[0].monotonicMs : end.startedMonotonicMs)!==item.firstMonotonicMs
+                    || rows.some((row,j)=>!row || !int(row.monotonicMs,item.firstMonotonicMs,item.lastMonotonicMs)
+                        || (j>0 && row.monotonicMs<rows[j-1].monotonicMs)
+                        || ((kind==="memory" || kind==="threads") && (row.pid!==pin.pid || row.startTicks!==pin.startTicks)))) return null;
+            // Python's ASCII JSONL can expand non-ASCII thread names. Re-encode
+            // as ASCII before checking the per-child limit and existing policy.
+            const raw=rows.map(row=>JSON.stringify(row).replace(/[^\x00-\x7f]/g,ch=>"\\u"+ch.charCodeAt(0).toString(16).padStart(4,"0"))).join("\n")+"\n";
+            if (raw.length>65536 || !configuredEvidence(kind,raw,c)) return null;
+            const summary=summarize(kind,raw);
+            if (!summary) return null;
+            summaries.push(kind.toUpperCase()+" // VERIFIED");
+            complete++;
+            first=Math.max(first,item.firstMonotonicMs);
+            last=Math.min(last,item.lastMonotonicMs);
+        }
+        if (!seen.some(k=>k==="threads"||k==="memory") && pin!==null) return null;
+        const overlap=complete===seen.length?Math.max(0,last-first):null;
+        if (d.overlapMs!==overlap || (d.status==="COLLECTED" && !(complete===seen.length&&overlap>0))
+                || (d.status==="NOT VERIFIED" && complete===seen.length&&overlap>0)) return null;
+        return {status:d.status,complete:complete,summary:"WORKFLOW // "+complete+" / "+seen.length+" VERIFIED"
+            +"\nDURATION // "+d.durationSeconds+" s   OVERLAP // "+(overlap===null?"N/A":overlap+" ms")
+            +"\n"+summaries.join("\n")};
+    } catch (_) { return null; }
 }

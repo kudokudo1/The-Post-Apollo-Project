@@ -257,6 +257,33 @@ ShellRoot {
                     && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id),
                     "configured capture survives unload and archive // "+CpuPlusDiagnostics.feedback)) return;
                 console.log("CPU_D1B_NATIVE_PASS");
+                const plan={durationSeconds:1,instruments:[{kind:"census",intervalMs:1000},{kind:"storage"}]};
+                if (!root.check(CpuPlusDiagnostics.requestWorkflow(plan),"workflow launch")) return;
+                plan.durationSeconds=99;
+                if (!root.check(!CpuPlusDiagnostics.request("inventory") && !CpuPlusDiagnostics.requestWorkflow(plan),
+                    "shared workflow single flight")) return;
+                root.phase=15;
+                return;
+            }
+            if (root.phase===15) {
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.workflow;
+                if (!root.check(report && report.status==="COMPLETE"
+                    && report.summary.indexOf("2 / 2 VERIFIED")>=0
+                    && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id)
+                    && !CpuPlusDiagnostics.selectComparison("before",report.id),
+                    "workflow receipt and archive // "+CpuPlusDiagnostics.feedback)) return;
+                if (!root.check(CpuPlusDiagnostics.loadHistory(),"workflow history reload")) return;
+                root.phase=16;
+                return;
+            }
+            if (root.phase===16) {
+                if (CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.workflow;
+                if (!root.check(CpuPlusDiagnostics.archiveStatus==="READY"
+                    && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id&&row.text===report.text),
+                    "workflow exact archive readback")) return;
+                console.log("CPU_D2C_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

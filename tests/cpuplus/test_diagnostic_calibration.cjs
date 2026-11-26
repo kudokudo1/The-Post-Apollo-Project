@@ -142,3 +142,43 @@ assert.deepEqual(JSON.parse(workflowLaunch.args[7]),workflowLaunch.plan);
 assert.deepEqual(workflowLaunch.plan.instruments.map(x=>x.kind),["threads","memory","census","storage"]);
 assert.equal(vm.runInContext('workflowLaunchPlan(JSON.parse(input),p=>p,"relative")',ctx),null);
 console.log("DIAG D2b fixed workflow command contract PASS");
+
+
+// D2c: actual existing policies must validate child metrics, not just transport.
+const pairedPlan={durationSeconds:5,instruments:[{kind:"threads",intervalMs:1000,topCount:2},{kind:"memory",intervalMs:5000}]};
+const pairedPin={pid:123,startTicks:456};
+const threadConfig={...pairedPlan.instruments[0],durationSeconds:5};
+const memoryConfig={...pairedPlan.instruments[1],durationSeconds:5};
+const threadRecords=[{...tag,event:"start",durationSeconds:5,intervalMs:1000,topCount:2,monotonicMs:1000},
+    ...Array.from({length:5},(_,i)=>({...row,sampleIntervalMs:1000,monotonicMs:2000+i*1000})),
+    {...tag,event:"complete",samples:5,observedMs:5000,monotonicMs:6000}];
+const memoryRecords=[{...memBase,monotonicMs:1100},{...memRow,monotonicMs:6100},
+    {...memEnd,monotonicMs:6100}];
+const collected=(config,records,first,last)=>({config,records,status:"COLLECTED",exitCode:0,error:"",
+    launchMonotonicMs:900,payloadBytes:encode(records).length+1,firstMonotonicMs:first,lastMonotonicMs:last});
+const combined={schema:"post-apollo-diagnostic-workflow-transport-v1",status:"COLLECTED",durationSeconds:5,
+    pinnedQuickshell:pairedPin,startedMonotonicMs:900,finishedMonotonicMs:6200,overlapMs:4900,
+    instruments:[collected(threadConfig,threadRecords,1000,6000),collected(memoryConfig,memoryRecords,1100,6100)]};
+const validateWorkflow=(x,p=pairedPlan)=>plain(policyCtx.workflowEvidence(JSON.stringify(x),p));
+assert.equal(validateWorkflow(combined).complete,2);
+assert.match(policyCtx.summarize("workflow",JSON.stringify(combined)),/2 \/ 2 VERIFIED/);
+assert.equal(validateWorkflow({...combined,overlapMs:5000}),null);
+assert.equal(validateWorkflow({...combined,pinnedQuickshell:{...pairedPin,startTicks:999}}),null);
+assert.equal(validateWorkflow(combined,{...pairedPlan,durationSeconds:6}),null);
+assert.equal(validateWorkflow({...combined,instruments:combined.instruments.slice().reverse()}),null);
+const invalid=plain(combined);invalid.instruments[0].records[1].totalCpuPct=-1;
+assert.equal(validateWorkflow(invalid),null);
+const badMemory=plain(combined);badMemory.instruments[1].records[1].memoryKiB.Pss=-1;
+assert.equal(validateWorkflow(badMemory),null);
+const badClock=plain(combined);badClock.instruments[0].records[2].monotonicMs=1000;
+assert.equal(validateWorkflow(badClock),null);
+const partial=plain(combined);partial.status="NOT VERIFIED";partial.overlapMs=null;
+partial.instruments[1]={config:memoryConfig,records:[],status:"NOT VERIFIED",exitCode:1,error:"COLLECTOR EXIT",launchMonotonicMs:900,payloadBytes:0};
+assert.equal(validateWorkflow(partial).complete,1);
+assert.equal(policyCtx.summarize("workflow",JSON.stringify(partial)),null);
+assert.equal(validateWorkflow({...partial,status:"COLLECTED"}),null);
+assert.equal(validateWorkflow({...partial,status:"CANCELLED"}).status,"CANCELLED");
+const archiveWorkflow={kind:"workflow",id:"session-abc-def-1",status:"COMPLETE",summary:"summary",text:"x".repeat(300000),finishedAt:"2026-11-24T12:00:00.000Z"};
+assert.ok(policyCtx.archiveResponse({schema:"post-apollo-diagnostic-archive-v1",rows:[archiveWorkflow],savedId:null},{action:"list"}));
+assert.equal(policyCtx.archiveResponse({schema:"post-apollo-diagnostic-archive-v1",rows:[{...archiveWorkflow,text:"x".repeat(300001)}],savedId:null},{action:"list"}),null);
+console.log("DIAG D2c combined evidence and report capacity PASS");

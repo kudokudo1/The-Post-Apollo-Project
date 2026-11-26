@@ -10,10 +10,10 @@ import stat
 import sys
 
 SCHEMA = "post-apollo-diagnostic-archive-v1"
-KINDS = {"memory", "inventory", "threads", "census", "storage", "appcontrol"}
+KINDS = {"memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow"}
 STATUSES = {"COMPLETE", "CANCELLED", "NOT VERIFIED"}
 LIMIT = 8
-MAX_FRAME = 512 * 1024
+MAX_FRAME = 1024 * 1024
 MAX_FILE = 4 * 1024 * 1024
 ID = re.compile(r"[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*")
 
@@ -25,7 +25,9 @@ def validate_record(record):
         raise ValueError("record types")
     if (record["kind"] not in KINDS or record["status"] not in STATUSES
             or len(record["id"]) > 128 or not ID.fullmatch(record["id"])
-            or len(record["summary"]) > 4096 or len(record["text"]) > 65536
+            or len(record["summary"]) > 4096
+            or len(record["text"]) > (300000 if record["kind"] == "workflow" else 65536)
+            or (record["kind"] == "workflow" and not record["text"].isascii() and record["text"] != "")
             or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", record["finishedAt"])):
         raise ValueError("record values")
     datetime.datetime.fromisoformat(record["finishedAt"].replace("Z", "+00:00"))
@@ -141,6 +143,10 @@ def execute(folder, request):
                     raise ValueError("capture identity collision")
                 if existing is None:
                     rows = ([record] + rows)[:LIMIT]
+                    # Retain newest first; the response includes savedId as well.
+                    # Limit serialized size, not just character count.
+                    while len(rows)>1 and len(encode({"schema": SCHEMA, "rows": rows, "savedId": record["id"]})) >= MAX_FILE:
+                        rows.pop()
                     commit(directory, rows)
             return {"schema": SCHEMA, "rows": rows,
                     "savedId": record["id"] if record is not None else None}

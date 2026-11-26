@@ -22,7 +22,7 @@ Column {
         ? CpuPlusDiagnostics.archiveRows : []
     readonly property var beforeRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareBeforeId) || null
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
-    readonly property bool canChooseComparison: report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
+    readonly property bool canChooseComparison: selectedReport !== "workflow" && report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
     readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize, Policy.appControlMetrics) : null
     readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true, true)
     readonly property var hostDetails: memoryDetails ? memoryDetails.hostContext : null

@@ -3,6 +3,7 @@ import QtQuick.Window
 import Quickshell
 import "widgets"
 import "services/github"
+import qs.components
 
 ShellRoot {
     id: root
@@ -59,6 +60,18 @@ ShellRoot {
         }
         return null;
     }
+    function haloOnly(button) {
+        const perimeter = find(button,"actionButtonNormalPerimeter");
+        const soft = find(button,"actionButtonBroadSoftGlow");
+        const wide = find(button,"actionButtonBroadWideGlow");
+        return button.contentGlowEnabled && button.contentGlowSource === button.labelItem
+            && button.effectiveContentGlowOpacity > 0
+            && button.washSafePerimeter && button.perimeterGlowEnabled
+            && !button.wideGlowEnabled
+            && perimeter && perimeter.active && perimeter.item
+            && perimeter.item.color.a === 0 && perimeter.z === -1
+            && soft && !soft.visible && wide && !wide.visible;
+    }
     function require(ok, message) {
         if (!ok) {
             console.error("GIT_WORKFLOW_LIBRARY_FAIL // " + message);
@@ -75,6 +88,38 @@ ShellRoot {
             if (!list || !input) return;
             if (root.phase===0) {
                 if (!root.require(list.count===241,"full inventory")) return;
+                const info=root.find(view,"gitWorkflowInfo");
+                const clear=root.find(view,"gitWorkflowSearchClear");
+                const refresh=root.find(view,"gitWorkflowRefresh");
+                const queueRun=root.find(view,"gitWorkflowRunQueue");
+                const queueClear=root.find(view,"gitWorkflowQueueClear");
+                if (!root.require(info && clear && refresh && queueRun && queueClear,"shared action controls present")) return;
+                if (!root.require(info.width===24 && info.height===22 && info.label==="i"
+                    && Qt.colorEqual(info.idleForegroundColor,Colors.white)
+                    && Qt.colorEqual(info.hoverForegroundColor,Colors.orange)
+                    && Qt.colorEqual(info.hoverContentGlowColor,Colors.orange)
+                    && Qt.colorEqual(info.hoverFillColor,Colors.yellow)
+                    && info.contentGlowEnabled,"compact info recipe")) return;
+                if (!root.require(Qt.colorEqual(clear.accentColor,Colors.red)
+                    && Qt.colorEqual(queueClear.idleForegroundColor,Colors.white)
+                    && Qt.colorEqual(clear.hoverForegroundColor,Colors.red)
+                    && Qt.colorEqual(clear.keyboardSelectedForegroundColor,Colors.red)
+                    && Qt.colorEqual(clear.hoverContentGlowColor,Colors.red)
+                    && Qt.colorEqual(clear.hoverFillColor,Colors.yellow)
+                    && Qt.colorEqual(clear.hoverSoftGlowColor,Colors.red)
+                    && Qt.colorEqual(refresh.idleFillColor,Colors.yellow)
+                    && Qt.colorEqual(queueRun.accentColor,Colors.green)
+                    && Qt.colorEqual(queueRun.hoverSoftGlowColor,Colors.orange)
+                    && Qt.colorEqual(queueRun.hoverForegroundColor,Colors.orange)
+                    && Qt.colorEqual(queueRun.hoverBorderColor,Colors.orange)
+                    && Qt.colorEqual(refresh.hoverForegroundColor,Colors.orange)
+                    && Qt.colorEqual(refresh.hoverSoftGlowColor,Colors.orange)
+                    && Qt.colorEqual(queueRun.hoverFillColor,Colors.yellow),"semantic action faces")) return;
+                if (!root.require(haloOnly(info) && haloOnly(clear) && haloOnly(refresh),"header glyph and perimeter halos; no wash")) return;
+                info.activateFromGitKeyboard();
+                if (!root.require(view.workflowHelpOpen && info.selected && Qt.colorEqual(info.fillColor,Colors.yellow),"info opens selected")) return;
+                info.activateFromGitKeyboard();
+                if (!root.require(!view.workflowHelpOpen && !info.selected,"info closes")) return;
                 list.positionViewAtEnd();
                 root.phase=1;
                 return;
@@ -91,11 +136,20 @@ ShellRoot {
                 if (!row) return;
                 const run=root.find(row,"gitWorkflowRun"),control=root.find(row,"gitWorkflowControl"),queue=root.find(row,"gitWorkflowQueue");
                 if (!root.require(run && control && queue && run.enabledAction,"actual row controls")) return;
-                control.triggered();
+                if (!root.require(Qt.colorEqual(run.accentColor,Colors.green)
+                    && Qt.colorEqual(run.idleContentGlowColor,Colors.green)
+                    && Qt.colorEqual(run.hoverContentGlowColor,Colors.orange)
+                    && Qt.colorEqual(run.hoverForegroundColor,Colors.orange)
+                    && Qt.colorEqual(run.hoverBorderColor,Colors.orange)
+                    && Qt.colorEqual(run.keyboardSelectedContentGlowColor,Colors.orange)
+                    && Qt.colorEqual(run.hoverFillColor,Colors.yellow)
+                    && run.contentGlowEnabled && queue.contentGlowEnabled,"row action recipes")) return;
+                if (!root.require(haloOnly(run) && haloOnly(control) && haloOnly(queue),"row glyph and perimeter halos; no wash")) return;
+                control.activateFromGitKeyboard();
                 if (!root.require(root.controlIndex===240,"original source index")) return;
-                queue.triggered();
+                queue.activateFromGitKeyboard();
                 if (!root.require(store.queue.length===1 && store.queue[0].path===root.targetPath,"queue exact path")) return;
-                run.triggered();
+                run.activateFromGitKeyboard();
                 if (!root.require(remote.calls.length===0 && run.label==="GO?","first click arms only")) return;
                 remote.refresh();
                 root.phase=3;
@@ -106,10 +160,10 @@ ShellRoot {
                 if (!row) return;
                 const run=root.find(row,"gitWorkflowRun");
                 if (!root.require(run && run.label==="RUN","refresh clears authorization")) return;
-                run.triggered();
-                run.triggered();
+                run.activateFromGitKeyboard();
+                run.activateFromGitKeyboard();
                 if (!root.require(remote.calls.length===1 && remote.calls[0].path===root.targetPath && remote.calls[0].ref==="","exact default-ref dispatch")) return;
-                run.triggered();
+                run.activateFromGitKeyboard();
                 remote.repoSlug="fixture/other";
                 root.phase=4;
                 return;

@@ -895,7 +895,10 @@ PanelWindow {
             return;
         }
 
-        item.triggered();
+        if (typeof item.activateFromGitKeyboard === "function")
+            item.activateFromGitKeyboard();
+        else
+            item.triggered();
     }
 
     function selectPrimaryMode(direction) {

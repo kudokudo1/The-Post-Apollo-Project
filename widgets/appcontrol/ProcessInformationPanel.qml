@@ -173,7 +173,7 @@ Rectangle {
             GohuText {
                 objectName: "processInformationBirthIdentity"
                 width: parent.width
-                text: root.task ? "START TICKS " + String(root.task.startTicks || "?") + " • PID + START TICKS + NAME identify the exact live process. State is the Linux process status (e.g. S sleeping, R running, L locked pages, l multithreaded)." : ""
+                text: root.task ? "START TICKS " + String(root.task.startTicks || "?") + " • PID + START TICKS + NAME verify process identity. State: S sleeping, R running, L locked pages, l multithreaded." : ""
                 textFormat: Text.PlainText
                 color: Colors.white
                 font.pixelSize: 10
@@ -190,16 +190,20 @@ Rectangle {
                 color: Colors.orange
                 font.pixelSize: 12
             }
-            GohuText {
-                id: purposeText
-                objectName: "processInformationPurpose"
+            Item {
                 width: parent.width
-                text: root.helpText(root.purpose || "NO DESCRIPTION AVAILABLE")
-                textFormat: Text.RichText
-                wrapMode: Text.Wrap
-                color: Colors.white
-                font.pixelSize: 12
-                GaussianBlur { anchors.fill: parent; source: purposeText; radius: 4; samples: 9; opacity: 0.55; z: -1 }
+                height: purposeText.implicitHeight
+                GohuText {
+                    id: purposeText
+                    objectName: "processInformationPurpose"
+                    width: parent.width
+                    text: root.helpText(root.purpose || "NO DESCRIPTION AVAILABLE")
+                    textFormat: Text.RichText
+                    wrapMode: Text.Wrap
+                    color: Colors.white
+                    font.pixelSize: 12
+                }
+                GaussianBlur { anchors.fill: purposeText; source: purposeText; radius: 4; samples: 9; opacity: 0.55; z: -1 }
             }
         }
         Rectangle {
@@ -216,7 +220,7 @@ Rectangle {
                 x: 7
                 y: 5
                 width: Math.max(0, parent.width - 14)
-                text: root.helpText("PROCESS SCOPE // LIMIT = THIS PROCESS")
+                text: root.semanticText("PROCESS SCOPE //", Colors.cyan) + " " + root.helpText("LIMIT") + " " + root.semanticText("= THIS PROCESS", Colors.cyan)
                 textFormat: Text.RichText
                 wrapMode: Text.Wrap
                 color: Colors.cyan
@@ -249,8 +253,8 @@ Rectangle {
                     wrapMode: Text.WrapAnywhere
                     color: Colors.white
                     font.pixelSize: 11
-                    GaussianBlur { anchors.fill: parent; source: scopeValue; radius: 4; samples: 9; opacity: 0.55; z: -1 }
                 }
+                GaussianBlur { anchors.fill: scopeValue; source: scopeValue; radius: 4; samples: 9; opacity: 0.55; z: -1 }
             }
             NeonScrollBar {
                 objectName: "processInformationScopeRail"

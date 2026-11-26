@@ -135,7 +135,16 @@ ShellRoot {
             if (!view || view.width <= 0) return;
             const detail = smoke.find(view,"cpuPlusKillSharedTaskView");
             const targets = smoke.find(view,"cpuPlusKillLiveTargets");
-            if (!detail || !targets || targets.count !== 1) return;
+            if (!detail || !targets || targets.count !== 1) {
+                if (smoke.ticks > 12) {
+                    smoke.check(false, "mount incomplete: loader="
+                        + String(scene.status) + " view=" + (!!view)
+                        + " detail=" + (!!detail) + " targets=" + (!!targets)
+                        + " count=" + (targets ? targets.count : "none")
+                        + " rows=" + fakeOwner.taskRows.length);
+                }
+                return;
+            }
 
             if (smoke.phase === 0) {
                 if (!smoke.check(!view.currentTask && fakeGate.preparations===0

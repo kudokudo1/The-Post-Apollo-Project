@@ -564,6 +564,10 @@ ShellRoot {
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!duration || duration.hardwareThumbLength<=root.mediumThumbLength) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,"large instruments fit")) return;
+                const pair=root.findItem(workshop,"cpuplusWorkshopStorageDialPair");
+                if (!root.check(pair && pair.visible && workshop.storageMechanical && workshop.storageDialScale>=0.55
+                    && root.findItem(pair,"cpuplusWorkshopStorage-sample-dial") && root.findItem(pair,"cpuplusWorkshopStorage-report-dial"),
+                    "large storage slot mounts two mechanical countdown dials")) return;
                 nativeWindow.width=320;
                 nativeWindow.height=620;
                 root.phase=244;
@@ -576,6 +580,8 @@ ShellRoot {
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!duration || duration.hardwareThumbLength!==root.compactThumbLength) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,"compact instruments fit after resize")) return;
+                if (!root.check(!workshop.storageMechanical && !root.findItem(workshop,"cpuplusWorkshopStorageDialPair").visible,
+                    "narrow slot returns to digital clocks")) return;
                 workshop.edit("selected",["storage","stall"]);
                 workshop.edit("durationSeconds",5);
                 dial.valueRequested(500);

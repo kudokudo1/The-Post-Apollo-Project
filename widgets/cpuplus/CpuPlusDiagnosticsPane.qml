@@ -355,6 +355,7 @@ Column {
                     ActionButton {
                         width: Math.floor((parent.width-4)*0.6)
                         height: 26
+                        objectName: "cpuplusDiagnosticLoadPreset-"+modelData.name
                         label: "LOAD CONTROLS"
                         normalFace: true
                         accentColor: Colors.cyan
@@ -366,7 +367,7 @@ Column {
                         }
                     }
                     ActionButton {
-                        width: parent.width-parent.children[0].width-4
+                        width: parent.width-Math.floor((parent.width-4)*0.6)-4
                         height: 26
                         label: presets.deleteName===modelData.name ? "CONFIRM" : "REMOVE"
                         normalFace: true

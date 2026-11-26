@@ -239,6 +239,24 @@ ShellRoot {
                 const cancel=root.findItem(pane.item,"cpuplusProcCancel");
                 if (!root.check(report && report.status==="CANCELLED" && cancel && !cancel.available,
                     "census cancellation terminal receipt")) return;
+                if (!root.check(!CpuPlusDiagnostics.requestConfigured({kind:"threads",durationSeconds:2,intervalMs:500,topCount:99}),
+                    "invalid calibration refused")) return;
+                const config={kind:"threads",durationSeconds:2,intervalMs:500,topCount:2};
+                if (!root.check(CpuPlusDiagnostics.requestConfigured(config), "configured thread launch")) return;
+                config.topCount=12;
+                if (!root.check(!CpuPlusDiagnostics.request("inventory"), "configured run retains single-flight guard")) return;
+                root.paneActive=false;
+                root.phase=14;
+                return;
+            }
+            if (root.phase===14) {
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.threads;
+                if (!root.check(report && report.status==="COMPLETE"
+                    && report.summary.indexOf("CALIBRATION // 2 s / 500 ms / TOP 2")>=0
+                    && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id),
+                    "configured capture survives unload and archive // "+CpuPlusDiagnostics.feedback)) return;
+                console.log("CPU_D1B_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

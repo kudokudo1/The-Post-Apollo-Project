@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
-const graph = fs.readFileSync(path.join(root, 'widgets/appcontrol/TaskGraphController.qml'), 'utf8');
+const graph = fs.readFileSync(path.join(root, 'services/kill/TaskGraphController.qml'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'widgets/AppControlW.qml'), 'utf8');
 const miniSource = fs.readFileSync(path.join(root, 'widgets/appcontrol/ProcessMiniGraph.qml'), 'utf8');
 
@@ -256,7 +256,9 @@ test('Hunter display short circuits preserve thresholds and protection classes',
 });
 
 test('menu visibility binds immutable graph presentation policy', () => {
-    assert.match(app, /taskMiniHistoryKeepImmutable:\s*appControlWindow\.menuOpen/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    assert.match(app, /property: "graphVisible"\s*value: appControlWindow\.menuOpen/);
+    assert.match(store, /taskMiniHistoryKeepImmutable: root\.graphVisible/);
     assert.match(graph, /if \(immutable\) \{/);
 });
 

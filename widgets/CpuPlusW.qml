@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../components"
+import "../services/kill" as KillBackend
 import "appcontrol"
 import "cpuplus"
 import qs.services.location
@@ -3371,6 +3372,7 @@ PanelWindow {
                 && !!cpuPlusWindow.appControlWindow
         visible: active
         sourceComponent: CpuPlusKillWorkspace {
+            graphSource: KillBackend.KillStore.graphState
             instrumentWidth: sharedInstrumentPane.width
             targetWidth: targetPane.width
             appControlWindow: cpuPlusWindow.appControlWindow

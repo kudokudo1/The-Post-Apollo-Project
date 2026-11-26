@@ -5,14 +5,16 @@ import Quickshell
 import "../../components"
 import "../appcontrol"
 import "../../services/system"
+import "../../services/kill" as KillBackend
 
-// CPU++ owns navigation and presentation. AppControl owns the one live
-// ProcessTelemetry and the birth-time-verified action gate. No second poller,
+// CPU++ owns navigation and presentation. KillStore owns live telemetry and
+// mini histories; AppControl temporarily owns the birth-time-verified action gate. No second poller,
 // kill/prlimit backend, detached command, or historical-census actuation.
 Item {
     id: workspace
     objectName: "cpuPlusSharedKillWorkspace"
     required property var appControlWindow
+    required property var graphSource
     property bool active: true
 
     readonly property var gate: appControlWindow
@@ -43,8 +45,8 @@ Item {
     property int hunterVisibilityMode: hunterVisibilityTargets
     readonly property string hunterCombiIcon: hunterGraph.combiIcon
     readonly property string metricKey: ["combined","cpu","mem","io","age"][hunterMetricMode]
-    readonly property int miniHistoryRevision: appControlWindow
-        ? Number(appControlWindow.taskMiniDisplayRevision || 0) : 0
+    readonly property int miniHistoryRevision: graphSource
+        ? Number(graphSource.taskMiniDisplayRevision || 0) : 0
     readonly property var ownerFavoriteStore: appControlWindow
         ? appControlWindow.favoriteStore : null
     property var bulkReview: null
@@ -511,10 +513,12 @@ Item {
     GraphHistory { id: graphGeometry }
     ProcessPresentationState {
         id: history
-        taskMiniCpuHistories: workspace.appControlWindow
-            ? (workspace.appControlWindow.taskMiniCpuHistories || ({})) : ({})
-        taskMiniHunterMetricHistories: workspace.appControlWindow
-            ? (workspace.appControlWindow.taskMiniHunterMetricHistories || ({})) : ({})
+        taskMiniCpuHistories: workspace.graphSource
+            ? (workspace.graphSource.taskMiniCpuHistories || ({})) : ({})
+        taskMiniHunterMetricHistories: workspace.graphSource
+            ? (workspace.graphSource.taskMiniHunterMetricHistories || ({})) : ({})
+        taskMiniCpuIdentityHistories: workspace.graphSource
+            ? (workspace.graphSource.taskMiniCpuIdentityHistories || ({})) : ({})
         taskMiniHistoryRevision: workspace.miniHistoryRevision
     }
     HunterPresentation {
@@ -522,7 +526,7 @@ Item {
         presentationState: history
         metricMode: workspace.hunterMetricMode
     }
-    TaskGraphController {
+    KillBackend.TaskGraphController {
         id: detailGraph
         presentationState: history
         hunterPresentation: hunterGraph

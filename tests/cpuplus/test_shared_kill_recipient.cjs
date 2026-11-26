@@ -91,8 +91,10 @@ test("recipient restores existing owner graph and favorite semantics", () => {
     assert.match(recipient,/details\.cpuCanvas\.requestPaint\(true\)/);
     assert.match(recipient,/details\.combiScoreCanvas\.requestPaint\(true\)/);
     assert.match(recipient,/detailGraph\.appendSelectedTaskHunterHistories/);
-    assert.match(recipient,/appControlWindow\.taskMiniCpuHistories/);
-    assert.match(recipient,/appControlWindow\.taskMiniHunterMetricHistories/);
+    assert.match(host,/graphSource: KillBackend\.KillStore\.graphState/);
+    assert.match(recipient,/graphSource\.taskMiniCpuHistories/);
+    assert.match(recipient,/graphSource\.taskMiniHunterMetricHistories/);
+    assert.doesNotMatch(recipient,/appControlWindow\.taskMini(?:CpuHistories|HunterMetricHistories|DisplayRevision)/);
     assert.match(row,/width: 82/);
     assert.match(row,/mini\.combi/);
     assert.match(row,/root\.controller\.miniHistory/);
@@ -125,7 +127,7 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     const shell=read("shell.qml");
     assert.match(shell,/AppControlW\s*\{[\s\S]*?cpuPlusProcessVisible:\s*cpuPlusWindow\.menuOpen\s*&& cpuPlusWindow\.selectedModeIndex === 1/);
     assert.match(owner,/property bool cpuPlusProcessVisible: false/);
-    assert.match(owner,/taskMiniHistoryKeepImmutable: appControlWindow\.menuOpen\s*\|\| appControlWindow\.cpuPlusProcessVisible/);
+    assert.match(owner,/property: "graphVisible"\s*value: appControlWindow\.menuOpen\s*\|\| appControlWindow\.cpuPlusProcessVisible/);
     assert.match(owner,/function taskMiniProbeNeeded\(\) \{\s*return cpuPlusProcessVisible\s*\|\| \(menuOpen/);
     assert.match(owner,/id: taskManagerRefreshTimer[\s\S]*?interval:\s*appControlWindow\.cpuPlusProcessVisible\s*\? 600/);
     assert.match(owner,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: appControlWindow\.taskMiniProbeNeeded\(\)/);
@@ -396,4 +398,22 @@ test("P4j: presentation classification and escaped rich-text identity preserve s
     assert.ok(text.includes('<font color="#9ECE6A">314</font>'));
     assert.ok(text.includes('<font color="#DCF3FA"> [PID </font>'));
     assert.ok(!text.includes("<&"));
+});
+
+test("K2a: service owns donor graph controller and history; views consume the same store", () => {
+    const owner=read("widgets/AppControlW.qml");
+    const store=read("services/kill/KillStore.qml");
+    const legacy=read("widgets/appcontrol/TaskGraphController.qml");
+    assert.equal((store.match(/^\s*ProcessPresentationState\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*TaskGraphController\s*\{/gm)||[]).length,1);
+    assert.match(store,/taskMiniHistoryKeepImmutable: root\.graphVisible/);
+    assert.match(owner,/readonly property var processPresentationState: KillBackend\.KillStore\.graphState/);
+    assert.match(owner,/readonly property var taskGraphController: KillBackend\.KillStore\.graphController/);
+    assert.doesNotMatch(owner,/^\s*(ProcessPresentationState|TaskGraphController)\s*\{/m);
+    assert.match(owner,/target: appControlWindow\.taskGraphController/);
+    assert.match(legacy,/KillBackend\.TaskGraphController \{\}/);
+    assert.doesNotMatch(legacy,/function updateMiniCpuHistories/);
+    assert.match(recipient,/KillBackend\.TaskGraphController\s*\{/);
+    assert.match(recipient,/required property var graphSource/);
+    assert.match(recipient,/Number\(graphSource\.taskMiniDisplayRevision/);
 });

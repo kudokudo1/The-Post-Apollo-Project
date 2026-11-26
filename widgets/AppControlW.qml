@@ -8900,119 +8900,24 @@ PanelWindow {
 
 
     function detailFavoriteContextKey() {
-        const entry = selectedResult();
-
-        if (!entry)
-            return "";
-
-        if (selectedResultIsApplication()) {
-            const appEntry = favoriteSourceItem(entry) || entry;
-            const appKey = appEntryKey(appEntry);
-
-            return appKey
-                   ? "app|" + encodeURIComponent(appKey)
-                   : "";
-        }
-
-        if (selectedResultIsRun()) {
-            const runEntry = favoriteSourceItem(entry) || entry;
-            const runKey = favoriteKeyFor(runEntry, runModeIndex);
-
-            return runKey
-                   ? "run|" + encodeURIComponent(runKey)
-                   : "";
-        }
-
-        return "";
+        return FavoriteIdentity.detailContextKey(selectedResult(),
+            function() { return appControlWindow.selectedResultIsApplication(); },
+            function() { return appControlWindow.selectedResultIsRun(); },
+            function(entry) { return appControlWindow.appEntryKey(entry); },
+            function(entry) { return appControlWindow.favoriteKeyFor(entry, appControlWindow.runModeIndex); });
     }
 
     function detailActionStableId(actionIndex, desktopActions) {
-        const entry = selectedResult();
-
-        if (!entry || actionIndex < 0)
-            return "";
-
-        if (selectedResultIsRun()) {
-            if (actionIndex === 0)
-                return "run";
-            if (actionIndex === 1)
-                return "kitty";
-            if (actionIndex === 2)
-                return "float";
-            if (actionIndex === 3)
-                return "fullscreen";
-            if (actionIndex === 4)
-                return "toolbox";
-            if (actionIndex === 5)
-                return "kill";
-
-            return "";
-        }
-
-        if (!selectedResultIsApplication())
-            return "";
-
-        const appEntry = favoriteSourceItem(entry) || entry;
-        const actions = desktopActions === undefined
-            ? appDesktopActions(appEntry) : desktopActions;
-        const desktopCount = actions.length;
-
-        if (actionIndex === 0)
-            return "launch";
-
-        if (appEntry._hiddenCommand) {
-            if (actionIndex === 1) return "hidden-kitty";
-            if (actionIndex === 2) return "hidden-float";
-            if (actionIndex === 3) return "hidden-fullscreen";
-            if (actionIndex === 4) return "hidden-bottles";
-            if (actionIndex === 5) return "hidden-toolbox";
-            if (actionIndex === 6) return "hidden-kill";
-            return "";
-        }
-
-        if (actionIndex === desktopCount + 1)
-            return "bottles";
-
-        if (actionIndex === desktopCount + 2)
-            return "toolbox";
-
-        if (actionIndex === desktopCount + 3)
-            return "mute-app";
-
-        if (actionIndex === desktopCount + 4)
-            return "freeze-app";
-
-        if (actionIndex === desktopCount + 5)
-            return "kill";
-
-        const desktopIndex = actionIndex - 1;
-
-        if (desktopIndex < 0 || desktopIndex >= desktopCount)
-            return "";
-
-        const action = actions[desktopIndex];
-
-        if (action && action._appControlBuiltin)
-            return "builtin|" + String(action._appControlBuiltin);
-
-        return "desktop|"
-               + encodeURIComponent(
-                     String(
-                         action && action.name
-                         ? action.name
-                         : desktopIndex
-                     )
-                 );
+        return FavoriteIdentity.detailActionId(selectedResult(), actionIndex, desktopActions,
+            function() { return appControlWindow.selectedResultIsRun(); },
+            function() { return appControlWindow.selectedResultIsApplication(); },
+            function(entry) { return appControlWindow.appDesktopActions(entry); });
     }
 
     function detailFavoriteKeyFor(actionIndex) {
         const context = detailFavoriteContextKey();
         const actionId = detailActionStableId(actionIndex);
-
-        if (!context || !actionId)
-            return "";
-
-        return context + "|" + actionId;
+        return FavoriteIdentity.detailKey(context, actionId);
     }
 
     function isDetailActionFavorite(actionIndex) {

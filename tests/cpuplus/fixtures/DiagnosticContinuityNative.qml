@@ -592,7 +592,15 @@ ShellRoot {
                         && root.findItem(d,"selectorAutomotiveDial").actualFaceDiameter>=72
                         && root.findItem(d,"selectorAutomotiveDial").unitPixelSize>=9
                         && root.findItem(d,"automotiveGauge").width===root.findItem(d,"selectorAutomotiveDial").actualFaceDiameter
-                        && root.findItem(d,"automotiveValueUnit").visible
+                        && root.findItem(d,"selectorAutomotiveDial").insetWindowFits(root.findItem(d,"selectorAutomotiveDial").upperGeometry)
+                        && root.findItem(d,"selectorAutomotiveDial").insetWindowFits(root.findItem(d,"selectorAutomotiveDial").lowerGeometry)
+                        && root.findItem(d,"automotiveValueWindow").visible
+                        && root.findItem(d,"automotiveSetWindow").visible
+                        && root.findItem(d,"instrumentChassis").screwEdgeClearance>=2.5
+                        && (!root.findItem(d,"automotiveValueUnit").visible || (()=>{
+                            const v=root.findItem(d,"selectorStopwatchCenter"),u=root.findItem(d,"automotiveValueUnit");
+                            return v.x+v.width<=u.x+0.01 || v.y+v.height<=u.y+0.01;
+                        })())
                         && root.findItem(d,"selectorDialReadableValue").visible
                         && root.findItem(d,"selectorDialReadableValue").text.includes("SEC")
                         && d.scale===1)

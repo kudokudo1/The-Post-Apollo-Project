@@ -113,3 +113,4 @@ fs.writeFileSync(out,fixture.replace("// INSERT_APP_CONTROL_BINDING",
   wrappers.join("\n\n")+"\n\n"+model.replace("DesktopEntries.applications.values","fixtureDesktopEntries.applications.values")));
 NODE
 run_phase binding "FB_PASS // APP_CONTROL_EXACT_BINDING_REACTIVE" "$work/config/binding.qml" "$work/binding-data"
+grep -F "FB_PASS // SHARED_STORE_CPU_PROJECTION_REACTIVE_READ_ONLY" "$work/binding.log" >/dev/null

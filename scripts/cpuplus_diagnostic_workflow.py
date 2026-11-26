@@ -17,10 +17,11 @@ import time
 
 from syntagma_quickshell_thread_sampler import find_quickshell, parse_stat_line
 
-ORDER = ("threads", "memory", "census", "storage")
+ORDER = ("threads", "memory", "census", "storage", "stall")
 SCRIPTS = dict(zip(ORDER, ("syntagma_quickshell_thread_sampler.py",
                          "cpuplus_quickshell_memory_observer.py",
-                         "cpuplus_process_census.py", "cpuplus_storage_observer.py")))
+                         "cpuplus_process_census.py", "cpuplus_storage_observer.py",
+                         "cpuplus_stall_clock_witness.py")))
 CHILD_BYTES = 65536
 ENVELOPE_BYTES = 300000
 PLAN_BYTES = 4096
@@ -49,7 +50,7 @@ def validate(plan):
     if type(plan) is not dict or set(plan) != {"durationSeconds", "instruments"}:
         raise ValueError("invalid workflow fields")
     duration, items = plan["durationSeconds"], plan["instruments"]
-    if not integer(duration, 1, 120) or type(items) is not list or not 2 <= len(items) <= 4:
+    if not integer(duration, 1, 120) or type(items) is not list or not 2 <= len(items) <= 5:
         raise ValueError("invalid workflow duration/count")
     configs = {}
     for item in items:
@@ -58,12 +59,15 @@ def validate(plan):
         kind = item["kind"]
         if kind not in ORDER or kind in configs:
             raise ValueError("unsupported/duplicate instrument")
-        keys = {"kind"} if kind == "storage" else {"kind", "intervalMs"}
+        keys = {"kind"} if kind == "storage" else {"kind", "thresholdMs"} if kind == "stall" else {"kind", "intervalMs"}
         if kind == "threads":
             keys.add("topCount")
         if set(item) != keys:
             raise ValueError("unsupported instrument fields")
-        if kind == "storage":
+        if kind == "stall":
+            if duration<5 or not integer(item["thresholdMs"],150,2000) or item["thresholdMs"]%50:
+                raise ValueError("stall calibration")
+        elif kind == "storage":
             if duration > 30:
                 raise ValueError("storage duration")
         else:
@@ -100,6 +104,10 @@ def commands(configs, data_dir, scripts, pinned):
     result = {}
     for c in configs:
         kind = c["kind"]
+        if kind == "stall":
+            result[kind]=[sys.executable,"-B",str(scripts/SCRIPTS[kind]),"--workflow",
+                          "--duration",str(c["durationSeconds"])]
+            continue
         args = [sys.executable, "-B", str(scripts/SCRIPTS[kind]), "--workshop",
                 "--duration", str(c["durationSeconds"])]
         if kind == "storage":
@@ -200,6 +208,19 @@ def receipt(config, raw, pinned):
         raise ValueError("invalid rows")
     kind=config["kind"]
     end=rows[-1]
+    if kind=="stall":
+        if len(raw)>2048 or len(rows)!=1 or end.get("schema")!="post-apollo-stall-clock-v1":
+            raise ValueError("invalid stall witness")
+        first,last=end.get("startedMonotonicMs"),end.get("monotonicMs")
+        a,b=end.get("startWallMs"),end.get("endWallMs")
+        elapsed=end.get("elapsedMs")
+        if (end.get("durationSeconds")!=config["durationSeconds"]
+                or not integer(first,0,2**53-1) or not integer(last,first,2**53-1)
+                or not integer(a,1,2**53-1) or not integer(b,a,2**53-1)
+                or not integer(elapsed,config["durationSeconds"]*1000,config["durationSeconds"]*1000+5000)
+                or abs(last-first-elapsed)>2 or abs(b-a-elapsed)>250):
+            raise ValueError("stall witness timeline")
+        return rows,first,last
     if end.get("event")!="complete":
         raise ValueError("missing terminal receipt")
     if kind=="threads":

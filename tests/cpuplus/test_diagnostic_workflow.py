@@ -106,6 +106,22 @@ print(own)
             self.assertTrue(all(i["payloadBytes"]<=w.CHILD_BYTES for i in result["instruments"]))
             self.assertIsNone(result["pinnedQuickshell"])
 
+    def test_actual_storage_and_stall_witness(self):
+        with tempfile.TemporaryDirectory() as folder:
+            plan={"durationSeconds":5,"instruments":[{"kind":"storage"},{"kind":"stall","thresholdMs":350}]}
+            config=w.validate(plan)
+            self.assertEqual(w.commands(config,Path(folder),ROOT/"scripts",None)["stall"][-3:],
+                             ["--workflow","--duration","5"])
+            result=w.run(plan,Path(folder),lambda:False)
+            self.assertEqual(result["status"],"COLLECTED",result)
+            self.assertGreater(result["overlapMs"],0)
+            item=result["instruments"][1]
+            self.assertEqual(item["records"][0]["schema"],"post-apollo-stall-clock-v1")
+            self.assertNotIn("ticks",item["records"][0])
+            self.assertEqual(item["config"]["thresholdMs"],350)
+            with self.assertRaises(ValueError):
+                w.validate(dict(plan,instruments=[{"kind":"storage"},{"kind":"stall","thresholdMs":351}]))
+
 
 if __name__=="__main__":
     unittest.main()

@@ -307,6 +307,15 @@ console.log("DIAG D3d reuse existing shell heartbeat contract PASS");
 
 assert.match(workshop,/objectName: "cpuplusWorkshopStallThreshold"/);
 assert.match(workshop,/numericDetentInterval: 50/);
-assert.match(workshop,/thresholdMs:d.stallThresholdMs/);
+assert.match(read("services/diagnostics/DiagnosticCalibration.js"),/thresholdMs:d.stallThresholdMs/);
 assert.match(workshop,/onValueRequested: value=>root.edit\("stallThresholdMs",Math.round\(value\)\)/);
 assert.match(owner,/Policy.attachWorkflowStall\(output,expected,stallTicks,stallOverflow\)/);
+
+assert.match(parent,/objectName: "cpuplusDiagnosticTopRail"/);
+assert.match(parent,/anchors.top: diagnosticTopRail.bottom/);
+assert.match(parent,/model: \[\{key:"WORK",label:"CONTROLS"\},\{key:"PRESETS",label:"WORKFLOWS"\}\]/);
+assert.match(ui,/objectName: "cpuplusDiagnosticWorkflowCatalog"/);
+assert.match(ui,/id: diagnosticIndex\s+visible: root.viewMode !== "PRESETS"/);
+assert.match(workshop,/Calibration.workshopPlanFromDraft\(d\)/);
+assert.match(owner,/function saveWorkshopPreset\(name\)/);
+assert.match(owner,/function loadWorkshopPreset\(name\)/);

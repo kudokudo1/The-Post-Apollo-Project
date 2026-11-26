@@ -85,8 +85,17 @@ if "graphql" in args:
     for arg in args:
         if arg.startswith("cursor="):
             page = int(arg.split("=", 1)[1])
-    chunk = rows[page * 25:(page + 1) * 25]
-    more = len(rows) > (page + 1) * 25
+    size = next(int(arg.split("=", 1)[1]) for arg in args if arg.startswith("size="))
+    assert size == (25 if page == 0 else 75), size
+    start = 0 if page == 0 else 25
+    chunk = json.loads(json.dumps(rows[start:start + size]))
+    # Simulate the actual lightweight selection: no nested review/check lists.
+    for row in chunk:
+        row.pop("reviews", None)
+        for node in row.get("commits", {}).get("nodes", []):
+            rollup = node.get("commit", {}).get("statusCheckRollup", {})
+            rollup.pop("contexts", None)
+    more = len(rows) > start + size
     body = {"data":{"repository":{"pullRequests":{"nodes":chunk,"pageInfo":{
         "hasNextPage":more,"endCursor":str(page + 1) if more else None}}}}}
     sys.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\n\\r\\n")
@@ -149,15 +158,16 @@ assert len(large_payload.encode()) > 131072
 success = run_synthetic(large_payload)
 assert success.returncode == 0, success.stderr
 frames = [json.loads(line) for line in success.stdout.splitlines()]
-assert len(frames) == 5, frames
-assert [len(f["page"]) for f in frames[:-1]] == [25, 25, 25, 25]
+assert len(frames) == 3, frames
+assert [len(f["page"]) for f in frames[:-1]] == [25, 75]
 output = frames[-1]
 assert [r for f in frames[:-1] for r in f["page"]] == output
 assert len(output) == 100, f"Expected 100 PRs, got {len(output)}"
 assert output[0]["number"] == 1 and output[-1]["number"] == 100
 assert output[0]["checkState"] == "SUCCESS"
-assert len(output[0]["checkContexts"]) == 1
-assert output[0]["checkDetailsDeferred"] is False
+assert output[0]["checkContexts"] == []
+assert output[0]["checkDetailsDeferred"] is True
+assert output[0]["reviewDetailsDeferred"] is True
 assert success.rest_calls == 0
 
 # A sparse open PR must exercise the review/CI evidence fallback. The
@@ -223,4 +233,7 @@ assert "waitForEnd: false" in SOURCE
 assert "root.consumePullsOutput(this.text)" in SOURCE
 assert "pullsRequestEpoch !== pullsRepoEpoch" in SOURCE
 assert "FINAL RESPONSE DOES NOT MATCH VALIDATED PAGES" in SOURCE
-print("GitHub PULLS progressive pages, large payload and error propagation: PASS")
+assert "pullsCacheMaxAgeMs: 30000" in SOURCE
+assert "pullsFirstPageMs = Math.max" in SOURCE
+assert "pullsFullLoadMs = Math.max" in SOURCE
+print("GitHub PULLS lightweight progressive pages, large payload and error propagation: PASS")

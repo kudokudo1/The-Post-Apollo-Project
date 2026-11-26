@@ -393,7 +393,7 @@ assert.match(chassis,/faceDiameter \+ 2\*safeClearance/);
 assert.ok(automotive.indexOf("selectorStopwatchCenter") < automotive.indexOf("selectorStopwatchHand"));
 assert.doesNotMatch(automotive,/\bTimer\s*\{|\bProcess\s*\{/);
 assert.doesNotMatch(chassis,/\bTimer\s*\{|\bProcess\s*\{/);
-for(const variant of ["industrial","capsule","continuous","dualRail","radialTeeth","sparse","numbers","none"]) assert.ok(automotive.includes(variant)||variant==="capsule");
+for(const variant of ["industrial","capsule","continuous","dualRail","radialTeeth","sparse","numbers","none"]) assert.ok(automotive.includes(variant));
 assert.match(read("components/qmldir"),/AutomotiveDial 1\.0 AutomotiveDial\.qml/);
 assert.match(stopwatchDialSource,/stopwatchLitSegments: Math.ceil\(30\*stopwatchVisualFraction\)/);
 assert.equal((workshop.match(/stopwatchFace: true/g)||[]).length,2);

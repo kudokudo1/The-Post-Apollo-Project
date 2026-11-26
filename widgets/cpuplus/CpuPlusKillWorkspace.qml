@@ -632,6 +632,7 @@ Item {
 
         Rectangle {
             id: instrumentBay
+            objectName: "cpuPlusProcessControlBay"
             width: Math.min(workspace.instrumentWidth, Math.max(0,bays.width-targetBay.width))
             height: bays.height
             color: Colors.dark
@@ -692,6 +693,7 @@ Item {
                     anchors.top: parent.top
                     anchors.margins: 6
                     selected: cpuProcessInformation.open
+                    available: cpuProcessInformation.contextActive
                     onLeftClicked: cpuProcessInformation.open = !cpuProcessInformation.open
                 }
             }
@@ -731,50 +733,215 @@ Item {
                     color: Colors.red
                 }
             }
-            GohuText {
-                id: emptyTarget
-                visible: !workspace.currentTask
-                anchors.centerIn: parent
-                width: parent.width - 25
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
-                color: Colors.cyan
-                font.pixelSize: 12
-            }
             Flickable {
-                id: detailsScroll
-                anchors.top: processStateHeader.bottom
-                anchors.topMargin: 8
+                id: actuatorScroll
+                anchors.top: workspace.currentTask ? processStateHeader.bottom : instrumentTitle.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                anchors.margins: 6
+                anchors.margins: 8
                 clip: true
-                visible: !!workspace.currentTask
                 contentWidth: width
-                contentHeight: details.implicitHeight + 20
-                TaskManagerView {
-                    id: details
-                    objectName: "cpuPlusKillSharedTaskView"
-                    x: 8
-                    width: Math.max(0,detailsScroll.width - 20)
-                    host: taskHost
-                    presentationState: history
-                    processController: processView
-                    graphGeometry: graphGeometry
-                    hunterGraph: hunterGraph
-                    searchInputTarget: processSearch
-                    safetyLockComponent: safetyLock
-                    actionTarget: rightActions
-                    viewportHeight: detailsScroll.height - 12
+                contentHeight: actuatorBody.implicitHeight + 12
+                Column {
+                id: actuatorBody
+                width: Math.max(0,actuatorScroll.width-14)
+                spacing: 6
+                GohuText {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "PROCESS // ACTUATORS"
+                    color: Colors.magenta
+                    font.pixelSize: 12
+                }
+                Column {
+                    objectName: "cpuPlusBulkReview"
+                    width: parent.width
+                    visible: workspace.hasBulkReview || workspace.bulkOperation
+                    spacing: 8
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Colors.red
+                        text: workspace.hasBulkReview
+                            ? "REVIEW // " + workspace.bulkReview.label
+                            : workspace.bulkOperation
+                            ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase() : ""
+                    }
+                    GohuText {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Colors.white
+                        font.pixelSize: 11
+                        text: workspace.hasBulkReview
+                            ? String(workspace.bulkReview.targets.length) + " CAPTURED TARGETS"
+                              + "\nGLOBAL SCOPE • NOT SEARCH RESULTS"
+                              + "\nNO COMMAND SENT • PROTECTION RECHECKED BEFORE DISPATCH\n\n"
+                              + workspace.bulkReview.targets.map(t => t.name + " [PID " + t.pid + "]").join("\n")
+                            : workspace.bulkOperation ? workspace.appControlWindow.cpuBulkMessage : ""
+                    }
+                    Rectangle {
+                        objectName: "cpuPlusBulkConfirm"
+                        width: parent.width; height: 38
+                        visible: workspace.hasBulkReview
+                        color: Colors.black; border.color: Colors.red; border.width: 1
+                        GohuText { anchors.centerIn: parent; text: "CONFIRM CAPTURE"; color: Colors.red }
+                        MouseArea { anchors.fill: parent; enabled: workspace.hasBulkReview; onClicked: workspace.confirmBulk() }
+                    }
+                    Rectangle {
+                        objectName: "cpuPlusBulkCancel"
+                        width: parent.width; height: 34
+                        visible: workspace.hasBulkReview || (workspace.bulkOperation
+                            && workspace.appControlWindow.hunterOperationPhase === "report")
+                        color: Colors.black; border.color: Colors.cyan; border.width: 1
+                        GohuText { anchors.centerIn: parent; text: workspace.hasBulkReview ? "CANCEL" : "ACKNOWLEDGE"; color: Colors.cyan }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                if (workspace.hasBulkReview) workspace.cancelBulk();
+                                else if (workspace.bulkOperation) workspace.appControlWindow.acknowledgeCpuBulkReport();
+                            }
+                        }
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: workspace.currentTask
+                        ? (String(workspace.currentTask.comm)
+                           + " // PID " + workspace.selectedPid)
+                        : "NO LIVE PROCESS SELECTED"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+                GohuText {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: workspace.exactTargetAvailable
+                        ? "EXACT LIVE PID + START TICKS + NAME"
+                        : workspace.currentTask && !workspace.selectedTargetVisible
+                        ? "TARGET OUTSIDE CURRENT FILTER // CONTROLS LOCKED"
+                        : "TARGET IDENTITY NOT VERIFIED // CONTROLS LOCKED"
+                    color: workspace.exactTargetAvailable ? Colors.white : Colors.orange
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: "Live owner • explicit review before dispatch"
+                    color: Colors.white
+                    font.pixelSize: 10
+                }
+                Column {
+                    id: leftActions
+                    objectName: "cpuPlusSharedActionTarget"
+                    width: parent.width
+                    spacing: 6
+                    visible: !!workspace.currentTask
+                    enabled: workspace.exactTargetAvailable && !workspace.locallyPending
+                }
+                GohuText {
+                    width: parent.width
+                    visible: workspace.stagedLimitPercent >= 0
+                    text: "LIMIT PREVIEW // " + workspace.stagedLimitPercent + "%"
+                    color: Colors.yellow
+                    font.pixelSize: 12
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 34
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.yellow
+                    visible: workspace.stagedLimitPercent >= 0
+                    opacity: workspace.exactTargetAvailable && !workspace.locallyPending ? 1 : 0.45
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "APPLY LIMIT // REVIEW"
+                        color: Colors.yellow
+                        font.pixelSize: 11
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: workspace.exactTargetAvailable
+                                 && !workspace.locallyPending
+                        onClicked: workspace.prepareAction(
+                            "limit", workspace.stagedLimitPercent)
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: workspace.gate ? workspace.gate.feedback : "NO SHARED ACTION OWNER"
+                    color: Colors.orange
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    visible: workspace.hasOwnedPending
+                    wrapMode: Text.Wrap
+                    text: workspace.hasOwnedPending
+                        ? ("CONFIRM " + String(workspace.gate.pending.action).toUpperCase()
+                           + " FOR PID " + String(workspace.gate.pending.pid)
+                           + "\nNO COMMAND HAS BEEN SENT")
+                        : ""
+                    color: Colors.red
+                    font.pixelSize: 12
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 38
+                    visible: workspace.hasOwnedPending
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.red
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "CONFIRM REQUEST"
+                        color: Colors.red
+                        font.pixelSize: 12
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: workspace.hasOwnedPending
+                        onClicked: {
+                            if (workspace.gate && workspace.hasOwnedPending
+                                    && workspace.exactTargetAvailable)
+                                workspace.gate.confirm()
+                        }
+                    }
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 34
+                    visible: workspace.hasOwnedPending
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "CANCEL"
+                        color: Colors.cyan
+                        font.pixelSize: 12
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: workspace.cancelOwned()
+                    }
+                }
+                GohuText {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: "Left click lock: one-shot • Right click: sticky. Existing owner safety policy applies. Dispatch is not proof of success."
+                    color: Colors.orange
+                    font.pixelSize: 10
+                }
                 }
             }
             NeonScrollBar {
-                objectName: "cpuPlusKillDetailScroll"
-                flickable: detailsScroll
+                objectName: "cpuPlusKillActuatorScroll"
+                flickable: actuatorScroll
                 geometryMode: "viewport"
-                visible: detailsScroll.visible && scrollable
+                visible: scrollable
                 railColor: Colors.red
                 handleColor: Colors.magenta
                 wheelEnabled: false
@@ -784,10 +951,14 @@ Item {
                 objectName: "cpuPlusProcessInformation"
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.top: processStateHeader.bottom
-                anchors.margins: 6
-                maximumHeight: Math.max(0, instrumentBay.height - processStateHeader.y - processStateHeader.height - 12)
+                anchors.leftMargin: 6
+                anchors.rightMargin: 6
+                compactTop: processStateHeader.y + processStateHeader.height + 6
+                expandedTop: processStateHeader.y
+                fullTop: 6
+                maximumHeight: Math.max(0, instrumentBay.height - fullTop - 6)
                 contextActive: workspace.active && !!workspace.currentTask
+                    && !workspace.locallyPending && !workspace.hasBulkReview && !workspace.bulkOperation
                 task: contextActive ? workspace.currentTask : null
                 purpose: open && contextActive && task && workspace.appControlWindow.taskSimplePurpose
                     ? workspace.appControlWindow.taskSimplePurpose(task) : ""
@@ -928,218 +1099,66 @@ Item {
         }
 
         Rectangle {
-            id: actuatorBay
+            id: resourceBay
+            objectName: "cpuPlusProcessResourceBay"
             width: Math.max(0,bays.width-instrumentBay.width-targetBay.width)
             height: bays.height
             color: Colors.dark
             border.width: 1
             border.color: Colors.orange
+            GohuText {
+                id: resourceTitle
+                anchors.top: parent.top
+                anchors.topMargin: 14
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "PROCESS // RESOURCES"
+                color: Colors.magenta
+                font.pixelSize: 12
+            }
+            GohuText {
+                id: emptyTarget
+                visible: !workspace.currentTask
+                anchors.centerIn: parent
+                width: parent.width - 25
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
+                color: Colors.cyan
+                font.pixelSize: 12
+            }
             Flickable {
-                id: actuatorScroll
-                anchors.fill: parent
-                anchors.margins: 8
+                id: detailsScroll
+                anchors.top: resourceTitle.bottom
+                anchors.topMargin: 8
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 6
                 clip: true
+                visible: !!workspace.currentTask
                 contentWidth: width
-                contentHeight: actuatorBody.implicitHeight + 12
-                Column {
-                id: actuatorBody
-                width: Math.max(0,actuatorScroll.width-14)
-                spacing: 6
-                GohuText {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "PROCESS // ACTUATORS"
-                    color: Colors.magenta
-                    font.pixelSize: 12
-                }
-                Column {
-                    objectName: "cpuPlusBulkReview"
-                    width: parent.width
-                    visible: workspace.hasBulkReview || workspace.bulkOperation
-                    spacing: 8
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Colors.red
-                        text: workspace.hasBulkReview
-                            ? "REVIEW // " + workspace.bulkReview.label
-                            : workspace.bulkOperation
-                            ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase() : ""
-                    }
-                    GohuText {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Colors.white
-                        font.pixelSize: 11
-                        text: workspace.hasBulkReview
-                            ? String(workspace.bulkReview.targets.length) + " CAPTURED TARGETS"
-                              + "\nGLOBAL SCOPE • NOT SEARCH RESULTS"
-                              + "\nNO COMMAND SENT • PROTECTION RECHECKED BEFORE DISPATCH\n\n"
-                              + workspace.bulkReview.targets.map(t => t.name + " [PID " + t.pid + "]").join("\n")
-                            : workspace.bulkOperation ? workspace.appControlWindow.cpuBulkMessage : ""
-                    }
-                    Rectangle {
-                        objectName: "cpuPlusBulkConfirm"
-                        width: parent.width; height: 38
-                        visible: workspace.hasBulkReview
-                        color: Colors.black; border.color: Colors.red; border.width: 1
-                        GohuText { anchors.centerIn: parent; text: "CONFIRM CAPTURE"; color: Colors.red }
-                        MouseArea { anchors.fill: parent; enabled: workspace.hasBulkReview; onClicked: workspace.confirmBulk() }
-                    }
-                    Rectangle {
-                        objectName: "cpuPlusBulkCancel"
-                        width: parent.width; height: 34
-                        visible: workspace.hasBulkReview || (workspace.bulkOperation
-                            && workspace.appControlWindow.hunterOperationPhase === "report")
-                        color: Colors.black; border.color: Colors.cyan; border.width: 1
-                        GohuText { anchors.centerIn: parent; text: workspace.hasBulkReview ? "CANCEL" : "ACKNOWLEDGE"; color: Colors.cyan }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (workspace.hasBulkReview) workspace.cancelBulk();
-                                else if (workspace.bulkOperation) workspace.appControlWindow.acknowledgeCpuBulkReport();
-                            }
-                        }
-                    }
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: workspace.currentTask
-                        ? (String(workspace.currentTask.comm)
-                           + " // PID " + workspace.selectedPid)
-                        : "NO LIVE PROCESS SELECTED"
-                    color: Colors.cyan
-                    font.pixelSize: 12
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: workspace.exactTargetAvailable
-                        ? "EXACT LIVE PID + START TICKS + NAME"
-                        : workspace.currentTask && !workspace.selectedTargetVisible
-                        ? "TARGET OUTSIDE CURRENT FILTER // CONTROLS LOCKED"
-                        : "TARGET IDENTITY NOT VERIFIED // CONTROLS LOCKED"
-                    color: workspace.exactTargetAvailable ? Colors.white : Colors.orange
-                    font.pixelSize: 10
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: "Live owner • explicit review before dispatch"
-                    color: Colors.white
-                    font.pixelSize: 10
-                }
-                Column {
-                    id: rightActions
-                    objectName: "cpuPlusSharedActionTarget"
-                    width: parent.width
-                    spacing: 6
-                    visible: !!workspace.currentTask
-                    enabled: workspace.exactTargetAvailable && !workspace.locallyPending
-                }
-                GohuText {
-                    width: parent.width
-                    visible: workspace.stagedLimitPercent >= 0
-                    text: "LIMIT PREVIEW // " + workspace.stagedLimitPercent + "%"
-                    color: Colors.yellow
-                    font.pixelSize: 12
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 34
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.yellow
-                    visible: workspace.stagedLimitPercent >= 0
-                    opacity: workspace.exactTargetAvailable && !workspace.locallyPending ? 1 : 0.45
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "APPLY LIMIT // REVIEW"
-                        color: Colors.yellow
-                        font.pixelSize: 11
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: workspace.exactTargetAvailable
-                                 && !workspace.locallyPending
-                        onClicked: workspace.prepareAction(
-                            "limit", workspace.stagedLimitPercent)
-                    }
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: workspace.gate ? workspace.gate.feedback : "NO SHARED ACTION OWNER"
-                    color: Colors.orange
-                    font.pixelSize: 10
-                }
-                GohuText {
-                    width: parent.width
-                    visible: workspace.hasOwnedPending
-                    wrapMode: Text.Wrap
-                    text: workspace.hasOwnedPending
-                        ? ("CONFIRM " + String(workspace.gate.pending.action).toUpperCase()
-                           + " FOR PID " + String(workspace.gate.pending.pid)
-                           + "\nNO COMMAND HAS BEEN SENT")
-                        : ""
-                    color: Colors.red
-                    font.pixelSize: 12
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 38
-                    visible: workspace.hasOwnedPending
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.red
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "CONFIRM REQUEST"
-                        color: Colors.red
-                        font.pixelSize: 12
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: workspace.hasOwnedPending
-                        onClicked: {
-                            if (workspace.gate && workspace.hasOwnedPending
-                                    && workspace.exactTargetAvailable)
-                                workspace.gate.confirm()
-                        }
-                    }
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 34
-                    visible: workspace.hasOwnedPending
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.cyan
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "CANCEL"
-                        color: Colors.cyan
-                        font.pixelSize: 12
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: workspace.cancelOwned()
-                    }
-                }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: "Left click lock: one-shot • Right click: sticky. Existing owner safety policy applies. Dispatch is not proof of success."
-                    color: Colors.orange
-                    font.pixelSize: 10
-                }
+                contentHeight: details.implicitHeight + 20
+                TaskManagerView {
+                    id: details
+                    objectName: "cpuPlusKillSharedTaskView"
+                    x: 8
+                    width: Math.max(0,detailsScroll.width - 20)
+                    host: taskHost
+                    presentationState: history
+                    processController: processView
+                    graphGeometry: graphGeometry
+                    hunterGraph: hunterGraph
+                    searchInputTarget: processSearch
+                    safetyLockComponent: safetyLock
+                    actionTarget: leftActions
+                    viewportHeight: detailsScroll.height - 12
                 }
             }
             NeonScrollBar {
-                objectName: "cpuPlusKillActuatorScroll"
-                flickable: actuatorScroll
+                objectName: "cpuPlusKillDetailScroll"
+                flickable: detailsScroll
                 geometryMode: "viewport"
-                visible: scrollable
+                visible: detailsScroll.visible && scrollable
                 railColor: Colors.red
                 handleColor: Colors.magenta
                 wheelEnabled: false

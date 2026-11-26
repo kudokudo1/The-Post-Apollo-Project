@@ -11,10 +11,15 @@ Rectangle {
     property string virtualMemory: "?"
     property bool contextActive: false
     property bool open: false
-    // Host supplies the FULL usable side-panel height, excluding its fixed chrome.
-    property real maximumHeight: 0
+    // Host coordinates are in the same side-panel parent. Expansion moves the
+    // top edge as well as increasing the available vertical space.
+    property real compactTop: 0
+    property real expandedTop: compactTop
+    property real fullTop: expandedTop
+    property real maximumHeight: 0 // from fullTop to the usable lower edge
     property int sizeLevel: 0
-    readonly property real availableHeight: Math.max(0, maximumHeight)
+    y: sizeLevel === 2 ? fullTop : sizeLevel === 1 ? expandedTop : compactTop
+    readonly property real availableHeight: Math.max(0, maximumHeight - Math.max(0, y - fullTop))
     readonly property int inset: 7
     readonly property int gap: 6
     readonly property real scopeNeed: Math.max(0, scopeValue.implicitHeight)
@@ -45,6 +50,7 @@ Rectangle {
     onTargetIdentityChanged: open = false
     onContextActiveChanged: if (!contextActive) open = false
     onOpenChanged: if (open) {
+        if (!contextActive || !task) { open = false; return }
         sizeLevel = 0
         scopeScroll.contentY = 0
         argumentsScroll.contentY = 0

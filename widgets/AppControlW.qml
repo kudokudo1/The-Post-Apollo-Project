@@ -21408,6 +21408,7 @@ PanelWindow {
                     anchors.topMargin: 8
                     visible: selectedAppIdentity.showingTask
                     selected: appControlProcessInformation.open
+                    available: appControlProcessInformation.contextActive
                     onLeftClicked: appControlProcessInformation.open = !appControlProcessInformation.open
                 }
 
@@ -28901,12 +28902,16 @@ PanelWindow {
         ProcessInformationPanel {
             id: appControlProcessInformation
             objectName: "appControlProcessInformation"
-            anchors.left: detailFlickable.left
-            anchors.right: detailFlickable.right
-            anchors.top: detailStaticHeader.bottom
-            anchors.topMargin: 4
-            maximumHeight: Math.max(0, detailBottomBar.y - detailStaticHeader.y - detailStaticHeader.height - 4)
+            anchors.left: sizeLevel === 2 ? parent.left : detailFlickable.left
+            anchors.right: sizeLevel === 2 ? parent.right : detailFlickable.right
+            anchors.leftMargin: sizeLevel === 2 ? 5 : 0
+            anchors.rightMargin: sizeLevel === 2 ? 5 : 0
+            compactTop: detailStaticHeader.y + detailStaticHeader.height + 4
+            expandedTop: detailStaticHeader.y + runningStateSection.y
+            fullTop: 5
+            maximumHeight: Math.max(0, detailBottomBar.y - fullTop)
             contextActive: appControlWindow.menuOpen && appControlWindow.selectedResultIsTask()
+                && !appControlWindow.destructiveConfirmOpen && !hubProcessActionGate.pending && !hubProcessActionGate.busy
             task: contextActive ? taskManagerBody.currentTask : null
             purpose: open && contextActive && task ? appControlWindow.taskSimplePurpose(task) : ""
             scopeText: open && contextActive && task ? processPresentationController.scopeProcessText() : ""

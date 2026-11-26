@@ -114,7 +114,7 @@ test("master and per-action lock state is rendered with donor glyphs and exact-o
     assert.match(recipient,/appControlWindow\.toggleTaskDangerActionStickyUnlock/);
     assert.match(recipient,/appControlWindow\.toggleTaskDangerStickyUnlock/);
     assert.match(donorView,/property Item actionTarget: null/);
-    assert.match(recipient,/actionTarget: rightActions/);
+    assert.match(recipient,/actionTarget: leftActions/);
     assert.equal((donorView.match(/parent: taskManagerBody\.actionTarget \|\| taskManagerBody/g)||[]).length,1);
     assert.match(donorView,/property alias actionSection: actionColumn/);
 });
@@ -170,6 +170,27 @@ test("P4b: three real size steps and only scope/command bodies scroll", () => {
     assert.match(info,/geometryHost: argumentsFrame/);
     assert.doesNotMatch(info,/processInformationScroll"/);
     assert.match(info,/text: root.task \? String\(root.task.args \|\| ""\) : ""\s+textFormat: Text.PlainText/);
-    assert.match(app,/maximumHeight: Math.max\(0, detailBottomBar.y - detailStaticHeader.y - detailStaticHeader.height - 4\)/);
-    assert.match(recipient,/maximumHeight: Math.max\(0, instrumentBay.height - processStateHeader.y - processStateHeader.height - 12\)/);
+    assert.match(app,/maximumHeight: Math.max\(0, detailBottomBar.y - fullTop\)/);
+    assert.match(recipient,/maximumHeight: Math.max\(0, instrumentBay.height - fullTop - 6\)/);
+});
+
+test("P4c: expansion crosses state header and moves controls without duplicating actions", () => {
+    const info=read("widgets/appcontrol/ProcessInformationPanel.qml");
+    const app=read("widgets/AppControlW.qml");
+    assert.match(info,/y: sizeLevel === 2 \? fullTop : sizeLevel === 1 \? expandedTop : compactTop/);
+    assert.match(info,/maximumHeight - Math.max\(0, y - fullTop\)/);
+    assert.match(app,/expandedTop: detailStaticHeader.y \+ runningStateSection.y/);
+    assert.match(recipient,/expandedTop: processStateHeader.y/);
+    assert.match(recipient,/fullTop: 6/);
+    assert.match(recipient,/contextActive: workspace.active && !!workspace.currentTask\s+&& !workspace.locallyPending && !workspace.hasBulkReview && !workspace.bulkOperation/);
+    const left=recipient.slice(recipient.indexOf("id: instrumentBay"),recipient.indexOf("id: targetBay"));
+    const right=recipient.slice(recipient.indexOf("id: resourceBay"));
+    assert.match(left,/id: actuatorScroll/);
+    assert.match(left,/id: leftActions/);
+    assert.match(left,/cpuPlusBulkConfirm/);
+    assert.match(left,/id: cpuProcessInformation/);
+    assert.match(right,/id: detailsScroll/);
+    assert.match(right,/actionTarget: leftActions/);
+    assert.doesNotMatch(right,/id: actuatorScroll|id: leftActions/);
+    assert.equal((recipient.match(/id: leftActions/g)||[]).length,1);
 });

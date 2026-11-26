@@ -56,3 +56,4 @@ ChassisGlow 1.0 ChassisGlow.qml
 TextHashGlow 1.0 TextHashGlow.qml
 QuietText 1.0 QuietText.qml
 SecondaryText 1.0 SecondaryText.qml
+EnergyProgressFace 1.0 EnergyProgressFace.qml

@@ -8,6 +8,9 @@ Rectangle {
     property int count: 0
     property int currentIndex: -1
     property color accentColor: Colors.cyan
+    // Outer time/unit chassis can differ from the semantic scale and handle.
+    property color frameColor: accentColor
+    property color frameGlowColor: frameColor
     // Optional numeric fill ink; existing controls inherit their original accent.
     property color valueFillColor: accentColor
     property color handleColor: Colors.white
@@ -346,14 +349,14 @@ Rectangle {
     radius: 2
     color: "#09070D"
     border.width: 1
-    border.color: accentColor
+    border.color: frameColor
 
     RectangularShadow {
         anchors.fill: parent
         spread: 4
         z: -2
         opacity: slider.enabledSlider ? 0.22 : 0.08
-        color: slider.accentColor
+        color: slider.frameGlowColor
     }
 
     Rectangle {

@@ -21,12 +21,12 @@ Column {
         text: root.title + " // " + root.readout
         color: root.subjectColor
         font.pixelSize: 12
-        semanticGlowColor: root.subjectColor
+        semanticGlowColor: root.fillColor
         elide: Text.ElideRight
     }
     Item {
         width: parent.width
-        height: root.compact ? 24 : 32
+        height: root.compact ? 22 : 32
         SelectorSlider {
             objectName: root.objectName + "-hardware"
             anchors.centerIn: parent
@@ -42,12 +42,14 @@ Column {
             valueDecimals: 0
             enabledSlider: root.adjustable && validStepDomain
             accentColor: root.subjectColor
+            frameColor: Colors.white
+            frameGlowColor: root.fillColor
             valueFillColor: root.fillColor
             handleColor: root.subjectColor
             handleGradientBaseColor: root.subjectColor
             handleGradientAccentColor: root.subjectColor
-            handleGlowColor: root.subjectColor
-            activityGlowColor: root.subjectColor
+            handleGlowColor: root.fillColor
+            activityGlowColor: root.fillColor
             onValueRequested: value => root.valueRequested(value)
         }
     }

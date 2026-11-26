@@ -8,14 +8,17 @@ import "../../components"
 Column {
     id: root
     objectName: "cpuplusDiagnosticWorkshop"
-    spacing: 2
+    spacing: compactLayout ? 1 : 2
     property real viewportHeight: 0
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
-    readonly property int instrumentHeight: compactLayout ? 128 : 176
+    readonly property int instrumentHeight: compactLayout ? 112 : 176
+    readonly property int filterSize: compactLayout ? 24 : 32
+    readonly property int filterGap: compactLayout ? 3 : 4
+    readonly property int filterWidth: Math.min(filterSize,Math.max(16,Math.floor((width-68-5*filterGap)/5)))
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
-    readonly property real storageWidth: lowerInstrumentCount===3 ? Math.floor(lowerInstrumentSpace*0.24) : lowerInstrumentWidth
+    readonly property real storageWidth: lowerInstrumentCount===3 ? Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24)) : lowerInstrumentWidth
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property bool locked: CpuPlusDiagnostics.workshopPresetLocked
@@ -104,9 +107,11 @@ Column {
     }
 
 
-    Flow {
+    Row {
+        objectName: "cpuplusWorkshopFilterRail"
         width: parent.width
-        spacing: 4
+        height: root.filterSize
+        spacing: root.filterGap
         Repeater {
             model: [{kind:"threads",symbol:"≋",subject:"THREADS"},
                 {kind:"memory",symbol:"",subject:"MEMORY"},
@@ -117,11 +122,11 @@ Column {
                 id: instrumentFilter
                 required property var modelData
                 objectName: "cpuplusWorkshopInstrument-"+modelData.kind
-                width: 32
-                height: 32
+                width: root.filterWidth
+                height: root.filterSize
                 accentColor: Colors.resourceColor(modelData.subject)
                 label: modelData.symbol
-                labelPixelSize: 24
+                labelPixelSize: root.compactLayout ? 18 : 24
                 labelElide: Text.ElideNone
                 contentPadding: 0
                 selected: root.draft.selected.includes(modelData.kind)
@@ -136,8 +141,8 @@ Column {
             }
         }
         GohuText {
-            width: parent.width >= 260 ? parent.width - 180 : parent.width
-            height: parent.width >= 260 ? 32 : implicitHeight
+            width: Math.max(0,parent.width-5*(root.filterWidth+root.filterGap))
+            height: parent.height
             verticalAlignment: Text.AlignVCenter
             text: {
                 const qs=root.draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
@@ -147,7 +152,9 @@ Column {
             }
             color: Colors.purple
             font.pixelSize: 10
-            wrapMode: Text.Wrap
+            wrapMode: Text.WordWrap
+            elide: Text.ElideRight
+            maximumLineCount: 2
         }
     }
     CpuPlusDiagnosticSlider {
@@ -227,6 +234,7 @@ Column {
                 titlePixelSize: 12
                 idleRingGlowStrength: 0.65
                 titleColor: accentColor
+                outlinedOptionLabels: true
                 numericDetentInterval: 1
                 numericDetentOrigin: 1
                 selectorMode: "continuous"
@@ -256,10 +264,12 @@ Column {
             height: root.instrumentHeight
             color: Colors.black
             border.color: Colors.blue
+            clip: true
             Column {
+                objectName: "cpuplusWorkshopStorageContents"
                 anchors.centerIn: parent
-                width: parent.width-8
-                spacing: root.compactLayout ? 2 : 5
+                width: Math.max(0,parent.width-(root.compactLayout ? 4 : 8))
+                spacing: root.compactLayout ? 1 : 5
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: root.lowerInstrumentCount===3 ? "STORAGE" : "STORAGE // METADATA"
@@ -274,14 +284,14 @@ Column {
                     text: "1 SEC"
                     semanticGlowColor: Colors.blue
                     color: Colors.blue
-                    font.pixelSize: root.compactLayout ? 20 : 24
+                    font.pixelSize: root.compactLayout ? 17 : 24
                     fontSizeMode: Text.HorizontalFit
                     minimumPixelSize: 10
                     horizontalAlignment: Text.AlignHCenter
                 }
                 Rectangle {
                     width: parent.width
-                    height: 14
+                    height: root.compactLayout ? 10 : 14
                     color: Colors.black
                     border.color: Colors.blue
                     Row {
@@ -302,7 +312,9 @@ Column {
                     width: parent.width
                     text: "FIXED CADENCE"
                     color: Colors.white
-                    font.pixelSize: 10
+                    font.pixelSize: root.compactLayout ? 9 : 10
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 7
                     horizontalAlignment: Text.AlignHCenter
                 }
                 CpuPlusMemoryReadout {
@@ -319,6 +331,8 @@ Column {
                     text: root.lowerInstrumentCount===3 ? "10s / FINAL" : "10s / FINAL REPORT"
                     color: Colors.white
                     font.pixelSize: 9
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 7
                     horizontalAlignment: Text.AlignHCenter
                 }
             }
@@ -350,10 +364,12 @@ Column {
                 valueDecimals: 0
                 snapContinuousToStep: true
                 showNumericDetentTicks: true
-                accentColor: Colors.white
-                markerColor: Colors.orange
-                labelColor: Colors.white
-                readoutColor: Colors.white
+                accentColor: Colors.yellow
+                markerColor: Colors.magenta
+                activeDetentColor: Colors.magenta
+                outlinedOptionLabels: true
+                labelColor: Colors.yellow
+                readoutColor: Colors.yellow
                 readoutGlowEnabled: true
                 interactionGlowColor: Colors.magenta
                 readoutText: String(Math.round(previewNumericValue))
@@ -380,6 +396,7 @@ Column {
         CpuPlusDiagnosticExecutionButton {
             objectName: "cpuplusWorkshopExecute"
             width: Math.max(0,parent.width-40)
+            height: root.compactLayout ? 28 : 34
             phase: root.phase
             caption: root.phase==="READY" ? "READY // START"
                 : root.phase==="RECORDING" ? "RECORDING // "+Math.floor(root.elapsedFraction*100)+"% TIME"
@@ -393,7 +410,7 @@ Column {
         ActionButton {
             objectName: "cpuplusWorkshopStop"
             width: 36
-            height: 34
+            height: root.compactLayout ? 28 : 34
             label: "■"
             labelPixelSize: 21
             accentColor: Colors.red

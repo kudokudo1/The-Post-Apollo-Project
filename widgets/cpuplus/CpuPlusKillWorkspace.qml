@@ -17,15 +17,16 @@ Item {
     required property var graphSource
     required property var graphController
     required property var graphSession
+    required property var collectionSource
     readonly property var history: graphSource
     readonly property var detailGraph: graphController
     property bool active: true
 
     readonly property var gate: appControlWindow
         ? appControlWindow.hubProcessActionGate : null
-    readonly property var taskRows: appControlWindow
-        && Array.isArray(appControlWindow.taskRows)
-        ? appControlWindow.taskRows : []
+    readonly property var taskRows: collectionSource
+        && Array.isArray(collectionSource.rows)
+        ? collectionSource.rows : []
 
     // The live owner continues to own sampling and the persistent store.
     // These are CPU++-local view choices, never AppControl's current mode.
@@ -391,8 +392,8 @@ Item {
     }
 
     function requestRefresh() {
-        if (active && appControlWindow && appControlWindow.refreshTaskManager)
-            appControlWindow.refreshTaskManager();
+        if (active && collectionSource)
+            collectionSource.refreshSnapshot();
     }
 
     function prepareAction(action, percent) {
@@ -479,8 +480,7 @@ Item {
         requestRefresh();
     }
     Component.onDestruction: { graphSession.setCpuActive(false); cancelOwned(); cancelBulk(); }
-    // The existing AppControl timer already samples in all modes; do not
-    // create a competing periodic refresh request from the recipient.
+    // KillStore already samples in all modes; no competing recipient timer.
     Connections {
         target: workspace.gate
         function onPendingChanged() {

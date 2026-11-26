@@ -200,7 +200,8 @@ ShellRoot {
         property int selectedModeIndex: 0
         readonly property int killModeIndex: 7
         property int refreshes: 0
-        function refreshTaskManager() { refreshes++; }
+        readonly property var rows: taskRows
+        function refreshSnapshot() { refreshes++; }
         function isTaskMetricFavorite(entry,metricId) { return false; }
         function toggleTaskMetricFavorite(entry,metricId) { }
     }
@@ -219,6 +220,7 @@ ShellRoot {
                 graphSource: fakeHistory
                 graphController: fakeGraph
                 graphSession: fakeSession
+                collectionSource: fakeOwner
                 active: smoke.armed
             }
         }

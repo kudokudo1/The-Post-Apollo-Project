@@ -112,7 +112,7 @@ Scope {
     // D4a session presets. Persistence is a separate catalog milestone.
     property var workshopPresets: []
     property string workshopPresetFeedback: "SESSION ONLY // NO DISK SAVE"
-    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted
+    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive
     function saveWorkshopPreset(name) {
         if (workshopPresetLocked) return false;
         if (typeof name!=="string" || !/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(name) || name.trim()!==name) {
@@ -141,6 +141,101 @@ Scope {
         workshopPresets=workshopPresets.filter(row=>row.name!==name);
         workshopPresetFeedback="REMOVED FROM SESSION";
         return true;
+    }
+    // Session-only mixer. The owner, not the view, owns an explicit ordered run.
+    property var workshopQueue: []
+    property var workshopSets: []
+    property bool setActive: false
+    property bool setDispatching: false
+    property bool setStopRequested: false
+    property string setFeedback: "QUEUE // READY"
+    property var setRunItems: []
+    property var setRunResults: []
+    property int setRunIndex: 0
+    property string setCurrentId: ""
+    property string setCurrentKind: ""
+    readonly property var queuePreview: Calibration.validatedWorkshopSet(workshopQueue)
+    function queueWorkshop(name) {
+        if (workshopPresetLocked) return false;
+        const p=workshopPresets.find(x=>x.name===name);
+        const next=p && Calibration.validatedWorkshopSet(workshopQueue.concat([p]));
+        if(!next){setFeedback="LIMIT // 4 STEPS / 240s";return false;}
+        workshopQueue=next.items;setFeedback="QUEUED // "+name;return true;
+    }
+    function moveWorkshopQueue(index,delta) {
+        if(workshopPresetLocked||!Number.isInteger(index)||![-1,1].includes(delta)
+            ||index<0||index>=workshopQueue.length||index+delta<0||index+delta>=workshopQueue.length)return false;
+        const rows=workshopQueue.slice(),row=rows.splice(index,1)[0];
+        rows.splice(index+delta,0,row);workshopQueue=rows;return true;
+    }
+    function removeWorkshopQueue(index) {
+        if(workshopPresetLocked||!Number.isInteger(index)||index<0||index>=workshopQueue.length)return false;
+        workshopQueue=workshopQueue.filter((_,i)=>i!==index);return true;
+    }
+    function clearWorkshopQueue() {
+        if(workshopPresetLocked)return false;
+        workshopQueue=[];setFeedback="QUEUE CLEARED";return true;
+    }
+    function saveWorkshopSet(name) {
+        if(workshopPresetLocked||!queuePreview||typeof name!=="string"
+            ||!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(name)||name.trim()!==name
+            ||workshopSets.length>=12||workshopSets.some(x=>x.name.toLowerCase()===name.toLowerCase()))return false;
+        workshopSets=workshopSets.concat([{name:name,items:queuePreview.items}]);
+        setFeedback="SET SAVED // SESSION ONLY";return true;
+    }
+    function loadWorkshopSet(name) {
+        if(workshopPresetLocked)return false;
+        const row=workshopSets.find(x=>x.name===name),next=row&&Calibration.validatedWorkshopSet(row.items);
+        if(!next)return false;
+        workshopQueue=next.items;setFeedback="SET LOADED // RUN REQUIRED";return true;
+    }
+    function removeWorkshopSet(name) {
+        if(workshopPresetLocked||!workshopSets.some(x=>x.name===name))return false;
+        workshopSets=workshopSets.filter(x=>x.name!==name);return true;
+    }
+    function startWorkshopSet(exact) {
+        if(workshopPresetLocked||!queuePreview||exact!==JSON.stringify(queuePreview.items))return false;
+        const frozen=Calibration.validatedWorkshopSet(JSON.parse(exact));
+        if(!frozen)return false;
+        setRunItems=frozen.items;setRunResults=[];setRunIndex=0;setCurrentId="";setCurrentKind="";
+        setStopRequested=false;setActive=true;
+        dispatchSetStep();return true;
+    }
+    function finishSet(status) {
+        setActive=false;setDispatching=false;setCurrentId="";setCurrentKind="";
+        setFeedback=status+" // "+setRunResults.filter(x=>x.status==="COMPLETE").length+"/"+setRunItems.length+" COMPLETE";
+    }
+    function dispatchSetStep() {
+        if(!setActive||busy||archiveBusy)return;
+        if(setStopRequested){finishSet("SET CANCELLED");return;}
+        if(faulted||archive.faulted){finishSet("SET NOT VERIFIED");return;}
+        if(setCurrentId!==""){
+            // The preceding capture must have an exact successful report AND
+            // a confirmed archive receipt before another child can launch.
+            const row=archiveStatus==="READY"&&archiveRows.find(x=>x.id===setCurrentId&&x.kind===setCurrentKind);
+            const status=row&&row.status==="COMPLETE"?"COMPLETE":"NOT VERIFIED";
+            setRunResults=setRunResults.concat([{name:setRunItems[setRunIndex].name,id:setCurrentId,
+                kind:setCurrentKind,status:status}]);
+            setCurrentId="";setCurrentKind="";
+            if(status!=="COMPLETE"){finishSet("SET STOPPED");return;}
+            setRunIndex++;
+        }
+        if(setRunIndex>=setRunItems.length){finishSet("SET COMPLETE");return;}
+        const step=setRunItems[setRunIndex];
+        setDispatching=true;
+        let accepted=false;
+        try {accepted=requestWorkshopCapture(step.plan);} finally {setDispatching=false;}
+        if(!accepted){finishSet("SET LAUNCH REFUSED");return;}
+        setCurrentId=captureId;setCurrentKind=kind;
+        setFeedback="STEP "+(setRunIndex+1)+"/"+setRunItems.length+" // "+step.name;
+    }
+    // Archive owns its async completion; no polling or additional child.
+    onArchiveBusyChanged: if(setActive&&!archiveBusy) Qt.callLater(dispatchSetStep)
+    function stopWorkshopSet() {
+        if(!setActive)return;
+        setStopRequested=true;setFeedback="SET STOPPING";
+        if(busy)cancel();
+        else if(!archiveBusy)Qt.callLater(dispatchSetStep);
     }
     property string workshopRunId: ""
     property string workshopRunKind: ""
@@ -177,7 +272,7 @@ Scope {
     }
 
     function request(job, configuration) {
-        if (busy || faulted || worker.running || archive.busy) return false;
+        if (busy || faulted || worker.running || archive.busy || (setActive && !setDispatching)) return false;
         const configured = configuration !== undefined;
         const plan = configured
             ? (job === "workflow"
@@ -214,6 +309,7 @@ Scope {
     }
 
     function cancel() {
+        if (setActive) setStopRequested=true;
         if (!busy || cancelled) return;
         cancelled = true;
         feedback = "STOPPING DIAGNOSTIC // WAIT FOR EXIT";
@@ -248,6 +344,7 @@ Scope {
         activeCalibration = "";
         busy = false;
         captureFinished(kind, captureId);
+        if(setActive&&!archiveBusy)Qt.callLater(dispatchSetStep);
     }
 
     function finish() {

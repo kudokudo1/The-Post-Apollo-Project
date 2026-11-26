@@ -62,8 +62,13 @@ Item {
         return String(row.id || ("task:" + row.pid));
     }
     function isProtected(row) {
-        return !!row && !!gate && gate.isProtected(
-            Number(row.pid), Number(row.startTicks), String(row.comm || ""));
+        // Read-only classification, identical to donor filter. Avoid a full
+        // exact-row search for every row; mutations still require gate.exactRow.
+        if (!row || !appControlWindow || !gate) return true;
+        if (appControlWindow.taskRequiresDangerUnlock)
+            return appControlWindow.taskRequiresDangerUnlock(row);
+        return gate.isProtected(Number(row.pid),Number(row.startTicks),
+                                String(row.comm || ""));
     }
     function hunterMetricAccent() { return hunterGraph.metricAccent(); }
     function hunterActive(row) {
@@ -118,7 +123,7 @@ Item {
     readonly property var filteredRows: {
         if (modelBlank || !active) return [];
         const query=processSearch.text.trim().toLowerCase();
-        const revision=miniHistoryRevision;
+        const revision=killViewMode===killViewHunter ? miniHistoryRevision : 0;
         const slots=orderSlots;
         return taskRows.filter(function(row) {
             if (!visibleForView(row)) return false;
@@ -295,7 +300,8 @@ Item {
 
     function prepareAction(action, percent) {
         const row = currentTask;
-        if (!active || !exactTargetAvailable || !gate || locallyPending)
+        if (!active || !exactTargetAvailable || !gate || locallyPending
+                || appControlWindow.destructiveConfirmOpen)
             return false;
         const ok = gate.prepare(
             Number(row.pid), Number(row.startTicks), String(row.comm),

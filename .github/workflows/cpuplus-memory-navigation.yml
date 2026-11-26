@@ -2,6 +2,9 @@ name: CPU++ memory navigation contract
 on:
   pull_request:
     paths:
+      - 'widgets/CpuPlusW.qml'
+      - 'widgets/cpuplus/CpuPlusSystemTargetStrip.qml'
+      - 'tests/cpuplus_system_target_native.py'
       - 'widgets/cpuplus/CpuPlusMemoryActuatorPane.qml'
       - 'widgets/cpuplus/CpuPlusProcessPane.qml'
       - 'widgets/cpuplus/CpuPlusProcessPresentation.js'
@@ -62,3 +65,7 @@ jobs:
         env:
           POST_APOLLO_MEMORY_UI_SMOKE: CI_DISPOSABLE_ONLY
         run: python3 -B tests/cpuplus_memory_ui_native.py
+      - name: Verify actual SYSTEM filter glyph geometry and state contract
+        env:
+          POST_APOLLO_MEMORY_UI_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/cpuplus_system_target_native.py

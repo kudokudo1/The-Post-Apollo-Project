@@ -270,3 +270,33 @@ function validatedWorkshopSet(items) {
         return {items:result,durationSeconds:duration};
     }catch(_){return null;}
 }
+
+/* D5b: choices are calibrated, not launch requests. The duration is never
+ * silently changed. A sample edit may select the nearest compatible report. */
+function storageReportChoices(duration,sample) {
+    if (!Number.isSafeInteger(duration)||duration<1||duration>30
+            || !Number.isSafeInteger(sample)||sample<1||sample>Math.min(5,duration)) return [];
+    const choices=[];
+    for (let report=sample;report<=30;report+=sample)
+        if (previewCalibration({kind:"storage",durationSeconds:duration,
+                sampleSeconds:sample,reportSeconds:report}).ok) choices.push(report);
+    return choices;
+}
+function storageCadenceStep(duration,sample,report,field,direction) {
+    if (direction!==-1 && direction!==1) return null;
+    if (field==="sample") {
+        if (!Number.isSafeInteger(sample)||!Number.isSafeInteger(report)) return null;
+        const choices=Array.from({length:5},(_,i)=>i+1).filter(n=>storageReportChoices(duration,n).length);
+        const next=direction>0?choices.find(n=>n>sample):choices.slice().reverse().find(n=>n<sample);
+        if (next===undefined) return null;
+        const reports=storageReportChoices(duration,next);
+        const nearest=reports.reduce((a,b)=>Math.abs(b-report)<Math.abs(a-report)?b:a);
+        return {sampleSeconds:next,reportSeconds:nearest};
+    }
+    if (field==="report") {
+        const choices=storageReportChoices(duration,sample);
+        const next=direction>0?choices.find(n=>n>report):choices.slice().reverse().find(n=>n<report);
+        return next===undefined?null:{sampleSeconds:sample,reportSeconds:next};
+    }
+    return null;
+}

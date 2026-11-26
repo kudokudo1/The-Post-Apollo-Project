@@ -208,3 +208,20 @@ test("P4d: both hosts mount the same process row and mini renderer", () => {
     assert.match(recipient,/id: identityContent[\s\S]*?cpuPlusProcessExactIdentity[\s\S]*?cpuPlusProcessLiveOwner[\s\S]*?ProcessInformationButton/);
     assert.match(recipient,/objectName: "cpuPlusProcessReservedBay"/);
 });
+
+test("P4e: CPU++ mounts the same three action instances in its floating identity header", () => {
+    assert.match(recipient,/Item\s*\{\s*id: processIdentity/);
+    assert.doesNotMatch(recipient,/text: "PROCESS \/\/ INSTRUMENTS"/);
+    assert.match(recipient,/quickActionTarget: headerActions/);
+    assert.match(recipient,/lockTarget: headerActionLocks/);
+    assert.match(recipient,/item.parent === headerActions/);
+    assert.equal((donorView.match(/parent: taskManagerBody.quickActionTarget \|\| actionColumn/g)||[]).length,3);
+    assert.match(donorView,/parent: taskManagerBody.lockTarget \|\| taskTerminationHeaderBox/);
+    assert.match(donorView,/id: taskRestartAction[\s\S]*?accentColor: taskManagerBody.headerActions \? Colors.yellow/);
+    assert.match(donorView,/⋆❆⋆/);
+    assert.match(recipient,/objectName: "cpuPlusProcessLockHelpButton"[\s\S]*?onLeftClicked: lockHelp.open = !lockHelp.open/);
+    assert.match(recipient,/id: lockHelp[\s\S]*?visible: open && lockHelpButton.available && workspace.active[\s\S]*?Left click lock: one-shot/);
+    assert.equal((recipient.match(/Left click lock: one-shot/g)||[]).length,1);
+    for (const action of ["requestRestart", "toggleFreeze", "requestTerminate"])
+        assert.equal((donorView.match(new RegExp("processController\\."+action+"\\(\\)","g"))||[]).length,1);
+});

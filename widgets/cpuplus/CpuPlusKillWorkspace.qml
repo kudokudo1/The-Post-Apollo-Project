@@ -452,7 +452,7 @@ Item {
         appendCurrentHistory();
     }
     onActiveChanged: {
-        if (!active) { cancelOwned(); cancelBulk(); }
+        if (!active) { if (lockHelp) lockHelp.open = false; cancelOwned(); cancelBulk(); }
         else if (ready) requestRefresh();
     }
     Component.onCompleted: {
@@ -621,7 +621,7 @@ Item {
                 : selectedDetailActionIndex===0 ? details.restartAction
                 : selectedDetailActionIndex===1 ? details.freezeAction
                 : selectedDetailActionIndex===2 ? details.endAction : null;
-            if (!item || !actuatorScroll) return;
+            if (!item || !actuatorScroll || item.parent === headerActions) return;
             const y=item.mapToItem(actuatorScroll.contentItem,0,0).y;
             if (y<actuatorScroll.contentY) actuatorScroll.contentY=Math.max(0,y);
             else if (y+item.height>actuatorScroll.contentY+actuatorScroll.height)
@@ -666,7 +666,7 @@ Item {
                 color: Colors.magenta
                 font.pixelSize: 12
             }
-            Rectangle {
+            Item {
                 id: processIdentity
                 objectName: "cpuPlusProcessIdentity"
                 anchors.top: instrumentTitle.bottom
@@ -675,9 +675,6 @@ Item {
                 anchors.right: parent.right
                 anchors.margins: 8
                 height: identityContent.implicitHeight + 16
-                color: Colors.black
-                border.color: Colors.cyan
-                border.width: 1
                 visible: !!workspace.currentTask
                 Column {
                     id: identityContent
@@ -727,6 +724,17 @@ Item {
                         color: Colors.white
                         font.pixelSize: 10
                     }
+                    Row {
+                        id: headerActions
+                        objectName: "cpuPlusProcessHeaderActions"
+                        width: parent.width
+                        height: 34
+                        spacing: 6
+                        enabled: workspace.exactTargetAvailable && !workspace.locallyPending
+                            && !workspace.hasBulkReview && !workspace.bulkOperation
+                            && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
+                    }
+
                 }
                 ProcessInformationButton {
                     objectName: "cpuPlusProcessInformationButton"
@@ -752,20 +760,54 @@ Item {
                 GohuText {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
+                    anchors.right: headerLocks.left
+                    anchors.rightMargin: 4
                     anchors.verticalCenter: parent.verticalCenter
+                    elide: Text.ElideRight
                     text: "PROCESS STATE"
                     color: Colors.red
                     font.pixelSize: 13
                 }
-                ProcessSafetyLock {
-                    objectName: "cpuPlusProcessMasterLock"
+                Row {
+                    id: headerLocks
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 30
-                    height: 26
-                    controller: workspace
-                    taskItem: workspace.currentTask
-                    accentColor: Colors.magenta
+                    spacing: 3
+                    ProcessSafetyLock {
+                        objectName: "cpuPlusProcessMasterLock"
+                        width: 30
+                        height: 26
+                        controller: workspace
+                        taskItem: workspace.currentTask
+                        accentColor: Colors.magenta
+                    }
+                    Item {
+                        id: headerActionLocks
+                        objectName: "cpuPlusProcessHeaderActionLocks"
+                        width: childrenRect.width
+                        height: 26
+                    }
+                    ActionButton {
+                        id: lockHelpButton
+                        objectName: "cpuPlusProcessLockHelpButton"
+                        width: 26
+                        height: 26
+                        label: "󰈈"
+                        labelPixelSize: 15
+                        contentPadding: 2
+                        accentColor: Colors.yellow
+                        idleForegroundColor: Colors.white
+                        hoverForegroundColor: Colors.orange
+                        selectedForegroundColor: Colors.magenta
+                        selected: lockHelp.open
+                        available: !!workspace.currentTask && !workspace.locallyPending
+                            && !workspace.hasBulkReview && !workspace.bulkOperation
+                            && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
+                            && !workspace.appControlWindow.destructiveConfirmOpen && !cpuProcessInformation.open
+                        acceptedButtons: Qt.LeftButton
+                        Accessible.name: "Lock usage help"
+                        onLeftClicked: lockHelp.open = !lockHelp.open
+                    }
                 }
                 Rectangle {
                     anchors.bottom: parent.bottom
@@ -789,12 +831,6 @@ Item {
                 id: actuatorBody
                 width: Math.max(0,actuatorScroll.width-14)
                 spacing: 6
-                GohuText {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "PROCESS // INSTRUMENTS"
-                    color: Colors.magenta
-                    font.pixelSize: 12
-                }
                 Column {
                     objectName: "cpuPlusBulkReview"
                     width: parent.width
@@ -868,6 +904,8 @@ Item {
                     searchInputTarget: processSearch
                     safetyLockComponent: safetyLock
                     actionTarget: leftActions
+                    quickActionTarget: headerActions
+                    lockTarget: headerActionLocks
                     viewportHeight: actuatorScroll.height - 12
                 }
 
@@ -968,13 +1006,6 @@ Item {
                         onClicked: workspace.cancelOwned()
                     }
                 }
-                GohuText {
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    text: "Left click lock: one-shot • Right click: sticky. Existing owner safety policy applies. Dispatch is not proof of success."
-                    color: Colors.orange
-                    font.pixelSize: 10
-                }
                 }
             }
             NeonScrollBar {
@@ -985,6 +1016,65 @@ Item {
                 railColor: Colors.red
                 handleColor: Colors.magenta
                 wheelEnabled: false
+            }
+            Rectangle {
+                id: lockHelp
+                objectName: "cpuPlusProcessLockHelpPopup"
+                property bool open: false
+                readonly property string targetIdentity: workspace.currentTask
+                    ? String(workspace.selectedPid) + "|" + String(workspace.selectedStartTicks) + "|" + workspace.selectedComm : ""
+                onTargetIdentityChanged: open = false
+                visible: open && lockHelpButton.available && workspace.active
+                Connections {
+                    target: lockHelpButton
+                    function onAvailableChanged() { if (!lockHelpButton.available) lockHelp.open = false }
+                }
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: processStateHeader.bottom
+                anchors.margins: 8
+                height: helpContent.implicitHeight + 14
+                z: 401
+                color: Colors.black
+                border.color: Colors.yellow
+                clip: true
+                MouseArea {
+                    anchors.fill: parent
+                    onWheel: function(wheel) { wheel.accepted = true }
+                }
+                Column {
+                    id: helpContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 7
+                    spacing: 4
+                    Row {
+                        width: parent.width
+                        height: 24
+                        GohuText {
+                            width: Math.max(0,parent.width-26)
+                            height: parent.height
+                            text: "LOCK // HELP"
+                            verticalAlignment: Text.AlignVCenter
+                            color: Colors.yellow
+                            font.pixelSize: 12
+                        }
+                        CloseButton {
+                            width: 24
+                            height: 24
+                            onCloseRequested: lockHelp.open = false
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "Left click lock: one-shot • Right click: sticky. Existing owner safety policy applies. Dispatch is not proof of success."
+                        wrapMode: Text.Wrap
+                        textFormat: Text.PlainText
+                        color: Colors.orange
+                        font.pixelSize: 11
+                    }
+                }
             }
             ProcessInformationPanel {
                 id: cpuProcessInformation

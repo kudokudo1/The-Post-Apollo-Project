@@ -233,8 +233,11 @@ ShellRoot {
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
-                const quick=smoke.find(header,"cpuPlusProcessHeaderActions");
-                const locks=smoke.find(view,"cpuPlusProcessHeaderActionLocks");
+                const quick=smoke.find(view,"cpuPlusProcessHeaderActions");
+                const kill=smoke.find(view,"cpuPlusProcessKillSlot");
+                const freeze=smoke.find(view,"cpuPlusProcessFreezeSlot");
+                const killLock=smoke.find(view,"cpuPlusProcessKillLockSlot");
+                const freezeLock=smoke.find(view,"cpuPlusProcessFreezeLockSlot");
                 const helpButton=smoke.find(view,"cpuPlusProcessLockHelpButton");
                 const help=smoke.find(view,"cpuPlusProcessLockHelpPopup");
                 const leftBay=smoke.find(view,"cpuPlusProcessControlBay");
@@ -250,35 +253,37 @@ ShellRoot {
                     && detail.mapToItem(leftBay,0,0).x >= 0
                     && detail.mapToItem(leftBay,0,0).x + detail.width <= leftBay.width
                     && detail.actionSection.parent===actionTarget
-                    && quick && locks && helpButton && help
+                    && quick && kill && freeze && killLock && freezeLock && helpButton && help
                     && detail.restartAction.parent===quick
-                    && detail.freezeAction.parent===quick
-                    && detail.endAction.parent===quick
+                    && detail.freezeAction.parent===freeze
+                    && detail.endAction.parent===kill
                     && detail.limitSlider.parent===detail.actionSection
                     && detail.restartAction.width===34 && detail.restartAction.height===34
                     && detail.freezeAction.width===34 && detail.freezeAction.height===34
-                    && detail.endAction.width===34 && detail.endAction.height===34
+                    && detail.endAction.width>detail.restartAction.width && detail.endAction.height===34
                     && detail.restartAction.showLabel && detail.freezeAction.showLabel && detail.endAction.showLabel
-                    && detail.restartAction.x < detail.freezeAction.x
-                    && detail.freezeAction.x < detail.endAction.x
+                    && kill.x < quick.x && quick.x < freeze.x && freeze.x < helpButton.x
+                    && killLock.parent===kill && freezeLock.parent===freeze
+                    && killLock.y<0 && freezeLock.y<0
+                    && detail.restartAction.label=== "⟳" && helpButton.label === "i"
                     && search && hunter
                     && smoke.find(view,"cpuPlusKillTargetScroll")
                     && smoke.find(view,"cpuPlusKillInstrumentViewport"),
                     "shared detail, identity, controls, scrollbar mounting")) return;
                 const info=smoke.find(view,"cpuPlusProcessInformation");
                 const infoButton=smoke.find(view,"cpuPlusProcessInformationButton");
-                if (!smoke.check(info && infoButton && !info.visible && header.height>54 && smoke.find(header,"cpuPlusProcessExactIdentity") && smoke.find(header,"cpuPlusProcessLiveOwner"),
+                if (!smoke.check(info && infoButton && !info.visible && header.height>0 && !smoke.find(header,"cpuPlusProcessExactIdentity").visible && smoke.find(header,"cpuPlusProcessLiveOwner"),
                     "compact identity with hidden shared information")) return;
                 if (!smoke.check(!help.visible && !help.open && helpButton.available, "lock help initially hidden")) return;
                 helpButton.leftClicked(null);
-                if (!smoke.check(help.visible && helpButton.selected, "eye opens lock instructions")) return;
-                helpButton.leftClicked(null);
-                if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===0, "eye closes without action")) return;
+                if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===0, "click does not open hover-only help or request action")) return;
                 info.open=true;
                 if (!smoke.check(info.visible && infoButton.selected
                     && info.purpose==="Synthetic purpose"
                     && smoke.find(info,"processInformationScope")
                     && smoke.find(info,"processInformationArguments")
+                    && smoke.find(info,"processInformationBirthIdentity").text.includes("967833")
+                    && info.helpInk("CPU") !== info.helpInk("memory")
                     && info.height<=info.maximumHeight,
                     "bounded single-document information popup")) return;
                 info.open=false;

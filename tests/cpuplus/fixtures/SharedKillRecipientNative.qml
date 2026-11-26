@@ -12,6 +12,8 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property int previousRevision: 0
+    property real previousMiniOffset: 0
+    property real previousCpuOffset: 0
     property real previousInfoHeight: 0
     property real previousInfoY: 0
     property real previousScopeHeight: 0
@@ -232,7 +234,7 @@ ShellRoot {
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
                 const leftBay=smoke.find(view,"cpuPlusProcessControlBay");
-                const rightBay=smoke.find(view,"cpuPlusProcessResourceBay");
+                const rightBay=smoke.find(view,"cpuPlusProcessReservedBay");
                 const search=smoke.find(view,"cpuPlusKillSearch");
                 const hunter=smoke.find(view,"cpuPlusSharedHunterControls");
                 if (!smoke.check(view.currentTask && view.currentTask.pid===3442
@@ -241,8 +243,8 @@ ShellRoot {
                     && leftBay && rightBay && leftBay.x < rightBay.x
                     && actionTarget.mapToItem(leftBay,0,0).x >= 0
                     && actionTarget.mapToItem(leftBay,0,0).x + actionTarget.width <= leftBay.width
-                    && detail.mapToItem(rightBay,0,0).x >= 0
-                    && detail.mapToItem(rightBay,0,0).x + detail.width <= rightBay.width
+                    && detail.mapToItem(leftBay,0,0).x >= 0
+                    && detail.mapToItem(leftBay,0,0).x + detail.width <= leftBay.width
                     && detail.actionSection.parent===actionTarget
                     && detail.restartAction.parent===detail.actionSection
                     && detail.endAction.parent===detail.actionSection
@@ -251,11 +253,11 @@ ShellRoot {
                     && detail.freezeAction.y < detail.endAction.y
                     && search && hunter
                     && smoke.find(view,"cpuPlusKillTargetScroll")
-                    && smoke.find(view,"cpuPlusKillDetailScroll"),
+                    && smoke.find(view,"cpuPlusKillInstrumentViewport"),
                     "shared detail, identity, controls, scrollbar mounting")) return;
                 const info=smoke.find(view,"cpuPlusProcessInformation");
                 const infoButton=smoke.find(view,"cpuPlusProcessInformationButton");
-                if (!smoke.check(info && infoButton && !info.visible && header.height===54,
+                if (!smoke.check(info && infoButton && !info.visible && header.height>54 && smoke.find(header,"cpuPlusProcessExactIdentity") && smoke.find(header,"cpuPlusProcessLiveOwner"),
                     "compact identity with hidden shared information")) return;
                 info.open=true;
                 if (!smoke.check(info.visible && infoButton.selected
@@ -282,6 +284,8 @@ ShellRoot {
                 info.open=true;
                 const initial=detail.cpuCanvas.graphRevision;
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];
+                fakeOwner.taskMiniCpuHistories=({"pid:3442":[5,12,37]});
+                fakeOwner.taskMiniDisplayRevision++;
                 smoke.previousRevision=initial;
                 smoke.phase=10;
                 return;
@@ -290,6 +294,12 @@ ShellRoot {
                 const info=smoke.find(view,"cpuPlusProcessInformation");
                 if (!smoke.check(info.open && info.visible,
                     "same birth identity refresh preserves information popup")) return;
+                const mini=smoke.find(targets,"killTargetSharedMiniRenderer");
+                if (!smoke.check(mini && mini.historyValues.length===3 && mini.historyValues[2]===37
+                    && mini.graphScrollOffset>0 && detail.cpuCanvas.graphScrollOffset>0,
+                    "same-length mini snapshot and main graph both animate after publication")) return;
+                smoke.previousMiniOffset=mini.graphScrollOffset;
+                smoke.previousCpuOffset=detail.cpuCanvas.graphScrollOffset;
                 // Test-only long scope injection. The actual hosts retain their
                 // owner-projected scope bindings; no real process or command runs.
                 info.scopeText = Array(100).fill("SYNTHETIC SCOPE / CHILD PID 3442").join("\n");
@@ -297,6 +307,10 @@ ShellRoot {
                 return;
             }
             if (smoke.phase===15) {
+                const mini=smoke.find(targets,"killTargetSharedMiniRenderer");
+                if (!smoke.check(mini && mini.graphScrollOffset<smoke.previousMiniOffset
+                    && detail.cpuCanvas.graphScrollOffset<smoke.previousCpuOffset,
+                    "mini and large graph offsets advance across frames")) return;
                 const info=smoke.find(view,"cpuPlusProcessInformation");
                 const scope=smoke.find(info,"processInformationScopeScroll");
                 const args=smoke.find(info,"processInformationArgumentsScroll");

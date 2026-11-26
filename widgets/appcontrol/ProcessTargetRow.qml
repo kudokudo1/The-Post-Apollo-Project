@@ -3,7 +3,7 @@ import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../../components"
 
-// KILL-only projection of the donor selector's row grammar: 50px card,
+// Shared KILL selector row: 50px card,
 // process glyph, protected indicator, live metric, mini-history, and star.
 // No process mutations or persistent identity construction in the delegate.
 Item {
@@ -12,7 +12,11 @@ Item {
     required property var controller
     property bool selected: false
     property bool hovered: false
+    property real leftInset: 6
+    property real rightInset: 6
     signal selectedRequested()
+    signal favoriteSelectedRequested()
+    signal favoriteHovered()
     height: 50
 
     readonly property bool hunter: controller.killViewMode === controller.killViewHunter
@@ -21,16 +25,16 @@ Item {
         ? (protectedTask ? Colors.red : controller.hunterMetricAccent())
         : Number(entry.cpuInstant !== undefined ? entry.cpuInstant : entry.cpu) >= 25
           ? Colors.red : Colors.magenta
+    readonly property color subtitleAccent: hunter ? accent : Number(entry.cpu || 0) >= 25 ? Colors.red : Colors.magenta
     readonly property bool favorite: controller.isTaskFavorite(entry)
 
     Rectangle {
         id: plate
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.leftMargin: root.leftInset
+        anchors.rightMargin: root.rightInset
         color: clicker.pressed ? Colors.magenta
                : root.selected || root.hovered ? Colors.yellow : Colors.dark
-        border.width: 1
-        border.color: root.selected || root.hovered ? Colors.red : root.accent
 
         RectangularShadow {
             anchors.fill: parent
@@ -43,7 +47,9 @@ Item {
         GohuText {
             id: glyph
             anchors.left: parent.left
-            anchors.leftMargin: 7
+            anchors.leftMargin: 14
+            width: 50
+            horizontalAlignment: Text.AlignHCenter
             anchors.verticalCenter: parent.verticalCenter
             text: root.controller.taskGlyph(root.entry)
             font.pixelSize: 11
@@ -54,45 +60,51 @@ Item {
                 radius: 6
                 samples: 5
                 opacity: 0.46
-                color: glyph.color
+                color: root.selected || root.hovered ? Colors.orange : Colors.red
                 transparentBorder: true
             }
         }
         GohuText {
-            anchors.right: glyph.left
-            anchors.rightMargin: 1
+            id: protectedLock
+            x: glyph.x + (glyph.width - glyph.contentWidth) / 2 - width - 4
             anchors.verticalCenter: glyph.verticalCenter
             visible: root.protectedTask
             text: ""
             font.pixelSize: 8
             color: root.controller.lockMode(root.entry, "") !== ""
                 ? Colors.white : Colors.magenta
+            layer.enabled: visible
+            layer.effect: DropShadow { radius: 3; samples: 3; opacity: 0.24; color: protectedLock.color; transparentBorder: true }
         }
 
         Column {
             id: labelColumn
             anchors.left: glyph.right
-            anchors.leftMargin: 6
+            anchors.leftMargin: 9
             anchors.right: mini.left
-            anchors.rightMargin: 5
+            anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
+            spacing: 0
+            layer.enabled: !clicker.pressed && !root.selected && !root.hovered
+            layer.effect: DropShadow { radius: 6; samples: 6; opacity: 0.38; color: Colors.red; transparentBorder: true }
             GohuText {
                 width: parent.width
-                text: String(root.entry.comm || root.entry.name || "PROCESS")
+                text: root.controller.taskDisplayName(root.entry)
                 textFormat: Text.PlainText
                 elide: Text.ElideRight
-                font.pixelSize: 12
+                font.pixelSize: 15
                 color: clicker.pressed ? Colors.black
-                     : root.selected || root.hovered ? Colors.orange : root.accent
+                     : root.selected || root.hovered ? Colors.orange : Colors.red
             }
             GohuText {
                 width: parent.width
-                text: root.controller.taskRowMetric(root.entry)
+                text: root.controller.taskRowMetric(root.entry) + " • PID " + String(root.entry.pid || "?")
+                    + (root.hunter && root.protectedTask ? " • ⚠︎ PROTECTED" : "")
                 font.pixelSize: 10
+                opacity: 0.90
                 elide: Text.ElideRight
                 color: clicker.pressed ? Colors.black
-                     : root.selected || root.hovered ? Colors.orange : root.accent
+                     : root.selected || root.hovered ? Colors.orange : root.subtitleAccent
             }
         }
 
@@ -109,21 +121,6 @@ Item {
             clip: true
             readonly property bool combi: root.hunter
                 && root.controller.hunterMetricMode === root.controller.hunterMetricCombined
-            readonly property int revision: root.controller.miniHistoryRevision
-            property real scrollOffset: 0
-            NumberAnimation {
-                id: motion
-                target: mini
-                property: "scrollOffset"
-                to: 0
-                duration: 1080
-                easing.type: Easing.Linear
-            }
-            onRevisionChanged: {
-                motion.stop();
-                scrollOffset = width / 47;
-                motion.start();
-            }
             Rectangle {
                 anchors.fill: parent
                 color: Colors.black
@@ -131,39 +128,22 @@ Item {
                 border.width: 1
                 border.color: root.accent
             }
-            Repeater {
-                model: mini.combi
-                    ? [{key:"cpu",accent:Colors.orange},{key:"mem",accent:Colors.magenta},
-                       {key:"io",accent:Colors.cyan},{key:"age",accent:Colors.white}]
-                    : [{key:root.hunter ? root.controller.metricKey : "normal",
-                        accent:root.accent}]
-                delegate: Item {
-                    id: trace
-                    required property var modelData
-                    anchors.fill: mini
-                    anchors.margins: 2
-                    readonly property var points: {
-                        const rev = mini.revision;
-                        return root.controller.miniGraphPoints(
-                            root.entry, modelData.key, width, height);
-                    }
-                    Repeater {
-                        model: Math.max(0, trace.points.length - 1)
-                        delegate: Rectangle {
-                            required property int index
-                            readonly property point p1: trace.points[index]
-                            readonly property point p2: trace.points[index + 1]
-                            x: p1.x + mini.scrollOffset
-                            y: p1.y - height / 2
-                            width: Math.max(1, Math.hypot(p2.x-p1.x,p2.y-p1.y))
-                            height: 1
-                            color: trace.modelData.accent
-                            transformOrigin: Item.Left
-                            rotation: Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI
-                            antialiasing: true
-                        }
-                    }
-                }
+            ProcessMiniGraph {
+                objectName: "killTargetSharedMiniRenderer"
+                anchors.fill: parent
+                anchors.margins: 2
+                geometry: root.controller.miniGeometry
+                historyRevision: root.controller.miniHistoryRevision
+                historyLimit: root.controller.miniHistoryLimit
+                scrollDuration: root.controller.miniScrollDuration
+                taskIdentity: String(root.entry.pid || 0) + "|" + String(root.entry.startTicks || 0) + "|" + String(root.entry.comm || "")
+                metricKey: root.hunter ? root.controller.metricKey : "normal"
+                combiView: mini.combi
+                graphRange: root.controller.miniRange(metricKey)
+                accent: root.accent
+                readHistory: function() { return root.controller.miniHistory(root.entry, metricKey) }
+                readMetricHistory: function(key) { return root.controller.miniHistory(root.entry, key) }
+                metricRange: function(key) { return root.controller.miniMetricRange(key) }
             }
         }
         MouseArea {
@@ -173,36 +153,44 @@ Item {
             onClicked: root.selectedRequested()
         }
         Item {
-            width: 23
+            width: 30
             height: 30
             anchors.right: parent.right
+            anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
             z: 500
+            id: star
+            property bool removalFlash: false
+            Timer { id: removalFlashTimer; interval: 240; onTriggered: star.removalFlash = false }
             GohuText {
                 anchors.centerIn: parent
                 text: root.favorite ? "✦" : "✧"
                 font.pixelSize: 19
                 color: root.favorite ? (root.accent === Colors.red ? Colors.magenta : root.accent)
-                      : Colors.white
-                opacity: root.favorite ? 1 : 0.62
+                      : star.removalFlash ? Colors.black : Colors.white
+                opacity: root.favorite || star.removalFlash ? 1 : 0.62
                 layer.enabled: true
                 layer.effect: DropShadow {
-                    radius: root.favorite ? 8 : 5
+                    radius: root.favorite || star.removalFlash ? 8 : 5
                     samples: 5
-                    opacity: root.favorite ? 0.58 : 0.12
-                    color: root.accent
+                    opacity: root.favorite ? 0.58 : star.removalFlash ? 0.72 : starMouse.containsMouse ? 0.20 : 0.08
+                    color: root.favorite ? (root.accent === Colors.red ? Colors.magenta : root.accent) : star.removalFlash ? Colors.red : Colors.white
                     transparentBorder: true
                 }
             }
             MouseArea {
+                id: starMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
                 preventStealing: true
+                onEntered: root.favoriteHovered()
                 onClicked: function(event) {
                     event.accepted = true;
-                    root.selectedRequested();
+                    root.favoriteSelectedRequested();
+                    const wasFavorite = root.favorite;
                     root.controller.toggleTaskFavorite(root.entry);
+                    if (wasFavorite) { star.removalFlash = true; removalFlashTimer.restart() }
                 }
             }
         }

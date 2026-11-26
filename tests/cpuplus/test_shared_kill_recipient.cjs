@@ -44,7 +44,7 @@ test("all mutation requests use shared action gateway and explicit confirmation"
     assert.match(recipient, /ownedPendingRef && gate\.pending === ownedPendingRef/);
     assert.match(recipient, /workspace\.gate\.pending !== workspace\.ownedPendingRef/);
     assert.match(recipient, /function setLimitPercent\(percent\)[\s\S]*?workspace\.stagedLimitPercent/);
-    assert.match(recipient, /Preview only\. Right bay requires APPLY then CONFIRM/);
+    assert.match(recipient, /Preview only\. Existing actuator review requires APPLY then CONFIRM/);
     for (const backendMethod of [".sendSignal(", ".sendSignalMany(", ".restart(",
                                  ".setLimitPercent(currentTask", ".setLimitMiB(currentTask"])
         assert.equal(recipient.includes(backendMethod), false,
@@ -72,7 +72,7 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     assert.match(recipient,/modelBlank=true;[\s\S]*?modelBlank=false;/);
     assert.match(recipient,/acceptedButtons: Qt.NoButton[\s\S]*?targets.indexAt/);
     assert.match(recipient,/if \(sameTarget\(row\)\) return true/);
-    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillDetailScroll","cpuPlusKillActuatorScroll"])
+    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillInstrumentViewport","cpuPlusKillActuatorScroll"])
         assert.ok(recipient.includes(name));
     assert.match(recipient,/function killAllEligibleTasks\(\) \{ return bulkCandidates\("kill-all"\); \}/);
     assert.match(recipient,/appControlWindow\.prepareCpuBulkReview\(kind,hunterMetricMode,hunterVisibilityMode\)/);
@@ -95,7 +95,7 @@ test("recipient restores existing owner graph and favorite semantics", () => {
     assert.match(recipient,/appControlWindow\.taskMiniHunterMetricHistories/);
     assert.match(row,/width: 82/);
     assert.match(row,/mini\.combi/);
-    assert.match(row,/root\.controller\.miniGraphPoints/);
+    assert.match(row,/root\.controller\.miniHistory/);
     assert.match(row,/root\.favorite \? "✦" : "✧"/);
     assert.match(recipient,/appControlWindow\.taskFavoriteKey\(row\)/);
     assert.match(recipient,/ownerFavoriteStore\.favoriteKeys=next/);
@@ -189,8 +189,22 @@ test("P4c: expansion crosses state header and moves controls without duplicating
     assert.match(left,/id: leftActions/);
     assert.match(left,/cpuPlusBulkConfirm/);
     assert.match(left,/id: cpuProcessInformation/);
-    assert.match(right,/id: detailsScroll/);
-    assert.match(right,/actionTarget: leftActions/);
-    assert.doesNotMatch(right,/id: actuatorScroll|id: leftActions/);
+    assert.match(left,/id: details/);
+    assert.match(left,/actionTarget: leftActions/);
+    assert.doesNotMatch(right,/id: actuatorScroll|id: leftActions|TaskManagerView|ProcessInformationPanel/);
     assert.equal((recipient.match(/id: leftActions/g)||[]).length,1);
+});
+
+test("P4d: both hosts mount the same process row and mini renderer", () => {
+    const app=read("widgets/AppControlW.qml");
+    const row=read("widgets/appcontrol/ProcessTargetRow.qml");
+    const mini=read("widgets/appcontrol/ProcessMiniGraph.qml");
+    assert.match(app,/sourceComponent: ProcessTargetRow/);
+    assert.match(recipient,/delegate: ProcessTargetRow/);
+    assert.match(row,/ProcessMiniGraph\s*\{/);
+    assert.match(mini,/historyFrame = \{values:Array.isArray\(next\)\?next.slice\(\):\[\],combi:combi\}/);
+    assert.match(mini,/transform: Translate\s*\{\s*x: root.graphScrollOffset/);
+    assert.match(mini,/onHistoryRevisionChanged: refreshHistory\(true\)/);
+    assert.match(recipient,/id: identityContent[\s\S]*?cpuPlusProcessExactIdentity[\s\S]*?cpuPlusProcessLiveOwner[\s\S]*?ProcessInformationButton/);
+    assert.match(recipient,/objectName: "cpuPlusProcessReservedBay"/);
 });

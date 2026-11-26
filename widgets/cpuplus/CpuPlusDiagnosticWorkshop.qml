@@ -85,7 +85,7 @@ Column {
         // Defer only the synchronous validation handoff, not a fake loading
         // duration. No elapsed timer or launch until the second click.
         Qt.callLater(function() {
-            if (root.preparationGeneration!==generation || !root.visible) return;
+            if (!root || root.preparationGeneration!==generation || !root.visible) return;
             root.calibrating=false;
             if (!root.locked && root.planText===exact && root.preview.ok
                     && CpuPlusDiagnostics.captureSequence===sequence) {

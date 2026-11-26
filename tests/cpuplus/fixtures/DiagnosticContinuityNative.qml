@@ -70,7 +70,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 260) {
+            if (++root.ticks > 360) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -404,6 +404,59 @@ ShellRoot {
                     && report.summary.indexOf("THRESHOLD // 350 ms")>=0,
                     "real clock witness plus fixture heartbeat, archive and unload // "+CpuPlusDiagnostics.feedback)) return;
                 console.log("CPU_D3D_NATIVE_PASS");
+                root.paneActive=true;
+                root.phase=23;
+                return;
+            }
+            if (root.phase===23 && pane.item) {
+                pane.item.selectMenu(4);
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop) return;
+                workshop.edit("selected",["threads","memory","census","storage","stall"]);
+                workshop.edit("durationSeconds",30);
+                root.phase=24;
+                return;
+            }
+            if (root.phase===24 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const dial=root.findItem(workshop,"cpuplusWorkshopStallThreshold");
+                const threads=root.findItem(workshop,"cpuplusWorkshopTopThreads");
+                const storage=root.findItem(workshop,"cpuplusWorkshopStorageInstrument");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!root.check(dial && dial.visible && threads.visible && storage.visible
+                    && dial.numericDetentInterval===50 && dial.markerColor.toString().toLowerCase()==="#ed981a"
+                    && root.normalFace(workshop,"cpuplusWorkshopInstrument-stall",true),
+                    "actual second dial and fifth normal-face selector")) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,
+                    "all five instruments fit // "+viewport.contentHeight+" / "+viewport.height)) return;
+                workshop.edit("selected",["storage","stall"]);
+                workshop.edit("durationSeconds",5);
+                dial.valueRequested(500);
+                if (!root.check(workshop.preview.ok && workshop.plan.instruments[1].thresholdMs===500,
+                    "stall dial changes submitted calibration")) return;
+                workshop.activate();
+                root.phase=25;
+                return;
+            }
+            if (root.phase===25 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if (!workshop || workshop.calibrating) return;
+                if (!root.check(workshop.ready && !CpuPlusDiagnostics.busy,"stall prepare does not launch")) return;
+                workshop.activate();
+                if (!root.check(CpuPlusDiagnostics.kind==="workflow" && CpuPlusDiagnostics.stallCaptureActive,
+                    "second click starts coordinated stall capture")) return;
+                root.paneActive=false;
+                root.phase=26;
+                return;
+            }
+            if (root.phase===26) {
+                if (CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy) return;
+                const report=CpuPlusDiagnostics.reports.workflow;
+                if (!root.check(report && report.status==="COMPLETE" && report.id===CpuPlusDiagnostics.workshopRunId
+                    && !CpuPlusDiagnostics.stallCaptureActive && report.summary.indexOf("THRESHOLD 500 ms")>=0
+                    && CpuPlusDiagnostics.archiveRows.some(row=>row.id===report.id),
+                    "real coordinated storage/clock witness and fixture heartbeat // "+CpuPlusDiagnostics.feedback)) return;
+                console.log("CPU_D3E_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

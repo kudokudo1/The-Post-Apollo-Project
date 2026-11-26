@@ -40,22 +40,26 @@ Item {
         duration: root.scrollDuration
         easing.type: Easing.Linear
     }
+    function snapshotCombiHistory() {
+        if (!combiView) return emptyCombiHistories
+        const cpu=readMetricHistory("cpu"), mem=readMetricHistory("mem")
+        const io=readMetricHistory("io"), age=readMetricHistory("age")
+        const n=Math.min(cpu.length,mem.length,io.length,age.length)
+        return n>0 ? {cpu:cpu.slice(-n),mem:mem.slice(-n),io:io.slice(-n),age:age.slice(-n)}
+                   : emptyCombiHistories
+    }
     function refreshHistory(animate) {
         if (!graphReady) return
         if (!showingTask) {
-            motion.stop()
-            graphScrollOffset = 0
-            historyFrame = {values: [], combi: emptyCombiHistories}
+            if (historyValues.length>0 || combiHistories!==emptyCombiHistories) {
+                motion.stop()
+                graphScrollOffset = 0
+                historyFrame = {values: [], combi: emptyCombiHistories}
+            }
             return
         }
         const next = readHistory()
-        let combi = emptyCombiHistories
-        if (combiView) {
-            const cpu=readMetricHistory("cpu"), mem=readMetricHistory("mem")
-            const io=readMetricHistory("io"), age=readMetricHistory("age")
-            const n=Math.min(cpu.length,mem.length,io.length,age.length)
-            if (n>0) combi={cpu:cpu.slice(-n),mem:mem.slice(-n),io:io.slice(-n),age:age.slice(-n)}
-        }
+        const combi = snapshotCombiHistory()
         motion.stop()
         graphScrollOffset = animate && historyValues.length >= 1
             ? width / Math.max(1, historyLimit - 1) : 0

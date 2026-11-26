@@ -567,6 +567,104 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
+    // Actions belong to the contextual body, not the invariant navigation footer.
+    Column {
+        objectName: "cpuplusDiagnosticReportActions"
+        width: parent.width
+        visible: ["REPORT","HISTORY","COMPARE"].includes(root.viewMode)
+        spacing: 3
+        Row {
+            id: reportRail
+            visible: root.viewMode === "REPORT"
+            width: parent.width
+            spacing: 3
+            Repeater {
+                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall"]
+                delegate: ActionButton {
+                    required property string modelData
+                    width: Math.max(0, Math.floor((reportRail.width - 21) / 8))
+                    height: 27
+                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : modelData === "stall" ? "STALL" : "STORE"
+                    labelPixelSize: 9
+                    labelFontSizeMode: Text.HorizontalFit
+                    labelMinimumPixelSize: 8
+                    contentPadding: 2
+                    selected: root.selectedReport === modelData
+                    onLeftClicked: {
+                        CpuPlusDiagnostics.selectLatest(modelData);
+                        root.showReport = false;
+                    }
+                }
+            }
+        }
+        Row {
+            id: reportActions
+            visible: root.viewMode === "REPORT"
+            width: parent.width
+            spacing: 3
+            ActionButton {
+                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                height: 26
+                available: root.report !== null && root.report.text.length > 0
+                label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
+                onLeftClicked: root.showReport = !root.showReport
+            }
+            ActionButton {
+                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                height: 26
+                available: root.showReport && root.report !== null && root.report.text.length > 0
+                label: "COPY REPORT"
+                onLeftClicked: {
+                    reportText.selectAll();
+                    reportText.copy();
+                    reportText.deselect();
+                }
+            }
+        }
+        Row {
+            id: historyActions
+            visible: root.viewMode === "HISTORY" || root.viewMode === "COMPARE"
+            width: parent.width
+            spacing: 3
+            ActionButton {
+                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
+                height: 26
+                label: "RELOAD ARCHIVE"
+                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy
+                onLeftClicked: CpuPlusDiagnostics.loadHistory()
+            }
+            ActionButton {
+                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
+                height: 26
+                label: root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE"
+                labelFontSizeMode: Text.HorizontalFit
+                labelMinimumPixelSize: 8
+                contentPadding: 2
+                available: true
+                onLeftClicked: root.selectView(root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE")
+            }
+        }
+        Row {
+            id: compareRail
+            visible: root.viewMode === "COMPARE"
+            width: parent.width
+            spacing: 4
+            ActionButton {
+                width: Math.max(0, (compareRail.width - 4) / 2)
+                height: 26
+                label: "SET BEFORE"
+                available: root.canChooseComparison
+                onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
+            }
+            ActionButton {
+                width: Math.max(0, (compareRail.width - 4) / 2)
+                height: 26
+                label: "SET AFTER"
+                available: root.canChooseComparison
+                onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
+            }
+        }
+    }
     GohuText {
         width: parent.width
         visible: root.viewMode === "REPORT"
@@ -842,104 +940,6 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.Wrap
     }
-    // Actions belong to the contextual body, not the invariant navigation footer.
-    Column {
-        objectName: "cpuplusDiagnosticReportActions"
-        width: parent.width
-        visible: ["REPORT","HISTORY","COMPARE"].includes(root.viewMode)
-        spacing: 3
-        Row {
-            id: reportRail
-            visible: root.viewMode === "REPORT"
-            width: parent.width
-            spacing: 3
-            Repeater {
-                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall"]
-                delegate: ActionButton {
-                    required property string modelData
-                    width: Math.max(0, Math.floor((reportRail.width - 21) / 8))
-                    height: 27
-                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : modelData === "stall" ? "STALL" : "STORE"
-                    labelPixelSize: 9
-                    labelFontSizeMode: Text.HorizontalFit
-                    labelMinimumPixelSize: 8
-                    contentPadding: 2
-                    selected: root.selectedReport === modelData
-                    onLeftClicked: {
-                        CpuPlusDiagnostics.selectLatest(modelData);
-                        root.showReport = false;
-                    }
-                }
-            }
-        }
-        Row {
-            id: reportActions
-            visible: root.viewMode === "REPORT"
-            width: parent.width
-            spacing: 3
-            ActionButton {
-                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
-                height: 26
-                available: root.report !== null && root.report.text.length > 0
-                label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
-                onLeftClicked: root.showReport = !root.showReport
-            }
-            ActionButton {
-                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
-                height: 26
-                available: root.showReport && root.report !== null && root.report.text.length > 0
-                label: "COPY REPORT"
-                onLeftClicked: {
-                    reportText.selectAll();
-                    reportText.copy();
-                    reportText.deselect();
-                }
-            }
-        }
-        Row {
-            id: historyActions
-            visible: root.viewMode === "HISTORY" || root.viewMode === "COMPARE"
-            width: parent.width
-            spacing: 3
-            ActionButton {
-                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
-                height: 26
-                label: "RELOAD ARCHIVE"
-                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy
-                onLeftClicked: CpuPlusDiagnostics.loadHistory()
-            }
-            ActionButton {
-                width: Math.max(0,(historyActions.width-historyActions.spacing)/2)
-                height: 26
-                label: root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE"
-                labelFontSizeMode: Text.HorizontalFit
-                labelMinimumPixelSize: 8
-                contentPadding: 2
-                available: true
-                onLeftClicked: root.selectView(root.viewMode === "COMPARE" ? "HISTORY" : "COMPARE")
-            }
-        }
-        Row {
-            id: compareRail
-            visible: root.viewMode === "COMPARE"
-            width: parent.width
-            spacing: 4
-            ActionButton {
-                width: Math.max(0, (compareRail.width - 4) / 2)
-                height: 26
-                label: "SET BEFORE"
-                available: root.canChooseComparison
-                onLeftClicked: CpuPlusDiagnostics.selectComparison("before", root.report.id)
-            }
-            ActionButton {
-                width: Math.max(0, (compareRail.width - 4) / 2)
-                height: 26
-                label: "SET AFTER"
-                available: root.canChooseComparison
-                onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
-            }
-        }
-    }
     Column {
         parent: root.footerTarget || root
         objectName: "cpuplusDiagBottomControls"
@@ -974,6 +974,7 @@ Column {
                     selectedForegroundColor: Colors.magenta
                     normalFace: true
                     acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
                     onLeftClicked: {
                         if(root.viewMode==="PRESETS")presets.mixerPage=modelData.key;
                         else root.selectView(modelData.key);

@@ -514,5 +514,7 @@ console.log("CPU++ M11h compact transport palette and pinned diagnostics header 
  assert.match(targetStripSource,/width: 36\s+height: 36/);
  assert.match(targetStripSource,/label: String\(modelData.symbol \|\| ""\)/);
  assert.match(targetStripSource,/labelPixelSize: 24/);
- assert.doesNotMatch(targetStripSource,/(hover|pressed|selected)(Fill|Foreground|Border|SoftGlow|ContentGlow)Color:/);
+ assert.doesNotMatch(targetStripSource,/(hover|pressed)(Fill|Foreground|Border|SoftGlow|ContentGlow)Color:/);
+ assert.match(targetStripSource,/selectedFillColor: Colors.black/);
+ assert.match(targetStripSource,/selectedContentGlowColor: accentColor/);
  console.log("CPU++ SYSTEM and KILL semantic palette source contracts PASS");

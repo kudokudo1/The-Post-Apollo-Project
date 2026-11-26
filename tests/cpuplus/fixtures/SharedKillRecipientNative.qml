@@ -307,12 +307,16 @@ ShellRoot {
                     && fakeGate.pending===null
                     && !view.hasOwnedPending, "confirm controls only"))
                     return;
+                if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
+                    "prepare before process removal")) return;
                 fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }
             if (!smoke.check(!view.currentTask && !view.exactTargetAvailable
-                && !view.prepareAction("end"), "stale selection refusal"))
+                && !view.prepareAction("end") && !view.hasOwnedPending
+                && fakeGate.pending===null && fakeGate.cancels===2
+                && fakeGate.confirmations===1, "stale selection refusal and owned review cancelled"))
                 return;
             console.log("CPU_KILL_NATIVE_PASS");
             smoke.done = true;

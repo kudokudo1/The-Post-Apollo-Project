@@ -425,6 +425,12 @@ Column {
                                 objectName: "cpuplusWorkshopStorage-sample-dial"
                                 readonly property var stopwatch: root.countdown("sample")
                                 stopwatchFace: true
+                                stopwatchArmStyle: "tapered"
+                                stopwatchArmReach: 95
+                                stopwatchGaugeStyle: "segmented"
+                                stopwatchScaleStyle: "ticks"
+                                chassisStyle: "square"
+                                chassisClearance: 10
                                 stopwatchActive: root.storageRunning
                                 stopwatchFraction: stopwatch ? stopwatch.fraction : -1
                                 stopwatchFlash: !!stopwatch && stopwatch.flash
@@ -474,6 +480,12 @@ Column {
                                 objectName: "cpuplusWorkshopStorage-report-dial"
                                 readonly property var stopwatch: root.countdown("report")
                                 stopwatchFace: true
+                                stopwatchArmStyle: "tapered"
+                                stopwatchArmReach: 95
+                                stopwatchGaugeStyle: "segmented"
+                                stopwatchScaleStyle: "ticks"
+                                chassisStyle: "square"
+                                chassisClearance: 10
                                 stopwatchActive: root.storageRunning
                                 stopwatchFraction: stopwatch ? stopwatch.fraction : -1
                                 stopwatchFlash: !!stopwatch && stopwatch.flash

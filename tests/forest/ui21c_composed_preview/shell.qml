@@ -327,6 +327,226 @@ ShellRoot {
                 "season preserves Tree artwork");
         }
     }
+    // S3: fixed-public display-only witness. These strings are supplied
+    // example outcomes, not source authorization, an issuer or a roster.
+    Component {
+        id: s3PresentationType
+        Item {
+            id: s3
+            property var original: null
+            property var selection: null
+            property bool localReviewVisible: false
+            property string suppliedOutcome: "UNAVAILABLE"
+            property string chatMode: "CHATS"
+            property string chatDraft: "PUBLIC DRAFT"
+            property string chatHistory: "PUBLIC HISTORY"
+            readonly property bool sourceAuthenticated: false
+            readonly property bool permissionGranted: false
+            readonly property bool productionAuthority: false
+            readonly property string publicStatus:
+                suppliedOutcome === "AUTHORIZED_COMPLETE_EMPTY"
+                    ? "NO VISIBLE MEMBERS"
+                    : suppliedOutcome === "AUTHORIZED_ROWS"
+                      ? "PUBLIC MEMBER" : "COLONY UNAVAILABLE"
+
+            // Test-only exact identity, including original member lifetime
+            // and local view incarnation; never compare a visible label.
+            function same(a,b) {
+                if (!a || !b || typeof a !== "object" || typeof b !== "object")
+                    return false;
+                const names = ["principal","tree","member","task","recipient","view"];
+                for (const name of names) {
+                    if (typeof a[name] !== "string" || !a[name] ||
+                        typeof b[name] !== "string" || a[name] !== b[name])
+                        return false;
+                }
+                return Number.isInteger(a.generation) && a.generation > 0
+                    && Number.isInteger(b.generation) && a.generation === b.generation
+                    && Number.isInteger(a.revision) && a.revision > 0
+                    && Number.isInteger(b.revision) && a.revision === b.revision;
+            }
+            function pin(ref) {
+                // Copy the literal identity fields. Caller mutation cannot
+                // replace the independently pinned fixture incarnation.
+                if (!same(ref,ref)) return null;
+                return {principal:ref.principal, tree:ref.tree, member:ref.member,
+                    task:ref.task, recipient:ref.recipient, view:ref.view,
+                    generation:ref.generation, revision:ref.revision};
+            }
+            function enter(ref) {
+                original = pin(ref); // Test-local copy, not authority.
+                suppliedOutcome = "UNAVAILABLE";
+                selection = null;
+                localReviewVisible = false;
+            }
+            function receive(ref,outcome) {
+                if (!same(ref,original)) return false;
+                if (["AUTHORIZED_COMPLETE_EMPTY","AUTHORIZED_ROWS","UNAVAILABLE",
+                     "MISSING","PARTIAL","REFUSED","LOST","UNKNOWN"].indexOf(outcome) < 0) {
+                    suppliedOutcome = "UNAVAILABLE";
+                    selection = null;
+                    localReviewVisible = false;
+                    return false;
+                }
+                suppliedOutcome = outcome;
+                if (outcome !== "AUTHORIZED_ROWS") {
+                    selection = null;
+                    localReviewVisible = false;
+                }
+                return true;
+            }
+            function choose(ref) {
+                if (!same(ref,original) || suppliedOutcome !== "AUTHORIZED_ROWS")
+                    return false;
+                selection = pin(ref);
+                return selection !== null;
+            }
+            function showLocalReview(ref) {
+                // A fixture illustration, NOT R1/R2 or Cleaning authorization.
+                if (!same(ref,original) || !same(ref,selection))
+                    return false;
+                localReviewVisible = true;
+                return true;
+            }
+            function withdraw(ref) {
+                if (!same(ref,original)) return false;
+                // Unlike temporary UNAVAILABLE/PARTIAL, explicit withdrawal
+                // ends this exact view. A delayed reply cannot resurrect it.
+                original = null;
+                suppliedOutcome = "UNAVAILABLE";
+                selection = null;
+                localReviewVisible = false;
+                return true;
+            }
+            Text {
+                id: s3PublicText
+                objectName: "s3PublicStatus"
+                x: 24; y: 20; width: parent.width - 64; height: 24
+                text: s3.publicStatus
+                textFormat: Text.PlainText
+                color: "#999999"
+                Accessible.name: text
+            }
+            UI2.PublicSeasonIndicator {
+                id: s3UnknownSeason
+                objectName: "s3UnknownSeason"
+                x: 4; y: 23
+                // syntheticOwner intentionally remains false.
+            }
+        }
+    }
+    function s3Scope(view,lifetime) {
+        return {principal:"PUBLIC OWNER", tree:"CHERRY", member:"PUBLIC ORIGINAL",
+            task:"PUBLIC TASK", recipient:"PUBLIC RECIPIENT",view:view,
+            generation:lifetime,revision:1};
+    }
+    function s3Changed(ref,key,value) {
+        const copy=JSON.parse(JSON.stringify(ref));
+        copy[key]=value;
+        return copy;
+    }
+    function s3Checks() {
+        s3Host.active=true;
+        const item=s3Host.item;
+        const status=descendant(item,"s3PublicStatus");
+        const season=descendant(item,"s3UnknownSeason");
+        check(item && status && season && item.original===null
+            && item.selection===null && !item.localReviewVisible
+            && item.publicStatus==="COLONY UNAVAILABLE"
+            && !item.sourceAuthenticated && !item.permissionGranted
+            && !item.productionAuthority && !season.syntheticOwner
+            && season.season==="UNKNOWN" && season.seasonLabel==="Season unknown",
+            "S3 initial neutral and authority locked");
+        if (!item || !status || !season) return;
+        const old=s3Scope("view-old",1);
+        const newer=s3Scope("view-new",1);
+        const replacement=s3Scope("view-new",2);
+        item.enter(old);
+        for (const outcome of ["UNAVAILABLE","MISSING","PARTIAL","REFUSED","LOST","UNKNOWN"]) {
+            check(item.receive(old,outcome) && status.text==="COLONY UNAVAILABLE"
+                && status.Accessible.name===status.text && item.selection===null
+                && !item.localReviewVisible && !item.choose(old),
+                "S3 no forbidden reason, alias or inferred empty");
+        }
+        check(item.receive(old,"AUTHORIZED_COMPLETE_EMPTY")
+            && status.text==="NO VISIBLE MEMBERS" && !item.choose(old),
+            "S3 explicitly supplied scoped empty only");
+        check(!item.receive(newer,"AUTHORIZED_ROWS")
+            && status.text==="NO VISIBLE MEMBERS",
+            "S3 foreign view cannot populate");
+        check(item.receive(old,"AUTHORIZED_ROWS")
+            && status.text==="PUBLIC MEMBER" && item.selection===null
+            && !item.localReviewVisible,
+            "S3 public row never selects or reviews itself");
+        check(item.choose(old) && item.selection!==null
+            && !item.localReviewVisible && item.showLocalReview(old),
+            "S3 explicit local selection and review illustration");
+        for (const key of ["principal","tree","member","task","recipient","view",
+                          "generation","revision"]) {
+            const wrong=s3Changed(old,key,
+                key==="generation" || key==="revision" ? 9 : "other");
+            check(!item.choose(wrong) && !item.withdraw(wrong)
+                && !item.receive(wrong,"AUTHORIZED_COMPLETE_EMPTY")
+                && item.localReviewVisible && item.publicStatus==="PUBLIC MEMBER",
+                "S3 exact original scope fence "+key);
+        }
+        item.enter(newer);
+        check(item.publicStatus==="COLONY UNAVAILABLE" && item.selection===null
+            && !item.localReviewVisible && !item.showLocalReview(old),
+            "S3 new view retires old selection/review");
+        check(item.receive(newer,"AUTHORIZED_ROWS") && item.choose(newer)
+            && item.showLocalReview(newer),"S3 replacement local selection");
+        check(!item.withdraw(old) && !item.receive(old,"AUTHORIZED_COMPLETE_EMPTY")
+            && item.localReviewVisible && item.publicStatus==="PUBLIC MEMBER",
+            "S3 stale old-view withdrawal cannot clear replacement");
+        item.enter(replacement);
+        check(item.selection===null && !item.localReviewVisible
+            && item.publicStatus==="COLONY UNAVAILABLE",
+            "S3 new member lifetime resets equal label and view");
+        check(item.receive(replacement,"AUTHORIZED_ROWS") && item.choose(replacement)
+            && item.showLocalReview(replacement) && !item.withdraw(newer)
+            && item.localReviewVisible, "S3 older generation cannot retire new member");
+        check(item.receive(replacement,"PARTIAL") && item.selection===null
+            && !item.localReviewVisible && status.text==="COLONY UNAVAILABLE",
+            "S3 lost completeness retires original visible details");
+        check(item.receive(replacement,"AUTHORIZED_ROWS") && item.choose(replacement)
+            && item.showLocalReview(replacement) && item.withdraw(replacement)
+            && !item.localReviewVisible && item.selection===null
+            && item.original===null && status.text==="COLONY UNAVAILABLE",
+            "S3 current withdrawal retires original fixture");
+        check(!item.receive(replacement,"AUTHORIZED_ROWS")
+            && !item.choose(replacement) && !item.showLocalReview(replacement)
+            && !item.withdraw(replacement) && item.original===null
+            && item.publicStatus==="COLONY UNAVAILABLE",
+            "S3 withdrawn same-original reply cannot resurrect selection or review");
+        const fresh=s3Scope("fresh-view",3);
+        item.enter(fresh);
+        check(item.receive(fresh,"AUTHORIZED_ROWS") && item.choose(fresh)
+            && item.showLocalReview(fresh) && !item.receive(replacement,"AUTHORIZED_ROWS")
+            && !item.withdraw(replacement) && item.localReviewVisible
+            && item.publicStatus==="PUBLIC MEMBER",
+            "S3 separately pinned fresh view survives stale original replies");
+        const mutable=s3Scope("mutable-view",4);
+        item.enter(mutable);
+        mutable.view="changed-by-caller";
+        check(item.original.view==="mutable-view"
+            && !item.receive(mutable,"AUTHORIZED_ROWS")
+            && item.publicStatus==="COLONY UNAVAILABLE",
+            "S3 copied original pin ignores external alias mutation");
+        const copied=s3Scope("mutable-view",4);
+        check(item.receive(copied,"AUTHORIZED_ROWS") && item.choose(copied),
+            "S3 matching original fixture accepted after copy");
+        copied.task="changed-by-caller";
+        check(item.selection.task==="PUBLIC TASK"
+            && !item.showLocalReview(copied)
+            && item.showLocalReview(s3Scope("mutable-view",4)),
+            "S3 selection pin resists externally changed task");
+        check(item.chatMode==="CHATS" && item.chatDraft==="PUBLIC DRAFT"
+            && item.chatHistory==="PUBLIC HISTORY" && season.season==="UNKNOWN"
+            && !season.syntheticOwner && !item.permissionGranted,
+            "S3 unaffected chat/unknown season and no implicit action");
+        s3Host.active=false;
+    }
     Window {
         id: scene
         width: 480
@@ -355,6 +575,12 @@ ShellRoot {
             anchors.fill: parent
             active: false
             sourceComponent: UI2.PublicRestorationReview {}
+        }
+        Loader {
+            id: s3Host
+            anchors.fill: parent
+            active: false
+            sourceComponent: s3PresentationType
         }
     }
     Timer {
@@ -1036,8 +1262,10 @@ ShellRoot {
             }
             case 64:
                 check(selector.item===null,"cap fixture unloaded");
+                s3Checks();
                 break;
             case 65:
+                check(s3Host.item===null,"S3 fixture unloaded");
                 check(!seasonRows.active && seasonRows.item===null,"season default unmounted");
                 scene.width=480; scene.height=300;
                 seasonRows.active=true;

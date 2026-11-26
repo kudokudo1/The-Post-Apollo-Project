@@ -1,8 +1,9 @@
 "use strict";
 
-// Phase A: executable donor vs existing FavoritesService contract.
-// This test runs actual extracted function bodies from both QML sources against
-// isolated synthetic stores. It does not open the desktop or change user data.
+// Host integration: run actual AppControl wrappers and FavoritesService bodies
+// against isolated synthetic stores. Explicit expected arrays and call counts
+// avoid treating two calls to the same implementation as independent parity.
+// No desktop or user data is accessed.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -62,6 +63,7 @@ function stateFor(overrides) {
         store: initialStore(overrides),
         events,
         queued: [],
+        serviceCalls: [],
         actionKeys: {},
         context: "",
         actionAvailable: true,
@@ -79,8 +81,9 @@ function stateFor(overrides) {
     return state;
 }
 
-const makeDonor = new Function("state", [
+const buildHost = new Function("state", [
     "const favoriteStore = state.store;",
+    "const FavoritesService = state.service;",
     "const appsModeIndex = 1;",
     "let rememberedAppKey = '';",
     "const favoriteKeyFor = entry => entry && entry.key || '';",
@@ -103,6 +106,15 @@ const makeService = new Function("state", [
     serviceFunctions,
     "return {isFavoriteKey, toggleFavoriteKey, isTaskMetricKey, toggleTaskMetricKey, isMonitorBoxKey, toggleMonitorBoxKey, isPreferredActionKey, togglePreferredActionKey};"
 ].join("\n"));
+
+function makeDonor(state) {
+    const service = makeService(state);
+    state.service = new Proxy(service, {get(target, key) {
+        if (typeof target[key] !== "function") return target[key];
+        return (...args) => { state.serviceCalls.push([key, ...args]); return target[key](...args); };
+    }});
+    return buildHost(state);
+}
 
 function sameStore(donorState, serviceState) {
     assert.deepEqual(donorState.store, serviceState.store);
@@ -227,4 +239,48 @@ test("HUNTER reads the original task favorite identity after service toggle", ()
     assert.equal(hunter.targetIsFavorite(target),true);
     assert.equal(service.toggleFavoriteKey("task|firefox"),false);
     assert.equal(hunter.targetIsFavorite(target),false);
+});
+
+
+test("host delegates exactly four mutations without direct store assignments or private action key logging", () => {
+    const s = stateFor({
+        favoriteKeys: ["app.desktop"],
+        favoriteTaskMetricKeys: ["taskmetric|other|cpu"],
+        favoriteMonitorBoxKeys: ["watchbox|system|cpu|frequency"],
+        favoriteDetailActionKeys: ["run|other|launch", "app|sample|old"]
+    });
+    s.context = "app|sample";
+    s.actionKeys = {0: "app|sample|new"};
+    const host = makeDonor(s);
+    host.toggleFavorite({key:"task|firefox"}, 7);
+    host.toggleTaskMetricFavorite({metricKey:"taskmetric|firefox|cpu"}, "cpu");
+    host.toggleMonitorBoxFavorite({boxKey:"watchbox|thermal|sensor|temperature"}, "temperature");
+    host.toggleDetailActionFavorite(0);
+    assert.deepEqual(s.serviceCalls, [
+        ["toggleFavoriteKey","task|firefox"],
+        ["toggleTaskMetricKey","taskmetric|firefox|cpu"],
+        ["toggleMonitorBoxKey","watchbox|thermal|sensor|temperature"],
+        ["togglePreferredActionKey","app|sample","app|sample|new"]
+    ]);
+    assert.deepEqual(s.store, {
+        favoriteKeys:["task|firefox","app.desktop"],
+        favoriteTaskMetricKeys:["taskmetric|firefox|cpu","taskmetric|other|cpu"],
+        favoriteMonitorBoxKeys:["watchbox|thermal|sensor|temperature","watchbox|system|cpu|frequency"],
+        favoriteDetailActionKeys:["run|other|launch","app|sample|new"]
+    });
+    const hunter = new Function("favoriteStoreObject",
+        actualFunction(hunterSource, "targetIsFavorite") + "\nreturn targetIsFavorite;")(s.store);
+    assert.equal(hunter({pid:4127,identity:"Firefox"}), true);
+    host.toggleFavorite({key:"task|firefox"}, 7);
+    assert.equal(hunter({pid:4127,identity:"Firefox"}), false);
+    assert.deepEqual(s.store.favoriteKeys, ["app.desktop"]);
+    s.serviceCalls.length = 0;
+    host.toggleFavorite({key:""}, 7);
+    host.toggleTaskMetricFavorite({}, "cpu");
+    host.toggleMonitorBoxFavorite({}, "temperature");
+    s.actionAvailable = false;
+    host.toggleDetailActionFavorite(0);
+    assert.deepEqual(s.serviceCalls, []);
+    assert.doesNotMatch(appSource, /favoriteStore\.(favoriteKeys|favoriteTaskMetricKeys|favoriteMonitorBoxKeys|favoriteDetailActionKeys)\s*=(?!=)/);
+    assert.doesNotMatch(actualFunction(appSource, "toggleDetailActionFavorite"), /console\.log\([\s\S]*?\bkey\s*,/);
 });

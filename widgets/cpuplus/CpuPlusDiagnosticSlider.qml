@@ -16,11 +16,12 @@ Column {
     property bool compact: false
     signal valueRequested(real value)
     spacing: compact ? 0 : 2
-    GohuText {
+    CpuPlusMemoryReadout {
         width: parent.width
         text: root.title + " // " + root.readout
         color: root.subjectColor
-        font.pixelSize: 10
+        font.pixelSize: 12
+        semanticGlowColor: root.subjectColor
         elide: Text.ElideRight
     }
     Item {

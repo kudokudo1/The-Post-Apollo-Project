@@ -11,6 +11,14 @@ Item {
     property string readoutUnit: ""
     // Opt-in interval stopwatch face. The owner supplies observed timing;
     // the existing rotary input/keyboard machinery remains authoritative.
+    property bool showInstrumentChassis: true
+    property string chassisStyle: "square"
+    property real chassisClearance: 10
+    property bool showChassisScrews: true
+    property string stopwatchArmStyle: "tapered"
+    property real stopwatchArmReach: 95
+    property string stopwatchGaugeStyle: "segmented"
+    property string stopwatchScaleStyle: "ticks"
     property bool stopwatchFace: false
     property bool stopwatchActive: false
     property real stopwatchFraction: -1
@@ -600,6 +608,15 @@ Item {
         width: 116
         height: 116
 
+        InstrumentChassis {
+            anchors.centerIn: parent
+            visible: dialRoot.showInstrumentChassis && !dialRoot.stopwatchFace
+            faceDiameter: 106
+            clearance: dialRoot.chassisClearance
+            chassisStyle: dialRoot.chassisStyle
+            showScrews: dialRoot.showChassisScrews
+        }
+
         // Deep dock well.
         Rectangle {
             visible: !dialRoot.stopwatchFace
@@ -1041,122 +1058,30 @@ Item {
             }
         }
 
-        // Same rotary control underneath, distinct time/cadence artwork.
-        // No independent clock, animation loop, or completion inference.
+        // Passive shared automotive face, retaining rotary input and capture locks.
         Loader {
             anchors.fill: parent
             active: dialRoot.stopwatchFace
-            sourceComponent: Item {
-                objectName: "selectorStopwatchFace"
-                Rectangle {
-                    x: (parent.width-width)/2
-                    y: -6
-                    width: 24; height: 14; radius: 2
-                    color: "#24192b"
-                    border.color: dialRoot.accentColor
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 3
-                        Repeater {
-                            model: 5
-                            Rectangle {width: 1; height: 7; color: dialRoot.accentColor}
-                        }
-                    }
-                }
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 106; height: 106; radius: 53
-                    color: "#09060e"
-                    border.color: dialRoot.accentColor
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        shadowEnabled: true
-                        shadowColor: dialRoot.accentColor
-                        shadowOpacity: dialRoot.stopwatchFlash ? 0.95 : 0.40
-                        shadowBlur: 0.65
-                    }
-                }
-                Repeater {
-                    model: 30
-                    delegate: Item {
-                        required property int index
-                        anchors.fill: parent
-                        rotation: index*12
-                        Rectangle {
-                            objectName: "selectorStopwatchSegment-"+index
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: 10
-                            width: 6; height: 8; radius: 1
-                            color: index<dialRoot.stopwatchLitSegments
-                                ? (dialRoot.stopwatchFlash ? Colors.white : dialRoot.accentColor) : "#302039"
-                        }
-                    }
-                }
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 76; height: 76; radius: 38
-                    color: "#120c19"
-                    border.color: Qt.rgba(dialRoot.accentColor.r,dialRoot.accentColor.g,dialRoot.accentColor.b,0.38)
-                }
-                Repeater {
-                    model: 12
-                    delegate: Item {
-                        required property int index
-                        anchors.fill: parent
-                        rotation: index*30
-                        Rectangle {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: 21; width: 1; height: 4
-                            color: Colors.white
-                            opacity: 0.55
-                        }
-                    }
-                }
-                Item {
-                    objectName: "selectorStopwatchHand"
-                    anchors.fill: parent
-                    rotation: dialRoot.stopwatchActive ? 360*dialRoot.stopwatchVisualFraction
-                        : dialRoot.visualAngle+90
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        y: 16; width: 2; height: 42
-                        color: Colors.white
-                    }
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        y: 15; width: 5; height: 5; radius: 2.5
-                        color: dialRoot.stopwatchFlash ? Colors.white : dialRoot.accentColor
-                    }
-                }
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 65; height: 40
-                    color: "#120c19"
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 0
-                        GohuText {
-                            objectName: "selectorStopwatchCenter"
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: dialRoot.readoutText
-                            font.pixelSize: text.length>4 ? 16 : 24
-                            color: dialRoot.stopwatchFlash ? Colors.white : dialRoot.accentColor
-                            layer.enabled: true
-                            layer.effect: MultiEffect {
-                                shadowEnabled: true
-                                shadowColor: dialRoot.accentColor
-                                shadowOpacity: 0.65
-                                shadowBlur: 0.55
-                            }
-                        }
-                        GohuText {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: dialRoot.readoutUnit
-                            font.pixelSize: 10
-                            color: Colors.white
-                        }
-                    }
-                }
+            sourceComponent: AutomotiveDial {
+                objectName: "selectorAutomotiveDial"
+                faceDiameter: 116
+                armStyle: dialRoot.stopwatchArmStyle
+                armReach: dialRoot.stopwatchArmReach
+                gaugeStyle: dialRoot.stopwatchGaugeStyle
+                scaleStyle: dialRoot.stopwatchScaleStyle
+                chassisStyle: dialRoot.chassisStyle
+                chassisClearance: dialRoot.chassisClearance
+                showChassis: dialRoot.showInstrumentChassis
+                showScrews: dialRoot.showChassisScrews
+                accentColor: dialRoot.accentColor
+                fraction: dialRoot.stopwatchVisualFraction
+                rotationDegrees: dialRoot.stopwatchActive ? 360*boundedFraction : dialRoot.visualAngle+90
+                flash: dialRoot.stopwatchFlash
+                valueText: dialRoot.readoutText
+                valueUnit: dialRoot.readoutUnit
+                setText: "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds
+                scaleMinimum: dialRoot.minimumValue
+                scaleMaximum: dialRoot.maximumValue
             }
         }
 
@@ -1326,6 +1251,7 @@ Item {
         }
 
         width: parent.width - 6
+        visible: !dialRoot.stopwatchFace
         text: dialRoot.stopwatchFace ? "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds+" <font color='"+Colors.white+"'>SEC</font>"
             : dialRoot.readoutUnit === "" ? dialRoot.readoutText
             : dialRoot.readoutText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")

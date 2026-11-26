@@ -6,6 +6,15 @@ on:
       - 'tests/forest/test_h14d_runtime_sequence.py'
       - 'tests/forest/h14d_resource_witness.py'
       - '.github/workflows/forest-runtime-h14d-offline.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/forest/h14d_runtime_sequence.py'
+      - 'tests/forest/test_h14d_runtime_sequence.py'
+      - 'tests/forest/h14d_resource_witness.py'
+      - 'tests/forest/test_h14d_resource_witness.py'
+      - '.github/workflows/forest-runtime-h14d-offline.yml'
 permissions:
   contents: read
 jobs:
@@ -14,6 +23,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify exact triggering commit
+        env:
+          TRIGGER_SHA: ${{ github.sha }}
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "Trigger SHA: $TRIGGER_SHA"
+          echo "Checkout HEAD: $ACTUAL_SHA"
+          test "$ACTUAL_SHA" = "$TRIGGER_SHA"
       - name: Fixed-public offline reference and Heart regression
         run: |
           python3 -m unittest discover -s tests/forest -p 'test_h14d_runtime_sequence.py' -v

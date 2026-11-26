@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "CpuPlusDiagnosticsPolicy.js" as Policy
+import "DiagnosticCalibration.js" as Calibration
 
 // Session owner, independent of the demand-loaded CPU++ pane.
 // No process or timer runs until an explicit button request.
@@ -86,10 +87,23 @@ Scope {
         workRecords.push({stage:stage, elapsedMs:elapsedMs, tsMs:timestampMs, mode:appControlMode});
     }
 
-    function request(job) {
+    // Detached serialization freezes the submitted calibration for completion validation.
+    property string activeCalibration: ""
+
+    function requestConfigured(configuration) {
+        if (configuration === undefined) return false;
+        return request("threads", configuration);
+    }
+
+    function request(job, configuration) {
         if (busy || faulted || worker.running || archive.busy) return false;
-        const args = Policy.argumentsFor(job, path => Quickshell.shellPath(path), Quickshell.dataDir);
+        const configured = configuration !== undefined;
+        const plan = configured && job === "threads"
+            ? Calibration.threadLaunchPlan(configuration, path => Quickshell.shellPath(path)) : null;
+        if (configured && !plan) return false;
+        const args = plan ? plan.args : Policy.argumentsFor(job, path => Quickshell.shellPath(path), Quickshell.dataDir);
         if (!args) return false;
+        activeCalibration = plan ? JSON.stringify(plan.config) : "";
         kind = job;
         captureSequence += 1;
         captureId = sessionTag + "-" + captureSequence;
@@ -144,6 +158,7 @@ Scope {
         archive.invoke({action: "save", record: Object.assign({kind: kind}, next[kind])});
         feedback = status + " // " + kind.toUpperCase();
         output = "";
+        activeCalibration = "";
         busy = false;
         captureFinished(kind, captureId);
     }
@@ -153,7 +168,9 @@ Scope {
         deadline.stop();
         if (kind === "appcontrol" && !cancelled && exitOk && output.length <= maximumReport)
             output = Policy.combineAppControl(output, modeRecords, openingRecords, diagnosticOverflow, killWorkRecords, workRecords) || "";
-        const summary = !cancelled && exitOk && output.length <= maximumReport
+        const calibrationMatches = !activeCalibration ||
+            Policy.configuredThreadEvidence(output, JSON.parse(activeCalibration)) !== null;
+        const summary = !cancelled && exitOk && output.length <= maximumReport && calibrationMatches
             ? Policy.summarize(kind, output) : null;
         publishResult(cancelled ? "CANCELLED" : summary ? "COMPLETE" : "NOT VERIFIED",
                       summary || (cancelled ? "CAPTURE STOPPED" : "NO VERIFIED RESULT // EXIT " + exitCode),

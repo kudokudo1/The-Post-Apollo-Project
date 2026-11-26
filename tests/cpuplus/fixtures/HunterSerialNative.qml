@@ -90,8 +90,20 @@ ShellRoot {
                 engine.exit(false);
                 if (!check(controller.phase==="report" && controller.results.length===4
                            && engine.calls.length===3,"unknown result stops remaining dispatch")) return;
-                console.log("HUNTER_SERIAL_PASS");
-                Qt.quit();
+                const priorCalls=engine.calls.length;
+                controller.start("kill-all",[]);
+                if (!check(engine.calls.length===priorCalls,"empty Kill All never expands")) return;
+                controller.start("kill-all",[captured[0]]);
+                if (!check(engine.calls.length===priorCalls+1
+                           && engine.calls[priorCalls].pid===first.pid
+                           && controller.operationLabel()==="ALL","Kill All uses exact serial capture")) return;
+                engine.exit(true);
+                Qt.callLater(function() {
+                    if (!check(controller.phase==="report" && controller.results.length===1
+                               && engine.calls.length===priorCalls+1,"Kill All reports reviewed set only")) return;
+                    console.log("HUNTER_SERIAL_PASS");
+                    Qt.quit();
+                });
             });
         });
     }

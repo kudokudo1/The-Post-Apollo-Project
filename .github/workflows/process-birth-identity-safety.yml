@@ -5,6 +5,8 @@ on:
       - 'services/system/TaskSafety.qml'
       - 'services/system/HunterExecutor.qml'
       - 'widgets/appcontrol/HunterOperationController.qml'
+      - 'widgets/appcontrol/GlobalTaskActionController.qml'
+      - 'widgets/AppControlW.qml'
       - 'tests/cpuplus/test_hunter_birth_identity.py'
       - 'tests/cpuplus/fixtures/TaskSafetyBirthNative.qml'
       - 'tests/cpuplus/fixtures/HunterSerialNative.qml'

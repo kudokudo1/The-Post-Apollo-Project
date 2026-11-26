@@ -79,39 +79,37 @@ QtObject {
 
 
     function requestKillAllEligibleTasks() {
-        const rows = host.killAllEligibleTasks();
-        if (rows.length === 0)
+        if (host.hunterOperationPhase !== "idle") {
+            host.showHunterOperationWindow();
+            return;
+        }
+        if (host.destructiveConfirmOpen || host.hubProcessActionGate.pending)
+            return;
+        const rows = host.killAllEligibleTasks().filter(function(row) {
+            const capture = host.hunterTargetsFromRows([row])[0];
+            return capture && Number.isSafeInteger(capture.pid) && capture.pid > 1
+                && Number.isSafeInteger(capture.startTicks) && capture.startTicks > 0
+                && !!capture.name && !!capture.identity
+                && !host.hunterTargetIsFavorite(capture);
+        });
+        const captured = host.hunterTargetsFromRows(rows);
+        if (captured.length === 0)
             return;
 
         host.openDestructiveConfirm(
             "kill-all",
             "⚠︎ CONFIRM KILL ALL ⚠︎",
-            "TERMINATE " + String(rows.length)
-            + " ELIGIBLE USER PROCESSES?\n"
-            + "SWAY, QUICKSHELL, AUDIO, DBUS AND SESSION SERVICES ARE PROTECTED.",
+            "TERMINATE THESE " + String(captured.length)
+            + " ELIGIBLE USER PROCESSES?\n\n"
+            + captured.map(function(target) {
+                return "• " + target.name + " [PID " + String(target.pid) + "]";
+            }).join("\n")
+            + "\n\nALL ELIGIBLE PROCESSES, NOT JUST SEARCH RESULTS. "
+            + "FAVORITES AND PROTECTED PROCESSES ARE EXCLUDED AND RECHECKED. "
+            + "EACH EXACT CAPTURE IS CHECKED ONCE; NO AUTOMATIC RETRY.",
             "KILL ALL"
         );
-        host.destructiveConfirmTargetPids = rows.map(function(entry) {
-            return Number(entry.pid || 0);
-        });
-    }
-
-
-    function executeKillAllEligibleTasks(targetPids) {
-        const wanted = Array.isArray(targetPids) ? targetPids : [];
-        const rows = host.killAllEligibleTasks().filter(function(entry) {
-            return wanted.length === 0
-                   || wanted.indexOf(Number(entry.pid || 0)) !== -1;
-        });
-        if (rows.length === 0)
-            return;
-
-        console.log("AppControl: KILL ALL eligible count", rows.length);
-        processControlObject.sendSignalMany(
-            rows.map(function(entry) { return Number(entry.pid || 0); }),
-            "-TERM"
-        );
-        refreshTimer.restart();
+        host.hunterPendingTargets = captured;
     }
 
 

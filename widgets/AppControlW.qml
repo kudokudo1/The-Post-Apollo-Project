@@ -1300,6 +1300,7 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
+        hunterPendingTargets = [];
         destructiveConfirmOpen = true;
         detailFocused = false;
         modeRailFocused = false;
@@ -1360,12 +1361,20 @@ PanelWindow {
     }
 
     function executeDestructiveConfirm() {
+        if (!destructiveConfirmOpen || hunterOperationPhase !== "idle")
+            return;
         const kind = destructiveConfirmKind;
         const targetPids = destructiveConfirmTargetPids.slice();
         const targetName = destructiveConfirmTargetName;
 
-        if (kind === "kill-hogs" || kind === "kill-mice") {
-            startHunterOperation(kind, hunterPendingTargets.slice());
+        if (kind === "kill-all" || kind === "kill-hogs" || kind === "kill-mice") {
+            const captured = hunterPendingTargets.slice();
+            hunterPendingTargets = [];
+            if (captured.length === 0) {
+                cancelDestructiveConfirm();
+                return;
+            }
+            startHunterOperation(kind, captured);
             return;
         }
 
@@ -1376,9 +1385,7 @@ PanelWindow {
         destructiveConfirmTargetName = "";
         hunterPendingTargets = [];
 
-        if (kind === "kill-all")
-            executeKillAllEligibleTasks(targetPids);
-        else if (kind === "reboot")
+        if (kind === "reboot")
             Quickshell.execDetached(["systemctl", "reboot"]);
         else if (kind === "protected-freeze" || kind === "task-freeze")
             executeProtectedTaskSignal(targetPids.length > 0 ? targetPids[0] : 0, targetName, "-STOP");
@@ -1957,11 +1964,7 @@ PanelWindow {
         globalTaskActionController.requestKillAllEligibleTasks();
     }
 
-    function executeKillAllEligibleTasks(targetPids) {
-        globalTaskActionController.executeKillAllEligibleTasks(targetPids);
-    }
-
-    function executeBulkTaskTermination(targetPids, label) {
+     function executeBulkTaskTermination(targetPids, label) {
         globalTaskActionController.executeBulkTaskTermination(targetPids, label);
     }
 
@@ -2409,7 +2412,7 @@ PanelWindow {
         if (rows.length === 0)
             return;
 
-        hunterPendingTargets = hunterTargetsFromRows(rows);
+        const captured = hunterTargetsFromRows(rows);
         openDestructiveConfirm(
             "kill-hogs",
             "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  CONFIRM KILL HOGS  ⚠︎",
@@ -2423,6 +2426,7 @@ PanelWindow {
             + "SURVIVORS ARE REPORTED; THEY ARE NOT RETRIED AUTOMATICALLY.",
             "KILL HOGS"
         );
+        hunterPendingTargets = captured;
         destructiveConfirmTargetPids = rows.map(function(entry) {
             return Number(entry.pid || 0);
         });
@@ -2438,7 +2442,7 @@ PanelWindow {
         if (rows.length === 0)
             return;
 
-        hunterPendingTargets = hunterTargetsFromRows(rows);
+        const captured = hunterTargetsFromRows(rows);
         openDestructiveConfirm(
             "kill-mice",
             "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  CONFIRM KILL MICE  ⚠︎",
@@ -2453,6 +2457,7 @@ PanelWindow {
             + "SURVIVORS ARE REPORTED; THEY ARE NOT RETRIED AUTOMATICALLY.",
             "KILL MICE"
         );
+        hunterPendingTargets = captured;
         destructiveConfirmTargetPids = rows.map(function(entry) {
             return Number(entry.pid || 0);
         });

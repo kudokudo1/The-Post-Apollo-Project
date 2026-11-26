@@ -103,7 +103,7 @@ Scope {
     function dangerActionKey(entry, actionKind) {
         const base = dangerKey(entry);
         const action = String(actionKind || "").trim().toLowerCase();
-        return base && action ? base + "|action:" + action : "";
+        return base && ["kill", "restart", "freeze", "limit"].indexOf(action) !== -1 ? base + "|action:" + action : "";
     }
 
     function dangerActionUnlockMode(entry, actionKind) {
@@ -153,7 +153,7 @@ Scope {
     }
 
     function toggleDangerActionUnlock(entry, actionKind) {
-        if (!entry || Number(entry.pid || 0) <= 1 || dangerUnlocked(entry))
+        if (!entry || Number(entry.pid || 0) <= 1)
             return;
 
         const key = dangerActionKey(entry, actionKind);
@@ -171,7 +171,7 @@ Scope {
     }
 
     function toggleDangerActionStickyUnlock(entry, actionKind) {
-        if (!entry || Number(entry.pid || 0) <= 1 || dangerUnlocked(entry))
+        if (!entry || Number(entry.pid || 0) <= 1)
             return;
 
         const key = dangerActionKey(entry, actionKind);

@@ -3,7 +3,7 @@ import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../../components"
 
-// KILL-only projection of the donor selector's row grammar: 50px card,
+// Shared KILL selector row: 50px card,
 // process glyph, protected indicator, live metric, mini-history, and star.
 // No process mutations or persistent identity construction in the delegate.
 Item {
@@ -25,6 +25,7 @@ Item {
         ? (protectedTask ? Colors.red : controller.hunterMetricAccent())
         : Number(entry.cpuInstant !== undefined ? entry.cpuInstant : entry.cpu) >= 25
           ? Colors.red : Colors.magenta
+    readonly property color subtitleAccent: hunter ? accent : Number(entry.cpu || 0) >= 25 ? Colors.red : Colors.magenta
     readonly property bool favorite: controller.isTaskFavorite(entry)
 
     Rectangle {
@@ -64,14 +65,16 @@ Item {
             }
         }
         GohuText {
-            anchors.left: glyph.left
-            anchors.leftMargin: -3
+            id: protectedLock
+            x: glyph.x + (glyph.width - glyph.contentWidth) / 2 - width - 4
             anchors.verticalCenter: glyph.verticalCenter
             visible: root.protectedTask
             text: ""
             font.pixelSize: 8
             color: root.controller.lockMode(root.entry, "") !== ""
                 ? Colors.white : Colors.magenta
+            layer.enabled: visible
+            layer.effect: DropShadow { radius: 3; samples: 3; opacity: 0.24; color: protectedLock.color; transparentBorder: true }
         }
 
         Column {
@@ -101,7 +104,7 @@ Item {
                 opacity: 0.90
                 elide: Text.ElideRight
                 color: clicker.pressed ? Colors.black
-                     : root.selected || root.hovered ? Colors.orange : root.accent
+                     : root.selected || root.hovered ? Colors.orange : root.subtitleAccent
             }
         }
 

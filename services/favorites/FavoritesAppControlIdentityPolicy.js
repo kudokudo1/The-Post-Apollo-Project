@@ -101,3 +101,37 @@ function hasMonitorBoxFavorite(entry, modeName, keys) {
     }
     return false;
 }
+
+// Mode numbers and app/RUN provider identity remain host-owned.
+function keyFor(entry, modeIndex, modeIds, appKey, runKey) {
+    if (!entry)
+        return "";
+
+    if (entry._favoriteRecord && entry._favoriteKey)
+        return entry._favoriteKey;
+
+    if (modeIndex === modeIds.apps)
+        return appKey(entry);
+
+    if (modeIndex === modeIds.run)
+        return runKey(entry);
+
+    if (modeIndex === modeIds.thermal && entry.id)
+        return "thermal|" + encodeURIComponent(String(entry.id));
+
+    if (modeIndex === modeIds.system && entry.id)
+        return "system|" + encodeURIComponent(String(entry.id));
+
+    if (modeIndex === modeIds.kill && entry._taskRecord)
+        return taskKey(entry);
+
+    // WINDOWS and any remaining placeholders include the mode index so
+    // identical temporary labels remain distinct until those modes get
+    // their real stable identities.
+    const label = String(entry.label || entry.name || "");
+
+    if (!label)
+        return "";
+
+    return "mode:" + modeIndex + ":" + label;
+}

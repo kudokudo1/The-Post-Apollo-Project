@@ -114,3 +114,26 @@ test("local wrappers neither perform commands nor write Favorites storage", () =
 test("live host delegates extracted Record policy without replacing independent baseline",()=>{
     for(const call of ["FavoriteRecord.appRecord(entry, key, appsModeIndex","FavoriteRecord.runRecord(sourceItem, key, resolvedPrefix"]) assert.ok(liveHost.includes(call),call);
  });
+
+test("C5 mode wrappers and process display records match immutable donors",()=>{
+    const messages=[];
+    const logger={log:(...args)=>messages.push(args)};
+    const key=e=>e.id||"mode:2:"+e.name;
+    const modes={2:{name:"WINDOWS"}};
+    const donor=new Function("favoriteKeyFor","modes","console",donorFunction("favoriteRecordForModeItem")+"\nreturn favoriteRecordForModeItem;")(key,modes,logger);
+    for(const entry of [{id:"x",label:"Window"},{name:"fallback"},{name:""}]) for(const mode of [2,9]) {
+        const a=policy.modeRecord(entry,key(entry),mode,modes[mode]?modes[mode].name:"MODE",(name,label)=>logger.log("AppControl:",name,label));
+        const b=donor(entry,mode);
+        assert.deepEqual(noAction(a),noAction(b));assert.strictEqual(a._sourceItem,entry);
+        const before=messages.length;a.execute();b.execute();
+        assert.equal(messages.length,before+2);assert.deepEqual(messages[before],messages[before+1]);
+    }
+    const taskDonor=new Function("killModeIndex",donorFunction("favoriteRecordForTaskIdentity")+"\nreturn favoriteRecordForTaskIdentity;")(7);
+    for(const identity of [null,""," Firefox ","a|b","文書"]) for(const live of [null,{comm:"FIREFOX",pid:123,cpu:4},{pid:0}]) {
+        const a=policy.taskRecord(identity,live,7),b=taskDonor(identity,live);
+        assert.deepEqual(plain(a),plain(b));
+        if(a&&live)assert.strictEqual(a._sourceItem,live);
+    }
+    assert.ok(liveHost.includes("FavoriteRecord.modeRecord(entry, key, modeIndex, modeName,"));
+    assert.ok(liveHost.includes("FavoriteRecord.taskRecord(identity, liveEntry, killModeIndex)"));
+});

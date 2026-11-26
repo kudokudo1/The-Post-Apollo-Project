@@ -151,3 +151,21 @@ test("adapter is pure and never assumes provider execution or storage",()=>{
 test("live host delegates extracted Identity policy without replacing independent baseline",()=>{
     for(const call of ["FavoriteIdentity.sourceItem(entry)","FavoriteIdentity.taskIdentity(entry)","FavoriteIdentity.taskKey(entry)","FavoriteIdentity.taskIdentityFromKey(key)","FavoriteIdentity.taskMetricKey(entry, metricId)","FavoriteIdentity.taskMetricData(key)","FavoriteIdentity.monitorBoxKey(entry, boxId, modeName)","FavoriteIdentity.hasMonitorBoxFavorite(entry, modeName,"]) assert.ok(liveHost.includes(call),call);
  });
+
+test("C5 generic favorite keys preserve original mode and provider identity",()=>{
+    const modeIds={apps:1,run:3,thermal:6,system:8,kill:7};
+    const appKey=e=>e.id||"";
+    const command=e=>e.commandText;
+    const prefix=e=>e.prefix;
+    const runKey=(c,p)=>"run:"+p+":"+encodeURIComponent(c);
+    const original=new Function("appEntryKey","runCommandText","runPrefixModeForEntry","runFavoriteKey","taskFavoriteKey",[
+        "const appsModeIndex=1,runModeIndex=3,thermalModeIndex=6,systemModeIndex=8,killModeIndex=7;",
+        donorFunction("favoriteKeyFor"),"return favoriteKeyFor;"
+    ].join("\n"))(appKey,command,prefix,runKey,adapter.taskKey);
+    for(const mode of [1,3,6,8,7,2,0]) for(const entry of [
+        null,{}, {id:"CPU | 0",name:"Example",commandText:"echo private",prefix:2},
+        {_taskRecord:true,comm:"FIREFOX"},{_favoriteRecord:true,_favoriteKey:"preserved"},
+        {label:"a:b|c"}, {id:0,name:""}, {_favoriteRecord:true,_favoriteKey:"",name:"fallback"}
+    ]) assert.equal(adapter.keyFor(entry,mode,modeIds,appKey,e=>runKey(command(e),prefix(e))),original(entry,mode));
+    assert.ok(liveHost.includes("FavoriteIdentity.keyFor(entry, modeIndex,"));
+});

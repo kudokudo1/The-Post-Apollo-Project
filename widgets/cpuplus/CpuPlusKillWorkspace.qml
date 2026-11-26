@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../../components"
 import "../appcontrol"
@@ -22,6 +23,7 @@ Item {
 
     // The live owner continues to own sampling and the persistent store.
     // These are CPU++-local view choices, never AppControl's current mode.
+    readonly property int displayedTargetCount: filteredRows.length
     property int instrumentWidth: 390
     property int targetWidth: 260
     readonly property int killModeIndex: 7
@@ -1131,12 +1133,15 @@ Item {
                         width: parent.width
                         height: 24
                         GohuText {
+                            id: helpGlowText1
                             width: parent.width
                             height: parent.height
                             text: "LOCK // HELP"
                             verticalAlignment: Text.AlignVCenter
                             color: Colors.yellow
                             font.pixelSize: 12
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: Colors.yellow; transparentBorder: true }
                         }
                     }
                     GohuText {
@@ -1149,6 +1154,8 @@ Item {
                         textFormat: Text.PlainText
                         color: lockRail.protectedTarget ? Colors.red : Colors.white
                         font.pixelSize: 11
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText1.color; transparentBorder: true }
                     }
                     Rectangle { width: parent.width; height: 1; color: Colors.orange; opacity: 0.7 }
                     Repeater {
@@ -1164,41 +1171,56 @@ Item {
                             width: helpContent.width
                             spacing: 6
                             GohuText {
+                            id: helpGlowText2
                                 width: Math.min(112, parent.width * 0.36)
                                 text: modelData.name
                                 color: modelData.ink
                                 font.pixelSize: 11
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText2.color; transparentBorder: true }
                                 wrapMode: Text.Wrap
                             }
                             GohuText {
+                            id: helpGlowText3
                                 width: Math.max(0, parent.width - 6 - Math.min(112, parent.width * 0.36))
                                 text: modelData.detail
                                 color: Colors.white
                                 font.pixelSize: 11
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText3.color; transparentBorder: true }
                                 wrapMode: Text.Wrap
                             }
                         }
                     }
                     Rectangle { width: parent.width; height: 1; color: Colors.orange; opacity: 0.7 }
                     GohuText {
+                            id: helpGlowText4
                         width: parent.width
                         text: "Left click lock: one-shot • Right click: sticky."
                         color: Colors.yellow
                         font.pixelSize: 11
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText4.color; transparentBorder: true }
                         wrapMode: Text.Wrap
                     }
                     GohuText {
+                            id: helpGlowText5
                         width: parent.width
                         text: "Individual locks work independently. Master overrides them while open. A + or key marks an individual grant."
                         color: Colors.white
                         font.pixelSize: 11
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText5.color; transparentBorder: true }
                         wrapMode: Text.Wrap
                     }
                     GohuText {
+                            id: helpGlowText6
                         width: parent.width
                         text: "UNLOCK ≠ EXECUTE // Review and confirm. Dispatch is not proof of success."
                         color: Colors.red
                         font.pixelSize: 11
+                            layer.enabled: lockHelp.visible
+                            layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.60; color: helpGlowText6.color; transparentBorder: true }
                         wrapMode: Text.Wrap
                     }
                 }
@@ -1232,48 +1254,106 @@ Item {
             color: Colors.black
             border.width: 1
             border.color: Colors.orange
-            GohuText {
-                id: targetTitle
-                anchors.top: parent.top
-                anchors.topMargin: 14
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: workspace.killViewMode===workspace.killViewHunter ? "HUNTER" : "KILL"
-                color: Colors.red
-                font.pixelSize: 12
-            }
             Rectangle {
                 id: searchHeader
-                anchors.top: targetTitle.bottom
-                anchors.topMargin: 7
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 6
-                height: 27
+                objectName: "cpuPlusKillSearchHeader"
+                width: parent.width
+                height: 70
+                anchors.top: parent.top
                 color: Colors.black
-                border.color: Colors.red
+                Item {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 15
+                    anchors.rightMargin: 15
+                    anchors.topMargin: 9
+                    height: 22
+                    GohuText {
+                        id: targetTitle
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "KILL"
+                        font.pixelSize: 19
+                        color: Colors.red
+                    }
+                    SafeDropShadow {
+                        anchors.fill: targetTitle
+                        safeSource: targetTitle
+                        radius: 14
+                        samples: 11
+                        z: 2
+                        opacity: 0.75
+                        color: Colors.red
+                        transparentBorder: true
+                    }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: -15
+                        anchors.rightMargin: -15
+                        transform: Translate { y: 4 }
+                        height: 1
+                        color: Colors.red
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 3
+                            z: -1
+                            opacity: 0.38
+                            color: parent.color
+                        }
+                    }
+                }
                 TextInput {
                     id: processSearch
                     objectName: "cpuPlusKillSearch"
-                    anchors.fill: parent
-                    anchors.margins: 4
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 15
+                    anchors.rightMargin: 15
+                    anchors.bottomMargin: 3
+                    height: 22
                     font.family: "GohuFont 11 Nerd Font Mono"
-                    font.pixelSize: 14
+                    font.pixelSize: 18
+                    verticalAlignment: TextInput.AlignVCenter
                     color: Colors.magenta
                     selectionColor: Colors.yellow
                     selectedTextColor: Colors.black
+                    cursorVisible: activeFocus
+                    cursorDelegate: Item { width: 0; height: 0; visible: false; opacity: 0.0 }
                     clip: true
                     selectByMouse: true
                     readOnly: workspace.locallyPending || (!!workspace.gate && workspace.gate.busy)
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        horizontalOffset: 0
+                        verticalOffset: 0
+                        radius: 7
+                        samples: 9
+                        opacity: 0.30
+                        color: Colors.magenta
+                        transparentBorder: true
+                    }
                 }
-                GohuText {
+                AnimatedTextCursor {
+                    objectName: "cpuPlusKillAnimatedCursor"
+                    input: processSearch
+                }
+                Rectangle {
                     anchors.left: parent.left
-                    anchors.leftMargin: 4
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "SEARCH PROCESSES"
-                    color: Colors.white
-                    opacity: 0.45
-                    font.pixelSize: 10
-                    visible: processSearch.text.length===0 && !processSearch.activeFocus
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 1
+                    color: Colors.red
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 3
+                        z: -1
+                        opacity: 0.38
+                        color: parent.color
+                    }
                 }
             }
             HunterControls {
@@ -1295,8 +1375,8 @@ Item {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.leftMargin: 4
-                anchors.rightMargin: 14
-                anchors.bottomMargin: hunterControls.bottomSelectorHeight+18
+                anchors.rightMargin: 20
+                anchors.bottomMargin: hunterControls.bottomSelectorHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 highlightMoveDuration: 0
@@ -1334,26 +1414,34 @@ Item {
                     onWheel: function(wheel) { wheel.accepted=false; }
                 }
             }
+            Rectangle {
+                objectName: "cpuPlusKillListTopDivider"
+                x: 0; y: searchHeader.height + hunterControls.topSelectorHeight
+                width: parent.width; height: 1; color: Colors.red; z: 261
+            }
+            Rectangle {
+                objectName: "cpuPlusKillListBottomDivider"
+                x: 0; y: parent.height - hunterControls.bottomSelectorHeight
+                width: parent.width; height: 1; color: Colors.red; z: 271
+            }
             NeonScrollBar {
                 objectName: "cpuPlusKillTargetScroll"
                 flickable: targets
                 geometryMode: "viewport"
                 accountForContentOrigin: true
+                handleStyle: "star"
+                z: 300
+                topInset: 0
+                bottomInset: 0
+                y: searchHeader.height + hunterControls.topSelectorHeight
+                height: Math.max(0, targetBay.height - y - hunterControls.bottomSelectorHeight)
                 x: targetBay.width-width-3
                 visible: scrollable
                 railColor: Colors.red
                 handleColor: Colors.magenta
                 wheelEnabled: false
             }
-            GohuText {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: hunterControls.bottomSelectorHeight+2
-                text: String(workspace.filteredRows.length)+" TARGETS"
-                    + (workspace.bulkAvailable ? "" : " • BULK HOLD")
-                color: Colors.orange
-                font.pixelSize: 9
-            }
+
         }
 
         Rectangle {

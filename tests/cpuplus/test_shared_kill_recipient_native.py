@@ -22,7 +22,8 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
     shutil.copytree(ROOT / "components", config / "components")
     for name in ("TaskManagerView.qml", "TaskGraphController.qml",
                  "HunterControls.qml", "ProcessTargetRow.qml",
-                 "ProcessSafetyLock.qml"):
+                 "ProcessSafetyLock.qml", "ProcessInformationButton.qml",
+                 "ProcessInformationPanel.qml"):
         shutil.copy2(ROOT / "widgets/appcontrol" / name,
                      config / "widgets/appcontrol")
     shutil.copy2(ROOT / "widgets/cpuplus/CpuPlusKillWorkspace.qml",

@@ -655,7 +655,7 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: 8
-                height: 114
+                height: 54
                 color: Colors.black
                 border.color: Colors.cyan
                 border.width: 1
@@ -663,6 +663,7 @@ Item {
                 Column {
                     anchors.fill: parent
                     anchors.margins: 8
+                    anchors.rightMargin: 38
                     spacing: 4
                     GohuText {
                         width: parent.width
@@ -684,19 +685,14 @@ Item {
                         color: Colors.white
                         elide: Text.ElideRight
                     }
-                    GohuText {
-                        width: parent.width
-                        height: Math.max(0,parent.height-43)
-                        text: workspace.currentTask && workspace.appControlWindow.taskSimplePurpose
-                            ? workspace.appControlWindow.taskSimplePurpose(workspace.currentTask) : ""
-                        textFormat: Text.PlainText
-                        font.pixelSize: 10
-                        color: Colors.white
-                        opacity: 0.58
-                        wrapMode: Text.Wrap
-                        elide: Text.ElideRight
-                        clip: true
-                    }
+                }
+                ProcessInformationButton {
+                    objectName: "cpuPlusProcessInformationButton"
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    selected: cpuProcessInformation.open
+                    onLeftClicked: cpuProcessInformation.open = !cpuProcessInformation.open
                 }
             }
             Item {
@@ -771,6 +767,7 @@ Item {
                     searchInputTarget: processSearch
                     safetyLockComponent: safetyLock
                     actionTarget: rightActions
+                    viewportHeight: detailsScroll.height - 12
                 }
             }
             NeonScrollBar {
@@ -782,6 +779,22 @@ Item {
                 handleColor: Colors.magenta
                 wheelEnabled: false
             }
+            ProcessInformationPanel {
+                id: cpuProcessInformation
+                objectName: "cpuPlusProcessInformation"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: processStateHeader.bottom
+                anchors.margins: 6
+                maximumHeight: Math.max(0, instrumentBay.height * 0.55)
+                contextActive: workspace.active && !!workspace.currentTask
+                task: contextActive ? workspace.currentTask : null
+                purpose: open && contextActive && task && workspace.appControlWindow.taskSimplePurpose
+                    ? workspace.appControlWindow.taskSimplePurpose(task) : ""
+                scopeText: open && contextActive && task ? processView.scopeProcessText() : ""
+                virtualMemory: open && contextActive && task ? processView.formatMemory(task.vsz) : "?"
+            }
+
         }
 
         Rectangle {
@@ -931,7 +944,7 @@ Item {
                 Column {
                 id: actuatorBody
                 width: Math.max(0,actuatorScroll.width-14)
-                spacing: 12
+                spacing: 6
                 GohuText {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "PROCESS // ACTUATORS"
@@ -1020,7 +1033,7 @@ Item {
                     id: rightActions
                     objectName: "cpuPlusSharedActionTarget"
                     width: parent.width
-                    spacing: 12
+                    spacing: 6
                     visible: !!workspace.currentTask
                     enabled: workspace.exactTargetAvailable && !workspace.locallyPending
                 }

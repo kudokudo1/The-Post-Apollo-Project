@@ -232,12 +232,30 @@ ShellRoot {
                 if (!smoke.check(view.currentTask && view.currentTask.pid===3442
                     && detail.visible && header && header.visible
                     && master && master.visible && actionTarget
-                    && detail.restartAction.parent===actionTarget
-                    && detail.endAction.parent===actionTarget
+                    && detail.actionSection.parent===actionTarget
+                    && detail.restartAction.parent===detail.actionSection
+                    && detail.endAction.parent===detail.actionSection
+                    && detail.restartAction.y < detail.limitSlider.y
+                    && detail.limitSlider.y < detail.freezeAction.y
+                    && detail.freezeAction.y < detail.endAction.y
                     && search && hunter
                     && smoke.find(view,"cpuPlusKillTargetScroll")
                     && smoke.find(view,"cpuPlusKillDetailScroll"),
                     "shared detail, identity, controls, scrollbar mounting")) return;
+                const info=smoke.find(view,"cpuPlusProcessInformation");
+                const infoButton=smoke.find(view,"cpuPlusProcessInformationButton");
+                if (!smoke.check(info && infoButton && !info.visible && header.height===54,
+                    "compact identity with hidden shared information")) return;
+                info.open=true;
+                if (!smoke.check(info.visible && infoButton.selected
+                    && info.purpose==="Synthetic purpose"
+                    && smoke.find(info,"processInformationScope")
+                    && smoke.find(info,"processInformationArguments")
+                    && info.height<=info.maximumHeight,
+                    "bounded single-document information popup")) return;
+                info.open=false;
+                if (!smoke.check(!info.visible && !infoButton.selected,
+                    "information closes without action")) return;
                 if (!smoke.check(view.toggleLock(view.currentTask,"limit",false)
                     && view.lockMode(view.currentTask,"limit")==="once"
                     && view.toggleLock(view.currentTask,"limit",true)
@@ -250,6 +268,7 @@ ShellRoot {
                 if (!smoke.check(view.isTaskFavorite(view.currentTask)
                     && fakeOwner.favoriteStore.favoriteKeys[0]==="task|synthetic-worker",
                     "shared favorite identity")) return;
+                info.open=true;
                 const initial=detail.cpuCanvas.graphRevision;
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];
                 smoke.previousRevision=initial;
@@ -257,6 +276,10 @@ ShellRoot {
                 return;
             }
             if (smoke.phase===10) {
+                const info=smoke.find(view,"cpuPlusProcessInformation");
+                if (!smoke.check(info.open && info.visible,
+                    "same birth identity refresh preserves information popup")) return;
+                info.open=false;
                 if (!smoke.check(detail.cpuCanvas.graphRevision>smoke.previousRevision,
                     "new owner sample repaints shared detail")) return;
                 const observed=detail.presentationState.taskCpuHistory;
@@ -342,10 +365,14 @@ ShellRoot {
                 if (!smoke.check(view.prepareAction("end") && view.hasOwnedPending,
                     "prepare before process removal")) return;
                 smoke.lastRow = fakeOwner.taskRows[0];
+                smoke.find(view,"cpuPlusProcessInformation").open=true;
             fakeOwner.taskRows = [];
                 smoke.phase = 4;
                 return;
             }
+            if (!smoke.check(!smoke.find(view,"cpuPlusProcessInformation").open
+                && !smoke.find(view,"cpuPlusProcessInformation").visible,
+                "disappearing process closes information")) return;
             if (!smoke.check(!view.currentTask && !view.exactTargetAvailable
                 && !view.prepareAction("end") && !view.hasOwnedPending
                 && fakeGate.pending===null && fakeGate.cancels===2

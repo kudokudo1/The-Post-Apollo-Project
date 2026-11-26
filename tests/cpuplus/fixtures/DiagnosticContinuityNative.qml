@@ -578,7 +578,7 @@ ShellRoot {
                         && b.x-a.x>=74 && b.y-a.y>=87
                         && d.currentValue===value && String(d.accentColor).toLowerCase()===color;
                 };
-                if (!root.check(pair && pair.visible && workshop.storageMechanical && workshop.storageDialScale>=0.55
+                if (!root.check(pair && pair.visible && workshop.storageMechanical && workshop.storageDialWidth>=92
                     && rendered(sampleDial,workshop.storageSample,"#ed981a")
                     && rendered(reportDial,workshop.storageReport,"#c74ec7")
                     && [sampleDial,reportDial].every(d=>d.stopwatchFace && d.stopwatchLitSegments===30
@@ -587,10 +587,18 @@ ShellRoot {
                         && root.findItem(d,"automotiveGauge").visible
                         && root.findItem(d,"automotiveArm").visible
                         && root.findItem(d,"selectorAutomotiveDial").boundedArmReach===95
-                        && root.findItem(d,"instrumentChassis").width===136)
+                        && root.findItem(d,"instrumentChassis").width===d.automotivePlateSize
+                        && root.findItem(d,"instrumentChassis").screwSlotWidth>=1.5
+                        && root.findItem(d,"selectorAutomotiveDial").actualFaceDiameter>=72
+                        && root.findItem(d,"selectorAutomotiveDial").unitPixelSize>=9
+                        && root.findItem(d,"automotiveGauge").width===root.findItem(d,"selectorAutomotiveDial").actualFaceDiameter
+                        && root.findItem(d,"automotiveValueUnit").visible
+                        && root.findItem(d,"selectorDialReadableValue").visible
+                        && root.findItem(d,"selectorDialReadableValue").text.includes("SEC")
+                        && d.scale===1)
                     && !root.findItem(workshop,"cpuplusWorkshopStallThreshold").stopwatchFace
                     && !root.findItem(workshop,"cpuplusWorkshopTopThreads").stopwatchFace,
-                    "both mechanical dials have visible nonzero scaled geometry, actual values and semantic colors")) return;
+                    "both mechanical dials use allocated pixels, legible unit, Phillips slot and actual values")) return;
                 // Exercise the configurable variants on real mounted instruments.
                 const combinations=[["industrial","continuous","numbers","chamfered"],["capsule","dualRail","sparse","rounded"],["tapered","radialTeeth","none","square"],["tapered","segmented","ticks","square"]];
                 if(root.automotiveVariantIndex<combinations.length){
@@ -700,6 +708,7 @@ ShellRoot {
                         && d.stopwatchFraction<=1 && d.stopwatchLitSegments===Math.ceil(d.stopwatchFraction*30)
                         && root.findItem(d,"selectorStopwatchCenter").text===d.readoutText
                         && root.findItem(d,"selectorAutomotiveDial").boundedFraction===d.stopwatchFraction
+                        && root.findItem(d,"selectorDialReadableValue").visible
                         && root.findItem(d,"selectorAutomotiveDial").rotationDegrees===360*d.stopwatchFraction)
                     && sample.stopwatchSetSeconds===2 && report.stopwatchSetSeconds===4,
                     "live mechanical countdown face retains exact capture and independent cadence after resize")) return;

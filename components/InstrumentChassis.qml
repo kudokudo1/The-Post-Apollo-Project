@@ -8,6 +8,9 @@ Item {
     property string chassisStyle: "square"
     property bool showScrews: true
     property color structuralColor: Colors.cyan
+    // The cross is deliberately larger than a decorative rivet.
+    readonly property real screwDiameter: Math.min(12, Math.max(8, Math.round(Math.min(width,height)*0.105)))
+    readonly property real screwSlotWidth: Math.max(1.5, Math.round(screwDiameter*0.20))
     readonly property real safeClearance: Math.max(0, Math.min(40, clearance))
     implicitWidth: faceDiameter + 2*safeClearance
     implicitHeight: implicitWidth
@@ -51,12 +54,19 @@ Item {
             c.strokeStyle="#78858a"; c.lineWidth=1; c.stroke();
             outline(2.5); c.strokeStyle=root.structuralColor; c.globalAlpha=0.28; c.lineWidth=0.7; c.stroke(); c.globalAlpha=1;
             if (!root.showScrews) return;
-            const p=Math.min(7,w/8,h/8), rad=Math.min(3.5,p-1);
+            const rad=root.screwDiameter/2;
+            const p=Math.min(Math.max(rad+2,8),w/4,h/4);
             for(const x of [p,w-p]) for(const y of [p,h-p]) {
-                c.beginPath(); c.arc(x,y+0.6,rad+0.4,0,2*Math.PI); c.fillStyle="#08050c"; c.fill();
-                c.beginPath(); c.arc(x,y,rad,0,2*Math.PI); c.fillStyle="#17121e"; c.fill(); c.strokeStyle=root.structuralColor; c.lineWidth=0.65; c.stroke();
-                c.beginPath(); c.arc(x,y,rad*0.66,0,2*Math.PI); c.fillStyle="#78858a"; c.fill();
-                c.beginPath(); c.moveTo(x-rad*0.45,y); c.lineTo(x+rad*0.45,y); c.moveTo(x,y-rad*0.45); c.lineTo(x,y+rad*0.45); c.strokeStyle="#09060e"; c.lineWidth=0.9; c.stroke();
+                c.beginPath(); c.arc(x,y+0.6,rad+0.5,0,2*Math.PI); c.fillStyle="#08050c"; c.fill();
+                c.beginPath(); c.arc(x,y,rad,0,2*Math.PI); c.fillStyle="#b5c2c9"; c.fill();
+                c.strokeStyle="#526069"; c.lineWidth=0.8; c.stroke();
+                // High-contrast, square-ended Phillips recess, not a pinhole.
+                const slot=root.screwSlotWidth, span=rad*1.42;
+                c.fillStyle="#17121e";
+                c.fillRect(x-span/2,y-slot/2,span,slot);
+                c.fillRect(x-slot/2,y-span/2,slot,span);
+                c.beginPath(); c.arc(x,y,rad-0.8,Math.PI,Math.PI*1.5);
+                c.strokeStyle="#edf5f8"; c.lineWidth=0.8; c.stroke();
             }
         }
     }

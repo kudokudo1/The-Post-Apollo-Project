@@ -364,7 +364,7 @@ assert.match(ui,/filterTarget: root.workshopFilterTarget/);
 assert.match(read("components/SelectorSlider.qml"),/property bool responsiveHardware: false/);
 assert.match(read("components/SelectorSlider.qml"),/property bool energizedValueFill: false/);
 
-assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialScale>=0.55/);
+assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialWidth>=92/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorage-sample-dial"/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorage-report-dial"/);
 assert.doesNotMatch(workshop,/storageDialCell/);
@@ -398,3 +398,15 @@ assert.match(read("components/qmldir"),/AutomotiveDial 1\.0 AutomotiveDial\.qml/
 assert.match(stopwatchDialSource,/stopwatchLitSegments: Math.ceil\(30\*stopwatchVisualFraction\)/);
 assert.equal((workshop.match(/stopwatchFace: true/g)||[]).length,2);
 assert.equal((workshop.match(/stopwatchFraction: stopwatch \? stopwatch.fraction : -1/g)||[]).length,2);
+
+// Responsive components draw in their allocated pixel geometry, never a shrunk face texture.
+assert.doesNotMatch(automotive,/width: 216; height: 216|scale: Math.min\(root.faceDiameter/);
+assert.doesNotMatch(workshop,/scale: root.storageDialScale/);
+assert.match(automotive,/width: root.actualFaceDiameter; height: width/);
+assert.match(automotive,/readonly property string detailTier:/);
+assert.match(automotive,/readonly property int unitPixelSize: Math.max\(9,/);
+assert.match(automotive,/function cut\(m,k,fill,stroke\)/);
+assert.match(chassis,/readonly property real screwSlotWidth: Math.max\(1.5,/);
+assert.match(chassis,/c.fillRect\(x-span\/2,y-slot\/2,span,slot\)/);
+assert.match(chassis,/c.fillRect\(x-slot\/2,y-span\/2,slot,span\)/);
+assert.match(stopwatchDialSource,/objectName: "selectorDialReadableValue"/);

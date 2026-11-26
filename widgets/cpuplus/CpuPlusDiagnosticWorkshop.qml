@@ -18,17 +18,20 @@ Column {
         return qs && system ? "TARGET // QS + USER" : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
     }
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
-    readonly property int instrumentHeight: compactLayout ? 112 : 176
+    readonly property int instrumentHeight: compactLayout ? 112 : Math.min(240,176+Math.floor(Math.max(0,viewportHeight-540)*0.35))
     readonly property int filterSize: compactLayout ? 24 : 32
     readonly property int filterGap: compactLayout ? 3 : 4
     readonly property int filterWidth: Math.min(filterSize,Math.max(16,Math.floor((width-68-5*filterGap)/5)))
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
-    readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(288,Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
-    readonly property real storageDialScale: Math.max(0,Math.min(1,(storageWidth-16)/272,(instrumentHeight-23)/160))
+    readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(Math.max(288,2*(instrumentHeight-57)+18),Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
+    readonly property int storageDialWidth: Math.max(0,Math.floor(Math.min(180,(storageWidth-18)/2,instrumentHeight-57)))
+    readonly property int storageDialHeight: storageDialWidth+34
     readonly property bool smallestStorageLayout: width<340 && viewportHeight<380
-    readonly property bool storageMechanical: !smallestStorageLayout && storageDialScale>=0.55
+    // A 92px mounted dial gives the face at least 72 actual logical pixels.
+    // Below that size use the existing readable digital controls instead.
+    readonly property bool storageMechanical: !smallestStorageLayout && storageDialWidth>=92
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property int storageSample: draft.storageSampleSeconds || 1
@@ -257,7 +260,8 @@ Column {
             SelectorDial {
                 objectName: "cpuplusWorkshopTopThreads"
                 anchors.centerIn: parent
-                scale: Math.min(1.1, parent.width/width, parent.height/height)
+                width: Math.max(0,Math.min(parent.width,parent.height-24,180))
+                height: width+24
                 labelText: "TOP THREADS"
                 options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
                 displayOptions: options
@@ -407,20 +411,19 @@ Column {
                     objectName: "cpuplusWorkshopStorageDialPair"
                     visible: root.storageMechanical
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: visible ? 272*root.storageDialScale+2 : 0
-                    height: visible ? 160*root.storageDialScale : 0
+                    width: visible ? 2*root.storageDialWidth+2 : 0
+                    height: visible ? root.storageDialHeight : 0
                     spacing: 2
                     // Fixed instruments, not model delegates. Each sourceComponent
                     // closes over the workshop itself and has a real sized loader.
                     Item {
-                        width: 136*root.storageDialScale
-                        height: 160*root.storageDialScale
+                        width: root.storageDialWidth
+                        height: root.storageDialHeight
                         Loader {
                             anchors.centerIn: parent
                             active: root.storageMechanical && root.draft.selected.includes("storage")
-                            width: 136
-                            height: 160
-                            scale: root.storageDialScale
+                            width: root.storageDialWidth
+                            height: root.storageDialHeight
                             sourceComponent: SelectorDial {
                                 objectName: "cpuplusWorkshopStorage-sample-dial"
                                 readonly property var stopwatch: root.countdown("sample")
@@ -468,14 +471,13 @@ Column {
                         }
                     }
                     Item {
-                        width: 136*root.storageDialScale
-                        height: 160*root.storageDialScale
+                        width: root.storageDialWidth
+                        height: root.storageDialHeight
                         Loader {
                             anchors.centerIn: parent
                             active: root.storageMechanical && root.draft.selected.includes("storage")
-                            width: 136
-                            height: 160
-                            scale: root.storageDialScale
+                            width: root.storageDialWidth
+                            height: root.storageDialHeight
                             sourceComponent: SelectorDial {
                                 objectName: "cpuplusWorkshopStorage-report-dial"
                                 readonly property var stopwatch: root.countdown("report")
@@ -552,7 +554,8 @@ Column {
             SelectorDial {
                 objectName: "cpuplusWorkshopStallThreshold"
                 anchors.centerIn: parent
-                scale: Math.min(1.1,parent.width/width,parent.height/height)
+                width: Math.max(0,Math.min(parent.width,parent.height-24,180))
+                height: width+24
                 labelText: "STALL THRESHOLD"
                 options: ["150","500","1000","1500","2000"]
                 displayOptions: options

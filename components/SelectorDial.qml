@@ -15,6 +15,11 @@ Item {
     property string chassisStyle: "square"
     property real chassisClearance: 10
     property bool showChassisScrews: true
+    readonly property real mountingClearance: showInstrumentChassis ? Math.max(0,Math.min(40,chassisClearance)) : 0
+    // Legacy knob artwork keeps its original coordinate/input mapping; the
+    // mount and labels are sized in the actual allocated logical pixels.
+    readonly property real legacyStageScale: Math.max(0.01,Math.min(width/136,height/160,(width-2*mountingClearance)/106,(height-34-2*mountingClearance)/106))
+    readonly property real automotivePlateSize: Math.max(0,Math.floor(Math.min(width,height-34)))
     property string stopwatchArmStyle: "tapered"
     property real stopwatchArmReach: 95
     property string stopwatchGaugeStyle: "segmented"
@@ -584,7 +589,11 @@ Item {
         }
 
         text: dialRoot.labelText
-        font.pixelSize: dialRoot.titlePixelSize
+        width: parent.width-2
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: Math.min(dialRoot.titlePixelSize,Math.max(10,Math.floor(dialRoot.width*0.12)))
+        fontSizeMode: Text.HorizontalFit
+        minimumPixelSize: 9
         color: dialRoot.titleColor
 
         layer.enabled: true
@@ -596,28 +605,26 @@ Item {
         }
     }
 
+    // The shared mounting plate is a sibling of the legacy transformed knob,
+    // so its screw slots are rasterized at actual layout size.
+    Loader {
+        anchors.centerIn: dialStage
+        active: dialRoot.showInstrumentChassis && !dialRoot.stopwatchFace
+        sourceComponent: InstrumentChassis {
+            faceDiameter: 106*dialRoot.legacyStageScale
+            clearance: dialRoot.mountingClearance
+            chassisStyle: dialRoot.chassisStyle
+            showScrews: dialRoot.showChassisScrews
+        }
+    }
+
     Item {
         id: dialStage
-
-        anchors {
-            top: parent.top
-            topMargin: dialRoot.stopwatchFace ? 24 : 18
-            horizontalCenter: parent.horizontalCenter
-        }
-
-        width: 116
-        height: 116
-
-        Loader {
-            anchors.centerIn: parent
-            active: dialRoot.showInstrumentChassis && !dialRoot.stopwatchFace
-            sourceComponent: InstrumentChassis {
-                faceDiameter: 106
-                clearance: dialRoot.chassisClearance
-                chassisStyle: dialRoot.chassisStyle
-                showScrews: dialRoot.showChassisScrews
-            }
-        }
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: dialRoot.stopwatchFace ? 0 : -4
+        width: dialRoot.stopwatchFace ? dialRoot.automotivePlateSize : 116
+        height: width
+        scale: dialRoot.stopwatchFace ? 1 : dialRoot.legacyStageScale
 
         // Deep dock well.
         Rectangle {
@@ -1066,7 +1073,7 @@ Item {
             active: dialRoot.stopwatchFace
             sourceComponent: AutomotiveDial {
                 objectName: "selectorAutomotiveDial"
-                faceDiameter: 116
+                faceDiameter: Math.max(0,dialStage.width-2*dialRoot.mountingClearance)
                 armStyle: dialRoot.stopwatchArmStyle
                 armReach: dialRoot.stopwatchArmReach
                 gaugeStyle: dialRoot.stopwatchGaugeStyle
@@ -1081,7 +1088,7 @@ Item {
                 flash: dialRoot.stopwatchFlash
                 valueText: dialRoot.readoutText
                 valueUnit: dialRoot.readoutUnit
-                setText: "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds+" <font color='"+Colors.white+"'>SEC</font>"
+                setText: "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds
                 scaleMinimum: dialRoot.minimumValue
                 scaleMaximum: dialRoot.maximumValue
             }
@@ -1093,8 +1100,8 @@ Item {
             // Flickable must never steal a rotation midway through a drag.
             preventStealing: true
             anchors.centerIn: parent
-            width: 90
-            height: 90
+            width: dialRoot.stopwatchFace ? Math.max(0,dialStage.width-2*dialRoot.mountingClearance) : 90
+            height: width
 
             enabled: dialRoot.interactive
             hoverEnabled: true
@@ -1228,9 +1235,9 @@ Item {
         // Git spatial navigator and while it owns direct dial focus.
         Rectangle {
             anchors.centerIn: parent
-            width: 110
-            height: 110
-            radius: 55
+            width: dialRoot.stopwatchFace ? Math.max(0,dialStage.width-2*dialRoot.mountingClearance) : 110
+            height: width
+            radius: width/2
             color: "transparent"
             border.width:
                 dialRoot.activeFocus || dialRoot.keyboardSelected
@@ -1253,18 +1260,19 @@ Item {
         }
 
         width: parent.width - 6
-        visible: !dialRoot.stopwatchFace
-        text: dialRoot.stopwatchFace ? "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds+" <font color='"+Colors.white+"'>SEC</font>"
-            : dialRoot.readoutUnit === "" ? dialRoot.readoutText
+        objectName: "selectorDialReadableValue"
+        text: dialRoot.readoutUnit === "" ? dialRoot.readoutText
             : dialRoot.readoutText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
                 + ' <font color="'+Colors.white+'">'+dialRoot.readoutUnit.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</font>'
-        textFormat: dialRoot.stopwatchFace || dialRoot.readoutUnit !== "" ? Text.RichText : Text.AutoText
+        textFormat: dialRoot.readoutUnit !== "" ? Text.RichText : Text.PlainText
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        font.pixelSize: dialRoot.stopwatchFace ? 12 : dialRoot.readoutPixelSize
+        font.pixelSize: dialRoot.stopwatchFace ? Math.max(12,Math.min(18,Math.floor(dialRoot.width*0.13))) : Math.min(dialRoot.readoutPixelSize,Math.max(10,Math.floor(dialRoot.width*0.15)))
+        fontSizeMode: Text.HorizontalFit
+        minimumPixelSize: 9
         color: dialRoot.interactive || dialRoot.readoutGlowEnabled ? dialRoot.readoutColor : Colors.orange
         opacity: dialRoot.interactive ? 1.0 : 0.78
-        layer.enabled: dialRoot.readoutGlowEnabled
+        layer.enabled: dialRoot.readoutGlowEnabled && !dialRoot.stopwatchFace
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowColor: dialRoot.readoutColor

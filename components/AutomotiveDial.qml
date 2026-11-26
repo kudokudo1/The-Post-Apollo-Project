@@ -29,7 +29,15 @@ Item {
     readonly property string resolvedArmStyle: ["tapered","industrial","capsule"].includes(armStyle) ? armStyle : "tapered"
     readonly property real boundedFraction: Number.isFinite(fraction) ? Math.max(0,Math.min(1,fraction)) : 0
     readonly property real boundedArmReach: Number.isFinite(armReach) ? Math.max(65,Math.min(95,armReach)) : 95
-    readonly property int litSegments: Math.ceil(30*boundedFraction)
+    readonly property int litSegments: Math.ceil(segmentCount*boundedFraction)
+    readonly property real actualFaceDiameter: Math.max(0,Math.min(faceDiameter,Math.min(width,height)-(showChassis?2*Math.max(0,Math.min(40,chassisClearance)):0)))
+    readonly property real faceUnit: actualFaceDiameter/216
+    readonly property string detailTier: actualFaceDiameter>=150?"large":actualFaceDiameter>=105?"medium":actualFaceDiameter>=72?"small":"compact"
+    readonly property int segmentCount: detailTier==="large"?30:detailTier==="medium"?24:detailTier==="small"?18:12
+    readonly property int tickCount: detailTier==="large"?60:detailTier==="medium"?30:12
+    readonly property int teethCount: detailTier==="large"?60:detailTier==="medium"?40:detailTier==="small"?24:12
+    readonly property int valuePixelSize: Math.max(12,Math.round(actualFaceDiameter*0.18))
+    readonly property int unitPixelSize: Math.max(9,Math.round(actualFaceDiameter*0.085))
     readonly property color liveColor: flash ? Colors.white : accentColor
     implicitWidth: faceDiameter + (showChassis ? 2*Math.max(0,Math.min(40,chassisClearance)) : 0)
     implicitHeight: implicitWidth
@@ -39,7 +47,7 @@ Item {
     InstrumentChassis {
         anchors.centerIn: parent
         visible: root.showChassis
-        faceDiameter: root.faceDiameter
+        faceDiameter: root.actualFaceDiameter
         clearance: root.chassisClearance
         chassisStyle: root.chassisStyle
         showScrews: root.showScrews
@@ -50,8 +58,8 @@ Item {
         id: face
         objectName: "selectorStopwatchFace"
         anchors.centerIn: parent
-        width: 216; height: 216
-        scale: Math.min(root.faceDiameter,root.width,root.height)/216
+        width: root.actualFaceDiameter; height: width
+        visible: width>0
         Canvas {
             id: gauge
             objectName: "automotiveGauge"
@@ -59,6 +67,8 @@ Item {
             property bool hasPainted: false
             onPainted: hasPainted = true
             onAvailableChanged: if (available) requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
             Connections {
                 target: root
                 function onBoundedFractionChanged() { gauge.requestPaint() }
@@ -73,11 +83,14 @@ Item {
             }
             onPaint: {
                 const c=getContext("2d"), tau=2*Math.PI, f=root.boundedFraction;
-                c.reset(); c.clearRect(0,0,width,height); c.translate(108,108);
+                c.reset(); c.clearRect(0,0,width,height);
+                if(width<=0)return;
+                const u=width/216;
+                c.translate(width/2,height/2); c.scale(u,u);
                 function ring(r,fill,stroke,w) {
                     c.beginPath(); c.arc(0,0,r,0,tau);
                     if(fill) {c.fillStyle=fill;c.fill();}
-                    if(stroke) {c.strokeStyle=stroke;c.lineWidth=w;c.stroke();}
+                    if(stroke) {c.strokeStyle=stroke;c.lineWidth=Math.max(w,0.85/u);c.stroke();}
                 }
                 function arc(r,w,color,amount) {
                     if(amount<=0)return;
@@ -95,30 +108,33 @@ Item {
                         const w=root.gaugeStyle==="dualRail" ? 5 : 14;
                         arc(r,w,"#39283f",1); arc(r,w,root.liveColor,f);
                     }
-                    if(root.gaugeStyle==="dualRail") for(let i=0;i<30;i++){
-                        c.save();c.rotate(i*tau/30);c.fillStyle="#09060e";c.fillRect(-1,-102,2,16);c.restore();
+                    if(root.gaugeStyle==="dualRail") for(let i=0;i<root.segmentCount;i++){
+                        c.save();c.rotate(i*tau/root.segmentCount);c.fillStyle="#09060e";const gap=Math.max(2,1/u);c.fillRect(-gap/2,-102,gap,16);c.restore();
                     }
                 } else {
-                    const teeth=root.gaugeStyle==="radialTeeth", n=teeth?60:30;
+                    const teeth=root.gaugeStyle==="radialTeeth", n=teeth?root.teethCount:root.segmentCount;
                     for(let i=0;i<n;i++) {
                         c.save();c.rotate(i*tau/n);
                         c.fillStyle=i<Math.ceil(f*n)?root.liveColor:"#39283f";
-                        const w=teeth?(i%5===0?5:2.8):12;
-                        c.fillRect(-w/2,-100,w,teeth?(i%5===0?17:10):15);
+                        const major=i%Math.max(1,Math.floor(n/12))===0;
+                        const w=teeth?Math.max(major?5:2.8,1.1/u):Math.min(18,2*Math.PI*93/n-2/u);
+                        c.fillRect(-w/2,-100,w,teeth?(major?17:10):15);
                         c.restore();
                     }
                 }
                 ring(82,null,root.structuralColor,1);
-                ring(79,null,"#78858a",0.8);
+                if(root.detailTier==="large" || root.detailTier==="medium") ring(79,null,"#78858a",0.8);
                 ring(70,"#120c19",root.accentColor,0.8);
-                c.globalAlpha=0.45;ring(63,null,root.accentColor,0.8);c.globalAlpha=1;
-                if(root.scaleStyle!=="none") for(let i=0;i<60;i++){
-                    c.save();c.rotate(i*tau/60);c.fillStyle=i%5===0?Colors.white:root.accentColor;
-                    c.globalAlpha=i%5===0?0.9:0.45;c.fillRect(-0.6,-77,1.2,i%5===0?7:3);c.restore();
+                if(root.detailTier==="large"){c.globalAlpha=0.65;ring(63,null,root.accentColor,0.8);c.globalAlpha=1;}
+                if(root.scaleStyle!=="none") for(let i=0;i<root.tickCount;i++){
+                    const major=root.tickCount<=12 || i%Math.max(1,Math.floor(root.tickCount/12))===0;
+                    const tickWidth=Math.max(major?2:1.2,(major?1.25:0.8)/u);
+                    c.save();c.rotate(i*tau/root.tickCount);c.fillStyle=major?Colors.white:root.accentColor;
+                    c.globalAlpha=major?1:0.75;c.fillRect(-tickWidth/2,-77,tickWidth,major?9:4);c.restore();
                 }
                 if(root.scaleStyle==="numbers" || root.scaleStyle==="sparse"){
-                    const n=root.scaleStyle==="sparse"?3:5;
-                    c.fillStyle=Colors.white;c.font="11px monospace";c.textAlign="center";c.textBaseline="middle";
+                    const n=root.scaleStyle==="sparse"||root.detailTier==="small"||root.detailTier==="compact"?3:5;
+                    c.fillStyle=Colors.white;c.font=Math.max(12,9/u)+"px monospace";c.textAlign="center";c.textBaseline="middle";
                     for(let i=0;i<n;i++){
                         const a=i*tau/n;
                         c.fillText(String(Number((root.scaleMinimum+(root.scaleMaximum-root.scaleMinimum)*i/n).toFixed(2))),55*Math.sin(a),-55*Math.cos(a));
@@ -126,48 +142,84 @@ Item {
                 }
             }
         }
-        // Recessed readout layers MUST precede the rotating arm.
-        Rectangle {
+        // Real-pixel chamfered windows, rendered behind the arm.
+        Item {
+            id: valueWindow
+            objectName: "automotiveValueWindow"
             visible: root.showValue
-            x: 64; y: 57; width: 88; height: 31
-            color: "#33263d"; border.color: "#514354"
-            Rectangle {
-                anchors.fill: parent; anchors.margins: 3
-                color: "#07040b"; border.color: root.accentColor
-                GohuText {
-                    objectName: "selectorStopwatchCenter"
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 2
-                    text: root.valueText
-                    color: root.liveColor
-                    font.pixelSize: text.length>4?18:29
-                    width: parent.width-(root.valueUnit!==""?24:4)
-                    horizontalAlignment: Text.AlignHCenter
-                    fontSizeMode: Text.Fit
-                    minimumPixelSize: 12
-                }
-                GohuText {
-                    anchors.right: parent.right; anchors.rightMargin: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: root.valueUnit!==""
-                    text: root.valueUnit; color: Colors.white; font.pixelSize: 10
+            width: Math.round(face.width*0.64)
+            height: Math.max(24,Math.round(face.height*0.27))
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.round(face.height*0.15)
+            Canvas {
+                id: valueFrame
+                anchors.fill: parent
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onAvailableChanged: if(available) requestPaint()
+                Connections {target: root; function onAccentColorChanged(){valueFrame.requestPaint()}}
+                onPaint: {
+                    const c=getContext("2d"); c.reset();c.clearRect(0,0,width,height);
+                    function cut(m,k,fill,stroke){
+                        const x=m,y=m,b=width-m,d=height-m;
+                        if(b-x<=2*k || d-y<=2*k)return;
+                        c.beginPath();c.moveTo(x+k,y);c.lineTo(b-k,y);c.lineTo(b,y+k);
+                        c.lineTo(b,d-k);c.lineTo(b-k,d);c.lineTo(x+k,d);c.lineTo(x,d-k);c.lineTo(x,y+k);c.closePath();
+                        c.fillStyle=fill;c.fill();c.strokeStyle=stroke;c.lineWidth=1;c.stroke();
+                    }
+                    cut(0.5,Math.max(2,Math.round(height*0.16)),"#33263d","#78858a");
+                    cut(2,Math.max(1,Math.round(height*0.10)),"#07040b",root.accentColor);
                 }
             }
+            GohuText {
+                objectName: "selectorStopwatchCenter"
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: root.valueUnit!==""?1:Math.max(0,(parent.height-height)/2)
+                width: parent.width-6
+                text: root.valueText
+                color: root.liveColor
+                font.pixelSize: root.valuePixelSize
+                horizontalAlignment: Text.AlignHCenter
+                fontSizeMode: Text.HorizontalFit
+                minimumPixelSize: 10
+            }
+            GohuText {
+                objectName: "automotiveValueUnit"
+                visible: root.valueUnit!==""
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 2
+                text: root.valueUnit; color: Colors.white; font.pixelSize: root.unitPixelSize
+            }
         }
-        Rectangle {
+        Item {
+            id: setWindow
             visible: root.showSetValue && root.setText!==""
-            x: 66; y: 140; width: 84; height: 23
-            color: "#09060e"; border.color: root.structuralColor
+            width: Math.round(face.width*0.58)
+            height: Math.max(13,Math.round(face.height*0.14))
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.round(face.height*0.66)
+            Canvas {
+                anchors.fill: parent
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onAvailableChanged: if(available) requestPaint()
+                id: setFrame
+                Connections {target:root; function onStructuralColorChanged(){setFrame.requestPaint()}}
+                onPaint: {
+                    const c=getContext("2d"),k=Math.max(2,Math.round(height*0.2)),b=width-0.5,d=height-0.5;
+                    c.reset();c.clearRect(0,0,width,height);
+                    c.beginPath();c.moveTo(k,0.5);c.lineTo(b-k,0.5);c.lineTo(b,k);c.lineTo(b,d-k);c.lineTo(b-k,d);c.lineTo(k,d);c.lineTo(0.5,d-k);c.lineTo(0.5,k);c.closePath();
+                    c.fillStyle="#09060e";c.fill();c.strokeStyle=root.structuralColor;c.lineWidth=1;c.stroke();
+                }
+            }
             GohuText {
                 anchors.centerIn: parent
                 width: parent.width-4
                 horizontalAlignment: Text.AlignHCenter
-                text: root.setText
-                textFormat: Text.RichText
-                color: root.accentColor
-                font.pixelSize: 12
-                fontSizeMode: Text.Fit
-                minimumPixelSize: 8
+                text: root.setText; textFormat: Text.RichText; color: root.accentColor
+                font.pixelSize: Math.max(9,Math.round(face.width*0.08))
+                fontSizeMode: Text.HorizontalFit; minimumPixelSize: 8
                 elide: Text.ElideRight
             }
         }
@@ -181,6 +233,8 @@ Item {
                 anchors.fill: parent
                 property bool hasPainted: false
                 onPainted: hasPainted = true
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
                 onAvailableChanged: if(available) requestPaint()
                 Connections {
                     target: root
@@ -189,8 +243,12 @@ Item {
                     function onLiveColorChanged() {arm.requestPaint()}
                 }
                 onPaint: {
-                    const c=getContext("2d"), r=root.boundedArmReach-1;
-                    c.reset();c.clearRect(0,0,width,height);c.translate(108,108);
+                    const c=getContext("2d");
+                    c.reset();c.clearRect(0,0,width,height);
+                    if(width<=0)return;
+                    const u=width/216;
+                    const r=Math.max(1,root.boundedArmReach-Math.max(2,0.4/u+1));
+                    c.translate(width/2,height/2);c.scale(u,u);
                     const tapered=root.resolvedArmStyle==="tapered";
                     const half=root.resolvedArmStyle==="industrial"?14:11;
                     const tip=Math.sqrt(r*r-half*half);
@@ -207,7 +265,7 @@ Item {
                         }
                     }
                     body(3);c.fillStyle="#647178";c.fill();
-                    body(0);c.fillStyle="#d4dfe3";c.fill();c.strokeStyle="#97a6ad";c.lineWidth=1;c.stroke();
+                    body(0);c.fillStyle="#d4dfe3";c.fill();c.strokeStyle="#97a6ad";c.lineWidth=Math.max(1,0.8/u);c.stroke();
                     c.fillStyle="#30323c";
                     if(tapered) {
                         c.beginPath();c.moveTo(0,-r+9);c.lineTo(5,-r+21);c.lineTo(8,-35);c.lineTo(-8,-35);c.lineTo(-5,-r+21);c.closePath();c.fill();
@@ -217,17 +275,17 @@ Item {
                         c.fillStyle=root.liveColor;c.fillRect(-half+7,-tip+9,2*half-14,tip-45);
                     }
                     c.strokeStyle="#78858a";c.lineWidth=2;
-                    for(const y of [-27,-21,-15]){c.beginPath();c.moveTo(-7,y);c.lineTo(7,y);c.stroke();}
+                    for(const y of (root.detailTier==="large"||root.detailTier==="medium"?[-27,-21,-15]:[-22])){c.beginPath();c.moveTo(-7,y);c.lineTo(7,y);c.stroke();}
                 }
             }
         }
         Rectangle {
-            anchors.centerIn: parent; width:34; height:34; radius:17
+            anchors.centerIn: parent; width:Math.max(8,34*root.faceUnit); height:width; radius:width/2
             color:"#78858a";border.color:"#b2c0c4"
             Rectangle {
-                anchors.centerIn:parent; width:24;height:24;radius:12
+                anchors.centerIn:parent; width:parent.width*0.70;height:width;radius:width/2
                 color:"#241a29";border.color:"#d4dfe3"
-                Rectangle {anchors.centerIn:parent;width:14;height:14;radius:7;color:"#09060e";border.color:root.accentColor;border.width:2}
+                Rectangle {anchors.centerIn:parent;width:parent.width*0.58;height:width;radius:width/2;color:"#09060e";border.color:root.accentColor;border.width:2}
             }
         }
     }

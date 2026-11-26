@@ -14,6 +14,10 @@ import "../../components"
     required property var searchInputTarget
     required property Component safetyLockComponent
 
+    // Optional recipient-owned actuator column. Default preserves AppControl's
+    // exact existing inline layout and action aliases.
+    property Item actionTarget: null
+
     property alias cpuCanvas: taskCpuCanvas
     property alias combiScoreCanvas: taskCombiScoreCanvas
     property alias memCanvas: taskMemCanvas
@@ -1109,6 +1113,7 @@ import "../../components"
                 // KILLING ACTIONS sit immediately below the graphs.
 Item {
                     id: taskTerminationHeaderBox
+                    parent: taskManagerBody.actionTarget || taskManagerBody
 
                     width: parent.width
                     height: 30
@@ -1217,6 +1222,7 @@ Item {
 
                 ActionButton {
                     id: taskRestartAction
+                    parent: taskManagerBody.actionTarget || taskManagerBody
                     width: parent.width - 10
                     height: 34
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -1323,6 +1329,7 @@ Item {
 
                 Rectangle {
                     id: taskLimitSlider
+                    parent: taskManagerBody.actionTarget || taskManagerBody
 
                     width: parent.width - 10
                     height: 34
@@ -1725,6 +1732,7 @@ Item {
 
                 ActionButton {
                     id: taskFreezeAction
+                    parent: taskManagerBody.actionTarget || taskManagerBody
 
                     width: parent.width - 10
                     height: 34
@@ -1870,6 +1878,7 @@ Item {
 
                 ActionButton {
                     id: taskEndAction
+                    parent: taskManagerBody.actionTarget || taskManagerBody
                     property bool clickFirePulse: false
                     Timer {
                         id: taskEndFireTimer
@@ -2033,6 +2042,7 @@ Item {
 
                                 Rectangle {
                     id: taskProcessScopeInfo
+                    parent: taskManagerBody.actionTarget || taskManagerBody
                     width: parent.width - 10
                     height: 112
                     anchors.horizontalCenter: parent.horizontalCenter

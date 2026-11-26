@@ -59,3 +59,54 @@ test("shared gate verifies process birth identity on commit, not only UI selecti
     assert.match(gate, /print\('MATCH' if actual==comm and int\(fields\[19\]\)==born else 'STALE'\)/);
     assert.match(gate, /PROCESS IDENTITY NOT VERIFIED \/\/ NO ACTION/);
 });
+
+test("recipient mounts actual donor Hunter controls, all filter rails, search and scrollbars", () => {
+    assert.match(recipient, /HunterControls\s*\{[\s\S]*?controller: workspace/);
+    assert.match(recipient, /id: processSearch/);
+    assert.match(recipient, /\[row\.comm,row\.args,row\.user,row\.pid,row\.ppid,row\.state\]/);
+    for(const key of ["hunterMetricCombined","hunterMetricCpu","hunterMetricMemory","hunterMetricIo","hunterMetricAge",
+        "hunterVisibilityTargets","hunterVisibilityProtected","hunterVisibilityAll"])
+        assert.ok(recipient.includes(key));
+    assert.match(recipient,/model: liveTargetModel/);
+    assert.match(recipient,/ScriptModel\s*\{[\s\S]*?objectProp: "id"/);
+    assert.match(recipient,/modelBlank=true;[\s\S]*?modelBlank=false;/);
+    assert.match(recipient,/acceptedButtons: Qt.NoButton[\s\S]*?targets.indexAt/);
+    assert.match(recipient,/if \(sameTarget\(row\)\) return true/);
+    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillDetailScroll","cpuPlusKillActuatorScroll"])
+        assert.ok(recipient.includes(name));
+    assert.match(recipient,/function killAllEligibleTasks\(\) \{ return \[\]; \}/);
+    assert.match(recipient,/BULK HOLD/);
+});
+
+test("recipient restores existing owner graph and favorite semantics", () => {
+    const row = read("widgets/appcontrol/ProcessTargetRow.qml");
+    assert.match(recipient,/TaskGraphController\s*\{/);
+    assert.match(recipient,/details\.cpuCanvas\.requestPaint\(true\)/);
+    assert.match(recipient,/details\.combiScoreCanvas\.requestPaint\(true\)/);
+    assert.match(recipient,/detailGraph\.appendSelectedTaskHunterHistories/);
+    assert.match(recipient,/appControlWindow\.taskMiniCpuHistories/);
+    assert.match(recipient,/appControlWindow\.taskMiniHunterMetricHistories/);
+    assert.match(row,/width: 82/);
+    assert.match(row,/mini\.combi/);
+    assert.match(row,/root\.controller\.miniGraphPoints/);
+    assert.match(row,/root\.favorite \? "✦" : "✧"/);
+    assert.match(recipient,/appControlWindow\.taskFavoriteKey\(row\)/);
+    assert.match(recipient,/ownerFavoriteStore\.favoriteKeys=next/);
+    assert.match(recipient,/appControlWindow\.toggleTaskMetricFavorite/);
+    assert.doesNotMatch(recipient,/new ProcessTelemetry/);
+});
+
+test("master and per-action lock state is rendered with donor glyphs and exact-owner gating", () => {
+    const lock = read("widgets/appcontrol/ProcessSafetyLock.qml");
+    assert.match(lock,/root\.stickyUnlocked \? "" : root\.unlocked \? "☍" : ""/);
+    assert.match(lock,/acceptedButtons: Qt.LeftButton \| Qt.RightButton/);
+    assert.match(lock,/!root\.masterUnlocked/);
+    assert.match(recipient,/objectName: "cpuPlusProcessMasterLock"/);
+    assert.match(recipient,/function canChangeLock\(row\)[\s\S]*?exactTargetAvailable[\s\S]*?!gate\.pending && !gate\.busy/);
+    assert.match(recipient,/appControlWindow\.taskDangerActionUnlockMode/);
+    assert.match(recipient,/appControlWindow\.toggleTaskDangerActionStickyUnlock/);
+    assert.match(recipient,/appControlWindow\.toggleTaskDangerStickyUnlock/);
+    assert.match(donorView,/property Item actionTarget: null/);
+    assert.match(recipient,/actionTarget: rightActions/);
+    assert.equal((donorView.match(/parent: taskManagerBody\.actionTarget \|\| taskManagerBody/g)||[]).length,6);
+});

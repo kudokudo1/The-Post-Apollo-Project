@@ -433,6 +433,7 @@ Item {
         height: visible ? implicitHeight : 0
         GohuText {
             width: parent.width
+            visible: root.page !== "DIAG"
             text: "MEMORY // " + root.menuTitles[root.menuIndex]
             color: Colors.magenta
             font.pixelSize: 11
@@ -444,7 +445,7 @@ Item {
             GohuText {
                 width: Math.max(0,parent.width-(workRefresh.visible ? 72+parent.spacing : 0))
                 height: Math.max(workRefresh.visible ? 26 : 14,implicitHeight)
-                text: "SOURCE // " + root.status
+                text: (root.page === "DIAG" ? "DIAG // " : "SOURCE // ") + root.status
                 color: root.sample ? Colors.cyan : Colors.orange
                 font.pixelSize: 10
                 verticalAlignment: Text.AlignVCenter
@@ -778,7 +779,11 @@ Item {
                 height: active && item ? item.implicitHeight : 0
                 active: root.page === "DIAG"
                 visible: active
-                sourceComponent: CpuPlusDiagnosticsPane { headerTarget: workHeader; footerTarget: workFooter }
+                sourceComponent: CpuPlusDiagnosticsPane {
+                    headerTarget: workHeader
+                    footerTarget: workFooter
+                    workshopViewportHeight: scroll.height
+                }
             }
             Column {
                 width: parent.width

@@ -2321,8 +2321,13 @@ PanelWindow {
                         Accessible.name: String(modelData.name || "")
                         Accessible.role: Accessible.Button
                         Accessible.onPressAction: {
-                            if (isSystemTarget && !isSpacer)
+                            if (isSpacer) return;
+                            if (cpuPlusWindow.selectedModeIndex === 2)
+                                cpuPlusWindow.selectThermalSubMode(modelData.key);
+                            else if (isSystemTarget)
                                 cpuPlusWindow.selectSystemSubMode(modelData.key);
+                            else if (cpuPlusWindow.selectedModeIndex === 6)
+                                cpuPlusWindow.selectSettingsSubMode(modelData.key);
                         }
 
                         width:
@@ -2340,10 +2345,10 @@ PanelWindow {
                         color:
                             isSpacer
                             ? "transparent"
-                            : isSystemTarget && isSelected
-                            ? subjectColor
                             : isPressed
                             ? Colors.magenta
+                            : isSystemTarget && isSelected
+                            ? subjectColor
                             : isHovered || isSelected
                             ? Colors.yellow
                             : Colors.dark
@@ -2463,7 +2468,7 @@ PanelWindow {
 
                             GohuText {
                                 anchors.verticalCenter: parent.verticalCenter
-                                // Icon-only Settings selector. Keep the name in
+                                // Icon-only SYSTEM and Settings selectors. Keep the name in
                                 // the model for headings, navigation and audits.
                                 visible: cpuPlusWindow.selectedModeIndex === 2
                                 text: String(modelData.name || "")

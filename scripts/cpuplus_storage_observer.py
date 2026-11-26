@@ -89,11 +89,21 @@ def main(argv=None):
     parser.add_argument("--shell-dir", type=Path, required=True)
     parser.add_argument("--duration", type=int, default=30)
     parser.add_argument("--workshop", action="store_true")
+    parser.add_argument("--sample-seconds", type=int)
+    parser.add_argument("--report-seconds", type=int)
     args = parser.parse_args(argv)
     if not args.data_dir.is_absolute() or not args.shell_dir.is_absolute():
         parser.error("absolute configured roots required")
     if not 1 <= args.duration <= 30:
         parser.error("duration 1..30 seconds")
+    explicit = args.sample_seconds is not None or args.report_seconds is not None
+    if explicit and (not args.workshop or args.sample_seconds is None or args.report_seconds is None):
+        parser.error("both cadence fields require workshop mode")
+    sample = args.sample_seconds if explicit else 1
+    report = args.report_seconds if explicit else 10
+    if not (1 <= sample <= min(5, args.duration) and sample <= report <= 30
+            and report % sample == 0 and (args.duration + report - 1)//report <= 6):
+        parser.error("storage cadence or report budget")
     if args.workshop:
         from syntagma_quickshell_thread_sampler import WorkshopOutput, WorkshopOutputLimit
         send = WorkshopOutput().emit
@@ -109,13 +119,15 @@ def main(argv=None):
     start = time.monotonic()
     samples = 0
     try:
-        for tick in range(1, args.duration + 1):
-            time.sleep(max(0, start + tick - time.monotonic()))
+        intervals = (args.duration + sample - 1)//sample
+        for tick in range(1, intervals + 1):
+            scheduled = min(tick * sample, args.duration)
+            time.sleep(max(0, start + scheduled - time.monotonic()))
             for key, path in targets:
                 current = observe(path, uid)
                 advance(rows[key], previous[key], current)
                 previous[key] = current
-            if tick % 10 == 0 or tick == args.duration:
+            if scheduled % report == 0 or tick == intervals:
                 samples += 1
                 now = time.monotonic()
                 elapsed_ms = round((now - start) * 1000)
@@ -133,8 +145,11 @@ def main(argv=None):
         return 130
     end = {"schema": SCHEMA, "event": "complete", "samples": samples}
     if args.workshop:
+        calibration = {"kind":"storage","durationSeconds":args.duration}
+        if explicit:
+            calibration.update(sampleSeconds=sample, reportSeconds=report)
         end.update(workshopSchema="post-apollo-observer-calibration-v1",
-                   calibration={"kind":"storage","durationSeconds":args.duration},
+                   calibration=calibration,
                    observedMs=elapsed_ms, monotonicMs=round(now*1000),
                    startedMonotonicMs=round(start*1000))
     try:

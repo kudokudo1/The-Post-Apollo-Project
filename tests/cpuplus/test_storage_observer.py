@@ -78,6 +78,25 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(rows[-1]["samples"],1)
             self.assertLessEqual(len(p.stdout.encode("ascii")),65536)
 
+    def test_explicit_cadence_and_partial_final(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base=[sys.executable,"-B",str(ROOT/"scripts/cpuplus_storage_observer.py"),
+                  "--workshop","--data-dir",folder,"--shell-dir",folder,"--duration","5"]
+            p=subprocess.run(base+["--sample-seconds","2","--report-seconds","4"],
+                env=dict(os.environ,XDG_DATA_HOME=folder),capture_output=True,text=True,timeout=12)
+            self.assertEqual(p.returncode,0,p.stderr)
+            rows=[json.loads(line) for line in p.stdout.splitlines()]
+            self.assertEqual([r["intervals"] for r in rows[:-1]],[2,3])
+            self.assertEqual(rows[-1]["calibration"],{"kind":"storage","durationSeconds":5,
+                "sampleSeconds":2,"reportSeconds":4})
+            self.assertGreaterEqual(rows[0]["elapsedMs"],4000)
+            self.assertGreaterEqual(rows[1]["elapsedMs"],5000)
+            for bad in (["--sample-seconds","2"],["--sample-seconds","2","--report-seconds","3"],
+                        ["--sample-seconds","0","--report-seconds","4"]):
+                p=subprocess.run(base+bad,capture_output=True,text=True,timeout=3)
+                self.assertNotEqual(p.returncode,0)
+                self.assertEqual(p.stdout,"")
+
 
 if __name__ == "__main__":
     unittest.main()

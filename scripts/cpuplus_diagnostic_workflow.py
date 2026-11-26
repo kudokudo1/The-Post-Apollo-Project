@@ -62,6 +62,8 @@ def validate(plan):
         keys = {"kind"} if kind == "storage" else {"kind", "thresholdMs"} if kind == "stall" else {"kind", "intervalMs"}
         if kind == "threads":
             keys.add("topCount")
+        if kind == "storage" and set(item) == {"kind", "sampleSeconds", "reportSeconds"}:
+            keys = set(item)
         if set(item) != keys:
             raise ValueError("unsupported instrument fields")
         if kind == "stall":
@@ -70,6 +72,11 @@ def validate(plan):
         elif kind == "storage":
             if duration > 30:
                 raise ValueError("storage duration")
+            if "sampleSeconds" in item:
+                sample, report = item["sampleSeconds"], item["reportSeconds"]
+                if (not integer(sample,1,min(5,duration)) or not integer(report,sample,30)
+                        or report%sample or (duration+report-1)//report>6):
+                    raise ValueError("storage cadence or report budget")
         else:
             ms = item["intervalMs"]
             if not integer(ms, 100, min(60000, duration*1000)):
@@ -112,6 +119,8 @@ def commands(configs, data_dir, scripts, pinned):
                 "--duration", str(c["durationSeconds"])]
         if kind == "storage":
             args += ["--data-dir", str(data_dir), "--shell-dir", str(scripts.parent)]
+            if "sampleSeconds" in c:
+                args += ["--sample-seconds",str(c["sampleSeconds"]),"--report-seconds",str(c["reportSeconds"])]
         else:
             args += ["--interval", str(c["intervalMs"]/1000) if kind=="threads" else str(c["intervalMs"]//1000)]
         if kind == "threads":

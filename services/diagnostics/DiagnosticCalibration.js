@@ -25,6 +25,10 @@ function previewCalibration(input) {
     if (!Object.prototype.hasOwnProperty.call(input,"kind"))
         return refuse("SELECT INSTRUMENT");
     const d = defaultsFor(input.kind);
+    if (d && d.kind==="storage" && keys.length===4
+            && keys.includes("sampleSeconds") && keys.includes("reportSeconds")) {
+        d.sampleSeconds=1; d.reportSeconds=10;
+    }
     if (!d || keys.length!==Object.keys(d).length
         || keys.some(k=>!Object.prototype.hasOwnProperty.call(d,k)))
         return refuse("UNSUPPORTED CONFIGURATION");
@@ -44,7 +48,13 @@ function previewCalibration(input) {
     }
     if (kind==="storage") {
         if (duration>30) return refuse("STORAGE LIMIT 30 SECONDS");
-        return {ok:true,config:d,intervals:duration,observations:Math.ceil(duration/10),
+        const explicit=Object.prototype.hasOwnProperty.call(d,"sampleSeconds");
+        const sample=explicit?input.sampleSeconds:1, report=explicit?input.reportSeconds:10;
+        if (!integer(sample,1,Math.min(5,duration)) || !integer(report,sample,30)
+                || report%sample || Math.ceil(duration/report)>6)
+            return refuse("STORAGE CADENCE / REPORT BUDGET");
+        if (explicit) {d.sampleSeconds=sample;d.reportSeconds=report;}
+        return {ok:true,config:d,intervals:Math.ceil(duration/sample),observations:Math.ceil(duration/report),
             scope:"configured-file-metadata",fixed:false};
     }
     const interval=input.intervalMs;
@@ -112,6 +122,8 @@ function observerLaunchPlan(input, resolvePath, dataDir) {
     if (config.kind==="storage") {
         if (typeof dataDir!=="string" || !dataDir.startsWith("/")) return null;
         args.push("--data-dir",dataDir,"--shell-dir",resolvePath("."));
+        if (Object.prototype.hasOwnProperty.call(config,"sampleSeconds"))
+            args.push("--sample-seconds",String(config.sampleSeconds),"--report-seconds",String(config.reportSeconds));
     } else args.push("--interval",String(config.intervalMs/1000));
     return {config:config,args:args};
 }
@@ -147,7 +159,7 @@ function previewWorkflow(input) {
         if (!["threads","memory","census","storage","stall"].includes(kind)||seen.includes(kind))
             return refuse("UNSUPPORTED OR DUPLICATE INSTRUMENT");
         const keys=kind==="threads"?["kind","intervalMs","topCount"]:
-            kind==="storage"?["kind"]:kind==="stall"?["kind","thresholdMs"]:["kind","intervalMs"];
+            kind==="storage"?(fields(item,["kind"])?["kind"]:["kind","sampleSeconds","reportSeconds"]):kind==="stall"?["kind","thresholdMs"]:["kind","intervalMs"];
         if (!fields(item,keys)) return refuse("UNSUPPORTED INSTRUMENT FIELDS");
         const preview=previewCalibration(Object.assign({},item,{durationSeconds:duration}));
         if (!preview.ok) return refuse(kind.toUpperCase()+" // "+preview.reason);
@@ -191,6 +203,8 @@ function workshopPlanFromDraft(d) {
         else if (kind==="memory") instruments.push({kind:kind,intervalMs:d.memoryIntervalMs});
         else if (kind==="census") instruments.push({kind:kind,intervalMs:d.censusIntervalMs});
         else if (kind==="stall") instruments.push({kind:kind,thresholdMs:d.stallThresholdMs});
+        else if (kind==="storage" && d.storageCadenceExplicit===true)
+            instruments.push({kind:kind,sampleSeconds:d.storageSampleSeconds,reportSeconds:d.storageReportSeconds});
         else instruments.push({kind:kind});
     }
     return {durationSeconds:d.durationSeconds,instruments:instruments};
@@ -215,13 +229,16 @@ function workshopDraftFromPlan(plan) {
         } else if (!previewWorkflow(plan).ok) return null;
         const draft={durationSeconds:plan.durationSeconds,selected:[],
             threadIntervalMs:1000,memoryIntervalMs:10000,censusIntervalMs:10000,
-            topCount:4,stallThresholdMs:350};
+            topCount:4,stallThresholdMs:350,storageCadenceExplicit:false,storageSampleSeconds:1,storageReportSeconds:10};
         for (const c of items) {
             draft.selected.push(c.kind);
             if (c.kind==="threads") {draft.threadIntervalMs=c.intervalMs;draft.topCount=c.topCount;}
             else if (c.kind==="memory") draft.memoryIntervalMs=c.intervalMs;
             else if (c.kind==="census") draft.censusIntervalMs=c.intervalMs;
             else if (c.kind==="stall") draft.stallThresholdMs=c.thresholdMs;
+            else if (c.kind==="storage" && Object.prototype.hasOwnProperty.call(c,"sampleSeconds")) {
+                draft.storageCadenceExplicit=true;draft.storageSampleSeconds=c.sampleSeconds;draft.storageReportSeconds=c.reportSeconds;
+            }
         }
         return draft;
     } catch (_) {return null;}

@@ -130,6 +130,21 @@ function configuredThreadEvidence(text, expected) {
     } catch (_) { return null; }
 }
 
+// Legacy configured storage receipts retain their original exact shape.
+function storageCadence(c) {
+    if (!c || c.kind!=="storage" || !Number.isSafeInteger(c.durationSeconds)
+            || c.durationSeconds<1 || c.durationSeconds>30) return null;
+    const explicit=Object.prototype.hasOwnProperty.call(c,"sampleSeconds")
+        || Object.prototype.hasOwnProperty.call(c,"reportSeconds");
+    const keys=explicit?["kind","durationSeconds","sampleSeconds","reportSeconds"]:["kind","durationSeconds"];
+    if (Object.keys(c).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(c,k))) return null;
+    const sample=explicit?c.sampleSeconds:1, report=explicit?c.reportSeconds:10;
+    if (!Number.isSafeInteger(sample)||sample<1||sample>Math.min(5,c.durationSeconds)
+            || !Number.isSafeInteger(report)||report<sample||report>30||report%sample
+            || Math.ceil(c.durationSeconds/report)>6) return null;
+    return {keys:keys,sample:sample,report:report,explicit:explicit};
+}
+
 // Observer receipts extend the terminal record rather than prepend a row,
 // keeping existing memory, census and storage projections compatible.
 function configuredEvidence(kind,text,expected) {
@@ -144,13 +159,18 @@ function configuredEvidence(kind,text,expected) {
                 || !integer(end.observedMs,c.durationSeconds*1000,145000)
                 || end.samples!==rows.length || !rows.length
                 || rows.some(r=>!r || r.event!==kind)) return null;
-        const keys=kind==="storage"?["kind","durationSeconds"]:["kind","durationSeconds","intervalMs"];
+        const cadence=kind==="storage"?storageCadence(c):null;
+        if (kind==="storage" && !cadence) return null;
+        const keys=cadence?cadence.keys:["kind","durationSeconds","intervalMs"];
         if (Object.keys(c).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(c,k))
-                || (expected && keys.some(k=>expected[k]!==c[k]))) return null;
+                || (expected && (Object.keys(expected).length!==keys.length || keys.some(k=>expected[k]!==c[k])))) return null;
         if (kind==="storage") {
-            if (c.durationSeconds>30 || rows.length!==Math.ceil(c.durationSeconds/10)
-                    || rows.some((r,i)=>r.intervals!==Math.min((i+1)*10,c.durationSeconds))
-                    || rows[rows.length-1].elapsedMs!==end.observedMs) return null;
+            if (rows.length!==Math.ceil(c.durationSeconds/cadence.report)
+                    || rows.some((r,i)=>{
+                        const scheduled=Math.min((i+1)*cadence.report,c.durationSeconds);
+                        return r.intervals!==Math.ceil(scheduled/cadence.sample)
+                            || !integer(r.elapsedMs,cadence.explicit?scheduled*1000:0,end.observedMs);
+                    }) || rows[rows.length-1].elapsedMs!==end.observedMs) return null;
         } else {
             const min=kind==="memory"?5000:1000;
             if (!integer(c.intervalMs,min,Math.min(60000,c.durationSeconds*1000)) || c.intervalMs%1000!==0) return null;
@@ -183,7 +203,8 @@ function observerCalibrationSuffix(kind,text) {
     const c=configuredEvidence(kind,text,null);
     if (!c) return null;
     return "\nCALIBRATION // "+c.durationSeconds+" s"
-        +(kind==="storage"?" / 1000 ms metadata cadence":" / "+c.intervalMs+" ms");
+        +(kind==="storage"?(c.sampleSeconds===undefined?" / 1000 ms metadata cadence":
+            " / "+c.sampleSeconds+" s metadata cadence / "+c.reportSeconds+" s reports"):" / "+c.intervalMs+" ms");
 }
 
 function numeric(value) {
@@ -397,7 +418,8 @@ function summarize(kind, text) {
             const size = (state, value) => state === "present" ? count(value) : value === null;
             if (!final || final.schema !== "post-apollo-storage-observation-v1"
                     || final.event !== "complete" || final.samples !== records.length
-                    || records.length < 1 || records.length > 3) return null;
+                    || records.length < 1 || records.length > (final.calibration && storageCadence(final.calibration)
+                        && storageCadence(final.calibration).explicit ? 6 : 3)) return null;
             if (records.some((sample, index) =>
                 sample.schema !== final.schema || sample.event !== "storage"
                 || sample.sequence !== index + 1 || !count(sample.intervals)
@@ -534,10 +556,13 @@ function workflowEvidence(text, expected) {
             if (!c || !order.includes(kind) || seen.includes(kind)
                     || (seen.length && order.indexOf(kind)<=order.indexOf(seen[seen.length-1]))
                     || c.durationSeconds!==d.durationSeconds) return null;
+            const cadence=kind==="storage"?storageCadence(c):null;
+            if (kind==="storage" && !cadence) return null;
             const keys=kind==="threads"?["kind","durationSeconds","intervalMs","topCount"]:
-                kind==="storage"?["kind","durationSeconds"]:kind==="stall"?["kind","durationSeconds","thresholdMs"]:["kind","durationSeconds","intervalMs"];
+                cadence?cadence.keys:kind==="stall"?["kind","durationSeconds","thresholdMs"]:["kind","durationSeconds","intervalMs"];
             if (Object.keys(c).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(c,k))) return null;
-            if (expected && keys.some(k=>k!=="durationSeconds" && expected.instruments[i][k]!==c[k])) return null;
+            if (expected && (Object.keys(expected.instruments[i]).length!==keys.length-1
+                    || keys.some(k=>k!=="durationSeconds" && expected.instruments[i][k]!==c[k]))) return null;
             if (kind==="stall") { if (c.durationSeconds<5 || !int(c.thresholdMs,150,2000) || c.thresholdMs%50) return null; }
             else if (kind==="storage") { if (c.durationSeconds>30) return null; }
             else {

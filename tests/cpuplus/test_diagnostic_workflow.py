@@ -106,6 +106,26 @@ print(own)
             self.assertTrue(all(i["payloadBytes"]<=w.CHILD_BYTES for i in result["instruments"]))
             self.assertIsNone(result["pinnedQuickshell"])
 
+    def test_configured_storage_workflow(self):
+        plan={"durationSeconds":5,"instruments":[{"kind":"storage","sampleSeconds":2,"reportSeconds":4},
+                                                 {"kind":"stall","thresholdMs":350}]}
+        configs=w.validate(plan)
+        self.assertEqual(configs[0]["sampleSeconds"],2)
+        self.assertEqual(w.commands(configs,Path("/data"),ROOT/"scripts",None)["storage"][-4:],
+                         ["--sample-seconds","2","--report-seconds","4"])
+        with tempfile.TemporaryDirectory() as folder:
+            result=w.run(plan,Path(folder),lambda:False)
+            self.assertEqual(result["status"],"COLLECTED",result)
+            item=result["instruments"][0]
+            self.assertEqual(item["config"],configs[0])
+            self.assertEqual([r["intervals"] for r in item["records"][:-1]],[2,3])
+            self.assertEqual(item["records"][-1]["calibration"],configs[0])
+            self.assertGreater(result["overlapMs"],0)
+        for bad in ({"kind":"storage","sampleSeconds":2},
+                    {"kind":"storage","sampleSeconds":2,"reportSeconds":3}):
+            with self.assertRaises(ValueError):
+                w.validate(dict(plan,instruments=[bad,plan["instruments"][1]]))
+
     def test_actual_storage_and_stall_witness(self):
         with tempfile.TemporaryDirectory() as folder:
             plan={"durationSeconds":5,"instruments":[{"kind":"storage"},{"kind":"stall","thresholdMs":350}]}

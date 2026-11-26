@@ -487,6 +487,10 @@ PanelWindow {
     }
 
     function cycleMonitorRow(direction) {
+        if (selectedModeIndex === 1 && sharedKillWorkspaceLoader.item) {
+            sharedKillWorkspaceLoader.item.cycleTarget(direction);
+            return;
+        }
         if (selectedModeIndex !== 2 && selectedModeIndex !== 3)
             return;
         const rows = selectedMonitorRows();
@@ -3365,6 +3369,8 @@ PanelWindow {
                 && !!cpuPlusWindow.appControlWindow
         visible: active
         sourceComponent: CpuPlusKillWorkspace {
+            instrumentWidth: sharedInstrumentPane.width
+            targetWidth: targetPane.width
             appControlWindow: cpuPlusWindow.appControlWindow
             active: cpuPlusWindow.menuOpen
                     && cpuPlusWindow.selectedModeIndex === 1

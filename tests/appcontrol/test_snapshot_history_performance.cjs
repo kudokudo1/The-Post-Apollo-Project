@@ -436,10 +436,10 @@ test('mini graph scroll moves one trace layer, not every rectangle', () => {
     assert.match(controls, /duration: root.scrollDuration/);
     assert.match(controls, /model: 3\s+delegate: Rectangle/);
     assert.match(controls, /readonly property bool fillReady:\s*graphPoints.length >= 2/);
-    assert.match(trace, /anchors.fill: parent\s+transform: Translate \{\s*x: killMiniCpuCanvas.graphScrollOffset\s*\}/);
+    assert.match(trace, /anchors.fill: parent\s+transform: Translate \{\s*x: root\.graphScrollOffset\s*\}/);
     assert.equal((mini.match(/root\.graphScrollOffset/g) || []).length, 1,
         'only one animated geometry dependency per mini graph');
-    assert.match(trace, /model:\s*killMiniCpuCanvas.combiView\s*\? killMiniCpuCanvas.combiSeries : \[\]/);
+    assert.match(trace, /model:\s*root\.combiView\s*\?\s*root\.combiSeries : \[\]/);
     assert.match(trace, /x:\s*graphPoint.x\s*- width \/ 2\s+y: graphPoint.y/);
     assert.match(trace, /x:\s*leftX\s+y: topY/);
     assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y: parent\.p1\.y/g) || []).length, 4);

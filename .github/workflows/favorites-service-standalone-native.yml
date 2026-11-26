@@ -1,0 +1,37 @@
+name: Favorites widget-independent service lifecycle
+
+on:
+  push:
+    paths:
+      - "tests/favorites/fixtures/FavoritesServiceStandaloneNative.qml"
+      - "scripts/favorites/verify_service_standalone_native.sh"
+      - ".github/workflows/favorites-service-standalone-native.yml"
+      - "services/favorites/**"
+  pull_request:
+    paths:
+      - "tests/favorites/fixtures/FavoritesServiceStandaloneNative.qml"
+      - "scripts/favorites/verify_service_standalone_native.sh"
+      - ".github/workflows/favorites-service-standalone-native.yml"
+      - "services/favorites/**"
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-native:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+    timeout-minutes: 20
+    steps:
+      - name: Install Fedora Quickshell and isolated Xvfb test dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False \
+            quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui \
+            qt6-qtsvg git nodejs coreutils findutils xorg-x11-server-Xvfb
+          quickshell --version
+      - uses: actions/checkout@v4
+      - name: Confirm FavoritesService loads/writes/reads without AppControl or CPU++
+        run: bash scripts/favorites/verify_service_standalone_native.sh

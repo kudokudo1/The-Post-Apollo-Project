@@ -36,7 +36,7 @@ Scope {
     DiagnosticReportArchive { id: archive }
 
     function loadHistory() {
-        if (busy) return false;
+        if (busy || setActive) return false;
         return archive.invoke({action: "list"});
     }
     function selectLatest(job) {
@@ -207,19 +207,20 @@ Scope {
     }
     function dispatchSetStep() {
         if(!setActive||busy||archiveBusy)return;
-        if(setStopRequested){finishSet("SET CANCELLED");return;}
-        if(faulted||archive.faulted){finishSet("SET NOT VERIFIED");return;}
         if(setCurrentId!==""){
             // The preceding capture must have an exact successful report AND
             // a confirmed archive receipt before another child can launch.
             const row=archiveStatus==="READY"&&archiveRows.find(x=>x.id===setCurrentId&&x.kind===setCurrentKind);
-            const status=row&&row.status==="COMPLETE"?"COMPLETE":"NOT VERIFIED";
+            const status=row&&["COMPLETE","CANCELLED"].includes(row.status)?row.status:"NOT VERIFIED";
             setRunResults=setRunResults.concat([{name:setRunItems[setRunIndex].name,id:setCurrentId,
                 kind:setCurrentKind,status:status}]);
             setCurrentId="";setCurrentKind="";
+            if(setStopRequested){finishSet("SET CANCELLED");return;}
             if(status!=="COMPLETE"){finishSet("SET STOPPED");return;}
             setRunIndex++;
         }
+        if(setStopRequested){finishSet("SET CANCELLED");return;}
+        if(faulted||archive.faulted){finishSet("SET NOT VERIFIED");return;}
         if(setRunIndex>=setRunItems.length){finishSet("SET COMPLETE");return;}
         const step=setRunItems[setRunIndex];
         setDispatching=true;

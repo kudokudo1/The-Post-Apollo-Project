@@ -63,7 +63,8 @@ Scope {
     property var workRecords: []
     property var modeRecords: []
     property bool diagnosticOverflow: false
-    readonly property bool stallCaptureActive: busy && kind === "stall" && !cancelled && !exited
+    property bool workflowStallRequested: false
+    readonly property bool stallCaptureActive: busy && (kind === "stall" || (kind === "workflow" && workflowStallRequested)) && !cancelled && !exited
     property var stallTicks: []
     property bool stallOverflow: false
 
@@ -107,7 +108,7 @@ Scope {
 
     // Session-owned draft, not authorization. No persistence or auto-start.
     property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
-        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4})
+        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350})
     property string workshopRunId: ""
     property string workshopRunKind: ""
     property string workshopRunPlan: ""
@@ -170,6 +171,7 @@ Scope {
         diagnosticOverflow = false;
         stallTicks = [];
         stallOverflow = false;
+        workflowStallRequested = job === "workflow" && !!plan && plan.plan.instruments.some(c=>c.kind==="stall");
         busy = true;
         if (job === "appcontrol") recordMode();
         feedback = "RUNNING // " + job.toUpperCase();
@@ -230,7 +232,10 @@ Scope {
             return;
         }
         if (kind === "workflow") {
-            const evidence = activeCalibration && Policy.workflowEvidence(output, JSON.parse(activeCalibration));
+            const expected = activeCalibration ? JSON.parse(activeCalibration) : null;
+            if (workflowStallRequested) output = Policy.attachWorkflowStall(output,expected,stallTicks,stallOverflow) || "";
+            stallTicks=[];
+            const evidence = expected && Policy.workflowEvidence(output, expected);
             const status = cancelled ? "CANCELLED" : exitOk && evidence && evidence.status === "COLLECTED" ? "COMPLETE" : "NOT VERIFIED";
             publishResult(status, evidence ? evidence.summary : (cancelled ? "CAPTURE STOPPED" : "NO VERIFIED WORKFLOW // EXIT " + exitCode),
                           evidence ? output : "");

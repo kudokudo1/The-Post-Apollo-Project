@@ -298,11 +298,26 @@ ShellRoot {
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
                 if (!root.check(duration && execute && dial && duration.width===32
                     && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
-                    && workshop.phase==="PREPARE" && dial.options.length===4
+                    && workshop.phase==="PREPARE" && dial.options.length===12 && dial.readoutGlowEnabled && String(dial.markerColor).toLowerCase()==="#ed981a"
                     && dial.numericDetentInterval===1,"actual Workshop hardware and no automatic launch")) return;
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
                 if (!root.check(viewport && viewport.contentHeight<=viewport.height+1,
                     "default Workshop fits native 320x620 viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
+                workshop.edit("selected",["threads","memory","census","storage"]);
+                root.phase=171;
+                return;
+            }
+            if (root.phase===171 && pane.item) {
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
+                const execute=root.findItem(workshop,"cpuplusWorkshopExecute");
+                const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
+                const storage=root.findItem(workshop,"cpuplusWorkshopStorageInstrument");
+                const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
+                if (!root.check(storage && storage.visible && storage.height===160 && dial.visible
+                    && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>duration.mapToItem(workshop,0,0).y,
+                    "full-length sliders above storage/thread instrument row")) return;
+                if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport")) return;
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("censusIntervalMs",1000);
                 duration.valueRequested(1);

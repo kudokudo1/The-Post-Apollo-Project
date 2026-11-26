@@ -10,6 +10,7 @@ Rectangle {
     property color accentColor: Colors.cyan
     // Outer time/unit chassis can differ from the semantic scale and handle.
     property color frameColor: accentColor
+    property color frameGlowColor: frameColor
     // Optional numeric fill ink; existing controls inherit their original accent.
     property color valueFillColor: accentColor
     property color handleColor: Colors.white
@@ -355,7 +356,7 @@ Rectangle {
         spread: 4
         z: -2
         opacity: slider.enabledSlider ? 0.22 : 0.08
-        color: slider.frameColor
+        color: slider.frameGlowColor
     }
 
     Rectangle {

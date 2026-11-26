@@ -303,7 +303,7 @@ ShellRoot {
                 const duration=root.findItem(workshop,"cpuplusWorkshopDuration-hardware");
                 const execute=root.findItem(workshop,"cpuplusWorkshopExecute");
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
-                if (!root.check(duration && execute && dial && duration.width===32
+                if (!root.check(duration && execute && dial && duration.width===(workshop.compactLayout?24:32)
                     && duration.horizontalStepPresentation && !CpuPlusDiagnostics.busy
                     && workshop.phase==="PREPARE" && dial.options.length===12 && dial.readoutGlowEnabled && String(dial.markerColor).toLowerCase()==="#ed981a"
                     && dial.numericDetentInterval===1,"actual Workshop hardware and no automatic launch")) return;
@@ -325,8 +325,12 @@ ShellRoot {
                 const dial=root.findItem(workshop,"cpuplusWorkshopTopThreads");
                 const storage=root.findItem(workshop,"cpuplusWorkshopStorageInstrument");
                 const viewport=root.findItem(pane.item,"cpuplusMemoryScroll");
-                if (!root.check(storage && storage.visible && storage.height===160 && dial.visible
-                    && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>duration.mapToItem(workshop,0,0).y,
+                if (!root.check(storage && storage.visible && storage.height===workshop.instrumentHeight && dial.visible
+                    && duration.height===workshop.width && dial.mapToItem(workshop,0,0).y>root.findItem(workshop,"cpuplusWorkshopCensusInterval").mapToItem(workshop,0,0).y
+                    && ["Duration","ThreadInterval","MemoryInterval","CensusInterval"].every(name=>{
+                        const slider=root.findItem(workshop,"cpuplusWorkshop"+name+"-hardware");
+                        return slider && slider.visible && slider.height===workshop.width;
+                    }),
                     "full-length sliders above storage/thread instrument row")) return;
                 if (!root.check(viewport.contentHeight<=viewport.height+1,"all four instruments fit default viewport // "+viewport.contentHeight+" / "+viewport.height)) return;
                 workshop.edit("selected",["census","storage"]);

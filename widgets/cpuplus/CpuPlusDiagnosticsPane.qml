@@ -15,6 +15,8 @@ Column {
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
     property string viewMode: "WORK"
+    signal navigationChanged()
+    onViewModeChanged: navigationChanged()
     readonly property bool workshopOpen: viewMode === "WORK"
     function consumeReportView() {
         if (!CpuPlusDiagnostics.pendingReportView) return;
@@ -271,24 +273,11 @@ Column {
         property string mixerPage: "LIBRARY"
         property string armedQueue: ""
         onVisibleChanged: if (!visible) {deleteName="";armedQueue="";}
-        onMixerPageChanged: {deleteName="";armedQueue="";}
+        onMixerPageChanged: {deleteName="";armedQueue="";root.navigationChanged();}
         Connections {
             target: CpuPlusDiagnostics
             function onWorkshopQueueChanged() {presets.armedQueue="";}
             function onWorkshopPresetLockedChanged() {if(CpuPlusDiagnostics.workshopPresetLocked)presets.armedQueue="";}
-        }
-        Row {
-            width: parent.width; spacing: 3
-            Repeater {
-                model: ["LIBRARY","QUEUE","SETS"]
-                ActionButton {
-                    required property string modelData
-                    width: Math.floor((presets.width-6)/3);height: 25
-                    label: modelData;normalFace: true
-                    selected: presets.mixerPage===modelData
-                    onLeftClicked: presets.mixerPage=modelData
-                }
-            }
         }
         GohuText {
             width: parent.width
@@ -550,8 +539,18 @@ Column {
             width: parent.width; color: Colors.yellow; font.pixelSize: 10;wrapMode:Text.Wrap
             text: CpuPlusDiagnostics.setFeedback+" // SESSION ONLY"
         }
+        GohuText {
+            width: parent.width; color: Colors.magenta; font.pixelSize: 11
+            visible: presets.mixerPage==="RESULTS"
+            text: "SET RESULTS // LAST RUN"
+        }
+        GohuText {
+            width: parent.width; color: Colors.cyan; font.pixelSize: 10;wrapMode:Text.Wrap
+            visible: presets.mixerPage==="RESULTS" && CpuPlusDiagnostics.setRunResults.length===0
+            text: CpuPlusDiagnostics.setActive ? "WAITING FOR FIRST STEP" : "NO SET RESULTS YET"
+        }
         Repeater {
-            model: CpuPlusDiagnostics.setRunResults
+            model: presets.mixerPage==="RESULTS" ? CpuPlusDiagnostics.setRunResults : []
             GohuText {
                 required property var modelData
                 width: presets.width; font.pixelSize:10; elide:Text.ElideRight
@@ -843,40 +842,12 @@ Column {
         font.pixelSize: 10
         wrapMode: Text.Wrap
     }
+    // Actions belong to the contextual body, not the invariant navigation footer.
     Column {
-        parent: root.footerTarget || root
-        objectName: "cpuplusDiagBottomControls"
+        objectName: "cpuplusDiagnosticReportActions"
         width: parent.width
+        visible: ["REPORT","HISTORY","COMPARE"].includes(root.viewMode)
         spacing: 3
-        Row {
-            id: diagnosticIndex
-            visible: root.viewMode !== "PRESETS"
-            width: parent.width
-            spacing: 3
-            Repeater {
-                model: [{key:"QUICK",label:"QUICK"},
-                        {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
-                        {key:"COMPARE",label:"CMP"}]
-                ActionButton {
-                    id: diagnosticViewFilter
-                    objectName: "cpuplusDiagnosticView-"+modelData.key
-                    required property var modelData
-                    width: Math.max(0,Math.floor((diagnosticIndex.width-9)/4))
-                    height: 25
-                    label: modelData.label
-                    accentColor: Colors.cyan
-                    labelPixelSize: 10
-                    labelFontSizeMode: Text.HorizontalFit
-                    contentPadding: 1
-                    selected: root.viewMode===modelData.key
-                    selectedBorderColor: Colors.magenta
-                    selectedForegroundColor: Colors.magenta
-                    normalFace: true
-                    acceptedButtons: Qt.LeftButton
-                    onLeftClicked: root.selectView(modelData.key)
-                }
-            }
-        }
         Row {
             id: reportRail
             visible: root.viewMode === "REPORT"
@@ -966,6 +937,76 @@ Column {
                 label: "SET AFTER"
                 available: root.canChooseComparison
                 onLeftClicked: CpuPlusDiagnostics.selectComparison("after", root.report.id)
+            }
+        }
+    }
+    Column {
+        parent: root.footerTarget || root
+        objectName: "cpuplusDiagBottomControls"
+        width: parent.width
+        spacing: 3
+        height: 53
+        Row {
+            id: diagnosticIndex
+            objectName: "cpuplusDiagnosticContextRail"
+            height: 25
+            width: parent.width
+            spacing: 3
+            Repeater {
+                model: root.viewMode==="PRESETS" ? [{key:"LIBRARY",label:"LIBRARY"},
+                        {key:"QUEUE",label:"QUEUE"},{key:"SETS",label:"SETS"},{key:"RESULTS",label:"RESULTS"}]
+                    : [{key:"QUICK",label:"QUICK"},
+                        {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
+                        {key:"COMPARE",label:"CMP"}]
+                ActionButton {
+                    id: diagnosticViewFilter
+                    objectName: "cpuplusDiagnosticView-"+modelData.key
+                    required property var modelData
+                    width: Math.max(0,Math.floor((diagnosticIndex.width-9)/4))
+                    height: 25
+                    label: modelData.label
+                    accentColor: Colors.cyan
+                    labelPixelSize: 10
+                    labelFontSizeMode: Text.HorizontalFit
+                    contentPadding: 1
+                    selected: root.viewMode==="PRESETS" ? presets.mixerPage===modelData.key : root.viewMode===modelData.key
+                    selectedBorderColor: Colors.magenta
+                    selectedForegroundColor: Colors.magenta
+                    normalFace: true
+                    acceptedButtons: Qt.LeftButton
+                    onLeftClicked: {
+                        if(root.viewMode==="PRESETS")presets.mixerPage=modelData.key;
+                        else root.selectView(modelData.key);
+                    }
+                }
+            }
+        }
+        Row {
+            id: workspaceRail
+            objectName: "cpuplusDiagnosticWorkspaceRail"
+            width: parent.width
+            height: 25
+            spacing: 3
+            Repeater {
+                model: [{key:"WORK",label:"CONTROLS"},{key:"PRESETS",label:"WORKFLOWS"}]
+                ActionButton {
+                    required property var modelData
+                    objectName: "cpuplusDiagnosticWorkspace-"+modelData.key
+                    width: Math.max(0,Math.floor((workspaceRail.width-3)/2))
+                    height: 25
+                    label: modelData.label
+                    labelPixelSize: 10
+                    labelFontSizeMode: Text.HorizontalFit
+                    contentPadding: 1
+                    normalFace: true
+                    accentColor: modelData.key==="WORK" ? Colors.cyan : Colors.magenta
+                    selected: modelData.key==="PRESETS" ? root.viewMode==="PRESETS" : root.viewMode!=="PRESETS"
+                    selectedForegroundColor: accentColor
+                    selectedBorderColor: accentColor
+                    acceptedButtons: Qt.LeftButton
+                    keyboardActivationSignal: "leftClicked"
+                    onLeftClicked: root.selectView(modelData.key)
+                }
             }
         }
     }

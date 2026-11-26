@@ -488,3 +488,26 @@ assert.match(pane,/objectName: "cpuplusScanFrequencySlider"[\s\S]*?valueFillColo
 assert.match(pane,/objectName: "cpuplusScanStop"[\s\S]*?selectedFillColor: Colors.red/);
 assert.match(cpuWindowM9,/cpuHeaderStatus==="PAUSED" \? Colors.yellow/);
 console.log("CPU++ M11h compact transport palette and pinned diagnostics header PASS");
+
+ // Resource semantic palette: actual shared mapping and both consumers.
+ const semanticPaletteSource=fs.readFileSync(path.join(__dirname,"../components/Colors.qml"),"utf8");
+ const semanticColors=Object.fromEntries([...semanticPaletteSource.matchAll(/readonly property color (\w+): "(#[0-9A-Fa-f]{6})"/g)].map(m=>[m[1],m[2]]));
+ const semanticVm=require("node:vm").createContext(semanticColors);
+ const semanticFunction=semanticPaletteSource.slice(semanticPaletteSource.indexOf("    function resourceColor("),semanticPaletteSource.lastIndexOf("}"));
+ require("node:vm").runInContext(semanticFunction,semanticVm);
+ for(const [key,ink] of Object.entries({CPU:"orange",MEM:"magenta",MEMORY:"magenta",RSS:"blue",THREADS:"cyan",PID:"purple",UPTIME:"white",ALL:"white",OFF:"white",GPU:"omnitrix",STORAGE:"blue",NETWORK:"cyan",SWAP:"yellow",FANS:"omnitrix"}))
+     assert.equal(semanticVm.resourceColor(key),semanticColors[ink],key);
+ assert.equal(semanticColors.purple,"#A879ED");
+ const killMetricSource=fs.readFileSync(path.join(__dirname,"../widgets/appcontrol/TaskManagerView.qml"),"utf8");
+ for(const key of ["cpu","mem","rss","threads","pid","uptime"])
+     assert.ok(killMetricSource.split("\n").some(line=>line.includes('id: "'+key+'"')&&line.includes('baseAccent: Colors.resourceColor("'+key+'")')));
+ assert.match(killMetricSource,/modelData.critical \? Colors.red : modelData.baseAccent/);
+ const semanticCpu=fs.readFileSync(path.join(__dirname,"../widgets/CpuPlusW.qml"),"utf8");
+ const semanticStrip=semanticCpu.slice(semanticCpu.indexOf("id: targetSubModeStrip"),semanticCpu.indexOf("// Unimplemented input categories only."));
+ assert.match(semanticStrip,/Colors.resourceColor\(modelData.key\)/);
+ assert.match(semanticStrip,/\? systemTargetFlow.implicitHeight/);
+ assert.match(semanticStrip,/\? 38 : 36/);
+ assert.match(semanticStrip,/\? 24\s+: 20/);
+ assert.match(semanticStrip,/visible: cpuPlusWindow.selectedModeIndex === 2\s+text: String\(modelData.name/);
+ assert.match(semanticStrip,/cpuPlusWindow.selectSystemSubMode\(modelData.key\)/);
+ console.log("CPU++ SYSTEM and KILL semantic palette source contracts PASS");

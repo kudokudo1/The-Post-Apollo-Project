@@ -214,8 +214,9 @@ Subsequent member selection and contextual Cleaning re-resolve exact
 identity/currentness and independently authorize the action. Viewing
 does not read bodies, claim a Task, enter Spring, activate or restore.
 
-UI1/2 retain CHATS default, explicit Colony rail selection, existing
-184/148/hidden compact rail and accepted neutral Tree glyph. Member
+UI1/2 retain one unified Tree-first conversation/member surface per R7h,
+with optional presentation-only filters, existing 184/148/hidden compact
+rail and accepted neutral Tree glyph. Member
 lineage/role can occupy an independently disclosed lower line only after
 approved source/placement; no Ortet=Main assumption. Contextual Cleaning
 needs independently pinned plan and separately approved existing workspace
@@ -342,8 +343,9 @@ For either candidate, the R7e owner projection must:
   and replacement-view negative acceptance cases per R7e.
 - Heart resource/attempt/H2 custody remains independent; no physical
   resource credit from a roster. Mind history, cache and retrieval
-  remain separately authorized. UI1/2 retain CHATS default, neutral
-  Tree and unavailable roster until a real source is approved.
+  remain separately authorized. UI1/2 retain the unified Tree-first
+  surface per R7h, with neutral unavailable roster/chat coverage until
+  independently qualified sources are approved.
 
 ### Decision requested
 
@@ -355,3 +357,173 @@ approved fence/custody design. If no candidate meets the requirements,
 seek a new bounded architecture decision with the actual owner and
 Connections before proposing a writer, schema, migration or UI producer.
 Native execution, protected operations and production remain HOLD.
+
+
+## R7h // Persistent member identity, chat binding and execution succession
+
+Design only. Operator unified Forest vision #2161 7202168479,
+development direction 7204485179 and Nurse reconciliation 7204663398.
+Runtime 7202378795/7204270135/7204354166; Heart 7204297064,
+Mind 7204287316, Spirit 7204264385, UI1 7204259049, UI2 7204310531.
+Supersedes only the two former default/exclusive CHATS presentation
+assumptions in R7e/f. All existing R7a-g lifecycle, source permission,
+original custody and uncertainty rules remain. See
+[R7g source custody](RUNTIME_LIFECYCLE_WRITER_BOUNDARY_R7D.md).
+A/B transaction domain and actual independent opener/custodian remain
+unselected. No schema, registry, issuer, producer or executable change.
+
+### Original recovery and separate identities
+
+Frozen original 28895aaf: Colony architecture checkpoint 0d15621d
+distinguishes shared durable Tree identity, knowledge and capabilities
+from each presence's active Task, conversation, Workshop/Ready rack
+and runtime state. Original colony/identity.py 849a4378 and
+runtime/session_identity.py 64e97968 distinguish semantic execution
+context and context+model binding from adapter/provider session IDs.
+runtime/conversation_continuity.py 39d2a20b preserves completed public
+exchanges by execution context and Task, not hidden reasoning, tool
+replay, in-flight turns or provider KV. Recover the distinctions, not
+a caller-selected root or implicit transfer of history.
+
+Current B1 d1533f15 stores session_id, owner_key, tree_key, title,
+state and revision and ordered turns. It has no authoritative member
+binding. B6 TaskContext b7fdcfc5 has optional clone_key and exact
+task/context/generation/origin but is a reference, not a registry.
+R5/R6b disposable reopen and history evidence is not persistent
+member succession or production restart evidence. R7e historical
+Tree + execution_context_id address remains a lineage reference;
+the actual owner must establish stable member identity independently
+of each replaceable execution incarnation. Do not mint a second ID
+merely for presentation or reinterpret B6 fields as issuer evidence.
+
+| Concept | Required separation (not a storage or wire schema) |
+| --- | --- |
+| Tree / Colony | Canonical owner and Tree identity; base and Clone presences share durable Tree ownership, no duplicate independent intelligence identity. |
+| Member / Clone | Stable independently resolved member identity and lineage. Role, Assignment, logical home and current execution are distinct. A dormant member can exist with no live process or chat. |
+| Display name / number | Mutable user name takes precedence over owner-issued stable sequential default Clone number when no name exists. Neither is an identity, permission, membership count or process. |
+| Chat | Durable conversation identity, original authorship/turn lineage, independent revision and authorized history; no inferred member from B1 Tree or OPEN state. |
+| Binding | Candidate versioned member/chat relation with independently current old/new scope; no selected one-to-one or many-to-many persistence/cardinality. |
+| Assignment / home | Exact assigned work and logical tool/widget/environment reference, independently current TaskContext and origin. Home does not imply host/PID, active state or access. |
+| Execution / effect | Exact original Task/context/generation, execution incarnation, operation/attempt, frozen model binding/settings and H11/H2 claim; distinct provider session/process and actual external effect. |
+| View / recipient | Authorized source revision, recipient, view lifetime, purpose and action. Selecting a row is not a grant or change to the composer target. |
+
+The base Tree name is the primary public heading in the disconnected
+UI design; real names, aliases, default numbers, binding, role, home,
+task, season, count and completeness require independently authorized
+per-field disclosure before enumeration. No client-derived numbering
+or hidden gaps/counts. Name uniqueness, numbering namespace, allocation
+and reuse are open owner/operator decisions; names need not define
+identity. A user-assigned name does not change original authorship,
+member identity, chat binding, permissions or execution incarnation.
+
+### Versioned association and original writer order
+
+The unified view can present a permitted member with related chats,
+a member without a chat or a standalone chat with no qualified
+association. No assumed cardinality or automatic membership creation.
+Multiple relations do not imply multiple current send recipients:
+each actual submission independently binds one exact authorized
+original operation, chat revision, Task/member and recipient. Separate
+authorized tasks may run concurrently; conflicting writes to the
+same conversation require original writer ordering, not last-writer-
+wins. Do not change existing B1 revision/attempt semantics here.
+
+1. Independently resolve and authorize the exact original owner,
+   Tree/member/chat, source and intended metadata mutation or
+   reassignment before reading protected data. A rename, home change,
+   Assignment change, explicit bind/unbind/rebind, view selection
+   and send are distinct intents.
+2. For rename or association mutation, pin current original metadata
+   and relation revision, exact old and proposed new scope, recipient
+   and original outstanding effect references. Compare and serialize
+   at the actual authorized durable writer; stale/conflicting/unknown
+   observations refuse. Actual transaction domain is not selected.
+3. Preserve historical authorship, chat ID, original turns and committed
+   conversation revision. A successful reassignment changes the
+   prospective authorized relationship only, not prior Tasks, effects,
+   histories, retained Leaves or authorization. No automatic draft,
+   cache, credential, live session or grant transfer.
+4. Existing admitted original operations settle only through the exact
+   original R7d/g custody boundary. Unknown effect/receipt/terminal
+   remains attached to the original; no inferred rollback, re-send,
+   replacement claim or automatic release. A conflicting rebind or
+   progression must HOLD if original custody cannot be preserved.
+5. Publish only independently permitted current metadata after original
+   mutation outcome is known and the view/recipient rechecked. Unknown
+   write outcome is not success; reconcile exact original operation
+   rather than retry as a new mutation. A stale callback cannot update
+   replacement selection, draft, source or view.
+
+### Renewal and shared continuity
+
+The persistent chat and member can outlive execution. Detaching a
+Bark, filtering, closing a view or changing a display name does not
+retire the member or stop separately authorized background work.
+Preserve the existing UI close/draft behavior; no durable draft
+storage is claimed or introduced.
+
+Before replacing a held execution, reconcile exact original terminal,
+quiescence, later attributable resource accounting (Heart) and
+independently authorized effect settlement (Spirit/Connections).
+Retain original custody if any is unknown; no retry/replay, new
+admission or inferred Winter. A separately eligible new Task or
+execution must establish its own current context, binding/settings,
+claim, policy, source/use and recipient; it cannot inherit the old
+provider session, KV, lease, in-flight work or grant. Preserve exact
+committed B1 history and prior authorship. Historical continuation
+references and independently authorized Mind-derived context are
+different; regenerate the latter for the new eligible workload and
+recipient as needed, not by silently rewriting original history.
+Model-form handoff and H16 temporary reasoning consumption are
+separate from execution renewal and must retain original operation
+identity and one-use settlement.
+
+Same-Tree coordination can use authorized versioned durable knowledge
+and shared Tree capability/Workshop ownership under scoped standing
+policy. No wholesale transcript or live context broadcast, implicit
+active Workshop/tool activation, role-specific data transfer, resource
+credit or automatic permission from shared Tree identity. Mind owns
+Leaf provenance, bounded retrieval and refinement; authorized lossy
+working-context stewardship is not destruction of history. Spirit
+owns distinct source/use/mutation/egress/revoke and destruction scope.
+Cross-Tree Mycelium remains independently authorized. No hidden
+retention or recurrence check contrary to a completed authorized
+destruction scope, no claim to erase unknown external copies.
+
+UI1/UI2 own the unified Tree-first rail, future ALL/CHATS/CLONES
+visibility filters and explicit composer target; filters, row
+navigation and rename do not silently retarget the composer. S4-U1
+disconnected presentation remains separate and does not provide a
+roster, count, binding or active execution. Unknown/partial/denied
+coverage is not complete-empty; only independently authorized
+current completeness may support an empty/count assertion. No
+inferred membership, season or running status from OPEN/PAUSED,
+hostConnected, process observations, model inventory or resource
+reservation. Retain R7e pre-enumeration and final delivery fences.
+
+### Negative acceptance matrix (future implementation criteria only)
+
+| Case | Required outcome |
+| --- | --- |
+| Same member renamed / same display name on different members | Preserve immutable identity and original history; labels never transfer scope or selection. |
+| No user name / hidden member or number | Only independently issued permitted default label; no client numbering, hidden ordinal/count leak or inferred empty. |
+| Member without chat / standalone chat / multiple associations | No fabricated counterpart or assumed cardinality; exact authorized send target remains separate. |
+| Rebind with stale revision, competing mutation, wrong Tree/member/recipient or unknown write outcome | Refuse or retain exact original pending effect; no implicit retarget, duplicate write or permission transfer. |
+| Rebind with committed history or old derived context | Preserve original authorship/revision; new scope needs independent read/use and recipient; no automatic copy/cache inheritance. |
+| Rebind/renewal while old effect, terminal or accounting unknown | Original remains held; no conflicting progression, replay, release or replacement claim. |
+| Detached background Task or hidden rail | No Task cancellation, member retirement, resource release or new attachment inferred. |
+| New incarnation after qualified original settlement | Same authorized durable member/chat and committed history; fresh exact execution, input, policy, recipient and claim independently required. |
+| Same-Tree shared knowledge vs foreign Tree or role-restricted data | Only currently permitted scoped coordination; Mycelium/cross-Tree separately authorized; no automatic transcript or capability grant. |
+| Stale/withdrawn projection, filter change or renamed row | Clear affected presentation only; no new read/send, automatic composer target, history mutation or durable deletion. |
+| Missing source/partial roster or local session OPEN | Neutral unavailable coverage, never false count, membership, season or complete-empty. |
+
+Open decisions: actual stable identity and versioned association
+custodian; relation cardinality and allowed reassignment semantics;
+name/number namespace and allocation/reuse; source completeness and
+per-field policy; actual A/B transaction and old-writer recovery;
+original terminal/effect and admission boundaries. Operator/owners
+must settle these with actual source evidence before implementing
+a protected writer or roster. No new API, schema, data migration,
+registry, opener, issuer, test, UI, provider or native operation
+in R7h. Exact source review/CI at handoff; operator integration
+separate. Native/protected/production HOLD.

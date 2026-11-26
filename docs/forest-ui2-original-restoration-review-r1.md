@@ -466,6 +466,12 @@ identities, mutate B1 or equate B1 PAUSED/ARCHIVED with Winter.
 
 ### Reconciled placement and intent
 
+> Historical S2 placement decision: the exclusive CHATS/Colony view and
+> its default below are superseded by operator decision #7202168479.
+> Retain this record for provenance; apply the S4 reconciliation below
+> for current interaction design. Identity, disclosure and contextual
+> restoration safeguards remain in force.
+
 UI1 #7176088888/#7177006429 and UI2 #7176099165 agree on a future
 explicitly selected Colony view reusing the existing secondary rail.
 Keep CHATS default, identity and OPEN-only filter unchanged. Rail width
@@ -534,3 +540,91 @@ UI1 and UI2 then request exact bounded implementation approval.
 Mind M7g derived-cache design is separate from lifecycle evidence.
 No new schema, producer, executable source, synthetic membership,
 installed mount, query or authority is proposed in this reconciliation.
+
+
+## S4 // Unified Tree, Clone and conversation interaction reconciliation
+
+State: design contract, not a connected UI or an implementation claim.
+Operator direction #7202168479 supersedes the exclusive S2 placement
+above. UI2 #7204240406/#7204310531, UI1 #7204351741, Spirit and Runtime
+owner dispositions reconcile the boundary. Nurse #7204663398 and
+operator relay #7204485179 authorize bounded owned development without
+repeated preliminary approval loops; independent completed-source
+review and operator acceptance remain. Production/native/protected HOLD.
+
+### Current disconnected slice versus future projection
+
+UI1 owns S4-U1 host implementation. Its four-file scope retains existing
+184/148/0 rail geometry, 55px header, 56px B0 strip, neutral Tree
+indicator, chat pane and composer. The selected public Tree name is a
+plain elided heading, not identity or membership evidence. The honest
+unqualified states are COLONY UNAVAILABLE and, independently,
+CHAT HOST OFFLINE or CHAT COVERAGE UNKNOWN. No inferred zero or empty
+roster, new filter controls, fake rows, connected source or action
+dispatch in S4-U1. This document does not change those four files.
+
+The future unified presentation has one Tree heading and one rail
+collection of authorized conversations and member presences. ALL is
+the proposed default; CHATS and CLONES are visibility filters only,
+not competing workspaces or sources. Preserve standalone conversations
+when no authorized member link is established. Do not infer a link,
+one-to-one cardinality, base member, role or current work from titles,
+B1 rows, process state or model state. User-assigned member display names
+take precedence over owner-issued sequential defaults. Names and
+numbers are labels, never identity, and missing numbers must not
+disclose hidden membership. Runtime owns numbering, namespace, durable
+identity, versioned binding and succession; Spirit owns disclosure and
+action eligibility.
+
+### Interaction and acceptance proposal for the later connected slice
+
+Keep selected Tree, inspected member, selected conversation and
+composer target conceptually separate. A chat target must be explicitly
+selected and independently current, authorized and visibly identified
+where disclosure permits. Selecting or inspecting a Clone or Assignment
+does not silently change the conversation or target. Never dispatch
+from a hidden, stale, unknown or unverified target. A filter must not
+grant, revoke, rebind or fetch protected data by itself.
+
+| Intent or event | Required presentation behavior | Must not imply |
+| --- | --- | --- |
+| Open unified view | Show only independently current, authorized projection for the selected Tree | Complete roster, live process or global counts |
+| ALL / CHATS / CLONES | Change visibility, preserve an otherwise valid selected conversation and draft | Implicit target switch, history fetch or action |
+| Filter hides selected conversation | Keep its current target explicitly identified if permitted; otherwise lock dispatch until explicitly reselected | Send to first visible row or disclose hidden label |
+| Select member or Assignment | Inspect separately authorized metadata and contextual controls | Chat retarget, session creation, task start or grant |
+| Select conversation | Explicitly establish matching chat target; retain unrelated draft/history according to owner contract | Member reassignment, activation or permission transfer |
+| Rename or rebind | Present separately authorized, current, versioned action/result; retain stable identity and original authorship | Rename creates identity, automatic draft migration or history relabel |
+| Execution succession | Preserve independently verified durable conversation/member identity; withdraw stale incarnation status | New chat required, replay, old effect settlement or inherited grant |
+| Tree change / scope loss | Retire affected view/selection/target and withdraw stale protected data; preserve unrelated authorized context | Global clear, durable deletion or replacement mutation |
+| Compact rail hidden | Preserve composer geometry and current target only if safely represented; no hidden rail activation | New overlay/window or invisible actionable controls |
+
+A missing binding differs from an independently authorized unbound
+record; do not label a hidden relationship as absent. Complete-empty
+requires authorized current completeness for that projection, not
+hostConnected, visible row count or silence. Partial or unknown
+coverage must not leak hidden records, categories or counts. Separate
+member/task/season status from active model, operational home and chat
+state. Member home is not execution location or permission.
+
+Preserve S3 scoped stale/withdrawn-view evidence (#2928/#2936);
+its single explicit withdrawal is not a general revocation mechanism.
+An invalid old response must not populate or clear the replacement.
+Exact currentness and source/effect ordering remain owner contracts.
+Keep existing R1/R2 contextual Cleaning review separate from selection,
+and preserve 300x160 minimum and UI1-owned placement. Current local draft
+clears on menu close; do not claim durable draft continuity from this
+behavior. Future durable draft association is a separate owner contract.
+
+### Scope and next implementation boundary
+
+This is UI2's one-document reconciliation of a superseded interaction
+direction. The filter/selection table is a proposal for subsequent
+review, not a new wire schema, roster source, permission system or
+approved connected implementation. Reuse existing UI2 projection and
+history components where their actual relationship fits; do not widen
+public fixtures into protected sources. UI1 owns native geometry,
+accessibility and installed host; Runtime owns binding and lifecycle;
+Mind owns Leaves/provenance; Spirit owns disclosure; Heart owns
+resource evidence. Review actual S4-U1 source and existing disposable
+CI at handoff. No code, test, workflow, protected data, host execution
+or merge in this document change.

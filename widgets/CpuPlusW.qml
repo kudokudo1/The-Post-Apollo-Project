@@ -374,7 +374,7 @@ PanelWindow {
     // Legacy THERMAL / SYSTEM indices 2/3 retain existing IPC compatibility.
     readonly property var modes: [
         { name: "OVERVIEW", symbol: "(˵✧ᴗ✧˵)", kind: "text" },
-        { name: "PROCESS", symbol: "(-_•)︻デ═一", kind: "text" },
+        { name: "PROCESS", displayName: "KILL", symbol: "(-_•)︻デ═一", kind: "text" },
         { name: "THERMAL", symbol: "", kind: "thermal" },
         { name: "SYSTEM", symbol: "🖳", kind: "text" },
         { name: "FAVORITES", symbol: "★", kind: "text" },
@@ -546,7 +546,7 @@ PanelWindow {
     readonly property var activeMemoryPane: memoryActuatorLoader.active ? memoryActuatorLoader.item : null
     readonly property string cpuHeaderStatus: activeMemoryPane ? activeMemoryPane.scanBadge
         : selectedModeIndex===2 || selectedModeIndex===3 ? ((selectedMonitorRows().length>0)?"OBSERVED":"WAITING")
-        : modes[selectedModeIndex].name
+        : (modes[selectedModeIndex].displayName || modes[selectedModeIndex].name)
     readonly property bool showCpuObservation: selectedModeIndex<=3
     readonly property color cpuHeaderColor: !showCpuObservation ? internetStatusColor : (cpuHeaderStatus==="OBSERVED" || cpuHeaderStatus.startsWith("LIVE")) ? Colors.omnitrix
         : cpuHeaderStatus==="PAUSED" ? Colors.yellow
@@ -1409,7 +1409,7 @@ PanelWindow {
                                 id: modeCaption
                                 anchors.centerIn: parent
 
-                                text: modelData.name
+                                text: modelData.displayName || modelData.name
                                 font.pixelSize: 10
                                 color: modeButton.isPressed
                                        ? Colors.black : Colors.white

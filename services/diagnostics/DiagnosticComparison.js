@@ -162,7 +162,9 @@ function compare(before, after, validate, appMetrics) {
                 if (x.workshopSchema!==y.workshopSchema || !x.calibration || !y.calibration
                         || x.calibration.kind!==y.calibration.kind
                         || x.calibration.durationSeconds!==y.calibration.durationSeconds
-                        || x.calibration.intervalMs!==y.calibration.intervalMs)
+                        || x.calibration.intervalMs!==y.calibration.intervalMs
+                        || x.calibration.sampleSeconds!==y.calibration.sampleSeconds
+                        || x.calibration.reportSeconds!==y.calibration.reportSeconds)
                     return fail("OBSERVER CALIBRATION MUST MATCH");
             }
         }

@@ -751,6 +751,12 @@ ShellRoot {
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);
+                if (!root.check(!workshop.preview.ok && workshop.draft.storageSampleSeconds===2,
+                    "shortening duration preserves explicit cadence and refuses invalid plan")) return;
+                workshop.chooseStorageCadence("sample",1);
+                workshop.chooseStorageCadence("report",10);
+                if (!root.check(workshop.preview.ok && workshop.draft.storageSampleSeconds===1 && workshop.draft.storageReportSeconds===10,
+                    "explicit recalibration enables short set capture")) return;
                 if (!root.check(CpuPlusDiagnostics.saveWorkshopPreset("QUICK A")
                     && CpuPlusDiagnostics.saveWorkshopPreset("QUICK B")
                     && CpuPlusDiagnostics.queueWorkshop("QUICK A")

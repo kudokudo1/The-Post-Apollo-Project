@@ -145,10 +145,31 @@ test("both process hosts share the compact information document and action secti
     }
     assert.match(info,/onTargetIdentityChanged: open = false/);
     assert.match(info,/onContextActiveChanged: if \(!contextActive\) open = false/);
-    assert.match(info,/text: "PROCESS PURPOSE"[\s\S]*text: "PROCESS SCOPE \/\/ LIMIT = THIS PROCESS"[\s\S]*text: "TECHNICAL INFORMATION"[\s\S]*text: "COMMAND LINE"/);
+    assert.match(info,/text: "PROCESS PURPOSE"[\s\S]*semanticText\("PROCESS SCOPE \/\/ LIMIT = THIS PROCESS"[\s\S]*text: "TECHNICAL INFORMATION"[\s\S]*text: "COMMAND LINE"/);
     assert.match(info,/textFormat: Text.PlainText/);
     assert.match(app,/anchors.bottom: pinnedTaskActions.visible \? pinnedTaskActions.top : detailBottomBar.top/);
     assert.match(app,/actionTarget: pinnedTaskActions/);
     assert.match(donorView,/height: taskManagerBody.graphHeight/);
     assert.doesNotMatch(donorView,/id: taskProcessScopeInfo/);
+});
+
+test("P4b: three real size steps and only scope/command bodies scroll", () => {
+    const info=read("widgets/appcontrol/ProcessInformationPanel.qml");
+    const button=read("widgets/appcontrol/ProcessInformationButton.qml");
+    const app=read("widgets/AppControlW.qml");
+    assert.match(button,/hoverForegroundColor: Colors.orange/);
+    assert.equal((info.match(/^\s*Flickable\s*\{/gm)||[]).length,2);
+    assert.equal((info.match(/^\s*ResizeButton\s*\{/gm)||[]).length,2);
+    assert.match(info,/sizeLevel === 2 \? availableHeight/);
+    assert.match(info,/availableHeight \* 0\.78/);
+    assert.match(info,/availableHeight \* 0\.55/);
+    assert.match(info,/Math\.max\(0, Math\.min\(2, sizeLevel \+ delta\)\)/);
+    assert.match(info,/scopeMinimum \* baseFraction/);
+    assert.match(info,/argumentsMinimum \* baseFraction/);
+    assert.match(info,/geometryHost: scopeFrame/);
+    assert.match(info,/geometryHost: argumentsFrame/);
+    assert.doesNotMatch(info,/processInformationScroll"/);
+    assert.match(info,/text: root.task \? String\(root.task.args \|\| ""\) : ""\s+textFormat: Text.PlainText/);
+    assert.match(app,/maximumHeight: Math.max\(0, detailBottomBar.y - detailStaticHeader.y - detailStaticHeader.height - 4\)/);
+    assert.match(recipient,/maximumHeight: Math.max\(0, instrumentBay.height - processStateHeader.y - processStateHeader.height - 12\)/);
 });

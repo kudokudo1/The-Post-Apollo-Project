@@ -26,11 +26,10 @@ Item {
     Rectangle {
         id: plate
         anchors.fill: parent
-        anchors.margins: 4
+        anchors.leftMargin: 6
+        anchors.rightMargin: 6
         color: clicker.pressed ? Colors.magenta
                : root.selected || root.hovered ? Colors.yellow : Colors.dark
-        border.width: 1
-        border.color: root.selected || root.hovered ? Colors.red : root.accent
 
         RectangularShadow {
             anchors.fill: parent
@@ -43,7 +42,9 @@ Item {
         GohuText {
             id: glyph
             anchors.left: parent.left
-            anchors.leftMargin: 7
+            anchors.leftMargin: 14
+            width: 50
+            horizontalAlignment: Text.AlignHCenter
             anchors.verticalCenter: parent.verticalCenter
             text: root.controller.taskGlyph(root.entry)
             font.pixelSize: 11
@@ -59,8 +60,8 @@ Item {
             }
         }
         GohuText {
-            anchors.right: glyph.left
-            anchors.rightMargin: 1
+            anchors.left: glyph.left
+            anchors.leftMargin: -3
             anchors.verticalCenter: glyph.verticalCenter
             visible: root.protectedTask
             text: ""
@@ -72,23 +73,24 @@ Item {
         Column {
             id: labelColumn
             anchors.left: glyph.right
-            anchors.leftMargin: 6
+            anchors.leftMargin: 9
             anchors.right: mini.left
-            anchors.rightMargin: 5
+            anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
+            spacing: 0
             GohuText {
                 width: parent.width
-                text: String(root.entry.comm || root.entry.name || "PROCESS")
+                text: root.controller.taskDisplayName(root.entry)
                 textFormat: Text.PlainText
                 elide: Text.ElideRight
-                font.pixelSize: 12
+                font.pixelSize: 15
                 color: clicker.pressed ? Colors.black
-                     : root.selected || root.hovered ? Colors.orange : root.accent
+                     : root.selected || root.hovered ? Colors.orange : Colors.red
             }
             GohuText {
                 width: parent.width
-                text: root.controller.taskRowMetric(root.entry)
+                text: root.controller.taskRowMetric(root.entry) + " • PID " + String(root.entry.pid || "?")
+                    + (root.hunter && root.protectedTask ? " • ⚠︎ PROTECTED" : "")
                 font.pixelSize: 10
                 elide: Text.ElideRight
                 color: clicker.pressed ? Colors.black
@@ -109,21 +111,6 @@ Item {
             clip: true
             readonly property bool combi: root.hunter
                 && root.controller.hunterMetricMode === root.controller.hunterMetricCombined
-            readonly property int revision: root.controller.miniHistoryRevision
-            property real scrollOffset: 0
-            NumberAnimation {
-                id: motion
-                target: mini
-                property: "scrollOffset"
-                to: 0
-                duration: 1080
-                easing.type: Easing.Linear
-            }
-            onRevisionChanged: {
-                motion.stop();
-                scrollOffset = width / 47;
-                motion.start();
-            }
             Rectangle {
                 anchors.fill: parent
                 color: Colors.black
@@ -131,39 +118,22 @@ Item {
                 border.width: 1
                 border.color: root.accent
             }
-            Repeater {
-                model: mini.combi
-                    ? [{key:"cpu",accent:Colors.orange},{key:"mem",accent:Colors.magenta},
-                       {key:"io",accent:Colors.cyan},{key:"age",accent:Colors.white}]
-                    : [{key:root.hunter ? root.controller.metricKey : "normal",
-                        accent:root.accent}]
-                delegate: Item {
-                    id: trace
-                    required property var modelData
-                    anchors.fill: mini
-                    anchors.margins: 2
-                    readonly property var points: {
-                        const rev = mini.revision;
-                        return root.controller.miniGraphPoints(
-                            root.entry, modelData.key, width, height);
-                    }
-                    Repeater {
-                        model: Math.max(0, trace.points.length - 1)
-                        delegate: Rectangle {
-                            required property int index
-                            readonly property point p1: trace.points[index]
-                            readonly property point p2: trace.points[index + 1]
-                            x: p1.x + mini.scrollOffset
-                            y: p1.y - height / 2
-                            width: Math.max(1, Math.hypot(p2.x-p1.x,p2.y-p1.y))
-                            height: 1
-                            color: trace.modelData.accent
-                            transformOrigin: Item.Left
-                            rotation: Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI
-                            antialiasing: true
-                        }
-                    }
-                }
+            ProcessMiniGraph {
+                objectName: "killTargetSharedMiniRenderer"
+                anchors.fill: parent
+                anchors.margins: 2
+                geometry: root.controller.miniGeometry
+                historyRevision: root.controller.miniHistoryRevision
+                historyLimit: root.controller.miniHistoryLimit
+                scrollDuration: root.controller.miniScrollDuration
+                taskIdentity: String(root.entry.pid || 0) + "|" + String(root.entry.startTicks || 0) + "|" + String(root.entry.comm || "")
+                metricKey: root.hunter ? root.controller.metricKey : "normal"
+                combiView: mini.combi
+                graphRange: root.controller.miniRange(metricKey)
+                accent: root.accent
+                readHistory: function() { return root.controller.miniHistory(root.entry, metricKey) }
+                readMetricHistory: function(key) { return root.controller.miniHistory(root.entry, key) }
+                metricRange: function(key) { return root.controller.miniMetricRange(key) }
             }
         }
         MouseArea {
@@ -173,9 +143,10 @@ Item {
             onClicked: root.selectedRequested()
         }
         Item {
-            width: 23
+            width: 30
             height: 30
             anchors.right: parent.right
+            anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
             z: 500
             GohuText {

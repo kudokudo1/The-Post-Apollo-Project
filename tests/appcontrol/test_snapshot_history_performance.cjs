@@ -756,12 +756,10 @@ test('application sort snapshots preserve favorites, source ties and row identit
     assert.match(app,/return appControlWindow.sortApplicationRows\(filtered\);/);
 });
 test('task favorite first matches use one pass and avoid unneeded snapshot subscriptions',()=>{
-    const start=app.indexOf('    function firstFavoriteTaskRows(');
-    const end=app.indexOf('    ScriptModel {',start);
-    assert.ok(start>=0&&end>start);
+    const combi=fs.readFileSync(path.join(root,'services/favorites/FavoritesAppControlCombiPolicy.js'),'utf8');
+    const firstPolicy=new Function(combi.replace(/^\.pragma library\s*$/m,'')+'\nreturn firstFavoriteTaskRows;')();
     let reads=0;
-    const first=new Function('taskPersistentIdentity',app.slice(start,end)+'\nreturn firstFavoriteTaskRows;')(
-        e=>{reads++;return e.identity;});
+    const first=(wanted,rows)=>firstPolicy(wanted,rows,e=>{reads++;return e.identity;});
     const rows=Array.from({length:600},(_,i)=>({identity:'task'+i%90,pid:i+2}));
     rows.push({identity:'__proto__',pid:900});
     for(const wanted of [[],['task20'],['task40','task20','absent'],['task0','__proto__']]){
@@ -773,8 +771,9 @@ test('task favorite first matches use one pass and avoid unneeded snapshot subsc
     }
     const model=app.slice(app.indexOf('id: favoriteResults'),app.indexOf('function resultCount()'));
     assert.equal((model.match(/appControlWindow\.taskRows/g)||[]).length,1);
-    assert.match(model,/if \(watchedIdentities.length > 0\) \{\s*const first = appControlWindow.firstFavoriteTaskRows\(\s*watchedIdentities, appControlWindow.taskRows\)/);
-    assert.match(model,/favoriteRecordForTaskIdentity\(\s*identity,\s*first\[identity\] \|\| null/);
+    assert.match(model,/taskRows: function\(\) \{ return appControlWindow\.taskRows; \}/);
+    assert.match(combi,/if \(watchedIdentities.length > 0\) \{\s*const first = firstFavoriteTaskRows\(watchedIdentities, sources.taskRows\(\), owner.taskIdentity\)/);
+    assert.match(combi,/favoriteRecordForTaskIdentity\(\s*identity,\s*first\[identity\] \|\| null/);
 });
 
 test('APP row restore observes read, scan, assignment and deferred view without changing order',()=>{

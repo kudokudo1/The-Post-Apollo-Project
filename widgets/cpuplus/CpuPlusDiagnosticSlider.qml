@@ -13,8 +13,9 @@ Column {
     property color subjectColor: Colors.white
     property color fillColor: Colors.omnitrix
     property bool adjustable: true
+    property bool compact: false
     signal valueRequested(real value)
-    spacing: 2
+    spacing: compact ? 0 : 2
     GohuText {
         width: parent.width
         text: root.title + " // " + root.readout
@@ -24,11 +25,11 @@ Column {
     }
     Item {
         width: parent.width
-        height: 32
+        height: root.compact ? 24 : 32
         SelectorSlider {
             objectName: root.objectName + "-hardware"
             anchors.centerIn: parent
-            width: 32
+            width: parent.height
             height: parent.width
             rotation: 90
             horizontalStepPresentation: true

@@ -55,6 +55,9 @@ Item {
     property color accentColor: Colors.cyan
     property color markerColor: Colors.orange
     property color labelColor: Colors.cyan
+    property color readoutColor: Colors.white
+    property bool readoutGlowEnabled: false
+    property color interactionGlowColor: accentColor
     // Operation state comes from the owning module, never inferred from a selection.
     property string loadingState: "idle" // idle, loading, success, error
     property real loadingProgress: -1 // -1: indeterminate; otherwise 0..1
@@ -622,7 +625,7 @@ Item {
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: dialRoot.accentColor
+                shadowColor: dialRoot.rotating || dialRoot.dialHovered ? dialRoot.interactionGlowColor : dialRoot.accentColor
                 shadowOpacity: dialRoot.ringGlowStrength * 0.56
                 shadowBlur: 0.72
             }
@@ -1184,7 +1187,14 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         font.pixelSize: dialRoot.readoutPixelSize
-        color: dialRoot.interactive ? Colors.white : Colors.orange
+        color: dialRoot.interactive || dialRoot.readoutGlowEnabled ? dialRoot.readoutColor : Colors.orange
         opacity: dialRoot.interactive ? 1.0 : 0.78
+        layer.enabled: dialRoot.readoutGlowEnabled
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: dialRoot.readoutColor
+            shadowOpacity: 0.85
+            shadowBlur: 0.65
+        }
     }
 }

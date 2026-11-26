@@ -115,3 +115,86 @@ evidence source feasibility, exact implementation and integrated focused
 tests require Heart/Runtime compatibility and independent Nurse review.
 The eventual manual-only workflow remains uninvoked and requires separate
 explicit operator/Nurse run approval plus successful preflight.
+
+## 6. Read-only evidence feasibility and negative qualification
+
+Design supplement authorized by Nurse #2161 comment 7185166925, with
+Heart 7183374829 and Runtime 7184293060 compatibility. This is a
+candidate evidence acquisition contract, not a selected runner, policy,
+observer, permission, implementation or native acceptance.
+
+| Evidence | Potential independent observation | Required feasibility / refusal |
+| --- | --- | --- |
+| Effective device policy | On the independently pinned cgroup FD, BPF_PROG_QUERY with BPF_F_QUERY_EFFECTIVE for BPF_CGROUP_DEVICE; program references via BPF_PROG_GET_FD_BY_ID and information via BPF_OBJ_GET_INFO_BY_FD | Require complete effective set and actual semantics, including inherited restrictions and applicable attachment composition; refuse inaccessible, truncated, ambiguous or changing results. |
+| Original process and descendants | Host pidfd, boot/PID/start identity, pinned cgroup mount/inode, bounded recursive membership and lineage | Independently establish original identity and exclusive membership; refuse reuse, migration, incomplete traversal or unknown descendant. A pinned process handle does not pin its membership or prove absence of escape. |
+| Namespace, mount and controller scope | Host-side process namespace handles, mountinfo, root identity, controller access and FD inventory | Verify exact namespace/root and every relevant nested mount and inherited descriptor against reviewed allowlist; refuse writable controllers, shared or unexpected host mounts, incomplete visibility or mutable scope. |
+| Credentials and device/FD exposure | Per-member status, ID mappings, groups, capability sets, NoNewPrivs, seccomp evidence and independently classified descriptors | Refuse unapproved credentials, retained device or host descriptors, unaccounted transfer/acquisition, or unknown effective restrictions. A status bit alone does not establish seccomp policy semantics. |
+| Network and credential channels | Original private network namespace interfaces, addresses, routes, sockets, descriptor and reviewed immutable image/input provenance | Require loopback-only boundary and absence of credential/external channels, including inherited or transferred descriptors; no external connectivity or device-access probe. Export only approved aggregate reasons. |
+
+A deliberately restricted, independently reviewed deterministic map-free
+device-policy profile is a candidate for first qualification. An approved
+profile would have bounded known instructions and exact device
+type/major/minor/access semantics, default refusal outside the minimal
+benign character-device allowlist, no permitted accelerator or block-device
+access, and no opaque helpers, external mutable inputs or unverified
+effective composition. Compare actual translated instructions and relevant
+kernel semantics to the reviewed profile; an ID, tag or program count is
+not semantic evidence. Even freezing a map does not prevent BPF-program
+writes. A program FD retains the object, not its attachment. Require
+independently established prevention of policy/attachment changes
+throughout the original interval, including inherited controls; matching
+endpoint queries cannot exclude intervening change. If the existing
+runtime policy cannot be independently qualified in this restricted
+profile, HOLD and seek a separate design decision, not a policy rewrite,
+universal interpreter or substitute device probe.
+
+Host visibility and permission are explicit prelaunch feasibility gates.
+The intended approved disposable runner, pinned image, kernel/runtime
+and observer capability must be identified and separately qualified;
+procfs views and descriptor access can be restricted by namespace and
+ptrace checks. A missing record may mean denied visibility, not absence.
+No privilege grant or payload-side observer is implied. The reviewed
+host/runtime must establish prevention of unobserved process migration,
+controller/policy mutation, namespace escape and unexpected descriptor
+acquisition/transfer throughout the attempt; snapshots alone cannot
+establish continuous confinement. Actual feasibility remains UNKNOWN.
+
+Before any separately authorized creation, assess the planned observer
+and policy capability without consuming or relaxing the final parent
+and optional outer baseline freshness (each complete within 1s before
+actual launch). After creation, independently pin the original inner
+identity before first-active observation. The trusted startup gate
+must prevent payload progression until the original Heart prefix and
+all Spirit effective observations complete, with progression no later
+than actual launch plus 1s. Keep the original monotonic launch
+reference, preselected scope, Reader and samples; no substitute
+process or scope. Do not infer this deadline is achievable from
+synthetic test durations. Preserve bounded rechecks, original terminal
+before final empty sample and disposal after final read.
+
+Additional negative qualification cases for future separate review:
+incomplete effective query, matching program ID with unknown semantics,
+opaque/mutable map state even when frozen, pinned program detached or
+inherited policy changed, denied procfs visibility misread as empty,
+transient membership/control/descriptor change not excluded, prelaunch
+feasibility mistaken for actual original evidence, stale parent/baseline,
+late Heart prefix or late Spirit completion, and observer loss before
+progression or terminal. Any such failure is HOLD; after creation retain
+the original attempt/evidence with no payload progression on a failed
+startup gate, no assertion of no effect, no retry or replacement.
+Runtime owns bounded cleanup and original terminal; cleanup cannot
+manufacture terminal evidence. No new observer, launcher, workflow,
+BPF program, policy attach/detach, native probe or privilege authorized.
+
+Reference interfaces (not evidence of runner support):
+- https://docs.kernel.org/userspace-api/ebpf/syscall.html
+- https://docs.kernel.org/admin-guide/cgroup-v2.html#device-controller
+- https://docs.kernel.org/filesystems/proc.html
+- https://man7.org/linux/man-pages/man2/pidfd_open.2.html
+- https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html
+- https://man7.org/linux/man-pages/man5/proc_pid_mountinfo.5.html
+
+Exact Heart, Runtime and independent Nurse design review before operator
+integration. Any executable acquisition, native run or privilege decision
+requires separate explicit authorization. Connections F1–F6, native
+containment, protected operation and production remain HOLD.

@@ -55,6 +55,8 @@ Item {
             id: gauge
             objectName: "automotiveGauge"
             anchors.fill: parent
+            property bool hasPainted: false
+            onPainted: hasPainted = true
             onAvailableChanged: if (available) requestPaint()
             Connections {
                 target: root
@@ -133,21 +135,23 @@ Item {
                 color: "#07040b"; border.color: root.accentColor
                 GohuText {
                     objectName: "selectorStopwatchCenter"
-                    anchors.centerIn: parent
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 2
                     text: root.valueText
                     color: root.liveColor
                     font.pixelSize: text.length>4?18:29
-                    width: parent.width-4
+                    width: parent.width-(root.valueUnit!==""?24:4)
                     horizontalAlignment: Text.AlignHCenter
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 12
                 }
+                GohuText {
+                    anchors.right: parent.right; anchors.rightMargin: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: root.valueUnit!==""
+                    text: root.valueUnit; color: Colors.white; font.pixelSize: 10
+                }
             }
-        }
-        GohuText {
-            visible: root.showValue && root.valueUnit!==""
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: 89; text: root.valueUnit; color: Colors.white; font.pixelSize: 11
         }
         Rectangle {
             visible: root.showSetValue && root.setText!==""
@@ -160,7 +164,9 @@ Item {
                 text: root.setText
                 textFormat: Text.RichText
                 color: root.accentColor
-                font.pixelSize: 13
+                font.pixelSize: 12
+                fontSizeMode: Text.Fit
+                minimumPixelSize: 8
                 elide: Text.ElideRight
             }
         }
@@ -172,6 +178,8 @@ Item {
                 id: arm
                 objectName: "automotiveArm"
                 anchors.fill: parent
+                property bool hasPainted: false
+                onPainted: hasPainted = true
                 onAvailableChanged: if(available) requestPaint()
                 Connections {
                     target: root

@@ -3367,7 +3367,8 @@ PanelWindow {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 12
         anchors.rightMargin: 12
-        anchors.bottomMargin: cpuPlusWindow.chassisBottomInset
+        // Match the existing actuator bay boundary without a second geometry rule.
+        anchors.bottomMargin: actuatorPane.anchors.bottomMargin
         z: 1200
         active: cpuPlusWindow.menuOpen
                 && cpuPlusWindow.selectedModeIndex === 1

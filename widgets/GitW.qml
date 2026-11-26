@@ -2018,7 +2018,7 @@ PanelWindow {
         root.selectedPullRequest = null;
         root.githubView = "pulls";
 
-        githubWorkItemsService.refreshPulls(
+        githubWorkItemsService.ensurePulls(
             gitService.repoRemoteSlug
         );
 
@@ -2048,7 +2048,7 @@ PanelWindow {
 
         if (gitService.repoRemoteSlug
                 && !githubWorkItemsService.pullsBusy) {
-            githubWorkItemsService.refreshPulls(
+            githubWorkItemsService.ensurePulls(
                 gitService.repoRemoteSlug
             );
         }

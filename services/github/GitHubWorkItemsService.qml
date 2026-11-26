@@ -24,9 +24,17 @@ Scope {
     property int pullsStreamOffset: 0
     property string pullsStreamError: ""
     property bool pullsTimedOut: false
+    property double pullsListCompletedAtMs: 0
+    property double pullsStartedAtMs: 0
+    property int pullsFirstPageMs: -1
+    property int pullsFullLoadMs: -1
+    readonly property int pullsCacheMaxAgeMs: 30000
 
     onRepoSlugChanged: {
         pullsRepoEpoch += 1;
+        pullsListCompletedAtMs = 0;
+        pullsFirstPageMs = -1;
+        pullsFullLoadMs = -1;
         pulls = [];
         pullsPublishedRepo = "";
         pullsPendingRepo = "";
@@ -507,6 +515,8 @@ Scope {
 
     function pullReviewSummary(row) {
         const state = pullReviewState(row);
+        if ((row || {}).reviewDetailsDeferred)
+            return state === "UNKNOWN" ? "DETAILS NOT LOADED" : state + " // DETAILS ON OPEN";
         const approvals = pullApprovalCount(row);
         const countText =
             String(approvals)
@@ -580,6 +590,23 @@ Scope {
         return true;
     }
 
+    // Only automatic opening uses the freshness window. Explicit refresh
+    // and mutation-driven reads continue through refreshPulls.
+    function ensurePulls(repo) {
+        const clean = String(repo || "").trim();
+        if (!clean || clean.toLowerCase() !== repoSlug.toLowerCase())
+            return false;
+        if (pullsBusy && pullsRequestNumber === 0
+                && pullsRequestEpoch === pullsRepoEpoch
+                && pullsRequestRepo.toLowerCase() === clean.toLowerCase())
+            return true;
+        const age = Date.now() - pullsListCompletedAtMs;
+        if (!pullsError && pullsPublishedRepo.toLowerCase() === clean.toLowerCase()
+                && pullsListCompletedAtMs > 0 && age >= 0 && age < pullsCacheMaxAgeMs)
+            return true;
+        return refreshPulls(clean, 0);
+    }
+
     function refreshPulls(repo, number) {
         const cleanRepo = String(repo || repoSlug || "").trim();
         const target = Number(number || 0);
@@ -601,6 +628,12 @@ Scope {
             return false;
         }
 
+        if (target === 0) {
+            pullsListCompletedAtMs = 0;
+            pullsStartedAtMs = Date.now();
+            pullsFirstPageMs = -1;
+            pullsFullLoadMs = -1;
+        }
         pullsRequestRepo = cleanRepo;
         pullsRequestNumber = target;
         pullsRequestEpoch = pullsRepoEpoch;
@@ -627,14 +660,15 @@ Scope {
                 'owner="${repo%%/*}"',
                 'name="${repo#*/}"',
                 "[[ \"$repo\" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo \"PULLS REQUEST // INVALID REPOSITORY\" >&2; exit 1; }",
-                "query='query($owner:String!,$name:String!,$cursor:String){ repository(owner:$owner,name:$name){ pullRequests(first:25,after:$cursor,orderBy:{field:UPDATED_AT,direction:DESC}){ pageInfo{hasNextPage endCursor} nodes{ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } } }'",
+                "query='query($owner:String!,$name:String!,$cursor:String,$size:Int!){repository(owner:$owner,name:$name){pullRequests(first:$size,after:$cursor,orderBy:{field:UPDATED_AT,direction:DESC}){pageInfo{hasNextPage endCursor} nodes{number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:1){totalCount} commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}'",
                 "target=\"${2:-0}\"",
                 "detail_query='query($owner:String!,$name:String!,$number:Int!){ repository(owner:$owner,name:$name){ pullRequest(number:$number){ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } }'",
                 "tmpdir=\"$(mktemp -d)\"",
                 "trap 'rm -rf \"$tmpdir\"' EXIT",
                 "cursor=\"\"",
-                "for page in 1 2 3 4; do",
-                "  args=(); active_query=\"$query\"; [ -z \"$cursor\" ] || args+=(-f cursor=\"$cursor\")",
+                "for page in 1 2; do",
+                "  size=25; [ \"$page\" -eq 1 ] || size=75",
+                "  args=(-F size=\"$size\"); active_query=\"$query\"; [ -z \"$cursor\" ] || args+=(-f cursor=\"$cursor\")",
                 "  if [ \"$target\" -gt 0 ]; then active_query=\"$detail_query\"; args=(-F number=\"$target\"); fi",
                 "  rc=0",
                 "  gh api graphql --include -f owner=\"$owner\" -f name=\"$name\" -f query=\"$active_query\" \"${args[@]}\" > \"$tmpdir/response\" 2> \"$tmpdir/gh-error\" || rc=$?",
@@ -675,11 +709,11 @@ Scope {
                 "    jq -c \"[.data.repository.pullRequest]\" \"$tmpdir/body.json\" > \"$tmpdir/page-$page.json\"",
                 "    break",
                 "  fi",
-                "  if ! jq -e '.data.repository.pullRequests | (type == \"object\") and (.nodes | type == \"array\" and length <= 25) and (.pageInfo.hasNextPage | type == \"boolean\") and (if .pageInfo.hasNextPage then (.pageInfo.endCursor | type == \"string\" and length > 0) else true end) and all(.nodes[]; (.number | type == \"number\" and . > 0 and floor == .) and (.headRefOid | type == \"string\" and test(\"^[0-9a-fA-F]{40}$\")))' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
+                "  if ! jq -e --argjson size \"$size\" '.data.repository.pullRequests | (type == \"object\") and (.nodes | type == \"array\" and length <= $size) and (.pageInfo.hasNextPage | type == \"boolean\") and (if .pageInfo.hasNextPage then (.pageInfo.endCursor | type == \"string\" and length > 0) else true end) and all(.nodes[]; (.number | type == \"number\" and . > 0 and floor == .) and (.headRefOid | type == \"string\" and test(\"^[0-9a-fA-F]{40}$\")))' \"$tmpdir/body.json\" >/dev/null 2>&1; then",
                 "    echo \"PULLS RESPONSE // PAGE $page // INVALID RESULT SHAPE\" >&2; exit 1",
                 "  fi",
                 "  jq -c \".data.repository.pullRequests.nodes\" \"$tmpdir/body.json\" > \"$tmpdir/page-$page.json\"",
-                "  jq -c 'map(. + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // []),checkDetailsDeferred:(((.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // []) | length) == 0),reviewDetailsDeferred:((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0))}) | {page: ., kind:\"page\"}' \"$tmpdir/page-$page.json\"",
+                "  jq -c 'map(. + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // []),checkDetailsDeferred:true,reviewDetailsDeferred:true}) | {page: ., kind:\"page\"}' \"$tmpdir/page-$page.json\"",
                 "  [ \"$(jq -r \".data.repository.pullRequests.pageInfo.hasNextPage\" \"$tmpdir/body.json\")\" = true ] || break",
                 "  next=\"$(jq -r \".data.repository.pullRequests.pageInfo.endCursor\" \"$tmpdir/body.json\")\"",
                 "  [ \"$next\" != \"$cursor\" ] || { echo \"PULLS PAGINATION // REPEATED CURSOR\" >&2; exit 1; }",
@@ -688,7 +722,7 @@ Scope {
                 "jq -c -s 'add | if (map(.number) | unique | length) != length then error(\"duplicate pull request across pages\") else . end' \"$tmpdir\"/page-*.json > \"$tmpdir/rows.json\"",
                 "jq -c '[.[] | . + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])}]' \"$tmpdir/rows.json\" > \"$tmpdir/normalized.json\"",
                 "if [ \"$target\" -eq 0 ]; then",
-                "  jq -c 'map(. + {checkDetailsDeferred:(((.checkContexts // []) | length) == 0),reviewDetailsDeferred:((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0))})' \"$tmpdir/normalized.json\"",
+                "  jq -c 'map(. + {checkDetailsDeferred:true,reviewDetailsDeferred:true})' \"$tmpdir/normalized.json\"",
                 "  exit 0",
                 "fi",
                 "jq -c '.[] | select((((.checkContexts // []) | length) == 0) or ((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0)))' \"$tmpdir/normalized.json\" > \"$tmpdir/fallback.ndjson\"",
@@ -814,8 +848,8 @@ Scope {
                     continue;
                 }
                 if (pullsStdout || pullsRequestNumber !== 0 || !frame || frame.kind !== "page"
-                        || !Array.isArray(frame.page) || frame.page.length > 25
-                        || pullsPageCount >= 4)
+                        || !Array.isArray(frame.page) || frame.page.length > (pullsPageCount === 0 ? 25 : 75)
+                        || pullsPageCount >= 2)
                     throw new Error("INVALID PAGE FRAME");
                 const next = pullsPageCount ? pulls.slice() : [];
                 const seen = new Set(next.map(function(row) { return root.rowNumber(row); }));
@@ -827,10 +861,12 @@ Scope {
                     seen.add(number);
                     next.push(row);
                 }
+                if (pullsPageCount === 0)
+                    pullsFirstPageMs = Math.max(0, Date.now() - pullsStartedAtMs);
                 pullsPageCount += 1;
                 pullsPublishedRepo = pullsRequestRepo;
                 pulls = next;
-                pullsStateText = "PULLS // " + next.length + " LOADED // LOADING MORE";
+                pullsStateText = "PULLS // " + next.length + " LOADED // FIRST " + pullsFirstPageMs + " ms";
                 pullsRefreshed();
             } catch (e) {
                 pullsStreamError = "PULL RESPONSE FRAME // " + String(e);
@@ -897,9 +933,13 @@ Scope {
                     throw new Error("FINAL RESPONSE DOES NOT MATCH VALIDATED PAGES");
                 pullsPublishedRepo = requestRepo;
                 pulls = parsed;
+                pullsListCompletedAtMs = Date.now();
+                pullsFullLoadMs = Math.max(0, pullsListCompletedAtMs - pullsStartedAtMs);
             }
             pullsStateText = "PULLS READY // " + String(pulls.length)
-                + (pulls.length >= 100 ? " // LATEST 100" : "");
+                + (pulls.length >= 100 ? " // LATEST 100" : "")
+                + (pullsFirstPageMs >= 0 && pullsFullLoadMs >= 0
+                   ? " // FIRST " + pullsFirstPageMs + " ms / ALL " + pullsFullLoadMs + " ms" : "");
             pullsError = "";
         } catch (parseError) {
             pullsError = "PULL RESPONSE PARSE // " + String(parseError);

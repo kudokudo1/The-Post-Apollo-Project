@@ -9870,7 +9870,8 @@ PanelWindow {
         Qt.callLater(function () {
             const item = detailActionItem(selectedDetailActionIndex);
 
-            if (!item || detailFlickable.height <= 0)
+            if (!item || detailFlickable.height <= 0
+                    || appControlWindow.selectedResultIsTask())
                 return;
 
             const point = item.mapToItem(detailContent, 0, 0);
@@ -20557,7 +20558,7 @@ PanelWindow {
                             Row {
                                 id: selectedAppIdentity
 
-                                width: parent.width
+                                width: Math.max(0, parent.width - (showingTask ? 30 : 0))
                                 spacing: 14
 
                                 property var selectedRecord:
@@ -21311,9 +21312,7 @@ PanelWindow {
                             GohuText {
                                 id: selectedMonitorSimplePurpose
                                 width: parent.width
-                                visible:
-                                    selectedAppIdentity.showingTask
-                                    || selectedAppIdentity.showingThermal
+                                visible: selectedAppIdentity.showingThermal
                                 text:
                                     selectedAppIdentity.showingThermal
                                     ? thermalController.thermalSimplePurpose(
@@ -21401,6 +21400,17 @@ PanelWindow {
                                 opacity: 0.5
                             }
                 }
+                ProcessInformationButton {
+                    objectName: "appControlProcessInformationButton"
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 25
+                    anchors.topMargin: 8
+                    visible: selectedAppIdentity.showingTask
+                    selected: appControlProcessInformation.open
+                    onLeftClicked: appControlProcessInformation.open = !appControlProcessInformation.open
+                }
+
             }
 
             Column {
@@ -21742,7 +21752,7 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: detailStaticHeader.bottom
-            anchors.bottom: detailBottomBar.top
+            anchors.bottom: pinnedTaskActions.visible ? pinnedTaskActions.top : detailBottomBar.top
 
             anchors.leftMargin: 25
             anchors.rightMargin: 25
@@ -22335,6 +22345,8 @@ PanelWindow {
                 hunterGraph: hunterPresentation
                 searchInputTarget: searchInput
                 safetyLockComponent: taskActionSafetyLockComponent
+                actionTarget: pinnedTaskActions
+                viewportHeight: detailFlickable.height - 8
             }
 
             Column {
@@ -28679,6 +28691,7 @@ PanelWindow {
                     id: detailHintGlowBox
 
                     visible: appControlWindow.selectedResultSupportsDetail()
+                             && !appControlWindow.selectedResultIsTask()
 
                     width: detailHintText.implicitWidth + 24
                     height: detailHintText.implicitHeight + 16
@@ -28870,6 +28883,34 @@ PanelWindow {
                     // Keep wheel/trackpad scrolling available to the Flickable.
                     wheel.accepted = false;
                 }            }
+        }
+
+        // KILL controls remain visible independently of graph scrolling.
+        Column {
+            id: pinnedTaskActions
+            objectName: "appControlPinnedTaskActions"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: detailBottomBar.top
+            anchors.leftMargin: 25
+            anchors.rightMargin: 25
+            anchors.bottomMargin: 8
+            height: implicitHeight
+            visible: appControlWindow.selectedResultIsTask() && !!taskManagerBody.currentTask
+        }
+        ProcessInformationPanel {
+            id: appControlProcessInformation
+            objectName: "appControlProcessInformation"
+            anchors.left: detailFlickable.left
+            anchors.right: detailFlickable.right
+            anchors.top: detailStaticHeader.bottom
+            anchors.topMargin: 4
+            maximumHeight: Math.max(0, (detailBottomBar.y - detailStaticHeader.y) * 0.55)
+            contextActive: appControlWindow.menuOpen && appControlWindow.selectedResultIsTask()
+            task: contextActive ? taskManagerBody.currentTask : null
+            purpose: visible && task ? appControlWindow.taskSimplePurpose(task) : ""
+            scopeText: visible && task ? processPresentationController.scopeProcessText() : ""
+            virtualMemory: visible && task ? processPresentationController.formatMemory(task.vsz) : "?"
         }
 
         Rectangle {

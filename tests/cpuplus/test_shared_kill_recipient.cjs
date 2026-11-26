@@ -115,7 +115,8 @@ test("master and per-action lock state is rendered with donor glyphs and exact-o
     assert.match(recipient,/appControlWindow\.toggleTaskDangerStickyUnlock/);
     assert.match(donorView,/property Item actionTarget: null/);
     assert.match(recipient,/actionTarget: rightActions/);
-    assert.equal((donorView.match(/parent: taskManagerBody\.actionTarget \|\| taskManagerBody/g)||[]).length,6);
+    assert.equal((donorView.match(/parent: taskManagerBody\.actionTarget \|\| taskManagerBody/g)||[]).length,1);
+    assert.match(donorView,/property alias actionSection: actionColumn/);
 });
 
 test("PROCESS visibility increases only the existing owner sampling cadence", () => {
@@ -131,4 +132,23 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.doesNotMatch(recipient,/^\s*(Timer|ProcessTelemetry)\s*\{/m);
     assert.match(recipient,/row\.cpuInstant !== undefined \? row\.cpuInstant : row\.cpu/);
     assert.match(recipient,/now-lastDetailSampleMs<history\.taskGraphScrollDuration/);
+});
+
+test("both process hosts share the compact information document and action section", () => {
+    const app=read("widgets/AppControlW.qml");
+    const info=read("widgets/appcontrol/ProcessInformationPanel.qml");
+    for (const host of [app,recipient]) {
+        assert.match(host,/ProcessInformationButton\s*\{/);
+        assert.match(host,/ProcessInformationPanel\s*\{/);
+        assert.match(host,/scopeText: visible && task \?/);
+        assert.match(host,/maximumHeight: Math.max\(0,/);
+    }
+    assert.match(info,/onTargetIdentityChanged: open = false/);
+    assert.match(info,/onContextActiveChanged: if \(!contextActive\) open = false/);
+    assert.match(info,/text: "PROCESS PURPOSE"[\s\S]*text: "PROCESS SCOPE \/\/ LIMIT = THIS PROCESS"[\s\S]*text: "TECHNICAL INFORMATION"[\s\S]*text: "COMMAND LINE"/);
+    assert.match(info,/textFormat: Text.PlainText/);
+    assert.match(app,/anchors.bottom: pinnedTaskActions.visible \? pinnedTaskActions.top : detailBottomBar.top/);
+    assert.match(app,/actionTarget: pinnedTaskActions/);
+    assert.match(donorView,/height: taskManagerBody.graphHeight/);
+    assert.doesNotMatch(donorView,/id: taskProcessScopeInfo/);
 });

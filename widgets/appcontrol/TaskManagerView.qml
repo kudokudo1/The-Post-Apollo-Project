@@ -14,9 +14,17 @@ import "../../components"
     required property var searchInputTarget
     required property Component safetyLockComponent
 
-    // Optional recipient-owned actuator column. Default preserves AppControl's
-    // exact existing inline layout and action aliases.
+    // Hosts choose placement; the shared action column owns visual order.
     property Item actionTarget: null
+    property real viewportHeight: 0
+    readonly property bool compact: viewportHeight > 0
+    readonly property int graphCount: taskCpuGraph.hunterMetricView && !taskCpuGraph.combiView ? 1 : 2
+    readonly property real graphHeight: compact
+        ? Math.max(48, Math.min(112, Math.floor((viewportHeight - taskMetricGrid.implicitHeight
+            - (actionTarget ? 0 : actionColumn.implicitHeight + spacing)
+            - spacing * graphCount - 12) / graphCount)))
+        : 112
+    property alias actionSection: actionColumn
 
     property alias cpuCanvas: taskCpuCanvas
     property alias combiScoreCanvas: taskCombiScoreCanvas
@@ -31,7 +39,7 @@ import "../../components"
                 // were visibly hard-clipped on the top/left/right edges.
                 width: parent.width - 16
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 12
+                spacing: compact ? 6 : 12
 
                 visible: processController.currentTask !== null
 
@@ -76,7 +84,7 @@ import "../../components"
                                 )
 
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 58
+                            Layout.preferredHeight: taskManagerBody.compact ? 44 : 58
                             color: Colors.black
                             border.width: 1
                             border.color: accent
@@ -92,8 +100,8 @@ import "../../components"
 
                             Column {
                                 anchors.fill: parent
-                                anchors.margins: 7
-                                spacing: 3
+                                anchors.margins: taskManagerBody.compact ? 4 : 7
+                                spacing: taskManagerBody.compact ? 1 : 3
 
                                 GohuText {
                                     text: modelData.label
@@ -171,7 +179,7 @@ import "../../components"
                     id: taskCpuGraph
 
                     width: parent.width
-                    height: 112
+                    height: taskManagerBody.graphHeight
 
                     readonly property bool hunterMetricView:
                         host.hunterMetricView
@@ -673,7 +681,7 @@ import "../../components"
 
                     visible: taskCpuGraph.combiView
                     width: parent.width
-                    height: visible ? 112 : 0
+                    height: visible ? taskManagerBody.graphHeight : 0
 
                     readonly property color accent: Colors.yellow
                     readonly property var historyValues: {
@@ -904,7 +912,7 @@ import "../../components"
                     visible: !taskCpuGraph.hunterMetricView
 
                     width: parent.width
-                    height: 112
+                    height: taskManagerBody.graphHeight
 
                     GohuText {
                         id: taskMemGraphTitle
@@ -1110,10 +1118,16 @@ import "../../components"
 
 
 
-                // KILLING ACTIONS sit immediately below the graphs.
-Item {
-                    id: taskTerminationHeaderBox
+                // Reparent the entire column once, never individual controls.
+                Column {
+                    id: actionColumn
+                    objectName: "sharedProcessActionSection"
                     parent: taskManagerBody.actionTarget || taskManagerBody
+                    width: parent.width
+                    spacing: taskManagerBody.compact ? 6 : 12
+                    visible: !!taskManagerBody.currentTask
+                    Item {
+                    id: taskTerminationHeaderBox
 
                     width: parent.width
                     height: 30
@@ -1150,7 +1164,7 @@ Item {
                         // so their right edge sits 5 px inside this column.
                         anchors.rightMargin: 5
                         anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: 8
+                        anchors.verticalCenterOffset: 0
                         spacing: 5
 
                         Loader {
@@ -1222,7 +1236,6 @@ Item {
 
                 ActionButton {
                     id: taskRestartAction
-                    parent: taskManagerBody.actionTarget || taskManagerBody
                     width: parent.width - 10
                     height: 34
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -1329,7 +1342,6 @@ Item {
 
                 Rectangle {
                     id: taskLimitSlider
-                    parent: taskManagerBody.actionTarget || taskManagerBody
 
                     width: parent.width - 10
                     height: 34
@@ -1732,7 +1744,6 @@ Item {
 
                 ActionButton {
                     id: taskFreezeAction
-                    parent: taskManagerBody.actionTarget || taskManagerBody
 
                     width: parent.width - 10
                     height: 34
@@ -1878,7 +1889,6 @@ Item {
 
                 ActionButton {
                     id: taskEndAction
-                    parent: taskManagerBody.actionTarget || taskManagerBody
                     property bool clickFirePulse: false
                     Timer {
                         id: taskEndFireTimer
@@ -2040,225 +2050,5 @@ Item {
 
                 }
 
-                                Rectangle {
-                    id: taskProcessScopeInfo
-                    parent: taskManagerBody.actionTarget || taskManagerBody
-                    width: parent.width - 10
-                    height: 112
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.cyan
-                    clip: true
-
-                    GohuText {
-                        id: taskProcessScopeHeader
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.leftMargin: 7
-                        anchors.rightMargin: 7
-                        anchors.topMargin: 6
-
-                        text:
-                            "PROCESS SCOPE • PID "
-                            + String(
-                                  taskManagerBody.currentTask
-                                  ? taskManagerBody.currentTask.pid : "?"
-                              )
-                            + " • LIMIT = THIS PROCESS"
-                        font.pixelSize: 10
-                        color: Colors.cyan
-                        elide: Text.ElideRight
-                    }
-
-                    Flickable {
-                        id: taskProcessScopeFlick
-                        anchors.left: parent.left
-                        anchors.right: taskProcessScopeScrollTrack.left
-                        anchors.top: taskProcessScopeHeader.bottom
-                        anchors.bottom: parent.bottom
-                        anchors.leftMargin: 7
-                        anchors.rightMargin: 5
-                        anchors.topMargin: 4
-                        anchors.bottomMargin: 6
-
-                        clip: true
-                        contentWidth: width
-                        contentHeight: taskProcessScopeText.implicitHeight
-                        boundsBehavior: Flickable.StopAtBounds
-                        flickableDirection: Flickable.VerticalFlick
-
-                        GohuText {
-                            id: taskProcessScopeText
-                            width: taskProcessScopeFlick.width
-                            text: processController.scopeProcessText()
-                            font.pixelSize: 11
-                            color: Colors.white
-                            opacity: 0.86
-                            wrapMode: Text.Wrap
-                            lineHeight: 1.0
-                        }
-                    }
-
-                    NeonScrollBar {
-                        id: taskProcessScopeScrollTrack
-
-                        flickable: taskProcessScopeFlick
-
-                        x: parent.width - width - 4
-                        y: taskProcessScopeFlick.y
-                        height: taskProcessScopeFlick.height
-                        z: 20
-
-                        barAreaWidth: 8
-                        railWidth: 8
-                        barHandleWidth: 5
-                        minimumHandleHeight: 18
-
-                        railColor: taskProcessScopeInfo.border.color
-                        railOpacity: 0.90
-                        railRadius: 0
-                        railGlowEnabled: true
-                        railGlowOpacity: 0.20
-
-                        handleColor: Colors.magenta
-                        handleOpacity: 0.90
-                        barHandleRadius: 0
-                        handleBorderWidth: 0
-                        barGlowIdleSpread: 2
-                        barGlowHoverSpread: 2
-                        barGlowIdleOpacity: 0.22
-                        barGlowHoverOpacity: 0.22
-
-                        preserveDragOffset: true
-                        wheelEnabled: false
-                        pointerCursorShape: Qt.ArrowCursor
-
-                        visible: scrollable
-                    }
                 }
-
-            
-                // Process metadata and command text stay below KILLING ACTIONS.
-                GridLayout {
-                    width: parent.width
-                    columns: 3
-                    columnSpacing: 6
-                    rowSpacing: 4
-
-                    GohuText {
-                        Layout.preferredWidth: 62
-                        text: "USER"
-                        font.pixelSize: 11
-                        color: Colors.cyan
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 10
-                        text: ":"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-
-                    GohuText {
-                        Layout.fillWidth: true
-                        text:
-                            taskManagerBody.currentTask
-                            ? String(taskManagerBody.currentTask.user || "?")
-                            : "?"
-                        font.pixelSize: 11
-                        color: Colors.white
-                        elide: Text.ElideRight
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 62
-                        text: "PPID"
-                        font.pixelSize: 11
-                        color: Colors.cyan
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 10
-                        text: ":"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-
-                    GohuText {
-                        Layout.fillWidth: true
-                        text:
-                            taskManagerBody.currentTask
-                            ? String(taskManagerBody.currentTask.ppid || "?")
-                            : "?"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 62
-                        text: "VIRT"
-                        font.pixelSize: 11
-                        color: Colors.cyan
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 10
-                        text: ":"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-
-                    GohuText {
-                        Layout.fillWidth: true
-                        text:
-                            taskManagerBody.currentTask
-                            ? processController.formatMemory(
-                                  taskManagerBody.currentTask.vsz
-                              )
-                            : "?"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 62
-                        text: "STATE"
-                        font.pixelSize: 11
-                        color: Colors.cyan
-                    }
-
-                    GohuText {
-                        Layout.preferredWidth: 10
-                        text: ":"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-
-                    GohuText {
-                        Layout.fillWidth: true
-                        text:
-                            taskManagerBody.currentTask
-                            ? String(taskManagerBody.currentTask.state || "?")
-                            : "?"
-                        font.pixelSize: 11
-                        color: Colors.white
-                    }
-                }
-
-                GohuText {
-                    width: parent.width
-
-                    text:
-                        taskManagerBody.currentTask
-                        ? String(taskManagerBody.currentTask.args || "")
-                        : ""
-
-                    font.pixelSize: 10
-                    color: Colors.white
-                    opacity: 0.56
-                    wrapMode: Text.Wrap
-                }
-
-                                }
+            }

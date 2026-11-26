@@ -108,7 +108,8 @@ Scope {
 
     // Session-owned draft, not authorization. No persistence or auto-start.
     property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
-        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350})
+        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
+        storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
     // D4a session presets. Persistence is a separate catalog milestone.
     property var workshopPresets: []
     property string workshopPresetFeedback: "SESSION ONLY // NO DISK SAVE"

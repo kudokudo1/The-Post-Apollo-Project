@@ -292,3 +292,13 @@ ctx.input=JSON.stringify(cadencePlan);
 assert.deepEqual(plain(vm.runInContext("workshopPlanFromDraft(workshopDraftFromPlan(JSON.parse(input)))",ctx)),
     cadencePlan);
 console.log("DIAG D5a bounded storage cadence and legacy evidence contracts PASS");
+
+const stepStorage=(d,s,r,f,n)=>plain(ctx.storageCadenceStep(d,s,r,f,n));
+assert.deepEqual(stepStorage(30,1,10,"sample",1),{sampleSeconds:2,reportSeconds:10});
+assert.deepEqual(stepStorage(30,2,10,"sample",1),{sampleSeconds:3,reportSeconds:9});
+assert.deepEqual(stepStorage(30,2,10,"report",-1),{sampleSeconds:2,reportSeconds:8});
+assert.equal(stepStorage(30,2,6,"report",-1),null);
+assert.equal(stepStorage(31,1,10,"sample",1),null);
+assert.equal(stepStorage(1,1,10,"sample",1),null);
+assert.deepEqual(plain(ctx.storageReportChoices(30,5)),[5,10,15,20,25,30]);
+console.log("DIAG D5b calibrated storage controls PASS");

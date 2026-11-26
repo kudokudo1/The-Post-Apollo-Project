@@ -376,6 +376,12 @@ Item {
     onCurrentTaskChanged: {
         if (!currentTask && locallyPending) cancelOwned();
     }
+    onSelectedTargetVisibleChanged: {
+        // A live Hunter ranking can remove a row during review. Cancel only
+        // our own unsent request; a submitted operation remains owner-owned.
+        if (!selectedTargetVisible && locallyPending && gate && !gate.busy)
+            cancelOwned();
+    }
     onTaskRowsChanged: {
         if (!ready || !active) return;
         if (!modelBlank) updateOrder(false);
@@ -986,7 +992,8 @@ Item {
                         anchors.fill: parent
                         enabled: workspace.hasOwnedPending
                         onClicked: {
-                            if (workspace.gate && workspace.hasOwnedPending)
+                            if (workspace.gate && workspace.hasOwnedPending
+                                    && workspace.exactTargetAvailable)
                                 workspace.gate.confirm()
                         }
                     }

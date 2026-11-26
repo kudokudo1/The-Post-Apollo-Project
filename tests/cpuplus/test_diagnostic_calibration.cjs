@@ -256,3 +256,16 @@ for(const bad of [{...allFive,autoStart:true},{...allFive,durationSeconds:1},{du
 ctx.input=JSON.stringify({durationSeconds:5,instruments:[{kind:"stall",thresholdMs:500}]});
 assert.equal(vm.runInContext("workshopDraftFromPlan(JSON.parse(input)).stallThresholdMs",ctx),500);
 console.log("DIAG D4a shared preset calibration PASS");
+
+const setPlan=[{name:"A",plan:allFive},{name:"B",plan:{durationSeconds:5,instruments:[{kind:"stall",thresholdMs:500}]}},{name:"A",plan:allFive}];
+ctx.input=JSON.stringify(setPlan);
+const checkedSet=plain(vm.runInContext("validatedWorkshopSet(JSON.parse(input))",ctx));
+assert.deepEqual(checkedSet.items,setPlan);
+assert.equal(checkedSet.durationSeconds,25);
+for(const bad of [[],Array(5).fill(setPlan[0]),[{...setPlan[0],autoStart:true}],
+    [{name:"BAD",plan:{durationSeconds:5,instruments:[{kind:"stall",thresholdMs:351}]}}],
+    Array(3).fill({name:"LONG",plan:{durationSeconds:120,instruments:[{kind:"stall",thresholdMs:350}]}})]){
+    ctx.input=JSON.stringify(bad);
+    assert.equal(vm.runInContext("validatedWorkshopSet(JSON.parse(input))",ctx),null);
+}
+console.log("DIAG D4b detached bounded ordered sets PASS");

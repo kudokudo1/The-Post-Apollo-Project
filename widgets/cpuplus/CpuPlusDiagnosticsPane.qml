@@ -202,13 +202,13 @@ Column {
         ActionButton {
             width: parent.width
             height: 26
-            visible: CpuPlusDiagnostics.busy && (root.viewMode !== "WORK"
-                || CpuPlusDiagnostics.captureId !== CpuPlusDiagnostics.workshopRunId) && root.viewMode !== "QUICK"
-            available: !CpuPlusDiagnostics.cancelled
+            visible: CpuPlusDiagnostics.setActive || (CpuPlusDiagnostics.busy && (root.viewMode !== "WORK"
+                || CpuPlusDiagnostics.captureId !== CpuPlusDiagnostics.workshopRunId) && root.viewMode !== "QUICK")
+            available: CpuPlusDiagnostics.setActive ? !CpuPlusDiagnostics.setStopRequested : !CpuPlusDiagnostics.cancelled
             accentColor: Colors.red
             destructive: true
-            label: CpuPlusDiagnostics.cancelled ? "STOPPING" : "STOP ACTIVE CAPTURE"
-            onLeftClicked: CpuPlusDiagnostics.cancel()
+            label: CpuPlusDiagnostics.setActive ? (CpuPlusDiagnostics.setStopRequested?"SET STOPPING":"STOP SET") : CpuPlusDiagnostics.cancelled ? "STOPPING" : "STOP ACTIVE CAPTURE"
+            onLeftClicked: CpuPlusDiagnostics.setActive ? CpuPlusDiagnostics.stopWorkshopSet() : CpuPlusDiagnostics.cancel()
         }
         Grid {
             id: captureGrid
@@ -234,7 +234,7 @@ Column {
                 labelFontSizeMode: Text.HorizontalFit
                 labelMinimumPixelSize: 8
                 contentPadding: 2
-                available: !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.faulted && !CpuPlusDiagnostics.archiveBusy
+                available: !CpuPlusDiagnostics.workshopPresetLocked
                 onLeftClicked: {
                     if (CpuPlusDiagnostics.request(modelData.kind)) {
                         root.showReport = false;
@@ -268,21 +268,45 @@ Column {
         visible: root.viewMode === "PRESETS"
         spacing: 4
         property string deleteName: ""
-        onVisibleChanged: if (!visible) deleteName=""
+        property string mixerPage: "LIBRARY"
+        property string armedQueue: ""
+        onVisibleChanged: if (!visible) {deleteName="";armedQueue="";}
+        onMixerPageChanged: {deleteName="";armedQueue="";}
+        Connections {
+            target: CpuPlusDiagnostics
+            function onWorkshopQueueChanged() {presets.armedQueue="";}
+            function onWorkshopPresetLockedChanged() {if(CpuPlusDiagnostics.workshopPresetLocked)presets.armedQueue="";}
+        }
+        Row {
+            width: parent.width; spacing: 3
+            Repeater {
+                model: ["LIBRARY","QUEUE","SETS"]
+                ActionButton {
+                    required property string modelData
+                    width: Math.floor((presets.width-6)/3);height: 25
+                    label: modelData;normalFace: true
+                    selected: presets.mixerPage===modelData
+                    onLeftClicked: presets.mixerPage=modelData
+                }
+            }
+        }
         GohuText {
             width: parent.width
-            text: "WORKFLOWS // SESSION PRESETS"
+            visible: presets.mixerPage==="LIBRARY"
+            text: "ALL WORKFLOWS // SESSION"
             color: Colors.magenta
             font.pixelSize: 12
         }
         GohuText {
             width: parent.width
-            text: "SAVE CURRENT CALIBRATION // LOAD TO CONTROLS"
+            visible: presets.mixerPage==="LIBRARY"
+            text: "SAVE CURRENT CALIBRATION // LOAD OR + QUEUE"
             color: Colors.cyan
             font.pixelSize: 10
             wrapMode: Text.Wrap
         }
         Row {
+            visible: presets.mixerPage==="LIBRARY"
             width: parent.width
             spacing: 4
             Rectangle {
@@ -323,13 +347,14 @@ Column {
         }
         GohuText {
             width: parent.width
+            visible: presets.mixerPage==="LIBRARY"
             text: CpuPlusDiagnostics.workshopPresetFeedback
             color: Colors.yellow
             font.pixelSize: 10
             wrapMode: Text.Wrap
         }
         Repeater {
-            model: CpuPlusDiagnostics.workshopPresets
+            model: presets.mixerPage==="LIBRARY" ? CpuPlusDiagnostics.workshopPresets : []
             delegate: Column {
                 required property var modelData
                 width: presets.width
@@ -353,10 +378,10 @@ Column {
                     width: parent.width
                     spacing: 4
                     ActionButton {
-                        width: Math.floor((parent.width-4)*0.6)
+                        width: Math.floor((parent.width-8)/3)
                         height: 26
                         objectName: "cpuplusDiagnosticLoadPreset-"+modelData.name
-                        label: "LOAD CONTROLS"
+                        label: "LOAD"
                         normalFace: true
                         accentColor: Colors.cyan
                         available: !CpuPlusDiagnostics.workshopPresetLocked
@@ -367,7 +392,17 @@ Column {
                         }
                     }
                     ActionButton {
-                        width: parent.width-Math.floor((parent.width-4)*0.6)-4
+                        width: Math.floor((parent.width-8)/3)
+                        height: 26
+                        label: "+ QUEUE"
+                        normalFace: true
+                        accentColor: Colors.cyan
+                        objectName: "cpuplusDiagnosticQueuePreset-"+modelData.name
+                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        onLeftClicked: CpuPlusDiagnostics.queueWorkshop(modelData.name)
+                    }
+                    ActionButton {
+                        width: Math.floor((parent.width-8)/3)
                         height: 26
                         label: presets.deleteName===modelData.name ? "CONFIRM" : "REMOVE"
                         normalFace: true
@@ -380,6 +415,148 @@ Column {
                         }
                     }
                 }
+            }
+        }
+        Column {
+            width: parent.width;spacing: 4
+            visible: presets.mixerPage==="QUEUE"
+            GohuText {
+                width: parent.width;color: Colors.magenta;font.pixelSize: 11
+                text: "RUN QUEUE // ORDER"
+            }
+            GohuText {
+                width: parent.width;color: Colors.cyan;font.pixelSize: 10
+                text: CpuPlusDiagnostics.workshopQueue.length+" STEPS // "+(CpuPlusDiagnostics.queuePreview?CpuPlusDiagnostics.queuePreview.durationSeconds:0)+" SEC CAPTURE TIME"
+            }
+            Repeater {
+                model: presets.mixerPage==="QUEUE"?CpuPlusDiagnostics.workshopQueue:[]
+                Row {
+                    id: queueRow
+                    required property int index
+                    required property var modelData
+                    width: presets.width;spacing: 3
+                    GohuText {
+                        width: parent.width-87;height: 24;verticalAlignment: Text.AlignVCenter
+                        color: Colors.white;font.pixelSize: 10;elide: Text.ElideRight
+                        text: (index+1)+" // "+modelData.name+" / "+modelData.plan.durationSeconds+"s"
+                    }
+                    Repeater {
+                        model: ["↑","↓","X"]
+                        ActionButton {
+                            required property string modelData
+                            width: 26;height: 24;label:modelData;normalFace:true
+                            available: !CpuPlusDiagnostics.workshopPresetLocked && (modelData==="X" || (modelData==="↑"?queueRow.index>0:queueRow.index<CpuPlusDiagnostics.workshopQueue.length-1))
+                            onLeftClicked: {
+                                const i=queueRow.index;
+                                if(modelData==="X")CpuPlusDiagnostics.removeWorkshopQueue(i);
+                                else CpuPlusDiagnostics.moveWorkshopQueue(i,modelData==="↑"?-1:1);
+                            }
+                        }
+                    }
+                }
+            }
+            Row {
+                width: parent.width;spacing: 4
+                ActionButton {
+                    width: Math.floor((parent.width-4)*0.65);height: 28
+                    label: presets.armedQueue!==""?"CONFIRM RUN":"RUN QUEUE"
+                    objectName: "cpuplusDiagnosticRunQueue"
+                    accentColor: Colors.orange
+                    available: !CpuPlusDiagnostics.workshopPresetLocked&&!!CpuPlusDiagnostics.queuePreview
+                    onLeftClicked: {
+                        const exact=JSON.stringify(CpuPlusDiagnostics.queuePreview.items);
+                        if(presets.armedQueue===exact){presets.armedQueue="";CpuPlusDiagnostics.startWorkshopSet(exact);}
+                        else presets.armedQueue=exact;
+                    }
+                }
+                ActionButton {
+                    width: Math.floor((parent.width-4)*0.35);height: 28
+                    label: "CLEAR";normalFace:true
+                    available: !CpuPlusDiagnostics.workshopPresetLocked&&CpuPlusDiagnostics.workshopQueue.length>0
+                    onLeftClicked: CpuPlusDiagnostics.clearWorkshopQueue()
+                }
+            }
+            Row {
+                width: parent.width;spacing:4
+                Rectangle {
+                    width: parent.width-84;height:28;color:Colors.black;border.color:Colors.magenta
+                    TextInput {
+                        id: setName;anchors.fill:parent;anchors.margins:4
+                        color:Colors.white;maximumLength:32;selectByMouse:true;font.pixelSize:11
+                        enabled: !CpuPlusDiagnostics.workshopPresetLocked
+                    }
+                    GohuText {
+                        anchors.centerIn:parent;visible:setName.text===""&&!setName.activeFocus
+                        text:"SET NAME";color:Colors.cyan;font.pixelSize:10
+                    }
+                }
+                ActionButton {
+                    width:80;height:28;label:"SAVE SET";normalFace:true;accentColor:Colors.omnitrix
+                    available: !CpuPlusDiagnostics.workshopPresetLocked&&!!CpuPlusDiagnostics.queuePreview&&setName.text.length>0
+                    onLeftClicked: if(CpuPlusDiagnostics.saveWorkshopSet(setName.text)){setName.text="";presets.mixerPage="SETS";}
+                }
+            }
+        }
+        Column {
+            width: parent.width;spacing:4;visible:presets.mixerPage==="SETS"
+            GohuText {
+                width:parent.width;text:"SAVED SETS // ORDERS";color:Colors.magenta;font.pixelSize:11
+            }
+            Repeater {
+                model:presets.mixerPage==="SETS"?CpuPlusDiagnostics.workshopSets:[]
+                Column {
+                    required property var modelData
+                    width:presets.width;spacing:2
+                    GohuText {
+                        width:parent.width;text:modelData.name+" // "+modelData.items.length+" STEPS"
+                        color:Colors.white;font.pixelSize:11;elide:Text.ElideRight
+                    }
+                    GohuText {
+                        width:parent.width;text:modelData.items.map(x=>x.name).join(" → ")
+                        color:Colors.cyan;font.pixelSize:10;wrapMode:Text.Wrap
+                    }
+                    Row {
+                        width:parent.width;spacing:4
+                        ActionButton {
+                            width:Math.floor((parent.width-8)/3);height:26;label:"LOAD SET";normalFace:true
+                            available: !CpuPlusDiagnostics.workshopPresetLocked
+                            onLeftClicked: if(CpuPlusDiagnostics.loadWorkshopSet(modelData.name))presets.mixerPage="QUEUE"
+                        }
+                        ActionButton {
+                            width:Math.floor((parent.width-8)/3);height:26;label:"RUN SET";normalFace:true
+                            accentColor:Colors.orange
+                            available: !CpuPlusDiagnostics.workshopPresetLocked
+                            onLeftClicked: {
+                                if(CpuPlusDiagnostics.loadWorkshopSet(modelData.name)){
+                                    presets.mixerPage="QUEUE";
+                                    presets.armedQueue=JSON.stringify(CpuPlusDiagnostics.queuePreview.items);
+                                }
+                            }
+                        }
+                        ActionButton {
+                            width:Math.floor((parent.width-8)/3);height:26;normalFace:true;accentColor:Colors.red
+                            label:presets.deleteName==="SET:"+modelData.name?"CONFIRM":"REMOVE"
+                            available: !CpuPlusDiagnostics.workshopPresetLocked
+                            onLeftClicked: {
+                                if(presets.deleteName==="SET:"+modelData.name){presets.deleteName="";CpuPlusDiagnostics.removeWorkshopSet(modelData.name);}
+                                else presets.deleteName="SET:"+modelData.name;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        GohuText {
+            width: parent.width; color: Colors.yellow; font.pixelSize: 10;wrapMode:Text.Wrap
+            text: CpuPlusDiagnostics.setFeedback+" // SESSION ONLY"
+        }
+        Repeater {
+            model: CpuPlusDiagnostics.setRunResults
+            GohuText {
+                required property var modelData
+                width: presets.width; font.pixelSize:10; elide:Text.ElideRight
+                text: modelData.name+" // "+modelData.status
+                color: modelData.status==="COMPLETE"?Colors.omnitrix:Colors.red
             }
         }
     }

@@ -226,3 +226,30 @@ function workshopDraftFromPlan(plan) {
         return draft;
     } catch (_) {return null;}
 }
+
+
+// Set entries are detached calibration snapshots, not executable commands.
+// Repeated workflows are deliberate ordered steps, never silently deduplicated.
+function validatedWorkshopSet(items) {
+    try {
+        if (!Array.isArray(items)||items.length<1||items.length>4
+                ||Reflect.ownKeys(items).length!==items.length+1) return null;
+        const result=[];
+        let duration=0;
+        for(let i=0;i<items.length;i++){
+            const desc=Object.getOwnPropertyDescriptor(items,String(i));
+            if(!desc||!Object.prototype.hasOwnProperty.call(desc,"value"))return null;
+            const row=desc.value;
+            if(!row||Object.getPrototypeOf(row)!==Object.prototype||Reflect.ownKeys(row).length!==2
+                ||!["name","plan"].every(k=>{const d=Object.getOwnPropertyDescriptor(row,k);return d&&Object.prototype.hasOwnProperty.call(d,"value");})
+                ||typeof row.name!=="string"||!/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(row.name)||row.name.trim()!==row.name)return null;
+            const draft=workshopDraftFromPlan(row.plan);
+            if(!draft)return null;
+            const plan=workshopPlanFromDraft(draft);
+            duration+=plan.durationSeconds;
+            if(duration>240)return null;
+            result.push({name:row.name,plan:plan});
+        }
+        return {items:result,durationSeconds:duration};
+    }catch(_){return null;}
+}

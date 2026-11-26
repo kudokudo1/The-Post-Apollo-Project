@@ -15,7 +15,7 @@ Column {
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentWidth: Math.max(0,Math.floor((width-4*Math.max(0,lowerInstrumentCount-1))/Math.max(1,lowerInstrumentCount)))
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
-    readonly property bool locked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy || CpuPlusDiagnostics.faulted
+    readonly property bool locked: CpuPlusDiagnostics.workshopPresetLocked
     readonly property var plan: makePlan(draft)
     readonly property string planText: JSON.stringify(plan)
     readonly property var preview: plan.instruments.length === 1

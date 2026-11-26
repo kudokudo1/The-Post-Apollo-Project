@@ -34,6 +34,8 @@ on:
       - "services/notifications/ApolloNotificationRoute.js"
       - "scripts/cpuplus_quickshell_memory_observer.py"
       - "tests/cpuplus/test_configured_memory_observer.py"
+      - "scripts/cpuplus_diagnostic_workflow.py"
+      - "tests/cpuplus/test_diagnostic_workflow.py"
       - "scripts/cpuplus_process_census.py"
       - "scripts/cpuplus_storage_observer.py"
       - "tests/cpuplus/test_storage_observer.py"
@@ -59,6 +61,7 @@ jobs:
       - run: node tests/cpuplus/test_diagnostic_comparison.cjs
       - run: node tests/cpuplus/test_diagnostic_notifications.cjs
       - run: python3 -B tests/cpuplus/test_configured_memory_observer.py
+      - run: python3 -B tests/cpuplus/test_diagnostic_workflow.py
       - run: python3 -B tests/cpuplus/test_process_census.py
       - run: python3 -B tests/cpuplus/test_storage_observer.py
       - run: python3 -B tests/cpuplus/test_diagnostic_archive.py

@@ -28905,7 +28905,7 @@ PanelWindow {
             anchors.right: detailFlickable.right
             anchors.top: detailStaticHeader.bottom
             anchors.topMargin: 4
-            maximumHeight: Math.max(0, (detailBottomBar.y - detailStaticHeader.y) * 0.55)
+            maximumHeight: Math.max(0, detailBottomBar.y - detailStaticHeader.y - detailStaticHeader.height - 4)
             contextActive: appControlWindow.menuOpen && appControlWindow.selectedResultIsTask()
             task: contextActive ? taskManagerBody.currentTask : null
             purpose: open && contextActive && task ? appControlWindow.taskSimplePurpose(task) : ""

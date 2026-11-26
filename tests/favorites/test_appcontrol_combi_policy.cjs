@@ -29,13 +29,12 @@ function body(name) {
     }
     throw new Error("unbalanced donor "+name);
 }
-const donor = new Function(
-    "let favoriteSourceItem = null;",
+const donor = new Function([
     body("favoriteSourceItem"),
     body("combiSearchTextForRecord"),
     body("prepareCombiRecord"),
     "return {favoriteSourceItem,combiSearchTextForRecord,prepareCombiRecord};"
-)();
+].join("\n"))();
 
 function copy(v) {return JSON.parse(JSON.stringify(v));}
 function plain(v) {return copy(v);}

@@ -12,6 +12,8 @@ Column {
     property real viewportHeight: 0
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
     readonly property int instrumentHeight: compactLayout ? 120 : 160
+    readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
+    readonly property real lowerInstrumentWidth: Math.max(0,Math.floor((width-4*Math.max(0,lowerInstrumentCount-1))/Math.max(1,lowerInstrumentCount)))
     readonly property var draft: CpuPlusDiagnostics.workshopDraft
     readonly property bool locked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy || CpuPlusDiagnostics.faulted
     readonly property var plan: makePlan(draft)
@@ -45,11 +47,12 @@ Column {
 
     function makePlan(d) {
         const instruments=[];
-        for (const kind of ["threads","memory","census","storage"]) {
+        for (const kind of ["threads","memory","census","storage","stall"]) {
             if (!d.selected.includes(kind)) continue;
             if (kind==="threads") instruments.push({kind:kind,intervalMs:d.threadIntervalMs,topCount:d.topCount});
             else if (kind==="memory") instruments.push({kind:kind,intervalMs:d.memoryIntervalMs});
             else if (kind==="census") instruments.push({kind:kind,intervalMs:d.censusIntervalMs});
+            else if (kind==="stall") instruments.push({kind:kind,thresholdMs:d.stallThresholdMs});
             else instruments.push({kind:kind});
         }
         return {durationSeconds:d.durationSeconds,instruments:instruments};
@@ -116,7 +119,8 @@ Column {
             model: [{kind:"threads",symbol:"≋",subject:"THREADS"},
                 {kind:"memory",symbol:"",subject:"MEMORY"},
                 {kind:"census",symbol:"",subject:"CPU"},
-                {kind:"storage",symbol:"",subject:"STORAGE"}]
+                {kind:"storage",symbol:"",subject:"STORAGE"},
+                {kind:"stall",symbol:"⚡",subject:"UPTIME"}]
             ActionButton {
                 id: instrumentFilter
                 required property var modelData
@@ -144,11 +148,11 @@ Column {
             }
         }
         GohuText {
-            width: parent.width >= 224 ? parent.width - 144 : parent.width
-            height: parent.width >= 224 ? 32 : implicitHeight
+            width: parent.width >= 260 ? parent.width - 180 : parent.width
+            height: parent.width >= 260 ? 32 : implicitHeight
             verticalAlignment: Text.AlignVCenter
             text: {
-                const qs=root.draft.selected.some(k=>k==="threads"||k==="memory");
+                const qs=root.draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
                 const system=root.draft.selected.some(k=>k==="census"||k==="storage");
                 return qs && system ? "TARGET // QS + USER"
                     : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
@@ -215,9 +219,9 @@ Column {
     Row {
         width: parent.width
         spacing: 4
-        visible: root.draft.selected.includes("threads") || root.draft.selected.includes("storage")
+        visible: root.lowerInstrumentCount>0
         Item {
-            width: root.draft.selected.includes("storage") ? Math.floor((parent.width-4)/2) : parent.width
+            width: root.lowerInstrumentWidth
             height: root.instrumentHeight
             visible: root.draft.selected.includes("threads")
             SelectorDial {
@@ -251,10 +255,45 @@ Column {
             }
         }
 
+        Item {
+            width: root.lowerInstrumentWidth
+            height: root.instrumentHeight
+            visible: root.draft.selected.includes("stall")
+            SelectorDial {
+                objectName: "cpuplusWorkshopStallThreshold"
+                anchors.centerIn: parent
+                scale: Math.min(1,parent.width/width,parent.height/height)
+                labelText: "STALL THRESHOLD"
+                options: ["150","500","1000","1500","2000"]
+                displayOptions: options
+                numericReferenceValues: [150,500,1000,1500,2000]
+                numericLabelPixelSize: root.compactLayout ? 13 : 10
+                readoutPixelSize: root.compactLayout ? 15 : 11
+                selectorMode: "continuous"
+                minimumValue: 150
+                maximumValue: 2000
+                currentValue: root.draft.stallThresholdMs
+                valueStep: 50
+                numericDetentInterval: 50
+                numericDetentOrigin: 150
+                valueDecimals: 0
+                snapContinuousToStep: true
+                showNumericDetentTicks: true
+                accentColor: Colors.white
+                markerColor: Colors.orange
+                labelColor: Colors.yellow
+                readoutColor: Colors.white
+                readoutGlowEnabled: true
+                interactionGlowColor: Colors.magenta
+                readoutText: Math.round(previewNumericValue)+" MS"
+                interactive: !root.locked
+                onValueRequested: value=>root.edit("stallThresholdMs",Math.round(value))
+            }
+        }
         Rectangle {
             objectName: "cpuplusWorkshopStorageInstrument"
             visible: root.draft.selected.includes("storage")
-            width: root.draft.selected.includes("threads") ? Math.floor((parent.width-4)/2) : parent.width
+            width: root.lowerInstrumentWidth
             height: root.instrumentHeight
             color: Colors.black
             border.color: Colors.blue
@@ -264,7 +303,7 @@ Column {
                 spacing: root.compactLayout ? 2 : 5
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    text: "STORAGE // METADATA"
+                    text: root.lowerInstrumentCount===3 ? "STORAGE" : "STORAGE // METADATA"
                     color: Colors.blue
                     font.pixelSize: 11
                     horizontalAlignment: Text.AlignHCenter
@@ -313,7 +352,7 @@ Column {
                 }
                 GohuText {
                     width: parent.width
-                    text: "10s / FINAL REPORT"
+                    text: root.lowerInstrumentCount===3 ? "10s / FINAL" : "10s / FINAL REPORT"
                     color: Colors.white
                     font.pixelSize: 9
                     horizontalAlignment: Text.AlignHCenter

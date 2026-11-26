@@ -7665,6 +7665,44 @@ PanelWindow {
     // REAL APPLICATION MODEL
     // ============================================================
 
+    // One rank record per row; the expensive QML favorite lookup is
+    // no longer repeated by the sort comparator. Keep source and key
+    // resolution lazy, exactly as the old tie-breaker required.
+    function sortApplicationRows(rows) {
+        const ranked = rows.map(function(entry) {
+            return {entry: entry, favorite: isFavorite(entry),
+                    name: String(entry.name || ""), sourceKnown: false,
+                    keyKnown: false};
+        });
+        function matches(row) {
+            if (!row.sourceKnown) {
+                row.matches = appEntryMatchesSelectedSource(row.entry);
+                row.sourceKnown = true;
+            }
+            return row.matches;
+        }
+        function key(row) {
+            if (!row.keyKnown) {
+                row.key = appEntryKey(row.entry);
+                row.keyKnown = true;
+            }
+            return row.key;
+        }
+        ranked.sort(function(a,b) {
+            if (a.favorite !== b.favorite)
+                return a.favorite ? -1 : 1;
+            const nameCompare = a.name.localeCompare(b.name);
+            if (nameCompare !== 0)
+                return nameCompare;
+            const aMatches = matches(a);
+            const bMatches = matches(b);
+            if (aMatches !== bMatches)
+                return aMatches ? -1 : 1;
+            return key(a).localeCompare(key(b));
+        });
+        return ranked.map(function(row) { return row.entry; });
+    }
+
     ScriptModel {
         id: filteredApps
 
@@ -7718,35 +7756,7 @@ PanelWindow {
                 return haystack.indexOf(query) !== -1;
             });
 
-            filtered.sort(function (a, b) {
-                const aFavorite = appControlWindow.isFavorite(a);
-                const bFavorite = appControlWindow.isFavorite(b);
-
-                if (aFavorite !== bFavorite)
-                    return aFavorite ? -1 : 1;
-
-                const nameCompare =
-                    String(a.name || "").localeCompare(
-                        String(b.name || "")
-                    );
-
-                if (nameCompare !== 0)
-                    return nameCompare;
-
-                const aMatches =
-                    appControlWindow.appEntryMatchesSelectedSource(a);
-                const bMatches =
-                    appControlWindow.appEntryMatchesSelectedSource(b);
-
-                if (aMatches !== bMatches)
-                    return aMatches ? -1 : 1;
-
-                return appControlWindow.appEntryKey(a).localeCompare(
-                    appControlWindow.appEntryKey(b)
-                );
-            });
-
-            return filtered;
+            return appControlWindow.sortApplicationRows(filtered);
         }
     }
 
@@ -8209,6 +8219,24 @@ PanelWindow {
         }
     }
 
+    // Preserve the first live row for each watched identity. This is
+    // presentation-only: actual action targets still resolve live.
+    function firstFavoriteTaskRows(identities, rows) {
+        const first = Object.create(null);
+        const wanted = Object.create(null);
+        for (const identity of identities)
+            wanted[identity] = true;
+        let remaining = identities.length;
+        for (let i = 0; i < rows.length && remaining > 0; i++) {
+            const identity = taskPersistentIdentity(rows[i]);
+            if (wanted[identity] && first[identity] === undefined) {
+                first[identity] = rows[i];
+                remaining--;
+            }
+        }
+        return first;
+    }
+
     ScriptModel {
         id: favoriteResults
 
@@ -8219,7 +8247,6 @@ PanelWindow {
             const thermalSnapshot = inCombi ? [] : appControlWindow.thermalRows;
             const fanSnapshot = inCombi ? [] : appControlWindow.fanRows;
             const systemSnapshot = inCombi ? [] : appControlWindow.systemRows;
-            const taskSnapshot = inCombi ? [] : appControlWindow.taskRows;
             const rows = [];
             const seen = ({});
             const preferredAppKeys = ({});
@@ -8340,20 +8367,20 @@ PanelWindow {
                     taskIdentities[data.identity] = true;
             }
 
-            for (const identity in taskIdentities) {
-                let live = null;
-                for (let i = 0; i < taskSnapshot.length; i++) {
-                    if (appControlWindow.taskPersistentIdentity(taskSnapshot[i]) === identity) {
-                        live = taskSnapshot[i];
-                        break;
-                    }
+            const watchedIdentities = Object.keys(taskIdentities);
+            // Read taskRows only when the model actually contains task
+            // favorites; otherwise this binding need not rebuild on telemetry.
+            if (watchedIdentities.length > 0) {
+                const first = appControlWindow.firstFavoriteTaskRows(
+                    watchedIdentities, appControlWindow.taskRows);
+                for (const identity of watchedIdentities) {
+                    pushUnique(
+                        appControlWindow.favoriteRecordForTaskIdentity(
+                            identity,
+                            first[identity] || null
+                        )
+                    );
                 }
-                pushUnique(
-                    appControlWindow.favoriteRecordForTaskIdentity(
-                        identity,
-                        live
-                    )
-                );
             }
 
             }

@@ -716,3 +716,60 @@ test('mini graph publishes isolated equal-length frames and skips non-task refre
     assert.match(mini,/readonly property point p1:\s*killMiniCpuCanvas.graphPoints\[index\]/);
     assert.match(mini,/readonly property point p2:\s*killMiniCpuCanvas.graphPoints\[index \+ 1\]/);
 });
+
+
+test('application sort snapshots preserve favorites, source ties and row identity', () => {
+    const start=app.indexOf('    function sortApplicationRows(');
+    const end=app.indexOf('    ScriptModel {',start);
+    assert.ok(start>=0&&end>start);
+    const counters={favorite:0,source:0,key:0};
+    const fav=e=>e.favorite;
+    const matches=e=>e.matches;
+    const key=e=>String(e.id||e.name||"");
+    const sorted=new Function('isFavorite','appEntryMatchesSelectedSource','appEntryKey',
+        app.slice(start,end)+'\nreturn sortApplicationRows;')(
+            e=>{counters.favorite++;return fav(e);},
+            e=>{counters.source++;return matches(e);},
+            e=>{counters.key++;return key(e);});
+    function legacy(rows) {
+        return rows.slice().sort((a,b)=>{
+            if(fav(a)!==fav(b))return fav(a)?-1:1;
+            const n=String(a.name||"").localeCompare(String(b.name||""));
+            if(n!==0)return n;
+            if(matches(a)!==matches(b))return matches(a)?-1:1;
+            return key(a).localeCompare(key(b));
+        });
+    }
+    const rows=Array.from({length:600},(_,i)=>({name:['A','a','É','same','',undefined][i%6],id:'id'+(i%31),favorite:i%7===0,matches:i%3===0}));
+    for(const source of [[],[rows[0]],rows,rows.slice().reverse(),rows.filter(x=>x.favorite)]){
+        counters.favorite=0;counters.source=0;counters.key=0;
+        const result=sorted(source), expected=legacy(source);
+        assert.equal(result.length,expected.length);
+        result.forEach((row,i)=>assert.equal(row,expected[i]));
+        assert.equal(counters.favorite,source.length);
+        assert.ok(counters.source<=source.length);
+        assert.ok(counters.key<=source.length);
+    }
+    assert.match(app,/return appControlWindow.sortApplicationRows\(filtered\);/);
+});
+test('task favorite first matches use one pass and avoid unneeded snapshot subscriptions',()=>{
+    const start=app.indexOf('    function firstFavoriteTaskRows(');
+    const end=app.indexOf('    ScriptModel {',start);
+    assert.ok(start>=0&&end>start);
+    let reads=0;
+    const first=new Function('taskPersistentIdentity',app.slice(start,end)+'\nreturn firstFavoriteTaskRows;')(
+        e=>{reads++;return e.identity;});
+    const rows=Array.from({length:600},(_,i)=>({identity:'task'+i%90,pid:i+2}));
+    rows.push({identity:'__proto__',pid:900});
+    for(const wanted of [[],['task20'],['task40','task20','absent'],['task0','__proto__']]){
+        reads=0;
+        const result=first(wanted,rows);
+        for(const id of wanted)assert.equal(result[id],rows.find(e=>e.identity===id));
+        assert.ok(reads<=rows.length);
+        if(!wanted.length)assert.equal(reads,0);
+    }
+    const model=app.slice(app.indexOf('id: favoriteResults'),app.indexOf('function resultCount()'));
+    assert.equal((model.match(/appControlWindow\.taskRows/g)||[]).length,1);
+    assert.match(model,/if \(watchedIdentities.length > 0\) \{\s*const first = appControlWindow.firstFavoriteTaskRows\(\s*watchedIdentities, appControlWindow.taskRows\)/);
+    assert.match(model,/favoriteRecordForTaskIdentity\(\s*identity,\s*first\[identity\] \|\| null/);
+});

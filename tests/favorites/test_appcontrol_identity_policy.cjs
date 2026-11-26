@@ -169,3 +169,77 @@ test("C5 generic favorite keys preserve original mode and provider identity",()=
     ]) assert.equal(adapter.keyFor(entry,mode,modeIds,appKey,e=>runKey(command(e),prefix(e))),original(entry,mode));
     assert.ok(liveHost.includes("FavoriteIdentity.keyFor(entry, modeIndex,"));
 });
+
+test("C6 preferred action identity matches original donor and preserves lazy provider calls",()=>{
+    const names=["detailFavoriteContextKey","detailActionStableId","detailFavoriteKeyFor"];
+    const entries=[null,{id:"x|y"}, {_hiddenCommand:true,id:"hidden:foo"},
+        {_favoriteRecord:true,_sourceItem:{id:"wrapped %",_hiddenCommand:true}},
+        {_favoriteRecord:true,_sourceItem:null,id:"fallback"}];
+    const actions=[{name:"Open | private"},{_appControlBuiltin:"custom"},{},null,{name:"Open | private"}];
+    for(const entry of entries) for(const kind of ["app","run","other"]) {
+        let donorReads=0,policyReads=0;
+        const isApp=()=>kind==="app",isRun=()=>kind==="run";
+        const appKey=e=>e.id||"",runKey=e=>"run:"+encodeURIComponent(e.id||"");
+        const old=new Function("selectedResult","selectedResultIsApplication","selectedResultIsRun","favoriteSourceItem","appEntryKey","favoriteKeyFor","appDesktopActions",[
+            "const runModeIndex=3;",...names.map(donorFunction),"return {"+names.join(",")+"};"
+        ].join("\n"))(()=>entry,isApp,isRun,adapter.sourceItem,appKey,runKey,()=>{donorReads++;return actions;});
+        const context=()=>adapter.detailContextKey(entry,isApp,isRun,appKey,runKey);
+        const action=(i,provided)=>adapter.detailActionId(entry,i,provided,isRun,isApp,()=>{policyReads++;return actions;});
+        assert.equal(context(),old.detailFavoriteContextKey());
+        for(const i of [-3,-1,0,1,2,3,4,5,6,7,8,9,10,11,1.5,"1"]) {
+            for(const provided of [undefined,[],actions]) {
+                assert.equal(action(i,provided),old.detailActionStableId(i,provided));
+                assert.equal(policyReads,donorReads,"desktop action discovery must remain lazy");
+            }
+            assert.equal(adapter.detailKey(context(),action(i)),old.detailFavoriteKeyFor(i));
+            assert.equal(policyReads,donorReads);
+        }
+    }
+    assert.ok(liveHost.includes("FavoriteIdentity.detailContextKey(selectedResult(),"));
+    assert.ok(liveHost.includes("FavoriteIdentity.detailActionId(selectedResult(),"));
+    assert.ok(liveHost.includes("FavoriteIdentity.detailKey(context, actionId)"));
+});
+
+test("C10 residual membership and preferred selection match immutable donors",()=>{
+    for(const keys of [[],["task|"],["task|fox","system|cpu"],["thermal|"],[null,7,"other"],["task|%ZZ"]])
+    for(const metricKeys of [[],["taskmetric|fox|cpu"],["taskmetric|a%7Cb|rss"],["invalid"]])
+    for(const monitorKeys of [[],["invalid"]]) {
+        const store={favoriteKeys:keys,favoriteTaskMetricKeys:metricKeys,favoriteMonitorBoxKeys:monitorKeys};
+        const old=new Function("favoriteStore","taskPersistentIdentity",[
+            ...["taskHasMetricFavorite","hasTaskFavorites","hasMonitorFavorites"].map(donorFunction),
+            "return {taskHasMetricFavorite,hasTaskFavorites,hasMonitorFavorites};"
+        ].join("\n"))(store,adapter.taskIdentity);
+        let reads=0;
+        const readKeys=()=>{reads++;return keys;};
+        assert.equal(adapter.hasTaskFavorites(metricKeys,readKeys),old.hasTaskFavorites());
+        assert.equal(reads,metricKeys.length?0:1);
+        reads=0;
+        assert.equal(adapter.hasMonitorFavorites(monitorKeys,readKeys),old.hasMonitorFavorites());
+        assert.equal(reads,monitorKeys.length?0:1);
+        for(const entry of [null,{}, {comm:"FOX"}, {comm:"a|b"}, {name:"other"}]){
+            let metricReads=0;
+            const identity=adapter.taskIdentity(entry);
+            assert.equal(adapter.hasTaskMetricFavorite(identity,()=>{metricReads++;return metricKeys;}),
+                old.taskHasMetricFavorite(entry));
+            assert.equal(metricReads,identity?1:0);
+        }
+    }
+    for(const context of ["","app|x","run|x"])
+    for(const keys of [[],["app|other|launch"],["app|x|duplicate"],["run|x|duplicate","app|x|last"],["app|x|missing"]])
+    for(const count of [undefined,0,2,4]) {
+        const actions=["first","duplicate","duplicate","last"];
+        let expectedReads=[],actualReads=[];
+        const old=new Function("detailFavoriteContextKey","favoriteStore","detailActionCount","selectedResult","selectedResultIsApplication","appDesktopActions","favoriteSourceItem","detailActionStableId",
+            donorFunction("favoriteDetailActionIndex")+"\nreturn favoriteDetailActionIndex;")(
+                ()=>context,{favoriteDetailActionKeys:keys},()=>{expectedReads.push("count");return 4;},
+                ()=>({}),()=>true,()=>{expectedReads.push("actions");return actions;},e=>e,
+                (i,a)=>{expectedReads.push(i);return a[i]||"";});
+        const result=adapter.preferredActionIndex(context,keys,count,
+            ()=>{actualReads.push("count");return 4;},()=>{actualReads.push("actions");return actions;},
+            (i,a)=>{actualReads.push(i);return a[i]||"";});
+        assert.equal(result,old(count));
+        assert.deepEqual(actualReads,expectedReads);
+    }
+    for(const name of ["hasTaskMetricFavorite","hasTaskFavorites","hasMonitorFavorites","preferredActionIndex"])
+        assert.ok(liveHost.includes("FavoriteIdentity."+name+"("),name);
+});

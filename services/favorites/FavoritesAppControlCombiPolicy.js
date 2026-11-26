@@ -176,3 +176,167 @@ function visibleRows(records, options) {
     });
     return rows;
 }
+
+// Preserve the first live row for each watched identity. This is
+// presentation-only: actual action targets still resolve live.
+function firstFavoriteTaskRows(identities, rows, identityFor) {
+    const first = Object.create(null);
+    const wanted = Object.create(null);
+    for (const identity of identities)
+        wanted[identity] = true;
+    let remaining = identities.length;
+    for (let i = 0; i < rows.length && remaining > 0; i++) {
+        const identity = identityFor(rows[i]);
+        if (wanted[identity] && first[identity] === undefined) {
+            first[identity] = rows[i];
+            remaining--;
+        }
+    }
+    return first;
+}
+
+
+// Local projection only. Provider reads remain lazy; no storage or execution
+// authority is supplied. In COMBI mode only the cached catalog is read.
+function buildLocalCatalog(inCombi, sources, owner) {
+    const thermalSnapshot = inCombi ? [] : sources.thermalRows();
+    const fanSnapshot = inCombi ? [] : sources.fanRows();
+    const systemSnapshot = inCombi ? [] : sources.systemRows();
+    const rows = [];
+    const seen = ({});
+    const preferredAppKeys = ({});
+    const preferredRunKeys = ({});
+
+    function pushUnique(record) {
+        if (!record)
+            return;
+
+        const key = String(record._favoriteKey || record.id || record.name || "");
+        if (!key || seen[key])
+            return;
+
+        seen[key] = true;
+        rows.push(record);
+    }
+
+    if (inCombi) {
+        const cached = sources.cachedRows();
+        for (let i = 0; i < cached.length; i++)
+            pushUnique(cached[i]);
+    } else {
+        const favoriteStore = sources.membership();
+        for (let i = 0; i < favoriteStore.favoriteDetailActionKeys.length; i++) {
+            const raw = String(favoriteStore.favoriteDetailActionKeys[i] || "");
+            const first = raw.indexOf("|");
+            const second = first >= 0 ? raw.indexOf("|", first + 1) : -1;
+            if (first < 0 || second < 0)
+                continue;
+
+            const type = raw.slice(0, first);
+            let context = "";
+            try {
+                context = decodeURIComponent(raw.slice(first + 1, second));
+            } catch (error) {
+                continue;
+            }
+
+            if (type === "app") preferredAppKeys[context] = true;
+            else if (type === "run") preferredRunKeys[context] = true;
+        }
+
+        const apps = sources.apps();
+        for (let i = 0; i < apps.length; i++) {
+            const entry = apps[i];
+            const appKey = owner.appEntryKey(entry);
+            if (owner.isFavoriteItem(entry, owner.appsModeIndex)
+                    || !!preferredAppKeys[appKey]) {
+                pushUnique(owner.favoriteRecordForApp(entry));
+            }
+        }
+
+        const runKeys = ({});
+        for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
+            const key = String(favoriteStore.favoriteKeys[i] || "");
+            if (owner.runFavoriteDataFromKey(key)) runKeys[key] = true;
+        }
+        for (const key in preferredRunKeys) runKeys[key] = true;
+        for (const key in runKeys) {
+            const data = owner.runFavoriteDataFromKey(key);
+            if (data) pushUnique(owner.favoriteRecordForRunCommand(data.commandText, data.prefixMode));
+        }
+
+        const hiddenKeys = ({});
+        for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
+            const key = String(favoriteStore.favoriteKeys[i] || "");
+            if (key.indexOf("hidden:") === 0) hiddenKeys[key] = true;
+        }
+        for (const key in preferredAppKeys) {
+            if (key.indexOf("hidden:") === 0) hiddenKeys[key] = true;
+        }
+        for (const key in hiddenKeys) {
+            const command = key.slice(7);
+            if (command) pushUnique(owner.favoriteRecordForApp(owner.hiddenCommandRecord(command)));
+        }
+
+        const thermalItems = thermalSnapshot.concat(fanSnapshot);
+        for (let i = 0; i < thermalItems.length; i++) {
+            const entry = thermalItems[i];
+            if (owner.isFavoriteItem(entry, owner.thermalModeIndex)
+                    || owner.monitorEntryHasBoxFavorite(entry, owner.thermalModeIndex)) {
+                pushUnique(owner.favoriteRecordForModeItem(entry, owner.thermalModeIndex));
+            }
+        }
+
+        for (let i = 0; i < systemSnapshot.length; i++) {
+            const entry = systemSnapshot[i];
+            if (owner.isFavoriteItem(entry, owner.systemModeIndex)
+                    || owner.monitorEntryHasBoxFavorite(entry, owner.systemModeIndex)) {
+                pushUnique(owner.favoriteRecordForModeItem(entry, owner.systemModeIndex));
+            }
+        }
+
+        const windows = sources.windows();
+        for (let i = 0; i < windows.length; i++) {
+            const entry = windows[i];
+            if (owner.isFavoriteItem(entry, owner.windowsModeIndex)) {
+                pushUnique(owner.favoriteRecordForModeItem(entry, owner.windowsModeIndex));
+            }
+        }
+
+        const taskIdentities = ({});
+
+        for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
+            const identity = owner.taskIdentityFromFavoriteKey(
+                favoriteStore.favoriteKeys[i]
+            );
+            if (identity)
+                taskIdentities[identity] = true;
+        }
+
+        for (let i = 0; i < favoriteStore.favoriteTaskMetricKeys.length; i++) {
+            const data = owner.taskMetricFavoriteData(
+                favoriteStore.favoriteTaskMetricKeys[i]
+            );
+            if (data && data.identity)
+                taskIdentities[data.identity] = true;
+        }
+
+        const watchedIdentities = Object.keys(taskIdentities);
+        // Read taskRows only when the model actually contains task
+        // favorites; otherwise this binding need not rebuild on telemetry.
+        if (watchedIdentities.length > 0) {
+            const first = firstFavoriteTaskRows(watchedIdentities, sources.taskRows(), owner.taskIdentity);
+            for (const identity of watchedIdentities) {
+                pushUnique(
+                    owner.favoriteRecordForTaskIdentity(
+                        identity,
+                        first[identity] || null
+                    )
+                );
+            }
+        }
+
+    }
+
+    return rows;
+}

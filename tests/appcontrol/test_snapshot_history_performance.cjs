@@ -625,7 +625,11 @@ test('preferred detail selection reuses action snapshots without changing favori
         "function appDesktopActions(e){counts.actions++;return e._hiddenCommand?[]:e.actions.slice();}",
         "function detailActionCount(){counts.count++;if(!state.entry)return 0;const e=favoriteSourceItem(state.entry);return state.mode==='app'?(e._hiddenCommand?7:6+appDesktopActions(e).length):state.mode==='run'?6:3;}"
     ].join('\n');
-    const make=new Function('state','counts','favoriteStore',stubs+'\n'+code+
+    const identitySource=fs.readFileSync(path.join(root,'services/favorites/FavoritesAppControlIdentityPolicy.js'),'utf8');
+    const identity=new Function(identitySource.replace(/^\.pragma library\s*$/m,'')+
+        '\nreturn {detailContextKey,detailActionId,detailKey,preferredActionIndex};')();
+    const hostStub="const appControlWindow={selectedResultIsApplication,selectedResultIsRun,appEntryKey,favoriteKeyFor,runModeIndex,appDesktopActions,detailActionCount,selectedResult,favoriteSourceItem,detailActionStableId};";
+    const make=new Function('state','counts','favoriteStore','FavoriteIdentity',stubs+'\n'+hostStub+'\n'+code+
         '\nreturn {pick:favoriteDetailActionIndex,key:detailFavoriteKeyFor,legacy:function(){const n=detailActionCount();for(let i=0;i<n;i++)if(isDetailActionFavorite(i))return i;return -1;}};');
     const cases=[
         {mode:'app',entry:{id:'browser|a',actions:[{name:'New window'},{name:'New window'},{_appControlBuiltin:'history'},{}]}},
@@ -637,7 +641,7 @@ test('preferred detail selection reuses action snapshots without changing favori
     ];
     for(const state of cases){
         const counts={actions:0,count:0}, store={favoriteDetailActionKeys:[]};
-        const model=make(state,counts,store);
+        const model=make(state,counts,store,identity);
         const ids=Array.from({length:16},(_,i)=>model.key(i)).filter(Boolean);
         for(const keys of [[],['app|unrelated|launch'],ids.slice().reverse(),ids.slice(-1),ids.slice(1,3),['bad|key',...ids]]){
             store.favoriteDetailActionKeys=keys;
@@ -756,12 +760,10 @@ test('application sort snapshots preserve favorites, source ties and row identit
     assert.match(app,/return appControlWindow.sortApplicationRows\(filtered\);/);
 });
 test('task favorite first matches use one pass and avoid unneeded snapshot subscriptions',()=>{
-    const start=app.indexOf('    function firstFavoriteTaskRows(');
-    const end=app.indexOf('    ScriptModel {',start);
-    assert.ok(start>=0&&end>start);
+    const combi=fs.readFileSync(path.join(root,'services/favorites/FavoritesAppControlCombiPolicy.js'),'utf8');
+    const firstPolicy=new Function(combi.replace(/^\.pragma library\s*$/m,'')+'\nreturn firstFavoriteTaskRows;')();
     let reads=0;
-    const first=new Function('taskPersistentIdentity',app.slice(start,end)+'\nreturn firstFavoriteTaskRows;')(
-        e=>{reads++;return e.identity;});
+    const first=(wanted,rows)=>firstPolicy(wanted,rows,e=>{reads++;return e.identity;});
     const rows=Array.from({length:600},(_,i)=>({identity:'task'+i%90,pid:i+2}));
     rows.push({identity:'__proto__',pid:900});
     for(const wanted of [[],['task20'],['task40','task20','absent'],['task0','__proto__']]){
@@ -773,8 +775,9 @@ test('task favorite first matches use one pass and avoid unneeded snapshot subsc
     }
     const model=app.slice(app.indexOf('id: favoriteResults'),app.indexOf('function resultCount()'));
     assert.equal((model.match(/appControlWindow\.taskRows/g)||[]).length,1);
-    assert.match(model,/if \(watchedIdentities.length > 0\) \{\s*const first = appControlWindow.firstFavoriteTaskRows\(\s*watchedIdentities, appControlWindow.taskRows\)/);
-    assert.match(model,/favoriteRecordForTaskIdentity\(\s*identity,\s*first\[identity\] \|\| null/);
+    assert.match(model,/taskRows: function\(\) \{ return appControlWindow\.taskRows; \}/);
+    assert.match(combi,/if \(watchedIdentities.length > 0\) \{\s*const first = firstFavoriteTaskRows\(watchedIdentities, sources.taskRows\(\), owner.taskIdentity\)/);
+    assert.match(combi,/favoriteRecordForTaskIdentity\(\s*identity,\s*first\[identity\] \|\| null/);
 });
 
 test('APP row restore observes read, scan, assignment and deferred view without changing order',()=>{

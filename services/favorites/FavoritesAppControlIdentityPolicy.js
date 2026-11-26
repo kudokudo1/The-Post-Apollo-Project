@@ -135,3 +135,180 @@ function keyFor(entry, modeIndex, modeIds, appKey, runKey) {
 
     return "mode:" + modeIndex + ":" + label;
 }
+
+// Preferred-action identities only. Provider callbacks are lazy and host-owned;
+// an identity is never evidence of availability or permission to execute.
+function detailContextKey(entry, isApplication, isRun, appKeyFor, runKeyFor) {
+
+    if (!entry)
+        return "";
+
+    if (isApplication()) {
+        const appEntry = sourceItem(entry) || entry;
+        const appKey = appKeyFor(appEntry);
+
+        return appKey
+               ? "app|" + encodeURIComponent(appKey)
+               : "";
+    }
+
+    if (isRun()) {
+        const runEntry = sourceItem(entry) || entry;
+        const runKey = runKeyFor(runEntry);
+
+        return runKey
+               ? "run|" + encodeURIComponent(runKey)
+               : "";
+    }
+
+    return "";
+}
+
+function detailActionId(entry, actionIndex, desktopActions, isRun, isApplication, actionsFor) {
+
+    if (!entry || actionIndex < 0)
+        return "";
+
+    if (isRun()) {
+        if (actionIndex === 0)
+            return "run";
+        if (actionIndex === 1)
+            return "kitty";
+        if (actionIndex === 2)
+            return "float";
+        if (actionIndex === 3)
+            return "fullscreen";
+        if (actionIndex === 4)
+            return "toolbox";
+        if (actionIndex === 5)
+            return "kill";
+
+        return "";
+    }
+
+    if (!isApplication())
+        return "";
+
+    const appEntry = sourceItem(entry) || entry;
+    const actions = desktopActions === undefined
+        ? actionsFor(appEntry) : desktopActions;
+    const desktopCount = actions.length;
+
+    if (actionIndex === 0)
+        return "launch";
+
+    if (appEntry._hiddenCommand) {
+        if (actionIndex === 1) return "hidden-kitty";
+        if (actionIndex === 2) return "hidden-float";
+        if (actionIndex === 3) return "hidden-fullscreen";
+        if (actionIndex === 4) return "hidden-bottles";
+        if (actionIndex === 5) return "hidden-toolbox";
+        if (actionIndex === 6) return "hidden-kill";
+        return "";
+    }
+
+    if (actionIndex === desktopCount + 1)
+        return "bottles";
+
+    if (actionIndex === desktopCount + 2)
+        return "toolbox";
+
+    if (actionIndex === desktopCount + 3)
+        return "mute-app";
+
+    if (actionIndex === desktopCount + 4)
+        return "freeze-app";
+
+    if (actionIndex === desktopCount + 5)
+        return "kill";
+
+    const desktopIndex = actionIndex - 1;
+
+    if (desktopIndex < 0 || desktopIndex >= desktopCount)
+        return "";
+
+    const action = actions[desktopIndex];
+
+    if (action && action._appControlBuiltin)
+        return "builtin|" + String(action._appControlBuiltin);
+
+    return "desktop|"
+           + encodeURIComponent(
+                 String(
+                     action && action.name
+                     ? action.name
+                     : desktopIndex
+                 )
+             );
+}
+
+function detailKey(context, actionId) {
+
+    if (!context || !actionId)
+        return "";
+
+    return context + "|" + actionId;
+}
+
+// Local membership queries. Lazy key readers preserve the original QML
+// dependencies: no general-membership read when a watch already exists.
+function hasTaskMetricFavorite(identity, keysFor) {
+    if (!identity)
+        return false;
+    const prefix = "taskmetric|" + encodeURIComponent(identity) + "|";
+    const keys = keysFor();
+    for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i] || "").indexOf(prefix) === 0)
+            return true;
+    }
+    return false;
+}
+
+function hasTaskFavorites(metricKeys, keysFor) {
+    if (metricKeys.length > 0)
+        return true;
+    const keys = keysFor();
+    for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i] || "").indexOf("task|") === 0)
+            return true;
+    }
+    return false;
+}
+
+function hasMonitorFavorites(monitorKeys, keysFor) {
+    if (monitorKeys.length > 0)
+        return true;
+    const keys = keysFor();
+    for (let i = 0; i < keys.length; i++) {
+        const key = String(keys[i] || "");
+        if (key.indexOf("thermal|") === 0 || key.indexOf("system|") === 0)
+            return true;
+    }
+    return false;
+}
+
+// Selection only. A stored preferred identity is not permission to execute.
+// Snapshot callbacks run only for a relevant context; duplicate actions retain
+// the first matching action index, with availability checked by the host.
+function preferredActionIndex(context, keys, knownCount, countFor, actionsFor, idFor) {
+    if (!context)
+        return -1;
+    const prefix = context + "|";
+    let relevant = false;
+    for (let i = 0; i < keys.length; i++) {
+        if (String(keys[i]).indexOf(prefix) === 0) {
+            relevant = true;
+            break;
+        }
+    }
+    if (!relevant)
+        return -1;
+    const count = knownCount === undefined ? countFor() : knownCount;
+    const actions = actionsFor();
+    for (let i = 0; i < count; i++) {
+        const id = idFor(i, actions);
+        if (id && keys.indexOf(prefix + id) !== -1)
+            return i;
+    }
+    return -1;
+}

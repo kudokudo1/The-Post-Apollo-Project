@@ -4,12 +4,16 @@ on:
   push:
     paths:
       - "tests/favorites/fixtures/FavoritesServiceStandaloneNative.qml"
+      - "tests/favorites/fixtures/FavoritesAppControlBindingNative.qml"
+      - "widgets/AppControlW.qml"
       - "scripts/favorites/verify_service_standalone_native.sh"
       - ".github/workflows/favorites-service-standalone-native.yml"
       - "services/favorites/**"
   pull_request:
     paths:
       - "tests/favorites/fixtures/FavoritesServiceStandaloneNative.qml"
+      - "tests/favorites/fixtures/FavoritesAppControlBindingNative.qml"
+      - "widgets/AppControlW.qml"
       - "scripts/favorites/verify_service_standalone_native.sh"
       - ".github/workflows/favorites-service-standalone-native.yml"
       - "services/favorites/**"
@@ -33,5 +37,5 @@ jobs:
             qt6-qtsvg git nodejs coreutils findutils xorg-x11-server-Xvfb
           quickshell --version
       - uses: actions/checkout@v4
-      - name: Confirm FavoritesService loads/writes/reads without AppControl or CPU++
+      - name: Confirm standalone lifecycle and exact AppControl Favorites binding with synthetic providers
         run: bash scripts/favorites/verify_service_standalone_native.sh

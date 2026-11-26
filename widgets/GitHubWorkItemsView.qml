@@ -12,7 +12,8 @@ Item {
     property var keyboardHost: null
 
     property string kind: "issues"
-    property string stateFilter: "all"
+    property string stateFilter: isPulls ? "open" : "all"
+    property bool showProjectControls: false
     property string projectFilter: "all"
     property string searchText: ""
     property string armedProjectRemoveUrl: ""
@@ -136,6 +137,7 @@ Item {
         property bool selectedAction: false
         property bool enabledAction: true
         property bool primaryBlue: false
+        property color accent: primaryBlue ? Colors.blue : Colors.cyan
         property int keyboardListIndex: -1
 
         readonly property bool keyboardSelected:
@@ -180,13 +182,12 @@ Item {
             ? Colors.orange
             : selectedAction
             ? Colors.orange
-            : primaryBlue
-            ? Colors.blue
             : mouse.containsMouse
             ? Colors.orange
-            : Colors.cyan
+            : accent
 
         GohuText {
+            id: buttonLabel
             anchors.centerIn: parent
             text: button.label
             font.pixelSize: 9
@@ -194,13 +195,17 @@ Item {
                 button.keyboardSelector
                 || button.selectedAction
                 ? Colors.magenta
-                : button.primaryBlue
-                ? Colors.blue
-                : Colors.cyan
+                : button.accent
             opacity:
                 button.enabledAction
                 ? 1.0
                 : 0.34
+        }
+
+        TextHashGlow {
+            safeSource: buttonLabel
+            foregroundColor: buttonLabel.color
+            requestedVisible: root.isPulls && button.enabledAction && button.visible
         }
 
         MouseArea {
@@ -364,11 +369,11 @@ Item {
 
     Column {
         anchors.fill: parent
-        spacing: 8
+        spacing: root.isPulls ? 4 : 8
 
         SectionFrame {
             width: parent.width
-            height: 54
+            height: root.isPulls && !root.showProjectControls ? 30 : 54
             fillColor: Colors.dark
             borderWidth: 1
             borderColor: Colors.cyan
@@ -386,7 +391,7 @@ Item {
                         width: parent.width - 210
                         anchors.verticalCenter: parent.verticalCenter
                         text:
-                            (root.isPulls ? "ALL PULL REQUESTS // " : "ALL ISSUES // ")
+                            (root.isPulls ? root.stateFilter.toUpperCase() + " PULL REQUESTS // " : "ALL ISSUES // ")
                             + String(root.visibleRows.length)
                         font.pixelSize: 12
                         color: Colors.magenta
@@ -411,6 +416,7 @@ Item {
 
                 GohuText {
                     width: parent.width
+                    visible: !root.isPulls || root.showProjectControls
                     text:
                         "PROJECT TARGET // "
                         + (
@@ -434,11 +440,22 @@ Item {
         }
 
         Row {
+            id: filterRow
             width: parent.width
             height: 28
-            spacing: 6
+            spacing: 4
+
+            GohuText {
+                visible: root.isPulls
+                width: 45
+                anchors.verticalCenter: parent.verticalCenter
+                text: "FILTER"
+                color: Colors.magenta
+                font.pixelSize: 10
+            }
 
             ViewButton {
+                visible: !root.isPulls
                 width: 52
                 height: parent.height
                 label: "ALL"
@@ -450,6 +467,7 @@ Item {
                 width: 58
                 height: parent.height
                 label: "OPEN"
+                accent: root.isPulls ? Colors.green : Colors.cyan
                 selectedAction: root.stateFilter === "open"
                 onTriggered: root.stateFilter = "open"
             }
@@ -458,15 +476,24 @@ Item {
                 width: 64
                 height: parent.height
                 label: "CLOSED"
+                accent: root.isPulls ? Colors.magenta : Colors.cyan
                 selectedAction: root.stateFilter === "closed"
                 onTriggered: root.stateFilter = "closed"
+            }
+
+            ViewButton {
+                visible: root.isPulls
+                width: 44
+                label: "ALL"
+                selectedAction: root.stateFilter === "all"
+                onTriggered: root.stateFilter = "all"
             }
 
             SearchField {
                 id: searchField
                 width:
                     parent.width
-                    - (root.isPulls ? 264 : 362)
+                    - (root.isPulls ? 371 : 362)
                 height: parent.height
                 placeholderText:
                     root.isPulls
@@ -490,8 +517,21 @@ Item {
             }
 
             ViewButton {
+                visible: root.isPulls
+                width: 64
+                label: "PROJECT"
+                accent: Colors.magenta
+                selectedAction: root.showProjectControls
+                onTriggered: {
+                    root.showProjectControls = !root.showProjectControls;
+                    if (!root.showProjectControls) root.projectFilter = "all";
+                }
+            }
+
+            ViewButton {
                 width: 72
                 height: parent.height
+                accent: root.isPulls ? Colors.yellow : Colors.blue
                 label: root.busy ? "..." : "REFRESH"
                 primaryBlue: true
                 enabledAction: !root.busy && !!root.gitService.repoRemoteSlug
@@ -500,8 +540,9 @@ Item {
         }
 
         Row {
+            visible: !root.isPulls || root.showProjectControls
             width: parent.width
-            height: 28
+            height: visible ? 28 : 0
             spacing: 6
 
             GohuText {
@@ -573,7 +614,7 @@ Item {
 
         Rectangle {
             width: parent.width
-            height: parent.height - 134
+            height: Math.max(0, parent.height - (root.isPulls ? (root.showProjectControls ? 126 : 66) : 134))
             color: Colors.black
             border.width: 1
             border.color: root.lastError ? Colors.red : Colors.cyan
@@ -626,7 +667,7 @@ Item {
                         : ""
 
                     width: sourceList.width
-                    height: 132
+                    height: root.isPulls && !root.showProjectControls ? 76 : 132
                     color: Colors.dark
                     border.width: 1
                     border.color:
@@ -643,13 +684,13 @@ Item {
                             margins: 7
                             rightMargin: 8
                         }
-                        spacing: 4
+                        spacing: root.isPulls ? 1 : 4
 
                         Row {
                             id: workTitleRow
 
                             width: parent.width
-                            height: 22
+                            height: root.isPulls ? 17 : 22
                             spacing: 3
 
                             GohuText {
@@ -705,8 +746,8 @@ Item {
                             color:
                                 root.workService.rowState(sourceRow.modelData)
                                 === "OPEN"
-                                ? Colors.cyan
-                                : Colors.orange
+                                ? (root.isPulls && root.workService.pullIsDraft(sourceRow.modelData) ? Colors.orange : Colors.green)
+                                : root.workService.rowState(sourceRow.modelData) === "MERGED" ? Colors.magenta : Colors.orange
                             elide: Text.ElideRight
                         }
 
@@ -732,7 +773,7 @@ Item {
                                     : sourceRow.checkState === "PENDING"
                                     ? Colors.orange
                                     : sourceRow.checkState === "PASS"
-                                    ? Colors.cyan
+                                    ? Colors.green
                                     : Colors.white
                                 opacity:
                                     sourceRow.checkState === "NONE"
@@ -757,7 +798,7 @@ Item {
                                     : sourceRow.reviewState === "REVIEW_REQUIRED"
                                     ? Colors.orange
                                     : sourceRow.reviewState === "APPROVED"
-                                    ? Colors.cyan
+                                    ? Colors.green
                                     : Colors.white
                                 opacity:
                                     sourceRow.reviewState === "NONE"
@@ -783,7 +824,7 @@ Item {
                                     || sourceRow.mergeState === "UNSTABLE"
                                     ? Colors.orange
                                     : sourceRow.mergeState === "CLEAN"
-                                    ? Colors.cyan
+                                    ? Colors.green
                                     : Colors.white
                                 elide: Text.ElideRight
                             }
@@ -831,13 +872,14 @@ Item {
                             rightMargin: 7
                         }
 
-                        width: 126
-                        spacing: 5
+                        width: root.isPulls && !root.showProjectControls ? 70 : 126
+                        spacing: root.isPulls ? 3 : 5
 
                         ViewButton {
                             width: parent.width
                             height: 25
                             label: "OPEN"
+                            accent: root.isPulls ? Colors.green : Colors.cyan
                             keyboardListIndex: sourceRow.index
                             enabledAction: !!sourceRow.itemUrl
                             onTriggered: {
@@ -859,7 +901,7 @@ Item {
                             visible: true
                             width: parent.width
                             height: 25
-                            label: "WEB"
+                            label: root.isPulls ? "GITHUB ↗" : "WEB"
                             keyboardListIndex: sourceRow.index
                             enabledAction: !!sourceRow.itemUrl
                             onTriggered: {
@@ -869,7 +911,7 @@ Item {
                         }
 
                         ViewButton {
-                            visible: !sourceRow.alreadyAdded
+                            visible: (!root.isPulls || root.showProjectControls) && !sourceRow.alreadyAdded
                             width: parent.width
                             height: 25
                             label: "ADD TO PROJECT"
@@ -889,7 +931,7 @@ Item {
                         }
 
                         Row {
-                            visible: sourceRow.alreadyAdded
+                            visible: (!root.isPulls || root.showProjectControls) && sourceRow.alreadyAdded
                             width: parent.width
                             height: 25
                             spacing: 4
@@ -926,7 +968,7 @@ Item {
                         }
 
                         ViewButton {
-                            visible: sourceRow.alreadyAdded
+                            visible: (!root.isPulls || root.showProjectControls) && sourceRow.alreadyAdded
                             width: parent.width
                             height: 25
                             keyboardListIndex: sourceRow.index

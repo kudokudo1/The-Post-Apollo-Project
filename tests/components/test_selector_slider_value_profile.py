@@ -21,7 +21,15 @@ assert 'property bool previewGestureActive: false' in slider
 assert 'selectorProfile: "value"' not in git
 assert 'selectorProfile: "value"' not in hospital
 assert 'LIVE REPO //' not in git and 'LIVE REMOTE //' not in git
-assert 'LIVE FLOOR // OFF' in hospital
+# PR #1450 renamed the Floor pointer-mode toggle, not its guarded INDEX route.
+hospital_source = ' '.join(hospital.split())
+assert 'text: root.floorIndexPilotEnabled ? "FLOOR INPUT // PREVIEW" : "FLOOR INPUT // STANDARD"' in hospital_source
+assert 'indexInteraction: root.floorIndexPilotEnabled ? "preview-release" : "legacy"' in hospital_source
+assert 'enabledSlider: root.floorSwitchEnabled onIndexRequested: function(index) { root.selectFloor(index); }' in hospital_source
+assert 'function selectFloor(index) { if (!floorSwitchEnabled) return;' in hospital_source
+assert 'if (requested < 0 || requested >= floorService.floorCount || requested === current) return;' in hospital_source
+assert 'floorService.selectFloor(requested);' in hospital_source
+assert 'LIVE FLOOR // OFF' not in hospital and 'LIVE FLOOR // ON' not in hospital
 
 # The F2 owner owns real value acknowledgment; visual motion never performs
 # an external action or pretends that a requested value was accepted.

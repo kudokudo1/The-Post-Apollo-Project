@@ -1,0 +1,54 @@
+name: Process birth identity safety
+on:
+  pull_request:
+    paths:
+      - 'services/system/TaskSafety.qml'
+      - 'services/system/HunterExecutor.qml'
+      - 'widgets/appcontrol/HunterOperationController.qml'
+      - 'tests/cpuplus/test_hunter_birth_identity.py'
+      - 'tests/cpuplus/fixtures/TaskSafetyBirthNative.qml'
+      - '.github/workflows/process-birth-identity-safety.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test exact captured birth identity against disposable children
+        env:
+          POST_APOLLO_HUNTER_DISPOSABLE_CI: '1'
+        run: python3 -B tests/cpuplus/test_hunter_birth_identity.py
+  locks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates python3 quickshell=0.3.2-1 qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Verify native lock identity in disposable scene
+        env:
+          POST_APOLLO_HUNTER_DISPOSABLE_CI: '1'
+        run: |
+          set -eu
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/services/system" "$tmp/runtime" "$tmp/home"
+          chmod 700 "$tmp/runtime"
+          cp services/system/TaskSafety.qml "$tmp/services/system/"
+          cp tests/cpuplus/fixtures/TaskSafetyBirthNative.qml "$tmp/shell.qml"
+          export XDG_RUNTIME_DIR="$tmp/runtime" HOME="$tmp/home"
+          export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
+          export LIBGL_ALWAYS_SOFTWARE=1 QS_DISABLE_FILE_WATCHER=1
+          timeout 20s qs -p "$tmp/shell.qml" --no-color >"$tmp/log" 2>&1 || { cat "$tmp/log"; exit 1; }
+          cat "$tmp/log"
+          grep -q TASK_SAFETY_BIRTH_PASS "$tmp/log"
+          ! grep -q TASK_SAFETY_BIRTH_FAIL "$tmp/log"

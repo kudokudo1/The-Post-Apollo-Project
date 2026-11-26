@@ -135,7 +135,9 @@ ShellRoot {
             if (!view || view.width <= 0) return;
             const detail = smoke.find(view,"cpuPlusKillSharedTaskView");
             const targets = smoke.find(view,"cpuPlusKillLiveTargets");
-            if (!detail || !targets || targets.count !== 1) {
+            // The final phase deliberately removes the one synthetic row.
+            if (!detail || !targets
+                    || (smoke.phase < 4 && targets.count !== 1)) {
                 if (smoke.ticks > 12) {
                     smoke.check(false, "mount incomplete: loader="
                         + String(scene.status) + " view=" + (!!view)

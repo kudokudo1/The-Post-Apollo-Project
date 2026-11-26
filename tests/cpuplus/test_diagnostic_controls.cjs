@@ -292,7 +292,7 @@ assert.match(ui,/normalFace: true/);
 assert.match(workshop,/text: "FIXED CADENCE"/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: compactLayout \? 120 : 176/);
+assert.match(workshop,/instrumentHeight: compactLayout \? 128 : 176/);
 assert.match(workshopSlider,/height: root.compact \? 24 : 32/);
 assert.match(workshopSlider,/width: parent.height\s+height: parent.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);

@@ -66,6 +66,12 @@ Window {
         accentColor: Shared.Colors.red
         idleForegroundColor: Shared.Colors.cyan
     }
+    Shared.ModeButton {
+        objectName: "hierarchyModeButton"
+        x: 15; y: 160; width: 110; height: 50
+        iconText: "M"
+        labelText: "MODE"
+    }
     readonly property var sourceGlyph:
         labelButton.contentItem.children[0]
     readonly property var glyphEffect:

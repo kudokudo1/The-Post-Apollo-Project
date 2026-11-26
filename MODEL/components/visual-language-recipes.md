@@ -58,32 +58,40 @@ is independent of the Close × recipe:
 The selected state is supplied by the owner of the actual open surface;
 a one-shot action does not latch selected. The open state uses the existing
 selected glow intensity (content 1.0, soft .70, wide .32) versus idle
-(.65, .48, .22). Close × keeps its separate red glyph and original
+(.35, .48, .22). Close × keeps its separate red glyph and original
 interaction colors. Normal-face selectors and explicitly specialized
 recipes keep their own contracts. This changes presentation defaults,
 not action authority, click signals, or execution.
 
-## Shared button content illumination // 2026-11-26
+## Shared button content illumination // operator decision 2026-11-26
 
-Automatic sampled text/icon glow is a separate effect from the perimeter.
-Ordinary already-migrated controls inherit these changes through their
-shared QML defaults; consumer-local property bindings still take priority.
+Modules define the upper reference energy and remain untouched. Their
+custom layered effects (music, network, workspaces, volume, weather,
+Apollo Hub and others) must not be flattened into generic button halos.
+Forest's authored multi-color artwork is likewise preserved.
 
-| Family | Idle glyph opacity | Hover | Selected/open |
-| --- | ---: | ---: | ---: |
-| ActionButton | .65 | .86 | 1.0 |
-| ModeButton primary | .65 | .86 | 1.0 |
-| ModeButton supporting label | .34 | .56 | .56 |
-| DockButton | .84 | .95 | 1.0 |
+| Family | Idle | Hover | Pressed | Selected/open |
+| --- | ---: | ---: | ---: | ---: |
+| Modules (reference, unchanged) | .75 | .95 | 1.00 | 1.00 |
+| Main mode primary | .45 | .75 | .95 | 1.00 |
+| ActionButton | .35 | .65 | .85 | 1.00 |
 
-ActionButton uses radius 10 and 9 samples; ModeButton caption radius 7.
-Ordinary action press gets .84 content glow; the red action press retains
-its existing no-content-glow recipe and Close × keeps its explicit original
-values. The ModeButton black pressed caption treatment is unchanged.
-These are tuning baselines pending native pixel review, not new palette
-identities. Keep existing geometry, effect sources, and input behavior.
-Specialized multi-color clusters, explicit disable/opacity bindings, and
-custom controls remain review items, not automatic mass migrations.
+The shared action and mode primary opacity values live in VisualLanguage.
+Keyboard preview follows hover. The pressed-to-resting/open luminosity
+change IS the flash: no timer, blackout, new color or extra release state.
+The owner's actual selected/open state controls sustained illumination.
+Existing press colors, pointer signals, confirmation and execution rules
+remain unchanged. Close X retains its explicit original recipe.
+
+Preserve the intentional undersampled/hash-like texture. ActionButton
+retains radius 7 / samples 7; ModeButton retains its original geometry
+including caption 5 / 7. Standalone TextHashGlow retains 10 / 9 / .84.
+No module geometry or opacity changes. Supporting mode captions retain
+their original .06/.10 glow and quiet foreground treatment pending visual
+review. Perimeter and chassis recipes remain independent. Explicit
+specialized bindings still take precedence; missing or custom effects
+require an audit, not blanket replacement. These are starting values
+for operator visual tuning, not pixel-certified results.
 
 ## Default sampled-glow alignment // ActionButton rollout (2026-10-22)
 

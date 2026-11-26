@@ -56,11 +56,12 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
         assert button is not None, "ActionButton instance was not found"
         inspect("initial")
         assert button.property("contentGlowEnabled") is True
-        nearly(button.property("contentGlowIdleOpacity"), .65, "inherited idle glyph glow")
-        nearly(button.property("contentGlowHoverOpacity"), .86, "inherited hover glyph glow")
+        nearly(button.property("contentGlowIdleOpacity"), .35, "inherited idle glyph glow")
+        nearly(button.property("contentGlowHoverOpacity"), .65, "inherited hover glyph glow")
+        nearly(button.property("contentGlowPressedOpacity"), .85, "inherited pressed glyph glow")
         nearly(button.property("contentGlowSelectedOpacity"), 1.0, "inherited selected glyph glow")
-        nearly(button.property("contentGlowRadius"), 10, "inherited glyph radius")
-        nearly(button.property("contentGlowSamples"), 9, "inherited glyph samples")
+        nearly(button.property("contentGlowRadius"), 7, "preserved glyph radius")
+        nearly(button.property("contentGlowSamples"), 7, "preserved glyph samples")
         assert button.setProperty("label", "ARCHIVE / CONFIRM")
         inspect("new label")
         assert button.setProperty("width", 250)
@@ -98,16 +99,21 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
         idle = [red.property(k) for k in ("stateContentGlowOpacity", "stateSoftGlowOpacity", "stateWideGlowOpacity")]
         move(240, 30)
         assert red.property("hovered") is True
+        assert abs(red.property("stateContentGlowOpacity") - .65) < .001
         assert color(red, "fillColor") == color(red, "hoverFillColor")
         assert color(red, "foregroundColor") == color(red, "idleForegroundColor")
         assert color(red, "activeBorderColor") == color(red, "accentColor")
         QTest.mousePress(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(240,30))
         app.processEvents()
         assert red.property("pressed") is True
+        assert abs(red.property("stateContentGlowOpacity") - .85) < .001
         assert color(red, "fillColor") == color(red, "pressedFillColor")
         assert color(red, "foregroundColor") == color(red, "pressedForegroundColor")
         QTest.mouseRelease(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(240,30))
+        app.processEvents()
+        assert abs(red.property("stateContentGlowOpacity") - .65) < .001
         move(450,210)
+        assert abs(red.property("stateContentGlowOpacity") - .35) < .001
         assert red.setProperty("selected", True)
         app.processEvents()
         assert color(red, "foregroundColor") == color(red, "accentColor")
@@ -118,6 +124,26 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
         app.processEvents()
         assert color(red, "foregroundColor") == color(red, "idleForegroundColor")
         assert color(close, "foregroundColor") == color(close, "accentColor")
+        mode = window.findChild(QObject, "hierarchyModeButton")
+        glow = mode.findChild(QObject, "modePrimaryGlow")
+        assert mode and glow
+        def mode_strength(expected):
+            app.processEvents()
+            assert abs(glow.property("opacity") - expected) < .001
+        mode_strength(.45)
+        move(70, 185)
+        assert mode.property("hovered")
+        mode_strength(.75)
+        QTest.mousePress(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(70,185))
+        mode_strength(.95)
+        QTest.mouseRelease(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(70,185))
+        mode_strength(.75)
+        assert mode.setProperty("selected", True)
+        mode_strength(1.0)
+        move(450,210)
+        mode_strength(1.0)
+        assert mode.setProperty("selected", False)
+        mode_strength(.45)
     finally:
         window.close()
         window.deleteLater()

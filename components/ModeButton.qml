@@ -214,6 +214,7 @@ Rectangle {
         }
     
         TextHashGlow {
+            objectName: "modePrimaryGlow"
             parent: modeButton.effectivePrimaryGlowHost
             safeSource: modeButton.primaryGlowSource
             // Keep default artwork effects on the independent content plane,
@@ -238,6 +239,7 @@ Rectangle {
             modeButtonRecipe: true
             modeSelected: modeButton.selected
             modeHovered: modeButton.hovered
+            modePressed: modeButton.pressed
         }
     
         TextHashGlow {

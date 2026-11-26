@@ -35,7 +35,7 @@ Rectangle {
     property color openGlowColor: Colors.magenta
 
     // Rising per-cluster content glow; sample texture is provisional.
-    property real contentGlowIdleOpacity: 0.84
+    property real contentGlowIdleOpacity: 0.75
     property real contentGlowHoverOpacity: 0.95
     property real contentGlowPressedOpacity: 1.0
     property real contentGlowOpenOpacity: 1.0

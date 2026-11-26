@@ -309,7 +309,7 @@ for needle in (
     "normalDockGlowColor: Colors.cyan",
     "hoverDockGlowColor: Colors.orange",
     "pressedDockGlowColor: Colors.magenta",
-    "contentGlowIdleOpacity: 0.84",
+    "contentGlowIdleOpacity: 0.75",
     "contentGlowHoverOpacity: 0.95",
     "contentGlowActiveRadius: 14",
     "contentGlowActiveSamples: 15",

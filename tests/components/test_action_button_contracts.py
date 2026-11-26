@@ -795,12 +795,24 @@ print("Red action state contracts: PASS")
 # The shared default content glow is present independently of perimeter glow.
 for needle in (
     "property bool contentGlowEnabled: true",
-    "property real contentGlowIdleOpacity: 0.65",
-    "property real contentGlowHoverOpacity: 0.86",
-    "property real contentGlowSelectedOpacity: 1.0",
-    "property real contentGlowRadius: 10",
-    "property int contentGlowSamples: 9",
-    "property real contentGlowPressedOpacity: redActionFace ? 0.0 : 0.84",
+    "property real contentGlowIdleOpacity: VisualLanguage.actionContentIdleOpacity",
+    "property real contentGlowHoverOpacity: VisualLanguage.actionContentHoverOpacity",
+    "property real contentGlowSelectedOpacity: VisualLanguage.actionContentSelectedOpacity",
+    "property real contentGlowRadius: 7",
+    "property int contentGlowSamples: 7",
+    "property real contentGlowPressedOpacity: VisualLanguage.actionContentPressedOpacity",
 ):
     require(COMPONENT, needle, "visible shared content glow")
 print("Shared ActionButton content illumination: PASS")
+
+RECIPES = (ROOT / "components/VisualLanguage.qml").read_text(encoding="utf-8")
+for needle in (
+    "actionContentIdleOpacity: 0.35",
+    "actionContentHoverOpacity: 0.65",
+    "actionContentPressedOpacity: 0.85",
+    "actionContentSelectedOpacity: 1.00",
+):
+    require(RECIPES, needle, "operator-approved action illumination scale")
+require(COMPONENT, "contentGlowKeyboardSelectedOpacity: contentGlowHoverOpacity",
+        "keyboard preview equals hover")
+assert "Timer {" not in COMPONENT, "no artificial release flash"

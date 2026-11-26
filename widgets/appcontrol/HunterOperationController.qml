@@ -15,6 +15,9 @@ QtObject {
     property int completed: 0
     property int total: 0
     property var pendingTargets: []
+    property int cursor: 0
+    property var activeTarget: null
+    property bool activeResultReceived: false
 
     function targetsFromRows(rows) {
         return rows.map(function(entry) {
@@ -125,36 +128,38 @@ QtObject {
             return;
         }
 
-        const captured =
-            Array.isArray(operationTargets) ? operationTargets.slice() : [];
-        if (captured.length === 0) {
-            host.cancelDestructiveConfirm();
+        // Review owns a fixed, nonempty set of exact identities. Do not
+        // broaden malformed captures or let duplicate PIDs authorize a signal.
+        const captured = [];
+        const seen = new Set();
+        if (operationKind !== "kill-hogs" && operationKind !== "kill-mice")
             return;
-        }
-
-        const activeTargets = [];
-        const releasedFavorites = [];
-
-        for (let i = 0; i < captured.length; i++) {
-            const target = captured[i];
-            if (targetIsFavorite(target)) {
-                releasedFavorites.push({
-                    type: "result",
-                    pid: Number(target.pid || 0),
-                    name: String(target.name || "PROCESS"),
-                    status: "favorite",
-                    detail: "LET LOOSE • FAVORITE PROTECTED BEFORE FIRING"
-                });
-            } else {
-                activeTargets.push(target);
+        if (!Array.isArray(operationTargets) || operationTargets.length === 0)
+            return;
+        for (const target of operationTargets) {
+            if (!target || !Number.isSafeInteger(target.pid) || target.pid <= 1
+                    || !Number.isSafeInteger(target.startTicks) || target.startTicks <= 0
+                    || typeof target.name !== "string" || !target.name
+                    || typeof target.identity !== "string" || !target.identity
+                    || seen.has(target.pid)) {
+                host.cancelDestructiveConfirm();
+                return;
             }
+            seen.add(target.pid);
+            captured.push(Object.freeze({
+                pid: target.pid, startTicks: target.startTicks,
+                name: target.name, identity: target.identity
+            }));
         }
 
         phase = "running";
         kind = String(operationKind || "kill-hogs");
         targets = captured;
-        results = releasedFavorites;
-        completed = releasedFavorites.length;
+        results = [];
+        completed = 0;
+        cursor = 0;
+        activeTarget = null;
+        activeResultReceived = false;
         total = captured.length;
         pendingTargets = [];
 
@@ -168,52 +173,96 @@ QtObject {
         host.destructiveConfirmOpen = true;
         refreshMessage();
 
-        if (activeTargets.length === 0) {
-            finish();
-            return;
-        }
-
-        executor.start(activeTargets);
+        dispatchNext();
     }
 
-    function applyResult(result) {
-        if (phase !== "running")
-            return;
-
-        const payload = result || ({});
+    function record(target, status, detail) {
         const next = results.slice();
-        next.push(payload);
+        next.push({type: "result", pid: target.pid, name: target.name,
+                   status: status, detail: detail});
         results = next;
-        completed = Math.min(total, next.length);
+        completed = next.length;
         refreshMessage();
         refreshTimer.restart();
     }
 
-    function finish() {
-        if (phase !== "running")
-            return;
-
-        const seen = ({});
-        for (let i = 0; i < results.length; i++)
-            seen[String(results[i].pid || 0)] = true;
-
-        const finalResults = results.slice();
-        for (let i = 0; i < targets.length; i++) {
-            const target = targets[i];
-            const key = String(target.pid || 0);
-            if (!seen[key]) {
-                finalResults.push({
-                    type: "result",
-                    pid: Number(target.pid || 0),
-                    name: String(target.name || "PROCESS"),
-                    status: "escaped",
-                    detail: "NO VERIFIED RESULT • NOT RETRIED"
-                });
-            }
+    function liveRow(target) {
+        for (const row of host.taskRows) {
+            if (Number(row.pid) === target.pid
+                    && Number(row.startTicks) === target.startTicks
+                    && String(row.comm || row.name || "").trim() === target.name
+                    && host.taskPersistentIdentity(row) === target.identity)
+                return row;
         }
+        return null;
+    }
 
-        results = finalResults;
-        completed = total;
+    function dispatchNext() {
+        if (phase !== "running" || activeTarget || executor.running)
+            return;
+        while (cursor < targets.length) {
+            const target = targets[cursor++];
+            if (targetIsFavorite(target)) {
+                record(target, "favorite", "LET LOOSE • FAVORITE PROTECTED BEFORE FIRING");
+                continue;
+            }
+            const row = liveRow(target);
+            if (!row) {
+                record(target, "gone", "CAPTURED IDENTITY NO LONGER OBSERVED");
+                continue;
+            }
+            if (!host.taskEligibleForKillAll(row)
+                    || (kind === "kill-mice" && host.hunterMouseProtectedReason(row).length > 0)) {
+                record(target, "escaped", "CURRENT PROTECTION • NO SIGNAL");
+                continue;
+            }
+            activeTarget = target;
+            activeResultReceived = false;
+            if (!executor.start([target])) {
+                record(target, "escaped", "EXECUTOR REFUSED • NO RETRY");
+                activeTarget = null;
+                stopRemaining();
+            }
+            return;
+        }
+        completeReport();
+    }
+
+    function applyResult(result) {
+        if (phase !== "running" || !activeTarget || activeResultReceived
+                || !result || result.pid !== activeTarget.pid
+                || result.name !== activeTarget.name
+                || ["killed", "gone", "escaped"].indexOf(result.status) < 0)
+            return;
+        activeResultReceived = true;
+        record(activeTarget, result.status, String(result.detail || ""));
+    }
+
+    function stopRemaining() {
+        while (cursor < targets.length)
+            record(targets[cursor++], "escaped", "NOT ATTEMPTED • PREVIOUS EXECUTION UNVERIFIED");
+        completeReport();
+    }
+
+    // Only called by the executor after the child process has exited.
+    function finish() {
+        if (phase !== "running" || !activeTarget)
+            return;
+        const verified = activeResultReceived;
+        if (!verified)
+            record(activeTarget, "escaped", "NO VERIFIED RESULT • NOT RETRIED");
+        activeTarget = null;
+        activeResultReceived = false;
+        if (!verified) {
+            stopRemaining();
+            return;
+        }
+        Qt.callLater(function() { hunterOperationController.dispatchNext(); });
+    }
+
+    function completeReport() {
+        if (phase !== "running" || activeTarget)
+            return;
         phase = "report";
         host.destructiveConfirmTitle =
             kind === "kill-mice"

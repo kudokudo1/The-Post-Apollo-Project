@@ -23,7 +23,8 @@ Scope {
 
         const captured = Array.isArray(targets) ? targets.slice() : [];
 
-        if (captured.length === 0)
+        // The owner dispatches exactly one reviewed target at a time.
+        if (captured.length !== 1)
             return false;
 
         running = true;
@@ -60,8 +61,8 @@ Scope {
 
             if (payload.type === "result")
                 resultReady(payload);
-            else if (payload.type === "done")
-                finish();
+            // A "done" line is not proof that the child has exited.
+            // Keep the executor occupied until Process.onExited.
         } catch (error) {
             errorRaised("HUNTER progress parse: " + String(error));
         }
@@ -69,6 +70,10 @@ Scope {
 
     Process {
         id: process
+
+        onExited: function(exitCode, exitStatus) {
+            hunterExecutor.finish();
+        }
 
         stdout: SplitParser {
             onRead: function(line) {
@@ -91,6 +96,8 @@ Scope {
         interval: 23000
         repeat: false
 
-        onTriggered: hunterExecutor.finish()
+        // Stop the helper, but do not publish completion or admit a new
+        // dispatch until its exit is observed.
+        onTriggered: process.running = false
     }
 }

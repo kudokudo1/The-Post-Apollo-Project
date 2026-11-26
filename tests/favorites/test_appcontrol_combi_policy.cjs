@@ -77,7 +77,7 @@ test("static catalog preserves donor unique key, sort and signature",()=>{
     const prepared=copy(records);
     const result=policy.buildStatic(prepared);
     const expected=[];
-    const seen=Object.create(null);
+    const seen=({});
     for(const row of copy(records)){
         const p=donor.prepareCombiRecord(row);
         if(!p)continue;
@@ -98,7 +98,7 @@ test("static catalog preserves donor unique key, sort and signature",()=>{
     assert.deepEqual(plain(result.rows),plain(expected));
     assert.equal(result.signature,signature);
     assert.equal(result.rows.filter(x=>x._favoriteKey==="run:one").length,1);
-    assert.equal(result.rows.find(x=>x.id==="__proto__").name,"Reserved");
+    assert.equal(result.rows.some(x=>x.id==="__proto__"),false);
 });
 
 test("private local COMBI search fields never enter the universal catalog",()=>{

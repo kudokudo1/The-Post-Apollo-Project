@@ -12,7 +12,13 @@ ShellRoot {
         }
         return true;
     }
-    Component.onCompleted: {
+    Timer {
+        interval: 100
+        running: true
+        repeat: false
+        onTriggered: root.runChecks()
+    }
+    function runChecks() {
         if (Quickshell.env("POST_APOLLO_HUNTER_DISPOSABLE_CI") !== "1") {
             Qt.quit(); return;
         }

@@ -59,7 +59,13 @@ ShellRoot {
         }
         return ok;
     }
-    Component.onCompleted: {
+    Timer {
+        interval: 100
+        running: true
+        repeat: false
+        onTriggered: root.runChecks()
+    }
+    function runChecks() {
         if (Quickshell.env("POST_APOLLO_HUNTER_DISPOSABLE_CI") !== "1") {Qt.quit();return;}
         const captured=controller.targetsFromRows(fakeHost.taskRows);
         controller.start("kill-hogs",[captured[0],captured[0]]);

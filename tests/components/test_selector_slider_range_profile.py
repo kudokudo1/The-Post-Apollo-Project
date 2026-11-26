@@ -37,7 +37,15 @@ assert 'readonly property real rangePreviewLower:' in slider
 assert 'readonly property real rangePreviewUpper:' in slider
 assert 'gitService.selectRepo(index);' in git
 assert 'gitService.selectRemote(index);' in git
-assert 'LIVE FLOOR // OFF' in hospital
+# PR #1450 renamed the Floor pointer-mode toggle, not its guarded INDEX route.
+hospital_source = ' '.join(hospital.split())
+assert 'text: root.floorIndexPilotEnabled ? "FLOOR INPUT // PREVIEW" : "FLOOR INPUT // STANDARD"' in hospital_source
+assert 'indexInteraction: root.floorIndexPilotEnabled ? "preview-release" : "legacy"' in hospital_source
+assert 'enabledSlider: root.floorSwitchEnabled onIndexRequested: function(index) { root.selectFloor(index); }' in hospital_source
+assert 'function selectFloor(index) { if (!floorSwitchEnabled) return;' in hospital_source
+assert 'if (requested < 0 || requested >= floorService.floorCount || requested === current) return;' in hospital_source
+assert 'floorService.selectFloor(requested);' in hospital_source
+assert 'LIVE FLOOR // OFF' not in hospital and 'LIVE FLOOR // ON' not in hospital
 assert 'selectorProfile: "range"' not in git
 assert 'selectorProfile: "range"' not in hospital
 assert 'selectorProfile: "range"' not in (ROOT / "shell.qml").read_text()

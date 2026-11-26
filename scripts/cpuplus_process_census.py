@@ -147,11 +147,22 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--duration", type=int, default=30)
     parser.add_argument("--interval", type=int, default=10)
+    parser.add_argument("--workshop", action="store_true")
     args = parser.parse_args(argv)
     # At most six intervals; fixed production button uses three.
     if not (1 <= args.duration <= 60 and 1 <= args.interval <= args.duration
             and (args.duration + args.interval - 1) // args.interval <= 6):
         parser.error("duration 1..60 seconds, at most six intervals")
+    if args.workshop and (args.duration + args.interval - 1) // args.interval > 3:
+        parser.error("workshop census report budget")
+    # Import only on the configured path; legacy standalone tools stay intact.
+    if args.workshop:
+        from syntagma_quickshell_thread_sampler import WorkshopOutput, WorkshopOutputLimit
+        send = WorkshopOutput().emit
+        output_errors = (WorkshopOutputLimit,)
+    else:
+        send = emit
+        output_errors = ()
     root = Path("/proc")
     uid, page, hz = os.getuid(), os.sysconf("SC_PAGE_SIZE"), os.sysconf("SC_CLK_TCK")
     count = 0
@@ -159,8 +170,10 @@ def main(argv=None):
         previous, previous_coverage = snapshot(root, uid, page, os.getpid())
         if not previous:
             raise ValueError("no observable processes")
-        deadline = time.monotonic() + args.duration
-        while count < 6:
+        started = time.monotonic()
+        deadline = started + args.duration
+        limit = (args.duration + args.interval - 1) // args.interval if args.workshop else 6
+        while count < limit:
             remaining = deadline - time.monotonic()
             if remaining <= 0 and count:
                 break
@@ -171,7 +184,7 @@ def main(argv=None):
             rows = compare(previous, current, hz)
             selected, focus_count = select_rows(rows)
             count += 1
-            emit({"schema": SCHEMA, "event": "census", "sequence": count,
+            send({"schema": SCHEMA, "event": "census", "sequence": count,
                   "tsMs": round(time.time() * 1000), "scope": "same-user",
                   "observed": len(rows), "cpuMeasured": sum(r["cpuPct"] is not None for r in rows),
                   "ioMeasured": sum(r["readBps"] is not None and r["writeBps"] is not None for r in rows),
@@ -180,15 +193,31 @@ def main(argv=None):
             previous, previous_coverage = current, coverage
             if time.monotonic() >= deadline:
                 break
+    except output_errors:
+        return 1
     except (OSError, ValueError, IndexError):
-        emit({"schema": SCHEMA, "event": "stopped", "samples": count,
-              "reason": "observation-unavailable"})
+        try:
+            send({"schema": SCHEMA, "event": "stopped", "samples": count,
+                  "reason": "observation-unavailable"})
+        except output_errors:
+            pass
         return 1
     except KeyboardInterrupt:
-        emit({"schema": SCHEMA, "event": "stopped", "samples": count,
-              "reason": "user-interrupt"})
+        try:
+            send({"schema": SCHEMA, "event": "stopped", "samples": count,
+                  "reason": "user-interrupt"})
+        except output_errors:
+            pass
         return 130
-    emit({"schema": SCHEMA, "event": "complete", "samples": count})
+    end = {"schema": SCHEMA, "event": "complete", "samples": count}
+    if args.workshop:
+        end.update(workshopSchema="post-apollo-observer-calibration-v1",
+                   calibration={"kind":"census","durationSeconds":args.duration,"intervalMs":args.interval*1000},
+                   observedMs=round((time.monotonic()-started)*1000))
+    try:
+        send(end)
+    except output_errors:
+        return 1
     return 0
 
 

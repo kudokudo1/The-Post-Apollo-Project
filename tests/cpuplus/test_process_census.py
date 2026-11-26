@@ -68,6 +68,16 @@ class CensusTests(unittest.TestCase):
         self.assertLess(len(result.stdout),65536)
         self.assertNotIn("cmdline",result.stdout)
 
+    def test_configured_proc_receipt(self):
+        result = subprocess.run([sys.executable,"-B",str(ROOT/"scripts/cpuplus_process_census.py"),
+                                 "--workshop","--duration","1","--interval","1"],capture_output=True,text=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stderr+result.stdout)
+        rows=[json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(rows[-1]["calibration"],{"kind":"census","durationSeconds":1,"intervalMs":1000})
+        self.assertEqual(rows[-1]["samples"],1)
+        self.assertGreaterEqual(rows[-1]["observedMs"],1000)
+        self.assertLessEqual(len(result.stdout.encode("ascii")),65536)
+
 
 if __name__ == "__main__":
     unittest.main()

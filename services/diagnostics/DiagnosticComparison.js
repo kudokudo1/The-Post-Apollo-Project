@@ -155,6 +155,17 @@ function compare(before, after, validate, appMetrics) {
     if (!Number.isFinite(firstTime) || !Number.isFinite(secondTime) || secondTime <= firstTime)
         return fail("AFTER MUST BE NEWER THAN BEFORE");
     try {
+        if (["memory","census","storage"].includes(before.kind)) {
+            const terminal=report=>JSON.parse(report.text.trim().split("\n").pop());
+            const x=terminal(before), y=terminal(after);
+            if (x.workshopSchema || y.workshopSchema || x.calibration || y.calibration) {
+                if (x.workshopSchema!==y.workshopSchema || !x.calibration || !y.calibration
+                        || x.calibration.kind!==y.calibration.kind
+                        || x.calibration.durationSeconds!==y.calibration.durationSeconds
+                        || x.calibration.intervalMs!==y.calibration.intervalMs)
+                    return fail("OBSERVER CALIBRATION MUST MATCH");
+            }
+        }
         if (before.kind==="threads") {
             const first=JSON.parse(before.text.trim().split("\n",1)[0]);
             const second=JSON.parse(after.text.trim().split("\n",1)[0]);

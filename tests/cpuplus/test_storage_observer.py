@@ -66,6 +66,18 @@ class StorageTests(unittest.TestCase):
             self.assertNotIn("secret payload",p.stdout)
             self.assertNotIn(folder,p.stdout)
 
+    def test_configured_metadata_receipt(self):
+        with tempfile.TemporaryDirectory() as folder:
+            p=subprocess.run([sys.executable,"-B",str(ROOT/"scripts/cpuplus_storage_observer.py"),
+                "--workshop","--data-dir",folder,"--shell-dir",folder,"--duration","1"],
+                env=dict(os.environ,XDG_DATA_HOME=folder),capture_output=True,text=True,timeout=10)
+            self.assertEqual(p.returncode,0,p.stderr)
+            rows=[json.loads(line) for line in p.stdout.splitlines()]
+            self.assertEqual(rows[-1]["calibration"],{"kind":"storage","durationSeconds":1})
+            self.assertEqual(rows[-1]["observedMs"],rows[0]["elapsedMs"])
+            self.assertEqual(rows[-1]["samples"],1)
+            self.assertLessEqual(len(p.stdout.encode("ascii")),65536)
+
 
 if __name__ == "__main__":
     unittest.main()

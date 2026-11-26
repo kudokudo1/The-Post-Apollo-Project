@@ -91,16 +91,18 @@ Scope {
     property string activeCalibration: ""
 
     function requestConfigured(configuration) {
-        if (configuration === undefined) return false;
-        return request("threads", configuration);
+        if (!configuration || typeof configuration !== "object") return false;
+        const descriptor=Object.getOwnPropertyDescriptor(configuration,"kind");
+        if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor,"value")) return false;
+        return request(descriptor.value, configuration);
     }
 
     function request(job, configuration) {
         if (busy || faulted || worker.running || archive.busy) return false;
         const configured = configuration !== undefined;
-        const plan = configured && job === "threads"
-            ? Calibration.threadLaunchPlan(configuration, path => Quickshell.shellPath(path)) : null;
-        if (configured && !plan) return false;
+        const plan = configured
+            ? Calibration.observerLaunchPlan(configuration, path => Quickshell.shellPath(path), Quickshell.dataDir) : null;
+        if (configured && (!plan || plan.config.kind !== job)) return false;
         const args = plan ? plan.args : Policy.argumentsFor(job, path => Quickshell.shellPath(path), Quickshell.dataDir);
         if (!args) return false;
         activeCalibration = plan ? JSON.stringify(plan.config) : "";
@@ -169,7 +171,7 @@ Scope {
         if (kind === "appcontrol" && !cancelled && exitOk && output.length <= maximumReport)
             output = Policy.combineAppControl(output, modeRecords, openingRecords, diagnosticOverflow, killWorkRecords, workRecords) || "";
         const calibrationMatches = !activeCalibration ||
-            Policy.configuredThreadEvidence(output, JSON.parse(activeCalibration)) !== null;
+            Policy.configuredEvidence(kind, output, JSON.parse(activeCalibration)) !== null;
         const summary = !cancelled && exitOk && output.length <= maximumReport && calibrationMatches
             ? Policy.summarize(kind, output) : null;
         publishResult(cancelled ? "CANCELLED" : summary ? "COMPLETE" : "NOT VERIFIED",

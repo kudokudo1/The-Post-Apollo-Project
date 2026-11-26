@@ -88,11 +88,19 @@ def main(argv=None):
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--shell-dir", type=Path, required=True)
     parser.add_argument("--duration", type=int, default=30)
+    parser.add_argument("--workshop", action="store_true")
     args = parser.parse_args(argv)
     if not args.data_dir.is_absolute() or not args.shell_dir.is_absolute():
         parser.error("absolute configured roots required")
     if not 1 <= args.duration <= 30:
         parser.error("duration 1..30 seconds")
+    if args.workshop:
+        from syntagma_quickshell_thread_sampler import WorkshopOutput, WorkshopOutputLimit
+        send = WorkshopOutput().emit
+        output_errors = (WorkshopOutputLimit,)
+    else:
+        send = emit
+        output_errors = ()
     roots = {"qs": args.data_dir, "shell": args.shell_dir, "xdg": xdg_data()}
     targets = [(key, roots[root] / rel) for key, root, rel in TARGETS]
     uid = os.getuid()
@@ -109,13 +117,27 @@ def main(argv=None):
                 previous[key] = current
             if tick % 10 == 0 or tick == args.duration:
                 samples += 1
-                emit({"schema": SCHEMA, "event": "storage", "sequence": samples,
-                      "intervals": tick, "elapsedMs": round((time.monotonic() - start) * 1000),
+                elapsed_ms = round((time.monotonic() - start) * 1000)
+                send({"schema": SCHEMA, "event": "storage", "sequence": samples,
+                      "intervals": tick, "elapsedMs": elapsed_ms,
                       "rows": list(rows.values())})
+    except output_errors:
+        return 1
     except KeyboardInterrupt:
-        emit({"schema": SCHEMA, "event": "stopped", "samples": samples})
+        try:
+            send({"schema": SCHEMA, "event": "stopped", "samples": samples})
+        except output_errors:
+            pass
         return 130
-    emit({"schema": SCHEMA, "event": "complete", "samples": samples})
+    end = {"schema": SCHEMA, "event": "complete", "samples": samples}
+    if args.workshop:
+        end.update(workshopSchema="post-apollo-observer-calibration-v1",
+                   calibration={"kind":"storage","durationSeconds":args.duration},
+                   observedMs=elapsed_ms)
+    try:
+        send(end)
+    except output_errors:
+        return 1
     return 0
 
 

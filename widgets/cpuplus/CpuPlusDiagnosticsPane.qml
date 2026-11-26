@@ -13,6 +13,7 @@ Column {
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
+    property bool workshopOpen: true
     readonly property var report: CpuPlusDiagnostics.selectedArchiveId
         ? CpuPlusDiagnostics.reportFor(selectedReport, CpuPlusDiagnostics.selectedArchiveId)
         : CpuPlusDiagnostics.reports[selectedReport] || null
@@ -182,8 +183,33 @@ Column {
             font.pixelSize: 10
             wrapMode: Text.WordWrap
         }
+        ActionButton {
+            objectName: "cpuplusWorkshopToggle"
+            width: parent.width
+            height: 28
+            accentColor: Colors.magenta
+            label: root.workshopOpen ? "WORKSHOP // QUICK CAPTURES" : "OPEN DIAGNOSTIC WORKSHOP"
+            labelPixelSize: 10
+            labelFontSizeMode: Text.HorizontalFit
+            contentPadding: 2
+            selected: root.workshopOpen
+            acceptedButtons: Qt.LeftButton
+            onLeftClicked: root.workshopOpen = !root.workshopOpen
+        }
+        ActionButton {
+            width: parent.width
+            height: 26
+            visible: root.workshopOpen && CpuPlusDiagnostics.busy
+                && CpuPlusDiagnostics.captureId !== CpuPlusDiagnostics.workshopRunId
+            available: !CpuPlusDiagnostics.cancelled
+            accentColor: Colors.red
+            destructive: true
+            label: CpuPlusDiagnostics.cancelled ? "STOPPING" : "STOP ACTIVE CAPTURE"
+            onLeftClicked: CpuPlusDiagnostics.cancel()
+        }
         Grid {
             id: captureGrid
+            visible: !root.workshopOpen
             width: parent.width
             columns: 2
             spacing: 3
@@ -225,8 +251,16 @@ Column {
         }
         }
     }
+    Loader {
+        width: parent.width
+        height: active && item ? item.implicitHeight : 0
+        active: root.workshopOpen
+        visible: active
+        sourceComponent: CpuPlusDiagnosticWorkshop {}
+    }
     GohuText {
         width: parent.width
+        visible: !root.workshopOpen
         text: "Close this menu and reproduce the issue, then return here. APPCONTROL TEST: open AppControl, spend time in APP and KILL, then close it; no process actions needed. CPU sampling runs outside Quickshell; opening markers run inside it. CANCEL stops early without a verified comparison. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
         color: Colors.white
         font.pixelSize: 10
@@ -512,12 +546,12 @@ Column {
             width: parent.width
             spacing: 3
             Repeater {
-                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol"]
+                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow"]
                 delegate: ActionButton {
                     required property string modelData
-                    width: Math.max(0, Math.floor((reportRail.width - 15) / 6))
+                    width: Math.max(0, Math.floor((reportRail.width - 18) / 7))
                     height: 27
-                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : "STORE"
+                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : "STORE"
                     labelPixelSize: 9
                     labelFontSizeMode: Text.HorizontalFit
                     labelMinimumPixelSize: 8

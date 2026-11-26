@@ -126,26 +126,12 @@ Column {
                 labelElide: Text.ElideNone
                 contentPadding: 0
                 selected: root.draft.selected.includes(modelData.kind)
-                selectedFillColor: Colors.black
                 selectedForegroundColor: accentColor
                 selectedBorderColor: accentColor
                 selectedContentGlowColor: accentColor
                 selectedSoftGlowColor: accentColor
                 contentGlowSelectedOpacity: 0.95
-                // U9g / Angels: deterministic opaque face, no filled shadow layers.
-                color: Colors.black
-                softGlowEnabled: false
-                wideGlowEnabled: false
-                contentGlowEnabled: true
-                pressedForegroundColor: Colors.magenta
-                Rectangle {
-                    anchors.fill: parent
-                    color: "transparent"
-                    border.width: 1
-                    border.color: instrumentFilter.activeBorderColor
-                    opacity: 0.48
-                    visible: instrumentFilter.selected || instrumentFilter.hovered || instrumentFilter.pressed
-                }
+                normalFace: true
                 available: !root.locked
                 acceptedButtons: Qt.LeftButton
                 Accessible.name: modelData.kind.toUpperCase()

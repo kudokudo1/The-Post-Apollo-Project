@@ -544,11 +544,13 @@ PanelWindow {
     }
 
     readonly property var activeMemoryPane: memoryActuatorLoader.active ? memoryActuatorLoader.item : null
-    readonly property string cpuHeaderStatus: activeMemoryPane ? activeMemoryPane.scanBadge
+    readonly property string cpuHeaderStatus: selectedModeIndex === 1
+        ? "KILL // " + (sharedKillWorkspaceLoader.item ? String(sharedKillWorkspaceLoader.item.displayedTargetCount) : "—") + " TARGETS"
+        : activeMemoryPane ? activeMemoryPane.scanBadge
         : selectedModeIndex===2 || selectedModeIndex===3 ? ((selectedMonitorRows().length>0)?"OBSERVED":"WAITING")
         : (modes[selectedModeIndex].displayName || modes[selectedModeIndex].name)
     readonly property bool showCpuObservation: selectedModeIndex<=3
-    readonly property color cpuHeaderColor: !showCpuObservation ? internetStatusColor : (cpuHeaderStatus==="OBSERVED" || cpuHeaderStatus.startsWith("LIVE")) ? Colors.omnitrix
+    readonly property color cpuHeaderColor: selectedModeIndex === 1 ? Colors.red : !showCpuObservation ? internetStatusColor : (cpuHeaderStatus==="OBSERVED" || cpuHeaderStatus.startsWith("LIVE")) ? Colors.omnitrix
         : cpuHeaderStatus==="PAUSED" ? Colors.yellow
         : cpuHeaderStatus==="MANUAL" ? Colors.red
         : cpuHeaderStatus==="UNAVAILABLE" || cpuHeaderStatus.startsWith("STALE") ? Colors.orange : Colors.cyan
@@ -1134,7 +1136,7 @@ PanelWindow {
             anchors.verticalCenter: cpuPlusCloseButton.verticalCenter
             anchors.right: cpuPlusReloadButton.left
             anchors.rightMargin: 7
-            width: 156
+            width: cpuPlusWindow.selectedModeIndex === 1 ? Math.max(156, cpuPlusInternetText.implicitWidth + 14) : 156
             height: 22
             color: Colors.black
             border.width: 1

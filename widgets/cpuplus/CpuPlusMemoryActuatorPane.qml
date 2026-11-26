@@ -367,10 +367,51 @@ Item {
                 selectedForegroundColor: Colors.magenta
                 selectedBorderColor: Colors.magenta
                 contentGlowEnabled: true
-                softGlowEnabled: true
+                outlineOnlyGlow: true
                 onLeftClicked: root.selectMenu(index)
             }
         }
+    }
+    // One literal CAP layout, shared by both views. No additional observation.
+    component LiveCapacityBars: Column {
+        spacing: 5
+        CpuPlusMemoryReadout {
+            width: parent.width
+            text: root.displaySample ? "RAM AVAIL // " + root.gib(root.displaySample.available)
+                + " / " + root.gib(root.displaySample.total) : "RAM // UNAVAILABLE"
+            color: Colors.cyan
+            font.pixelSize: 12
+            wrapMode: Text.WordWrap
+        }
+        Rectangle {
+            width: parent.width
+            height: 24
+            color: Colors.black
+            border.width: 1
+            border.color: Colors.magenta
+            clip: true
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 3
+                color: Colors.cyan
+                opacity: root.displaySample ? 0.22 : 0
+            }
+            Rectangle {
+                x: 3; y: 3
+                height: Math.max(0, parent.height - 6)
+                width: root.displaySample && root.displaySample.total > 0
+                    ? Math.max(0, parent.width - 6) * root.displaySample.available / root.displaySample.total : 0
+                color: Colors.cyan
+                opacity: 0.85
+            }
+        }
+        CpuPlusSwapComposition {
+            width: parent.width
+            sample: root.displaySample
+            capacity: root.displayCapacity
+            compact: true
+        }
+
     }
     readonly property bool fixedWorkPage: ["PROC","AUTO","DIAG","PROF"].includes(root.page)
     Column {
@@ -420,56 +461,18 @@ Item {
                 onLeftClicked: root.refresh()
             }
         }
-        // Live read-only observations from the same snapshot as CAP.
-        Column {
+        LiveCapacityBars {
             objectName: "cpuplusDiagPinnedStatus"
             width: parent.width
             visible: root.page === "DIAG"
-            spacing: 2
-            GohuText {
-                width: parent.width
-                color: Colors.yellow
-                font.pixelSize: 9
-                text: root.displaySample ? "PSI 10s // "+root.displaySample.some.toFixed(2)+" / "+root.displaySample.full.toFixed(2)+"%" : "PSI // UNAVAILABLE"
-                elide: Text.ElideRight
-            }
-            Repeater {
-                model: [
-                    {label:"RAM AVAIL", ink:Colors.magenta, fill:Colors.cyan,
-                        used:root.displaySample?root.displaySample.available:0,
-                        total:root.displaySample?root.displaySample.total:0},
-                    {label:"SWAP USED", ink:Colors.yellow, fill:Colors.yellow,
-                        used:root.displaySample?root.displaySample.swap-root.displaySample.free:0,
-                        total:root.displaySample?root.displaySample.swap:0}
-                ]
-                delegate: Item {
-                    required property var modelData
-                    width: workHeader.width
-                    height: 21
-                    Rectangle {
-                        anchors.fill: parent
-                        color: Colors.black
-                        border.color: modelData.ink
-                        Rectangle {
-                            x:2; y:2
-                            height: parent.height-4
-                            width: modelData.total>0 ? Math.max(0,parent.width-4)*Math.max(0,Math.min(1,modelData.used/modelData.total)) : 0
-                            color: modelData.fill
-                            opacity: 0.35
-                        }
-                    }
-                    CpuPlusMemoryReadout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 4
-                        anchors.rightMargin: 4
-                        verticalAlignment: Text.AlignVCenter
-                        font.pixelSize: 10
-                        color: Colors.white
-                        text: modelData.label+" // "+(root.displaySample?root.gib(modelData.used)+" / "+root.gib(modelData.total):"UNAVAILABLE")
-                        elide: Text.ElideRight
-                    }
-                }
-            }
+        }
+        GohuText {
+            width: parent.width
+            visible: root.page === "DIAG"
+            color: Colors.yellow
+            font.pixelSize: 9
+            text: root.displaySample ? "PSI 10s // "+root.displaySample.some.toFixed(2)+" / "+root.displaySample.full.toFixed(2)+"%" : "PSI // UNAVAILABLE"
+            elide: Text.ElideRight
         }
     }
     Column {
@@ -596,42 +599,7 @@ Item {
                 onLeftClicked: root.refresh()
             }
         }
-        CpuPlusMemoryReadout {
-            width: parent.width
-            text: root.displaySample ? "RAM AVAIL // " + root.gib(root.displaySample.available)
-                + " / " + root.gib(root.displaySample.total) : "RAM // UNAVAILABLE"
-            color: Colors.cyan
-            font.pixelSize: 12
-            wrapMode: Text.WordWrap
-        }
-        Rectangle {
-            width: parent.width
-            height: 24
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.magenta
-            clip: true
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 3
-                color: Colors.cyan
-                opacity: root.displaySample ? 0.22 : 0
-            }
-            Rectangle {
-                x: 3; y: 3
-                height: Math.max(0, parent.height - 6)
-                width: root.displaySample && root.displaySample.total > 0
-                    ? Math.max(0, parent.width - 6) * root.displaySample.available / root.displaySample.total : 0
-                color: Colors.cyan
-                opacity: 0.85
-            }
-        }
-        CpuPlusSwapComposition {
-            width: parent.width
-            sample: root.displaySample
-            capacity: root.displayCapacity
-            compact: true
-        }
+        LiveCapacityBars { width: parent.width }
         Rectangle { width: parent.width; height: 1; color: Colors.cyan }
         Grid {
             width: parent.width

@@ -17,9 +17,17 @@ QtObject {
     readonly property real modeHaloSelectedStrength: 1.00
     readonly property real modeHaloPressedStrength: 1.20
 
-    // MAIN MODE primary sampled-icon glow tuning is provisional.
-    readonly property real modeIconIdleOpacity: 0.40
-    readonly property real modeIconHoverOpacity: 0.80
+    // Operator-approved sampled content hierarchy. Modules are the reference
+    // and retain their independent authored recipes unchanged.
+    readonly property real actionContentIdleOpacity: 0.35
+    readonly property real actionContentHoverOpacity: 0.65
+    readonly property real actionContentPressedOpacity: 0.85
+    readonly property real actionContentSelectedOpacity: 1.00
+
+    // Main mode primary artwork: luminosity states, not timed flashes.
+    readonly property real modeIconIdleOpacity: 0.45
+    readonly property real modeIconHoverOpacity: 0.75
+    readonly property real modeIconPressedOpacity: 0.95
     readonly property real modeIconSelectedOpacity: 1.00
     readonly property real modeIconIdleRadius: 10
     readonly property real modeIconHoverRadius: 14
@@ -31,6 +39,7 @@ QtObject {
     readonly property real modeLabelIdleOpacity: 0.34
     readonly property real modeLabelActiveOpacity: 0.48
     readonly property real modeLabelPressedOpacity: 0.42
+    // Supporting captions stay quiet and distinct from primary artwork.
     readonly property real modeLabelGlowIdleOpacity: 0.06
     readonly property real modeLabelGlowActiveOpacity: 0.10
     readonly property real modeLabelGlowRadius: 5

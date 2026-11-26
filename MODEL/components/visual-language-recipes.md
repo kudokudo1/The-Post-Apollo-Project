@@ -43,6 +43,56 @@ It is not a directive to replace all QML shadows or normalize every widget.
   source-attached text/icon effects. Do not replace it with unguarded
   `layer.effect: DropShadow` during cleanup.
 
+## Red action face // operator decision (2026-11-26)
+
+For ordinary filled red-accent `ActionButton` controls, the default face
+is independent of the Close × recipe:
+
+| State | Fill | Foreground | Border / glow |
+| --- | --- | --- | --- |
+| Idle | Black | White | Red |
+| Hover / keyboard focus | Yellow | White | Red |
+| Press | Existing pressed recipe | Existing pressed recipe | Existing pressed recipe |
+| Selected / held open | Black | Red | Red, stronger selected glow |
+
+The selected state is supplied by the owner of the actual open surface;
+a one-shot action does not latch selected. The open state uses the existing
+selected glow intensity (content 1.0, soft .70, wide .32) versus idle
+(.35, .48, .22). Close × keeps its separate red glyph and original
+interaction colors. Normal-face selectors and explicitly specialized
+recipes keep their own contracts. This changes presentation defaults,
+not action authority, click signals, or execution.
+
+## Shared button content illumination // operator decision 2026-11-26
+
+Modules define the upper reference energy and remain untouched. Their
+custom layered effects (music, network, workspaces, volume, weather,
+Apollo Hub and others) must not be flattened into generic button halos.
+Forest's authored multi-color artwork is likewise preserved.
+
+| Family | Idle | Hover | Pressed | Selected/open |
+| --- | ---: | ---: | ---: | ---: |
+| Modules (reference, unchanged) | .75 | .95 | 1.00 | 1.00 |
+| Main mode primary | .45 | .75 | .95 | 1.00 |
+| ActionButton | .35 | .65 | .85 | 1.00 |
+
+The shared action and mode primary opacity values live in VisualLanguage.
+Keyboard preview follows hover. The pressed-to-resting/open luminosity
+change IS the flash: no timer, blackout, new color or extra release state.
+The owner's actual selected/open state controls sustained illumination.
+Existing press colors, pointer signals, confirmation and execution rules
+remain unchanged. Close X retains its explicit original recipe.
+
+Preserve the intentional undersampled/hash-like texture. ActionButton
+retains radius 7 / samples 7; ModeButton retains its original geometry
+including caption 5 / 7. Standalone TextHashGlow retains 10 / 9 / .84.
+No module geometry or opacity changes. Supporting mode captions retain
+their original .06/.10 glow and quiet foreground treatment pending visual
+review. Perimeter and chassis recipes remain independent. Explicit
+specialized bindings still take precedence; missing or custom effects
+require an audit, not blanket replacement. These are starting values
+for operator visual tuning, not pixel-certified results.
+
 ## Default sampled-glow alignment // ActionButton rollout (2026-10-22)
 
 **Owner:** Post-Apollo shared controls. **Status:** first implementation stage;

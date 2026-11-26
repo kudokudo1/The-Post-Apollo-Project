@@ -29,6 +29,7 @@ ActionButton {
     Accessible.name: "Close"
 
     destructive: false
+    redActionFace: false
     accentColor: Colors.red
 
     // Surface and foreground remain separate from the permanent red glow.

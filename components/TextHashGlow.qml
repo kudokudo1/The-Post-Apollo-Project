@@ -26,6 +26,7 @@ SafeDropShadow {
     property bool modeButtonRecipe: false
     property bool modeSelected: false
     property bool modeHovered: false
+    property bool modePressed: false
 
     // mapToItem() alone does not track changes to an anchored source's x/y.
     // For source/effect siblings use reactive local coordinates instead.
@@ -53,6 +54,7 @@ SafeDropShadow {
              : modeHovered ? VisualLanguage.modeIconHoverSamples
              : VisualLanguage.modeIconIdleSamples
     opacity: !modeButtonRecipe ? VisualLanguage.textHashOpacity
+             : modePressed ? VisualLanguage.modeIconPressedOpacity
              : modeSelected ? VisualLanguage.modeIconSelectedOpacity
              : modeHovered ? VisualLanguage.modeIconHoverOpacity
              : VisualLanguage.modeIconIdleOpacity

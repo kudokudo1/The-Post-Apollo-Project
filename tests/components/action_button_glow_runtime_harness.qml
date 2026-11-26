@@ -7,8 +7,8 @@ import "../../components" as Shared
 // Run only in the offscreen Qt test environment.
 Window {
     id: harness
-    width: 420
-    height: 170
+    width: 480
+    height: 240
     visible: true
     color: "#1B0623"
 
@@ -40,6 +40,38 @@ Window {
         }
     }
 
+    Shared.ActionButton {
+        id: redButton
+        objectName: "redActionButton"
+        x: 200; y: 16; width: 140; height: 38
+        label: "DELETE"
+        accentColor: Shared.Colors.red
+        destructive: true
+    }
+    Shared.CloseButton {
+        objectName: "redActionCloseComparison"
+        x: 360; y: 16
+    }
+    Shared.ActionButton {
+        objectName: "redNormalComparison"
+        x: 200; y: 80
+        label: "NORMAL"
+        accentColor: Shared.Colors.red
+        normalFace: true
+    }
+    Shared.ActionButton {
+        objectName: "redExplicitComparison"
+        x: 200; y: 130
+        label: "CUSTOM"
+        accentColor: Shared.Colors.red
+        idleForegroundColor: Shared.Colors.cyan
+    }
+    Shared.ModeButton {
+        objectName: "hierarchyModeButton"
+        x: 15; y: 160; width: 110; height: 50
+        iconText: "M"
+        labelText: "MODE"
+    }
     readonly property var sourceGlyph:
         labelButton.contentItem.children[0]
     readonly property var glyphEffect:

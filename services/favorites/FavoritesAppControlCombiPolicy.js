@@ -96,3 +96,83 @@ function partitionPinned(rows, isFavorite) {
     }
     return pinned.concat(ordinary);
 }
+
+
+// The local COMBI process catalog is a presentation projection only.
+// PROCESS owns live task identity and record materialization. The caller must
+// supply those functions; this policy cannot kill, inspect procfs, or choose
+// another task when a target disappears.
+function buildTasks(tasks, identityFor, recordFor) {
+    const rows = [];
+    const seen = ({}); // Donor semantics, including reserved-object keys.
+    const identities = [];
+    const input = tasks || [];
+
+    for (let i = 0; i < input.length; i++) {
+        const task = input[i];
+        const identity = identityFor(task);
+        if (!identity || seen[identity])
+            continue;
+
+        seen[identity] = true;
+        identities.push(identity);
+
+        const record = prepare(recordFor(identity, task));
+        if (record)
+            rows.push(record);
+    }
+
+    identities.sort();
+    const signature = identities.join("\\n");
+    rows.sort(function(a, b) {
+        return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    return {rows: rows, signature: signature};
+}
+
+// AppControl-local Favorites/COMBI visible-row projection. This deliberately
+// does NOT reuse FavoritesSearchPolicy, which safely excludes sensitive
+// command/path/task fields for CPU++'s universal view. COMBI searches those
+// fields locally as it did before extraction. Never export these rows to
+// another widget.
+//
+// Options are supplied by the AppControl UI. In particular, copied-submode
+// visibility and starred membership remain owner-owned predicates.
+function visibleRows(records, options) {
+    const settings = options || {};
+    const query = settings.query || "";
+    const inCombi = !!settings.inCombi;
+    const rows = (records || []).filter(function(entry) {
+        if (settings.filterMode !== settings.filterAll
+                && Number(entry._sourceModeIndex) !== settings.filterMode)
+            return false;
+
+        if (!settings.matchesCopiedSubmode(entry))
+            return false;
+
+        if (query.length === 0)
+            return true;
+
+        const haystack = inCombi && entry._combiSearchText
+                       ? entry._combiSearchText
+                       : searchText(entry);
+        return haystack.indexOf(query) !== -1;
+    });
+
+    if (inCombi && query.length === 0)
+        return partitionPinned(rows, settings.isFavorite);
+
+    rows.sort(function(a, b) {
+        if (inCombi) {
+            const aFavorite = settings.isFavorite(a);
+            const bFavorite = settings.isFavorite(b);
+            if (aFavorite !== bFavorite)
+                return aFavorite ? -1 : 1;
+        }
+        const modeCompare = a._sourceModeIndex - b._sourceModeIndex;
+        if (modeCompare !== 0)
+            return modeCompare;
+        return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    return rows;
+}

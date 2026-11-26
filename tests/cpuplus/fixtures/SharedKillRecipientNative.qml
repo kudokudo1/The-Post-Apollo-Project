@@ -233,6 +233,10 @@ ShellRoot {
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
+                const quick=smoke.find(header,"cpuPlusProcessHeaderActions");
+                const locks=smoke.find(view,"cpuPlusProcessHeaderActionLocks");
+                const helpButton=smoke.find(view,"cpuPlusProcessLockHelpButton");
+                const help=smoke.find(view,"cpuPlusProcessLockHelpPopup");
                 const leftBay=smoke.find(view,"cpuPlusProcessControlBay");
                 const rightBay=smoke.find(view,"cpuPlusProcessReservedBay");
                 const search=smoke.find(view,"cpuPlusKillSearch");
@@ -246,11 +250,17 @@ ShellRoot {
                     && detail.mapToItem(leftBay,0,0).x >= 0
                     && detail.mapToItem(leftBay,0,0).x + detail.width <= leftBay.width
                     && detail.actionSection.parent===actionTarget
-                    && detail.restartAction.parent===detail.actionSection
-                    && detail.endAction.parent===detail.actionSection
-                    && detail.restartAction.y < detail.limitSlider.y
-                    && detail.limitSlider.y < detail.freezeAction.y
-                    && detail.freezeAction.y < detail.endAction.y
+                    && quick && locks && helpButton && help
+                    && detail.restartAction.parent===quick
+                    && detail.freezeAction.parent===quick
+                    && detail.endAction.parent===quick
+                    && detail.limitSlider.parent===detail.actionSection
+                    && detail.restartAction.width===34 && detail.restartAction.height===34
+                    && detail.freezeAction.width===34 && detail.freezeAction.height===34
+                    && detail.endAction.width===34 && detail.endAction.height===34
+                    && detail.restartAction.showLabel && detail.freezeAction.showLabel && detail.endAction.showLabel
+                    && detail.restartAction.x < detail.freezeAction.x
+                    && detail.freezeAction.x < detail.endAction.x
                     && search && hunter
                     && smoke.find(view,"cpuPlusKillTargetScroll")
                     && smoke.find(view,"cpuPlusKillInstrumentViewport"),
@@ -259,6 +269,11 @@ ShellRoot {
                 const infoButton=smoke.find(view,"cpuPlusProcessInformationButton");
                 if (!smoke.check(info && infoButton && !info.visible && header.height>54 && smoke.find(header,"cpuPlusProcessExactIdentity") && smoke.find(header,"cpuPlusProcessLiveOwner"),
                     "compact identity with hidden shared information")) return;
+                if (!smoke.check(!help.visible && !help.open && helpButton.available, "lock help initially hidden")) return;
+                helpButton.leftClicked();
+                if (!smoke.check(help.visible && helpButton.selected, "eye opens lock instructions")) return;
+                helpButton.leftClicked();
+                if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===0, "eye closes without action")) return;
                 info.open=true;
                 if (!smoke.check(info.visible && infoButton.selected
                     && info.purpose==="Synthetic purpose"

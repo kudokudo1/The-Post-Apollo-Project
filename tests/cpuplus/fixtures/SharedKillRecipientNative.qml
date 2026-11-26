@@ -12,6 +12,9 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property int previousRevision: 0
+    property real previousInfoHeight: 0
+    property real previousScopeHeight: 0
+    property real previousArgumentsHeight: 0
     property var lastRow: null
 
     QtObject {
@@ -88,7 +91,7 @@ ShellRoot {
             comm:"synthetic-worker", name:"synthetic-worker",
             cpu:12, mem:4, rss:23456, vsz:100000,
             threads:3, state:"S", ppid:1, elapsed:"00:55",
-            user:"ci", args:"synthetic-worker --test"
+            user:"ci", args:"synthetic-worker --test " + Array(150).fill("--synthetic-long-argument").join(" ")
         }]
         property var taskMiniCpuHistories: ({"pid:3442":[2,5,12]})
         property var taskMiniHunterMetricHistories: ({
@@ -279,6 +282,69 @@ ShellRoot {
                 const info=smoke.find(view,"cpuPlusProcessInformation");
                 if (!smoke.check(info.open && info.visible,
                     "same birth identity refresh preserves information popup")) return;
+                // Test-only long scope injection. The actual hosts retain their
+                // owner-projected scope bindings; no real process or command runs.
+                info.scopeText = Array(100).fill("SYNTHETIC SCOPE / CHILD PID 3442").join("\n");
+                smoke.phase=15;
+                return;
+            }
+            if (smoke.phase===15) {
+                const info=smoke.find(view,"cpuPlusProcessInformation");
+                const scope=smoke.find(info,"processInformationScopeScroll");
+                const args=smoke.find(info,"processInformationArgumentsScroll");
+                const grow=smoke.find(info,"processInformationGrow");
+                const shrink=smoke.find(info,"processInformationShrink");
+                const command=smoke.find(info,"processInformationCommandFrame");
+                if (!smoke.check(scope && args && grow && shrink && command
+                    && info.sizeLevel===0 && grow.available && !shrink.available
+                    && scope.height>0 && args.height>0
+                    && scope.contentHeight>scope.height && args.contentHeight>args.height,
+                    "compact level has two bounded independent scroll bodies")) return;
+                const before=command.y;
+                scope.contentY=12;
+                if (!smoke.check(scope.contentY===12 && args.contentY===0 && command.y===before,
+                    "scope scrolling does not move command box")) return;
+                args.contentY=15;
+                if (!smoke.check(scope.contentY===12 && args.contentY===15 && command.y===before,
+                    "command scrolling does not move scope or its own box")) return;
+                smoke.previousInfoHeight=info.height;
+                smoke.previousScopeHeight=scope.height;
+                smoke.previousArgumentsHeight=args.height;
+                grow.resizeRequested(1);
+                smoke.phase=16;
+                return;
+            }
+            if (smoke.phase===16) {
+                const info=smoke.find(view,"cpuPlusProcessInformation");
+                const scope=smoke.find(info,"processInformationScopeScroll");
+                const args=smoke.find(info,"processInformationArgumentsScroll");
+                const grow=smoke.find(info,"processInformationGrow");
+                if (!smoke.check(info.sizeLevel===1 && info.height>smoke.previousInfoHeight
+                    && scope.height>=smoke.previousScopeHeight && args.height>=smoke.previousArgumentsHeight,
+                    "upper level enlarges both long bodies")) return;
+                smoke.previousInfoHeight=info.height;
+                smoke.previousScopeHeight=scope.height;
+                smoke.previousArgumentsHeight=args.height;
+                grow.resizeRequested(1);
+                smoke.phase=17;
+                return;
+            }
+            if (smoke.phase===17) {
+                const info=smoke.find(view,"cpuPlusProcessInformation");
+                const scope=smoke.find(info,"processInformationScopeScroll");
+                const args=smoke.find(info,"processInformationArgumentsScroll");
+                const grow=smoke.find(info,"processInformationGrow");
+                const shrink=smoke.find(info,"processInformationShrink");
+                if (!smoke.check(info.sizeLevel===2 && !grow.available && shrink.available
+                    && Math.abs(info.height-info.maximumHeight)<1
+                    && info.height>smoke.previousInfoHeight
+                    && scope.height>=smoke.previousScopeHeight && args.height>=smoke.previousArgumentsHeight,
+                    "full usable bay with independently grown section bodies")) return;
+                info.resizeBy(1);
+                if (!smoke.check(info.sizeLevel===2,"maximum step clamps")) return;
+                shrink.resizeRequested(-1);
+                shrink.resizeRequested(-1);
+                if (!smoke.check(info.sizeLevel===0,"shrink restores compact level")) return;
                 info.open=false;
                 if (!smoke.check(detail.cpuCanvas.graphRevision>smoke.previousRevision,
                     "new owner sample repaints shared detail")) return;

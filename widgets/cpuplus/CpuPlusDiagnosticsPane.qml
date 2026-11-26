@@ -27,7 +27,7 @@ Column {
         function onPendingReportViewChanged() { root.consumeReportView(); }
     }
     function selectView(mode) {
-        if (!["WORK","QUICK","REPORT","HISTORY","COMPARE"].includes(mode)) return;
+        if (!["WORK","PRESETS","QUICK","REPORT","HISTORY","COMPARE"].includes(mode)) return;
         showReport=false;
         showHistory=mode==="HISTORY" || mode==="COMPARE";
         showComparison=mode==="COMPARE";
@@ -193,6 +193,7 @@ Column {
         spacing: 3
         GohuText {
             width: parent.width
+            visible: !root.headerTarget
             text: CpuPlusDiagnostics.feedback
             color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
             font.pixelSize: 10
@@ -259,6 +260,127 @@ Column {
         active: root.workshopOpen
         visible: active
         sourceComponent: CpuPlusDiagnosticWorkshop { viewportHeight: root.workshopViewportHeight }
+    }
+    Column {
+        id: presets
+        objectName: "cpuplusDiagnosticWorkflowCatalog"
+        width: parent.width
+        visible: root.viewMode === "PRESETS"
+        spacing: 4
+        property string deleteName: ""
+        onVisibleChanged: if (!visible) deleteName=""
+        GohuText {
+            width: parent.width
+            text: "WORKFLOWS // SESSION PRESETS"
+            color: Colors.magenta
+            font.pixelSize: 12
+        }
+        GohuText {
+            width: parent.width
+            text: "SAVE CURRENT CALIBRATION // LOAD TO CONTROLS"
+            color: Colors.cyan
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        Row {
+            width: parent.width
+            spacing: 4
+            Rectangle {
+                width: parent.width-76
+                height: 28
+                color: Colors.black
+                border.color: Colors.magenta
+                TextInput {
+                    id: presetName
+                    objectName: "cpuplusDiagnosticPresetName"
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    maximumLength: 32
+                    color: Colors.white
+                    font.pixelSize: 11
+                    verticalAlignment: TextInput.AlignVCenter
+                    selectByMouse: true
+                    enabled: !CpuPlusDiagnostics.workshopPresetLocked
+                }
+                GohuText {
+                    anchors.centerIn: parent
+                    visible: presetName.text.length===0 && !presetName.activeFocus
+                    text: "WORKFLOW NAME"
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                }
+            }
+            ActionButton {
+                objectName: "cpuplusDiagnosticSavePreset"
+                width: 72
+                height: 28
+                label: "SAVE"
+                normalFace: true
+                accentColor: Colors.omnitrix
+                available: !CpuPlusDiagnostics.workshopPresetLocked && presetName.text.length>0
+                onLeftClicked: if (CpuPlusDiagnostics.saveWorkshopPreset(presetName.text)) presetName.text=""
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: CpuPlusDiagnostics.workshopPresetFeedback
+            color: Colors.yellow
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: CpuPlusDiagnostics.workshopPresets
+            delegate: Column {
+                required property var modelData
+                width: presets.width
+                spacing: 2
+                GohuText {
+                    width: parent.width
+                    text: modelData.name+" // "+modelData.plan.durationSeconds+"s"
+                    color: Colors.white
+                    font.pixelSize: 11
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                }
+                GohuText {
+                    width: parent.width
+                    text: modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / ")
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                }
+                Row {
+                    width: parent.width
+                    spacing: 4
+                    ActionButton {
+                        width: Math.floor((parent.width-4)*0.6)
+                        height: 26
+                        label: "LOAD CONTROLS"
+                        normalFace: true
+                        accentColor: Colors.cyan
+                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        onLeftClicked: {
+                            if (CpuPlusDiagnostics.loadWorkshopPreset(modelData.name)) {
+                                presets.deleteName=""; root.selectView("WORK");
+                            }
+                        }
+                    }
+                    ActionButton {
+                        width: parent.width-parent.children[0].width-4
+                        height: 26
+                        label: presets.deleteName===modelData.name ? "CONFIRM" : "REMOVE"
+                        normalFace: true
+                        accentColor: Colors.red
+                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        onLeftClicked: {
+                            if (presets.deleteName===modelData.name) {
+                                presets.deleteName=""; CpuPlusDiagnostics.removeWorkshopPreset(modelData.name);
+                            } else presets.deleteName=modelData.name;
+                        }
+                    }
+                }
+            }
+        }
     }
     GohuText {
         width: parent.width
@@ -550,17 +672,18 @@ Column {
         spacing: 3
         Row {
             id: diagnosticIndex
+            visible: root.viewMode !== "PRESETS"
             width: parent.width
             spacing: 3
             Repeater {
-                model: [{key:"WORK",label:"WORK"},{key:"QUICK",label:"QUICK"},
+                model: [{key:"QUICK",label:"QUICK"},
                         {key:"REPORT",label:"REPORT"},{key:"HISTORY",label:"HIST"},
                         {key:"COMPARE",label:"CMP"}]
                 ActionButton {
                     id: diagnosticViewFilter
                     objectName: "cpuplusDiagnosticView-"+modelData.key
                     required property var modelData
-                    width: Math.max(0,Math.floor((diagnosticIndex.width-12)/5))
+                    width: Math.max(0,Math.floor((diagnosticIndex.width-9)/4))
                     height: 25
                     label: modelData.label
                     accentColor: Colors.cyan

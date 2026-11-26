@@ -84,8 +84,7 @@ assert.match(pane, /id: policyInstrument[\s\S]*?SelectorDial\s*\{[\s\S]*?id: pol
 const sharedHeaderSource=pane.slice(pane.indexOf("component LiveCapacityHeader"),pane.indexOf("readonly property bool fixedWorkPage"));
 assert.match(sharedHeaderSource,/objectName: sharedHeader.refreshName[\s\S]*?idleFillColor: Colors.yellow/);
 assert.match(pane,/refreshName: "cpuplusCapRefresh"/);
-const policyRefresh=pane.split('objectName: "cpuplusPolicyRefresh"')[1].split("onLeftClicked:")[0];
-assert.match(policyRefresh,/idleFillColor: Colors.yellow/);
+assert.doesNotMatch(pane,/objectName: "cpuplusPolicyRefresh"/);
 const zctx = vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname,"../widgets/cpuplus/CpuPlusZramPolicy.js"),"utf8"),zctx);
 assert.equal(zctx.parseAlgorithms("lzo [lz4] zstd\n").actual,"lz4");

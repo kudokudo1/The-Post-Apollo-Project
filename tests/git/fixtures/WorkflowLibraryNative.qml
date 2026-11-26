@@ -60,6 +60,18 @@ ShellRoot {
         }
         return null;
     }
+    function haloOnly(button) {
+        const perimeter = find(button,"actionButtonNormalPerimeter");
+        const soft = find(button,"actionButtonBroadSoftGlow");
+        const wide = find(button,"actionButtonBroadWideGlow");
+        return button.contentGlowEnabled && button.contentGlowSource === button.labelItem
+            && button.effectiveContentGlowOpacity > 0
+            && button.washSafePerimeter && button.perimeterGlowEnabled
+            && !button.wideGlowEnabled
+            && perimeter && perimeter.active && perimeter.item
+            && perimeter.item.color.a === 0 && perimeter.z === -1
+            && soft && !soft.visible && wide && !wide.visible;
+    }
     function require(ok, message) {
         if (!ok) {
             console.error("GIT_WORKFLOW_LIBRARY_FAIL // " + message);
@@ -90,7 +102,9 @@ ShellRoot {
                     && info.contentGlowEnabled,"compact info recipe")) return;
                 if (!root.require(Qt.colorEqual(clear.accentColor,Colors.red)
                     && Qt.colorEqual(queueClear.idleForegroundColor,Colors.white)
-                    && Qt.colorEqual(clear.hoverForegroundColor,Colors.white)
+                    && Qt.colorEqual(clear.hoverForegroundColor,Colors.red)
+                    && Qt.colorEqual(clear.keyboardSelectedForegroundColor,Colors.red)
+                    && Qt.colorEqual(clear.hoverContentGlowColor,Colors.red)
                     && Qt.colorEqual(clear.hoverFillColor,Colors.yellow)
                     && Qt.colorEqual(clear.hoverSoftGlowColor,Colors.red)
                     && Qt.colorEqual(refresh.idleFillColor,Colors.yellow)
@@ -101,6 +115,7 @@ ShellRoot {
                     && Qt.colorEqual(refresh.hoverForegroundColor,Colors.orange)
                     && Qt.colorEqual(refresh.hoverSoftGlowColor,Colors.orange)
                     && Qt.colorEqual(queueRun.hoverFillColor,Colors.yellow),"semantic action faces")) return;
+                if (!root.require(haloOnly(info) && haloOnly(clear) && haloOnly(refresh),"header glyph and perimeter halos; no wash")) return;
                 info.activateFromGitKeyboard();
                 if (!root.require(view.workflowHelpOpen && info.selected && Qt.colorEqual(info.fillColor,Colors.yellow),"info opens selected")) return;
                 info.activateFromGitKeyboard();
@@ -129,6 +144,7 @@ ShellRoot {
                     && Qt.colorEqual(run.keyboardSelectedContentGlowColor,Colors.orange)
                     && Qt.colorEqual(run.hoverFillColor,Colors.yellow)
                     && run.contentGlowEnabled && queue.contentGlowEnabled,"row action recipes")) return;
+                if (!root.require(haloOnly(run) && haloOnly(control) && haloOnly(queue),"row glyph and perimeter halos; no wash")) return;
                 control.activateFromGitKeyboard();
                 if (!root.require(root.controlIndex===240,"original source index")) return;
                 queue.activateFromGitKeyboard();

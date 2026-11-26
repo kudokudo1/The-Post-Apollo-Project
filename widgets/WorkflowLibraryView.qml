@@ -102,8 +102,15 @@ Item {
         idleFillColor: refreshAction ? Colors.yellow : Colors.black
         idleForegroundColor: redAction ? Colors.white : refreshAction ? Colors.magenta : accentColor
         idleBorderColor: refreshAction ? Colors.orange : accentColor
-        // All non-red actions use the ordinary shared hover/keyboard recipe.
-        // The semantic accent identifies the resting face only.
+        // Red actions: white at rest, red lettering on yellow hover.
+        // Other actions inherit the normal orange hover and magenta press.
+        hoverForegroundColor: redAction ? Colors.red : Colors.orange
+        // Glyph halo plus transparent perimeter halo, never a filled shadow.
+        contentGlowEnabled: true
+        washSafePerimeter: true
+        softGlowEnabled: true
+        perimeterGlowEnabled: true
+        wideGlowEnabled: false
 
         Component.onCompleted: if (root.keyboardHost) root.keyboardHost.registerGitKeyboardControl(button)
         Component.onDestruction: if (root.keyboardHost) root.keyboardHost.unregisterGitKeyboardControl(button)
@@ -114,6 +121,11 @@ Item {
     component LibraryInformationButton: InformationButton {
         id: button
         hoverContentGlowColor: Colors.orange
+        contentGlowEnabled: true
+        washSafePerimeter: true
+        softGlowEnabled: true
+        perimeterGlowEnabled: true
+        wideGlowEnabled: false
         property bool enabledAction: true
         property bool keyboardNavigable: true
         available: enabledAction
@@ -968,7 +980,6 @@ Item {
                 GohuText {
                     id: workflowHelp
                     width: parent.width; visible: root.workflowHelpOpen
-                    height: visible ? implicitHeight : 0
                     wrapMode: Text.WordWrap; font.pixelSize: 10; color: Colors.cyan
                     text: "SEARCH // matches loaded names and paths. RUN // confirm the exact workflow on the default branch; no queue required. CONTROL // open the existing selector. + QUEUE // append to ordered batch. X // two-click delete. REFRESH // fetch repository workflows."
                 }

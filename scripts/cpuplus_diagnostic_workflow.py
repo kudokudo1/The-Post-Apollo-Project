@@ -152,7 +152,8 @@ def collect_children(argvs, duration, cancelled):
             try:
                 # No new process group: outer timeout can clean up the whole tree.
                 child = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
-                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                                         stdout=subprocess.PIPE,
+                                         stderr=None if kind=="storage" else subprocess.DEVNULL)
                 children[kind]=child
                 launches[kind]=now_ms()
                 data[kind]=bytearray()

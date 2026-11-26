@@ -7,7 +7,8 @@ const vm = require("node:vm");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
-const host = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
+const liveHost = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
+const host = fs.readFileSync(path.join(root,"tests/favorites/fixtures/AppControlFavoritesDonorBeforeC4.js.txt"),"utf8");
 const source = fs.readFileSync(path.join(root,
     "services/favorites/FavoritesAppControlCombiPolicy.js"),"utf8");
 const policy = {};
@@ -242,3 +243,8 @@ test("new local projections do not own actions or enter universal Favorites",()=
         "services/favorites/FavoritesUnifiedCatalog.qml"),"utf8");
     assert.doesNotMatch(universal,/FavoritesAppControlCombiPolicy|_combiSearchText/);
 });
+
+
+test("live host delegates extracted Combi policy without replacing independent baseline",()=>{
+    for(const call of ["FavoriteCombi.searchText(record)","FavoriteCombi.prepare(record)","FavoriteCombi.buildStatic(records)","FavoriteCombi.buildTasks(taskRows","FavoriteCombi.visibleRows(rows,"]) assert.ok(liveHost.includes(call),call);
+ });

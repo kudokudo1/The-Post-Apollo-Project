@@ -9,6 +9,10 @@ import "../services/system"
 import "../services/files"
 import "../services/remote"
 import qs.services.favorites
+import "../services/favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
+import "../services/favorites/FavoritesAppControlRunIdentityPolicy.js" as FavoriteRunIdentity
+import "../services/favorites/FavoritesAppControlRecordPolicy.js" as FavoriteRecord
+import "../services/favorites/FavoritesAppControlCombiPolicy.js" as FavoriteCombi
 import "../services/favorites/FavoritesAppSelectionPolicy.js" as AppFavoriteSelection
 import "../services/favorites/FavoritesSystemSelectionPolicy.js" as SystemFavoriteSelection
 import "../services/favorites/FavoritesSystemWatchSelectionPolicy.js" as SystemWatchSelection
@@ -3513,52 +3517,25 @@ PanelWindow {
     }
 
     function combiSearchTextForRecord(record) {
-        if (!record)
-            return "";
-        const source = favoriteSourceItem(record) || record;
-        return ((record.name || "") + " "
-                + (record.genericName || "") + " "
-                + (record.comment || "") + " "
-                + (record.keywords || "") + " "
-                + (source.args || "") + " "
-                + (source.commandText || "") + " "
-                + (source.appName || "") + " "
-                + (source.windowName || "") + " "
-                + (source.tabTitle || "") + " "
-                + (source.category || "") + " "
-                + (source.role || "") + " "
-                + (source.metric || "") + " "
-                + String(source.pid || "")).toLowerCase();
+        return FavoriteCombi.searchText(record);
     }
 
     function prepareCombiRecord(record) {
-        if (!record)
-            return null;
-        record._combiSearchText = combiSearchTextForRecord(record);
-        return record;
+        return FavoriteCombi.prepare(record);
     }
 
     function rebuildCombiStaticCatalog() {
-        const rows = [];
-        const seen = ({});
-
-        function pushUnique(record) {
-            record = appControlWindow.prepareCombiRecord(record);
-            if (!record)
-                return;
-            const key = String(record._favoriteKey || record.id || record.name || "");
-            if (!key || seen[key])
-                return;
-            seen[key] = true;
-            rows.push(record);
+        const records = [];
+        function collect(record) {
+            records.push(record);
         }
 
         const apps = [...DesktopEntries.applications.values];
         for (let i = 0; i < apps.length; i++)
-            pushUnique(appControlWindow.favoriteRecordForApp(apps[i]));
+            collect(appControlWindow.favoriteRecordForApp(apps[i]));
 
         for (let i = 0; i < appControlWindow.runAllCommands.length; i++) {
-            pushUnique(appControlWindow.favoriteRecordForRunCommand(
+            collect(appControlWindow.favoriteRecordForRunCommand(
                 appControlWindow.runAllCommands[i],
                 appControlWindow.runPrefixNormal
             ));
@@ -3569,13 +3546,13 @@ PanelWindow {
             const commandText = typeof item === "object" ? item.commandText : item;
             const prefixMode = typeof item === "object"
                                ? item.prefixMode : appControlWindow.runPrefixNormal;
-            pushUnique(appControlWindow.favoriteRecordForRunCommand(
+            collect(appControlWindow.favoriteRecordForRunCommand(
                 commandText, prefixMode
             ));
         }
 
         for (let i = 0; i < appControlWindow.swayWindows.length; i++) {
-            pushUnique(appControlWindow.favoriteRecordForModeItem(
+            collect(appControlWindow.favoriteRecordForModeItem(
                 appControlWindow.swayWindows[i], appControlWindow.windowsModeIndex
             ));
         }
@@ -3584,40 +3561,27 @@ PanelWindow {
             const tab = appControlWindow.appTabs[i];
             if (!tab || tab._tabUnavailable)
                 continue;
-            pushUnique(appControlWindow.favoriteRecordForModeItem(
+            collect(appControlWindow.favoriteRecordForModeItem(
                 tab, appControlWindow.windowsModeIndex
             ));
         }
 
         const thermalItems = appControlWindow.thermalRows.concat(appControlWindow.fanRows);
         for (let i = 0; i < thermalItems.length; i++) {
-            pushUnique(appControlWindow.favoriteRecordForModeItem(
+            collect(appControlWindow.favoriteRecordForModeItem(
                 thermalItems[i], appControlWindow.thermalModeIndex
             ));
         }
 
         for (let i = 0; i < appControlWindow.systemRows.length; i++) {
-            pushUnique(appControlWindow.favoriteRecordForModeItem(
+            collect(appControlWindow.favoriteRecordForModeItem(
                 appControlWindow.systemRows[i], appControlWindow.systemModeIndex
             ));
         }
 
-        rows.sort(function(a, b) {
-            const modeCompare = Number(a._sourceModeIndex || 0)
-                                - Number(b._sourceModeIndex || 0);
-            if (modeCompare !== 0)
-                return modeCompare;
-            return String(a.name || "").localeCompare(String(b.name || ""));
-        });
-        const structureSignature = JSON.stringify(
-            rows.map(function(entry) {
-                return [
-                    Number(entry._sourceModeIndex || -1),
-                    String(entry.id || entry._favoriteKey || ""),
-                    String(entry.name || "")
-                ];
-            })
-        );
+        const built = FavoriteCombi.buildStatic(records);
+        const rows = built.rows;
+        const structureSignature = built.signature;
 
         // Thermal/system telemetry changes frequently, but the COMBI list
         // structure usually does not. Avoid replacing the ScriptModel for
@@ -3644,28 +3608,13 @@ PanelWindow {
     }
 
     function rebuildCombiTaskCatalog() {
-        const rows = [];
-        const seen = ({});
-        const identities = [];
-
-        for (let i = 0; i < taskRows.length; i++) {
-            const task = taskRows[i];
-            const identity = taskPersistentIdentity(task);
-            if (!identity || seen[identity])
-                continue;
-
-            seen[identity] = true;
-            identities.push(identity);
-
-            const record = prepareCombiRecord(
-                favoriteRecordForTaskIdentity(identity, task)
-            );
-            if (record)
-                rows.push(record);
-        }
-
-        identities.sort();
-        const signature = identities.join("\\n");
+        const built = FavoriteCombi.buildTasks(taskRows,
+            function(entry) { return appControlWindow.taskPersistentIdentity(entry); },
+            function(identity, entry) {
+                return appControlWindow.favoriteRecordForTaskIdentity(identity, entry);
+            });
+        const rows = built.rows;
+        const signature = built.signature;
 
         // Metric values change continuously, but those changes do not alter
         // the COMBI row order. Only rebuild when the process identity set
@@ -3679,10 +3628,6 @@ PanelWindow {
             && favoritesScopeMode === favoritesScopeCombi
             ? captureResultListState()
             : null;
-
-        rows.sort(function(a, b) {
-            return String(a.name || "").localeCompare(String(b.name || ""));
-        });
 
         combiTaskIdentitySignature = signature;
         combiTaskCatalog = rows;
@@ -4569,61 +4514,15 @@ PanelWindow {
     }
 
     function runFavoriteKey(command, prefixMode) {
-        const normalized = String(command || "").trim();
-
-        if (!normalized)
-            return "";
-
-        // Keep the old normal-command key format for backward compatibility.
-        // Alternate launch environments get their own namespaces so the same
-        // raw command can be favorited independently.
-        const resolved = normalizeRunPrefixMode(prefixMode);
-
-        if (resolved === runPrefixToolbox)
-            return "run:toolbox:" + encodeURIComponent(normalized);
-
-        if (resolved === runPrefixKitty)
-            return "run:kitty:" + encodeURIComponent(normalized);
-
-        return "run:" + encodeURIComponent(normalized);
+        return FavoriteRunIdentity.key(command, prefixMode);
     }
 
     function runFavoriteDataFromKey(key) {
-        const raw = String(key || "");
-
-        if (raw.indexOf("run:") !== 0)
-            return null;
-
-        let prefixMode = runPrefixNormal;
-        let encoded = raw.slice(4);
-
-        if (raw.indexOf("run:toolbox:") === 0) {
-            prefixMode = runPrefixToolbox;
-            encoded = raw.slice(12);
-        } else if (raw.indexOf("run:kitty:") === 0) {
-            prefixMode = runPrefixKitty;
-            encoded = raw.slice(10);
-        }
-
-        try {
-            const command = decodeURIComponent(encoded);
-
-            if (!command)
-                return null;
-
-            return {
-                commandText: command,
-                prefixMode: prefixMode
-            };
-        } catch (error) {
-            console.log("AppControl: invalid RUN favorite key:", raw);
-            return null;
-        }
+        return FavoriteRunIdentity.dataFromKey(key);
     }
 
     function runFavoriteCommandFromKey(key) {
-        const data = runFavoriteDataFromKey(key);
-        return data ? data.commandText : "";
+        return FavoriteRunIdentity.commandFromKey(key);
     }
 
     function runRecord(command, origin, prefixMode) {
@@ -6183,65 +6082,27 @@ PanelWindow {
     }
 
     function favoriteSourceItem(entry) {
-        if (entry && entry._favoriteRecord)
-            return entry._sourceItem;
-
-        return entry;
+        return FavoriteIdentity.sourceItem(entry);
     }
 
     function taskPersistentIdentity(entry) {
-        const source = favoriteSourceItem(entry) || entry;
-        if (!source)
-            return "";
-
-        const comm = String(source.comm || source.name || source.label || "").trim();
-        if (comm)
-            return comm.toLowerCase();
-
-        const args = String(source.args || "").trim();
-        if (!args)
-            return "";
-
-        const first = args.split(/\s+/)[0] || "";
-        const pieces = first.split("/");
-        return String(pieces[pieces.length - 1] || first).toLowerCase();
+        return FavoriteIdentity.taskIdentity(entry);
     }
 
     function taskFavoriteKey(entry) {
-        const identity = taskPersistentIdentity(entry);
-        return identity ? "task|" + encodeURIComponent(identity) : "";
+        return FavoriteIdentity.taskKey(entry);
     }
 
     function taskIdentityFromFavoriteKey(key) {
-        const raw = String(key || "");
-        if (raw.indexOf("task|") !== 0)
-            return "";
-        try { return decodeURIComponent(raw.slice(5)); }
-        catch (error) { return ""; }
+        return FavoriteIdentity.taskIdentityFromKey(key);
     }
 
     function taskMetricFavoriteKey(entry, metricId) {
-        const identity = taskPersistentIdentity(entry);
-        const id = String(metricId || "").trim().toLowerCase();
-        if (!identity || !id)
-            return "";
-        return "taskmetric|" + encodeURIComponent(identity)
-               + "|" + encodeURIComponent(id);
+        return FavoriteIdentity.taskMetricKey(entry, metricId);
     }
 
     function taskMetricFavoriteData(key) {
-        const raw = String(key || "");
-        if (raw.indexOf("taskmetric|") !== 0)
-            return null;
-        const parts = raw.split("|");
-        if (parts.length < 3)
-            return null;
-        try {
-            return {
-                identity: decodeURIComponent(parts[1]),
-                metricId: decodeURIComponent(parts.slice(2).join("|"))
-            };
-        } catch (error) { return null; }
+        return FavoriteIdentity.taskMetricData(key);
     }
 
     function isTaskMetricFavorite(entry, metricId) {
@@ -6394,27 +6255,10 @@ PanelWindow {
     }
 
     function monitorBoxFavoriteKey(entry, boxId) {
-        if (!entry || !entry.id || !boxId)
-            return "";
-
         const controlMode = selectedControlModeIndex();
-
-        const modeName =
-            controlMode === thermalModeIndex
-            ? "thermal"
-            : controlMode === systemModeIndex
-            ? "system"
-            : "";
-
-        if (!modeName)
-            return "";
-
-        return "watchbox|"
-               + modeName
-               + "|"
-               + encodeURIComponent(String(entry.id))
-               + "|"
-               + encodeURIComponent(String(boxId));
+        const modeName = controlMode === thermalModeIndex ? "thermal"
+                       : controlMode === systemModeIndex ? "system" : "";
+        return FavoriteIdentity.monitorBoxKey(entry, boxId, modeName);
     }
 
     function isMonitorBoxFavorite(entry, boxId) {
@@ -6434,36 +6278,10 @@ PanelWindow {
     }
 
     function monitorEntryHasBoxFavorite(entry, modeIndex) {
-        if (!entry || !entry.id)
-            return false;
-
-        const modeName =
-            modeIndex === thermalModeIndex
-            ? "thermal"
-            : modeIndex === systemModeIndex
-            ? "system"
-            : "";
-
-        if (!modeName)
-            return false;
-
-        const prefix =
-            "watchbox|"
-            + modeName
-            + "|"
-            + encodeURIComponent(String(entry.id))
-            + "|";
-
-        for (let i = 0;
-             i < favoriteStore.favoriteMonitorBoxKeys.length;
-             i++) {
-            if (String(
-                    favoriteStore.favoriteMonitorBoxKeys[i] || ""
-                ).indexOf(prefix) === 0)
-                return true;
-        }
-
-        return false;
+        const modeName = modeIndex === thermalModeIndex ? "thermal"
+                       : modeIndex === systemModeIndex ? "system" : "";
+        return FavoriteIdentity.hasMonitorBoxFavorite(entry, modeName,
+                    favoriteStore.favoriteMonitorBoxKeys);
     }
 
     function hasMonitorFavorites() {
@@ -6488,59 +6306,17 @@ PanelWindow {
 
     function favoriteRecordForApp(entry) {
         const key = favoriteKeyFor(entry, appsModeIndex);
-
-        return {
-            _favoriteRecord: true,
-            _favoriteType: "app",
-            _favoriteKey: key,
-            _sourceModeIndex: appsModeIndex,
-            _sourceItem: entry,
-
-            id: entry.id || key,
-            name: entry.name || "APPLICATION",
-            genericName: entry.genericName || "",
-            comment: entry.comment || "",
-            keywords: entry.keywords || "",
-            icon: entry.icon || "",
-            actions: entry.actions || [],
-            command: entry.command || [],
-            startupClass: entry.startupClass || "",
-
-            execute: function() {
-                appControlWindow.launchApplication(entry);
-            }
-        };
+        return FavoriteRecord.appRecord(entry, key, appsModeIndex, function(item) {
+            appControlWindow.launchApplication(item);
+        });
     }
 
     function favoriteRecordForRunCommand(command, prefixMode) {
-        const resolvedPrefix =
-            normalizeRunPrefixMode(prefixMode);
-        const sourceItem =
-            runRecord(command, "FAVORITE", resolvedPrefix);
+        const resolvedPrefix = normalizeRunPrefixMode(prefixMode);
+        const sourceItem = runRecord(command, "FAVORITE", resolvedPrefix);
         const key = runFavoriteKey(command, resolvedPrefix);
-
-        return {
-            _favoriteRecord: true,
-            _favoriteType: "run",
-            _favoriteKey: key,
-            _sourceModeIndex: runModeIndex,
-            _sourceItem: sourceItem,
-            _runPrefixMode: resolvedPrefix,
-
-            id: key,
-            label: sourceItem.label,
-            name: sourceItem.name,
-            commandText: sourceItem.commandText,
-            genericName: sourceItem.genericName,
-            comment: "FAVORITE • "
-                     + runPrefixName(resolvedPrefix)
-                     + " • "
-                     + runShellName().toUpperCase(),
-            keywords: "",
-            icon: "",
-            actions: [],
-            startupClass: ""
-        };
+        return FavoriteRecord.runRecord(sourceItem, key, resolvedPrefix,
+                    runModeIndex, runPrefixName(resolvedPrefix), runShellName());
     }
 
     function favoriteRecordForModeItem(entry, modeIndex) {
@@ -8466,73 +8242,18 @@ PanelWindow {
 
             }
 
-            const visibleRows = rows.filter(function(entry) {
-                if (appControlWindow.favoritesFilterMode
-                        !== appControlWindow.favoritesFilterAll
-                        && Number(entry._sourceModeIndex)
-                           !== appControlWindow.favoritesFilterMode)
-                    return false;
-
-                if (!appControlWindow.favoriteEntryMatchesCopiedSubmodes(entry))
-                    return false;
-
-                if (query.length === 0)
-                    return true;
-
-                const source = appControlWindow.favoriteSourceItem(entry) || entry;
-                const haystack = inCombi && entry._combiSearchText
-                                 ? entry._combiSearchText
-                                 : ((entry.name || "") + " "
-                                    + (entry.genericName || "") + " "
-                                    + (entry.comment || "") + " "
-                                    + (entry.keywords || "") + " "
-                                    + (source.args || "") + " "
-                                    + (source.commandText || "") + " "
-                                    + (source.appName || "") + " "
-                                    + (source.windowName || "") + " "
-                                    + (source.tabTitle || "") + " "
-                                    + (source.category || "") + " "
-                                    + (source.role || "") + " "
-                                    + (source.metric || "") + " "
-                                    + String(source.pid || "")).toLowerCase();
-                return haystack.indexOf(query) !== -1;
-            });
-
-            if (inCombi && query.length === 0) {
-                // The cache is already source/name ordered. Avoid an O(n log n)
-                // sort of the entire command universe every time FAVORITES is
-                // opened; a linear stable partition is enough to pin stars.
-                const pinned = [];
-                const ordinary = [];
-                for (let i = 0; i < visibleRows.length; i++) {
-                    const entry = visibleRows[i];
-                    if (appControlWindow.isFavoriteItem(
-                            entry, appControlWindow.favoritesModeIndex))
-                        pinned.push(entry);
-                    else
-                        ordinary.push(entry);
+            return FavoriteCombi.visibleRows(rows, {
+                query: query,
+                inCombi: inCombi,
+                filterMode: appControlWindow.favoritesFilterMode,
+                filterAll: appControlWindow.favoritesFilterAll,
+                matchesCopiedSubmode: function(entry) {
+                    return appControlWindow.favoriteEntryMatchesCopiedSubmodes(entry);
+                },
+                isFavorite: function(entry) {
+                    return appControlWindow.isFavoriteItem(entry, appControlWindow.favoritesModeIndex);
                 }
-                return pinned.concat(ordinary);
-            }
-
-            visibleRows.sort(function(a, b) {
-                if (inCombi) {
-                    const aFavorite = appControlWindow.isFavoriteItem(
-                        a, appControlWindow.favoritesModeIndex
-                    );
-                    const bFavorite = appControlWindow.isFavoriteItem(
-                        b, appControlWindow.favoritesModeIndex
-                    );
-                    if (aFavorite !== bFavorite)
-                        return aFavorite ? -1 : 1;
-                }
-
-                const modeCompare = a._sourceModeIndex - b._sourceModeIndex;
-                if (modeCompare !== 0) return modeCompare;
-                return String(a.name || "").localeCompare(String(b.name || ""));
             });
-
-            return visibleRows;
         }
     }    function resultCount() {
         if (selectedModeIndex === favoritesModeIndex)

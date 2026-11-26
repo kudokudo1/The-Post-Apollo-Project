@@ -424,6 +424,11 @@ Column {
                             sourceComponent: SelectorDial {
                                 objectName: "cpuplusWorkshopStorage-sample-dial"
                                 readonly property var stopwatch: root.countdown("sample")
+                                stopwatchFace: true
+                                stopwatchActive: root.storageRunning
+                                stopwatchFraction: stopwatch ? stopwatch.fraction : -1
+                                stopwatchFlash: !!stopwatch && stopwatch.flash
+                                stopwatchSetSeconds: root.storageSample
                                 labelText: "SAMPLE"
                                 selectorMode: "continuous"
                                 minimumValue: 0
@@ -468,6 +473,11 @@ Column {
                             sourceComponent: SelectorDial {
                                 objectName: "cpuplusWorkshopStorage-report-dial"
                                 readonly property var stopwatch: root.countdown("report")
+                                stopwatchFace: true
+                                stopwatchActive: root.storageRunning
+                                stopwatchFraction: stopwatch ? stopwatch.fraction : -1
+                                stopwatchFlash: !!stopwatch && stopwatch.flash
+                                stopwatchSetSeconds: root.storageReport
                                 labelText: "REPORT"
                                 selectorMode: "continuous"
                                 minimumValue: 0

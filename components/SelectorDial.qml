@@ -9,6 +9,17 @@ Item {
     property int titlePixelSize: 10
     property real idleRingGlowStrength: 0.28
     property string readoutUnit: ""
+    // Opt-in interval stopwatch face. The owner supplies observed timing;
+    // the existing rotary input/keyboard machinery remains authoritative.
+    property bool stopwatchFace: false
+    property bool stopwatchActive: false
+    property real stopwatchFraction: -1
+    property bool stopwatchFlash: false
+    property real stopwatchSetSeconds: currentValue
+    readonly property real stopwatchVisualFraction: stopwatchActive
+        ? Math.max(0,Math.min(1,stopwatchFraction))
+        : rotating ? Math.max(0,Math.min(1,(previewNumericValue-minimumValue)/Math.max(1,maximumValue-minimumValue))) : 1
+    readonly property int stopwatchLitSegments: Math.ceil(30*stopwatchVisualFraction)
     // Shared hardware-label defaults: numeric markings must be readable even
     // on the smaller Radio navigation encoder. Other dials may override.
     property int numericLabelPixelSize: 10
@@ -114,7 +125,7 @@ Item {
     width: 136
     height: 160
     activeFocusOnTab: true
-    opacity: interactive ? 1.0 : 0.42
+    opacity: interactive || (stopwatchFace && stopwatchActive) ? 1.0 : 0.42
     Behavior on opacity { NumberAnimation { duration: 125 } }
 
     HoverHandler {
@@ -582,7 +593,7 @@ Item {
 
         anchors {
             top: parent.top
-            topMargin: 18
+            topMargin: dialRoot.stopwatchFace ? 24 : 18
             horizontalCenter: parent.horizontalCenter
         }
 
@@ -591,6 +602,7 @@ Item {
 
         // Deep dock well.
         Rectangle {
+            visible: !dialRoot.stopwatchFace
             anchors.centerIn: parent
             width: 106
             height: 106
@@ -605,6 +617,7 @@ Item {
 
         // Offset lower-right layer makes the hardware stand proud of the dock.
         Rectangle {
+            visible: !dialRoot.stopwatchFace
             x: 10
             y: 12
             width: 94
@@ -622,6 +635,7 @@ Item {
         // Keep the original dark chassis edge; glow indicates hover/rotation.
         Rectangle {
             id: outerInteractionRing
+            visible: !dialRoot.stopwatchFace
             anchors.centerIn: parent
             width: 98
             height: 98
@@ -640,6 +654,7 @@ Item {
 
         Rectangle {
             id: modeBody
+            visible: !dialRoot.stopwatchFace
 
             anchors.centerIn: parent
             width: 90
@@ -891,7 +906,7 @@ Item {
         // competing labels. Where a DAY number exists, its label replaces
         // the tick. This feature is opt-in for the Clock interval dial.
         Repeater {
-            model: dialRoot.selectorMode === "continuous"
+            model: !dialRoot.stopwatchFace && dialRoot.selectorMode === "continuous"
                    && dialRoot.showNumericDetentTicks
                    && dialRoot.numericDetentInterval > 0
                    ? Math.max(0, Math.floor(
@@ -941,7 +956,7 @@ Item {
 
         // Each printed position is itself a direct-jump control.
         Repeater {
-            model: dialRoot.optionCount()
+            model: dialRoot.stopwatchFace ? 0 : dialRoot.optionCount()
 
             delegate: Item {
                 id: optionMark
@@ -1021,6 +1036,125 @@ Item {
 
                         if (dialRoot.keyboardHost)
                             dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
+                    }
+                }
+            }
+        }
+
+        // Same rotary control underneath, distinct time/cadence artwork.
+        // No independent clock, animation loop, or completion inference.
+        Loader {
+            anchors.fill: parent
+            active: dialRoot.stopwatchFace
+            sourceComponent: Item {
+                objectName: "selectorStopwatchFace"
+                Rectangle {
+                    x: (parent.width-width)/2
+                    y: -6
+                    width: 24; height: 14; radius: 2
+                    color: "#24192b"
+                    border.color: dialRoot.accentColor
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 3
+                        Repeater {
+                            model: 5
+                            Rectangle {width: 1; height: 7; color: dialRoot.accentColor}
+                        }
+                    }
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 106; height: 106; radius: 53
+                    color: "#09060e"
+                    border.color: dialRoot.accentColor
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: dialRoot.accentColor
+                        shadowOpacity: dialRoot.stopwatchFlash ? 0.95 : 0.40
+                        shadowBlur: 0.65
+                    }
+                }
+                Repeater {
+                    model: 30
+                    delegate: Item {
+                        required property int index
+                        anchors.fill: parent
+                        rotation: index*12
+                        Rectangle {
+                            objectName: "selectorStopwatchSegment-"+index
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 10
+                            width: 6; height: 8; radius: 1
+                            color: index<dialRoot.stopwatchLitSegments
+                                ? (dialRoot.stopwatchFlash ? Colors.white : dialRoot.accentColor) : "#302039"
+                        }
+                    }
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 76; height: 76; radius: 38
+                    color: "#120c19"
+                    border.color: Qt.rgba(dialRoot.accentColor.r,dialRoot.accentColor.g,dialRoot.accentColor.b,0.38)
+                }
+                Repeater {
+                    model: 12
+                    delegate: Item {
+                        required property int index
+                        anchors.fill: parent
+                        rotation: index*30
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 21; width: 1; height: 4
+                            color: Colors.white
+                            opacity: 0.55
+                        }
+                    }
+                }
+                Item {
+                    objectName: "selectorStopwatchHand"
+                    anchors.fill: parent
+                    rotation: dialRoot.stopwatchActive ? 360*dialRoot.stopwatchVisualFraction
+                        : dialRoot.visualAngle+90
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 16; width: 2; height: 42
+                        color: Colors.white
+                    }
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 15; width: 5; height: 5; radius: 2.5
+                        color: dialRoot.stopwatchFlash ? Colors.white : dialRoot.accentColor
+                    }
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 65; height: 40
+                    color: "#120c19"
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 0
+                        GohuText {
+                            objectName: "selectorStopwatchCenter"
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: dialRoot.readoutText
+                            font.pixelSize: text.length>4 ? 16 : 24
+                            color: dialRoot.stopwatchFlash ? Colors.white : dialRoot.accentColor
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: dialRoot.accentColor
+                                shadowOpacity: 0.65
+                                shadowBlur: 0.55
+                            }
+                        }
+                        GohuText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: dialRoot.readoutUnit
+                            font.pixelSize: 10
+                            color: Colors.white
+                        }
                     }
                 }
             }
@@ -1192,13 +1326,14 @@ Item {
         }
 
         width: parent.width - 6
-        text: dialRoot.readoutUnit === "" ? dialRoot.readoutText
+        text: dialRoot.stopwatchFace ? "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds+" <font color='"+Colors.white+"'>SEC</font>"
+            : dialRoot.readoutUnit === "" ? dialRoot.readoutText
             : dialRoot.readoutText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
                 + ' <font color="'+Colors.white+'">'+dialRoot.readoutUnit.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</font>'
-        textFormat: dialRoot.readoutUnit === "" ? Text.AutoText : Text.RichText
+        textFormat: dialRoot.stopwatchFace || dialRoot.readoutUnit !== "" ? Text.RichText : Text.AutoText
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        font.pixelSize: dialRoot.readoutPixelSize
+        font.pixelSize: dialRoot.stopwatchFace ? 12 : dialRoot.readoutPixelSize
         color: dialRoot.interactive || dialRoot.readoutGlowEnabled ? dialRoot.readoutColor : Colors.orange
         opacity: dialRoot.interactive ? 1.0 : 0.78
         layer.enabled: dialRoot.readoutGlowEnabled

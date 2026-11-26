@@ -264,7 +264,7 @@ assert.match(workshopSlider,/horizontalStepPresentation: true/);
 assert.match(workshopSlider,/property color subjectColor: Colors.white/);
 assert.match(workshopSlider,/property color fillColor: Colors.omnitrix/);
 assert.match(workshop,/SelectorDial\s*\{/);
-assert.match(workshop,/markerColor: Colors.magenta/);
+assert.match(workshop,/markerColor: Colors.orange/);
 assert.match(workshop,/Colors.resourceColor\(modelData.subject\)/);
 assert.match(workshop,/if \(ready\) \{[\s\S]*?requestWorkshopCapture\(frozen\)/);
 assert.match(workshop,/onPlanTextChanged: disarm\(\)/);
@@ -277,10 +277,16 @@ console.log("DIAG D3a canonical Workshop instrument and explicit activation cont
 assert.match(ui,/property string viewMode: "WORK"/);
 assert.match(ui,/id: reportRail\s+visible: root.viewMode === "REPORT"/);
 assert.match(ui,/id: compareRail\s+visible: root.viewMode === "COMPARE"/);
-assert.match(workshop,/options: \["1","4","8","12"\]/);
+assert.match(workshop,/options: \["1","2","3","4","5","6","7","8","9","10","11","12"\]/);
 assert.match(workshop,/numericDetentInterval: 1/);
 assert.match(workshop,/fillColor: Colors.cyan/);
 assert.match(workshop,/fillColor: Colors.magenta/);
 assert.match(workshop,/fillColor: Colors.orange/);
 assert.match(workshop,/selectedFillColor: Colors.black/);
 console.log("DIAG D3b compact Workshop and contextual controls PASS");
+
+assert.match(workshop,/readoutColor: Colors.cyan/);
+assert.match(workshop,/interactionGlowColor: Colors.magenta/);
+assert.match(workshop,/objectName: "cpuplusWorkshopStorageInstrument"/);
+assert.match(workshop,/outlineOnlyGlow: true/);
+assert.match(workshop,/text: "FIXED CADENCE"/);

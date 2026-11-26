@@ -304,8 +304,7 @@ Column {
                     minimumPixelSize: 8
                 }
                 Repeater {
-                    model: [{key:"sample",label:"SAMPLE",value:root.storageSample},
-                            {key:"report",label:"REPORT",value:root.storageReport}]
+                    model: [{key:"sample",label:"SAMPLE"},{key:"report",label:"REPORT"}]
                     Column {
                         required property var modelData
                         width: storageContents.width
@@ -320,10 +319,10 @@ Column {
                         Row {
                             id: cadenceRow
                             width: parent.width
-                            height: root.compactLayout ? 20 : 26
+                            height: root.compactLayout ? 19 : 26
                             spacing: 2
                             readonly property string field: parent.modelData.key
-                            readonly property int seconds: parent.modelData.value
+                            readonly property int seconds: field==="sample" ? root.storageSample : root.storageReport
                             readonly property real buttonSize: Math.min(height,Math.max(12,Math.floor((width-24)/2)))
                             ActionButton {
                                 objectName: "cpuplusWorkshopStorage-"+cadenceRow.field+"-minus"
@@ -384,6 +383,7 @@ Column {
                 GohuText {
                     width: parent.width
                     text: "FINAL INCLUDED"
+                    visible: !root.compactLayout
                     color: Colors.white
                     font.pixelSize: 8
                     fontSizeMode: Text.HorizontalFit

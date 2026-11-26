@@ -374,11 +374,15 @@ Item {
     }
     // One literal CAP layout, shared by both views. No additional observation.
     component LiveCapacityBars: Column {
+        id: liveBars
+        required property var sample
+        required property var capacity
+        required property var formatGiB
         spacing: 5
         CpuPlusMemoryReadout {
             width: parent.width
-            text: root.displaySample ? "RAM AVAIL // " + root.gib(root.displaySample.available)
-                + " / " + root.gib(root.displaySample.total) : "RAM // UNAVAILABLE"
+            text: liveBars.sample ? "RAM AVAIL // " + liveBars.formatGiB(liveBars.sample.available)
+                + " / " + liveBars.formatGiB(liveBars.sample.total) : "RAM // UNAVAILABLE"
             color: Colors.cyan
             font.pixelSize: 12
             wrapMode: Text.WordWrap
@@ -394,21 +398,21 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 3
                 color: Colors.cyan
-                opacity: root.displaySample ? 0.22 : 0
+                opacity: liveBars.sample ? 0.22 : 0
             }
             Rectangle {
                 x: 3; y: 3
                 height: Math.max(0, parent.height - 6)
-                width: root.displaySample && root.displaySample.total > 0
-                    ? Math.max(0, parent.width - 6) * root.displaySample.available / root.displaySample.total : 0
+                width: liveBars.sample && liveBars.sample.total > 0
+                    ? Math.max(0, parent.width - 6) * liveBars.sample.available / liveBars.sample.total : 0
                 color: Colors.cyan
                 opacity: 0.85
             }
         }
         CpuPlusSwapComposition {
             width: parent.width
-            sample: root.displaySample
-            capacity: root.displayCapacity
+            sample: liveBars.sample
+            capacity: liveBars.capacity
             compact: true
         }
 
@@ -464,6 +468,9 @@ Item {
         LiveCapacityBars {
             objectName: "cpuplusDiagPinnedStatus"
             width: parent.width
+            sample: root.displaySample
+            capacity: root.displayCapacity
+            formatGiB: value => root.gib(value)
             visible: root.page === "DIAG"
         }
         GohuText {
@@ -599,7 +606,12 @@ Item {
                 onLeftClicked: root.refresh()
             }
         }
-        LiveCapacityBars { width: parent.width }
+        LiveCapacityBars {
+            width: parent.width
+            sample: root.displaySample
+            capacity: root.displayCapacity
+            formatGiB: value => root.gib(value)
+        }
         Rectangle { width: parent.width; height: 1; color: Colors.cyan }
         Grid {
             width: parent.width

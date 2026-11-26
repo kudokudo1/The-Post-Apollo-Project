@@ -7,6 +7,7 @@ on:
       - 'tests/fixtures/EnergyProgress*'
       - 'tests/components/energy-progress-motion.test.cjs'
       - '.github/workflows/energy-progress-native.yml'
+      - 'scripts/components/run_energy_progress_lab.sh'
 permissions:
   contents: read
 jobs:
@@ -27,11 +28,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export XDG_RUNTIME_DIR="$(mktemp -d)"
-          chmod 700 "$XDG_RUNTIME_DIR"
+          work="$(mktemp -d -t energy-native.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/run" "$work/data" "$work/cache" "$work/config"
+          export HOME="$work/home"
+          export XDG_RUNTIME_DIR="$work/run"
+          export XDG_DATA_HOME="$work/data"
+          export XDG_CACHE_HOME="$work/cache"
+          export XDG_CONFIG_HOME="$work/config"
           export QT_QPA_PLATFORM=xcb
-          export QSG_RHI_BACKEND=opengl
-          export LIBGL_ALWAYS_SOFTWARE=1
-          timeout 25s xvfb-run -a quickshell -p "$PWD/tests/fixtures/EnergyProgressNative.qml" 2>&1 | tee /tmp/energy-native.log
+          export QT_QUICK_BACKEND=software
+          export QT_LOGGING_RULES=qml.debug=true
+          timeout --kill-after=3s 30s xvfb-run -a bash scripts/components/run_energy_progress_lab.sh native 2>&1 | tee /tmp/energy-native.log
           grep -F 'ENERGY_NATIVE_PASS' /tmp/energy-native.log
           if grep -E 'ENERGY_NATIVE_FAIL|ReferenceError:|TypeError:|SyntaxError:|Binding loop detected|Failed to load configuration' /tmp/energy-native.log; then exit 1; fi

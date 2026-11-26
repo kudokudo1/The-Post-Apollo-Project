@@ -426,6 +426,13 @@ Item {
             width: parent.width
             visible: root.page === "DIAG"
             spacing: 2
+            GohuText {
+                width: parent.width
+                color: Colors.yellow
+                font.pixelSize: 9
+                text: root.displaySample ? "PSI 10s // "+root.displaySample.some.toFixed(2)+" / "+root.displaySample.full.toFixed(2)+"%" : "PSI // UNAVAILABLE"
+                elide: Text.ElideRight
+            }
             Repeater {
                 model: [
                     {label:"RAM AVAIL", ink:Colors.magenta, fill:Colors.cyan,

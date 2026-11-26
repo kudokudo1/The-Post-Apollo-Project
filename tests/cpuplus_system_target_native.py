@@ -54,7 +54,7 @@ ShellRoot {
                     &&b.hoverFillColor===Colors.yellow&&b.hoverForegroundColor===Colors.orange
                     &&b.hoverBorderColor===Colors.orange&&b.pressedFillColor===Colors.magenta
                     &&b.pressedForegroundColor===Colors.black&&b.selectedFillColor===Colors.black
-                    &&b.selectedForegroundColor===b.accentColor,"canonical state colors "+choice.key)) return;
+                    &&b.selectedForegroundColor===b.accentColor&&b.outlineOnlyGlow,"canonical state colors "+choice.key)) return;
             }
             const all=root.find("ALL"), cpu=root.find("CPU");
             if (!root.check(all.selected&&all.accentColor===Colors.white&&root.requests===0,"initial ALL")) return;

@@ -212,10 +212,11 @@ def main(argv=None):
         return 130
     end = {"schema": SCHEMA, "event": "complete", "samples": count}
     if args.workshop:
+        finished = time.monotonic()
         end.update(workshopSchema="post-apollo-observer-calibration-v1",
                    calibration={"kind":"census","durationSeconds":args.duration,"intervalMs":args.interval*1000},
-                   observedMs=round((time.monotonic()-started)*1000),
-                   monotonicMs=round(time.monotonic()*1000), startedMonotonicMs=round(started*1000))
+                   observedMs=round((finished-started)*1000),
+                   monotonicMs=round(finished*1000), startedMonotonicMs=round(started*1000))
     try:
         send(end)
     except output_errors:

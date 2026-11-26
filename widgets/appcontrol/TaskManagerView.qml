@@ -1332,15 +1332,19 @@ import "../../components"
                     softGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0.58
                     wideGlowEnabled: taskManagerBody.headerActions
 
-                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.52 : 0
-                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0
-                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 1.0 : 0
+                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 1.0 : 0
                     contentGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0
                     idleContentGlowColor: Colors.yellow
                     hoverContentGlowColor: Colors.yellow
                     selectedContentGlowColor: Colors.yellow
                     pressedContentGlowColor: Colors.yellow
                     trackLabelGlowLocally: taskManagerBody.headerActions
+                    contentGlowRadius: taskManagerBody.headerActions ? 8 : 7
+                    contentGlowSamples: taskManagerBody.headerActions ? 9 : 7
+                    keyboardSelectedContentGlowColor: taskManagerBody.headerActions ? Colors.yellow : Colors.orange
+                    unavailableContentGlowOpacity: taskManagerBody.headerActions ? 0.25 : -1
                     onHoverEntered: {
                         host.setKeyboardActive(false);
                         host.clearModeRailFocus();
@@ -1839,8 +1843,8 @@ import "../../components"
                     Accessible.name: processController.isFrozen() ? "Thaw process" : "Freeze process"
                     accentColor: taskManagerBody.headerActions ? Colors.cyan : Colors.cyan
                     idleForegroundColor: taskManagerBody.headerActions ? Colors.cyan : Colors.white
-                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.orange : Colors.white
-                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.magenta : Colors.white
+                    hoverForegroundColor: taskManagerBody.headerActions ? Colors.cyan : Colors.white
+                    selectedForegroundColor: taskManagerBody.headerActions ? Colors.cyan : Colors.white
                     pointerCursorShape: Qt.ArrowCursor
 
                     idleFillColor: Colors.black
@@ -1874,12 +1878,16 @@ import "../../components"
                     hoverContentGlowColor: Colors.cyan
                     selectedContentGlowColor: Colors.cyan
 
-                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.52 : 0
-                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0
-                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 1.0 : 0
+                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 1.0 : 0
                     contentGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0
                     pressedContentGlowColor: Colors.cyan
                     trackLabelGlowLocally: taskManagerBody.headerActions
+                    contentGlowRadius: taskManagerBody.headerActions ? 8 : 7
+                    contentGlowSamples: taskManagerBody.headerActions ? 9 : 7
+                    keyboardSelectedContentGlowColor: taskManagerBody.headerActions ? Colors.cyan : Colors.orange
+                    unavailableContentGlowOpacity: taskManagerBody.headerActions ? 0.25 : -1
                     onHoverEntered: {
                         host.setKeyboardActive(false);
                         host.clearModeRailFocus();
@@ -2016,7 +2024,7 @@ import "../../components"
                     contentPadding: taskManagerBody.headerActions ? 2 : 8
                     Accessible.name: "End process (TERM)"
                     accentColor: taskManagerBody.headerActions ? Colors.red : Colors.cyan
-                    idleForegroundColor: taskManagerBody.headerActions ? Colors.white : Colors.white
+                    idleForegroundColor: taskManagerBody.headerActions ? Colors.red : Colors.white
                     hoverForegroundColor: taskManagerBody.headerActions ? Colors.red : Colors.white
                     selectedForegroundColor: taskManagerBody.headerActions ? Colors.red : Colors.white
                     pointerCursorShape: Qt.ArrowCursor
@@ -2045,15 +2053,19 @@ import "../../components"
                     softGlowPressedOpacity: 0.92
                     wideGlowEnabled: false
 
-                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.52 : 0
-                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 0.82 : 0
-                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowIdleOpacity: taskManagerBody.headerActions ? 0.82 : 0
+                    contentGlowHoverOpacity: taskManagerBody.headerActions ? 1.0 : 0
+                    contentGlowSelectedOpacity: taskManagerBody.headerActions ? 1.0 : 0
                     contentGlowPressedOpacity: taskManagerBody.headerActions ? 0.92 : 0
                     idleContentGlowColor: Colors.red
                     hoverContentGlowColor: Colors.red
                     selectedContentGlowColor: Colors.red
                     pressedContentGlowColor: Colors.red
                     trackLabelGlowLocally: taskManagerBody.headerActions
+                    contentGlowRadius: taskManagerBody.headerActions ? 8 : 7
+                    contentGlowSamples: taskManagerBody.headerActions ? 9 : 7
+                    keyboardSelectedContentGlowColor: taskManagerBody.headerActions ? Colors.red : Colors.orange
+                    unavailableContentGlowOpacity: taskManagerBody.headerActions ? 0.25 : -1
                     onHoverEntered: {
                         host.setKeyboardActive(false);
                         host.clearModeRailFocus();

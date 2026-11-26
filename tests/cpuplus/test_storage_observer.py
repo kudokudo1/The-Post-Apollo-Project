@@ -91,6 +91,9 @@ class StorageTests(unittest.TestCase):
                 "sampleSeconds":2,"reportSeconds":4})
             self.assertGreaterEqual(rows[0]["elapsedMs"],4000)
             self.assertGreaterEqual(rows[1]["elapsedMs"],5000)
+            progress=[json.loads(line[len("STORAGE_PROGRESS "):]) for line in p.stderr.splitlines() if line.startswith("STORAGE_PROGRESS ")]
+            self.assertEqual([(x["tick"],x["reports"]) for x in progress],[(0,0),(1,0),(2,1),(3,2)])
+            self.assertTrue(all(x["sampleSeconds"]==2 and x["reportSeconds"]==4 for x in progress))
             for bad in (["--sample-seconds","2"],["--sample-seconds","2","--report-seconds","3"],
                         ["--sample-seconds","0","--report-seconds","4"]):
                 p=subprocess.run(base+bad,capture_output=True,text=True,timeout=3)

@@ -3,6 +3,7 @@ import QtQuick.Window
 import Quickshell
 import "widgets"
 import "services/github"
+import qs.components
 
 ShellRoot {
     id: root
@@ -75,6 +76,30 @@ ShellRoot {
             if (!list || !input) return;
             if (root.phase===0) {
                 if (!root.require(list.count===241,"full inventory")) return;
+                const info=root.find(view,"gitWorkflowInfo");
+                const clear=root.find(view,"gitWorkflowSearchClear");
+                const refresh=root.find(view,"gitWorkflowRefresh");
+                const queueRun=root.find(view,"gitWorkflowRunQueue");
+                const queueClear=root.find(view,"gitWorkflowQueueClear");
+                if (!root.require(info && clear && refresh && queueRun && queueClear,"shared action controls present")) return;
+                if (!root.require(info.width===24 && info.height===22 && info.label==="i"
+                    && Qt.colorEqual(info.idleForegroundColor,Colors.white)
+                    && Qt.colorEqual(info.hoverForegroundColor,Colors.orange)
+                    && Qt.colorEqual(info.hoverFillColor,Colors.yellow)
+                    && info.contentGlowEnabled,"compact info recipe")) return;
+                if (!root.require(Qt.colorEqual(clear.accentColor,Colors.red)
+                    && Qt.colorEqual(queueClear.idleForegroundColor,Colors.white)
+                    && Qt.colorEqual(clear.hoverForegroundColor,Colors.white)
+                    && Qt.colorEqual(clear.hoverFillColor,Colors.yellow)
+                    && Qt.colorEqual(clear.hoverSoftGlowColor,Colors.red)
+                    && Qt.colorEqual(refresh.idleFillColor,Colors.yellow)
+                    && Qt.colorEqual(queueRun.accentColor,Colors.green)
+                    && Qt.colorEqual(queueRun.hoverSoftGlowColor,Colors.green)
+                    && Qt.colorEqual(queueRun.hoverFillColor,Colors.yellow),"semantic action faces")) return;
+                info.triggered(null);
+                if (!root.require(view.workflowHelpOpen && info.selected && Qt.colorEqual(info.fillColor,Colors.yellow),"info opens selected")) return;
+                info.triggered(null);
+                if (!root.require(!view.workflowHelpOpen && !info.selected,"info closes")) return;
                 list.positionViewAtEnd();
                 root.phase=1;
                 return;
@@ -91,6 +116,10 @@ ShellRoot {
                 if (!row) return;
                 const run=root.find(row,"gitWorkflowRun"),control=root.find(row,"gitWorkflowControl"),queue=root.find(row,"gitWorkflowQueue");
                 if (!root.require(run && control && queue && run.enabledAction,"actual row controls")) return;
+                if (!root.require(Qt.colorEqual(run.accentColor,Colors.green)
+                    && Qt.colorEqual(run.hoverContentGlowColor,Colors.green)
+                    && Qt.colorEqual(run.hoverFillColor,Colors.yellow)
+                    && run.contentGlowEnabled && queue.contentGlowEnabled,"row action recipes")) return;
                 control.triggered();
                 if (!root.require(root.controlIndex===240,"original source index")) return;
                 queue.triggered();

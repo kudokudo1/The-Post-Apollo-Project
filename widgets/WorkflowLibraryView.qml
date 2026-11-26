@@ -68,109 +68,66 @@ Item {
         }
     }
 
-    component LibraryButton: Rectangle {
+    // Preserve GitW keyboard registration and routing; share the actual face.
+    component LibraryButton: ActionButton {
         id: button
-
-        property string label: ""
         property bool enabledAction: true
         property bool selectedAction: false
-        property bool destructive: false
-        property bool keyboardNavigable:
-            label !== "↑"
-            && label !== "↓"
-        readonly property bool keyboardSelected:
-            !!root.keyboardHost
+        property string actionRole: "normal"
+        property bool keyboardNavigable: label !== "↑" && label !== "↓"
+        readonly property bool hostSelected: !!root.keyboardHost
             && root.keyboardHost.gitKeyboardControl === button
-        readonly property bool keyboardSelector:
-            keyboardSelected
-            && root.keyboardHost.gitSelectorSource === "keyboard"
-        readonly property bool mouseSelector:
-            keyboardSelected
-            && root.keyboardHost.gitSelectorSource === "mouse"
-
-        signal triggered()
-
-        Component.onCompleted: {
-            if (root.keyboardHost)
-                root.keyboardHost.registerGitKeyboardControl(button);
-        }
-
-        Component.onDestruction: {
-            if (root.keyboardHost)
-                root.keyboardHost.unregisterGitKeyboardControl(button);
-        }
+        readonly property bool runAction: actionRole === "run"
+        readonly property bool refreshAction: actionRole === "refresh"
+        readonly property bool redAction: actionRole === "clear" || actionRole === "delete" || destructive
 
         height: 28
-        opacity:
-            destructive
-            ? (enabledAction ? 1.0 : 0.34)
-            : 1.0
+        contentPadding: 2
+        labelPixelSize: 10
+        labelFontSizeMode: Text.HorizontalFit
+        available: enabledAction
+        selected: selectedAction
+        acceptedButtons: Qt.LeftButton
+        keyboardActivationSignal: "triggered"
+        keyboardSelected: hostSelected && root.keyboardHost.gitSelectorSource === "keyboard"
+        contentKeyboardNavigationActive: !!root.keyboardHost
+            && root.keyboardHost.gitSelectorSource === "keyboard"
 
-        color:
-            !enabledAction
-            ? Colors.black
-            : keyboardSelector || selectedAction
-            ? Colors.yellow
-            : Colors.black
+        accentColor: redAction ? Colors.red : runAction ? Colors.green
+            : refreshAction ? Colors.yellow : Colors.cyan
+        idleFillColor: refreshAction ? Colors.yellow : Colors.black
+        idleForegroundColor: redAction ? Colors.white : refreshAction ? Colors.magenta : accentColor
+        idleBorderColor: refreshAction ? Colors.orange : accentColor
+        hoverForegroundColor: redAction ? Colors.white : runAction ? Colors.green : Colors.orange
+        hoverBorderColor: redAction ? Colors.red : runAction ? Colors.green : Colors.orange
+        hoverContentGlowColor: redAction ? Colors.red : runAction ? Colors.green : Colors.orange
+        hoverSoftGlowColor: redAction ? Colors.red : runAction ? Colors.green : Colors.orange
+        keyboardSelectedForegroundColor: hoverForegroundColor
+        keyboardSelectedBorderColor: hoverBorderColor
+        keyboardSelectedContentGlowColor: hoverContentGlowColor
+        keyboardSelectedSoftGlowColor: hoverSoftGlowColor
 
-        border.width:
-            keyboardSelector || mouseSelector
-            ? 2 : 1
-        border.color:
-            keyboardSelector || mouseSelector
-            ? Colors.orange
-            : selectedAction
-            ? Colors.magenta
-            : mouse.containsMouse
-            ? Colors.orange
-            : destructive
-            ? Colors.red
-            : Colors.cyan
+        Component.onCompleted: if (root.keyboardHost) root.keyboardHost.registerGitKeyboardControl(button)
+        Component.onDestruction: if (root.keyboardHost) root.keyboardHost.unregisterGitKeyboardControl(button)
+        onPointerMoved: if (root.keyboardHost) root.keyboardHost.selectGitControlFromMouse(button)
+        onLeftClicked: if (root.keyboardHost) root.keyboardHost.selectGitControlFromMouse(button)
+    }
 
-        GohuText {
-            anchors.centerIn: parent
-
-            text: button.label
-            font.pixelSize: 8
-
-            color:
-                button.keyboardSelector || button.selectedAction
-                ? Colors.magenta
-                : button.destructive
-                ? Colors.red
-                : Colors.cyan
-
-            opacity:
-                button.destructive
-                ? 1.0
-                : button.enabledAction ? 1.0 : 0.34
-        }
-
-        MouseArea {
-            id: mouse
-
-            anchors.fill: parent
-            enabled: button.enabledAction
-            hoverEnabled: true
-            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-
-            onEntered: {
-                if (root.keyboardHost)
-                    root.keyboardHost.selectGitControlFromMouse(button);
-            }
-
-            onPositionChanged: {
-                if (root.keyboardHost)
-                    root.keyboardHost.selectGitControlFromMouse(button);
-            }
-
-            onClicked: {
-                if (root.keyboardHost)
-                    root.keyboardHost.selectGitControlFromMouse(button);
-
-                button.triggered();
-            }
-        }
+    component LibraryInformationButton: InformationButton {
+        id: button
+        property bool enabledAction: true
+        property bool keyboardNavigable: true
+        available: enabledAction
+        keyboardActivationSignal: "triggered"
+        keyboardSelected: !!root.keyboardHost
+            && root.keyboardHost.gitKeyboardControl === button
+            && root.keyboardHost.gitSelectorSource === "keyboard"
+        contentKeyboardNavigationActive: !!root.keyboardHost
+            && root.keyboardHost.gitSelectorSource === "keyboard"
+        Component.onCompleted: if (root.keyboardHost) root.keyboardHost.registerGitKeyboardControl(button)
+        Component.onDestruction: if (root.keyboardHost) root.keyboardHost.unregisterGitKeyboardControl(button)
+        onPointerMoved: if (root.keyboardHost) root.keyboardHost.selectGitControlFromMouse(button)
+        onLeftClicked: if (root.keyboardHost) root.keyboardHost.selectGitControlFromMouse(button)
     }
 
     Row {
@@ -216,6 +173,8 @@ Item {
 
                         LibraryButton {
                             width: 62
+                            objectName: "gitWorkflowQueueClear"
+                            actionRole: "clear"
                             label: "CLEAR"
                             enabledAction: root.libraryStore.queue.length > 0
 
@@ -224,6 +183,8 @@ Item {
 
                         LibraryButton {
                             width: 72
+                            objectName: "gitWorkflowRunQueue"
+                            actionRole: "run"
                             label:
                                 root.githubService.actionBusy
                                 ? "RUNNING"
@@ -552,6 +513,7 @@ Item {
                                             width: 38
                                             height: 26
                                             label: "×"
+                                            actionRole: "delete"
 
                                             onTriggered: root.libraryStore.removeQueueIndex(index)
                                         }
@@ -850,6 +812,8 @@ Item {
                                         LibraryButton {
                                             width: 48
                                             height: 26
+                                            objectName: "gitWorkflowRunSet"
+                                            actionRole: "run"
                                             label: "RUN"
 
                                             enabledAction:
@@ -862,6 +826,7 @@ Item {
                                         LibraryButton {
                                             width: 58
                                             height: 26
+                                            actionRole: "delete"
                                             label:
                                                 root.setActionArmed(
                                                     "delete",
@@ -936,7 +901,7 @@ Item {
                     height: 24
 
                     GohuText {
-                        width: Math.max(0, parent.width - 144)
+                        width: Math.max(0, parent.width - 124)
                         text: "ALL WORKFLOWS"
                         font.pixelSize: 12
                         color: Colors.magenta
@@ -949,9 +914,11 @@ Item {
                         font.pixelSize: 8
                         color: Colors.orange
                     }
-                    LibraryButton {
-                        width: 44; height: 24; label: "INFO"
-                        selectedAction: root.workflowHelpOpen
+                    LibraryInformationButton {
+                        objectName: "gitWorkflowInfo"
+                        anchors.verticalCenter: parent.verticalCenter
+                        selected: root.workflowHelpOpen
+                        Accessible.name: "Workflow library information"
                         onTriggered: root.workflowHelpOpen = !root.workflowHelpOpen
                     }
                 }
@@ -992,8 +959,8 @@ Item {
                             }
                         }
                     }
-                    LibraryButton { width: 48; height: 32; label: "CLEAR"; onTriggered: { workflowSearchInput.text = ""; } }
-                    LibraryButton { width: 62; height: 32; label: "REFRESH"; enabledAction: !root.githubService.refreshing && !root.githubService.actionBusy && !root.githubService.factoryBusy; onTriggered: root.githubService.refresh() }
+                    LibraryButton { objectName: "gitWorkflowSearchClear"; actionRole: "clear"; width: 48; height: 32; label: "CLEAR"; onTriggered: { workflowSearchInput.text = ""; } }
+                    LibraryButton { objectName: "gitWorkflowRefresh"; actionRole: "refresh"; width: 62; height: 32; label: "REFRESH"; enabledAction: !root.githubService.refreshing && !root.githubService.actionBusy && !root.githubService.factoryBusy; onTriggered: root.githubService.refresh() }
                 }
                 GohuText {
                     id: workflowHelp
@@ -1133,6 +1100,7 @@ Item {
                                         LibraryButton {
                                             width: 54
                                             objectName: "gitWorkflowRun"
+                                            actionRole: "run"
                                             label: root.setActionArmed("run-workflow", String(workflow.path || "")) ? "GO?" : "RUN"
                                             enabledAction: !!workflow.path && workflow.state === "active"
                                                 && root.githubService.available && !root.githubService.refreshing

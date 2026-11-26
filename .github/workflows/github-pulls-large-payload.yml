@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - "services/github/GitHubWorkItemsService.qml"
+      - "widgets/GitW.qml"
       - "tests/git/test_github_pulls_large_payload_contracts.py"
       - ".github/workflows/github-pulls-large-payload.yml"
   push:
     branches: [main]
     paths:
       - "services/github/GitHubWorkItemsService.qml"
+      - "widgets/GitW.qml"
       - "tests/git/test_github_pulls_large_payload_contracts.py"
       - ".github/workflows/github-pulls-large-payload.yml"
 

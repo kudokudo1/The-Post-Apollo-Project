@@ -1223,6 +1223,7 @@ PanelWindow {
 
     onActivePageChanged: {
         if (activePage !== "github") {
+            pullsPrewarmTimer.stop();
             if (dialFxDemoRunning)
                 stopDialFxDemo();
             dialVariantsPreviewOpen = false;
@@ -1887,12 +1888,40 @@ PanelWindow {
             + "\nSelectors only. No Git operation occurred.";
     }
 
+    // One bounded read after entering the remote view. No desktop-start
+    // polling and no selected-PR operation is displaced by speculative work.
+    function schedulePullsPrewarm() {
+        if (!root.menuOpen || root.activePage !== "github")
+            return;
+        const repo = String(gitService.repoRemoteSlug || "").trim();
+        if (!repo || root.pullRequestControlOpen)
+            return;
+        pullsPrewarmTimer.repository = repo;
+        pullsPrewarmTimer.restart();
+    }
+
+    Timer {
+        id: pullsPrewarmTimer
+        interval: 300
+        repeat: false
+        property string repository: ""
+        onTriggered: {
+            if (!root.menuOpen || root.activePage !== "github"
+                    || root.pullRequestControlOpen
+                    || repository !== gitService.repoRemoteSlug
+                    || githubWorkItemsService.pullsBusy)
+                return;
+            githubWorkItemsService.ensurePulls(repository);
+        }
+    }
+
     function showGithubPage() {
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "github";
         root.ensureGitSnapshot();
         root.ensureGithubSnapshot();
+        root.schedulePullsPrewarm();
     }
 
     function showGithubControl() {
@@ -2017,6 +2046,7 @@ PanelWindow {
         root.pullRequestControlOpen = false;
         root.selectedPullRequest = null;
         root.githubView = "pulls";
+        pullsPrewarmTimer.stop();
 
         githubWorkItemsService.ensurePulls(
             gitService.repoRemoteSlug
@@ -2359,6 +2389,7 @@ PanelWindow {
         else if (!root.menuOpen)
             gitOpenFocusRetry.stop();
         if (!root.menuOpen) {
+            pullsPrewarmTimer.stop();
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();
@@ -2384,8 +2415,10 @@ PanelWindow {
             branchWorkspaceService.refresh();
         }
 
-        if (root.activePage === "github")
+        if (root.activePage === "github") {
             root.ensureGithubSnapshot();
+            root.schedulePullsPrewarm();
+        }
 
         Qt.callLater(root.ensureGitKeyboardControl);
         root.restoreGitKeyboardFocus(true);
@@ -2775,6 +2808,8 @@ PanelWindow {
             root.issueControlOpen = false;
             root.issueCreateMode = false;
             root.selectedIssue = null;
+            pullsPrewarmTimer.stop();
+            root.schedulePullsPrewarm();
         }
 
         function onRefreshed() {

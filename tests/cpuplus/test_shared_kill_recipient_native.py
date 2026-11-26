@@ -76,9 +76,14 @@ with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
     env.update(QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
                LIBGL_ALWAYS_SOFTWARE="1", QS_DISABLE_FILE_WATCHER="1",
                WAYLAND_DISPLAY="", DISPLAY="")
-    proc = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
-                          cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, timeout=20, check=False)
+    try:
+        proc = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
+                              cwd=config, env=env, text=True, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, timeout=20, check=False)
+    except subprocess.TimeoutExpired as exc:
+        print(exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes)
+              else (exc.stdout or ""))
+        raise SystemExit("Independent KillStore native fixture timed out") from exc
     print(proc.stdout)
     if (proc.returncode or "KILL_STORE_NATIVE_PASS" not in proc.stdout
             or "KILL_STORE_NATIVE_FAIL" in proc.stdout):

@@ -508,13 +508,17 @@ Item {
             selectedDetailActionIndex = Number(index);
         }
         function moveDetailSelection(direction) {
-            selectedDetailActionIndex = Math.max(-2, Math.min(2,
-                selectedDetailActionIndex + Number(direction || 0)));
+            const indices=[0,-2,1,2];
+            const position=indices.indexOf(selectedDetailActionIndex);
+            selectedDetailActionIndex=indices[Math.max(0,Math.min(indices.length-1,
+                position+(direction<0?-1:1)))];
+            ensureDetailActionVisible();
         }
         function ensureDetailActionVisible() {
-            const actions=[details.restartAction,details.limitSlider,
-                details.freezeAction,details.endAction];
-            const item=actions[selectedDetailActionIndex+1];
+            const item=selectedDetailActionIndex===-2 ? details.limitSlider
+                : selectedDetailActionIndex===0 ? details.restartAction
+                : selectedDetailActionIndex===1 ? details.freezeAction
+                : selectedDetailActionIndex===2 ? details.endAction : null;
             if (!item || !actuatorScroll) return;
             const y=item.mapToItem(actuatorScroll.contentItem,0,0).y;
             if (y<actuatorScroll.contentY) actuatorScroll.contentY=Math.max(0,y);

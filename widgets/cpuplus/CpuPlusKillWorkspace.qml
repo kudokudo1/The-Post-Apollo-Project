@@ -395,6 +395,10 @@ Item {
         if (ok) {
             ownedPendingRef = gate.pending;
             locallyPending = !!ownedPendingRef;
+            if (locallyPending) Qt.callLater(function() {
+                if (workspace.hasOwnedPending)
+                    actuatorScroll.contentY = Math.max(0,actuatorScroll.contentHeight-actuatorScroll.height);
+            });
         }
         return !!ok;
     }
@@ -447,9 +451,6 @@ Item {
         if (!modelBlank) updateOrder(false);
         appendCurrentHistory();
     }
-    // Owner mini publication can advance without replacing a selected row.
-    // Reuse the same sample coalescing guard rather than creating a poller.
-    onMiniHistoryRevisionChanged: if (ready && active) appendCurrentHistory()
     onActiveChanged: {
         if (!active) { cancelOwned(); cancelBulk(); }
         else if (ready) requestRefresh();
@@ -848,27 +849,27 @@ Item {
                     id: emptyTarget
                     visible: !workspace.currentTask
                     width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
-                color: Colors.cyan
-                font.pixelSize: 12
-            }
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: "SELECT A LIVE PROCESS IN THE MIDDLE BAY"
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
                 TaskManagerView {
                     id: details
                     objectName: "cpuPlusKillSharedTaskView"
                     width: parent.width
-                visible: !!workspace.currentTask
-                host: taskHost
-                presentationState: history
-                processController: processView
-                graphGeometry: graphGeometry
-                hunterGraph: hunterGraph
-                searchInputTarget: processSearch
-                safetyLockComponent: safetyLock
-                actionTarget: leftActions
-                viewportHeight: actuatorScroll.height - 12
-            }
+                    visible: !!workspace.currentTask
+                    host: taskHost
+                    presentationState: history
+                    processController: processView
+                    graphGeometry: graphGeometry
+                    hunterGraph: hunterGraph
+                    searchInputTarget: processSearch
+                    safetyLockComponent: safetyLock
+                    actionTarget: leftActions
+                    viewportHeight: actuatorScroll.height - 12
+                }
 
                 Column {
                     id: leftActions
@@ -1093,6 +1094,7 @@ Item {
                     selected: workspace.sameTarget(modelData)
                     hovered: workspace.hoveredIndex===index
                     onSelectedRequested: workspace.selectTarget(modelData)
+                    onFavoriteSelectedRequested: workspace.selectTarget(modelData)
                 }
                 // Viewport-level tracker from donor behavior. Real mouse
                 // movement selects the row; scrolling under a stationary

@@ -132,3 +132,165 @@ other than Python test discovery. No actual permission, atomic custody,
 storage, learned record, automatic matching, provider dispatch, or R6
 change. Twelve focused tests in existing Mind CI; independent exact-head
 review required. Production HOLD.
+
+
+## M7i-a // Original Warm trigger routing (design candidate only)
+
+Owner DOC4F Mind; Hospital #2161 proposal 7196959037, Heart 7198778561,
+Runtime 7198782473, Spirit 7198806331, Nurse one-document authorization
+7199717187. Supersedes only the deferral of automatic matching above as a
+design investigation; M7d-b remains a fixed-public exact-selection witness,
+not an automatic matcher. No executable behavior changes in this milestone.
+
+Historical reference: kudokudo1/The-Post-Apollo-Forest-Project frozen tree
+28895aafdddb07cf402f1e75574eea1ee79a516d, under
+raw-import/2026-09-22-transfer/The-Forest/bristlecone/learning/:
+context_matcher.py b95be68099035948803a8c119ec53ae2779d1e21 and
+indexes.py da7b65afe3f77948d4d656b75dbd3ca7cda613ec.
+The original matcher receives canonical Task signals, deduplicates in
+first-occurrence order, looks up exact tags, sorts deduplicated IDs/types,
+and chooses none/check/must-check. The original index derives mandatory
+routing solely from explicit hard user constraints. Recover these semantics,
+not the arbitrary iterable materialization, trimming of noncanonical input,
+global cache/index, whole-domain enumeration, exposed record/untagged counts,
+non-atomic separate generation read, or diagnostic error text.
+
+### Owner boundaries and authorization ordering
+
+1. Runtime independently pins the original TaskContext and lifetime,
+   including principal, Tree, Clone, task, context and execution generation,
+   original input revision/commitment and policy; supplies already canonical
+   signals bound to that exact input. Current TaskContext has no qualified
+   signal producer. No NLP, model call, provider/Bark inference, case folding,
+   whitespace repair, Unicode normalization, semantic expansion or inferred
+   operational-learning trigger in Mind. Noncanonical input is refused.
+2. Spirit/Connections must independently authenticate the source, original
+   query scope, purpose and intended recipient, and authorize metadata
+   disclosure **before enumeration or serialization**, field by field.
+   This includes tags, hard strength, IDs, types, completeness and any
+   derived mandatory/mode indicator. Read/use of record bodies remains
+   separately authorized. Only an immutable bounded metadata-only projection
+   for the exact user-context domain and independently pinned durable domain
+   generation (including retirement) is eligible. Snapshot, coverage and
+   generation must be bound together by the actual custodian; separate
+   current-record enumeration and generation reads or max active generation
+   are insufficient. No concrete producer, index, store or issuer selected.
+3. Independently establish relevant coverage and mandatory applicability for
+   the original query and current scope/purpose/recipient. A visible subset
+   and caller's complete flag prove neither coverage nor absence of mandatory
+   constraints. An authorized complete-empty projection is distinct from
+   unavailable. Unknown/partial/stale/refused/unauthorized coverage or
+   mandatory applicability is neutral HOLD for the whole route. Do not probe
+   hidden records to resolve this condition without prior authorization.
+4. Mind checks bounded metadata and performs deterministic routing only
+   after independent initial authority/currentness. At final publication/use
+   of the route, independently verify the same original input, lifetime,
+   source/domain generation, coverage, policy/revocation and recipient are
+   still current. A changed, unavailable, contradictory or unverified
+   observation discards the route; no stale fallback or retry against another
+   task. A recheck alone does not establish atomic revocation/effect ordering:
+   the actual disclosure boundary requires independently qualified fencing.
+5. Output is a task-local candidate reference selection, not a grant, read,
+   record version resolution, cache admission, assembly or dispatch. M7d
+   must independently resolve exact versions, source/content commitments,
+   eligibility, read/use and final currentness even for an empty selection.
+   Hard constraint means routing necessity only, never authority or budget
+   bypass. An unresolved mandatory candidate cannot be silently skipped.
+   Runtime retains lifecycle/effect authority, Heart capacity/admission,
+   Spirit security, Connections custody and UI owners presentation.
+
+### Proposed finite limits (not a wire schema or hardware measurements)
+
+These are candidate logical ceilings for a later separately authorized
+fixed-public witness. All bounds are inclusive and apply to one original
+Task routing operation. A future producer must enforce them while reading
+and before serializing; Mind must independently validate the already bounded
+input before copying/materializing, deduplicating, indexing or matching.
+Reject unbounded iterators, mutable or lazy collections and untrusted length
+claims. A future decoder must bound its envelope before allocating a
+collection; a post-allocation count check is not an allocation bound.
+
+| Budget | Proposed maximum |
+| --- | ---: |
+| Raw canonical signal entries, including duplicates | 32 |
+| UTF-8 bytes per signal/tag | 128 |
+| Raw signal UTF-8 bytes, including duplicates | 4096 |
+| Raw projected metadata rows, including duplicates | 128 |
+| Raw row/tag associations across all rows, including duplicates | 512 |
+| UTF-8 bytes per candidate record ID or type | 128 |
+| UTF-8 bytes per other variable-width provenance/coverage field | 256 |
+| Aggregate projection metadata UTF-8 bytes including repeated fields, provenance and framing | 65536 |
+| Exact signal/tag comparisons (32 raw signals x 512 raw associations) | 16384 |
+| Total distinct selected IDs across all routes | 32 |
+
+Use a finite immutable collection with fixed allowed field groups, typed
+scalar identities/flags and bounded nonnegative generation values (candidate
+unsigned 64-bit range, bool not integer); reject unknown fields, unbounded
+nesting, invalid UTF-8, empty identifiers/signals, conflicting metadata or
+ambiguous provenance. All variable-sized fields and framing count against
+the envelope, and repeated values count before deduplication. No arbitrary
+callbacks or hidden secondary enumeration. Before set construction, establish
+row/association counts, byte bounds and comparison upper bound using bounded
+validation; while selecting, refuse on the 33rd distinct candidate, without
+growing a result set past 32 or publishing a partial result. No per-route
+32 allowance or truncation. Other bounded work includes validation of at
+most 128 rows and 512 associations, bounded candidate accumulation and
+sorting within validated limits; no unbounded work hidden in equality,
+normalization or source access. Reject a projection requiring more work
+than the declared budget. Exact identical metadata may be deduplicated
+after validation; duplicate identity with conflicting metadata HOLD.
+No claim about CPU, RAM, tokenizer capacity, physical resource credit or
+native safety. Existing M7a limits of 32 selected records, 4096 UTF-8 bytes
+per body and 16384 assembled bytes including framing remain independent.
+
+### Deterministic candidate routing
+
+For each first-occurrence canonical signal in the original input order,
+compare exact tag values in the authorized projection. Retain the union of
+matching candidate IDs, sorted in deterministic lexical order (and types
+only when independently authorized and necessary); matched/unmatched signal
+order follows original input order. A route is mandatory only when an
+exact match is supported by an explicitly hard user-constraint record,
+never by preference, record type alone, model verdict or inferred strength.
+
+| Internal routing outcome | Meaning |
+| --- | --- |
+| none | Authorized, complete, current relevant coverage proves no exact match (including a qualified empty input/projection). |
+| check | At least one exact match; independently established no mandatory match. |
+| must-check | At least one exact match with independently established explicit hard user constraint; mandatory indicator itself authorized. |
+| HOLD | Entire route unavailable: any missing authority, coverage, provenance, currentness, required disclosure, validity or limit. |
+
+These outcomes describe internal routing, not a public status schema.
+Only release independently authorized fields and routing information to
+the exact intended recipient, including derived mode and completeness.
+If safe relevant coverage or a necessary disclosure cannot be established,
+return only neutral HOLD at the permitted boundary; no partial candidate
+output, hidden hard-constraint existence, category/count/type/ordinal/tag/ID,
+reason, diagnostic/accessibility leak or differentiated denial. No public
+mode, count, reason, or UI projection is established by this proposal.
+
+### Negative-case matrix for a future separately authorized witness
+
+| Case | Required behavior |
+| --- | --- |
+| Authorized complete current empty vs unavailable projection | none only for proven no-match; unavailable HOLD |
+| Exact tags, repeated signals/routes/identical metadata, mixed check and hard constraint | First-occurrence signal order, sorted unique candidate IDs, must-check only for explicit hard match |
+| Case variant, whitespace, inferred synonym or raw prompt | No invented match; refuse noncanonical input |
+| Unauthorized enumeration, hidden hard strength, mode or other metadata field | No enumeration/serialization before authorization; neutral HOLD when required disclosure unavailable |
+| Allowed visible subset but unknown relevant/mandatory coverage | HOLD, never none or check-and-skip |
+| Same visible mode with differing hidden IDs/types/counts/categories/ordinals | No hidden differentiation in output, errors, diagnostics or accessibility |
+| Wrong original TaskContext, lifetime, input commitment, source, domain, purpose, policy or recipient | HOLD; no substitution |
+| Stale/retired domain, input or policy changes, revocation, or unknown initial/final observation | HOLD, discard candidates; no stale route fallback |
+| Conflicting duplicate ID/type/strength/provenance, malformed scalar or invalid UTF-8 | HOLD whole route |
+| Raw duplicate flood, oversized field/envelope, row/association/work limit +1 | HOLD before unbounded allocation/scanning; no truncation |
+| 32 union IDs across routes vs 33, including overlapping routes | 32 within selected-ID bound; 33 HOLD without partial release |
+| Mandatory match but missing exact-version read/use authority, revoked version or failed downstream currentness | No body read/admission/assembly; mandatory route unresolved, no skip |
+| Qualified empty selection with missing downstream currentness | HOLD; empty never bypasses M7d |
+
+No executable matcher, parser, tests, schema, provider, credential, producer,
+global index/cache, new storage, protected body access, absorption, model
+call, host action or production feature is authorized here. A later witness
+needs separate bounded authorization and review. Actual custody/currentness
+and disclosure fencing remain unresolved. Heart, Runtime, Spirit and Nurse
+must review the exact candidate document, and exact-head doc CI must succeed
+before operator integration. Native/protected/production HOLD.

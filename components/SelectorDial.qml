@@ -1090,6 +1090,7 @@ Item {
                 valueUnit: dialRoot.readoutUnit
                 externalUnitReadout: true
                 setText: "SET <font color='"+Colors.white+"'>//</font> "+dialRoot.stopwatchSetSeconds
+                compactSetText: "SET "+dialRoot.stopwatchSetSeconds
                 scaleMinimum: dialRoot.minimumValue
                 scaleMaximum: dialRoot.maximumValue
             }

@@ -40,8 +40,9 @@ ShellRoot {
     }
     function face(b) {
         const glow=b && b.children.find(child=>child.objectName==="actionButtonNormalPerimeter");
-        return b && b.normalFace && b.color===Colors.black && b.fillColor===Colors.black
-            && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
+        const expected=b && (b.pressed?Colors.magenta:b.selected||b.keyboardSelected||b.contentKeyboardPrimary?Colors.yellow:b.hovered&&!b.pointerSecondaryHovered?Colors.yellow:Colors.black);
+        return b && b.normalFace && b.color===expected && b.color.a===1 && b.fillColor===expected
+            && b.washSafePerimeter && !b.softGlowEnabled && !b.wideGlowEnabled && b.contentGlowEnabled
             && glow && glow.active && glow.z===-1 && glow.item && glow.item.color.a===0;
     }
     function find(key) {
@@ -66,7 +67,7 @@ ShellRoot {
                 console.log("SYSTEM_TARGET_NATIVE_PASS"); Qt.quit(); return;
             }
             if (!root.check(!legacy.normalFace && legacy.color===Colors.yellow && legacy.softGlowEnabled
-                && !legacy.perimeterGlowEnabled,"legacy filled actions unchanged")) return;
+                && legacy.perimeterGlowEnabled && legacy.washSafePerimeter,"legacy filled actions unchanged")) return;
             if (!root.check(rail.implicitHeight>=72,"wrapped layout")) return;
             for (const choice of rail.choices) {
                 const b=root.find(choice.key);
@@ -78,8 +79,9 @@ ShellRoot {
                     &&b.idleBorderColor===Colors.resourceColor(choice.key)
                     &&b.hoverFillColor===Colors.yellow&&b.hoverForegroundColor===Colors.orange
                     &&b.hoverBorderColor===Colors.orange&&b.pressedFillColor===Colors.magenta
-                    &&b.pressedForegroundColor===Colors.magenta&&b.selectedFillColor===Colors.black
-                    &&b.selectedForegroundColor===b.accentColor&&root.face(b),"canonical state colors "+choice.key)) return;
+                    &&b.pressedForegroundColor===Colors.black&&b.selectedFillColor===Colors.yellow
+                    &&b.selectedForegroundColor===Colors.magenta&&b.selectedBorderColor===Colors.magenta
+                    &&b.selectedContentGlowColor===Colors.magenta&&root.face(b),"canonical state colors "+choice.key)) return;
             }
             const all=root.find("ALL"), cpu=root.find("CPU");
             if (!root.check(all.selected&&all.accentColor===Colors.white&&root.requests===0,"initial ALL")) return;

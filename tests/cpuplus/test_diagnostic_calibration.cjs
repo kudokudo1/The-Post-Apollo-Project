@@ -36,3 +36,46 @@ assert.equal(vm.runInContext('previewCalibration({kind:"inventory",[Symbol("extr
 const d=plain(ctx.defaultsFor("threads"));d.topCount=12;
 assert.equal(ctx.defaultsFor("threads").topCount,4);
 console.log("DIAG D1a calibration preview contracts PASS");
+
+ctx.input=JSON.stringify({...t,durationSeconds:2,intervalMs:500,topCount:2});
+const plan=plain(vm.runInContext('threadLaunchPlan(JSON.parse(input),p=>"/local/"+p)',ctx));
+assert.deepEqual(plan.args,["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B",
+    "/local/scripts/syntagma_quickshell_thread_sampler.py","--workshop","--duration","2","--interval","0.5","--top","2"]);
+ctx.input=JSON.stringify({...t,pid:7});
+assert.equal(vm.runInContext('threadLaunchPlan(JSON.parse(input),p=>p)',ctx),null);
+ctx.input=JSON.stringify(plain(ctx.defaultsFor("memory")));
+assert.equal(vm.runInContext('threadLaunchPlan(JSON.parse(input),p=>p)',ctx),null);
+const policyCtx=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../../services/diagnostics/CpuPlusDiagnosticsPolicy.js"),"utf8"),policyCtx);
+const comparisonCtx=vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../../services/diagnostics/DiagnosticComparison.js"),"utf8"),comparisonCtx);
+const tag={workshopSchema:"post-apollo-thread-calibration-v1",startTicks:456,pid:123};
+const main={tid:123,cpuPct:55};
+const row={event:"threads",pid:123,startTicks:456,sampleIntervalMs:500,totalCpuPct:55,threadCount:1,main,top:[main]};
+const start={...tag,event:"start",durationSeconds:2,intervalMs:500,topCount:2};
+const end={...tag,event:"complete",samples:4,observedMs:2000};
+const encode=rows=>rows.map(x=>JSON.stringify(x)).join("\n");
+const rows=[start,row,row,row,row,end];
+const valid=encode(rows);
+assert.deepEqual(plain(policyCtx.configuredThreadEvidence(valid,plan.config)),plan.config);
+assert.match(policyCtx.summarize("threads",valid),/CALIBRATION \/\/ 2 s \/ 500 ms \/ TOP 2/);
+assert.equal(policyCtx.configuredThreadEvidence(valid,{...plan.config,topCount:1}),null);
+for(const bad of [
+    [start,row,row,row,row,{...end,samples:3}],
+    [start,row,row,row,row,{...end,observedMs:1900}],
+    [start,row,row,row,{...row,startTicks:999},end],
+    [start,row,row,row,{...row,top:[main,main]},end],
+    [start,row,row,row,{...row,pid:124},end],
+    [start,row,row,row,row,{...end,startTicks:999}],
+    [start,row,row,row,row],
+    [start,row,row,row,row,{...end,workshopSchema:"other"}]
+]) assert.equal(policyCtx.configuredThreadEvidence(encode(bad),plan.config),null);
+assert.equal(policyCtx.summarize("threads",encode([start,row,end])),null);
+const legacy=encode([{event:"start",pid:123},row,{event:"complete",pid:123}]);
+assert.equal(policyCtx.configuredThreadEvidence(legacy,plan.config),null);
+const first={id:"first",kind:"threads",status:"COMPLETE",text:valid,finishedAt:"2026-11-24T00:00:00Z"};
+const second={...first,id:"second",finishedAt:"2026-11-24T00:01:00Z"};
+assert.equal(comparisonCtx.compare(first,second,policyCtx.summarize).error,"");
+assert.equal(comparisonCtx.compare(first,{...second,text:legacy},policyCtx.summarize).error,"THREAD CALIBRATION MUST MATCH");
+assert.equal(comparisonCtx.compare(first,{...second,text:encode([{...start,topCount:3},row,row,row,row,end])},policyCtx.summarize).error,"THREAD CALIBRATION MUST MATCH");
+console.log("DIAG D1b configured launch, evidence and comparison PASS");

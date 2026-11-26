@@ -478,5 +478,347 @@ class RetirementTransactionTests(unittest.TestCase):
         self.r7d_check_hold()
 
 
+class AdmittedOriginalSettlementTests(unittest.TestCase):
+    """R7d-e: fixed-public local settlement, NOT an installed writer guard."""
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class Original:
+        operation: OperationRef
+        attempt: AttemptRef
+        lifetime: str
+        lifecycle_revision: int
+        pre_revision: int
+        post_revision: int
+        effect: str
+
+    @dataclass(frozen=True)
+    class Admission:
+        original: object
+        observed: int
+
+    @dataclass(frozen=True)
+    class Freeze:
+        original: object
+        intent: str
+        lifecycle_revision: int
+        observed: int
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(prefix="forest-r7de-public-")
+        self.addCleanup(tmp.cleanup)
+        self.path = Path(tmp.name) / "settlement.sqlite"
+        self.db = sqlite3.connect(self.path)
+        self.addCleanup(self.db.close)
+        bootstrap_synthetic(self.db)
+        bootstrap_attempts_synthetic(self.db)
+        self.journal = ForestSessionJournal(self.db)
+        self.ctx = TaskContext("settlement-owner", "cherry", None,
+                               "settlement-task", "settlement-execution", 3,
+                               "INTERACTIVE")
+        self.sid = self.journal.create_session(
+            self.ctx.principal_key, self.ctx.tree_key,
+            "Fixed public settlement", now_ms=1)["session_id"]
+        self.user = self.journal.append_turn(
+            self.ctx.principal_key, self.sid, expected_revision=0,
+            role="user", body="Public fixture", now_ms=2)["turn_id"]
+        self.ref = SessionContextRef(self.ctx, self.sid, 1, self.user)
+        self.op = OperationRef(self.ref, "settlement-operation")
+        self.settings = TransportSettings("fixture-model", 2048, 32)
+        self.binding = ModelBinding("settlement-binding", "small",
+            ModelIdentity(self.settings.model, "sha256:"+"a"*64, "ollama",
+                          "fixture-runtime", "1.0", "sha256:"+"b"*64),
+            self.settings.config_digest, 2048, 32)
+        self.calls = []
+        self.custody = ResourceCustody()
+        self.bridge = ForestTurnBridge(self.journal, clock_ms=lambda:3,
+                                       streamer=self.fake_stream)
+        self.assertEqual(self.custody.status()["status"], "IDLE")
+
+    def fake_stream(self, **kw):
+        # Ordinary function records invocation, not merely generator creation.
+        self.calls.append("fake-stream")
+        self.assertEqual((kw["model"], kw["num_ctx"], kw["max_predict"]),
+                         (self.settings.model, 2048, 32))
+        return iter((
+            dict(event="STARTED", model=self.settings.model, provider="ollama"),
+            dict(event="DELTA", text="Public reply"),
+            dict(event="COMPLETE", model=self.settings.model,
+                 provider="ollama", text="Public reply"),
+        ))
+
+    def exchange(self, **kw):
+        generator = self.bridge.exchange(
+            owner=self.ctx.principal_key, session_id=self.sid,
+            expected_revision=1, model=self.settings.model,
+            num_ctx=self.settings.num_ctx, max_predict=self.settings.max_predict,
+            context_ref=self.ref, current_context_ref=self.ref,
+            resolve_current_context=lambda:self.ref, **kw)
+        self.addCleanup(generator.close)
+        return generator
+
+    def reserve_and_hold(self, generator):
+        first = next(generator)
+        self.assertEqual(first["event"], "RESERVED")
+        self.assertEqual(self.calls, [])
+        attempt = AttemptRef(self.ctx, self.user, self.op.operation_id,
+                             first["attempt_id"], self.binding, self.settings)
+        self.original = self.Original(self.op, attempt, "original-lifetime",
+                                      1, 1, 2, "original-modeled-effect")
+        turn = TurnScope(self.ctx, self.user)
+        recommendation = recommend(RoutingInput(turn, "small",
+            ReasoningReference(turn, "normal", "explicit")))
+        registry = BindingRegistry(self.ctx.principal_key, self.ctx.tree_key,
+                                   1, (self.binding,))
+        evidence = BindingEvidence(turn, self.binding, "fixture-producer",
+                                   "fixture-observation", True, ("chat",), 2048)
+        resolved = resolve_reference(recommendation, registry,
+                                    required_features=("chat",), evidence=evidence)
+        request = ResourceRequest(self.ctx.task_id, self.ctx.execution_context_id,
+                                  "small", "normal", "interactive", "heart")
+        dispatch = DispatchSnapshot(resolved, self.settings, self.op.operation_id,
+            attempt.attempt_id, "fixture-clock", 1, request,
+            ResourceRequirement(request, "requirements", 512, 256, 2),
+            ResourceBudget("budget", 1024, 512, 4),
+            ResourceAvailability("available", 1024, 512, 4))
+        self.assertEqual(self.custody.claim_reference(
+            dispatch, replace(dispatch, captured_ns=2), now_ns=3),
+            "REFERENCE_HELD")
+        self.held = self.custody.status()
+        self.assert_held()
+        self.assert_local("RESERVED", 1)
+
+    def assert_held(self):
+        # Inspect the exact local fixture claim, not authenticated custody.
+        self.assertEqual(self.custody._active, self.original.attempt)
+        self.assertEqual(self.custody.status(), self.held)
+        self.assertEqual(self.held["status"], "REFERENCE_HELD")
+        self.assertTrue(self.held["fixture_slot_occupied"])
+        for key in ("physical_resources_reserved", "physical_resources_released",
+                    "source_authenticated", "terminal_verified", "durable_recovery",
+                    "safe_to_start_inference", "permission_granted",
+                    "production_authority"):
+            self.assertIs(self.held[key], False)
+        self.assertEqual(self.held["safe_actions"], [])
+
+    def rows(self):
+        return (
+            self.db.execute("SELECT state,revision FROM forest_sessions "
+                            "WHERE session_id=?", (self.sid,)).fetchone(),
+            self.db.execute("SELECT turn_id,role FROM forest_turns WHERE "
+                            "session_id=? ORDER BY ordinal", (self.sid,)).fetchall(),
+            self.db.execute("SELECT attempt_id,user_turn_id,expected_revision,"
+                            "model_key,status,reply_turn_id FROM forest_attempts_b3 "
+                            "WHERE session_id=?", (self.sid,)).fetchall(),
+        )
+
+    def assert_local(self, state, revision):
+        session, turns, attempts = self.rows()
+        self.assertEqual(session, ("OPEN", revision))
+        self.assertEqual(len(attempts), 1)
+        a = self.original.attempt
+        self.assertEqual(attempts[0][:5],
+                         (a.attempt_id, self.user, 1, a.binding.identity.model_name, state))
+        self.assertEqual(turns[0], (self.user, "user"))
+        if state == "COMMITTED":
+            self.assertEqual(len(turns), 2)
+            self.assertEqual(turns[1], (attempts[0][5], "assistant"))
+            self.assertEqual(revision, self.original.post_revision)
+        else:
+            self.assertEqual(len(turns), 1)
+            self.assertIsNone(attempts[0][5])
+            self.assertEqual(revision, self.original.pre_revision)
+        self.assertFalse(self.db.in_transaction)
+        self.assert_held()
+
+    def freeze(self, observed=20):
+        return self.Freeze(self.original, "original-retirement-intent", 2, observed)
+
+    def modeled_decision(self, admission, intent, current, current_intent):
+        # Pure test-local comparison, NOT a production gate or writer wrapper.
+        # Independent fixture observations are supplied explicitly; no B3
+        # RESERVED/STARTED/DELTA state is used as admission evidence.
+        o = self.original
+        if (type(admission) is not self.Admission
+                or type(intent) is not self.Freeze
+                or type(current) is not self.Original
+                or type(current_intent) is not self.Freeze
+                or admission.original != o or current != o
+                or intent.original != o or current_intent != intent
+                or intent.intent != "original-retirement-intent"
+                or type(intent.lifecycle_revision) is not int
+                or intent.lifecycle_revision != o.lifecycle_revision+1
+                or type(admission.observed) is not int
+                or type(intent.observed) is not int
+                or not 0 < admission.observed < intent.observed
+                or self.custody._active != o.attempt
+                or self.custody.status() != self.held):
+            return "MODELED_HOLD"
+        return "MODELED_ORIGINAL_ONLY"
+
+    def admit_then_freeze(self, generator):
+        self.reserve_and_hold(generator)
+        # Independent fixture input, deliberately NOT inferred from stream.
+        admission = self.Admission(self.original, 10)
+        self.assertEqual(next(generator)["event"], "STARTED")
+        self.assertEqual(next(generator)["event"], "DELTA")
+        intent = self.freeze()
+        self.assertEqual(self.modeled_decision(
+            admission, intent, self.original, intent), "MODELED_ORIGINAL_ONLY")
+        self.assert_local("RESERVED", 1)
+        return admission, intent
+
+    def recover(self, state):
+        from recovery_inspect_b4d import ForestLocalRecoveryInspector
+        before = self.rows()
+        with sqlite3.connect(self.path.as_uri()+"?mode=ro", uri=True) as reader:
+            try:
+                reader.execute("PRAGMA query_only=ON")
+                inspector = ForestLocalRecoveryInspector(ForestSessionJournal(reader))
+                result = inspector.inspect(owner=self.ctx.principal_key,
+                    session_id=self.sid, attempt_id=self.original.attempt.attempt_id)
+                self.assertEqual(result["attemptId"], self.original.attempt.attempt_id)
+                self.assertEqual(result["forestWriteState"], "FOREST_"+state)
+                self.assertEqual(result["c5Settlement"], "UNKNOWN_HOLD")
+                for key in ("c5EvidenceAuthenticated", "terminalReceiptAuthenticated",
+                            "safeToRetryInference", "safeToReleaseRevocation",
+                            "productionAuthority"):
+                    self.assertIs(result[key], False)
+            finally:
+                reader.close()
+        self.assertEqual(self.rows(), before)
+        self.assert_held()
+
+    def test_r7de_freeze_before_reserve_does_not_install_guard(self):
+        # Fixture freeze is intentionally pre-attempt, so there is no H2
+        # original claim yet. Actual B3 still bypasses this modeled refusal.
+        pre_reserve_freeze = (self.op, "original-lifetime", 2, 20)
+        self.assertEqual(pre_reserve_freeze[0], self.op)
+        self.assertEqual(self.rows()[2], [])
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.custody.status()["status"], "IDLE")
+        generator = self.exchange()
+        self.reserve_and_hold(generator)
+        intent = self.freeze()
+        self.assertEqual(intent.observed, pre_reserve_freeze[3])
+        self.assertEqual(self.modeled_decision(
+            None, intent, self.original, intent), "MODELED_HOLD")
+        # Direct B3 reservation happened despite modeled freeze: no actual guard.
+        generator.close()
+        self.assert_local("ABORTED", 1)
+        self.assertEqual(self.calls, [])
+
+    def test_r7de_reserved_without_admission_remains_local_only(self):
+        generator = self.exchange()
+        self.reserve_and_hold(generator)
+        intent = self.freeze()
+        before = self.rows()
+        self.assertEqual(self.modeled_decision(
+            None, intent, self.original, intent), "MODELED_HOLD")
+        self.assertEqual(self.rows(), before)
+        self.recover("RESERVED")
+        self.assertEqual(self.calls, [])
+        # Explicit fixture cancellation, not automatic abort on ambiguity.
+        generator.close()
+        self.assert_local("ABORTED", 1)
+        self.recover("ABORTED")
+        self.assertEqual(self.calls, [])
+
+    def test_r7de_original_local_commit_during_modeled_freeze(self):
+        generator = self.exchange()
+        self.admit_then_freeze(generator)
+        self.assertEqual([e["event"] for e in generator], ["COMMITTED"])
+        self.assert_local("COMMITTED", 2)
+        self.recover("COMMITTED")
+        self.assertEqual(self.calls, ["fake-stream"])
+
+    def test_r7de_foreign_stale_aba_or_unknown_reference_stays_held(self):
+        generator = self.exchange()
+        admission, intent = self.admit_then_freeze(generator)
+        o = self.original
+        a = o.attempt
+        other_settings = replace(a.settings, max_predict=31)
+        other_binding = replace(a.binding, config_digest=other_settings.config_digest,
+                                output_tokens=31)
+        foreigns = (
+            replace(o, lifetime="replacement-lifetime"),
+            replace(o, lifecycle_revision=2),
+            replace(o, pre_revision=2, post_revision=3),
+            replace(o, effect="other-effect"),
+            replace(o, attempt=replace(a, context=replace(a.context, generation=4))),
+            replace(o, attempt=replace(a, operation_id="other-operation")),
+            replace(o, attempt=replace(a, attempt_id="other-attempt")),
+            replace(o, attempt=replace(a, settings=other_settings, binding=other_binding)),
+        )
+        before = self.rows()
+        for foreign in foreigns:
+            for supplied, current in ((replace(admission, original=foreign), o),
+                                      (admission, foreign)):
+                self.assertEqual(self.modeled_decision(
+                    supplied, intent, current, intent), "MODELED_HOLD")
+                self.assertEqual(self.rows(), before)
+                self.assert_held()
+        for bad in (None, replace(admission, observed=20),
+                    replace(admission, observed=21)):
+            self.assertEqual(self.modeled_decision(
+                bad, intent, o, intent), "MODELED_HOLD")
+        self.assertEqual(self.modeled_decision(admission, intent, o,
+            replace(intent, intent="replacement-intent")), "MODELED_HOLD")
+        self.assert_local("RESERVED", 1)
+        self.recover("RESERVED")
+        self.assertEqual(self.calls, ["fake-stream"])
+        # No automatic terminal transition; registered test cleanup closes the
+        # disposable generator AFTER all unknown-state observations.
+
+    def test_r7de_denied_local_commit_keeps_pre_revision_and_custody(self):
+        from turn_bridge_b3 import BridgeRefusal
+        generator = self.exchange(pre_commit=lambda:False)
+        self.admit_then_freeze(generator)
+        with self.assertRaisesRegex(BridgeRefusal, "PRE_COMMIT_AUTHORIZATION_DENIED"):
+            list(generator)
+        self.assert_local("ABORTED", 1)
+        self.recover("ABORTED")
+        self.assertEqual(self.calls, ["fake-stream"])
+
+    def test_r7de_lost_synthetic_receipt_reconciles_original_only(self):
+        from turn_bridge_b3 import BridgeRefusal, SyntheticCommitBinding
+        fixture = self
+
+        class LostReceipt:
+            def __init__(self, binding):
+                self.binding = binding
+
+            def __enter__(self):
+                fixture.assertFalse(fixture.db.in_transaction)
+                return self
+
+            def terminal(self, result):
+                fixture.assertFalse(fixture.db.in_transaction)
+                fixture.assert_local("COMMITTED", 2)
+                fixture.assertEqual(fixture.rows()[2][0][5], result["turn_id"])
+                return False  # Explicit synthetic receipt loss, not C5 state.
+
+            def __exit__(self, *args):
+                return False
+
+        def fence(binding):
+            self.assertEqual(binding, SyntheticCommitBinding(
+                self.ctx.principal_key, self.ctx.tree_key, self.sid, self.user,
+                self.original.attempt.attempt_id, "fixture-receipt-request",
+                self.settings.model, 1))
+            return LostReceipt(binding)
+
+        generator = self.exchange(pre_commit=lambda:True, fence_factory=fence,
+                                  fence_request_id="fixture-receipt-request")
+        self.admit_then_freeze(generator)
+        with self.assertRaisesRegex(BridgeRefusal, "UNKNOWN_HOLD"):
+            list(generator)
+        self.assert_local("COMMITTED", 2)
+        self.recover("COMMITTED")
+        self.recover("COMMITTED")
+        self.assert_local("COMMITTED", 2)
+        self.assertEqual(self.calls, ["fake-stream"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -88,15 +88,15 @@ for token in ("property bool modeButtonRecipe: false", "property bool modeSelect
               "modeIconSelectedSamples", "modeIconIdleOpacity", "safeSource.mapToItem"):
     assert token in hash_glow, f"TextHashGlow missing: {token}"
 for token in (
-    "modeIconIdleOpacity: 0.40", "modeIconHoverOpacity: 0.80",
+    "modeIconIdleOpacity: 0.65", "modeIconHoverOpacity: 0.86",
     "modeIconSelectedOpacity: 1.00", "modeIconIdleRadius: 10",
     "modeIconHoverRadius: 14", "modeIconSelectedRadius: 18",
     "modeIconIdleSamples: 7", "modeIconHoverSamples: 9",
     "modeIconSelectedSamples: 17", "modeCloseSpread: 3",
     "modeWideSpread: 10", "modeHaloColor: Colors.orange",
     "modeLabelIdleOpacity: 0.34", "modeLabelActiveOpacity: 0.48",
-    "modeLabelPressedOpacity: 0.42", "modeLabelGlowIdleOpacity: 0.06",
-    "modeLabelGlowActiveOpacity: 0.10",
+    "modeLabelPressedOpacity: 0.42", "modeLabelGlowIdleOpacity: 0.34",
+    "modeLabelGlowActiveOpacity: 0.56",
 ):
     assert token in recipes, f"Main Mode recipe missing: {token}"
 print("Main Mode button contracts: PASS")

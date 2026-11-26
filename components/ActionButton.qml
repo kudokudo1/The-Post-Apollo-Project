@@ -147,14 +147,14 @@ Rectangle {
     property color selectedContentGlowColor: redActionFace ? Colors.red : Colors.magenta
     property color keyboardSelectedContentGlowColor: redActionFace ? Colors.red : Colors.orange
 
-    property real contentGlowIdleOpacity: 0.34
-    property real contentGlowHoverOpacity: 0.72
-    property real contentGlowPressedOpacity: normalFace ? 0.60 : 0.0
-    property real contentGlowSelectedOpacity: 0.72
-    property real contentGlowKeyboardSelectedOpacity: 0.72
+    property real contentGlowIdleOpacity: 0.65
+    property real contentGlowHoverOpacity: 0.86
+    property real contentGlowPressedOpacity: redActionFace ? 0.0 : 0.84
+    property real contentGlowSelectedOpacity: 1.0
+    property real contentGlowKeyboardSelectedOpacity: 0.86
 
-    property real contentGlowRadius: 7
-    property int contentGlowSamples: 7
+    property real contentGlowRadius: 10
+    property int contentGlowSamples: 9
 
     // Primary action halo. AppControl commonly uses one rectangular halo.
     property bool softGlowEnabled: !normalFace

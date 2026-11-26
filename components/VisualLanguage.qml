@@ -18,8 +18,8 @@ QtObject {
     readonly property real modeHaloPressedStrength: 1.20
 
     // MAIN MODE primary sampled-icon glow tuning is provisional.
-    readonly property real modeIconIdleOpacity: 0.40
-    readonly property real modeIconHoverOpacity: 0.80
+    readonly property real modeIconIdleOpacity: 0.65
+    readonly property real modeIconHoverOpacity: 0.86
     readonly property real modeIconSelectedOpacity: 1.00
     readonly property real modeIconIdleRadius: 10
     readonly property real modeIconHoverRadius: 14
@@ -31,9 +31,9 @@ QtObject {
     readonly property real modeLabelIdleOpacity: 0.34
     readonly property real modeLabelActiveOpacity: 0.48
     readonly property real modeLabelPressedOpacity: 0.42
-    readonly property real modeLabelGlowIdleOpacity: 0.06
-    readonly property real modeLabelGlowActiveOpacity: 0.10
-    readonly property real modeLabelGlowRadius: 5
+    readonly property real modeLabelGlowIdleOpacity: 0.34
+    readonly property real modeLabelGlowActiveOpacity: 0.56
+    readonly property real modeLabelGlowRadius: 7
     readonly property int modeLabelGlowSamples: 7
 
     // Git's restrained chassis is the preferred WINDOW default.

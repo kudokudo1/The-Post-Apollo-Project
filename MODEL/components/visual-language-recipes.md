@@ -57,11 +57,33 @@ is independent of the Close × recipe:
 
 The selected state is supplied by the owner of the actual open surface;
 a one-shot action does not latch selected. The open state uses the existing
-selected glow intensity (content .72, soft .70, wide .32) versus idle
-(.34, .48, .22). Close × keeps its separate red glyph and original
+selected glow intensity (content 1.0, soft .70, wide .32) versus idle
+(.65, .48, .22). Close × keeps its separate red glyph and original
 interaction colors. Normal-face selectors and explicitly specialized
 recipes keep their own contracts. This changes presentation defaults,
 not action authority, click signals, or execution.
+
+## Shared button content illumination // 2026-11-26
+
+Automatic sampled text/icon glow is a separate effect from the perimeter.
+Ordinary already-migrated controls inherit these changes through their
+shared QML defaults; consumer-local property bindings still take priority.
+
+| Family | Idle glyph opacity | Hover | Selected/open |
+| --- | ---: | ---: | ---: |
+| ActionButton | .65 | .86 | 1.0 |
+| ModeButton primary | .65 | .86 | 1.0 |
+| ModeButton supporting label | .34 | .56 | .56 |
+| DockButton | .84 | .95 | 1.0 |
+
+ActionButton uses radius 10 and 9 samples; ModeButton caption radius 7.
+Ordinary action press gets .84 content glow; the red action press retains
+its existing no-content-glow recipe and Close × keeps its explicit original
+values. The ModeButton black pressed caption treatment is unchanged.
+These are tuning baselines pending native pixel review, not new palette
+identities. Keep existing geometry, effect sources, and input behavior.
+Specialized multi-color clusters, explicit disable/opacity bindings, and
+custom controls remain review items, not automatic mass migrations.
 
 ## Default sampled-glow alignment // ActionButton rollout (2026-10-22)
 

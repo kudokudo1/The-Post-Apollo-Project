@@ -45,6 +45,10 @@ Rectangle {
     property Item customLabelGlowSource: null
     property bool primaryGlowEnabled: true
     property bool labelGlowEnabled: true
+    // Caption illumination is independent of its quiet foreground opacity.
+    // Specialized modes can retain a restrained recipe explicitly.
+    property real labelGlowIdleOpacity: VisualLanguage.modeLabelGlowIdleOpacity
+    property real labelGlowActiveOpacity: VisualLanguage.modeLabelGlowActiveOpacity
 
     // Source artwork and sampled glow remain distinct objects. By default the
     // glow lives on a separate sibling effect plane, under the button's scale,
@@ -258,8 +262,8 @@ Rectangle {
             radius: VisualLanguage.modeLabelGlowRadius
             samples: VisualLanguage.modeLabelGlowSamples
             opacity: modeButton.selected || modeButton.hovered
-                     ? VisualLanguage.modeLabelGlowActiveOpacity
-                     : VisualLanguage.modeLabelGlowIdleOpacity
+                     ? modeButton.labelGlowActiveOpacity
+                     : modeButton.labelGlowIdleOpacity
         }
     }
 

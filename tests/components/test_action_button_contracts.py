@@ -791,3 +791,16 @@ for needle in (
 require((ROOT / "components/CloseButton.qml").read_text(encoding="utf-8"),
         "redActionFace: false", "Close X remains distinct")
 print("Red action state contracts: PASS")
+
+# The shared default content glow is present independently of perimeter glow.
+for needle in (
+    "property bool contentGlowEnabled: true",
+    "property real contentGlowIdleOpacity: 0.65",
+    "property real contentGlowHoverOpacity: 0.86",
+    "property real contentGlowSelectedOpacity: 1.0",
+    "property real contentGlowRadius: 10",
+    "property int contentGlowSamples: 9",
+    "property real contentGlowPressedOpacity: redActionFace ? 0.0 : 0.84",
+):
+    require(COMPONENT, needle, "visible shared content glow")
+print("Shared ActionButton content illumination: PASS")

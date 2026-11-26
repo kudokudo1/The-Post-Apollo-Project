@@ -55,6 +55,12 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
         button = window.findChild(QObject, "glowLabelButton")
         assert button is not None, "ActionButton instance was not found"
         inspect("initial")
+        assert button.property("contentGlowEnabled") is True
+        nearly(button.property("contentGlowIdleOpacity"), .65, "inherited idle glyph glow")
+        nearly(button.property("contentGlowHoverOpacity"), .86, "inherited hover glyph glow")
+        nearly(button.property("contentGlowSelectedOpacity"), 1.0, "inherited selected glyph glow")
+        nearly(button.property("contentGlowRadius"), 10, "inherited glyph radius")
+        nearly(button.property("contentGlowSamples"), 9, "inherited glyph samples")
         assert button.setProperty("label", "ARCHIVE / CONFIRM")
         inspect("new label")
         assert button.setProperty("width", 250)

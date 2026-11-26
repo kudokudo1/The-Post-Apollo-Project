@@ -666,12 +666,20 @@ print("AppControl TAB ActionButton migration: PASS")
 TASK_MANAGER = (ROOT / "widgets/appcontrol/TaskManagerView.qml").read_text(encoding="utf-8")
 SYSTEM_MONITOR = (ROOT / "widgets/appcontrol/SystemMonitorView.qml").read_text(encoding="utf-8")
 
-for control_id in ("taskRestartAction", "taskFreezeAction", "taskEndAction"):
-    marker = f"id: {control_id}"
-    marker_pos = TASK_MANAGER.index(marker)
-    block_start = TASK_MANAGER.rfind("ActionButton {", 0, marker_pos)
-    assert block_start >= 0, f"{control_id} must inherit ActionButton"
-    rectangle_start = TASK_MANAGER.rfind("Rectangle {", 0, marker_pos)
+# Restart uses ReloadButton, a shared ActionButton subclass; others use ActionButton.
+RELOAD_BUTTON = (ROOT / "components/ReloadButton.qml").read_text(encoding="utf-8")
+assert "ActionButton {" in RELOAD_BUTTON, "ReloadButton must inherit ActionButton"
+for control_id, component_type in (
+    ("taskRestartAction", "ReloadButton"),
+    ("taskFreezeAction", "ActionButton"),
+    ("taskEndAction", "ActionButton"),
+):
+    declaration = component_type + " {\\n                    id: " + control_id
+    assert declaration in TASK_MANAGER, (
+        f"{control_id} must use {component_type} and inherit ActionButton"
+    )
+    block_start = TASK_MANAGER.index(declaration)
+    rectangle_start = TASK_MANAGER.rfind("Rectangle {", 0, block_start)
     assert rectangle_start < block_start, f"{control_id} fell back to a private Rectangle"
 
 for private_mouse in (

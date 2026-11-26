@@ -148,7 +148,11 @@ large_payload = json.dumps(rows)
 assert len(large_payload.encode()) > 131072
 success = run_synthetic(large_payload)
 assert success.returncode == 0, success.stderr
-output = json.loads(success.stdout)
+frames = [json.loads(line) for line in success.stdout.splitlines()]
+assert len(frames) == 5, frames
+assert [len(f["page"]) for f in frames[:-1]] == [25, 25, 25, 25]
+output = frames[-1]
+assert [r for f in frames[:-1] for r in f["page"]] == output
 assert len(output) == 100, f"Expected 100 PRs, got {len(output)}"
 assert output[0]["number"] == 1 and output[-1]["number"] == 100
 assert output[0]["checkState"] == "SUCCESS"
@@ -167,7 +171,9 @@ fallback_row["commits"] = {"nodes": [{"commit": {
 }}]}
 fallback = run_synthetic(json.dumps([fallback_row]))
 assert fallback.returncode == 0, fallback.stderr
-fallback_rows = json.loads(fallback.stdout)
+fallback_frames = [json.loads(line) for line in fallback.stdout.splitlines()]
+assert len(fallback_frames) == 2 and fallback_frames[0]["page"] == fallback_frames[1]
+fallback_rows = fallback_frames[-1]
 assert len(fallback_rows) == 1 and fallback_rows[0]["number"] == 1
 assert fallback_rows[0]["checkDetailsDeferred"] is True
 assert fallback_rows[0]["reviewDetailsDeferred"] is True
@@ -182,7 +188,8 @@ assert selected_rows[0]["reviewRequestCount"] == 0
 assert selected.rest_calls == 5
 
 empty = run_synthetic("[]")
-assert empty.returncode == 0 and json.loads(empty.stdout) == []
+assert empty.returncode == 0
+assert [json.loads(line) for line in empty.stdout.splitlines()] == [{"page": [], "kind": "page"}, []]
 
 bad_json = run_synthetic("{not valid JSON")
 assert bad_json.returncode != 0, "Invalid JSON must not look like READY // 0"
@@ -211,4 +218,9 @@ assert 'JSON.parse(output);' in SOURCE
 assert 'throw new Error("EMPTY RESPONSE")' in SOURCE
 assert 'throw new Error("EXPECTED PR ARRAY")' in SOURCE
 
-print("GitHub PULLS large-payload and error-propagation regression: PASS")
+# Source contract: consume complete frames before the process exits.
+assert "waitForEnd: false" in SOURCE
+assert "root.consumePullsOutput(this.text)" in SOURCE
+assert "pullsRequestEpoch !== pullsRepoEpoch" in SOURCE
+assert "FINAL RESPONSE DOES NOT MATCH VALIDATED PAGES" in SOURCE
+print("GitHub PULLS progressive pages, large payload and error propagation: PASS")

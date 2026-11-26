@@ -413,6 +413,12 @@ Item {
         return appControlWindow.taskDangerActionUnlockMode
             ? appControlWindow.taskDangerActionUnlockMode(exact,action) : "";
     }
+    function localLockMode(row, action) {
+        if (!row || !gate || !appControlWindow || !action) return "";
+        const exact=gate.exactRow(Number(row.pid),Number(row.startTicks),String(row.comm || ""));
+        return exact && appControlWindow.taskDangerActionLocalUnlockMode
+            ? appControlWindow.taskDangerActionLocalUnlockMode(exact,action) : "";
+    }
     function canChangeLock(row) {
         return active && exactTargetAvailable && sameTarget(row)
             && !!gate && !gate.pending && !gate.busy
@@ -1101,7 +1107,7 @@ Item {
                     }
                     GohuText {
                         width: parent.width
-                        text: "Left click lock: one-shot • Right click: sticky. Magenta unlocks all actions. Red: kill; yellow: restart; cyan: freeze/thaw. Each individual lock works without the master. While master authorization is active it overrides individual locks. Closing the master clears individual grants. Limit has its own lock beside the slider. Dispatch is not proof of success."
+                        text: "Left click lock: one-shot • Right click: sticky. Magenta unlocks all actions. Red: kill; yellow: restart; cyan: freeze/thaw. Each individual lock works without the master. While master authorization is active it overrides individual locks. A small + or key marks a separate individual grant while the master is open. Closing the master clears individual grants. Limit has its own lock beside the slider. Dispatch is not proof of success."
                         wrapMode: Text.Wrap
                         textFormat: Text.PlainText
                         color: Colors.orange

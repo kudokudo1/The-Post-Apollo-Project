@@ -97,15 +97,21 @@ Scope {
         return request(descriptor.value, configuration);
     }
 
+    function requestWorkflow(configuration) {
+        return request("workflow", configuration);
+    }
+
     function request(job, configuration) {
         if (busy || faulted || worker.running || archive.busy) return false;
         const configured = configuration !== undefined;
         const plan = configured
-            ? Calibration.observerLaunchPlan(configuration, path => Quickshell.shellPath(path), Quickshell.dataDir) : null;
-        if (configured && (!plan || plan.config.kind !== job)) return false;
+            ? (job === "workflow"
+                ? Calibration.workflowLaunchPlan(configuration, path => Quickshell.shellPath(path), Quickshell.dataDir)
+                : Calibration.observerLaunchPlan(configuration, path => Quickshell.shellPath(path), Quickshell.dataDir)) : null;
+        if (configured && (!plan || (job !== "workflow" && plan.config.kind !== job))) return false;
         const args = plan ? plan.args : Policy.argumentsFor(job, path => Quickshell.shellPath(path), Quickshell.dataDir);
         if (!args) return false;
-        activeCalibration = plan ? JSON.stringify(plan.config) : "";
+        activeCalibration = plan ? JSON.stringify(job === "workflow" ? plan.plan : plan.config) : "";
         kind = job;
         captureSequence += 1;
         captureId = sessionTag + "-" + captureSequence;
@@ -170,6 +176,13 @@ Scope {
         deadline.stop();
         if (kind === "appcontrol" && !cancelled && exitOk && output.length <= maximumReport)
             output = Policy.combineAppControl(output, modeRecords, openingRecords, diagnosticOverflow, killWorkRecords, workRecords) || "";
+        if (kind === "workflow") {
+            const evidence = activeCalibration && Policy.workflowEvidence(output, JSON.parse(activeCalibration));
+            const status = cancelled ? "CANCELLED" : exitOk && evidence && evidence.status === "COLLECTED" ? "COMPLETE" : "NOT VERIFIED";
+            publishResult(status, evidence ? evidence.summary : (cancelled ? "CAPTURE STOPPED" : "NO VERIFIED WORKFLOW // EXIT " + exitCode),
+                          evidence ? output : "");
+            return;
+        }
         const calibrationMatches = !activeCalibration ||
             Policy.configuredEvidence(kind, output, JSON.parse(activeCalibration)) !== null;
         const summary = !cancelled && exitOk && output.length <= maximumReport && calibrationMatches
@@ -189,7 +202,7 @@ Scope {
             // accepting late output under a new request identity.
             owner.faulted = true;
             owner.publishResult("NOT VERIFIED", "RUNNER UNAVAILABLE // COMPLETION NOT OBSERVED",
-                                owner.output.length <= owner.maximumReport ? owner.output : "");
+                                owner.kind !== "workflow" && owner.output.length <= owner.maximumReport ? owner.output : "");
             worker.running = false;
         }
     }

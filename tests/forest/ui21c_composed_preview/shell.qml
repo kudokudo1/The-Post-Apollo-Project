@@ -334,6 +334,9 @@ ShellRoot {
         Item {
             id: s3
             property var original: null
+            // Single test-local withdrawn incarnation, not a persistent
+            // tombstone store or authoritative revocation history.
+            property var withdrawnOriginal: null
             property var selection: null
             property bool localReviewVisible: false
             property string suppliedOutcome: "UNAVAILABLE"
@@ -374,10 +377,16 @@ ShellRoot {
                     generation:ref.generation, revision:ref.revision};
             }
             function enter(ref) {
-                original = pin(ref); // Test-local copy, not authority.
+                // An explicit withdraw cannot be undone by re-entering the
+                // same old fixture view. A distinct fresh pin is required.
+                if (same(ref,withdrawnOriginal)) return false;
+                const pinned = pin(ref);
+                if (!pinned) return false;
+                original = pinned; // Test-local copy, not authority.
                 suppliedOutcome = "UNAVAILABLE";
                 selection = null;
                 localReviewVisible = false;
+                return true;
             }
             function receive(ref,outcome) {
                 if (!same(ref,original)) return false;
@@ -412,6 +421,7 @@ ShellRoot {
                 if (!same(ref,original)) return false;
                 // Unlike temporary UNAVAILABLE/PARTIAL, explicit withdrawal
                 // ends this exact view. A delayed reply cannot resurrect it.
+                withdrawnOriginal = pin(original);
                 original = null;
                 suppliedOutcome = "UNAVAILABLE";
                 selection = null;
@@ -516,14 +526,14 @@ ShellRoot {
             "S3 current withdrawal retires original fixture");
         check(!item.receive(replacement,"AUTHORIZED_ROWS")
             && !item.choose(replacement) && !item.showLocalReview(replacement)
-            && !item.withdraw(replacement) && item.original===null
-            && item.publicStatus==="COLONY UNAVAILABLE",
-            "S3 withdrawn same-original reply cannot resurrect selection or review");
+            && !item.withdraw(replacement) && !item.enter(replacement)
+            && item.original===null && item.publicStatus==="COLONY UNAVAILABLE",
+            "S3 withdrawn same-original reply/re-entry cannot resurrect selection");
         const fresh=s3Scope("fresh-view",3);
-        item.enter(fresh);
-        check(item.receive(fresh,"AUTHORIZED_ROWS") && item.choose(fresh)
+        check(item.enter(fresh) && item.receive(fresh,"AUTHORIZED_ROWS") && item.choose(fresh)
             && item.showLocalReview(fresh) && !item.receive(replacement,"AUTHORIZED_ROWS")
-            && !item.withdraw(replacement) && item.localReviewVisible
+            && !item.withdraw(replacement) && !item.enter(replacement)
+            && item.original.view==="fresh-view" && item.localReviewVisible
             && item.publicStatus==="PUBLIC MEMBER",
             "S3 separately pinned fresh view survives stale original replies");
         const mutable=s3Scope("mutable-view",4);

@@ -248,3 +248,61 @@ test("new local projections do not own actions or enter universal Favorites",()=
 test("live host delegates extracted Combi policy without replacing independent baseline",()=>{
     for(const call of ["FavoriteCombi.searchText(record)","FavoriteCombi.prepare(record)","FavoriteCombi.buildStatic(records)","FavoriteCombi.buildTasks(taskRows","FavoriteCombi.visibleRows(rows,"]) assert.ok(liveHost.includes(call),call);
  });
+
+test("C7 local starred and COMBI catalogs preserve original records and lazy task reads",()=>{
+    const original=new Function(body("localCatalogBeforeC7")+"\nreturn localCatalogBeforeC7;")();
+    function setup(keys,preferred,metrics) {
+        const reads={tasks:0,apps:0,windows:0,thermal:0,fan:0,system:0,membership:0,cached:0};
+        const apps=[{id:"app:one"},{id:"app:two"},{id:"app:three"},{id:"app:one"}];
+        const windows=[{id:"window:one"},{id:"window:two"}];
+        const tasks=[{identity:"fox",pid:1},{identity:"fox",pid:2},{identity:"cat",pid:3}];
+        const thermal=[{id:"thermal:one"},{id:"thermal:two",watch:true}];
+        const fan=[{id:"fan:one",watch:true}];
+        const system=[{id:"system:one",watch:true}];
+        const cached=[{id:"cached"},{id:"cached"},{id:"__proto__"},{id:"cache2"},null];
+        const membership={favoriteKeys:keys,favoriteDetailActionKeys:preferred,favoriteTaskMetricKeys:metrics};
+        const record=(key,entry,mode)=>({_favoriteKey:key,_sourceItem:entry,_sourceModeIndex:mode,name:key});
+        const owner={appsModeIndex:1,thermalModeIndex:6,systemModeIndex:8,windowsModeIndex:2,
+            appEntryKey:e=>e.id,
+            isFavoriteItem:e=>keys.includes(e.id),
+            favoriteRecordForApp:e=>record(e.id,e,1),
+            runFavoriteDataFromKey:k=>k.startsWith("run:")&&k.length>4?{commandText:k.slice(4),prefixMode:0}:null,
+            favoriteRecordForRunCommand:(c,p)=>record("run:"+c,{commandText:c,prefixMode:p},3),
+            hiddenCommandRecord:c=>({id:"hidden:"+c}),
+            monitorEntryHasBoxFavorite:e=>!!e.watch,
+            favoriteRecordForModeItem:(e,m)=>record(e.id,e,m),
+            taskIdentityFromFavoriteKey:k=>k.startsWith("task|")?k.slice(5):"",
+            taskMetricFavoriteData:k=>k.startsWith("taskmetric|")?{identity:k.split("|")[1]}:null,
+            taskIdentity:e=>e.identity,
+            favoriteRecordForTaskIdentity:(i,e)=>record("task|"+i,e,7)};
+        const read=(name,rows)=>()=>{reads[name]++;return rows;};
+        const sources={thermalRows:read("thermal",thermal),fanRows:read("fan",fan),
+            systemRows:read("system",system),cachedRows:read("cached",cached),
+            membership:read("membership",membership),apps:read("apps",apps),
+            windows:read("windows",windows),taskRows:read("tasks",tasks)};
+        const old={...owner,
+            get thermalRows(){return sources.thermalRows();},get fanRows(){return sources.fanRows();},
+            get systemRows(){return sources.systemRows();},get taskRows(){return sources.taskRows();},
+            get combiStaticCatalog(){return sources.cachedRows();},combiTaskCatalog:[],
+            firstFavoriteTaskRows:new Function("taskPersistentIdentity",body("firstFavoriteTaskRows")+"\nreturn firstFavoriteTaskRows;")(owner.taskIdentity)};
+        return {reads,owner,sources,old,membership,
+            desktop:{applications:{get values(){return sources.apps();}}},
+            windows:{get values(){return sources.windows();}}};
+    }
+    for(const [keys,preferred,metrics] of [
+        [[],[],[]],
+        [["app:one","run:ls","hidden:cat","thermal:one","window:one"],["app|app%3Atwo|launch","run|run%3Aecho|kitty","app|hidden%3Anvim|launch","app|%ZZ|launch"],[]],
+        [["task|fox","task|absent","task|fox"],[],["taskmetric|cat|cpu","taskmetric|fox|mem"]],
+        [["task|__proto__"],["unknown|x|foo","app|bad"],["malformed"]]
+    ]) for(const inCombi of [true,false]) {
+        const a=setup(keys,preferred,metrics),b=setup(keys,preferred,metrics);
+        const expected=original(inCombi,a.old,a.membership,a.desktop,a.windows);
+        const actual=policy.buildLocalCatalog(inCombi,b.sources,b.owner);
+        assert.deepEqual(plain(actual),plain(expected));
+        for(const name of ["tasks","apps","windows","thermal","fan","system","cached"])
+            assert.equal(b.reads[name],a.reads[name],name);
+        assert.equal(b.reads.membership,inCombi?0:1);
+    }
+    assert.ok(liveHost.includes("FavoriteCombi.buildLocalCatalog(inCombi,"));
+    assert.match(liveHost,/taskRows: function\(\) \{ return appControlWindow\.taskRows; \}/);
+});

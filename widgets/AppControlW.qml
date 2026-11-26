@@ -8036,24 +8036,6 @@ PanelWindow {
         }
     }
 
-    // Preserve the first live row for each watched identity. This is
-    // presentation-only: actual action targets still resolve live.
-    function firstFavoriteTaskRows(identities, rows) {
-        const first = Object.create(null);
-        const wanted = Object.create(null);
-        for (const identity of identities)
-            wanted[identity] = true;
-        let remaining = identities.length;
-        for (let i = 0; i < rows.length && remaining > 0; i++) {
-            const identity = taskPersistentIdentity(rows[i]);
-            if (wanted[identity] && first[identity] === undefined) {
-                first[identity] = rows[i];
-                remaining--;
-            }
-        }
-        return first;
-    }
-
     ScriptModel {
         id: favoriteResults
 
@@ -8061,146 +8043,41 @@ PanelWindow {
             const query = searchInput.text.trim().toLowerCase();
             const inCombi = appControlWindow.favoritesScopeMode
                             === appControlWindow.favoritesScopeCombi;
-            const thermalSnapshot = inCombi ? [] : appControlWindow.thermalRows;
-            const fanSnapshot = inCombi ? [] : appControlWindow.fanRows;
-            const systemSnapshot = inCombi ? [] : appControlWindow.systemRows;
-            const rows = [];
-            const seen = ({});
-            const preferredAppKeys = ({});
-            const preferredRunKeys = ({});
-
-            function pushUnique(record) {
-                if (!record)
-                    return;
-
-                const key = String(record._favoriteKey || record.id || record.name || "");
-                if (!key || seen[key])
-                    return;
-
-                seen[key] = true;
-                rows.push(record);
-            }
-
-            if (inCombi) {
-                const cached = appControlWindow.combiStaticCatalog.concat(
-                    appControlWindow.combiTaskCatalog
-                );
-                for (let i = 0; i < cached.length; i++)
-                    pushUnique(cached[i]);
-            } else {
-            for (let i = 0; i < favoriteStore.favoriteDetailActionKeys.length; i++) {
-                const raw = String(favoriteStore.favoriteDetailActionKeys[i] || "");
-                const first = raw.indexOf("|");
-                const second = first >= 0 ? raw.indexOf("|", first + 1) : -1;
-                if (first < 0 || second < 0)
-                    continue;
-
-                const type = raw.slice(0, first);
-                let context = "";
-                try {
-                    context = decodeURIComponent(raw.slice(first + 1, second));
-                } catch (error) {
-                    continue;
-                }
-
-                if (type === "app") preferredAppKeys[context] = true;
-                else if (type === "run") preferredRunKeys[context] = true;
-            }
-
-            const apps = [...DesktopEntries.applications.values];
-            for (let i = 0; i < apps.length; i++) {
-                const entry = apps[i];
-                const appKey = appControlWindow.appEntryKey(entry);
-                if (appControlWindow.isFavoriteItem(entry, appControlWindow.appsModeIndex)
-                        || !!preferredAppKeys[appKey]) {
-                    pushUnique(appControlWindow.favoriteRecordForApp(entry));
-                }
-            }
-
-            const runKeys = ({});
-            for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
-                const key = String(favoriteStore.favoriteKeys[i] || "");
-                if (appControlWindow.runFavoriteDataFromKey(key)) runKeys[key] = true;
-            }
-            for (const key in preferredRunKeys) runKeys[key] = true;
-            for (const key in runKeys) {
-                const data = appControlWindow.runFavoriteDataFromKey(key);
-                if (data) pushUnique(appControlWindow.favoriteRecordForRunCommand(data.commandText, data.prefixMode));
-            }
-
-            const hiddenKeys = ({});
-            for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
-                const key = String(favoriteStore.favoriteKeys[i] || "");
-                if (key.indexOf("hidden:") === 0) hiddenKeys[key] = true;
-            }
-            for (const key in preferredAppKeys) {
-                if (key.indexOf("hidden:") === 0) hiddenKeys[key] = true;
-            }
-            for (const key in hiddenKeys) {
-                const command = key.slice(7);
-                if (command) pushUnique(appControlWindow.favoriteRecordForApp(appControlWindow.hiddenCommandRecord(command)));
-            }
-
-            const thermalItems = thermalSnapshot.concat(fanSnapshot);
-            for (let i = 0; i < thermalItems.length; i++) {
-                const entry = thermalItems[i];
-                if (appControlWindow.isFavoriteItem(entry, appControlWindow.thermalModeIndex)
-                        || appControlWindow.monitorEntryHasBoxFavorite(entry, appControlWindow.thermalModeIndex)) {
-                    pushUnique(appControlWindow.favoriteRecordForModeItem(entry, appControlWindow.thermalModeIndex));
-                }
-            }
-
-            for (let i = 0; i < systemSnapshot.length; i++) {
-                const entry = systemSnapshot[i];
-                if (appControlWindow.isFavoriteItem(entry, appControlWindow.systemModeIndex)
-                        || appControlWindow.monitorEntryHasBoxFavorite(entry, appControlWindow.systemModeIndex)) {
-                    pushUnique(appControlWindow.favoriteRecordForModeItem(entry, appControlWindow.systemModeIndex));
-                }
-            }
-
-            const windows = windowResults.values;
-            for (let i = 0; i < windows.length; i++) {
-                const entry = windows[i];
-                if (appControlWindow.isFavoriteItem(entry, appControlWindow.windowsModeIndex)) {
-                    pushUnique(appControlWindow.favoriteRecordForModeItem(entry, appControlWindow.windowsModeIndex));
-                }
-            }
-
-            const taskIdentities = ({});
-
-            for (let i = 0; i < favoriteStore.favoriteKeys.length; i++) {
-                const identity = appControlWindow.taskIdentityFromFavoriteKey(
-                    favoriteStore.favoriteKeys[i]
-                );
-                if (identity)
-                    taskIdentities[identity] = true;
-            }
-
-            for (let i = 0; i < favoriteStore.favoriteTaskMetricKeys.length; i++) {
-                const data = appControlWindow.taskMetricFavoriteData(
-                    favoriteStore.favoriteTaskMetricKeys[i]
-                );
-                if (data && data.identity)
-                    taskIdentities[data.identity] = true;
-            }
-
-            const watchedIdentities = Object.keys(taskIdentities);
-            // Read taskRows only when the model actually contains task
-            // favorites; otherwise this binding need not rebuild on telemetry.
-            if (watchedIdentities.length > 0) {
-                const first = appControlWindow.firstFavoriteTaskRows(
-                    watchedIdentities, appControlWindow.taskRows);
-                for (const identity of watchedIdentities) {
-                    pushUnique(
-                        appControlWindow.favoriteRecordForTaskIdentity(
-                            identity,
-                            first[identity] || null
-                        )
-                    );
-                }
-            }
-
-            }
+            const rows = FavoriteCombi.buildLocalCatalog(inCombi, {
+                thermalRows: function() { return appControlWindow.thermalRows; },
+                fanRows: function() { return appControlWindow.fanRows; },
+                systemRows: function() { return appControlWindow.systemRows; },
+                cachedRows: function() {
+                    return appControlWindow.combiStaticCatalog.concat(appControlWindow.combiTaskCatalog);
+                },
+                membership: function() {
+                    return {
+                        favoriteDetailActionKeys: favoriteStore.favoriteDetailActionKeys,
+                        favoriteKeys: favoriteStore.favoriteKeys,
+                        favoriteTaskMetricKeys: favoriteStore.favoriteTaskMetricKeys
+                    };
+                },
+                apps: function() { return [...DesktopEntries.applications.values]; },
+                windows: function() { return windowResults.values; },
+                taskRows: function() { return appControlWindow.taskRows; }
+            }, {
+                appsModeIndex: appControlWindow.appsModeIndex,
+                thermalModeIndex: appControlWindow.thermalModeIndex,
+                systemModeIndex: appControlWindow.systemModeIndex,
+                windowsModeIndex: appControlWindow.windowsModeIndex,
+                appEntryKey: function(entry) { return appControlWindow.appEntryKey(entry); },
+                isFavoriteItem: function(entry, mode) { return appControlWindow.isFavoriteItem(entry, mode); },
+                favoriteRecordForApp: function(entry) { return appControlWindow.favoriteRecordForApp(entry); },
+                runFavoriteDataFromKey: function(key) { return appControlWindow.runFavoriteDataFromKey(key); },
+                favoriteRecordForRunCommand: function(command, prefix) { return appControlWindow.favoriteRecordForRunCommand(command, prefix); },
+                hiddenCommandRecord: function(command) { return appControlWindow.hiddenCommandRecord(command); },
+                monitorEntryHasBoxFavorite: function(entry, mode) { return appControlWindow.monitorEntryHasBoxFavorite(entry, mode); },
+                favoriteRecordForModeItem: function(entry, mode) { return appControlWindow.favoriteRecordForModeItem(entry, mode); },
+                taskIdentityFromFavoriteKey: function(key) { return appControlWindow.taskIdentityFromFavoriteKey(key); },
+                taskMetricFavoriteData: function(key) { return appControlWindow.taskMetricFavoriteData(key); },
+                taskIdentity: function(entry) { return appControlWindow.taskPersistentIdentity(entry); },
+                favoriteRecordForTaskIdentity: function(identity, entry) { return appControlWindow.favoriteRecordForTaskIdentity(identity, entry); }
+            });
 
             return FavoriteCombi.visibleRows(rows, {
                 query: query,
@@ -8900,119 +8777,24 @@ PanelWindow {
 
 
     function detailFavoriteContextKey() {
-        const entry = selectedResult();
-
-        if (!entry)
-            return "";
-
-        if (selectedResultIsApplication()) {
-            const appEntry = favoriteSourceItem(entry) || entry;
-            const appKey = appEntryKey(appEntry);
-
-            return appKey
-                   ? "app|" + encodeURIComponent(appKey)
-                   : "";
-        }
-
-        if (selectedResultIsRun()) {
-            const runEntry = favoriteSourceItem(entry) || entry;
-            const runKey = favoriteKeyFor(runEntry, runModeIndex);
-
-            return runKey
-                   ? "run|" + encodeURIComponent(runKey)
-                   : "";
-        }
-
-        return "";
+        return FavoriteIdentity.detailContextKey(selectedResult(),
+            function() { return appControlWindow.selectedResultIsApplication(); },
+            function() { return appControlWindow.selectedResultIsRun(); },
+            function(entry) { return appControlWindow.appEntryKey(entry); },
+            function(entry) { return appControlWindow.favoriteKeyFor(entry, appControlWindow.runModeIndex); });
     }
 
     function detailActionStableId(actionIndex, desktopActions) {
-        const entry = selectedResult();
-
-        if (!entry || actionIndex < 0)
-            return "";
-
-        if (selectedResultIsRun()) {
-            if (actionIndex === 0)
-                return "run";
-            if (actionIndex === 1)
-                return "kitty";
-            if (actionIndex === 2)
-                return "float";
-            if (actionIndex === 3)
-                return "fullscreen";
-            if (actionIndex === 4)
-                return "toolbox";
-            if (actionIndex === 5)
-                return "kill";
-
-            return "";
-        }
-
-        if (!selectedResultIsApplication())
-            return "";
-
-        const appEntry = favoriteSourceItem(entry) || entry;
-        const actions = desktopActions === undefined
-            ? appDesktopActions(appEntry) : desktopActions;
-        const desktopCount = actions.length;
-
-        if (actionIndex === 0)
-            return "launch";
-
-        if (appEntry._hiddenCommand) {
-            if (actionIndex === 1) return "hidden-kitty";
-            if (actionIndex === 2) return "hidden-float";
-            if (actionIndex === 3) return "hidden-fullscreen";
-            if (actionIndex === 4) return "hidden-bottles";
-            if (actionIndex === 5) return "hidden-toolbox";
-            if (actionIndex === 6) return "hidden-kill";
-            return "";
-        }
-
-        if (actionIndex === desktopCount + 1)
-            return "bottles";
-
-        if (actionIndex === desktopCount + 2)
-            return "toolbox";
-
-        if (actionIndex === desktopCount + 3)
-            return "mute-app";
-
-        if (actionIndex === desktopCount + 4)
-            return "freeze-app";
-
-        if (actionIndex === desktopCount + 5)
-            return "kill";
-
-        const desktopIndex = actionIndex - 1;
-
-        if (desktopIndex < 0 || desktopIndex >= desktopCount)
-            return "";
-
-        const action = actions[desktopIndex];
-
-        if (action && action._appControlBuiltin)
-            return "builtin|" + String(action._appControlBuiltin);
-
-        return "desktop|"
-               + encodeURIComponent(
-                     String(
-                         action && action.name
-                         ? action.name
-                         : desktopIndex
-                     )
-                 );
+        return FavoriteIdentity.detailActionId(selectedResult(), actionIndex, desktopActions,
+            function() { return appControlWindow.selectedResultIsRun(); },
+            function() { return appControlWindow.selectedResultIsApplication(); },
+            function(entry) { return appControlWindow.appDesktopActions(entry); });
     }
 
     function detailFavoriteKeyFor(actionIndex) {
         const context = detailFavoriteContextKey();
         const actionId = detailActionStableId(actionIndex);
-
-        if (!context || !actionId)
-            return "";
-
-        return context + "|" + actionId;
+        return FavoriteIdentity.detailKey(context, actionId);
     }
 
     function isDetailActionFavorite(actionIndex) {

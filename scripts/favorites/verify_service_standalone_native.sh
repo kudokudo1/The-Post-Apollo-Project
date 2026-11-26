@@ -32,15 +32,16 @@ kill -0 "$xpid" || { cat "$work/xvfb.log"; exit 1; }
 
 run_phase() {
   local phase="$1" marker="$2" log="$work/$1.log" rc
+  local shell_path="${3:-$work/config/shell.qml}" data_path="${4:-$work/data}"
   echo "FB_PHASE // $phase"
   set +e
   timeout --signal=TERM --kill-after=3s 18s \
     env -u WAYLAND_DISPLAY \
     HOME="$work/home" XDG_RUNTIME_DIR="$work/run" \
-    XDG_DATA_HOME="$work/data" XDG_CONFIG_HOME="$work/config-home" \
+    XDG_DATA_HOME="$data_path" XDG_CONFIG_HOME="$work/config-home" \
     XDG_CACHE_HOME="$work/cache" FB_PHASE="$phase" \
     quickshell --no-color --log-rules "qml.debug=true" \
-    -p "$work/config/shell.qml" >"$log" 2>&1
+    -p "$shell_path" >"$log" 2>&1
   rc="$?"
   set -e
   cat "$log"
@@ -81,3 +82,34 @@ after="$(sha256sum "$saved" | cut -d' ' -f1)"
   echo "FB_FAIL // readback changed original JSON bytes"; exit 1;
 }
 echo "FB_PASS // WIDGET_INDEPENDENT_MEMBERSHIP_LIFECYCLE"
+
+# Native QML integration of the exact current AppControl Favorites binding
+# and wrappers, against synthetic provider rows and an independent data dir.
+install -d -m 700 "$work/binding-data"
+node - "$repo/widgets/AppControlW.qml" "$repo/tests/favorites/fixtures/FavoritesAppControlBindingNative.qml" "$work/config/binding.qml" <<'NODE'
+const fs=require("node:fs");
+const [source,template,out]=process.argv.slice(2);
+const host=fs.readFileSync(source,"utf8");
+const names=["favoriteKeyFor","favoriteRecordForApp","favoriteRecordForRunCommand",
+  "favoriteRecordForModeItem","favoriteRecordForTaskIdentity","isFavoriteItem",
+  "monitorEntryHasBoxFavorite","taskPersistentIdentity","taskIdentityFromFavoriteKey",
+  "taskMetricFavoriteData","runFavoriteKey","runFavoriteDataFromKey",
+  "detailFavoriteContextKey","detailActionStableId","detailFavoriteKeyFor"];
+const wrappers=names.map(name=>{
+  const start=host.indexOf("    function "+name+"(");
+  const end=host.indexOf("\n    }",start);
+  if(start<0||end<start)throw Error("Missing wrapper "+name);
+  return host.slice(start,end+6);
+});
+const start=host.indexOf("    ScriptModel {\n        id: favoriteResults");
+const end=host.indexOf("    function resultCount()",start);
+if(start<0||end<start)throw Error("Missing Favorites ScriptModel");
+const model=host.slice(start,end).trimEnd();
+if(!model.endsWith("}")||!model.includes("FavoriteCombi.buildLocalCatalog(")
+    ||!model.includes("DesktopEntries.applications.values"))throw Error("Unexpected model shape");
+const fixture=fs.readFileSync(template,"utf8");
+if(!fixture.includes("// INSERT_APP_CONTROL_BINDING"))throw Error("Missing fixture marker");
+fs.writeFileSync(out,fixture.replace("// INSERT_APP_CONTROL_BINDING",
+  wrappers.join("\n\n")+"\n\n"+model.replace("DesktopEntries.applications.values","fixtureDesktopEntries.applications.values")));
+NODE
+run_phase binding "FB_PASS // APP_CONTROL_EXACT_BINDING_REACTIVE" "$work/config/binding.qml" "$work/binding-data"

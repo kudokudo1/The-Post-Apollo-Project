@@ -452,7 +452,7 @@ Item {
         appendCurrentHistory();
     }
     onActiveChanged: {
-        if (!active) { lockHelp.open = false; cancelOwned(); cancelBulk(); }
+        if (!active) { if (lockHelp) lockHelp.open = false; cancelOwned(); cancelBulk(); }
         else if (ready) requestRefresh();
     }
     Component.onCompleted: {
@@ -760,7 +760,10 @@ Item {
                 GohuText {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
+                    anchors.right: headerLocks.left
+                    anchors.rightMargin: 4
                     anchors.verticalCenter: parent.verticalCenter
+                    elide: Text.ElideRight
                     text: "PROCESS STATE"
                     color: Colors.red
                     font.pixelSize: 13
@@ -799,7 +802,8 @@ Item {
                         selected: lockHelp.open
                         available: !!workspace.currentTask && !workspace.locallyPending
                             && !workspace.hasBulkReview && !workspace.bulkOperation
-                            && !cpuProcessInformation.open
+                            && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
+                            && !workspace.appControlWindow.destructiveConfirmOpen && !cpuProcessInformation.open
                         acceptedButtons: Qt.LeftButton
                         Accessible.name: "Lock usage help"
                         onLeftClicked: lockHelp.open = !lockHelp.open

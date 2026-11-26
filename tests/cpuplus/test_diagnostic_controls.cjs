@@ -292,7 +292,7 @@ assert.match(ui,/normalFace: true/);
 assert.match(workshop,/text: "FIXED CADENCE"/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: compactLayout \? 120 : 160/);
+assert.match(workshop,/instrumentHeight: compactLayout \? 128 : 176/);
 assert.match(workshopSlider,/height: root.compact \? 24 : 32/);
 assert.match(workshopSlider,/width: parent.height\s+height: parent.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
@@ -330,3 +330,13 @@ assert.match(owner,/onArchiveBusyChanged: if\(setActive&&!archiveBusy\) Qt.callL
 assert.match(owner,/archiveRows.find\(x=>x.id===setCurrentId&&x.kind===setCurrentKind\)/);
 assert.match(owner,/if\(setStopRequested\)\{finishSet\("SET CANCELLED"\);return;\}/);
 console.log("DIAG D4b ordered set session contracts PASS");
+
+for(const color of ["cyan","magenta","orange"])assert.ok(workshop.includes("subjectColor: Colors."+color));
+assert.match(workshopSlider,/handleColor: root.subjectColor/);
+assert.match(workshopSlider,/font.pixelSize: 12/);
+assert.match(workshopSlider,/semanticGlowColor: root.subjectColor/);
+assert.match(workshop,/idleRingGlowStrength: 0.65/);
+assert.match(workshop,/titleColor: accentColor/);
+assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopTopThreads"')<workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"'));
+assert.ok(workshop.indexOf('objectName: "cpuplusWorkshopStorageInstrument"')<workshop.indexOf('objectName: "cpuplusWorkshopStallThreshold"'));
+assert.doesNotMatch(workshop,/selected(Foreground|Border|ContentGlow|SoftGlow)Color: accentColor/);

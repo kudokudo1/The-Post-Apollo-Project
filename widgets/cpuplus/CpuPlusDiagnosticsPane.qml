@@ -1002,8 +1002,6 @@ Column {
                     normalFace: true
                     accentColor: modelData.key==="WORK" ? Colors.cyan : Colors.magenta
                     selected: modelData.key==="PRESETS" ? root.viewMode==="PRESETS" : root.viewMode!=="PRESETS"
-                    selectedForegroundColor: accentColor
-                    selectedBorderColor: accentColor
                     acceptedButtons: Qt.LeftButton
                     keyboardActivationSignal: "leftClicked"
                     onLeftClicked: root.selectView(modelData.key)

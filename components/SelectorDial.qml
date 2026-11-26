@@ -5,6 +5,10 @@ Item {
     id: dialRoot
 
     property string labelText: "SELECT"
+    property color titleColor: Colors.magenta
+    property int titlePixelSize: 10
+    property real idleRingGlowStrength: 0.28
+    property string readoutUnit: ""
     // Shared hardware-label defaults: numeric markings must be readable even
     // on the smaller Radio navigation encoder. Other dials may override.
     property int numericLabelPixelSize: 10
@@ -72,7 +76,7 @@ Item {
     property int hoveredOptionIndex: -1
     readonly property bool rotating: dragging || motionActive
     readonly property real ringGlowStrength: !interactive ? 0.10
-        : rotating ? 0.95 : dialHovered ? 0.64 : 0.28
+        : rotating ? 0.95 : dialHovered ? Math.max(0.64,idleRingGlowStrength) : idleRingGlowStrength
 
     readonly property string selectedValue:
         options && options.length > 0 && currentIndex >= 0 && currentIndex < options.length
@@ -558,13 +562,13 @@ Item {
         }
 
         text: dialRoot.labelText
-        font.pixelSize: 10
-        color: Colors.magenta
+        font.pixelSize: dialRoot.titlePixelSize
+        color: dialRoot.titleColor
 
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: Colors.magenta
+            shadowColor: dialRoot.titleColor
             shadowOpacity: 0.42
             shadowBlur: 0.45
         }
@@ -1183,7 +1187,10 @@ Item {
         }
 
         width: parent.width - 6
-        text: dialRoot.readoutText
+        text: dialRoot.readoutUnit === "" ? dialRoot.readoutText
+            : dialRoot.readoutText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+                + ' <font color="'+Colors.white+'">'+dialRoot.readoutUnit.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</font>'
+        textFormat: dialRoot.readoutUnit === "" ? Text.AutoText : Text.RichText
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         font.pixelSize: dialRoot.readoutPixelSize

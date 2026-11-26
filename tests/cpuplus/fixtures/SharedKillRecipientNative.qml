@@ -3,6 +3,8 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import "widgets/cpuplus"
+import "services/system"
+import "services/kill" as KillBackend
 
 ShellRoot {
     id: smoke
@@ -91,6 +93,39 @@ ShellRoot {
         }
     }
 
+    ProcessPresentationState {
+        id: fakeHistory
+        taskMiniCpuHistories: ({"pid:3442":[2,5,12]})
+        taskMiniHunterMetricHistories: ({
+            "cpu:pid:3442":[2,5,12], "mem:pid:3442":[20,21,23],
+            "io:pid:3442":[0,1,2], "age:pid:3442":[0.5,0.7,0.9],
+            "combined:pid:3442":[2,6,14]})
+        taskMiniCpuIdentityHistories: ({})
+        taskMiniDisplayRevision: 1
+    }
+    HunterPresentation {
+        id: fakeHunter
+        presentationState: fakeHistory
+    }
+    QtObject {
+        id: fakeTelemetry
+        property bool detailProbeLoading: false
+        function resetDetailProbe(pid) {}
+        function refreshDetailProbe(request) {}
+    }
+    KillBackend.TaskGraphController {
+        id: fakeGraph
+        presentationState: fakeHistory
+        hunterPresentation: fakeHunter
+        telemetry: fakeTelemetry
+        taskRows: fakeOwner.taskRows
+    }
+    KillBackend.KillDetailSession {
+        id: fakeSession
+        graph: fakeGraph
+        state: fakeHistory
+        rows: fakeOwner.taskRows
+    }
     QtObject {
         id: fakeOwner
         property var hubProcessActionGate: fakeGate
@@ -101,13 +136,9 @@ ShellRoot {
             threads:3, state:"S", ppid:1, elapsed:"00:55",
             user:"ci", args:"synthetic-worker --test " + Array(150).fill("--synthetic-long-argument").join(" ")
         }]
-        property var taskMiniCpuHistories: ({"pid:3442":[2,5,12]})
-        property var taskMiniHunterMetricHistories: ({
-            "cpu:pid:3442":[2,5,12], "mem:pid:3442":[20,21,23],
-            "io:pid:3442":[0,1,2], "age:pid:3442":[0.5,0.7,0.9],
-            "combined:pid:3442":[2,6,14]})
-        property var taskMiniCpuIdentityHistories: ({})
-        property int taskMiniDisplayRevision: 1
+        property alias taskMiniCpuHistories: fakeHistory.taskMiniCpuHistories
+        property alias taskMiniHunterMetricHistories: fakeHistory.taskMiniHunterMetricHistories
+        property alias taskMiniDisplayRevision: fakeHistory.taskMiniDisplayRevision
         property var favoriteStore: QtObject { property var favoriteKeys: [] }
         property bool destructiveConfirmOpen: false
         property var cpuBulkReview: null
@@ -185,7 +216,9 @@ ShellRoot {
             active: smoke.armed
             sourceComponent: CpuPlusKillWorkspace {
                 appControlWindow: fakeOwner
-                graphSource: fakeOwner
+                graphSource: fakeHistory
+                graphController: fakeGraph
+                graphSession: fakeSession
                 active: smoke.armed
             }
         }
@@ -378,6 +411,12 @@ ShellRoot {
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];
                 fakeOwner.taskMiniCpuHistories=({"pid:3442":[5,12,37]});
                 fakeOwner.taskMiniDisplayRevision++;
+                if (!smoke.check(!fakeSession.accept({pid:3442,startTicks:967834,cpuPercent:99})
+                    && fakeHistory.taskCpuHistory[fakeHistory.taskCpuHistory.length-1]!==37,
+                    "general snapshot and wrong birth do not feed selected detail")) return;
+                if (!smoke.check(fakeSession.accept({pid:3442,startTicks:967833,
+                    cpuPercent:37,memPercent:7,rssKiB:23456,ioRateBytes:1024,ageSeconds:55}),
+                    "exact dedicated probe feeds shared history")) return;
                 smoke.previousRevision=initial;
                 smoke.phase=10;
                 return;

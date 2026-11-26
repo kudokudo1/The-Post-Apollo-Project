@@ -8,6 +8,9 @@ import "../../components"
 
     required property var host
     required property var presentationState
+    // During the transitional two-view period, never label another process's
+    // selected-detail history with this view's current identity.
+    property bool graphDataAvailable: true
     required property var processController
     required property var graphGeometry
     required property var hunterGraph
@@ -203,6 +206,7 @@ import "../../components"
                         const miniRevision = presentationState.taskMiniHistoryRevision;
                         const detailRevision =
                             presentationState.taskHunterDetailHistoryRevision;
+                        if (!taskManagerBody.graphDataAvailable) return [];
                         if (hunterMetricView)
                             return hunterGraph.detailHistory();
                         return presentationState.taskCpuHistory;
@@ -467,6 +471,7 @@ import "../../components"
                                 readonly property var metricHistory: {
                                     const revision =
                                         presentationState.taskHunterDetailHistoryRevision;
+                                    if (!taskManagerBody.graphDataAvailable) return [];
                                     const metrics = ["cpu", "mem", "io", "age"];
                                     const histories = [];
                                     let commonLength = Number.MAX_SAFE_INTEGER;
@@ -695,6 +700,7 @@ import "../../components"
                     readonly property var historyValues: {
                         const revision =
                             presentationState.taskHunterDetailHistoryRevision;
+                        if (!taskManagerBody.graphDataAvailable) return [];
                         const values =
                             presentationState.taskHunterDetailHistories.combined;
                         return Array.isArray(values) ? values : [];
@@ -1035,7 +1041,7 @@ import "../../components"
                         readonly property var graphPoints: {
                             const revision = graphRevision;
                             return graphGeometry.linePoints(
-                                presentationState.taskMemHistory,
+                                taskManagerBody.graphDataAvailable ? presentationState.taskMemHistory : [],
                                 width,
                                 height,
                                 0.35,

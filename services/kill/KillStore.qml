@@ -20,6 +20,7 @@ Scope {
     readonly property var graphState: histories
     readonly property var graphController: graph
     readonly property var hunterPresentation: hunter
+    readonly property var detailSession: selectedDetail
 
     ProcessPresentationState {
         id: histories
@@ -40,11 +41,19 @@ Scope {
         taskRows: root.rows
     }
 
+    KillDetailSession {
+        id: selectedDetail
+        graph: graph
+        state: histories
+        rows: root.rows
+    }
+
     function publishSnapshot(rows) {
         sampler.rows = Array.isArray(rows) ? rows : [];
     }
 
     ProcessTelemetry {
         id: sampler
+        onDetailProbeReady: function(sample) { selectedDetail.accept(sample); }
     }
 }

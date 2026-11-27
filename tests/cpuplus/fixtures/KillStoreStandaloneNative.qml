@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "services/kill" as KillBackend
+import qs.services.favorites
 
 // No widget, real process probe or process mutation. Fixture timer only.
 ShellRoot {
@@ -97,7 +98,8 @@ ShellRoot {
                 || first.store.hunterOperation !== second.store.hunterOperation
                 || first.store.hunterOperation.phase !== "idle"
                 || first.store.hunterOperation.host !== null
-                || first.store.hunterOperation.favoriteStoreObject !== null
+                || first.store.hunterOperation.favoriteStoreObject !== FavoritesStore
+                || first.store.favoriteStore !== second.store.favoriteStore
                 || !safety.requiresDangerUnlock(old)
                 || first.store.limits.applyLoading
                 || first.store.limits.activeRequest !== null

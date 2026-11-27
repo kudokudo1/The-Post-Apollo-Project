@@ -374,15 +374,17 @@ Item {
                     }
                     const heat=root.fireMode==="burn-away"?1:root.fireMode==="ash-trail"?.83:.90;
                     const u=pixel.unit;
-                    // Hot forward emitter; the body remains a tapered
-                    // luminous trail rather than a second central sphere.
-                    orb(h*1.18,h*1.10,[[0,tint(Colors.yellow,.57*heat)],
-                        [.25,tint(Colors.orange,.46*heat)],
-                        [.58,tint(Colors.orange,.19*heat)],
-                        [1,tint(Colors.red,0)]],tip);
+                    // The flame itself emits light. The hot leading cap
+                    // grades into orange along its actual pixel silhouette.
+                    const fireOrange=[Qt.rgba(.79,.19,.04,1),Qt.rgba(.96,.35,.05,1),
+                        Qt.rgba(1,.57,.10,1),Qt.rgba(1,.72,.24,1)];
+                    const fireTip=[Qt.rgba(.95,.36,.06,1),Qt.rgba(1,.65,.16,1),
+                        Qt.rgba(1,.87,.39,1),Qt.rgba(1,.97,.72,1)];
+                    const front=root.flameTipOffset/u;
                     const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
                     for(const cell of pixel.cells) {
-                        c.fillStyle=palette[cell.heat];
+                        const k=Math.max(0,Math.min(1,1-(front-cell.x)/8));
+                        c.fillStyle=mix(fireOrange[cell.heat],fireTip[cell.heat],k*heat);
                         c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,u,u);
                     }
                     for(const ember of pixel.embers) {
@@ -470,12 +472,27 @@ Item {
                         compressed(1,enemyInk,enemyCore,enemyAlpha);
                     }
                     if(touching) {
-                        // A soft, overlapping hot bridge rather than a line.
                         const tall=contact.chord;
                         const winner=playerWins?ink:enemyInk;
+                        const dominance=Math.min(1,Math.abs(p-.5)*2);
+                        const penetration=Math.min(playerWins?inner*f.enemyFraction:inner*p,
+                            h*(.65+dominance*2.3));
+                        // The winner penetrates the losing beam, fading back
+                        // into its original color rather than recoloring it.
+                        if(penetration>0) {
+                            const end=edge+(playerWins?1:-1)*penetration;
+                            const g=c.createLinearGradient(edge,mid,end,mid);
+                            g.addColorStop(0,tint(winner,.60*dominance));
+                            g.addColorStop(.4,tint(winner,.30*dominance));
+                            g.addColorStop(1,tint(winner,0));
+                            c.fillStyle=g;
+                            c.fillRect(Math.min(edge,end),y+1,penetration,h-2);
+                        }
+                        orb(h*1.75,h*1.7,[[0,tint(winner,.57)],
+                            [.34,tint(winner,.32)],[1,tint(winner,0)]]);
                         orb(Math.max(h*.14,tall*.55),tall*1.1,[
-                            [0,tint(Colors.white,.72)],[.35,tint(winner,.56)],
-                            [.72,tint(winner,.19)],[1,tint(winner,0)]]);
+                            [0,tint(Colors.white,.92)],[.35,tint(winner,.66)],
+                            [.72,tint(winner,.22)],[1,tint(winner,0)]]);
                     }
                     return;
                 }
@@ -501,13 +518,8 @@ Item {
                         [enlarged.solid,mix(ink,Colors.white,.32)],
                         [.68,tint(ink,.58)],[1,tint(ink,0)]]);
                 } else if(hot) {
-                    // Preserve the pixel silhouette. The existing plasma is
-                    // now a soft, low-opacity light layer, not a solid ball.
-                    // Preserve hot pixels rather than painting a second
-                    // solid orb over the flame. The broader light is below it.
-                    orb(h*.65,h*.62,[[0,tint(Colors.white,.30)],
-                        [.30,tint(Colors.yellow,.21)],[.61,tint(Colors.orange,.10)],
-                        [1,tint(ink,0)]],edge+root.flameTipOffset);
+                    // No foreground sphere: the brightest pixels are the
+                    // leading cap itself. Surrounding heat is drawn below it.
                 } else {
                     orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
                         [0,tint(ink,Math.min(.98,.35*bright))],

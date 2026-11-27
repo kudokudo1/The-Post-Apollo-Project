@@ -10,6 +10,11 @@ ShellRoot {
     property string lastText: ""
     property bool failed: false
     property int phase: 0
+    property real initialTailHeight: 0
+    property real earlierY: 0
+    property var originalTail: null
+    readonly property string firstBody: "Public response growing in the same row. ".repeat(45)
+    readonly property string secondBody: firstBody + "Additional public response. ".repeat(45)
     Component.onCompleted: console.info("FEED_TRANSCRIPT_FIXTURE_STARTED")
     function check(ok, why) {
         if (!ok) {
@@ -133,6 +138,70 @@ ShellRoot {
                 break;
             case 7:
                 geometry(true, true, 60, 110);
+                check(!feed.streamingTailEnabled
+                    && !feed.updateStreamingTail(feed.effectiveScope, "not opted in"),
+                    "default feed behavior changed");
+                break;
+            case 8:
+                feed.showHeader = false;
+                feed.showComposer = false;
+                feed.sendEnabled = false;
+                feed.streamingTailEnabled = true;
+                scene.width = 300;
+                scene.height = 160;
+                feed.messages = [
+                    {direction: "outgoing", body: "Earlier public text. ".repeat(65)},
+                    {direction: "incoming", body: "Public response"}
+                ];
+                list.forceLayout();
+                list.positionViewAtEnd();
+                break;
+            case 9:
+                check(feed.streamingTailEligible && list.count === 2 && list.atYEnd,
+                    "streaming baseline not at end");
+                originalTail = list.itemAtIndex(1);
+                if (!originalTail) { check(false, "missing tail delegate"); break; }
+                initialTailHeight = originalTail.height;
+                check(feed.updateStreamingTail(feed.effectiveScope, firstBody),
+                    "valid tail update refused");
+                check(list.count === 2 && feed.messages[1].body === "Public response",
+                    "stable message model changed");
+                break;
+            case 10:
+                check(list.count === 2 && list.itemAtIndex(1) === originalTail,
+                    "tail row recreated");
+                check(originalTail && originalTail.renderedBody === firstBody
+                    && originalTail.height > initialTailHeight && list.atYEnd,
+                    "tail did not grow and follow bottom");
+                list.positionViewAtBeginning();
+                break;
+            case 11:
+                check(!list.atYEnd, "earlier reading position missing");
+                earlierY = list.contentY;
+                check(feed.updateStreamingTail(feed.effectiveScope, secondBody),
+                    "second tail update refused");
+                break;
+            case 12:
+                check(!list.atYEnd && Math.abs(list.contentY - earlierY) <= 2
+                    && list.count === 2, "reader pulled away from earlier text");
+                check(!feed.updateStreamingTail("wrong-scope", "stale")
+                    && !feed.updateStreamingTail(feed.effectiveScope, "é".repeat(8001)),
+                    "invalid scope or oversized UTF8 accepted");
+                list.positionViewAtEnd();
+                break;
+            case 13:
+                check(list.itemAtIndex(1) && list.itemAtIndex(1).renderedBody === secondBody,
+                    "newest snapshot missing on return");
+                feed.scopeId = "new-public-scope";
+                check(!feed.updateStreamingTail("default:public-a", "late"),
+                    "old scope accepted");
+                check(!feed._streamingTailActive, "scope change retained live body");
+                check(feed.updateStreamingTail(feed.effectiveScope, "new public text"),
+                    "new scope update refused");
+                feed.streamingTailEnabled = false;
+                check(!feed._streamingTailActive && feed._streamingTailBody === "",
+                    "disable retained live body");
+                check(sent === 2, "streaming dispatched a message");
                 break;
             default:
                 check(false, "unexpected test phase " + currentPhase);
@@ -145,7 +214,7 @@ ShellRoot {
                 return;
             }
             console.info("FEED_TRANSCRIPT_PHASE_PASS " + currentPhase);
-            if (currentPhase === 7) {
+            if (currentPhase === 13) {
                 console.info("FEED_TRANSCRIPT_NATIVE_PASS");
                 stop();
                 Qt.quit();

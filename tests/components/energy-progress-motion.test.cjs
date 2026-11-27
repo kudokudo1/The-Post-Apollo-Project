@@ -50,7 +50,7 @@ test("native renderer owns no operation or input; gallery has all four variants"
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
     const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
     assert.match(source,/const f=root.visualFrame, p=root.displayedFraction, mid=y\+h\/2/);
-    assert.match(source,/c.translate\(edge,mid\)/);
+    assert.match(source,/c.translate\(centerX===undefined\?edge:centerX,mid\)/);
     assert.doesNotMatch(source,/\b(?:MouseArea|TapHandler|Process|XMLHttpRequest|onLeftClicked)\b/);
     for(const key of ["omnitrix","tron","ki-blast","flamethrower"]) assert.ok(preview.includes('"'+key+'"'));
     assert.doesNotMatch(preview,/\b(?:Process|XMLHttpRequest)\b|import qs\.services/);
@@ -195,4 +195,57 @@ test("Ki Blast enemy heat grows through defeat and extinguishes after impact", (
     assert.equal(reduced.enemyOpacity,0);
     for(const name of ["tron","omnitrix","flamethrower"])
         assert.equal(frame("failure","measured",0,.5,.68,false,name).enemyHeat,0);
+});
+
+const currents=vm.runInNewContext(fs.readFileSync(path.join(root,
+    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head});");
+test("full-lane currents advance in opposite directions, with faster TRON", () => {
+    const w=900,h=40;
+    const left=currents.flow("ki-blast","standard","player",w,h,0,false);
+    const right=currents.flow("ki-blast","standard","enemy",w,h,0,false);
+    const next=currents.flow("ki-blast","standard","player",w,h,.01,false);
+    const nextRight=currents.flow("ki-blast","standard","enemy",w,h,.01,false);
+    assert.ok(left.length>=20 && left.length<=32);
+    assert.ok(next[0].x>left[0].x && nextRight[0].x<right[0].x);
+    const tron=currents.flow("tron","standard","player",w,h,0,false);
+    const tronNext=currents.flow("tron","standard","player",w,h,.01,false);
+    assert.ok(tron.length>left.length && tron.length<=53);
+    assert.ok(tronNext[0].x-tron[0].x>2*(next[0].x-left[0].x));
+    assert.ok(tron.filter(r=>!r.wake).some(r=>r.x<w*.15));
+    assert.ok(tron.filter(r=>!r.wake).some(r=>r.x>w*.8));
+    assert.ok(tron.some(r=>r.wake && r.length>h*2));
+    assert.equal(JSON.stringify(currents.flow("tron","standard","player",w,h,0,true)),
+        JSON.stringify(currents.flow("tron","standard","player",w,h,900,true)));
+});
+test("fire wake distribution distinguishes live fire from cooled material", () => {
+    const w=800,h=40;
+    const a=currents.flow("flamethrower","ash-trail","player",w,h,2,false);
+    const b=currents.flow("flamethrower","burn-away","player",w,h,2,false);
+    const standard=currents.flow("flamethrower","standard","player",w,h,2,false);
+    assert.equal(JSON.stringify(a),JSON.stringify(b));
+    assert.ok(a.length>0 && a.every(r=>r.wake && r.x>=w-h*2.8-1e-9));
+    assert.ok(standard.filter(r=>r.wake).length>standard.filter(r=>!r.wake).length);
+    assert.ok(standard.some(r=>!r.wake && r.x<w-h*2.8));
+    for(const variant of ["tron","ki-blast","flamethrower"]){
+        assert.equal(currents.flow(variant,"standard","player",0,h,2,false).length,0);
+        for(const r of currents.flow(variant,"standard","player",w,h,2,false)){
+            assert.ok(Number.isFinite(r.x) && r.length>0 && r.y>=0 && r.y<=h);
+        }
+    }
+});
+test("TRON and Omnitrix core covers chamber height; clash lobes have separate contact planes",()=>{
+    for(const variant of ["tron","omnitrix"]){
+        for(const h of [12,24,42,80]){
+            const g=currents.head(variant,h,1,800);
+            assert.ok(g.ry*g.solid>=h/2);
+            assert.ok(g.rx>=h);
+        }
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/compressed\(-1,ink/);
+    assert.match(source,/compressed\(1,enemyInk/);
+    assert.match(source,/c.rect\(0,0,edge,height\)/);
+    assert.match(source,/c.rect\(edge,0,width-edge,height\)/);
+    assert.match(source,/f.enemyHeat/);
+    assert.match(source,/Flow.flow/);
 });

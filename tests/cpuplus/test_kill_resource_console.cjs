@@ -104,6 +104,10 @@ test("K8d3 places modes beside the primary instrument and actions above divider"
     assert.match(ui.slice(apply),/accentColor: Colors.green/);
     assert.match(ui.slice(apply),/available: false/);
     assert.match(ui,/objectName: "cpuPlusResourceFooterDivider"[\s\S]*?color: Colors.red/);
+    assert.ok(ui.includes('objectName: "cpuPlusResourceDraftActionsStrip"'));
+    assert.ok(ui.includes('anchors.bottom: draftActionsStrip.top'));
+    assert.match(ui,/id: draftActionsStrip[\s\S]*?anchors.bottom: footer.top/);
+    assert.match(ui,/objectName: "cpuPlusResourceWorkspaceActions"/);
     assert.match(ui,/text: "RESOURCE CONTROL \/\/ DRAFT"[\s\S]*?color: Colors.orange[\s\S]*?color: Colors.red/);
 });
 

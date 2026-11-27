@@ -22,7 +22,102 @@ Item {
     property bool _rootCompleted: false
     property bool _populated: false
     readonly property bool canPopulate: _rootCompleted && history.initialized
-    readonly property bool transcriptReady: !connectedHistoryMode && fixtureReady && history.complete
+    readonly property bool transcriptReady: !_demoSelected && !connectedHistoryMode && fixtureReady && history.complete
+
+    // Explicit development-only, process-free presentation. The host opts in
+    // on this Loader, not by setting chatHostTrusted or forwarding the draft.
+    // One fixed operation per view; no model, I/O, history or automatic retry.
+    property bool developmentDemoMode: false
+    property bool _demoSelected: false
+    property bool _demoSeenVisible: false
+    property string _demoState: "READY"
+    property int _demoStep: 0
+    property var _demoRows: []
+    readonly property string demoState: _demoSelected ? _demoState : "OFF"
+    readonly property bool demoAvailable: _demoSelected && developmentDemoMode
+        && visible && _rootCompleted && !connectedHistoryMode && !runtimeViewOpen
+        && _demoState === "READY"
+    readonly property string demoPrompt: "Reply with READY."
+    readonly property var demoConversation: ({id:"public-dev-demo", displayNameInProfile:"Fixed development mock"})
+    readonly property string demoStatusText: {
+        switch (demoState) {
+        case "READY": return "DEV MOCK // FIXED TEST READY";
+        case "STREAMING": return "DEV MOCK // SIMULATED RESPONSE";
+        case "COMPLETE": return "DEV MOCK // COMPLETE (NOT SAVED)";
+        case "STOPPED": return "DEV MOCK // STOPPED (NOT SAVED)";
+        default: return "DEV MOCK // CLOSED";
+        }
+    }
+    function selectDemoMode() {
+        if (_demoSelected) return;
+        _demoSelected = true;
+        _demoSeenVisible = visible;
+        if (connectedHistoryMode || runtimeViewOpen) {
+            withdrawDemo();
+            clearConnectedHistory();
+            return;
+        }
+        clearConnectedHistory();
+    }
+    onDevelopmentDemoModeChanged: {
+        if (developmentDemoMode && _rootCompleted)
+            selectDemoMode();
+        else if (!developmentDemoMode && _demoSelected)
+            withdrawDemo();
+    }
+    onRuntimeViewOpenChanged: if (_demoSelected && runtimeViewOpen) withdrawDemo()
+    function beginDemo() {
+        if (!demoAvailable || arguments.length !== 0)
+            return false;
+        _demoRows = [
+            {turnId:"demo-user", ordinal:1, direction:"outgoing", body:demoPrompt},
+            {turnId:"demo-assistant", ordinal:2, direction:"incoming", body:"Simulated reply:"}
+        ];
+        _demoStep = 0;
+        _demoState = "STREAMING";
+        demoTimer.start();
+        return true;
+    }
+    function stopDemo() {
+        if (!_demoSelected || _demoState !== "STREAMING")
+            return false;
+        demoTimer.stop();
+        _demoState = "STOPPED";
+        _demoRows = [{turnId:"demo-user", ordinal:1, direction:"outgoing", body:demoPrompt}];
+        feed.clearStreamingTail();
+        return true;
+    }
+    function withdrawDemo() {
+        if (!_demoSelected) return;
+        demoTimer.stop();
+        _demoState = "WITHDRAWN";
+        _demoRows = [];
+        feed.clearStreamingTail();
+    }
+    Timer {
+        id: demoTimer
+        interval: 650
+        repeat: false
+        onTriggered: {
+            if (!root.developmentDemoMode || !root.visible
+                    || root._demoState !== "STREAMING" || root.runtimeViewOpen) {
+                root.withdrawDemo();
+                return;
+            }
+            const finalStep = root._demoStep === 1;
+            if (!feed.updateStreamingTail(feed.effectiveScope,
+                    finalStep ? "Simulated reply: READY." : "Simulated reply: RE")) {
+                root.withdrawDemo();
+                return;
+            }
+            if (finalStep)
+                root._demoState = "COMPLETE";
+            else {
+                root._demoStep = 1;
+                restart();
+            }
+        }
+    }
 
     // Independently observed owner scope, never derived from a PAGE response.
     // The owner must replace the whole object and fence its Process/Loader.
@@ -33,7 +128,7 @@ Item {
     property var _usedHistoryViews: ({})
     property int _historyViewCount: 0
     readonly property bool historyInitialized: history.initialized
-    readonly property bool historyScopeActive: connectedHistoryMode && visible
+    readonly property bool historyScopeActive: !_demoSelected && connectedHistoryMode && visible
         && history.attached && sameHistoryScope(_acceptedHistoryScope, historyCurrentScope)
     readonly property var historyPendingRequest: historyScopeActive ? history.pendingRequest : null
     readonly property var historyNextAfter: historyScopeActive ? history.nextAfter : null
@@ -60,7 +155,7 @@ Item {
     // Only an explicit owner action may leave the literal preview. No fallback
     // on refusal, detach, or missing history. Recreate Loader for a new sample.
     function beginConnectedHistory() {
-        if (!_rootCompleted || !history.initialized || !visible || connectedHistoryMode)
+        if (_demoSelected || developmentDemoMode || !_rootCompleted || !history.initialized || !visible || connectedHistoryMode)
             return false;
         clearConnectedHistory();
         _connectedHistoryMode = true;
@@ -72,7 +167,13 @@ Item {
             clearConnectedHistory();
     }
     onHistoryCurrentScopeChanged: observeHistoryScope()
-    onVisibleChanged: observeHistoryScope()
+    onVisibleChanged: {
+        observeHistoryScope();
+        if (_demoSelected) {
+            if (visible) _demoSeenVisible = true;
+            else if (_demoSeenVisible) withdrawDemo();
+        }
+    }
 
     function attachHistoryScope(ref) {
         if (!connectedHistoryMode || !visible || !history.initialized
@@ -167,13 +268,16 @@ Item {
     // Instantiation is the opt-in fixture action. This local literal page
     // is not an M4 database read or model execution. Child and parent
     // completion order is unspecified; wait for both, with no queued work.
-    Component.onCompleted: _rootCompleted = true
+    Component.onCompleted: {
+        _rootCompleted = true;
+        if (developmentDemoMode) selectDemoMode();
+    }
     onCanPopulateChanged: {
         if (canPopulate)
             populateFixture();
     }
     function populateFixture() {
-        if (!canPopulate || _populated || connectedHistoryMode)
+        if (!canPopulate || _populated || connectedHistoryMode || developmentDemoMode || _demoSelected)
             return;
         _populated = true;
         if (!fixtureReady)
@@ -201,11 +305,26 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: implicitHeight
-        fixtureVisible: true
+        height: root._demoSelected ? 0 : implicitHeight
+        fixtureVisible: !root._demoSelected
         historyState: root.connectedHistoryMode ? (root.historyScopeActive ? history.state : "CLOSED")
             : (root.fixtureReady ? history.state : "UNAVAILABLE")
         historyReason: history.reason
+    }
+
+    Text {
+        id: demoStatus
+        objectName: "publicDemoStatus"
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: root._demoSelected
+        height: visible ? implicitHeight : 0
+        text: root.demoStatusText + " // NO MODEL"
+        textFormat: Text.PlainText
+        color: "#ED981A"
+        font.pixelSize: 12
+        elide: Text.ElideRight
     }
 
     // One operation label below the independent history snapshot label.
@@ -213,10 +332,10 @@ Item {
     PublicRuntimeStatusView {
         id: operationStatus
         objectName: "publicFixtureRuntimeStatus"
-        anchors.top: status.bottom
+        anchors.top: root._demoSelected ? demoStatus.bottom : status.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        viewOpen: root.runtimeViewOpen && root.visible && (root.connectedHistoryMode || root.transcriptReady)
+        viewOpen: !root._demoSelected && root.runtimeViewOpen && root.visible && (root.connectedHistoryMode || root.transcriptReady)
         treeKey: root.runtimeTreeKey
         currentCorrelation: root.runtimeCurrentCorrelation
     }
@@ -228,21 +347,24 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        conversation: root.connectedHistoryMode
+        conversation: root._demoSelected ? (root.demoState === "WITHDRAWN" ? null : root.demoConversation) : root.connectedHistoryMode
             ? (root.historyScopeActive ? ({id: root._acceptedHistoryScope.sessionId,
                 displayNameInProfile: "Public conversation"}) : null)
             : (root.transcriptReady ? ({id: root.sample.sessions[0].session_id,
                 displayNameInProfile: root.sample.sessions[0].title}) : null)
-        scopeId: "forest-ui2-public-fixture"
-        messages: (root.connectedHistoryMode ? root.historyScopeActive : root.transcriptReady)
+        scopeId: root._demoSelected ? "forest-ui2-dev-demo" : "forest-ui2-public-fixture"
+        messages: root._demoSelected ? root._demoRows : (root.connectedHistoryMode ? root.historyScopeActive : root.transcriptReady)
             ? history.messages : []
+        streamingTailEnabled: root._demoSelected && root.demoState !== "WITHDRAWN"
         showHeader: false
         showComposer: false
         messageTextFormat: Text.PlainText
         richMessageActions: false
         sendEnabled: false
         sending: false
-        emptyConversationLabel: root.connectedHistoryMode ? "PUBLIC HISTORY NOT AVAILABLE" : "FIXTURE UNAVAILABLE"
+        emptyConversationLabel: root._demoSelected
+            ? (root.demoState === "READY" ? "FIXED PUBLIC TEST // NO MODEL" : "DEVELOPMENT VIEW CLOSED")
+            : root.connectedHistoryMode ? "PUBLIC HISTORY NOT AVAILABLE" : "FIXTURE UNAVAILABLE"
         // No sendRequested handler, no transport, no STOP or authority claims.
     }
 }

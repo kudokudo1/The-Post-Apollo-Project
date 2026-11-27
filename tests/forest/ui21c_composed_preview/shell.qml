@@ -1361,6 +1361,86 @@ ShellRoot {
                 check(seasonRows.item===null && selector.item===null && review.item===null
                     && preview.item===null,"season fixture unloaded");
                 break;
+            case 72:
+                preview.active=true;
+                break;
+            case 73: {
+                const item=preview.item, feed=actualFeed();
+                check(item.demoState==="OFF" && !item.beginDemo(),"default mock off");
+                item.developmentDemoMode=true;
+                check(item.demoAvailable && feed.messages.length===0
+                    && !item.beginConnectedHistory(),"explicit empty mock view");
+                check(!item.beginDemo("arbitrary draft"),"mock accepts no caller text");
+                check(item.beginDemo() && !item.beginDemo(),"single original mock");
+                check(item.demoState==="STREAMING" && feed.messages.length===2
+                    && feed.messages[0].body==="Reply with READY."
+                    && feed.messages[1].body==="Simulated reply:"
+                    && !feed.sendEnabled && !feed.showComposer,"mock baseline");
+                break;
+            }
+            case 74: case 75: case 76: case 77: case 78: case 79:
+            case 80: case 81: case 82: case 83: case 84: case 85:
+            case 86: case 87: case 88: case 89:
+                break; // let the actual finite timer deliver both snapshots
+            case 90: {
+                const item=preview.item, feed=actualFeed();
+                check(item.demoState==="COMPLETE" && feed.messages.length===2
+                    && feed.messages[1].turnId==="demo-assistant"
+                    && feed.messages[1].body==="Simulated reply:"
+                    && feed._streamingTailActive
+                    && feed._streamingTailBody==="Simulated reply: READY."
+                    && !item.stopDemo() && !item.beginDemo(),"same row mock completion");
+                check(item.demoStatusText.indexOf("NOT SAVED")>=0,"no save claim");
+                preview.active=false;
+                break;
+            }
+            case 91:
+                preview.active=true;
+                break;
+            case 92: {
+                const item=preview.item;
+                item.developmentDemoMode=true;
+                check(item.beginDemo() && item.stopDemo() && !item.stopDemo()
+                    && !item.beginDemo(),"mock stop once");
+                check(item.demoState==="STOPPED" && actualFeed().messages.length===1,
+                    "provisional answer removed");
+                break;
+            }
+            case 93: case 94: case 95: case 96: case 97: case 98:
+            case 99: case 100: case 101: case 102: case 103: case 104:
+            case 105: case 106: case 107: case 108:
+                break;
+            case 109:
+                check(preview.item.demoState==="STOPPED" && actualFeed().messages.length===1
+                    && !actualFeed()._streamingTailActive,"stopped timer cannot append");
+                preview.active=false;
+                break;
+            case 110:
+                preview.active=true;
+                break;
+            case 111: {
+                const item=preview.item;
+                item.developmentDemoMode=true;
+                check(item.beginDemo(),"withdrawal setup");
+                item.visible=false;
+                item.visible=true;
+                check(item.demoState==="WITHDRAWN" && actualFeed().messages.length===0
+                    && !item.beginDemo(),"visibility ABA retires mock");
+                item.developmentDemoMode=false;
+                item.developmentDemoMode=true;
+                check(item.demoState==="WITHDRAWN" && !item.beginDemo()
+                    && actualFeed().messages.length===0,"no mode fallback or restart");
+                break;
+            }
+            case 112:
+                check(preview.item.demoState==="WITHDRAWN" && !actualFeed()._streamingTailActive,
+                    "withdrawn response remains absent");
+                preview.active=false;
+                break;
+            case 113:
+                check(preview.item===null,"mock fixture unloaded");
+                console.info("UI2_DEV_MOCK_PASS");
+                break;
             default:
                 check(false, "unexpected phase");
             }
@@ -1368,7 +1448,7 @@ ShellRoot {
                 stop(); Qt.quit(); return;
             }
             console.info("UI2_PREVIEW_PHASE_PASS " + p);
-            if (p === 71) {
+            if (p === 113) {
                 console.info("UI2_PREVIEW_NATIVE_PASS");
                 stop(); Qt.quit();
             }

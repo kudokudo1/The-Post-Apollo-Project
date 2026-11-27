@@ -10,7 +10,7 @@ const root = path.resolve(__dirname,"../..");
 const liveHost = fs.readFileSync(path.join(root,"widgets/AppControlW.qml"),"utf8");
 const host = fs.readFileSync(path.join(root,"tests/favorites/fixtures/AppControlFavoritesDonorBeforeC4.js.txt"),"utf8");
 const hunter = fs.readFileSync(path.join(root,
-    "widgets/appcontrol/HunterOperationController.qml"),"utf8");
+    "services/kill/HunterOperationController.qml"),"utf8");
 const source = fs.readFileSync(path.join(root,
     "services/favorites/FavoritesAppControlIdentityPolicy.js"),"utf8");
 const adapter = {};

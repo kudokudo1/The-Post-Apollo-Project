@@ -141,3 +141,153 @@ release credit or model admission. DOC3F: confirm refined ordering
 and authority isolation; UI1/UI2 retain UNKNOWN without a real producer.
 Nurse2F: review exact design and later separately authorize fixed-public
 witness implementation, not production. No live seasonal claim.
+
+
+## M7j-a // Durable Leaf refinement and preservation (design only)
+
+Operator development autonomy #2161 7204485179 / Nurse reconciliation
+7204663398. Recovered Mind checkpoint #7202379265; M7i-a #2952 and
+M7i-b #2974 establish reference selection, not learning mutation. Align
+with integrated Spirit S4 #2969 (existing RFC blob 00857fb5).
+This is an owned recovery proposal, not a choice of custodian, writer,
+schema, policy defaults, or executable permissions.
+
+### Historical source and limits
+
+Frozen original Forest tree 28895aafdddb07cf402f1e75574eea1ee79a516d,
+learning/foundation.py fb79b392 under the existing import path:
+ForestLearningRecord stores immutable revision, semantic type, scope,
+strength, confidence, status, source_refs, tags, recorded-by identities
+and independent user/operational generations. revise() returns an
+uncommitted next revision, preserves record ID/type, and resets commit
+generations. ForestLearningStore.append() checks the next revision under
+an exclusive local lock, assigns the appropriate domain generation,
+appends JSONL and fsyncs. Historical generation lookup includes committed
+older revisions. This is evidence for revision lineage and conflict
+detection, not current custody. The old store reads all records under its
+local lock, does not enforce modern field/recipient authorization, treats
+protection as metadata, and has no independently qualified original-effect
+receipt or complete dependency/replica destruction mechanism. Do not
+port that writer, file layout or whole-domain enumeration into Post-Apollo.
+
+### Distinct knowledge and context objects
+
+| Concept | Preservation and revision rule |
+| --- | --- |
+| Original conversation | Runtime's exact committed B1 turn/revision and authorship; never rewritten by Mind. |
+| Approved Leaf version | Meaningful knowledge with exact semantic identity, immutable revision, source provenance and eligible scope; not a token or a chat row. |
+| Derived refinement / Syrup | A separately identified proposal or versioned derivative of exact eligible sources; lossy, not verbatim history. |
+| Task working set | Hot/Warm selections and bounded M7 cache entries; disposable and independently authorized; never a durable write receipt. |
+| Actual model context | Serialized provider payload and native context, independently qualified by M7e/Heart/Runtime; no implied retention or promotion. |
+
+A refinement of the same semantic record may propose a next revision
+with the same identity. A combination, split, or synthesis whose meaning
+changes requires separately resolved identity and exact input lineage;
+do not silently replace an unrelated record or create a duplicate
+durable identity from text similarity. Identity allocation and domain
+ownership remain undecided. Corrections and contradictions must be
+represented as such, not flattened into an apparently certain summary.
+Keep permitted decision outcome, rationale, rejected alternatives,
+uncertainty, scope, authorship and version/source references. Distinguish
+a direct source assertion from a derived interpretation and from an
+operator-approved correction. Do not infer permission or accuracy from
+confidence, tags, repetition, a model verdict or common Tree ownership.
+
+Retention priority (Loose/normal/Sturdy), current use/location and
+protection remain independent per Spirit S4. A Sturdy original is not
+silently demoted or overwritten by derivation. Honor explicit Loose
+limits, Never Reabsorb and qualified recovery policy. Do not choose
+grace duration, automation defaults, automatic promotion or destruction.
+A superseded revision may remain preserved only within authorized
+retention and recovery scope. Retirement is not proof of erasure.
+
+### Candidate refinement lifecycle and owner seams
+
+1. Resolve exact original Task, input, source identity/version, eligible
+   purpose and destination, policy/currentness and recipient before
+   metadata enumeration, body access or derivation. Bound the source
+   set, provenance expansion and work using approved limits; existing
+   M7 retrieval/assembly bounds remain independent, not mutation quotas.
+   Unknown relevant coverage, mandatory applicability or dependency
+   eligibility holds the affected operation without hidden enumeration.
+2. Produce a bounded, separately identified proposal only from currently
+   eligible inputs. Keep the original version reference, intended
+   destination, expected base revision, semantic domain and permitted
+   dependency lineage. Preserve minimum necessary data; no hidden full
+   copies or unrestricted source links. A model-assisted proposal would
+   need its own actual model/recipient and Heart resource qualification.
+   Proposal, inspection, active use or preview creates no approved Leaf.
+3. Resolve independent authorization for the intended preservation,
+   revision or absorption mutation. Existing standing policy may cover
+   bounded reversible work, but only the qualified current policy can
+   establish that scope. Distinguish permission to derive from permission
+   to retain, promote, recover, transmit or destroy. No new grant here.
+4. The future actual authorized writer must compare exact expected
+   version/domain and original operation identity at its real mutation
+   boundary, with current policy and recipient. Concurrent edits cannot
+   silently overwrite the base or rewrite prior authorship. A stale
+   proposal refuses; reconsideration needs a new independently eligible
+   proposal, not a hidden rebase or retry of an uncertain original effect.
+   Durable success needs an attributable original outcome. Lost or
+   unknown outcome retains original custody; reconcile that identity
+   before further conflicting mutation. Do not select a transaction
+   topology or receipt mechanism in this proposal.
+5. Only a qualified committed revision may update the authoritative
+   domain generation and dependency observations. User-context and
+   operational-learning clocks stay independent; retirement and
+   eligibility changes must not permit stale reuse. No clock increment
+   from preview, failed proposal, ordinary cache shed or unknown outcome.
+   M7a/d/f/g/h/i exact selection, scope and currentness remain separate;
+   a changed source version invalidates affected derived eligibility, not
+   every unrelated Leaf or task. A future producer must establish the
+   actual atomic snapshot and revocation/effect fence, not rely on a
+   self-asserted generation or local equality.
+6. Publish only independently permitted current outcome/provenance to
+   the intended view; distinguish proposed, pending, committed, refused
+   and unknown without leaking hidden IDs, counts or reasons. Runtime
+   owns original chat/effect ordering, Spirit owns mutation/retention/
+   disclosure authority, Connections actual custody, Heart resource
+   qualification, UI owners presentation. Mind owns semantic revision
+   and dependency lineage; none of these roles supplies a new issuer.
+
+### Dependency and destruction boundary
+
+A retained derivative needs independently eligible source lineage and
+destination restrictions; do not assume an allowed summary is public or
+inherits permission forever. Revocation or retirement blocks affected
+new retrieval/use and requires requalification before reuse. Do not
+silently revive an old derivative through a new cache, model or Clone.
+Do not cascade physical destruction from a missing dependency or a
+current-use refusal. Explicit separately authorized destruction must
+resolve actual dependent copies, versions, indexes, caches, recovery and
+replicas with their custodians. Preserve only permitted non-content
+outcomes; no recoverable summary, fingerprint or recurrence check
+contrary to the approved destruction scope. Unknown coverage is not
+complete destruction; delivered external bytes cannot be presumed recalled.
+The historical append-only record store cannot itself satisfy this.
+No deletion method, backup policy or retention schedule is selected.
+
+### Future acceptance cases (not implementation evidence)
+
+| Case | Required outcome |
+| --- | --- |
+| Preview or temporary use only | No durable promotion or generation advance. |
+| Refine exact approved Sturdy source | Preserve original and protection; distinct permitted derivative. |
+| Contradictory sources or explicit correction | Keep allowed source/version attribution and uncertainty; no silent overwrite. |
+| Same text under different scope or identity | No inferred duplicate, merge, permission transfer or cross-Tree sharing. |
+| Two proposals on same base revision | Only actual writer-qualified outcome; stale competitor refuses, no last-writer-wins. |
+| Unknown original commit or revoke before mutation | No assumed success, automatic retry or fresh operation bypass. |
+| Qualified user-context revision, operational domain unchanged | Advance only correct independently observed domain; affected stale selection cannot be reused. |
+| Source retirement/revocation after derivative | Requalify affected use; preserve unrelated eligible material and original history. |
+| Never Reabsorb or conflicting Loose limit | Refuse unauthorized promotion or revival. |
+| Protected source or destination unavailable | No enumeration, body use, inference or differentiated disclosure. |
+| Explicit destruction with unknown derivative/replica coverage | No complete-erasure claim or hidden retained content; no automatic retry. |
+| Bounded summary with fewer bytes/Leaves | No inferred token fit, freed RAM/VRAM or provider context release. |
+
+Next executable work must be scoped to a demonstrated Mind-owned gap,
+with actual source/custodian and writer/authority decisions separately
+settled before any protected mutation. Review this exact proposal with
+Spirit, Runtime, Heart and Nurse; UI compatibility when a presentation
+contract is proposed. No new schema, API, store, authority, test fixture,
+model call, protected data access, host execution or destructive action.
+Native/protected/production HOLD; operator integration separate.

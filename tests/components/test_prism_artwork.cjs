@@ -84,10 +84,10 @@ test("cached glow-only layer preserves opaque prism cores below it",()=>{
 test("Prism always uses one native pixel border underneath state-reactive cached glow",()=>{
     const qml=fs.readFileSync(path.join(root,"components/PrismButton.qml"),"utf8");
     for(const state of ["idle","hover","pressed","selected","keyboardSelected"])
-        assert.match(qml,new RegExp(state+"BorderWidth: 1\\\\b"));
-    assert.doesNotMatch(qml,/border\\.width: root\\.activeBorderWidth/);
-    assert.match(qml,/objectName: "prismGlowArtwork"/);
-    assert.match(qml,/opacity: root\\.glowEmphasisOpacity/);
-    assert.match(qml,/root\\.prismPalette,root\\.spectralGlowStrength,true/);
-    assert.doesNotMatch(qml,/onGlowEmphasisOpacityChanged/);
+        assert.ok(qml.includes(state+"BorderWidth: 1"),state+" one pixel");
+    assert.ok(!qml.includes("border.width: root.activeBorderWidth"),"no top overlay border");
+    assert.ok(qml.includes('objectName: "prismGlowArtwork"'));
+    assert.ok(qml.includes("opacity: root.glowEmphasisOpacity"));
+    assert.ok(qml.includes("root.prismPalette,root.spectralGlowStrength,true"));
+    assert.ok(!qml.includes("onGlowEmphasisOpacityChanged"),"opacity should not rerasterize");
 });

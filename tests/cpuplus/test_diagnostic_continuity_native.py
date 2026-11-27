@@ -97,6 +97,14 @@ for entry in [start,row,row,row,row,end]: print(json.dumps(entry))
     for name in ("cpuplus_diagnostic_workflow.py", "cpuplus_storage_observer.py",
                  "syntagma_quickshell_thread_sampler.py", "cpuplus_stall_clock_witness.py"):
         shutil.copy2(ROOT / "scripts" / name, real_scripts / name)
+    # Standalone Storage uses the real observer and real sampler import, not
+    # the synthetic thread fixture in scripts/. Keep disposable path arguments.
+    (scripts / "cpuplus_storage_observer.py").write_text("""import os,sys
+from pathlib import Path
+target=Path(__file__).resolve().parents[1]/"real-capture"/"scripts"/"cpuplus_storage_observer.py"
+assert "--workshop" in sys.argv and "--sample-seconds" in sys.argv and "--report-seconds" in sys.argv
+os.execv(sys.executable,[sys.executable,"-B",str(target),*sys.argv[1:]])
+""")
     # Fail at setup, not five seconds into the native test, if the collector
     # import graph is incomplete or accidentally resolves the fake sampler.
     subprocess.run(["python3", "-B", "-c",
@@ -139,7 +147,7 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                WAYLAND_DISPLAY="", DISPLAY="")
     result = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=65, check=False)
+                            stderr=subprocess.STDOUT, timeout=75, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

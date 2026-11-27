@@ -216,8 +216,8 @@ class ThinkingMetadataTests(unittest.TestCase):
         self.assertIsNone(self.parse({}, "99.99.99").descriptor)
 
     def test_no_transport_and_no_mutation_of_existing_observer(self):
-        with patch.object(M.http.client, "HTTPConnection") as connection, \\
-             patch.object(M, "observe") as observe:
+        with (patch.object(M.http.client, "HTTPConnection") as connection,
+              patch.object(M, "observe") as observe):
             result = self.parse({"thinking": {"values": [False], "default": False}})
             connection.assert_not_called()
             observe.assert_not_called()

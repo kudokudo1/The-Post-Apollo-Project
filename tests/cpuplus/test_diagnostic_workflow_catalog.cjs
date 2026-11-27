@@ -1,7 +1,7 @@
 const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const assert=require("node:assert/strict");
 const context=vm.createContext({assert});
-for(const file of ["DiagnosticWorkflowDefaults.js","DiagnosticCalibration.js","DiagnosticWorkflowCatalog.js"])
+for(const file of ["DiagnosticWorkflowDefaults.js","DiagnosticCalibration.js","DiagnosticTargetRegistry.js","DiagnosticWorkflowCatalog.js"])
     vm.runInContext(fs.readFileSync(path.join(__dirname,"../../services/diagnostics",file),"utf8"),context);
 function verify(assert, defaults, cal, cat) {
     const seeds=defaults.initialWorkflowFavorites();
@@ -49,3 +49,21 @@ function verify(assert, defaults, cal, cat) {
 
 vm.runInContext(verify.toString()+"\nverify(assert,{initialWorkflowFavorites},{workshopDraftFromPlan,workshopPlanFromDraft,validatedWorkshopSet},{newCatalog,validatedCatalog,editCatalog,queueProjection});",context);
 console.log("diagnostic workflow catalog PASS");
+
+vm.runInContext(`
+    const targetSeeds=initialWorkflowFavorites();
+    const targetCal={workshopDraftFromPlan,workshopPlanFromDraft,
+        targetCompatible:(id,p)=>targetPlanCompatibility(id,p,{workshopDraftFromPlan,previewCalibration}).ok};
+    const legacy=newCatalog(targetSeeds,targetCal);
+    const change={action:"create",name:"Event loop target",favorite:true,
+        plan:{durationSeconds:5,instruments:[{kind:"stall",thresholdMs:350}]},targetId:"apollo-loop"};
+    const explicit=editCatalog(legacy,change,targetSeeds,targetCal);
+    assert(explicit.rows[6].targetId==="apollo-loop");
+    assert(validatedCatalog(JSON.parse(JSON.stringify(explicit)),targetSeeds,targetCal).rows[6].targetId==="apollo-loop");
+    for(const id of ["quickshell","process-instance","automatic","unknown"])
+        assert(!editCatalog(legacy,{...change,targetId:id},targetSeeds,targetCal));
+    assert(!queueProjection(explicit.rows[6],targetCal));
+    assert(!editCatalog(explicit,{action:"replace",id:"user-1",plan:legacy.rows[0].plan},targetSeeds,targetCal));
+    assert(!Object.hasOwn(legacy.rows[0],"targetId"));
+`,context);
+console.log("diagnostic target catalog custody PASS");

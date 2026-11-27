@@ -13,8 +13,9 @@ function flow(variant, fireMode, side, span, height, time, reduced) {
         if(region<1) return;
         for(let i=0;i<count;i++){
             const lane=(i*7%13)/12;
-            const seed=((i*.61803398875+.17)%1);
-            const v=speed*(.82+(i%5)*.09);
+            // Keep combustion wake distributed even at a single frozen frame.
+            const seed=fire&&wake?i/count:((i*.61803398875+.17)%1);
+            const v=fire&&wake?speed:speed*(.82+(i%5)*.09);
             const travel=((seed*region+t*v)%region+region)%region;
             const size=Math.min(region,h*length*(.6+(i%4)*.23));
             // Left/player current travels right; enemy travels left.

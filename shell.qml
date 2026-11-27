@@ -797,8 +797,6 @@ PanelWindow {
 
             AppControlW {
                 id: appControlWindow
-                cpuPlusProcessVisible: cpuPlusWindow.menuOpen
-                                       && cpuPlusWindow.selectedModeIndex === 1
                 diagnosticCaptureActive: CpuPlusDiagnostics.appControlCaptureActive
                 onDiagnosticOpeningStage: function(stage, sequence, elapsedMs, timestampMs) {
                     CpuPlusDiagnostics.recordOpening(stage, sequence, elapsedMs, timestampMs);

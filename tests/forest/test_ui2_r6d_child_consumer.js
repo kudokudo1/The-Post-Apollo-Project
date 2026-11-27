@@ -65,7 +65,31 @@ assert.equal(deliver(d.c,d.unitsC).status,"GENERATING");
 assert.equal(status.receive(d.unitsB[0],d.c).status,"GENERATING");
 assert.equal(deliver(d.c,d.stop).status,"STOP_REQUESTED");
 assert.equal(history.observe(d.h3).messages.length,4);
-for(const u of d.abort) status.receive(u,d.c);
-assert.notEqual(status.observe(d.c).status,"LOCAL_COMMIT_RECORDED");
-assert.equal(history.observe(d.h3).messages.length,4);
+// STOP observation alone is not a cancellation outcome. An old typed
+// result must not change the current attempt or the retained history.
+assert.equal(status.observe(d.c).localOutcome,"");
+assert.equal(status.recordLocalAbort(d.b,d.abortCode,d.stop[0].sequence,d.c).status,"STOP_REQUESTED");
+assert.equal(status.observe(d.c).localOutcome,"");
+// The disposable child fixture has independently verified the STEP result,
+// durable ABORTED row, and absence of an assistant reply. Consume the whole
+// actual batch before applying that typed local result; no inferred abort.
+assert.equal(d.abortCode,"ABORTED_LOCAL");
+assert.equal(d.abort.length,1);
+assert.equal(d.abort[0].kind,"STATUS");
+assert.equal(d.abort[0].statusPacket.status,"UNKNOWN_HOLD");
+assert.equal(d.abort[0].sequence,d.stop[0].sequence+1);
+const unresolved=deliver(d.c,d.abort);
+assert.equal(unresolved.status,"UNKNOWN_HOLD");
+assert.equal(unresolved.localOutcome,"");
+assert.equal(unresolved.label,"UNKNOWN HOLD // NO AUTOMATIC RETRY");
+assert.equal(JSON.stringify(history.observe(d.h3).messages),JSON.stringify(full.messages));
+const settled=status.recordLocalAbort(d.c,d.abortCode,d.abort[0].sequence,d.c);
+assert.equal(settled.localOutcome,"ABORTED_LOCAL");
+assert.equal(settled.label,"LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED");
+for(const k of ["sourceAuthenticated","permissionGranted","productionAuthority","modelExecutionPermitted","sendEnabled","stopEnabled"])
+    assert.equal(settled[k],false);
+assert.equal(settled.safeActions.length,0);
+assert.equal(JSON.stringify(history.observe(d.h3).messages),JSON.stringify(full.messages));
+assert.equal(status.observe(null).state,"CLOSED");
+assert.equal(status.observe(d.c).localOutcome,"");
 console.log("UI2_R6D_CHILD_CONSUMER_PASS");

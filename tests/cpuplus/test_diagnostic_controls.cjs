@@ -859,3 +859,16 @@ assert.match(owner,/function publishLifecycleReport\(result\)/);
 assert.match(owner,/archive.invoke\(\{action:"save",record:Object.assign\(\{kind:"dump"\},record\)\}\)/);
 assert.match(ui,/objectName: "cpuplusDumpReport"/);
 assert.match(ui,/objectName: "cpuplusDumpEvidence"/);
+
+{
+    const d={schema:"post-apollo-widget-lifecycle-v1",status:"FAILED",reason:"INVALID TERMINAL WITNESS"};
+    const text=JSON.stringify(d);
+    const row={kind:"dump",id:"session-abc-def-1",status:"NOT VERIFIED",summary:policy.dumpSummary(d),text,finishedAt:"2026-11-27T12:00:00.000Z"};
+    const doc={schema:"post-apollo-diagnostic-archive-v1",rows:[row],savedId:row.id};
+    assert.ok(policy.dumpEvidence(text));
+    assert.ok(policy.archiveResponse(doc,{action:"save",record:row}));
+    assert.equal(policy.archiveResponse({...doc,rows:[{...row,status:"COMPLETE"}],savedId:null},{action:"list"}),null);
+    assert.equal(policy.archiveResponse({...doc,rows:[{...row,summary:"false"}],savedId:null},{action:"list"}),null);
+    assert.equal(policy.dumpEvidence(JSON.stringify({...d,reason:"private payload"})),null);
+    assert.equal(policy.argumentsFor("dump",p=>p,"/tmp"),null);
+}

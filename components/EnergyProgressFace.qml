@@ -26,6 +26,8 @@ Item {
     property color chassisColor: phase === "failure" ? Colors.red : energyColor
     property color foregroundColor: Colors.white
     readonly property var personality: Profiles.profile(variant)
+    readonly property var localVibration: Profiles.barMotion(variant, elapsed, visualFrame.intensity,
+        reducedMotion || !visible || phase !== "running")
     readonly property real displayedFraction: materialExperiment && progressMode === "indeterminate"
         ? Math.max(materialPeak, visualFrame.fraction) : visualFrame.fraction
     readonly property real headCenterY: height / 2
@@ -106,8 +108,8 @@ Item {
         id: visual
         anchors.fill: parent
         transform: Translate {
-            x: root.visualFrame.dx * root.personality.x
-            y: root.visualFrame.dy * root.personality.y
+            x: root.variant==="tron" ? root.localVibration.dx : root.visualFrame.dx * root.personality.x
+            y: root.variant==="tron" ? root.localVibration.dy : root.visualFrame.dy * root.personality.y
         }
         Canvas {
             id: surface
@@ -316,22 +318,24 @@ Item {
                     const red=Qt.rgba(1,.10,.16,1);
                     const enemyInk=mix(Qt.rgba(.65,1,1,1),red,f.enemyHeat);
                     const enemyCore=mix(Qt.rgba(1,.94,.74,1),red,f.enemyHeat*.82);
-                    const sizes=Flow.clashSizes(p,f.enemyHeat);
-                    const baseLobe=Math.min(h*.92,w*.22);
-                    const baseTall=h*.72;
+                    const contact=Flow.contact(p,f.enemyHeat,h,w);
+                    const touching=p>0 && f.enemyFraction>0;
                     function compressed(side,color,core,alpha) {
-                        const dominance=side<0?sizes.player:sizes.enemy;
-                        const lobe=baseLobe*dominance;
-                        const tall=baseTall*dominance;
+                        const shape=side<0?contact.left:contact.right;
+                        const lobe=shape.rx, tall=shape.ry;
                         if(alpha<=0 || lobe<=0) return;
+                        const center=edge+side*(touching?shape.offset:lobe*.12);
                         c.save(); c.globalAlpha=alpha;
-                        c.beginPath();
-                        if(side<0) c.rect(0,0,edge,height);
-                        else c.rect(edge,0,width-edge,height);
-                        c.clip();
-                        const center=edge+side*lobe*.40;
-                        orb(lobe*1.50,tall*1.30,[[0,tint(color,.7)],
-                            [.60,tint(color,.31)],[1,tint(color,0)]],center);
+                        // Glow is never cut by the contact plane. Only the
+                        // small physical contact cap of the core is flattened.
+                        orb(lobe*1.38,tall*1.35,[[0,tint(color,.50)],
+                            [.60,tint(color,.20)],[1,tint(color,0)]],center);
+                        if(touching) {
+                            c.beginPath();
+                            if(side<0) c.rect(0,0,edge,height);
+                            else c.rect(edge,0,width-edge,height);
+                            c.clip();
+                        }
                         orb(lobe,tall,[[0,core],[.24,core],[.48,color],
                             [.72,tint(color,.78)],[1,tint(color,0)]],center);
                         c.restore();
@@ -339,7 +343,7 @@ Item {
                     compressed(-1,ink,Qt.rgba(.70,.91,1,1),Math.min(1,p*12));
                     compressed(1,enemyInk,enemyCore,Math.min(1,f.enemyFraction*12)*f.enemyOpacity);
                     if(p>0 && f.enemyFraction>0) {
-                        const tall=baseTall*Math.min(sizes.player,sizes.enemy);
+                        const tall=contact.chord;
                         const seam=c.createLinearGradient(edge,mid-tall,edge,mid+tall);
                         seam.addColorStop(0,tint(Colors.white,0));
                         seam.addColorStop(.20,tint(Colors.white,.55));
@@ -353,11 +357,12 @@ Item {
                 if(enlarged) {
                     // Long light wake directly behind the substantial core.
                     // Its bright shoulders cover the full chamber height.
-                    const tail=Math.min(inner*p,h*(tron?8:3));
+                    const tail=Math.min(inner*p,h*(tron?4.2:3));
                     if(tail>0) {
                         const g=c.createLinearGradient(edge-tail,mid,edge,mid);
                         g.addColorStop(0,tint(ink,0));
-                        g.addColorStop(.65,tint(ink,.32));
+                        g.addColorStop(.45,tint(ink,.13));
+                        g.addColorStop(.78,tint(ink,.48));
                         g.addColorStop(1,tint(ink,.95));
                         c.fillStyle=g;
                         c.fillRect(edge-tail,mid-h*.16,tail,h*.32);

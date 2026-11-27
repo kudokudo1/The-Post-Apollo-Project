@@ -77,6 +77,29 @@ ShellRoot {
                     if (elapsed>4800 && !lab.require(field.pressure>.5,
                             "overdrive host pressure")) return;
                 }
+                if (lab.stage>=14) {
+                    const ki=faces.itemAt(2);
+                    if (lab.stage===14) {
+                        ki.reducedMotion=false;
+                        ki.phase="running";
+                        ki.progress=.68;
+                    } else if (lab.stage===15) {
+                        if (!lab.require(ki.visualFrame.clash && Math.abs(ki.visualFrame.enemyFraction-.32)<.00001,
+                                "native opposing beam")) return;
+                        ki.phase="failure";
+                        lab.pulseStarted=Date.now();
+                    } else if (lab.stage===16) {
+                        if (!lab.require(ki.displayedFraction<.68 && ki.displayedFraction>=0,
+                                "native defeat retreat")) return;
+                        if (Date.now()-lab.pulseStarted<1000) return;
+                        if (!lab.require(ki.displayedFraction===0 && !ki.animationActive,
+                                "native defeat drained and stopped")) return;
+                        console.log("ENERGY_NATIVE_PASS variants; host pulse; fire materials; opposing beam and defeat lifecycle");
+                        Qt.quit(); return;
+                    }
+                    lab.stage++;
+                    return;
+                }
                 if (lab.stage>=8) {
                     for (const f of [ash,erosion]) {
                         if (!lab.require(f.materialExperiment,"material mode mounted")) return;
@@ -104,8 +127,7 @@ ShellRoot {
                         }
                     }
                     if (lab.stage===13) {
-                        console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset; bounded host pressure; Omnitrix pulse; ash-trail and burn-away material lifecycle");
-                        Qt.quit();
+                        lab.stage=14;
                         return;
                     }
                     lab.stage++;

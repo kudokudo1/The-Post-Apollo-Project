@@ -711,12 +711,12 @@ test('mini graph publishes isolated equal-length frames and skips non-task refre
     assert.ok(start>=0&&end>start);
     const body=miniSource.slice(start,end);
     const create=new Function('state',
-        'let graphReady=true; const emptyCombiHistories=state.empty;'+
+        'let graphReady=true; const emptyCombiHistories=state.empty; const root={visible:true};'+
         'let showingTask=false; let historyFrame={values:[],combi:emptyCombiHistories}; let historyValues=historyFrame.values,combiHistories=historyFrame.combi;'+
         'let graphScrollOffset=0; const width=82, historyLimit=48;'+
         'function readHistory(){state.lookups++;return state.values;} function snapshotCombiHistory(){return emptyCombiHistories;}'+
         'const motion={stop(){state.stops++;},restart(){state.starts++;}};'+body+
-        '\nreturn {run(animate){showingTask=state.box.showingTask;refreshHistory(animate);historyValues=historyFrame.values;combiHistories=historyFrame.combi;return historyFrame;},ready(v){graphReady=v;}};');
+        '\nreturn {run(animate){showingTask=state.box.showingTask;root.visible=state.box.visible!==false;refreshHistory(animate);historyValues=historyFrame.values;combiHistories=historyFrame.combi;return historyFrame;},ready(v){graphReady=v;}};');
     const state={box:{showingTask:false,rowItem:{pid:10},taskIdentity:'task'},empty:{cpu:[],mem:[],io:[],age:[]},values:[1,2],lookups:0,starts:0,stops:0};
     const graph=create(state);
     const empty=graph.run(true);
@@ -740,9 +740,26 @@ test('mini graph publishes isolated equal-length frames and skips non-task refre
     assert.equal(state.lookups,2);
     state.box.showingTask=true;
     assert.deepStrictEqual(graph.run(false).values,[2,3]);
+    // Hidden view: clear last local display frame once, avoid per-revision reads
+    // and scroll restarts. Reopen: latest collected data with no stale animation.
+    state.box.visible=false;
+    const hidden=graph.run(true);
+    assert.deepStrictEqual(hidden.values,[]);
+    const hiddenLookups=state.lookups;
+    const hiddenStarts=state.starts;
+    assert.equal(graph.run(true),hidden);
+    assert.equal(state.lookups,hiddenLookups);
+    assert.equal(state.starts,hiddenStarts);
+    state.values=[3,4];
+    state.box.visible=true;
+    assert.deepStrictEqual(graph.run(false).values,[3,4]);
+    assert.equal(state.starts,hiddenStarts);
+    assert.equal(state.lookups,hiddenLookups+1);
     assert.doesNotMatch(miniSource,/graphEpoch/);
     assert.match(app,/historyRevision: showingTask \? appControlWindow.taskMiniDisplayRevision : -1/);
     assert.match(miniSource,/onShowingTaskChanged: refreshHistory\(false\)/);
+    assert.match(miniSource,/onVisibleChanged: refreshHistory\(false\)/);
+    assert.match(miniSource,/if \(!showingTask \|\| !root\.visible\)/);
     assert.match(miniSource,/readonly property point p1:\s*root.graphPoints\[index\]/);
     assert.match(miniSource,/readonly property point p2:\s*root.graphPoints\[index \+ 1\]/);
 });

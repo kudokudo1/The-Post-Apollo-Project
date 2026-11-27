@@ -50,7 +50,9 @@ Item {
     }
     function refreshHistory(animate) {
         if (!graphReady) return
-        if (!showingTask) {
+        // Hidden recipients must not clone histories or animate graphs. Keep
+        // collection in KillStore; read the latest frame when shown again.
+        if (!showingTask || !root.visible) {
             if (historyValues.length>0 || combiHistories!==emptyCombiHistories) {
                 motion.stop()
                 graphScrollOffset = 0
@@ -67,6 +69,7 @@ Item {
         historyFrame = {values:Array.isArray(next)?next.slice():[],combi:combi}
     }
     onHistoryRevisionChanged: refreshHistory(true)
+    onVisibleChanged: refreshHistory(false)
     onShowingTaskChanged: refreshHistory(false)
     onTaskIdentityChanged: refreshHistory(false)
     onMetricKeyChanged: refreshHistory(false)

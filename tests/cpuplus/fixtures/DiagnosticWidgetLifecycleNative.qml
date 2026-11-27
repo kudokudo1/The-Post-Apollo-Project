@@ -78,7 +78,7 @@ ShellRoot {
                 root.phase=2;return;
             }
             if(root.phase===2){
-                if(recorder.active)return;
+                if(recorder.active||CpuPlusDiagnostics.archiveBusy)return;
                 const r=recorder.report;
                 if(!root.check(r && r.status==="COMPLETE" && r.elapsedMs===1000 && r.completionDelayMs>=0
                     && r.events.length===15 && r.stats.length===15 && r.timings.length===2
@@ -90,6 +90,10 @@ ShellRoot {
                 if(!root.check(CpuPlusDiagnostics.cancelLifecycleCapture()&&recorder.report.status==="CANCELLED"
                     && recorder.report.events.length===1 && recorder.report.events[0].id==="git",
                     "unselected ignored, cancellation bounded"))return;
+                root.phase=21;return;
+            }
+            if(root.phase===21){
+                if(CpuPlusDiagnostics.archiveBusy)return;
                 recorder.blocked=true;
                 if(!root.check(!recorder.start(["git"],1000),"shared busy admission"))return;
                 recorder.blocked=false;
@@ -109,9 +113,12 @@ ShellRoot {
                     if(!root.check(!CpuPlusDiagnostics.request("threads") && !CpuPlusDiagnostics.startLifecycleCapture(),"drain lock"))return;
                     return;
                 }
+                if(CpuPlusDiagnostics.archiveBusy)return;
                 const r=recorder.report;
                 if(!root.check(r && r.status==="COMPLETE" && r.resource.status==="COMPLETE" && r.resource.evidence.pid===123
                     && r.eventLoop.ticks>0 && !resources.busy,"joint completion evidence"))return;
+                const archived=CpuPlusDiagnostics.archiveRows.find(x=>x.kind==="dump"&&x.status==="COMPLETE"&&JSON.parse(x.text).resource);
+                if(!root.check(archived && CpuPlusDiagnostics.selectExactReport("dump",archived.id,false),"confirmed combined archive"))return;
                 if(!root.check(CpuPlusDiagnostics.startLifecycleCapture(),"joint second capture"))return;
                 root.phase=4;return;
             }
@@ -120,7 +127,7 @@ ShellRoot {
                 root.phase=5;return;
             }
             if(root.phase===5){
-                if(recorder.active)return;
+                if(recorder.active||CpuPlusDiagnostics.archiveBusy)return;
                 if(!root.check(recorder.report.status==="CANCELLED" && !resources.busy,"joint cancel terminal"))return;
                 console.log("CPU_Q5E_JOINT_PASS");
                 if(!root.check(CpuPlusDiagnostics.loadWorkflowCatalog(),"load catalog for dump save"))return;
@@ -152,8 +159,16 @@ ShellRoot {
                 root.phase=10;return;
             }
             if(root.phase===10){
-                if(recorder.active)return;
+                if(recorder.active||CpuPlusDiagnostics.archiveBusy)return;
                 if(!root.check(recorder.report.status==="CANCELLED","saved dump stopped"))return;
+                if(!root.check(CpuPlusDiagnostics.loadHistory(),"reload dump archive"))return;
+                root.phase=11;return;
+            }
+            if(root.phase===11){
+                if(CpuPlusDiagnostics.archiveBusy)return;
+                const saved=CpuPlusDiagnostics.archiveRows.find(r=>r.kind==="dump"&&r.status==="COMPLETE"&&JSON.parse(r.text).resource);
+                if(!root.check(CpuPlusDiagnostics.archiveStatus==="READY" && saved && CpuPlusDiagnostics.selectExactReport("dump",saved.id,false) && CpuPlusDiagnostics.reportFor("dump",saved.id).text===saved.text,"disk-reloaded exact completed dump"))return;
+                console.log("CPU_Q5F_DUMP_ARCHIVE_PASS");
                 console.log("CPU_Q5F_SAVED_DUMP_PASS");
                 console.log("CPU_Q5_NATIVE_PASS");Qt.quit();
             }

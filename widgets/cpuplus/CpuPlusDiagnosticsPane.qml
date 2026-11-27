@@ -959,6 +959,12 @@ Column {
             wrapMode: Text.Wrap
         }
     }
+    GohuText {
+        width: parent.width
+        visible: root.viewMode==="REPORT" && root.selectedReport==="dump" && root.report!==null && !CpuPlusDiagnostics.selectedArchiveId
+        text: CpuPlusDiagnostics.dumpArchiveReceipt
+        color: Colors.cyan; font.pixelSize: 10; wrapMode: Text.Wrap
+    }
     Column {
         objectName: "cpuplusDumpEvidence"
         width: parent.width
@@ -970,7 +976,7 @@ Column {
             color: Colors.magenta; font.pixelSize: 10; wrapMode: Text.Wrap
         }
         Repeater {
-            model: parent.visible && root.dumpDetails.resource && root.dumpDetails.resource.evidence ? root.dumpDetails.resource.evidence.samples : []
+            model: root.viewMode==="REPORT" && root.dumpDetails && root.dumpDetails.resource && root.dumpDetails.resource.evidence ? root.dumpDetails.resource.evidence.samples : []
             GohuText {
                 required property var modelData
                 width: root.width; color: Colors.white; font.pixelSize: 10; wrapMode: Text.Wrap
@@ -985,7 +991,7 @@ Column {
             color: Colors.cyan; font.pixelSize: 10; wrapMode: Text.Wrap
         }
         Repeater {
-            model: parent.visible ? root.dumpDetails.timings : []
+            model: root.viewMode==="REPORT" && root.dumpDetails && root.dumpDetails.timings ? root.dumpDetails.timings : []
             GohuText {
                 required property var modelData
                 width: root.width; color: Colors.white; font.pixelSize: 10; wrapMode: Text.Wrap

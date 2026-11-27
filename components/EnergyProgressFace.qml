@@ -21,6 +21,9 @@ Item {
     property real progress: 0
     property string caption: ""
     property bool reducedMotion: false
+    // Opt-in suspension when the owner has no fresh process evidence.
+    // Preserve elapsed visual position; a quiet child is not a failed child.
+    property bool activityMotionEnabled: true
     property color energyColor: (variant === "omnitrix" || variant === "default") ? Colors.omnitrix
         : variant === "tron" ? Colors.cyan
         : variant === "flamethrower" ? Colors.orange : "#55CFFF"
@@ -28,7 +31,7 @@ Item {
     property color foregroundColor: Colors.white
     readonly property var personality: Profiles.profile(variant)
     readonly property var localVibration: Profiles.barMotion(variant, elapsed, visualFrame.intensity,
-        reducedMotion || !visible || phase !== "running")
+        reducedMotion || !visible || !activityMotionEnabled || phase !== "running")
     readonly property real displayedFraction: materialExperiment && progressMode === "indeterminate"
         ? Math.max(materialPeak, visualFrame.fraction) : visualFrame.fraction
     readonly property var track: Flow.trackGeometry(width,height,displayedFraction)
@@ -36,7 +39,7 @@ Item {
     readonly property real headCenterX: track.front
     readonly property real headCenterY: height / 2
     readonly property var fireState: PixelFire.extinguish(phase,elapsed,reducedMotion,fireMode)
-    readonly property bool animationActive: visible && !reducedMotion
+    readonly property bool animationActive: visible && !reducedMotion && activityMotionEnabled
         && (phase === "running" || (phase === "success" && (variant==="flamethrower"?(fireState.active || fireState.repairing):elapsed<.84))
             || (variant==="flamethrower" && phase==="failure" && finishFrom>0 && fireState.active)
             || (variant==="ki-blast" && phase==="failure" && elapsed<1.08))
@@ -104,6 +107,10 @@ Item {
             lastFraction=materialPeak;
         } else lastFraction=next;
     }
+    onActivityMotionEnabledChanged: if (initialized) {
+        if (activityMotionEnabled) startedAt = Date.now() - elapsed * 1000;
+        surface.requestPaint();
+    }
     onReducedMotionChanged: if (initialized && variant==="flamethrower") {
         flameSpeed=0;
         speedFraction=displayedFraction;
@@ -156,8 +163,8 @@ Item {
         id: visual
         anchors.fill: parent
         transform: Translate {
-            x: root.variant==="tron" ? root.localVibration.dx : root.visualFrame.dx * root.personality.x
-            y: root.variant==="tron" ? root.localVibration.dy : root.visualFrame.dy * root.personality.y
+            x: !root.activityMotionEnabled ? 0 : root.variant==="tron" ? root.localVibration.dx : root.visualFrame.dx * root.personality.x
+            y: !root.activityMotionEnabled ? 0 : root.variant==="tron" ? root.localVibration.dy : root.visualFrame.dy * root.personality.y
         }
         Canvas {
             id: surface

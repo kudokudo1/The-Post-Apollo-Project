@@ -58,10 +58,11 @@ Column {
         ? CpuPlusDiagnostics.archiveRows : []
     readonly property var beforeRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareBeforeId) || null
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
-    readonly property bool canChooseComparison: !["workflow","stall","hostcpu","gpu","diskio","swapio","netio"].includes(selectedReport) && report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
+    readonly property bool canChooseComparison: !["workflow","stall","hostcpu","gpu","diskio","swapio","netio","dump"].includes(selectedReport) && report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
     readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize, Policy.appControlMetrics) : null
     readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true, true)
     readonly property var hostDetails: memoryDetails ? memoryDetails.hostContext : null
+    readonly property var dumpDetails: selectedReport==="dump" && report ? Policy.dumpEvidence(report.text) : null
     property bool showHostDetails: true
     function memoryBreakdown(selected, report, includePrivate = false, includeHost = false) {
         // Presentation only: reuse the existing completed JSONL capture.
@@ -709,14 +710,22 @@ Column {
             width: parent.width
             spacing: 3
             ActionButton {
-                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                objectName: "cpuplusDumpReport"
+                width: Math.max(0,(reportActions.width-2*reportActions.spacing)/3)
+                height: 26
+                label: "DUMP"
+                selected: root.selectedReport==="dump"
+                onLeftClicked: {CpuPlusDiagnostics.selectLatest("dump");root.showReport=false;}
+            }
+            ActionButton {
+                width: Math.max(0,(reportActions.width-2*reportActions.spacing)/3)
                 height: 26
                 available: root.report !== null && root.report.text.length > 0
                 label: root.showReport ? "HIDE REPORT" : "VIEW REPORT"
                 onLeftClicked: root.showReport = !root.showReport
             }
             ActionButton {
-                width: Math.max(0,(reportActions.width-reportActions.spacing)/2)
+                width: Math.max(0,(reportActions.width-2*reportActions.spacing)/3)
                 height: 26
                 available: root.showReport && root.report !== null && root.report.text.length > 0
                 label: "COPY REPORT"
@@ -950,6 +959,47 @@ Column {
             wrapMode: Text.Wrap
         }
     }
+    GohuText {
+        width: parent.width
+        visible: root.viewMode==="REPORT" && root.selectedReport==="dump" && root.report!==null && !CpuPlusDiagnostics.selectedArchiveId
+        text: CpuPlusDiagnostics.dumpArchiveReceipt
+        color: Colors.cyan; font.pixelSize: 10; wrapMode: Text.Wrap
+    }
+    Column {
+        objectName: "cpuplusDumpEvidence"
+        width: parent.width
+        spacing: 3
+        visible: root.viewMode==="REPORT" && root.dumpDetails!==null && !!root.dumpDetails.stats
+        GohuText {
+            width: parent.width
+            text: "SHELL SAMPLES // actual offsets; interval CPU / PSS / RSS / SWAP PSS"
+            color: Colors.magenta; font.pixelSize: 10; wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.viewMode==="REPORT" && root.dumpDetails && root.dumpDetails.resource && root.dumpDetails.resource.evidence ? root.dumpDetails.resource.evidence.samples : []
+            GohuText {
+                required property var modelData
+                width: root.width; color: Colors.white; font.pixelSize: 10; wrapMode: Text.Wrap
+                text: (modelData.atMs/1000).toFixed(2)+"s // "+(modelData.cpuPct===null?"CPU N/A":modelData.cpuPct.toFixed(1)+"% CPU")+
+                    " / "+(modelData.pssKiB/1024).toFixed(1)+" MiB PSS / "+(modelData.rssKiB/1024).toFixed(1)+" MiB RSS / "+
+                    (modelData.swapPssKiB/1024).toFixed(1)+" MiB SWAP PSS"+(modelData.withinWindow?"":" // OUTSIDE WINDOW")
+            }
+        }
+        GohuText {
+            width: parent.width
+            text: "SPECIALIZED HANDLER TIMINGS // elapsed wall time, not exclusive CPU"
+            color: Colors.cyan; font.pixelSize: 10; wrapMode: Text.Wrap
+        }
+        Repeater {
+            model: root.viewMode==="REPORT" && root.dumpDetails && root.dumpDetails.timings ? root.dumpDetails.timings : []
+            GohuText {
+                required property var modelData
+                width: root.width; color: Colors.white; font.pixelSize: 10; wrapMode: Text.Wrap
+                text: modelData.id.toUpperCase()+" / "+modelData.stage+" / "+modelData.count+" calls / "+
+                    modelData.totalMs.toFixed(1)+" ms total / "+modelData.maxMs.toFixed(1)+" ms max"
+            }
+        }
+    }
     TextEdit {
         id: reportText
         width: parent.width
@@ -978,7 +1028,7 @@ Column {
             required property var modelData
             width: root.width
             height: 30
-            label: modelData.kind.toUpperCase() + " // " + modelData.finishedAt.slice(5, 16)
+            label: modelData.kind.toUpperCase() + " // " + modelData.finishedAt.slice(5, 16)+(modelData.kind==="dump"?" / "+modelData.status:"")
             labelPixelSize: 9
             selected: root.report !== null && root.report.id === modelData.id
             onLeftClicked: {

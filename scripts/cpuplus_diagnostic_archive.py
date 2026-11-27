@@ -10,7 +10,7 @@ import stat
 import sys
 
 SCHEMA = "post-apollo-diagnostic-archive-v1"
-KINDS = {"memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio", "netio"}
+KINDS = {"memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio", "netio", "dump"}
 STATUSES = {"COMPLETE", "CANCELLED", "NOT VERIFIED"}
 LIMIT = 8
 MAX_FRAME = 1024 * 1024
@@ -26,10 +26,17 @@ def validate_record(record):
     if (record["kind"] not in KINDS or record["status"] not in STATUSES
             or len(record["id"]) > 128 or not ID.fullmatch(record["id"])
             or len(record["summary"]) > 4096
-            or len(record["text"]) > (300000 if record["kind"] == "workflow" else 65536)
-            or (record["kind"] == "workflow" and not record["text"].isascii() and record["text"] != "")
+            or len(record["text"]) > (300000 if record["kind"] in ("workflow","dump") else 65536)
+            or (record["kind"] in ("workflow","dump") and not record["text"].isascii() and record["text"] != "")
             or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", record["finishedAt"])):
         raise ValueError("record values")
+    if record["kind"] == "dump":
+        payload = json.loads(record["text"])
+        if (type(payload) is not dict or payload.get("schema") != "post-apollo-widget-lifecycle-v1"
+                or payload.get("status") not in ("COMPLETE","PARTIAL","CANCELLED","FAILED")
+                or record["status"] != {"COMPLETE":"COMPLETE","PARTIAL":"NOT VERIFIED",
+                    "CANCELLED":"CANCELLED","FAILED":"NOT VERIFIED"}[payload["status"]]):
+            raise ValueError("dump envelope")
     datetime.datetime.fromisoformat(record["finishedAt"].replace("Z", "+00:00"))
     return record
 

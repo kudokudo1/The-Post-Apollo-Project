@@ -28,6 +28,16 @@ class ArchiveTests(unittest.TestCase):
     def read(self):
         return archive.execute(self.folder, {"action": "list"})
 
+    def test_dump_archive_envelope_and_retention(self):
+        failed=dict(record(1),kind="dump",status="NOT VERIFIED",
+                    text=json.dumps({"schema":"post-apollo-widget-lifecycle-v1","status":"FAILED","reason":"INVALID TERMINAL WITNESS"}))
+        self.assertEqual(self.save(failed)["savedId"],failed["id"])
+        self.assertEqual(self.read()["rows"],[failed])
+        for text,status in (("not JSON","NOT VERIFIED"),(failed["text"],"COMPLETE"),('{"schema":"wrong","status":"FAILED"}',"NOT VERIFIED")):
+            with self.assertRaises(ValueError):
+                self.save(dict(failed,id=record(2)["id"],text=text,status=status))
+        self.assertEqual(self.read()["rows"],[failed])
+
     def test_empty_list_and_private_modes(self):
         self.assertEqual(self.read()["rows"], [])
         self.assertFalse(self.folder.exists())

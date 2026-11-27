@@ -45,5 +45,5 @@ print(json.dumps(dict(event="complete",pid=123,startTicks=456,workshopSchema="po
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,text=True,
                           stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=40,check=False)
     print(result.stdout)
-    if result.returncode or "CPU_Q5_NATIVE_PASS" not in result.stdout or "CPU_Q5E_JOINT_PASS" not in result.stdout or "CPU_Q5F_SAVED_DUMP_PASS" not in result.stdout or "CPU_Q5_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_Q5_NATIVE_PASS" not in result.stdout or "CPU_Q5E_JOINT_PASS" not in result.stdout or "CPU_Q5F_SAVED_DUMP_PASS" not in result.stdout or "CPU_Q5F_DUMP_ARCHIVE_PASS" not in result.stdout or "CPU_Q5_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native lifecycle witness failed")

@@ -72,7 +72,7 @@ QtObject {
         }
         return {
             clashLight: clashLight,
-            localLights: localLights.sort((a,b)=>b.level-a.level).slice(0,6),
+            localLights: localLights.sort((a,b)=>b.level-a.level).slice(0,8),
             power: light ? light.power : 0,
             time: light ? light.time : 0,
             color: light ? light.color : Colors.magenta,

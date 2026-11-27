@@ -1,5 +1,8 @@
 """FL5 actual owner delivery path; disposable B2 peer, no native grants."""
 import sys
+import json
+import subprocess
+from unittest.mock import patch
 import threading
 import unittest
 from pathlib import Path
@@ -104,6 +107,77 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(peer.observed, [])
         self.finish(d)
         self.assertEqual(d.take(view).status, "LOCAL_COMMITTED")
+
+    def test_recycled_numeric_identity_cannot_take_over_delivery(self):
+        d, view, peer = self.setup_trial([packet("READY", done=True)])
+        original = threading.current_thread()
+        self.assertIs(d._owner_thread, original)
+        with patch("first_light_delivery.threading.current_thread", return_value=object()):
+            for action in (d.advance, d.close, d.owner_outcome):
+                with self.assertRaisesRegex(DeliveryRefusal, "OWNER_ACTION_UNAVAILABLE"):
+                    action()
+        self.assertEqual(peer.observed, [])
+        self.finish(d)
+        self.assertEqual(d.take(view).status, "LOCAL_COMMITTED")
+
+    def child_commands(self, commands):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("first_light_delivery_child.py"))],
+            input="".join(json.dumps(c) + "\n" for c in commands),
+            capture_output=True, text=True, timeout=15, check=True)
+        self.assertEqual(result.stderr, "")
+        return [json.loads(line) for line in result.stdout.splitlines()]
+
+    def test_actual_child_control_snapshot_and_no_retarget(self):
+        commands = [
+            {"op": "OBSERVE", "epoch": 1, "visible": True},
+            {"op": "SUBMIT", "epoch": 1, "prompt": "wrong"},
+            {"op": "SUBMIT", "epoch": 1, "prompt": PROMPT},
+            {"op": "TAKE", "epoch": 1},
+            *[{"op": "STEP"} for _ in range(4)],
+            {"op": "TAKE", "epoch": 1},
+            {"op": "OBSERVE", "epoch": 2, "visible": False},
+            {"op": "OBSERVE", "epoch": 3, "visible": True},
+            {"op": "TAKE", "epoch": 1},
+            {"op": "TAKE", "epoch": 3},
+            {"op": "STOP", "epoch": 3},
+            {"op": "STEP"}, {"op": "STEP"}, {"op": "OUTCOME"},
+            {"op": "TAKE", "epoch": 3}, {"op": "CLOSE"},
+        ]
+        replies = self.child_commands(commands)
+        self.assertEqual(len(replies), len(commands))
+        self.assertFalse(replies[1]["ok"])
+        self.assertEqual(replies[3]["snapshot"]["status"], "PREPARED")
+        partial = replies[8]
+        self.assertEqual(partial["epoch"], 1)
+        self.assertEqual(partial["snapshot"]["text"], "RE")
+        self.assertTrue(partial["snapshot"]["provisional"])
+        self.assertFalse(partial["snapshot"]["native_admitted"])
+        self.assertEqual(set(partial["snapshot"]),
+                         {"sequence", "status", "text", "local_outcome",
+                          "provisional", "native_admitted"})
+        self.assertFalse(replies[11]["ok"])
+        self.assertIsNone(replies[12]["snapshot"])
+        self.assertEqual(replies[13]["ack"], "STOP_UNAVAILABLE")
+        self.assertEqual(replies[16]["status"], "LOCAL_COMMITTED")
+        self.assertIsNone(replies[17]["snapshot"])
+        self.assertEqual(replies[18]["local_outcome"], "COMMITTED_LOCAL")
+
+    def test_actual_child_contextual_stop_and_terminal(self):
+        commands = [
+            {"op": "OBSERVE", "epoch": 1, "visible": True},
+            {"op": "SUBMIT", "epoch": 1, "prompt": PROMPT},
+            *[{"op": "STEP"} for _ in range(4)],
+            {"op": "STOP", "epoch": 1}, {"op": "TAKE", "epoch": 1},
+            {"op": "STEP"}, {"op": "TAKE", "epoch": 1}, {"op": "CLOSE"},
+        ]
+        replies = self.child_commands(commands)
+        self.assertEqual(replies[6]["ack"], "STOP_LATCHED")
+        self.assertEqual(replies[7]["snapshot"]["status"], "STOP_REQUESTED")
+        self.assertEqual(replies[9]["snapshot"]["status"], "UNKNOWN_HOLD")
+        self.assertEqual(replies[9]["snapshot"]["local_outcome"], "ABORTED_LOCAL")
+        self.assertEqual(replies[9]["snapshot"]["text"], "")
+        self.assertEqual(replies[10]["local_outcome"], "ABORTED_LOCAL")
 
     def test_wrong_prompt_is_unknown_not_admission_or_retry(self):
         calls = []

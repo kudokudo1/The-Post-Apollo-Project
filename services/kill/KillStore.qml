@@ -38,6 +38,10 @@ Scope {
     readonly property var safety: safetyState
     readonly property var control: controlBackend
     readonly property var limits: limitBackend
+    // One long-lived executor; existing donor Hunter controller still admits
+    // and sequences exact reviewed targets during the transition.
+    readonly property var hunterExecutor: hunterExecution
+    HunterExecutor { id: hunterExecution }
 
     // Shared individual action authority. Only the transitional legacy
     // confirmation UI selects donorTask and contributes its bulk exclusion.

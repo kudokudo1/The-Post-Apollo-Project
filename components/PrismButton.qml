@@ -100,8 +100,12 @@ ActionButton {
             try {
                 Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
                               1,root.prismPalette,root.spectralGlowStrength)
+                const before=c.getImageData(Math.floor(width/2),Math.floor(height/2),1,1).data
+                console.info("PRISM_PAINT_PUT_IMAGE",before[0],before[1],before[2],before[3])
+                c.fillStyle="#ffffff"
+                c.fillRect(Math.floor(width/2),Math.floor(height/2),2,2)
                 const px=c.getImageData(Math.floor(width/2),Math.floor(height/2),1,1).data
-                console.info("PRISM_PAINT_DONE",px[0],px[1],px[2],px[3])
+                console.info("PRISM_PAINT_FILL_RECT",px[0],px[1],px[2],px[3])
             } catch (error) {
                 console.error("PRISM_PAINT_ERROR",String(error))
             }

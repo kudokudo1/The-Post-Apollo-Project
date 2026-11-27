@@ -271,7 +271,8 @@ Scope {
     // Observational timestamp only. Silence is not proof the child is hung.
     property double actionLastActivityAt: 0
     onActionBusyChanged: if (actionBusy) actionLastActivityAt = Date.now()
-    onActionStageChanged: if (actionBusy) actionLastActivityAt = Date.now()
+    onActionStageChanged: if (actionBusy && actionStage !== "RUNNING (SLOW)")
+        actionLastActivityAt = Date.now()
     function noteActionActivity() {
         if (actionBusy) actionLastActivityAt = Date.now();
     }

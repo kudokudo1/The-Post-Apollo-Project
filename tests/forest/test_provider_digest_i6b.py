@@ -151,3 +151,76 @@ class TagsTransportTests(unittest.TestCase):
         ):
             with self.assertRaises(M.DigestRefusal):
                 self.read(body, status, media)
+
+
+class ThinkingMetadataTests(unittest.TestCase):
+    def parse(self, show, version="0.32.14"):
+        return M.parse_thinking_metadata(
+            json.dumps({"version": version}).encode(),
+            json.dumps(show).encode())
+
+    def test_old_schema_missing_descriptor_is_unknown(self):
+        report = self.parse({"capabilities": ["completion", "thinking"],
+                             "renderer": "example"})
+        self.assertEqual(report.version_reported, "0.32.14")
+        self.assertIsNone(report.descriptor)
+
+    def test_named_exact_values_and_default(self):
+        report = self.parse({"thinking": {"values": ["low", "medium", "HIGH"],
+                                           "default": "medium"},
+                             "template": "not retained",
+                             "system": "not retained"}, "example-build")
+        self.assertEqual(report.descriptor.values, ("low", "medium", "HIGH"))
+        self.assertEqual(report.descriptor.default, "medium")
+        self.assertEqual(report.version_reported, "example-build")
+        self.assertNotIn("not retained", repr(report))
+
+    def test_binary_singleton_and_mixed_controls_are_not_three_levels(self):
+        for values, default in (([False, True], True), ([False], False),
+                                ([False, "low", "high"], "low")):
+            with self.subTest(values=values):
+                report = self.parse({"thinking": {"values": values, "default": default}})
+                self.assertEqual(report.descriptor.values, tuple(values))
+                self.assertIs(type(report.descriptor.default), type(default))
+
+    def test_reject_invalid_descriptor_and_defaults(self):
+        for descriptor in (None, [], {}, {"values": [], "default": False},
+                           {"values": ["low"], "default": "LOW"},
+                           {"values": [True], "default": 1},
+                           {"values": [0, 1], "default": 0},
+                           {"values": [None], "default": None},
+                           {"values": ["low", "low"], "default": "low"},
+                           {"values": [False, False], "default": False},
+                           {"values": [" low"], "default": " low"},
+                           {"values": ["x"*65], "default": "x"*65},
+                           {"values": [str(i) for i in range(33)], "default": "0"},
+                           {"values": ["low"], "default": "low", "extra": False}):
+            with self.subTest(descriptor=descriptor), self.assertRaisesRegex(
+                    M.DigestRefusal, "THINK_DESCRIPTOR_INVALID"):
+                self.parse({"thinking": descriptor})
+
+    def test_reject_duplicate_json_invalid_utf8_constants_and_size(self):
+        version = b'{"version":"example-build"}'
+        for body in (b'{"thinking":null,"thinking":null}',
+                     b'{"thinking":{"values":["low"],"default":"low","default":"low"}}',
+                     b'{"other":{"x":1,"x":2}}', b'{"other":NaN}', b'\xff',
+                     b'[]', b' '*(M.p0.MAX_BODY_BYTES+1), bytearray(b'{}')):
+            with self.subTest(kind=type(body)), self.assertRaises(M.DigestRefusal):
+                M.parse_thinking_metadata(version, body)
+
+    def test_invalid_version_and_no_version_inference(self):
+        for version in ("", "invalid version", "x"*65, None, 1):
+            with self.assertRaisesRegex(M.DigestRefusal, "THINK_VERSION_INVALID"):
+                self.parse({}, version)
+        # A version string alone supplies no evidence about a particular build.
+        self.assertIsNone(self.parse({}, "99.99.99").descriptor)
+
+    def test_no_transport_and_no_mutation_of_existing_observer(self):
+        with patch.object(M.http.client, "HTTPConnection") as connection, \\
+             patch.object(M, "observe") as observe:
+            result = self.parse({"thinking": {"values": [False], "default": False}})
+            connection.assert_not_called()
+            observe.assert_not_called()
+            with self.assertRaises(AttributeError):
+                result.descriptor.default = True
+            self.assertEqual(result.descriptor.values, (False,))

@@ -133,7 +133,9 @@ PanelWindow {
             height: 40
             color: "transparent"
 
+            PrismTextGlow { labelItem: prismTitleText }
             GohuText {
+                id: prismTitleText
                 anchors.left: parent.left
                 anchors.leftMargin: 8
                 anchors.right: prismToolbar.left
@@ -161,12 +163,8 @@ PanelWindow {
                     id: closePrismButton
                     width: prismToolbar.controlWidth
                     height: width
-                    softGlowEnabled: false
-                    wideGlowEnabled: false
-                    perimeterGlowEnabled: false
                     Accessible.name: "Close Prism widget"
                     onCloseRequested: root.menuOpen = false
-                    PrismBorderGlow { anchors.fill: parent }
                 }
                 ReloadButton {
                     id: prismReloadButton
@@ -177,11 +175,7 @@ PanelWindow {
                     unavailableOpacity: 0.80
                     semanticColor: Colors.yellow
                     hoverSurfaceColor: Colors.orange
-                    softGlowEnabled: false
-                    wideGlowEnabled: false
-                    perimeterGlowEnabled: false
                     Accessible.name: "Reload Prism index not yet available"
-                    PrismBorderGlow { anchors.fill: parent; strength: 0.65 }
                 }
                 Rectangle {
                     id: prismSourceIndicator
@@ -192,9 +186,11 @@ PanelWindow {
                     radius: 0
                     color: Colors.dark
                     border.width: 1
-                    border.color: root.prismBorderColor
+                    border.color: Colors.white
                     PrismBorderGlow { anchors.fill: parent }
+                    PrismTextGlow { labelItem: prismSourceText; strength: 0.85 }
                     GohuText {
+                        id: prismSourceText
                         anchors.fill: parent
                         anchors.leftMargin: 2
                         anchors.rightMargin: 2
@@ -212,38 +208,26 @@ PanelWindow {
                     width: prismToolbar.controlWidth
                     height: width
                     diagnosticsOpen: root.indexOpen
-                    softGlowEnabled: false
-                    wideGlowEnabled: false
-                    perimeterGlowEnabled: false
                     Accessible.description: "Registered Prism locations index"
                     onToggleRequested: root.indexOpen = !root.indexOpen
-                    PrismBorderGlow { anchors.fill: parent }
                 }
                 ResizeButton {
                     id: expandPrismButton
                     width: prismToolbar.controlWidth
                     direction: "up"
                     available: root.chassisLevel !== "large"
-                    softGlowEnabled: false
-                    wideGlowEnabled: false
-                    perimeterGlowEnabled: false
                     onResizeRequested: function(delta) {
                         if (delta === 1) root.expandChassis();
                     }
-                    PrismBorderGlow { anchors.fill: parent }
                 }
                 ResizeButton {
                     id: collapsePrismButton
                     width: prismToolbar.controlWidth
                     direction: "down"
                     available: root.chassisLevel !== "compact"
-                    softGlowEnabled: false
-                    wideGlowEnabled: false
-                    perimeterGlowEnabled: false
                     onResizeRequested: function(delta) {
                         if (delta === -1) root.collapseChassis();
                     }
-                    PrismBorderGlow { anchors.fill: parent }
                 }
             }
         }

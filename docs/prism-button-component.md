@@ -40,3 +40,34 @@ PrismArtwork.js computes continuous Gaussian-like glow falloff and antialiased c
 Run `node --test tests/components/test_prism_artwork.cjs` for deterministic source/geometry/pixel checks. It uses a mock Canvas context, not Qt. Native verification must inspect rendering at 24/32/44/64/96px, mirrored gap and square cuts, no colored slivers in the node, white interior continuity, white border and independent glow, resize and destruction, availability and one-click activation, and measure creation/paint cost on the actual QuickShell host. The exact native glow strength and state styling remain subject to operator acceptance. No existing widget or information control is replaced in V1.
 
 Shared semantic authority: [Syntagma icon grammar](https://github.com/kudokudo1/Meta-Apollo-Logos-Syntagma/blob/main/OPERATE/POST-APOLLO-ICON-GRAMMAR.md); this file records the technical implementation recipe, not a universal rollout authorization.
+
+## Prism widget header and placement index
+
+The full Post Apollo `PrismW` keeps its TASKS portrait proportions and
+Trash-derived height ceiling. The owning shell wires
+`PrismW.prismBorderColor` to `PrismDock.prismBorderColor`, which reads
+the actual `PrismButton.idleBorderColor`. Thus the 1px outer panel border,
+header title, divider, index-card borders and source label use one border
+identity, not copied color values. This does **not** replace the Prism
+button's multicolored ray/glow artwork with a monochrome image.
+
+The header deliberately has two rows so that the title and existing close
+button remain legible in narrow sizes. Resize down/up, a static
+`COLOR // SYNTAGMA` source badge, the disabled standard reload button, and
+the shared diagnostic toggle occupy its second row. The badge is not a
+heartbeat. Reload is unavailable until it has actual data to refresh.
+
+The diagnostic toggle owns `PrismW.indexOpen`; it switches the existing
+body between the honest empty dictionary and a placement dossier. The index
+renders `services/prism/PrismIndex.js`, a small source-backed registry of
+**verified Prism entry points**. Initially it includes only the Post Apollo
+bottom dock, with zero authored definitions. For later installations, update
+the registry **in the same integration PR** as the new `PrismButton` mount
+and reference a real module source path. The registry is not a background
+scanner, service-health authority, or permission boundary. Do not add
+uninstalled widgets or invented semantic definitions.
+
+Validation: `node --test tests/components/test_prism_artwork.cjs
+tests/components/test_prism_dock.cjs tests/components/test_prism_index.cjs`.
+Native/operator visual review still determines final header spacing and
+border/glow appearance.

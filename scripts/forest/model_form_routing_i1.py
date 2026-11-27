@@ -57,11 +57,80 @@ class TurnScope:
 
 
 @dataclass(frozen=True, slots=True)
+class ReasoningLeaseReference:
+    """Fixture description of a temporary lease, never a reservation."""
+    context: TaskContext
+    lease_id: str
+    revision: int
+    mode: str
+    remaining: int
+
+    def __post_init__(self):
+        _context(self.context)
+        _id(self.lease_id)
+        for value in (self.revision, self.remaining):
+            if type(value) is not int or not 1 <= value <= 2**53 - 1:
+                raise RoutingRefusal("INVALID_REASONING_LEASE")
+        _choice(self.mode, ("light", "normal", "deep"), "INVALID_REASONING")
+
+
+@dataclass(frozen=True, slots=True)
+class ReasoningControlReference:
+    """H16c synthetic turn projection; no source authentication or writes.
+
+    Auto mode is a supplied per-turn recommendation, not a router or
+    implicit default. A lease is scoped to the execution context, not
+    transferable to another lifetime. COMPLETE is only fixture coverage.
+    """
+    scope: TurnScope
+    revision: int
+    coverage: str
+    baseline: str
+    explicit_mode: str | None = None
+    temporary: ReasoningLeaseReference | None = None
+    automatic_mode: str | None = None
+
+    def __post_init__(self):
+        if type(self.scope) is not TurnScope:
+            raise RoutingRefusal("INVALID_TURN_SCOPE")
+        if type(self.revision) is not int or not 1 <= self.revision <= 2**53 - 1:
+            raise RoutingRefusal("INVALID_REASONING_CONTROL")
+        _choice(self.coverage, ("COMPLETE", "UNKNOWN"), "INVALID_REASONING_CONTROL")
+        _choice(self.baseline, ("auto", "light", "normal", "deep"),
+                "INVALID_REASONING_CONTROL")
+        for value in (self.explicit_mode, self.automatic_mode):
+            if value is not None:
+                _choice(value, ("light", "normal", "deep"), "INVALID_REASONING")
+        if self.temporary is not None:
+            if type(self.temporary) is not ReasoningLeaseReference:
+                raise RoutingRefusal("INVALID_REASONING_LEASE")
+            if self.temporary.context != self.scope.context:
+                raise RoutingRefusal("REASONING_SCOPE_MISMATCH")
+
+
+def _effective_reasoning(control):
+    if type(control) is not ReasoningControlReference:
+        raise RoutingRefusal("INVALID_REASONING_CONTROL")
+    if control.coverage != "COMPLETE":
+        raise RoutingRefusal("REASONING_COVERAGE_HOLD")
+    if control.explicit_mode is not None:
+        return control.explicit_mode, "explicit"
+    if control.temporary is not None:
+        return control.temporary.mode, "temporary"
+    if control.baseline != "auto":
+        return control.baseline, "pinned"
+    if control.automatic_mode is not None:
+        return control.automatic_mode, "automatic"
+    raise RoutingRefusal("REASONING_COVERAGE_HOLD")
+
+
+@dataclass(frozen=True, slots=True)
 class ReasoningReference:
-    """Already resolved reasoning; not a new reasoning resolver or lease."""
+    """Resolved fixture reasoning; legacy direct references are nonauthoritative."""
     scope: TurnScope
     mode: str
     source: str
+    control: ReasoningControlReference | None = None
 
     def __post_init__(self):
         if type(self.scope) is not TurnScope:
@@ -74,6 +143,30 @@ class ReasoningReference:
         object.__setattr__(self, "mode", mode)
         _choice(self.source, ("explicit", "temporary", "pinned", "automatic",
                               "fallback"), "INVALID_REASONING_SOURCE")
+        if self.control is not None:
+            if (type(self.control) is not ReasoningControlReference
+                    or self.control.scope != self.scope):
+                raise RoutingRefusal("REASONING_SCOPE_MISMATCH")
+            if _effective_reasoning(self.control) != (self.mode, self.source):
+                raise RoutingRefusal("REASONING_CONTROL_MISMATCH")
+
+    @property
+    def selected_lease(self):
+        """Original selected lease reference; not a claim or consumption."""
+        if self.control is not None and self.source == "temporary":
+            return self.control.temporary
+        return None
+
+
+def controlled_reasoning_reference(original, current):
+    """Freeze equal fixture observations; no durable settlement or authority."""
+    if (type(original) is not ReasoningControlReference
+            or type(current) is not ReasoningControlReference):
+        raise RoutingRefusal("INVALID_REASONING_CONTROL")
+    if original != current:
+        raise RoutingRefusal("REASONING_REFERENCE_CHANGED")
+    mode, source = _effective_reasoning(original)
+    return ReasoningReference(original.scope, mode, source, original)
 
 
 @dataclass(frozen=True, slots=True)

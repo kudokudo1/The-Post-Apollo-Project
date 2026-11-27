@@ -323,7 +323,7 @@ class ReasoningControlReferenceTests(unittest.TestCase):
         for context in (replace(self.scope.context, task_id="task-b"),
                         replace(self.scope.context, generation=2),
                         replace(self.scope.context, clone_key="clone-a"),
-                        replace(self.scope.context, owner_key="owner-b")):
+                        replace(self.scope.context, principal_key="owner-b")):
             with self.assertRaisesRegex(RoutingRefusal, "REASONING_SCOPE_MISMATCH"):
                 replace(self.base, temporary=replace(self.lease, context=context),
                         explicit_mode="deep")

@@ -57,6 +57,9 @@ ShellRoot {
         const workshop=findItem(paneItem,"cpuplusDiagnosticWorkshop");
         const slider=findItem(paneItem,"cpuplusWorkshopDuration-hardware");
         if(!band||!block||!target||!divider||!info||!host||!rail||!popup||!workshop||!slider) return false;
+        const calibration=findItem(paneItem,"cpuplusWorkshopCalibrationStatus");
+        const calibrationHost=findItem(paneItem,"cpuplusResourceCalibrationHost");
+        if(!calibration||!calibrationHost||calibration.parent!==calibrationHost)return false;
         const pos=item=>item.mapToItem(paneItem,0,0);
         const horizontal = Math.abs(pos(block).x-pos(band).x)<1
             && Math.abs(pos(host).x+host.width-pos(band).x-band.width)<1
@@ -77,6 +80,7 @@ ShellRoot {
             && pos(popup).y>=pos(divider).y+divider.height
             && (paneItem.subject==="SYSTEM" || (!workshop.verticalLayout && slider.rotation===90))
             && pos(divider).y+divider.height<=pos(band).y+1
+            && pos(calibration).y>=pos(band).y+band.height
             && (band.stacked ? stacked : horizontal)
             && Math.abs(rail.height-host.height)<1
             && Math.abs(rail.width-host.width)<1;
@@ -1325,6 +1329,17 @@ ShellRoot {
                 if(!root.check(w && host && host.selectorColumns===5
                     && root.resourceStatusGeometry(resourcePane.item)
                     && w.draft.selected.length===10,"SYSTEM wide rail retains vertical pairs and draft"))return;
+                nativeWindow.width=480;
+                root.phase=670;return;
+            }
+            if(root.phase===670 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const box=root.findItem(resourcePane.item,"cpuplusWorkshopStorageInstrument");
+                const pair=root.findItem(resourcePane.item,"cpuplusWorkshopStorageDialPair");
+                if(!w||!box||!pair)return;
+                if(!root.check(w.verticalLayout && w.mediumSystemDials && w.storageMechanical && pair.visible
+                    && box.y>=0 && box.y+box.height<=box.parent.height+1
+                    && root.resourceStatusGeometry(resourcePane.item),"SYSTEM medium mechanical dials and bounded enclosure"))return;
                 nativeWindow.width=160;
                 root.phase=671;return;
             }
@@ -1366,6 +1381,7 @@ ShellRoot {
                 const info=root.findItem(pane.item,"cpuplusMemoryDiagnosticsInfo");
                 if(!root.check(!w.verticalLayout && slider && slider.rotation===90 && popup && info
                     && popup.y>=info.mapToItem(pane.item,0,info.height).y
+                    && root.findItem(pane.item,"cpuplusWorkshopCalibrationStatus").parent===root.findItem(pane.item,"cpuplusMemoryCalibrationHost")
                     && w.filterKinds.join(",")==="memory" && w.draft.selected.join(",")==="memory"
                     && host&&block&&button&&button.width===button.height
                     && Math.abs(block.height-host.height)<=1

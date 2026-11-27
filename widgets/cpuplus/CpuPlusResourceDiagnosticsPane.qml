@@ -146,6 +146,13 @@ Item {
                 y: statusBand.stacked ? statusBlock.height+4 : (parent.height-height)/2
             }
         }
+        Item {
+            id: calibrationHost
+            objectName: "cpuplusResourceCalibrationHost"
+            width: parent.width
+            height: 14
+            visible: diagnostics.workshopOpen
+        }
     }
     Flickable {
         id: scroll
@@ -168,6 +175,7 @@ Item {
             workshopSubject: root.subject
             workshopViewportHeight: scroll.height
             workshopFilterTarget: filterHost
+            workshopCalibrationTarget: calibrationHost
             footerTarget: footerControls
             onNavigationChanged: scroll.contentY=0
         }

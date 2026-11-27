@@ -296,7 +296,7 @@ assert.match(workshop,/root.changeStorageCadence\(cadenceRow.field,-1\)/);
 assert.match(workshop,/storagePreview.observations/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: verticalLayout \? Math.max\(76,Math.min\(112,Math.floor\(viewportHeight\*0.47\)\)\) : compactLayout \? 112 : Math.min\(240,176\+/);
+assert.match(workshop,/instrumentHeight: mediumSystemDials && draft.selected.includes\("storage"\) \? Math.max\(154,Math.min\(184,Math.floor\(viewportHeight\*0.53\)\)\)/);
 assert.match(workshopSlider,/height: root\.vertical \? root\.verticalTravel : \(root\.compact \? 22 : 32\)/);
 assert.match(workshopSlider,/width: root\.vertical \? Math\.min\(parent\.width,48\) : parent\.height\s+height: root\.vertical \? parent\.height : parent\.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
@@ -364,7 +364,7 @@ assert.match(ui,/filterTarget: root.workshopFilterTarget/);
 assert.match(read("components/SelectorSlider.qml"),/property bool responsiveHardware: false/);
 assert.match(read("components/SelectorSlider.qml"),/property bool energizedValueFill: false/);
 
-assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialWidth>=92/);
+assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialWidth>=\(mediumSystemDials\?76:92\)/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorage-sample-dial"/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorage-report-dial"/);
 assert.doesNotMatch(workshop,/storageDialCell/);
@@ -765,3 +765,8 @@ assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/y: head
     }
     assert.ok(size(240)>17 && size(320)>size(240));
 }
+
+assert.match(workshop,/parent: root.calibrationTarget \|\| executionColumn/);
+assert.match(ui,/calibrationTarget: root.workshopCalibrationTarget/);
+assert.match(parent,/workshopCalibrationTarget: root.diagnosticSubject==="ALL" \? null : memoryCalibrationHost/);
+assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/workshopCalibrationTarget: calibrationHost/);

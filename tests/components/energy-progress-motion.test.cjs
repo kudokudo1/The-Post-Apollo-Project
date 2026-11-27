@@ -201,7 +201,7 @@ test("Ki Blast enemy heat grows through defeat and persists after impact", () =>
 });
 
 const currents=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact,airFlow,speedSample});");
+    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact,airFlow,speedSample,trackGeometry});");
 test("full-lane currents advance in opposite directions, with faster TRON", () => {
     const w=900,h=40;
     const left=currents.flow("ki-blast","standard","player",w,h,0,false);
@@ -528,4 +528,47 @@ test("DEFAULT is monotonic, bounded, and does not emit energy effects",()=>{
     assert.doesNotMatch(source.slice(start,end),/createRadialGradient|shadowBlur|orb\(/);
     assert.match(field,/source.variant==="default"\) continue/);
     assert.match(preview,/name:"DEFAULT",key:"default"/);
+});
+
+test("shared inset scales with height and preserves exact progress geometry",()=>{
+    for(const w of [4,12,80,150,800,2400]){
+        for(const h of [4,12,18,24,34,36,68,120]){
+            for(const p of [0,.01,.35,.63,.99,1]){
+                const g=currents.trackGeometry(w,h,p);
+                assert.ok(g.inset>=0&&g.gap>=0&&g.gap<=6);
+                assert.ok(g.width>=w/2&&g.height>=h/2);
+                assert.ok(Math.abs(g.width+2*g.inset-w)<1e-9);
+                assert.ok(Math.abs(g.height+2*g.inset-h)<1e-9);
+                assert.ok(Math.abs(g.front-(g.inset+p*g.width))<1e-9);
+                assert.ok(g.front>=g.inset-1e-9&&g.front<=w-g.inset+1e-9);
+            }
+        }
+    }
+    assert.equal(currents.trackGeometry(150,34,.5).gap,3);
+    assert.equal(currents.trackGeometry(2400,34,.5).gap,3);
+    assert.equal(currents.trackGeometry(150,68,.5).gap,6);
+    assert.equal(currents.trackGeometry(150,17,.5).gap,1.5);
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/Flow.trackGeometry\(width,height,displayedFraction\)/);
+    assert.match(source,/c.fillRect\(fx,fy,inner\*p,fillHeight\)/);
+    assert.match(source,/c.fillRect\(edge,fy,inner\*f.enemyFraction,fillHeight\)/);
+    assert.match(source,/Material.drawAsh\(c,fx,fy,inner,fillHeight,edge/);
+    assert.match(source,/if\(p<1\) Material.drawRemaining/);
+    assert.match(source,/c.rect\(start,fy,span,fillHeight\)/);
+    assert.match(preview,/source.mapToItem\(localRadiance,source.headCenterX,source.headCenterY\)/);
+});
+test("surviving burn-away material is inset and does not restore erased structure",()=>{
+    const calls=[];
+    const gradient={addColorStop(){}};
+    const context=new Proxy({}, {get:(o,k)=>k==="createLinearGradient"
+        ? ()=>gradient : (...a)=>{calls.push([k,...a]);}});
+    material.drawRemaining(context,.5,.5,199,33,100,false,"orange",3.5);
+    const fill=calls.find(c=>c[0]==="fillRect");
+    assert.equal(fill[1],103.5);
+    assert.equal(fill[2],4);
+    assert.equal(fill[3],92.5);
+    assert.equal(fill[4],26);
+    assert.ok(calls.some(c=>c[0]==="clip"));
+    assert.ok(calls.some(c=>c[0]==="stroke"));
 });

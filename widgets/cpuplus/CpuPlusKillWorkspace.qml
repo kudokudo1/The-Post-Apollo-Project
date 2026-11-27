@@ -23,6 +23,19 @@ Item {
     readonly property var history: graphSource
     readonly property var detailGraph: graphController
     property bool active: true
+    property var selectedGraphKeys: ["cpu","mem"]
+
+    function toggleMetricGraph(key) {
+        if (["cpu","mem","rss","threads","io","age","combined"].indexOf(key)<0) return;
+        const previous=selectedGraphKeys;
+        if (key==="combined") {
+            selectedGraphKeys=previous.indexOf("combined")>=0 ? [] : ["combined","score"];
+            return;
+        }
+        const normal=previous.filter(k=>k!=="combined" && k!=="score");
+        selectedGraphKeys=normal.indexOf(key)>=0
+            ? normal.filter(k=>k!==key) : normal.concat([key]).slice(-2);
+    }
 
     readonly property var gate: collectionSource ? collectionSource.actionGate : null
     readonly property var safety: collectionSource ? collectionSource.safety : null
@@ -198,6 +211,10 @@ Item {
             if (serial!==viewSerial || !active) return;
             if (kind==="view") killViewMode=value===killViewHunter?killViewHunter:killViewNormal;
             if (kind==="metric") hunterMetricMode=Math.max(0,Math.min(4,Number(value)));
+            if (kind==="view" || (kind==="metric" && killViewMode===killViewHunter)) {
+                selectedGraphKeys=killViewMode===killViewNormal ? ["cpu","mem"]
+                    : [["combined","score"],["cpu"],["rss"],["io"],["age"]][hunterMetricMode];
+            }
             if (kind==="visibility") hunterVisibilityMode=Math.max(0,Math.min(2,Number(value)));
             updateOrder(true);
             Qt.callLater(function() {
@@ -356,7 +373,6 @@ Item {
         taskHost.detailFocused=false;
         taskHost.selectedDetailActionIndex=-1;
         graphSession.selectCpu(row);
-        actuatorScroll.contentY=0;
         return true;
     }
 
@@ -469,6 +485,11 @@ Item {
         id: hunterGraph
         presentationState: history
         metricMode: workspace.hunterMetricMode
+    }
+    HunterPresentation {
+        id: detailHunterGraph
+        presentationState: history
+        metricMode: metricCombined
     }
     Connections {
         target: workspace.graphController
@@ -606,10 +627,7 @@ Item {
                 : selectedDetailActionIndex===1 ? details.freezeAction
                 : selectedDetailActionIndex===2 ? details.endAction : null;
             if (!item || !actuatorScroll || item.parent === headerActions || item.parent === killSlot || item.parent === freezeSlot) return;
-            const y=item.mapToItem(actuatorScroll.contentItem,0,0).y;
-            if (y<actuatorScroll.contentY) actuatorScroll.contentY=Math.max(0,y);
-            else if (y+item.height>actuatorScroll.contentY+actuatorScroll.height)
-                actuatorScroll.contentY=Math.max(0,y+item.height-actuatorScroll.height);
+            // Quick controls are pinned; no scroll offset or hidden actuator.
         }
         function isTaskMetricFavorite(entry, metricId) {
             return FavoritesService.isTaskMetricKey(FavoriteIdentity.taskMetricKey(entry, metricId));
@@ -909,7 +927,9 @@ Item {
                 anchors.margins: 8
                 clip: true
                 contentWidth: width
-                contentHeight: actuatorBody.implicitHeight + 20
+                contentHeight: height
+                interactive: false
+                boundsBehavior: Flickable.StopAtBounds
                 Column {
                 id: actuatorBody
                 objectName: "cpuPlusProcessGlowGutter"
@@ -938,7 +958,10 @@ Item {
                     graphDataAvailable: workspace.graphSession.matches(workspace.currentTask)
                     processController: processView
                     graphGeometry: graphGeometry
-                    hunterGraph: hunterGraph
+                    hunterGraph: detailHunterGraph
+                    metricGraphSelectionEnabled: true
+                    selectedGraphKeys: workspace.selectedGraphKeys
+                    onMetricGraphRequested: function(key) { workspace.toggleMetricGraph(key); }
                     searchInputTarget: processSearch
                     safetyLockComponent: safetyLock
                     actionTarget: leftActions
@@ -949,7 +972,7 @@ Item {
                     killLockTarget: killLockSlot
                     restartLockTarget: restartLockSlot
                     freezeLockTarget: freezeLockSlot
-                    viewportHeight: actuatorScroll.height - 12
+                    viewportHeight: Math.max(1,actuatorScroll.height - quickFooter.height - 24)
                 }
 
                 // Extra observed metrics use the donor's existing scene-graph
@@ -960,13 +983,13 @@ Item {
                         {key:"threads", label:"THREADS", unit:"", accent:Colors.resourceColor("threads"), range:4, decimals:0},
                         {key:"io", label:"I/O", unit:" MiB/s", accent:Colors.cyan, range:0.25, decimals:2},
                         {key:"age", label:"UPTIME", unit:" min", accent:Colors.resourceColor("uptime"), range:1, decimals:2}
-                    ] : []
+                    ].filter(m=>workspace.selectedGraphKeys.indexOf(m.key)>=0) : []
                     delegate: Item {
                         id: extraMetric
                         required property var modelData
                         objectName: "cpuPlusDetailMetric-"+modelData.key
                         width: parent.width
-                        height: 96
+                        height: details.graphHeight
                         readonly property var values: details.graphDataAvailable
                             && history.taskExtraDetailHistories
                             ? history.taskExtraDetailHistories[modelData.key] || [] : []
@@ -1029,6 +1052,16 @@ Item {
                     }
                 }
 
+                }
+                Column {
+                id: quickFooter
+                objectName: "cpuPlusQuickControlFooter"
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 8
+                x: 8
+                width: actuatorBody.width
+                spacing: 6
+                visible: !!workspace.currentTask
                 Item {
                     id: limitLockSlot
                     objectName: "cpuPlusProcessLimitLockSlot"
@@ -1044,30 +1077,23 @@ Item {
                     visible: !!workspace.currentTask
                     enabled: workspace.exactTargetAvailable && !workspace.locallyPending
                 }
-                GohuText {
-                    width: parent.width
-                    visible: workspace.stagedLimitPercent >= 0
-                    text: "LIMIT PREVIEW // " + workspace.stagedLimitPercent + "%"
-                    color: Colors.yellow
-                    font.pixelSize: 12
-                }
                 Rectangle {
                     width: parent.width
                     height: 34
                     color: Colors.black
                     border.width: 1
                     border.color: Colors.yellow
-                    visible: workspace.stagedLimitPercent >= 0
-                    opacity: workspace.exactTargetAvailable && !workspace.locallyPending ? 1 : 0.45
+                    visible: !!workspace.currentTask
+                    opacity: workspace.stagedLimitPercent >= 0 && workspace.exactTargetAvailable && !workspace.locallyPending ? 1 : 0.45
                     GohuText {
                         anchors.centerIn: parent
-                        text: "APPLY LIMIT // REVIEW"
+                        text: workspace.stagedLimitPercent >= 0 ? "APPLY LIMIT "+workspace.stagedLimitPercent+"% // REVIEW" : "APPLY LIMIT // REVIEW"
                         color: Colors.yellow
                         font.pixelSize: 11
                     }
                     MouseArea {
                         anchors.fill: parent
-                        enabled: workspace.exactTargetAvailable
+                        enabled: workspace.stagedLimitPercent >= 0 && workspace.exactTargetAvailable
                                  && !workspace.locallyPending
                         onClicked: workspace.prepareAction(
                             "limit", workspace.stagedLimitPercent)
@@ -1075,22 +1101,13 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    wrapMode: Text.Wrap
+                    elide: Text.ElideRight
                     text: workspace.gate ? workspace.gate.feedback : "NO SHARED ACTION OWNER"
                     color: Colors.orange
                     font.pixelSize: 10
                 }
 
                 }
-            }
-            NeonScrollBar {
-                objectName: "cpuPlusKillActuatorScroll"
-                flickable: actuatorScroll
-                geometryMode: "viewport"
-                visible: scrollable
-                railColor: Colors.red
-                handleColor: Colors.magenta
-                wheelEnabled: false
             }
             Rectangle {
                 id: lockHelp

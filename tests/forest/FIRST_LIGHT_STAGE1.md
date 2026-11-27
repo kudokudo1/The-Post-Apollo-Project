@@ -81,3 +81,41 @@ source policy cannot be accepted. No extra source fetch or broadened
 allowlist. Template/config role evidence is not separately emitted; use
 the same verified manifest for later authorized qualification. Offline
 PR/push workflow runs synthetic verifier tests only, no acquisition.
+
+
+## Original attempt and FD launcher correction
+
+Hospital #7222390290 single intent is SPENT. Original manual run
+46027506290 attempt 1, exact 4971212b, raw job 140602601999: six offline
+tests pass; STAGE1_HOLD INHERITED_FD exit 2 before any artifact fetch.
+No FD target/type known, no credential exposure inferred. Never retry
+or rerun that exercise. Any second staging exercise requires distinct
+operator authorization after corrected exact review and fresh custody.
+
+Preserve the existing clean environment, null stdin, GNU timeout
+process-group boundary (720s + 10s), job deadline and all artifact/source/
+disk policies. Add fixed first_light_stage1_launcher.py between timeout
+and verifier. It requires the same exact environment key set and fixed
+PATH/LANG, validates null stdin and open stdout/stderr, closes every
+actual nonstdio FD in its single-threaded process, verifies no extra FD
+remains, then execve the fixed reviewed sibling with same PID/group,
+not another worker or an arbitrary executable. No FD target, value,
+credential or untrusted error detail logged. Original verifier independently
+checks extra FDs again before acquisition; only EBADF for the already
+closed enumeration FD is tolerated, unknown errors refuse. No change
+to preflight ordering or acquisition authority. This is descriptor
+hygiene, not full credential/host/egress isolation.
+
+Offline-only workflow runs actual fixed launcher with --offline-witness
+under timeout and clean env/null stdin; this execs only the fixed test
+entrypoint which calls the real verifier FD guard, never staging.
+Tests pass actual inheritable file, pipe, socket and high FD through
+raw and corrected exec, assert raw refusal, no inherited FD in corrected
+child, original parent descriptors remain usable; extra environment/
+nonnull stdin refuse. --offline-wait is a fixed no-acquisition witness
+for timeout exit 124 and original process reap, not a stage mode.
+No offline path calls stage.run/fetch, no actual artifact download
+or native provider. The original timeout behavior is unchanged;
+offline witness does not prove cleanup under runner death or actual
+acquisition capacity. Exact Spirit/Heart/Nurse correction reviews and
+a separate operator decision required before a new staging exercise.

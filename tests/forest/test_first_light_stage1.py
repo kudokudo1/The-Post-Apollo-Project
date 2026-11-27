@@ -1,5 +1,10 @@
 """Offline Stage 1 checks. No HTTP, no artifact acquisition or execution."""
+import fcntl
 import hashlib
+import os
+import signal
+import socket
+import subprocess
 import io
 import json
 from pathlib import Path
@@ -116,6 +121,67 @@ class Stage1Tests(unittest.TestCase):
             with self.subTest(length=len(raw)), self.assertRaises(stage.Hold):
                 stage.unpack(io.BytesIO(raw), time.monotonic()+5)
 
+    def test_actual_inherited_file_pipe_socket_high_fd_are_closed_only_in_child(self):
+        env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+        launcher = str(Path(__file__).with_name("first_light_stage1_launcher.py"))
+        raw = str(Path(__file__).resolve())
+        base = ["/usr/bin/python3", "-I", "-B"]
+        sock, peer = socket.socketpair()
+        with tempfile.TemporaryFile() as marker, sock, peer:
+            marker.write(b"fixture")
+            marker.flush()
+            marker.seek(0)
+            rd, wr = os.pipe()
+            high = fcntl.fcntl(marker.fileno(), fcntl.F_DUPFD, 256)
+            fds = (marker.fileno(), rd, wr, sock.fileno(), high)
+            try:
+                for fd in fds:
+                    os.set_inheritable(fd, True)
+                opts = dict(env=env, stdin=subprocess.DEVNULL, capture_output=True,
+                            text=True, timeout=10, pass_fds=fds)
+                refused = subprocess.run(base + [raw, "--fd-witness"], **opts)
+                self.assertEqual((refused.returncode, refused.stdout, refused.stderr),
+                                 (2, "STAGE1_HOLD INHERITED_FD\n", ""))
+                good = subprocess.run(
+                    ["/usr/bin/timeout", "--signal=TERM", "--kill-after=2s", "5s"]
+                    + base + [launcher, "--offline-witness"], **opts)
+                self.assertEqual((good.returncode, good.stdout, good.stderr),
+                                 (0, "STAGE1_OFFLINE_FD_PASS\n", ""))
+                # All original parent descriptors still exist and work.
+                for fd in fds:
+                    os.fstat(fd)
+                self.assertEqual(os.read(high, 7), b"fixture")
+                os.write(wr, b"x")
+                self.assertEqual(os.read(rd, 1), b"x")
+                peer.sendall(b"s")
+                self.assertEqual(sock.recv(1), b"s")
+            finally:
+                os.close(high)
+                os.close(rd)
+                os.close(wr)
+
+    def test_original_timeout_owns_exec_replacement(self):
+        env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+        launcher = str(Path(__file__).with_name("first_light_stage1_launcher.py"))
+        result = subprocess.run(
+            ["/usr/bin/timeout", "--signal=TERM", "--kill-after=2s", "2s",
+             "/usr/bin/python3", "-I", "-B", launcher, "--offline-wait"],
+            env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=8)
+        self.assertEqual((result.returncode, result.stdout, result.stderr),
+                         (124, "STAGE1_OFFLINE_FD_PASS\n", ""))
+
+    def test_launcher_refuses_extra_environment_and_nonnull_stdin(self):
+        env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+        argv = ["/usr/bin/python3", "-I", "-B",
+                str(Path(__file__).with_name("first_light_stage1_launcher.py")),
+                "--offline-witness"]
+        for kwargs in (dict(env={**env, "FIXTURE_SECRET": "not-a-real-secret"},
+                            stdin=subprocess.DEVNULL),
+                       dict(env=env, input="fixture")):
+            result = subprocess.run(argv, capture_output=True, text=True, timeout=5, **kwargs)
+            self.assertEqual((result.returncode, result.stdout, result.stderr),
+                             (2, "STAGE1_HOLD LAUNCHER_REFUSAL\n", ""))
+
     def test_unqualified_environment_stops_before_acquisition(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {}, clear=True):
             with self.assertRaisesRegex(stage.Hold, "RUNNER_SCOPE"):
@@ -123,4 +189,17 @@ class Stage1Tests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    if sys.argv[1:] in (["--fd-witness"], ["--fd-wait"]):
+        # Fixed no-acquisition child; invoke the real independent verifier
+        # FD guard, not a mock. Never call stage.run or stage.fetch.
+        try:
+            stage.require_closed_fds()
+        except stage.Hold as exc:
+            print("STAGE1_HOLD " + str(exc), flush=True)
+            sys.exit(2)
+        print("STAGE1_OFFLINE_FD_PASS", flush=True)
+        if sys.argv[1:] == ["--fd-wait"]:
+            signal.pause()
+            sys.exit(2)
+    else:
+        unittest.main()

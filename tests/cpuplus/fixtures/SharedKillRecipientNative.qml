@@ -457,28 +457,36 @@ ShellRoot {
                 // Exercise each real controller signal independently. The
                 // donor's selective repaint is the authority, not the old CPU++ path.
                 const revisions = () => [detail.cpuCanvas.graphRevision,
-                    detail.memCanvas.graphRevision, detail.combiScoreCanvas.graphRevision];
+                    detail.memCanvas.graphRevision];
                 const delta = before => JSON.stringify(revisions().map((n,i)=>n-before[i]));
+                // COMBI has no local revision counter: shared history revision
+                // drives its points. Its existing scroll state witnesses reset
+                // and append behavior without instrumenting the renderer.
+                const combi = detail.combiScoreCanvas;
+                combi.resetGraphScroll();
+                combi.graphScrollOffset=7;
                 let before = revisions();
-                fakeGraph.repaintCpuMem(false);
-                if (!smoke.check(delta(before)==="[1,1,0]",
-                    "donor parity: CPU/MEM repaint excludes COMBI")) return;
+                fakeGraph.repaintCpuMem(true);
+                if (!smoke.check(delta(before)==="[1,1]" && combi.graphScrollOffset===7,
+                    "donor parity: CPU/MEM repaint excludes COMBI reset")) return;
                 before = revisions();
-                fakeGraph.repaintCpu(false);
-                if (!smoke.check(delta(before)==="[1,0,0]",
+                fakeGraph.repaintCpu(true);
+                if (!smoke.check(delta(before)==="[1,0]" && combi.graphScrollOffset===7,
                     "donor parity: CPU-only repaint")) return;
                 before = revisions();
-                fakeGraph.repaintAll(false);
-                if (!smoke.check(delta(before)==="[1,1,1]",
-                    "donor parity: full repaint")) return;
+                fakeGraph.repaintAll(true);
+                if (!smoke.check(delta(before)==="[1,1]" && combi.graphScrollOffset===0,
+                    "donor parity: full repaint resets COMBI")) return;
+                combi.graphScrollOffset=7;
                 before = revisions();
                 fakeGraph.prepareCpuMemAppend();
-                if (!smoke.check(delta(before)==="[1,1,0]",
-                    "donor parity: CPU/MEM append preparation")) return;
+                if (!smoke.check(delta(before)==="[1,1]" && combi.graphScrollOffset===7,
+                    "donor parity: CPU/MEM append preparation excludes COMBI")) return;
+                combi.resetGraphScroll();
                 before = revisions();
                 fakeGraph.prepareCombiAppend();
-                if (!smoke.check(delta(before)==="[0,0,1]",
-                    "donor parity: COMBI append preparation")) return;
+                if (!smoke.check(delta(before)==="[0,0]" && combi.graphScrollOffset>0,
+                    "donor parity: COMBI append starts its own animation")) return;
                 info.open=true;
                 const initial=detail.cpuCanvas.graphRevision;
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];

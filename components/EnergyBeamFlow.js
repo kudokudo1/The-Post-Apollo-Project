@@ -24,9 +24,11 @@ function flow(variant, fireMode, side, span, height, time, reduced) {
         }
     }
     if(tron) {
-        stream(w,0,Math.min(44,Math.max(12,Math.ceil(w/h*2.1))),h*23,2.2,.84,false);
-        const wake=Math.min(w,h*7);
-        stream(wake,w-wake,9,h*28,3.5,.91,true);
+        // The fast visible wake remains attached to the head even on a
+        // wall-wide track; faint internal current still covers the lane.
+        stream(w,0,Math.min(44,Math.max(12,Math.ceil(w/h*2.1))),h*23,1.45,.24,false);
+        const wake=Math.min(w,h*4.2);
+        stream(wake,w-wake,9,h*28,1.65,.84,true);
     } else if(ki) {
         stream(w,0,Math.min(32,Math.max(7,Math.ceil(w/h*1.55))),h*11,1.15,.68,false);
     } else {
@@ -44,12 +46,28 @@ function head(variant,height,power,width) {
     if(!large) return null;
     const scale=Math.max(1,Math.min(2.5,power));
     // A core that covers the entire cross-section even at ignition.
-    return {rx:Math.min(h*(variant==="omnitrix"?.83:.76)*(1+.16*(scale-1)),w*.48),
-        ry:h*(.66+.055*(scale-1)),solid:.48};
+    return {rx:Math.min(h*(variant==="omnitrix"?.89:.82)*(1+.16*(scale-1)),w*.48),
+        ry:h*(.70+.055*(scale-1)),solid:.48};
 }
 
 function clashSizes(fraction,heat) {
     const p=Math.max(0,Math.min(1,fraction));
     const bias=2*p-1;
     return {player:1+.60*bias,enemy:1-.60*bias+.22*heat};
+}
+
+// Shared contact chord, smaller as either sphere dominates. The winning
+// sphere is clipped only at its small contact cap, not through its center.
+function contact(fraction,heat,height,width) {
+    const size=clashSizes(fraction,heat);
+    const h=Math.max(0,height),w=Math.max(0,width);
+    const base=Math.min(h*.92,w*.22);
+    const left={rx:base*size.player,ry:h*.72*size.player};
+    const right={rx:base*size.enemy,ry:h*.72*size.enemy};
+    const chord=Math.min(left.ry,right.ry)*.76;
+    for(const lobe of [left,right]) {
+        const ratio=lobe.ry>0?chord/lobe.ry:0;
+        lobe.offset=lobe.rx*Math.sqrt(Math.max(0,1-ratio*ratio));
+    }
+    return {left:left,right:right,chord:chord};
 }

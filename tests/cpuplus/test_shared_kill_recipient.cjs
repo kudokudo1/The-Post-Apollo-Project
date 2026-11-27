@@ -672,9 +672,109 @@ test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results wi
     assert.match(store,/onFinished: hunterController\.finish\(\)/);
     assert.match(store,/onErrorRaised: function\(message\)/);
     assert.match(owner,/property: "donorHunterHost"\s*value: appControlWindow/);
-    assert.match(owner,/property: "donorHunterFavorites"\s*value: appControlWindow\.favoriteStore/);
+    assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
+    assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
+    assert.doesNotMatch(owner,/property: "donorHunterFavorites"/);
     assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!host \|\| !favoriteStoreObject\) return;/);
     assert.match(controller,/if \(!host \|\| !favoriteStoreObject\) \{ stopRemaining\(\); return; \}/);
     assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
     assert.doesNotMatch(owner,/property alias hunterOperation/);
+});
+
+test("K4a: donor and service share original bulk eligibility policy", () => {
+    const store=read("services/kill/KillStore.qml");
+    const a=store.indexOf("    function taskEligibleForKillAll(");
+    const b=store.indexOf("    function snapshotCadence(",a);
+    assert.ok(a>=0 && b>a);
+    const rows=[{_taskRecord:true,pid:4321,user:"synthetic",state:"S"},
+                {_taskRecord:true,pid:4322,user:"other",state:"S"},
+                {_taskRecord:true,pid:4323,user:"synthetic",state:"Z"},
+                {_taskRecord:true,pid:4324,user:"synthetic",state:"S",protected:true},
+                {_taskRecord:true,pid:1,user:"synthetic",state:"S"},
+                {pid:4325,user:"synthetic",state:"S"}];
+    const safety={protectedFromKillAll:row=>!!row.protected};
+    const api=new Function("Quickshell","safety","rows",store.slice(a,b)
+        +"\nreturn {taskEligibleForKillAll,killAllEligibleTasks};")({env:()=>"synthetic"},safety,rows);
+    assert.deepEqual(rows.map(api.taskEligibleForKillAll),[true,false,false,false,false,false]);
+    assert.deepEqual(api.killAllEligibleTasks(),[rows[0]]);
+    assert.equal(api.taskEligibleForKillAll(null),false);
+    const owner=read("widgets/AppControlW.qml");
+    assert.match(owner,/return KillBackend\.KillStore\.taskEligibleForKillAll\(entry\)/);
+    assert.match(owner,/return KillBackend\.KillStore\.killAllEligibleTasks\(\)/);
+});
+
+test("K4b: Hunter uses canonical process identity and one Favorites singleton", () => {
+    const store=read("services/kill/KillStore.qml");
+    const controller=read("services/kill/HunterOperationController.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const js=read("services/favorites/FavoritesAppControlIdentityPolicy.js");
+    const policy=new Function(js.replace(/^\.pragma library\s*/,"")+"\nreturn {taskIdentity,taskKey};")();
+    assert.match(store,/import qs\.services\.favorites/);
+    assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
+    assert.match(owner,/readonly property var favoriteStore: FavoritesStore/);
+    assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
+    assert.doesNotMatch(store+owner,/donorHunterFavorites/);
+    assert.match(controller,/identity: FavoriteIdentity\.taskIdentity\(entry\)/);
+    assert.match(controller,/FavoriteIdentity\.taskIdentity\(row\) === target\.identity/);
+    assert.doesNotMatch(controller,/host\.taskPersistentIdentity/);
+    const a=store.indexOf("    function taskPersistentIdentity(");
+    const b=store.indexOf("    // Preserve the donor",a);
+    assert.ok(a>=0 && b>a);
+    const favorites={favoriteKeys:["task|brave","task|with%20space"]};
+    const api=new Function("FavoriteIdentity","favoriteStore",store.slice(a,b)
+        +"\nreturn {taskPersistentIdentity,isTaskFavorite};")(policy,favorites);
+    assert.equal(api.taskPersistentIdentity({comm:" Brave "}),"brave");
+    assert.equal(api.isTaskFavorite({comm:"BRAVE",pid:22}),true);
+    assert.equal(api.isTaskFavorite({comm:"BRAVE",pid:99}),true);
+    assert.equal(api.isTaskFavorite({comm:"With Space"}),true);
+    assert.equal(api.isTaskFavorite({args:"/usr/bin/brave --x"}),true);
+    assert.equal(api.isTaskFavorite({comm:"other"}),false);
+    assert.equal(api.isTaskFavorite({}),false);
+    favorites.favoriteKeys=[];
+    assert.equal(api.isTaskFavorite({comm:"brave"}),false);
+    favorites.favoriteKeys=null;
+    assert.equal(api.isTaskFavorite({comm:"brave"}),true);
+});
+
+test("K4c: shared HOG and MICE rules retain thresholds and refuse unknown window inventory", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const a=store.indexOf("    function hunterTaskActive(");
+    const b=store.indexOf("    // Read the original Favorites membership;",a);
+    assert.ok(a>=0 && b>a);
+    const rows=[];
+    const presentation={metricCombined:0,metricCpu:1,metricMemory:2,metricIo:3,metricAge:4,
+        taskPeak:e=>e.peak,taskAverage:e=>e.avg,taskMemoryMiB:e=>e.rss,taskIoRate:e=>e.io,
+        elapsedSeconds:v=>Number(v),taskMetricScore:(e,m)=>m===2?e.rss:e.peak};
+    const root={rows};
+    const api=new Function("root","hunterPresentation","taskEligibleForKillAll","isTaskFavorite",
+        "let hunterVisibleWindows=null;\n"+store.slice(a,b)
+        +"\nreturn {hunterHogCandidates,hunterMouseCandidates,hunterMouseProtectedReason,windows:v=>hunterVisibleWindows=v};")
+        (root,presentation,e=>!!e._taskRecord&&!e.protected,e=>!!e.favorite);
+    const row=(pid,extra={})=>({_taskRecord:true,pid,ppid:9000,comm:"synthetic-leaf",tty:"?",state:"S",
+        elapsed:"3000",cpu:.05,mem:.1,peak:.1,avg:.04,rss:12,io:0,...extra});
+    const first=row(4001), favorite=row(4002,{favorite:true}), protectedRow=row(4003,{protected:true});
+    const visible=row(4004), interactive=row(4005,{tty:"pts/1"}), orphan=row(4006,{ppid:1});
+    const parent=row(4007), child=row(4008,{ppid:4007,elapsed:"10"});
+    const helper=row(4009,{comm:"brave-helper"}), frozen=row(4010,{state:"T"});
+    rows.push(first,favorite,protectedRow,visible,interactive,orphan,parent,child,helper,frozen);
+    assert.deepEqual(api.hunterMouseCandidates(),[]);
+    assert.equal(api.hunterMouseProtectedReason(first),"WINDOW INVENTORY UNAVAILABLE");
+    api.windows([{pid:visible.pid}]);
+    assert.deepEqual(api.hunterMouseCandidates(),[first]);
+    assert.equal(api.hunterMouseProtectedReason(favorite),"FAVORITE");
+    assert.equal(api.hunterMouseProtectedReason(protectedRow),"SESSION/PROTECTED");
+    assert.equal(api.hunterMouseProtectedReason(visible),"ACTIVE APP TREE");
+    assert.equal(api.hunterMouseProtectedReason(interactive),"INTERACTIVE/TTY TREE");
+    assert.equal(api.hunterMouseProtectedReason(orphan),"USER SERVICE/ORPHAN");
+    assert.equal(api.hunterMouseProtectedReason(parent),"PROCESS TREE");
+    assert.equal(api.hunterMouseProtectedReason(helper),"IMPORTANT HELPER");
+    assert.equal(api.hunterMouseProtectedReason(frozen),"FROZEN");
+    const top=row(5001,{peak:30}), above=row(5002,{peak:15}), below=row(5003,{peak:14}),
+        excluded=row(5004,{peak:80,favorite:true}), critical=row(5005,{peak:90,protected:true});
+    rows.splice(0,rows.length,top,above,below,excluded,critical);
+    assert.deepEqual(api.hunterHogCandidates(1),[top,above]);
+    assert.match(owner,/return KillBackend\.KillStore\.hunterHogCandidates\(/);
+    assert.match(owner,/return KillBackend\.KillStore\.hunterMouseCandidates\(\)/);
+    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.swayWindows/);
 });

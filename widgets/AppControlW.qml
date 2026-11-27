@@ -1073,8 +1073,8 @@ PanelWindow {
     }
     Binding {
         target: KillBackend.KillStore
-        property: "donorHunterFavorites"
-        value: appControlWindow.favoriteStore
+        property: "hunterVisibleWindows"
+        value: appControlWindow.swayWindows
     }
 
     readonly property var thermalRows:
@@ -1939,30 +1939,11 @@ PanelWindow {
     }
 
     function taskEligibleForKillAll(entry) {
-        if (!entry || !entry._taskRecord || Number(entry.pid || 0) <= 1)
-            return false;
-
-        const currentUser = String(Quickshell.env("USER") || "").trim();
-        const taskUser = String(entry.user || "").trim();
-
-        if (currentUser.length > 0
-                && taskUser.length > 0
-                && taskUser !== currentUser)
-            return false;
-
-        if (String(entry.state || "").indexOf("Z") !== -1)
-            return false;
-
-        return !taskProtectedFromKillAll(entry);
+        return KillBackend.KillStore.taskEligibleForKillAll(entry);
     }
 
     function killAllEligibleTasks() {
-        const rows = [];
-        for (let i = 0; i < taskRows.length; i++) {
-            if (taskEligibleForKillAll(taskRows[i]))
-                rows.push(taskRows[i]);
-        }
-        return rows;
+        return KillBackend.KillStore.killAllEligibleTasks();
     }
 
     function requestKillAllEligibleTasks() {
@@ -2088,27 +2069,7 @@ PanelWindow {
     }
 
     function hunterTaskActive(entry, requestedMetric) {
-        const metric = requestedMetric === undefined ? hunterMetricMode : requestedMetric;
-        if (!entry || !entry._taskRecord)
-            return false;
-
-        if (metric === hunterMetricMemory)
-            return hunterTaskMemoryMiB(entry) >= 16;
-
-        if (metric === hunterMetricIo)
-            return hunterTaskIoRate(entry) >= 1024;
-
-        if (metric === hunterMetricAge)
-            return taskElapsedSeconds(entry.elapsed) > 0;
-
-        // COMBI's memory threshold independently admits a row.
-        // Avoid scanning CPU history when it already qualifies.
-        if (metric === hunterMetricCombined
-                && hunterTaskMemoryMiB(entry) >= 128)
-            return true;
-
-        return hunterTaskPeak(entry) >= 0.35
-               || hunterTaskAverage(entry) >= 0.15;
+        return KillBackend.KillStore.hunterTaskActive(entry, requestedMetric === undefined ? hunterMetricMode : requestedMetric);
     }
 
     function hunterTaskClassVisible(entry) {
@@ -2185,252 +2146,39 @@ PanelWindow {
     }
 
     function hunterHogCandidates(requestedMetric) {
-        const metric = requestedMetric === undefined ? hunterMetricMode : requestedMetric;
-        // Bulk HOG execution always excludes protected/session-critical rows,
-        // even when PROTECTED or ALL is selected for inspection.
-        const rows = taskRows.filter(function(entry) {
-            return taskEligibleForKillAll(entry)
-                   && hunterTaskActive(entry, metric)
-                   && !isFavoriteItem(entry, killModeIndex);
-        });
-        rows.sort(function(a, b) {
-            return hunterPresentation.taskMetricScore(b, metric) - hunterPresentation.taskMetricScore(a, metric);
-        });
-        if (rows.length === 0)
-            return [];
-
-        const topScore = Math.max(0.01, hunterPresentation.taskMetricScore(rows[0], metric));
-        let minimum = 0;
-        let ratio = 0.48;
-        if (metric === hunterMetricCpu)
-            minimum = 8.0;
-        else if (metric === hunterMetricMemory)
-            minimum = 128.0; // MiB RSS
-        else if (metric === hunterMetricIo)
-            minimum = 1024 * 1024; // 1 MiB/s
-        else if (metric === hunterMetricAge) {
-            minimum = 3600;
-            ratio = 0.72;
-        } else
-            minimum = 8.0;
-
-        const threshold = Math.max(minimum, topScore * ratio);
-        return rows.filter(function(entry) {
-            return hunterPresentation.taskMetricScore(entry, metric) >= threshold;
-        }).slice(0, 8);
+        return KillBackend.KillStore.hunterHogCandidates(requestedMetric === undefined ? hunterMetricMode : requestedMetric);
     }
 
     function hunterVisibleWindowPidSet() {
-        const visible = ({});
-        const windows = Array.isArray(swayWindows) ? swayWindows : [];
-        for (let i = 0; i < windows.length; i++) {
-            const pid = Number(windows[i] && windows[i].pid || 0);
-            if (pid > 1)
-                visible[String(pid)] = true;
-        }
-        return visible;
+        return KillBackend.KillStore.hunterVisibleWindowPidSet();
     }
 
     function hunterTaskPidMap() {
-        const byPid = ({});
-        for (let i = 0; i < taskRows.length; i++) {
-            const row = taskRows[i];
-            const pid = Number(row && row.pid || 0);
-            if (pid > 1)
-                byPid[String(pid)] = row;
-        }
-        return byPid;
+        return KillBackend.KillStore.hunterTaskPidMap();
     }
 
     function hunterDescendsFromVisibleWindow(entry) {
-        if (!entry)
-            return false;
-
-        const visible = hunterVisibleWindowPidSet();
-        const byPid = hunterTaskPidMap();
-        let pid = Number(entry.pid || 0);
-        let guard = 0;
-
-        while (pid > 1 && guard < 48) {
-            if (visible[String(pid)])
-                return true;
-
-            const row = byPid[String(pid)];
-            if (!row)
-                break;
-
-            const parent = Number(row.ppid || 0);
-            if (parent <= 1 || parent === pid)
-                break;
-
-            pid = parent;
-            guard++;
-        }
-
-        return false;
+        return KillBackend.KillStore.hunterDescendsFromVisibleWindow(entry);
     }
 
     function hunterTaskHasChildren(entry) {
-        if (!entry)
-            return false;
-        const pid = Number(entry.pid || 0);
-        if (pid <= 1)
-            return true;
-        for (let i = 0; i < taskRows.length; i++) {
-            if (Number(taskRows[i] && taskRows[i].ppid || 0) === pid)
-                return true;
-        }
-        return false;
+        return KillBackend.KillStore.hunterTaskHasChildren(entry);
     }
 
     function hunterInteractiveTask(entry) {
-        if (!entry)
-            return false;
-
-        const tty = String(entry.tty || "?").trim();
-        if (tty.length > 0 && tty !== "?" && tty !== "-")
-            return true;
-
-        const name = String(entry.comm || entry.name || "")
-                     .trim().toLowerCase();
-        const args = String(entry.args || "").trim().toLowerCase();
-        const haystack = name + " " + args;
-        const interactiveTokens = [
-            // Interactive shells / multiplexers / terminal emulators.
-            "zsh", "bash", "fish", "nushell", " nu ", "dash", "ksh",
-            "zellij", "tmux", "screen", "kitty", "foot", "alacritty",
-            "wezterm", "ghostty", "konsole", "gnome-terminal",
-
-            // Prompt/status helpers and keyboard-heavy interactive tools.
-            "gitstatusd", "starship", "oh-my-posh", "powerlevel10k",
-            "nvim", "neovim", "vim", "helix", "hx ", "emacs", "yazi",
-            "btop", "htop", "top ", "less", "fzf", "ranger"
-        ];
-
-        for (let i = 0; i < interactiveTokens.length; i++) {
-            if (haystack.indexOf(interactiveTokens[i]) !== -1)
-                return true;
-        }
-        return false;
+        return KillBackend.KillStore.hunterInteractiveTask(entry);
     }
 
     function hunterDescendsFromInteractiveTask(entry) {
-        if (!entry)
-            return false;
-        const byPid = hunterTaskPidMap();
-        let current = entry;
-        let guard = 0;
-        while (current && guard < 48) {
-            if (hunterInteractiveTask(current))
-                return true;
-            const parentPid = Number(current.ppid || 0);
-            if (parentPid <= 1 || parentPid === Number(current.pid || 0))
-                break;
-            current = byPid[String(parentPid)];
-            guard++;
-        }
-        return false;
+        return KillBackend.KillStore.hunterDescendsFromInteractiveTask(entry);
     }
 
     function hunterMouseProtectedReason(entry) {
-        if (!entry)
-            return "INVALID";
-
-        if (isFavoriteItem(entry, killModeIndex))
-            return "FAVORITE";
-
-        if (!taskEligibleForKillAll(entry))
-            return "SESSION/PROTECTED";
-
-        // Never let the low-activity heuristic dismantle a currently visible
-        // GUI application. Chromium/Electron in particular split downloads,
-        // networking, rendering and utility work across quiet child processes.
-        if (hunterDescendsFromVisibleWindow(entry))
-            return "ACTIVE APP TREE";
-
-        if (hunterDescendsFromInteractiveTask(entry))
-            return "INTERACTIVE/TTY TREE";
-
-        // MICE only hunts detached leaves. Parents are intentionally retained:
-        // killing a quiet parent can orphan or destabilize still-useful children.
-        if (hunterTaskHasChildren(entry))
-            return "PROCESS TREE";
-
-        // PPID 1/user-service leaves are ambiguous (systemd --user services,
-        // daemons, agents). Treat them as infrastructure rather than mice.
-        if (Number(entry.ppid || 0) <= 1)
-            return "USER SERVICE/ORPHAN";
-
-        const name = String(entry.comm || entry.name || "")
-                     .trim().toLowerCase();
-        const args = String(entry.args || "").trim().toLowerCase();
-        const haystack = name + " " + args;
-
-        const protectedTokens = [
-            // Browsers / web runtimes and their helper processes.
-            "brave", "chromium", "chrome", "firefox", "vivaldi",
-            "opera", "electron", "qtwebengine", "webkit", "webprocess",
-            "code", "codium",
-
-            // File transfer / download / sync tools.
-            "curl", "wget", "aria2", "rclone", "rsync", "scp", "sftp",
-            "syncthing", "megasync", "dropbox", "onedrive",
-
-            // Interactive shells / terminals / prompt helpers. These can be
-            // nearly idle for hours and are still absolutely user-owned state.
-            "zsh", "bash", "fish", "nushell", "zellij", "tmux", "screen",
-            "kitty", "foot", "alacritty", "wezterm", "ghostty",
-            "gitstatusd", "starship", "oh-my-posh", "powerlevel10k",
-            "nvim", "neovim", "vim", "helix", "emacs", "yazi",
-
-            // Desktop/session/portal/file-service infrastructure.
-            "xdg-desktop-portal", "xdg-document-portal", "xdg-permission-store",
-            "gvfs", "fuse", "dconf", "dbus", "pipewire", "wireplumber",
-            "at-spi", "ssh-agent", "gpg-agent", "polkit", "keyring",
-            "systemd", "systemd-oomd", "systemd-resolved", "systemd-timesyncd",
-
-            // Sandboxes, containers and transactional package operations.
-            "flatpak", "bwrap", "bubblewrap", "xdg-dbus-proxy", "toolbox",
-            "podman", "conmon", "rpm-ostree", "ostree"
-        ];
-
-        for (let i = 0; i < protectedTokens.length; i++) {
-            if (haystack.indexOf(protectedTokens[i]) !== -1)
-                return "IMPORTANT HELPER";
-        }
-
-        // Do not hunt a process that is already explicitly stopped/frozen;
-        // that state is intentional and managed by the per-process controls.
-        if (String(entry.state || "").indexOf("T") !== -1)
-            return "FROZEN";
-
-        return "";
+        return KillBackend.KillStore.hunterMouseProtectedReason(entry);
     }
 
     function hunterMouseCandidates() {
-        const rows = taskRows.filter(function(entry) {
-            if (hunterMouseProtectedReason(entry).length > 0)
-                return false;
-
-            // MICE is intentionally conservative. A process must have been
-            // around for a while AND remain tiny/quiet across the recent graph,
-            // rather than merely being momentarily idle.
-            const oldEnough = taskElapsedSeconds(entry.elapsed) >= 45 * 60;
-            const quiet = hunterTaskPeak(entry) <= 0.20
-                          && hunterTaskAverage(entry) <= 0.08
-                          && Number(entry.cpu || 0) <= 0.20;
-            const small = Number(entry.mem || 0) <= 0.50;
-            const tty = String(entry.tty || "?").trim();
-            const detached = tty === "?" || tty === "-" || tty.length === 0;
-            return oldEnough && quiet && small && detached;
-        });
-        rows.sort(function(a, b) {
-            const rssDelta = Number(a.rss || 0) - Number(b.rss || 0);
-            if (Math.abs(rssDelta) > 1)
-                return rssDelta;
-            return taskElapsedSeconds(b.elapsed) - taskElapsedSeconds(a.elapsed);
-        });
-        return rows.slice(0, 10);
+        return KillBackend.KillStore.hunterMouseCandidates();
     }
 
     function bulkTaskConfirmList(rows) {

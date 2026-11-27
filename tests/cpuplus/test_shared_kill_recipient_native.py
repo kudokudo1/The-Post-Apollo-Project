@@ -21,6 +21,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
     (config / "services/system").mkdir(parents=True)
     shutil.copytree(ROOT / "components", config / "components")
     shutil.copytree(ROOT / "services/kill", config / "services/kill")
+    shutil.copytree(ROOT / "services/favorites", config / "services/favorites")
     for name in ("TaskManagerView.qml", "TaskGraphController.qml",
                  "HunterControls.qml", "ProcessTargetRow.qml", "ProcessMiniGraph.qml",
                  "ProcessSafetyLock.qml", "ProcessInformationButton.qml",
@@ -66,6 +67,7 @@ with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
     config = base / "scene"
     (config / "services/system").mkdir(parents=True)
     shutil.copytree(ROOT / "services/kill", config / "services/kill")
+    shutil.copytree(ROOT / "services/favorites", config / "services/favorites")
     shutil.copytree(ROOT / "components", config / "components")
     for name in ("ProcessTelemetry.qml", "ProcessPresentationState.qml",
                  "HunterPresentation.qml", "TaskSafety.qml",

@@ -99,3 +99,33 @@ App Control placement and compact popup integration are subsequent owner-coordin
 work; this change does not modify App Control. Syntagma definitions await operator
 authorship. Atlas V1 is a read-only schematic rather than a live or clickable
 desktop map.
+
+## Atlas // Functional navigation, not merely locations
+
+Operator clarification: Atlas is a comprehensive map of what features do,
+how to reach their internal sections, and how related features fit together.
+The desktop schematic is a secondary LOCATIONS view. The default GUIDE
+lists actionable help-topic buttons with purpose summaries; selecting one
+shows a path, explanation, and buttons to related help topics. Both views
+read the same stable Atlas keys. Links only navigate within help; they do
+not open live widgets, execute process controls or grant permission.
+
+The first cross-feature route is APP CONTROL > KILL > SELECT PROCESS,
+linked to CPU++ > KILL > SELECT LIVE PROCESS and back. The shared
+TaskManagerView / KillStore relationship is supported by
+`widgets/appcontrol/AppControlTaskHost.qml`,
+`widgets/cpuplus/CpuPlusKillWorkspace.qml`,
+`widgets/CpuPlusW.qml` and the existing shared Kill recipient contract.
+Atlas explains Forest, Hospital and Prism in plain terms, distinguishes
+intended scope from installed readiness, and provides initial summaries
+for all 23 mounted entries. Bluetooth, Weather and Messaging detailed
+guides remain to be verified/authored; those entries say so explicitly.
+The full AppControlW file was too large for this inspection path; the
+Kill adapter and recipient evidence establish the shared relationship,
+not exhaustive current AppControl controls. Expand with exact sources
+before documenting additional operations.
+
+Prism's purpose: like a prism separating light, expose the layers of
+Post Apollo so its visual rules, features and connections are easier to
+distinguish. Future App Control HELP/PRISM and contextual popups reuse the
+same catalog; this PR does not change those owners.

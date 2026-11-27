@@ -193,3 +193,44 @@ test("Atlas maps mounted shell groups in their actual order, not Prism installat
     assert.equal(atlas.mapZones()[0].entries[0].name,"APP CONTROL");
     assert.equal(context.registered().length,1,"Atlas does not fabricate Prism registrations");
 });
+
+test("Atlas is a functional guide with normal navigation buttons, not just a dock schematic",()=>{
+    const help=file("widgets/PrismHelpContent.qml");
+    assert.match(help,/property bool showLocations: false/);
+    assert.match(help,/property string guideKey: ""/);
+    assert.match(help,/labelText: "GUIDE"/);
+    assert.match(help,/labelText: "LOCATIONS"/);
+    assert.match(help,/label: guideRow\.modelData\.title/);
+    assert.match(help,/onLeftClicked: help\.openGuide\(guideRow\.modelData\.key\)/);
+    assert.match(help,/onLeftClicked: help\.openGuide\(modelData\.mount\)/);
+    assert.match(help,/model: help\.selectedGuide \? help\.selectedGuide\.related : \[\]/);
+    assert.match(help,/onLeftClicked: help\.openGuide\(modelData\)/);
+    assert.match(help,/onLeftClicked: help\.backGuide\(\)/);
+    assert.match(help,/text: "HOW TO GET THERE"/);
+    assert.match(help,/text: "CONNECTED FEATURES"/);
+    assert.doesNotMatch(help,/(?:softGlowEnabled|wideGlowEnabled|perimeterGlowEnabled)\s*:/);
+    assert.doesNotMatch(help,/\b(?:Process|FileView|PanelWindow|MouseArea|Timer)\s*\{/);
+    const atlas=vm.createContext({});
+    vm.runInContext(file("services/prism/PrismAtlas.js").replace(/^\s*\.pragma library\s*/,""),atlas);
+    const rows=atlas.guideEntries();
+    assert.equal(rows.length,23);
+    for(const row of rows){
+        assert.ok(row.key&&row.title&&row.purpose&&row.path&&row.detail);
+        for(const key of row.related) assert.ok(atlas.guideFor(key));
+    }
+    assert.equal(atlas.guideFor("not-a-guide"),null);
+    assert.equal(atlas.guideFor("__proto__"),null);
+    assert.ok(atlas.guideFor("AppControlW").related.includes("app-kill"));
+    assert.ok(atlas.guideFor("app-kill").related.includes("cpu-kill"));
+    assert.ok(atlas.guideFor("CpuPlusW").related.includes("cpu-kill"));
+    assert.ok(atlas.guideFor("cpu-kill").related.includes("app-kill"));
+    assert.match(atlas.guideFor("ForestW").purpose,/assistant/);
+    assert.match(atlas.guideFor("HospitalW").purpose,/worker assignments/);
+    assert.match(atlas.guideFor("PrismDock").detail,/separating light/);
+    const copy=atlas.guideFor("app-kill");
+    copy.related.length=0;
+    assert.ok(atlas.guideFor("app-kill").related.length>0);
+    assert.match(file("widgets/CpuPlusW.qml"),/collectionSource: KillBackend\.KillStore/);
+    assert.match(file("widgets/cpuplus/CpuPlusKillWorkspace.qml"),/TaskManagerView\s*\{/);
+    assert.match(file("widgets/appcontrol/AppControlTaskHost.qml"),/controller\.killModeIndex/);
+});

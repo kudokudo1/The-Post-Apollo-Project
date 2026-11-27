@@ -185,6 +185,19 @@ Item {
                 const flame=root.flameMotion;
                 function radiate(start,span,color,amount) {
                     if(span<=0 || amount<=0) return;
+                    if(!hot && !omni) {
+                        // Preserve the accepted TRON and Ki Blast body light.
+                        const spread=h*.70;
+                        const g=c.createLinearGradient(0,y-spread,0,y+h+spread);
+                        g.addColorStop(0,tint(color,0));
+                        g.addColorStop(.19,tint(color,amount*.28));
+                        g.addColorStop(.36,tint(color,amount));
+                        g.addColorStop(.64,tint(color,amount));
+                        g.addColorStop(.81,tint(color,amount*.28));
+                        g.addColorStop(1,tint(color,0));
+                        c.fillStyle=g; c.fillRect(start,y-spread,span,h+2*spread);
+                        return;
+                    }
                     const spread=h*1.18;
                     const g=c.createLinearGradient(0,mid-spread,0,mid+spread);
                     for(let i=0;i<=16;i++)

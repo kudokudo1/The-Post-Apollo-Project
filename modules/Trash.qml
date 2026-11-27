@@ -3366,6 +3366,7 @@ PanelWindow {
                             Item {
                                 id: researchBurnFace
                                 anchors.fill: parent
+                                clip: true
                                 // Keep the full orange fill at 100% after
                                 // arming completes. Only the second click
                                 // transitions to the magenta feedback stage.
@@ -3403,6 +3404,7 @@ PanelWindow {
 
                                 GohuText {
                                     id: researchBurnLabelWhite
+                                    visible: trashLauncher.burnUiStage !== "working"
                                     anchors.centerIn: parent
                                     width: Math.max(0, parent.width - 12)
                                     height: parent.height
@@ -3466,6 +3468,34 @@ PanelWindow {
                 }
             }
 
+            // One persistent visual instance moves from the actual working
+            // button to the receipt. No phase or animation can authorize IO.
+            // The safety arm, second click, magenta acknowledgement and
+            // backend receipt retain their original independent owners.
+            EnergyProgressFace {
+                id: burnOperationFace
+                parent: trashLauncher.burnUiStage === "result"
+                        || trashLauncher.burnUiStage === "error"
+                        ? burnReceiptProgressSlot : researchBurnFace
+                anchors.fill: parent
+                anchors.margins: 2
+                z: 3
+                variant: "flamethrower"
+                fireMode: "burn-away"
+                energyColor: Colors.orange
+                chassisColor: Colors.red
+                progressMode: "indeterminate"
+                phase: trashLauncher.burnUiStage === "working" ? "running"
+                    : trashLauncher.burnUiStage === "result" && trashLauncher.burnReceiptVerified
+                        ? "success"
+                    : trashLauncher.burnUiStage === "result" || trashLauncher.burnUiStage === "error"
+                        ? "failure" : "idle"
+                visible: phase !== "idle"
+                caption: phase === "running" ? "BURNING..."
+                    : phase === "success" ? "BURN VERIFIED"
+                    : "PARTIAL // UNVERIFIED"
+            }
+
             // Stays here until DONE. Every listed name came from the actual
             // successful backend result, never a guessed input selection.
             Column {
@@ -3489,10 +3519,11 @@ PanelWindow {
                           ? "BURN // VERIFIED RESULT"
                           : "BURN // PARTIAL OR UNVERIFIED"
                 }
-                Rectangle {
+                Item {
+                    id: burnReceiptProgressSlot
                     width: parent.width
-                    height: 2
-                    color: Colors.orange
+                    height: 43
+                    clip: true
                 }
                 GohuText {
                     width: parent.width
@@ -3514,7 +3545,7 @@ PanelWindow {
 
                 Item {
                     width: parent.width
-                    height: Math.max(85, Math.min(210, trashMenu.height - 245))
+                    height: Math.max(85, Math.min(169, trashMenu.height - 286))
                     ListView {
                         id: burnReceiptList
                         anchors.fill: parent

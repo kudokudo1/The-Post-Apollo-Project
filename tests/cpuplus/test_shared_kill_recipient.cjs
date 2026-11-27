@@ -86,7 +86,7 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     assert.match(bulkStore,/cpuBulkReview !== review/);
     assert.match(bulkStore,/hunterOperation\.start\(review\.kind, review\.targets, true\)/);
     assert.match(bulkStore,/hunterHogCandidates\(metric\)/);
-    assert.match(bulkStore,/onCpuVisibleChanged: if \(!cpuVisible\) cancelCpuBulkReview\(cpuBulkReview\)/);
+    assert.match(bulkStore,/onCpuVisibleChanged:\s*\{\s*if \(!cpuVisible\) cancelCpuBulkReview\(cpuBulkReview\)/);
     assert.match(owner,/readonly property var cpuBulkReview: KillBackend\.KillStore\.cpuBulkReview/);
     assert.match(bulkStore,/captureCpuBulkReview\(kind, metric, visibility, captures\)/);
     assert.match(bulkStore,/if \(!releaseCpuBulkReview\(review\)\) return false;\s*hunterOperation\.start/);
@@ -778,7 +778,7 @@ test("K4c: shared HOG and MICE rules retain thresholds and refuse unknown window
     assert.deepEqual(api.hunterHogCandidates(1),[top,above]);
     assert.match(owner,/return KillBackend\.KillStore\.hunterHogCandidates\(/);
     assert.match(owner,/return KillBackend\.KillStore\.hunterMouseCandidates\(\)/);
-    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.windowDataReady && !appControlWindow\.windowDataError\s*\? appControlWindow\.swayWindows : null/);
+    assert.match(store,/readonly property var hunterVisibleWindows: compositor\.settled \? compositor\.windows : null/);
 });
 
 test("K4d: direct service admission consumes only the reviewed targets and preserves exclusion", () => {
@@ -844,4 +844,35 @@ test("K4e: Hunter dispatch reads the service policy and never the legacy dialog 
     assert.equal(api.liveRow({...target,startTicks:998}),null);
     api.ready(false);
     assert.equal(api.liveRow(target),null);
+});
+
+test("K4f: shared Sway inventory retains tree semantics and refuses unresolved snapshots", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const source=read("services/kill/SwayWindowInventory.qml");
+    const a=source.indexOf("    function collectSwayOutputNames(");
+    const b=source.indexOf("    function refresh()",a);
+    assert.ok(a>=0 && b>a);
+    const parse=new Function(source.slice(a,b)+"\nreturn parseSnapshot;")();
+    const tree={type:"root",nodes:[{type:"output",name:"DP-1",nodes:[{type:"workspace",name:"1",nodes:[
+        {type:"con",id:70,layout:"tabbed",nodes:[{type:"con",id:71,name:"A",app_id:"app",pid:4001}]}
+    ],floating_nodes:[{type:"floating_con",nodes:[{type:"con",id:72,name:"B",pid:4002}]}]}]}]};
+    const snapshot=parse(JSON.stringify(tree));
+    assert.deepEqual(snapshot.outputs,["DP-1"]);
+    assert.equal(snapshot.windows.length,2);
+    assert.equal(snapshot.windows[0].tabGroupId,70);
+    assert.equal(snapshot.windows[0].tabbed,true);
+    assert.equal(snapshot.windows[1].floating,true);
+    assert.equal(snapshot.windows[1].workspace,"1");
+    assert.throws(()=>parse(""));
+    assert.throws(()=>parse("{}"));
+    assert.deepEqual(parse('{"type":"root","nodes":[]}').windows,[]);
+    assert.equal((source.match(/swayTreeProcess\.exec\(/g)||[]).length,1);
+    assert.equal((source.match(/^\s*I3IpcListener\s*\{/gm)||[]).length,1);
+    assert.doesNotMatch(owner,/swayTreeProcess|function collectSwayWindows\(/);
+    assert.match(owner,/readonly property var swayWindows: KillBackend\.KillStore\.windowInventory\.windows/);
+    assert.match(owner,/function onSnapshotPublished\(\)/);
+    assert.match(source,/settled: enabled && ready && !error && !loading && !pending/);
+    assert.match(source,/!loading \|\| !exited \|\| !stdoutDone \|\| !stderrDone/);
+    assert.match(store,/readonly property var hunterVisibleWindows: compositor\.settled \? compositor\.windows : null/);
 });

@@ -48,3 +48,49 @@ and durable original effect/terminal custody remain external requirements.
 No qualified provider, actual model invocation, permission, retry,
 scheduler, new store or installed host. Existing B3 workflow exercises
 this implementation with actual B2 to an ephemeral fake HTTP peer.
+
+
+## FL7 // test-only serialization/control seam
+
+Nurse #2161 7218321562. Delivery now checks the original Thread object
+rather than recyclable numeric identity, aligned with FL6. Existing host
+and delivery methods remain unchanged. Combined B3/host/delivery CI is
+required against integrated FL4/5/6.
+
+UI1/UI2 disposable child: launch only
+`python3 tests/forest/first_light_delivery_child.py` from repo checkout.
+No arguments, no actual Ollama, no native launcher. It owns the real
+FirstLightDelivery on the child thread and a fixed fake loopback B2
+peer emitting RE + ADY. One JSON line command, one JSON line reply,
+synchronous request/reply, <=512-byte input and <=64 commands per child.
+Use an asynchronous parent process adapter; never block the GUI thread.
+No automatic retry. The test child is not a native streaming scheduler
+and cannot accept STOP during a blocked STEP; actual native control
+must be independently available. Close or EOF disposes the test journal,
+not evidence of native settlement.
+
+Commands (exact keys):
+- {"op":"OBSERVE","epoch":1,"visible":true}: actual independent view
+  incarnation, increasing positive integer (<=2147483647), fresh epoch
+  for every close/open/Tree/Loader replacement, including invisible.
+- {"op":"SUBMIT","epoch":1,"prompt":"Reply with READY."}: fixed exact
+  prompt only; ok means command handled, NOT native admission.
+- {"op":"STEP"}: owner advances one internal frame, no raw frame returned.
+- {"op":"TAKE","epoch":1}: one latest snapshot or null, plus original
+  epoch; snapshot fields sequence/status/text/local_outcome/provisional/
+  native_admitted (always false). No raw original IDs.
+- {"op":"STOP","epoch":1}: contextual original STOP acknowledgement.
+- {"op":"OUTCOME"}: owner local status/outcome only, no body.
+- {"op":"CLOSE"}: owner closes test lifetime; no provider settlement.
+  Refused command returns {"ok":false,"error":"COMMAND_REFUSED"}.
+
+Parent must pin its own observed epoch at command issue, compare returned
+epoch against the independently current GUI view immediately before
+render, discard queued old data on withdrawal (even after TAKE), and
+never reattach original on A-B-A. No callback from child establishes
+currentness or grant. Keep one child/original trial, no new submit after
+withdrawal or terminal; no persistent history. UI1 owns native test mount
+and actual epoch observation; UI2 owns typed bounded snapshot/render
+validation, same-row response and scroll, no draft clear from native false.
+Existing installed SEND remains locked; no R6 relabel or new production
+wire. Native admission/recipient/source/capacity/crash custody unresolved.

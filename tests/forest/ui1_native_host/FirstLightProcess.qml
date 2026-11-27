@@ -19,6 +19,7 @@ Item {
     property bool closing: false
     property bool closeReply: false
     property bool started: false
+    property bool launched: false
     property int pid: 0
     readonly property bool running: worker.running
 
@@ -26,7 +27,8 @@ Item {
     ElapsedTimer { id: deadline }
 
     function start() {
-        if (started || worker.running) return;
+        if (launched || worker.running) return;
+        launched=true;
         lifetime.restartMs(); deadline.restartMs();
         worker.running=true;
     }
@@ -108,7 +110,7 @@ Item {
     Timer {
         interval: 50
         repeat:true
-        running: !root.finished && (worker.running || root.started)
+        running: root.launched && !root.finished
         onTriggered: {
             if (root.failure!=="" || root.finished) return;
             if (lifetime.elapsedMs()>=20000 || ((!root.started || root.pending || root.closing)

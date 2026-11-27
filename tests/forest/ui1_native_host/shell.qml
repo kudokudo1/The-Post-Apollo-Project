@@ -35,6 +35,7 @@ ShellRoot {
     property int fl7Case: 0
     property int fl7Epoch: 0
     property var fl7View: null
+    property bool fl7ObservedVisible: false
     property var fl7OriginalView: null
     property int fl7OriginalEpoch: 0
     property bool fl7Withdrawn: false
@@ -1140,10 +1141,14 @@ ShellRoot {
         if (!fl7Active || !parts.loader) return;
         const candidate = forest.menuOpen && forest.activeTree.sessionKey==="CHERRY"
             && parts.loader.active && parts.loader.visible ? parts.loader.item : null;
-        if (candidate===fl7View) return;
-        if (fl7OriginalView!==null && candidate!==fl7OriginalView)
+        // A destroyed QML wrapper can already compare equal to null.
+        // Preserve the previously observed visibility independently.
+        const visible=candidate!==null;
+        if (candidate===fl7View && visible===fl7ObservedVisible) return;
+        if (fl7OriginalEpoch>0)
             fl7Withdrawn=true;
         fl7View=candidate;
+        fl7ObservedVisible=visible;
         fl7Epoch++;
     }
     Connections {
@@ -1165,7 +1170,8 @@ ShellRoot {
     }
     function beginFL7() {
         check(!forest.menuOpen && !parts.loader.active, "FL7 closed baseline");
-        fl7Epoch=0; fl7View=null; fl7OriginalView=null; fl7Withdrawn=false;
+        fl7Epoch=0; fl7OriginalEpoch=0; fl7View=null; fl7ObservedVisible=false;
+        fl7OriginalView=null; fl7Withdrawn=false;
         fl7Sequence=0; fl7Tail=null; fl7Late=null; fl7Stage=0; fl7Index=0;
         fl7Active=true;
         parts.loader.sourceComponent=firstLightCaptureType;
@@ -1294,7 +1300,8 @@ ShellRoot {
             observeFL7();
             const item=parts.loader.item;
             firstLightGeometry(item);
-            check(item && item.messages.length===0 && fl7Epoch>0,"FL7 empty original view");
+            check(item && item.messages.length===0 && fl7Epoch>0
+                && parts.input.text==="Reply with READY.","FL7 empty original view and exact public input");
             if (failed) return;
             fl7OriginalView=item; fl7OriginalEpoch=fl7Epoch;
             fl7Parent=fl7ParentType.createObject(witness);

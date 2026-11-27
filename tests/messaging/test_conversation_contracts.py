@@ -206,12 +206,17 @@ print("hospital Room provider recovery and explicit-write contracts: PASS")
 print("hospital room AI dock contracts: PASS")
 
 
-for service_path in (ADAPTER, PROVIDERS, DOCTORS):
+# Existing Room/Provider adapter still enforces desktop PX compatibility;
+# Doctor directory has deliberately cut over to the protected native reader.
+for service_path in (ADAPTER, PROVIDERS):
     service = service_path.read_text()
     assert '.local/share/post-apollo-dev-runtime/bin/px' in service, service_path
     assert '.local/bin/px' in service, service_path
     assert 'function compactPxError(value, context)' in service, service_path
     assert 'PX RUNTIME OUT OF DATE // UPDATE POST-APOLLO DEV EXPERIENCE' in service, service_path
+assert 'process.exec([nativeReaderPath, "doctor-directory"]);' in doctors
+assert '.local/share/post-apollo-dev-runtime/bin/px' not in doctors
+assert '.local/bin/px' not in doctors
 
 shared = SHARED.read_text()
 assert "maximumLineCount: 5" in shared

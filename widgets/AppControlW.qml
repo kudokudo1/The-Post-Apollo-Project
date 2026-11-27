@@ -46,7 +46,6 @@ PanelWindow {
     property bool menuOpen: false
     // Shell-owned visibility demand: read-only telemetry consumers do not start their own pollers.
     property bool cpuPlusProcessVisible: false
-    onCpuPlusProcessVisibleChanged: if (!cpuPlusProcessVisible) cancelCpuBulkReview(cpuBulkReview)
     readonly property var cpuBulkReview: KillBackend.KillStore.cpuBulkReview
     readonly property bool cpuBulkOperation: hunterOperationController.recipientOwned
         && hunterOperationPhase !== "idle"
@@ -1027,9 +1026,7 @@ PanelWindow {
     Binding {
         target: KillBackend.KillStore
         property: "donorActionBlocked"
-        value: appControlWindow.cpuBulkReview !== null
-            || appControlWindow.hunterOperationPhase !== "idle"
-            || appControlWindow.destructiveConfirmOpen
+        value: appControlWindow.destructiveConfirmOpen
     }
     Connections {
         target: appControlWindow.processPresentationController
@@ -1979,53 +1976,23 @@ PanelWindow {
     // Recipient chooses a metric, never a target list or executable command.
     // The existing owner computes candidates globally; search is inspection only.
     function cpuBulkCandidates(kind, metric, visibility) {
-        if (!cpuPlusProcessVisible || !Number.isInteger(metric) || metric < 0 || metric > 4
-                || !Number.isInteger(visibility) || visibility < 0 || visibility > 2)
-            return [];
-        if (kind !== "kill-all" && visibility === 1) return [];
-        const rows = kind === "kill-all" ? killAllEligibleTasks()
-            : kind === "kill-hogs" ? hunterHogCandidates(metric)
-            : kind === "kill-mice" ? hunterMouseCandidates() : [];
-        return rows.filter(function(row) {
-            const target = hunterTargetsFromRows([row])[0];
-            return target && Number.isSafeInteger(target.pid) && target.pid > 1
-                && Number.isSafeInteger(target.startTicks) && target.startTicks > 0
-                && !!target.name && !!target.identity && !hunterTargetIsFavorite(target);
-        });
+        return KillBackend.KillStore.cpuBulkCandidates(kind, metric, visibility);
     }
 
     function prepareCpuBulkReview(kind, metric, visibility) {
-        if (!cpuPlusProcessVisible || cpuBulkReview || destructiveConfirmOpen
-                || hunterOperationPhase !== "idle" || hubProcessActionGate.pending
-                || hubProcessActionGate.busy) return null;
-        const rows = cpuBulkCandidates(kind, metric, visibility);
-        const captures = hunterTargetsFromRows(rows);
-        return KillBackend.KillStore.captureCpuBulkReview(kind, metric, visibility, captures);
+        return KillBackend.KillStore.prepareCpuBulkReview(kind, metric, visibility);
     }
 
     function cancelCpuBulkReview(review) {
-        return KillBackend.KillStore.releaseCpuBulkReview(review);
+        return KillBackend.KillStore.cancelCpuBulkReview(review);
     }
 
     function confirmCpuBulkReview(review) {
-        if (!review || cpuBulkReview !== review || !cpuPlusProcessVisible
-                || destructiveConfirmOpen || hunterOperationPhase !== "idle"
-                || hubProcessActionGate.pending || hubProcessActionGate.busy) return false;
-        // Consume the exact review once; never recompute or broaden it.
-        if (!KillBackend.KillStore.releaseCpuBulkReview(review)) return false;
-        hunterOperationController.start(review.kind, review.targets, true);
-        return true;
+        return KillBackend.KillStore.confirmCpuBulkReview(review);
     }
 
     function acknowledgeCpuBulkReport() {
-        if (!cpuBulkOperation || hunterOperationPhase !== "report") return false;
-        hunterOperationController.phase = "idle";
-        hunterOperationController.kind = "";
-        hunterOperationController.targets = [];
-        hunterOperationController.results = [];
-        hunterOperationController.completed = 0;
-        hunterOperationController.total = 0;
-        return true;
+        return KillBackend.KillStore.acknowledgeCpuBulkReport();
     }
 
     function startHunterOperation(kind, targets) {

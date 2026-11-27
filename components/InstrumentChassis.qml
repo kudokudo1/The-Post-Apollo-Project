@@ -8,6 +8,28 @@ Item {
     property string chassisStyle: "square"
     property bool showScrews: true
     property color structuralColor: Colors.cyan
+    // Approved cyan gunmetal. The finish is independent of the dial accent.
+    property color screwColor: "#40899b"
+    // Semantic finishes blend 75% toward the selected hue from gunmetal.
+    // Set 1.0 for an exact legacy/custom metal tone.
+    property real screwColorStrength: 0.75
+    readonly property real boundedScrewColorStrength: Number.isFinite(screwColorStrength) ? Math.max(0,Math.min(1,screwColorStrength)) : 0.75
+    readonly property real screwShadow: 0.75
+    readonly property real screwDirectLight: 0.20
+    readonly property real screwReflectedLight: 0.10
+    readonly property real screwCatchlight: 0.40
+    readonly property real screwRecessDepth: 0.14
+    // Map the approved palette to a caller-selected metal color. Alpha is
+    // deliberately ignored: these are opaque metal surfaces, not glow.
+    function screwTone(r,g,b) {
+        const t=boundedScrewColorStrength;
+        return Qt.rgba(Math.min(1,((64/255)*(1-t)+screwColor.r*t)*r/64),
+                       Math.min(1,((137/255)*(1-t)+screwColor.g*t)*g/137),
+                       Math.min(1,((155/255)*(1-t)+screwColor.b*t)*b/155),1);
+    }
+    function screwLightingAngle(x,y) {
+        return Math.atan2(height/2-y,width/2-x)-Math.PI/4;
+    }
     // The cross is deliberately larger than a decorative rivet.
     readonly property real screwDiameter: Math.min(11, Math.max(8, Math.round(Math.min(width,height)*0.09)))
     readonly property real screwSlotWidth: Math.max(1.5, Math.round(screwDiameter*0.20))
@@ -35,6 +57,9 @@ Item {
             function onChassisStyleChanged() { plate.requestPaint() }
             function onShowScrewsChanged() { plate.requestPaint() }
             function onStructuralColorChanged() { plate.requestPaint() }
+            function onScrewColorChanged() { plate.requestPaint() }
+            function onScrewColorStrengthChanged() { plate.requestPaint() }
+            function onScrewDiameterChanged() { plate.requestPaint() }
             function onScrewInsetChanged() { plate.requestPaint() }
             function onScrewsFitChanged() { plate.requestPaint() }
         }
@@ -65,26 +90,70 @@ Item {
             const rad=root.screwDiameter/2;
             const p=root.screwInset;
             for(const x of [p,w-p]) for(const y of [p,h-p]) {
-                // One light source, upper left. Keep the metal face subdued,
-                // a restrained catchlight and an opposing contact shadow.
-                c.beginPath(); c.arc(x+0.35,y+0.55,rad+0.45,0,2*Math.PI); c.fillStyle="#08050c"; c.fill();
-                const metal=c.createLinearGradient(x-rad,y-rad,x+rad,y+rad);
-                metal.addColorStop(0,"#e1e9ed"); metal.addColorStop(0.38,"#b7c5cb");
-                metal.addColorStop(0.72,"#81919b"); metal.addColorStop(1,"#9aabb3");
-                c.beginPath(); c.arc(x,y,rad,0,2*Math.PI); c.fillStyle=metal; c.fill();
-                c.strokeStyle="#64737c"; c.lineWidth=0.65; c.stroke();
-                c.beginPath(); c.arc(x,y,rad-0.45,Math.PI*1.03,Math.PI*1.62);
-                c.strokeStyle="#f2f8fb"; c.lineWidth=0.9; c.stroke();
-                c.beginPath(); c.arc(x,y,rad-0.5,0.08,Math.PI*0.48);
-                c.strokeStyle="#a7bac4"; c.lineWidth=0.65; c.stroke();
-                const slot=root.screwSlotWidth, span=rad*1.42;
-                c.fillStyle="#20212a";
-                c.fillRect(x-span/2,y-slot/2,span,slot);
-                c.fillRect(x-slot/2,y-span/2,slot,span);
-                // The recessed slot catches a little light on the opposite lip.
-                c.beginPath(); c.moveTo(x+slot/2,y+slot/2);c.lineTo(x+span/2,y+slot/2);
-                c.moveTo(x+slot/2,y+slot/2);c.lineTo(x+slot/2,y+span/2);
-                c.strokeStyle="#d5dfe3";c.lineWidth=0.55;c.stroke();
+                // Normalized approved 26-unit head, drawn at actual size.
+                // The seat, outer head, wall and floor descend into the plate.
+                // All local lighting rotates inward; the final catchlight
+                // remains at screen top-right on every fastener.
+                c.save();
+                c.translate(x,y);
+                c.rotate(root.screwLightingAngle(x,y));
+                const u=rad/13, head=12.5*u, wall=10.8*u;
+                const floor=(10.8-10*root.screwRecessDepth)*u;
+                function disk(radius,fill,stroke,strokeWidth) {
+                    c.beginPath(); c.arc(0,0,radius,0,2*Math.PI);
+                    c.fillStyle=fill; c.fill();
+                    if(stroke) { c.strokeStyle=stroke; c.lineWidth=strokeWidth; c.stroke(); }
+                }
+                function metal(radius,stops) {
+                    const g=c.createLinearGradient(-radius,-radius,radius,radius);
+                    for(const p of stops) g.addColorStop(p[0],root.screwTone(p[1],p[2],p[3]));
+                    return g;
+                }
+                function lip(radius,a,b,ink,alpha,width) {
+                    c.beginPath(); c.arc(0,0,radius,a,b);
+                    c.globalAlpha=alpha; c.strokeStyle=ink; c.lineWidth=width; c.stroke(); c.globalAlpha=1;
+                }
+                function cross(half,arm,fill) {
+                    c.beginPath();
+                    c.moveTo(-half,-arm); c.lineTo(half,-arm);
+                    c.lineTo(half,-half); c.lineTo(arm,-half);
+                    c.lineTo(arm,half); c.lineTo(half,half);
+                    c.lineTo(half,arm); c.lineTo(-half,arm);
+                    c.lineTo(-half,half); c.lineTo(-arm,half);
+                    c.lineTo(-arm,-half); c.lineTo(-half,-half);
+                    c.closePath(); c.fillStyle=fill; c.fill();
+                }
+                const fine=Math.max(0.35,0.7*u);
+                disk(rad,"#101b21","#34494f",Math.max(0.35,0.5*u));
+                disk(head,metal(head,[[0,64,137,155],[0.4,47,101,117],[1,27,62,72]]));
+                disk(wall,metal(wall,[[0,13,34,44],[0.45,25,63,76],[1,50,109,126]]),"#080e13",fine);
+                disk(floor,metal(floor,[[0,43,94,110],[0.55,32,75,89],[1,27,62,72]]),"#0c151b",fine);
+                // Preserve the native minimum legible cross at compact sizes.
+                const half=root.screwSlotWidth/2, arm=Math.max(6*u,half+0.6);
+                cross(half+0.45*u,arm+0.8*u,root.screwTone(15,41,51));
+                cross(half,arm,metal(arm,[[0,5,9,13],[0.6,11,30,38],[1,25,66,79]]));
+                // One continuous shadow over every level, including the slot.
+                const shade=c.createLinearGradient(-head,-head,head,head);
+                shade.addColorStop(0,"rgba(8,14,19,0)");
+                shade.addColorStop(0.35,"rgba(8,14,19,0.04)");
+                shade.addColorStop(0.7,Qt.rgba(8/255,14/255,19/255,root.screwShadow/2));
+                shade.addColorStop(1,Qt.rgba(8/255,14/255,19/255,root.screwShadow));
+                disk(head,shade);
+                lip(10.2*u,Math.PI*1.06,Math.PI*1.44,"#a3d9df",root.screwDirectLight,fine);
+                lip(12.2*u,0.16,Math.PI/2-0.16,"#91c2cb",root.screwReflectedLight,fine);
+                lip(10.2*u,0.20,Math.PI/2-0.20,"#91c2cb",root.screwReflectedLight,fine);
+                c.beginPath(); c.moveTo(-arm,-half); c.lineTo(-half,-half); c.lineTo(-half,-arm);
+                c.strokeStyle="#91c2cb"; c.lineWidth=fine; c.globalAlpha=root.screwDirectLight; c.stroke();
+                c.beginPath(); c.moveTo(half,arm); c.lineTo(half,half); c.lineTo(arm,half);
+                c.globalAlpha=root.screwReflectedLight; c.stroke(); c.globalAlpha=1;
+                c.restore();
+                // Fixed screen-space top-right catchlight; no external glow.
+                c.save(); c.translate(x,y);
+                lip(12.2*u,-0.92,-0.65,"#dcf3fa",root.screwCatchlight,Math.max(0.45,0.85*u));
+                lip(10.1*u,-0.92,-0.65,"#b7dfe7",root.screwCatchlight/2.3,fine);
+                c.beginPath(); c.moveTo(half,-arm); c.lineTo(half,-half); c.lineTo(arm,-half);
+                c.strokeStyle="#a3d9df"; c.lineWidth=fine; c.globalAlpha=root.screwCatchlight/3; c.stroke();
+                c.restore();
             }
         }
     }

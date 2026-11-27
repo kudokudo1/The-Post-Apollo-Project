@@ -614,6 +614,23 @@ ShellRoot {
                     sampleDial.stopwatchArmStyle=v[0]; sampleDial.stopwatchGaugeStyle=v[1];
                     sampleDial.stopwatchScaleStyle=v[2]; sampleDial.chassisStyle=v[3];
                     sampleDial.stopwatchArmReach=120;
+                    const index=root.automotiveVariantIndex-1;
+                    const metal=["#a66c42","#914578","#d16041","#40899b"][index];
+                    const strength=index<2?1:0.75;
+                    sampleDial.screwColor=metal;
+                    sampleDial.screwColorStrength=strength;
+                    const chassis=root.findItem(sampleDial,"instrumentChassis");
+                    if(!root.check(String(chassis.screwColor).toLowerCase()===metal && String(instruments[0].screwColor).toLowerCase()===metal
+                        && chassis.screwColorStrength===strength && instruments[0].screwColorStrength===strength
+                        && Math.abs(chassis.screwTone(64,137,155).r-((64/255)*(1-strength)+chassis.screwColor.r*strength))<=1/255
+                        && Math.abs(chassis.screwTone(64,137,155).g-((137/255)*(1-strength)+chassis.screwColor.g*strength))<=1/255
+                        && Math.abs(chassis.screwTone(64,137,155).b-((155/255)*(1-strength)+chassis.screwColor.b*strength))<=1/255
+                        && (strength!==1 || String(chassis.screwTone(64,137,155)).toLowerCase()===metal)
+                        && chassis.screwShadow===0.75 && chassis.screwDirectLight===0.20 && chassis.screwReflectedLight===0.10
+                        && chassis.screwCatchlight===0.40 && chassis.screwRecessDepth===0.14
+                        && String(root.findItem(reportDial,"instrumentChassis").screwColor).toLowerCase()==="#40899b"
+                        && root.findItem(reportDial,"instrumentChassis").screwColorStrength===0.75,
+                        "shared screw finish follows caller color with fixed approved lighting; sibling unchanged")) return;
                     if(!root.check(instruments[0].boundedArmReach===95 && instruments[0].armStyle===v[0] && instruments[0].gaugeStyle===v[1] && instruments[0].scaleStyle===v[2] && instruments[0].chassisStyle===v[3],"automotive variant and reach bound "+v.join("/"))) return;
                     sampleDial.stopwatchArmReach=95;
                     return;

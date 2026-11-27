@@ -32,7 +32,7 @@ function flow(variant, fireMode, side, span, height, time, reduced) {
     } else if(ki) {
         stream(w,0,Math.min(32,Math.max(7,Math.ceil(w/h*1.55))),h*11,1.15,.68,false);
     } else {
-        const wake=Math.min(w,h*4.4);
+        const wake=Math.min(w,h*(fireMode==="burn-away"?4.4:fireMode==="ash-trail"?6.0:6.8));
         // Cooled residue and exposed background never acquire a live
         // full-lane current. Only standard fire retains scattered lines.
         if(fireMode==="standard") stream(w,0,Math.min(12,Math.max(3,Math.ceil(w/h*.45))),h*7,.8,.30,false);
@@ -70,4 +70,20 @@ function contact(fraction,heat,height,width) {
         lobe.offset=lobe.rx*Math.sqrt(Math.max(0,1-ratio*ratio));
     }
     return {left:left,right:right,chord:chord};
+}
+
+// Short atmospheric lines outside the chamber. Anchored to the active
+// head, not to the window or a percentage of the entire track.
+function airFlow(span,height,time,reduced) {
+    if(reduced || span<1 || height<1) return [];
+    const h=height,t=Math.max(0,time),w=Math.min(span,h*5.8);
+    const lines=[];
+    for(let i=0;i<14;i++){
+        const age=(i*.173+t*(2.2+i%4*.31))%1;
+        const length=Math.min(w,h*(.45+i%4*.26));
+        const distance=age*Math.max(0,w-length);
+        lines.push({x:-distance-length,y:(i%2?1:-1)*h*(.58+.12*(i%3)),
+            length:length,alpha:(1-age)*(.52+.08*(i%3))});
+    }
+    return lines;
 }

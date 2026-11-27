@@ -49,6 +49,31 @@ Scope {
     shutil.copy2(ROOT / "scripts/cpuplus_stall_clock_witness.py", scripts / "cpuplus_stall_clock_witness.py")
     shutil.copy2(ROOT / "scripts/cpuplus_host_cpu_observer.py", scripts / "cpuplus_host_cpu_observer.py")
     shutil.copy2(ROOT / "scripts/cpuplus_diagnostic_archive.py", scripts / "cpuplus_diagnostic_archive.py")
+    # Exercise the real GPU reader against a deterministic disposable sysfs
+    # tree; hosted CI need not expose a physical graphics device.
+    shutil.copy2(ROOT / "scripts/cpuplus_gpu_observer.py", scripts / "gpu_reader_fixture.py")
+    gpu_fixture = base / "gpu-fixture"
+    drm = gpu_fixture / "drm"
+    devices = gpu_fixture / "devices"
+    drm.mkdir(parents=True)
+    devices.mkdir()
+    for i in range(2):
+        dev = devices / ("0000:0%d:00.0" % (i+1))
+        dev.mkdir()
+        card = drm / ("card%d" % i)
+        card.mkdir()
+        (card / "device").symlink_to(dev)
+        if i == 0:
+            (dev / "gpu_busy_percent").write_text("40")
+            (dev / "mem_info_vram_used").write_text("1048576")
+            (dev / "mem_info_vram_total").write_text("2097152")
+    (scripts / "cpuplus_gpu_observer.py").write_text("""import sys
+from pathlib import Path
+from gpu_reader_fixture import capture
+assert sys.argv[1:]==["--workshop","--duration","2","--interval","1"]
+base=Path(__file__).resolve().parents[2]/"gpu-fixture"
+sys.stdout.write(capture(2,1,base/"drm",base/"devices"))
+""")
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')
@@ -114,7 +139,7 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                WAYLAND_DISPLAY="", DISPLAY="")
     result = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=55, check=False)
+                            stderr=subprocess.STDOUT, timeout=65, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

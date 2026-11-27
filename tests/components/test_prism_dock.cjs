@@ -38,7 +38,8 @@ test("Prism stays beside the original Trash dock with no new input stealing",()=
     assert.equal((73+10)-(10+15+50),8);
     assert.equal(10+(70-(10+50)),20);
     assert.match(dock,/mask: Region\s*\{\s*item: prismButton/);
-    assert.match(panel,/visible: true/);\n    assert.match(panel,/mask: Region\\s*\\{/);
+    assert.match(panel,/visible: true/);
+    assert.match(panel,/mask: Region\s*\{/);
     assert.match(panel,/width: root\.menuOpen \? root\.frameWidth : 0/);
     assert.match(panel,/height: root\.menuOpen \? root\.frameHeight : 0/);
     assert.match(panel,/focusable: menuOpen/);

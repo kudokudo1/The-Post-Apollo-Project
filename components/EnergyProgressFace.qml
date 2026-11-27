@@ -79,6 +79,7 @@ Item {
         transform: Translate { x: root.visualFrame.dx; y: root.visualFrame.dy }
         Canvas {
             id: surface
+            objectName: "energyProgressCanvas"
             anchors.fill: parent
             anchors.margins: -10
             renderTarget: Canvas.Image

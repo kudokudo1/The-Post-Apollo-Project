@@ -7,7 +7,8 @@ repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 case "${1:-preview}" in
   preview) fixture=EnergyProgressPreview.qml ;;
   native) fixture=EnergyProgressNative.qml ;;
-  *) echo "Usage: $0 [preview|native]" >&2; exit 2 ;;
+  load) fixture=EnergyProgressLoadNative.qml ;;
+  *) echo "Usage: $0 [preview|native|load]" >&2; exit 2 ;;
 esac
 [ "$#" -le 1 ] || exit 2
 qs_bin="$(command -v quickshell)" || { echo "quickshell not installed" >&2; exit 2; }

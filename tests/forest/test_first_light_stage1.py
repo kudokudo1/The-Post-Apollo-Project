@@ -87,6 +87,36 @@ class Stage1Tests(unittest.TestCase):
                 with self.assertRaises(stage.Hold):
                     stage.parse_manifest(data)
 
+    def test_descriptor_refusal_categories_preserve_strict_policy(self):
+        valid = {"mediaType": "layer", "digest": "sha256:" + "b"*64, "size": 16}
+        config = {"mediaType": "config", "digest": "sha256:" + "a"*64, "size": 8}
+        variants = [
+            (None, "BLOB_DESCRIPTOR_TYPE"),
+            ({**valid, "from": "fixture-provenance"}, "BLOB_DESCRIPTOR_KEYS"),
+            ({**valid, "name": "fixture-name"}, "BLOB_DESCRIPTOR_KEYS"),
+            ({**valid, "urls": ["https://example.invalid/fixture"]}, "BLOB_DESCRIPTOR_KEYS"),
+            ({"mediaType": "layer", "size": 16}, "BLOB_DESCRIPTOR_KEYS"),
+            ({**valid, "mediaType": 7}, "BLOB_MEDIA_TYPE"),
+            ({**valid, "digest": "sha256:" + "G"*64}, "BLOB_DIGEST_FORMAT"),
+            ({**valid, "size": True}, "BLOB_SIZE"),
+            ({**valid, "size": 0}, "BLOB_SIZE"),
+            ({**valid, "size": stage.MODEL_LIMIT+1}, "BLOB_SIZE"),
+        ]
+        for descriptor, reason in variants:
+            raw = json.dumps({"schemaVersion": 2, "config": config,
+                              "layers": [descriptor]}).encode()
+            with self.subTest(reason=reason):
+                # The fixed production pin is checked before any structural
+                # category can be returned. Override only in this fixture.
+                with self.assertRaisesRegex(stage.Hold, "^MANIFEST_DIGEST$"):
+                    stage.parse_manifest(raw)
+                with patch.object(stage, "MANIFEST_SHA", hashlib.sha256(raw).hexdigest()):
+                    with self.assertRaisesRegex(stage.Hold, "^" + reason + "$"):
+                        stage.parse_manifest(raw)
+        with self.assertRaisesRegex(stage.Hold, "^BLOB_REDIRECT_DIGEST_FORMAT$"):
+            stage.target("https://" + stage.R2 + "/fixture?sig=fixture",
+                         "blob", "invalid", True)
+
     def test_safe_regular_hash_and_unmaterialized_link(self):
         records, links, total = stage.unpack(tar_bytes([
             ("./bin/ollama", "file", b"not executable"),

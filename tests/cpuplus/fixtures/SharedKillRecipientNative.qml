@@ -118,6 +118,7 @@ ShellRoot {
     }
     KillBackend.TaskGraphController {
         id: fakeGraph
+        extraDetailHistoryEnabled: true
         presentationState: fakeHistory
         hunterPresentation: fakeHunter
         telemetry: fakeTelemetry
@@ -509,7 +510,8 @@ ShellRoot {
                     && fakeHistory.taskCpuHistory[fakeHistory.taskCpuHistory.length-1]!==37,
                     "general snapshot and wrong birth do not feed selected detail")) return;
                 if (!smoke.check(fakeSession.accept({pid:3442,startTicks:967833,
-                    cpuPercent:37,memPercent:7,rssKiB:23456,ioRateBytes:1024,ageSeconds:55}),
+                    cpuPercent:37,memPercent:7,rssKiB:23456,rssObserved:true,threadCount:29,
+                    ioRateBytes:1024,ioRateObserved:true,ageSeconds:55,ageObserved:true}),
                     "exact dedicated probe feeds shared history")) return;
                 smoke.previousRevision=initial;
                 smoke.phase=10;
@@ -523,6 +525,13 @@ ShellRoot {
                 if (!smoke.check(mini && mini.historyValues.length===3 && mini.historyValues[2]===37
                     && mini.graphScrollOffset>0 && detail.cpuCanvas.graphScrollOffset>0,
                     "same-length mini snapshot and main graph both animate after publication")) return;
+                for (const [metric,expected] of [["rss",23456/1024],["threads",29],["io",1024/1048576],["age",55/60]]) {
+                    const extra=smoke.find(view,"cpuPlusDetailGraph-"+metric);
+                    if (!smoke.check(extra && extra.historyValues.length===1
+                        && Math.abs(extra.historyValues[0]-expected)<0.00001
+                        && extra.historyLimit===132 && extra.scrollDuration===920,
+                        "extra observed graph "+metric)) return;
+                }
                 smoke.previousMiniOffset=mini.graphScrollOffset;
                 smoke.previousCpuOffset=detail.cpuCanvas.graphScrollOffset;
                 // Test-only long scope injection. The actual hosts retain their

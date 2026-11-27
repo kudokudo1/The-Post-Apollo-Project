@@ -119,3 +119,34 @@ or native provider. The original timeout behavior is unchanged;
 offline witness does not prove cleanup under runner death or actual
 acquisition capacity. Exact Spirit/Heart/Nurse correction reviews and
 a separate operator decision required before a new staging exercise.
+
+
+## Second original attempt: manifest descriptor refusal
+
+Hospital #7224005423 second intent SPENT; run 46039275672 attempt 1,
+exact a1b697191e939a3483028ac8c0ebdce9773b69e7; raw 140642552500:
+9/9 offline PASS, STAGE1_HOLD BLOB_DESCRIPTOR, exit 2. FD and other
+preflight checks precede acquisition. The fixed manifest SHA and size
+check precede descriptor parsing. For this accepted flow, blob targets
+are derived only from validated digest strings, so the observed code
+is consistent with pinned manifest descriptor predicate failure before
+the blob loop. Raw manifest structure was not retained in job output;
+do not assert an exact rejected field. Zero uploaded artifacts does not
+mean zero network acquisition. Both prior intents remain spent.
+
+Ollama v0.32.14 manifest/layer.go documents optional from and name
+fields; a public secondary example of granite3.3:2b locally stored
+manifest includes from. These are plausible explanations, not evidence
+of the exact pinned registry bytes. No schema relaxation based on this
+example. Recover exact public pinned descriptor metadata via separately
+reviewed read-only evidence; verify the existing SHA before deciding
+a narrow policy. This diagnostic-only change preserves every acceptance
+predicate, fixed source and size limit. Fixed refusal classes distinguish
+descriptor object/keys, media type, digest format, size, and redirect
+digest; never print raw keys, values, paths, digests or signed URLs.
+Synthetic offline fixtures exercise optional fields, URL override,
+missing keys, wrong types, invalid digest, zero/oversized sizes and
+pin-first refusal. No acquisition in CI. No additional staging exercise,
+retry or inference authorized; Nurse 2F sole operator-facing dispatch
+coordinator. Runtime owns diagnosis/source, Heart evidence, Spirit
+schema/security review. See Nurse incident #7224114032/#7224126906.

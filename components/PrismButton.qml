@@ -24,16 +24,17 @@ ActionButton {
         }
     }
 
-    // Specialized identity is deliberately independent of action state.
+    // The closed Prism keeps its special artwork. An actual open surface
+    // follows the ordinary yellow/magenta module-button identity.
     idleFillColor: Colors.black
     hoverFillColor: Colors.black
-    pressedFillColor: Colors.black
-    selectedFillColor: Colors.black
+    pressedFillColor: selected ? Colors.yellow : Colors.black
+    selectedFillColor: Colors.yellow
     keyboardSelectedFillColor: Colors.black
     idleBorderColor: Colors.white
     hoverBorderColor: Colors.white
-    pressedBorderColor: Colors.white
-    selectedBorderColor: Colors.white
+    pressedBorderColor: selected ? Colors.magenta : Colors.white
+    selectedBorderColor: Colors.magenta
     keyboardSelectedBorderColor: Colors.white
     // ONE native outline, fixed at one physical logical pixel in every state.
     // ActionButton paints its border below the children. Do not draw a second
@@ -43,10 +44,18 @@ ActionButton {
     pressedBorderWidth: 1
     selectedBorderWidth: 1
     keyboardSelectedBorderWidth: 1
+    selectedForegroundColor: Colors.magenta
+    pressedForegroundColor: selected ? Colors.magenta : Colors.white
     contentGlowEnabled: false
     contentGlowSource: null
-    softGlowEnabled: false
-    wideGlowEnabled: false
+    softGlowEnabled: selected
+    wideGlowEnabled: selected
+    selectedSoftGlowColor: Colors.magenta
+    selectedWideGlowColor: Colors.magenta
+    softGlowSelectedOpacity: 0.86
+    wideGlowSelectedOpacity: 0.22
+    softGlowPressedOpacity: 0.86
+    wideGlowPressedOpacity: 0.22
     perimeterGlowEnabled: false
 
     property real spectralGlowStrength: 1.0
@@ -55,7 +64,7 @@ ActionButton {
     // Dock-like rising intensity without rerasterizing the expensive artwork
     // on hover/press/open. The second Canvas is a static, bloom-only texture.
     readonly property real glowEmphasisOpacity:
-        !available ? 0.12 : effectiveSelected ? 0.78
+        selected ? 0 : !available ? 0.12 : effectiveSelected ? 0.78
         : pressed ? 0.64 : hovered ? 0.48 : 0.12
 
     function rgb(c) { return [c.r,c.g,c.b] }
@@ -71,6 +80,7 @@ ActionButton {
     Canvas {
         id: raster
         objectName: "prismArtwork"
+        opacity: root.selected ? 0 : 1
         readonly property real logicalWidth: Math.max(0,root.width+2*root.glowPadding)
         readonly property real logicalHeight: Math.max(0,root.height+2*root.glowPadding)
         readonly property real sampleScale: Math.min(2,root.rasterLimit/Math.max(1,logicalWidth,logicalHeight))
@@ -159,6 +169,68 @@ ActionButton {
             Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
                           1,root.prismPalette,root.spectralGlowStrength,true)
             lastPaintDurationMs=Date.now()-started
+        }
+    }
+
+    // Cache the open artwork only once it is needed. Its palette is the
+    // standard module magenta on yellow; the same renderer preserves the
+    // ray angles, cuts, triangle and nucleus. Never rebuild on state toggles.
+    readonly property var openPalette: [
+        rgb(Colors.magenta),rgb(Colors.magenta),rgb(Colors.magenta),
+        rgb(Colors.magenta),rgb(Colors.magenta),rgb(Colors.magenta),
+        rgb(Colors.magenta),rgb(Colors.magenta),rgb(Colors.yellow)
+    ]
+    property bool openArtworkPrepared: false
+    Loader {
+        id: openArtworkLoader
+        anchors.fill: parent
+        active: root.selected || root.openArtworkPrepared
+        opacity: root.selected ? 1 : 0
+        onLoaded: root.openArtworkPrepared = true
+        sourceComponent: Component {
+            Canvas {
+                id: openRaster
+                objectName: "prismOpenArtwork"
+                readonly property real logicalWidth: Math.max(0,root.width+2*root.glowPadding)
+                readonly property real logicalHeight: Math.max(0,root.height+2*root.glowPadding)
+                readonly property real sampleScale: Math.min(2,root.rasterLimit/Math.max(1,logicalWidth,logicalHeight))
+                anchors.centerIn: parent
+                width: Math.max(1,Math.min(root.rasterLimit,Math.ceil(logicalWidth*sampleScale)))
+                height: Math.max(1,Math.min(root.rasterLimit,Math.ceil(logicalHeight*sampleScale)))
+                transform: Scale {
+                    origin.x: openRaster.width/2
+                    origin.y: openRaster.height/2
+                    xScale: openRaster.logicalWidth/openRaster.width
+                    yScale: openRaster.logicalHeight/openRaster.height
+                }
+                renderTarget: Canvas.Image
+                renderStrategy: Canvas.Immediate
+                contextType: "2d"
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onLogicalWidthChanged: requestPaint()
+                onLogicalHeightChanged: requestPaint()
+                onAvailableChanged: if (available) requestPaint()
+                Component.onCompleted: requestPaint()
+                Connections {
+                    target: root
+                    function onSpectralGlowStrengthChanged() { openRaster.requestPaint() }
+                    function onOpenPaletteChanged() { openRaster.requestPaint() }
+                }
+                property real lastPaintDurationMs: -1
+                onPaint: {
+                    const started=Date.now()
+                    const c=getContext("2d")
+                    if (!c) return
+                    if (root.width<=0 || root.height<=0) {
+                        c.clearRect(0,0,width,height)
+                        return
+                    }
+                    Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
+                                  1,root.openPalette,root.spectralGlowStrength)
+                    lastPaintDurationMs=Date.now()-started
+                }
+            }
         }
     }
 }

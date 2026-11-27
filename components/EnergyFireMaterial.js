@@ -31,11 +31,12 @@ function drawAsh(c,x,y,w,h,edge,hot) {
         c.fillRect(px,py,size*1.7,size);
     }
     if(hot) {
+        const heatAlpha=typeof hot==="number"?Math.max(0,Math.min(1,hot)):1;
         const span=Math.min(burned,h*.85);
         const heat=c.createLinearGradient(edge-span,y,edge,y);
         heat.addColorStop(0,tint(.42,.18,.04,0));
-        heat.addColorStop(.72,tint(.75,.26,.03,.35));
-        heat.addColorStop(1,tint(.92,.46,.12,.60));
+        heat.addColorStop(.72,tint(.75,.26,.03,.35*heatAlpha));
+        heat.addColorStop(1,tint(.92,.46,.12,.60*heatAlpha));
         c.fillStyle=heat; c.fillRect(edge-span,y,span,h);
     }
     c.restore();
@@ -77,11 +78,12 @@ function drawRemaining(c,x,y,w,h,edge,hot,border,inset) {
         c.restore();
     }
     if(hot && remaining>0) {
+        const heatAlpha=typeof hot==="number"?Math.max(0,Math.min(1,hot)):1;
         const start=Math.max(x,edge-h*.75);
         for(let i=0;i<10;i++){
             const px=start+grain(i,12)*(edge-start);
             const py=y+h*(.25+.6*grain(i,13));
-            c.fillStyle=tint(.40,.27,.19,.28+.32*grain(i,14));
+            c.fillStyle=tint(.40,.27,.19,(.28+.32*grain(i,14))*heatAlpha);
             c.fillRect(px,py,1+grain(i,15)*2,1+grain(i,16)*2);
         }
     }

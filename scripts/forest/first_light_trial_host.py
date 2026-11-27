@@ -31,6 +31,63 @@ class FirstLightRefusal(ValueError):
     """Fixed local reason, no input/output or provider diagnostics."""
 
 
+class _OwnerStream:
+    """Checked iterator, not a transferable Python generator.
+
+    Keep the generator pinned in the original host until explicit owner
+    closure/exhaustion. A foreign caller cannot resume or inject close.
+    This is thread-lifetime hygiene, not process or security isolation.
+    """
+
+    def __init__(self, host, generator):
+        self._host = host
+        self._generator = generator
+        self._closed = False
+        self._busy = False
+
+    def __iter__(self):
+        return self
+
+    def _check(self):
+        if threading.current_thread() is not self._host._owner_thread or self._busy:
+            raise FirstLightRefusal("OWNER_ACTION_UNAVAILABLE")
+
+    def _retire(self):
+        self._closed = True
+        self._generator = None
+        self._host._active_stream = None
+        self._host._running = False
+        if self._host._phase == "RUNNING":
+            self._host._phase = "UNKNOWN_HOLD"
+
+    def __next__(self):
+        self._check()
+        if self._closed:
+            raise StopIteration
+        self._busy = True
+        try:
+            return next(self._generator)
+        except BaseException:
+            # Generator has terminated; never allow another original run.
+            self._retire()
+            raise
+        finally:
+            self._busy = False
+
+    def close(self):
+        self._check()
+        if self._closed:
+            return
+        self._busy = True
+        try:
+            self._generator.close()
+        finally:
+            # Also handles a never-started generator: its finally block
+            # has not executed, but this original stream is still spent.
+            self._retire()
+            self._busy = False
+
+
 class FirstLightTrialHost:
     """One fresh journal and one original operation per disposable host.
 
@@ -44,7 +101,7 @@ class FirstLightTrialHost:
     def __init__(self, *, test_transport):
         if not callable(test_transport):
             raise FirstLightRefusal("TRANSPORT_REQUIRED")
-        self._owner_thread = threading.get_ident()
+        self._owner_thread = threading.current_thread()
         self._transport = test_transport
         self._db = None
         self._runtime = None
@@ -52,6 +109,7 @@ class FirstLightTrialHost:
         self._attempt = None
         self._phase = "IDLE"
         self._running = False
+        self._active_stream = None
         self._closed = False
         self._local = "UNKNOWN_HOLD"
         self._clock = 0
@@ -61,7 +119,7 @@ class FirstLightTrialHost:
         return self._phase
 
     def _owner(self):
-        if threading.get_ident() != self._owner_thread or self._closed:
+        if threading.current_thread() is not self._owner_thread or self._closed:
             raise FirstLightRefusal("OWNER_ACTION_UNAVAILABLE")
 
     def _tick(self):
@@ -145,6 +203,10 @@ class FirstLightTrialHost:
             raise FirstLightRefusal("TRIAL_ALREADY_USED")
         self._running = True
         self._phase = "RUNNING"
+        self._active_stream = _OwnerStream(self, self._run_frames())
+        return self._active_stream
+
+    def _run_frames(self):
         stream = self._runtime.run()
         try:
             for frame in stream:
@@ -156,12 +218,7 @@ class FirstLightTrialHost:
                     self._phase = "UNKNOWN_HOLD"
                 yield frame
         finally:
-            try:
-                stream.close()
-            finally:
-                self._running = False
-                if self._phase == "RUNNING":
-                    self._phase = "UNKNOWN_HOLD"
+            stream.close()
 
     def request_stop(self, operation, attempt):
         """Owner resolves exact original references; no inferred terminal."""

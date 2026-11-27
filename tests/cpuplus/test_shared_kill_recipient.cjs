@@ -1342,3 +1342,49 @@ test("K8b3: restart observes original exit and refuses duplicate replacement on 
     const result=require("node:child_process").spawnSync("/usr/bin/python3",["-c",harness,command[2]],{encoding:"utf8",timeout:30000});
     assert.equal(result.status,0,result.stderr || String(result.error || ""));
 });
+
+
+test("P2: process snapshot reads procfs I/O counters once with legacy first-key semantics", () => {
+    const telemetry = read("services/system/ProcessTelemetry.qml");
+    const os = require("node:os");
+    const cp = require("node:child_process");
+    const fixture = require("node:fs");
+    const program = '$1=="read_bytes:" && !got_read {read=$2; got_read=1} '
+        + '$1=="write_bytes:" && !got_write {write=$2; got_write=1} '
+        + 'END {print read " " write}';
+    const sourceLiteral = program.replaceAll('"', '\\"');
+    assert.ok(telemetry.replace(/"\s*\+\s*"/g, "").includes("awk '" + sourceLiteral + "' /proc/$pid/io"),
+        "compiled shell command retains both exact I/O counters in one awk invocation");
+    const snapshotBody = telemetry.slice(telemetry.indexOf("    function refreshSnapshot() {"),
+        telemetry.indexOf("    function parseSnapshot(output) {"));
+    assert.equal((snapshotBody.match(/\/proc\/\$pid\/io/g) || []).length, 1);
+    assert.match(telemetry, /readb=\$\{io_pair%% \*\}; writeb=\$\{io_pair#\* \};/);
+    assert.doesNotMatch(telemetry, /(?:readb|writeb)=\$\(awk/);
+    const dir = fixture.mkdtempSync(path.join(os.tmpdir(), "cpuplus-proc-io-"));
+    try {
+        const cases = [
+            ["read_bytes: 100\nwrite_bytes: 200\n", ["100", "200"]],
+            ["write_bytes: 20\nread_bytes: 10\n", ["10", "20"]],
+            ["rchar: 90\nread_bytes: 9\nread_bytes: 999\nwrite_bytes: 22\nwrite_bytes: 30\n", ["9", "22"]],
+            ["rchar: 0\nsyscr: 0\n", ["", ""]],
+            ["write_bytes: 5\n", ["", "5"]],
+            ["read_bytes: 0\n", ["0", ""]],
+            ["read_bytes: 0\nwrite_bytes: 0\n", ["0", "0"]],
+        ];
+        const ioPath = path.join(dir, "io");
+        for (const [content, expected] of cases) {
+            fixture.writeFileSync(ioPath, content);
+            const result = cp.spawnSync("awk", [program, ioPath], {encoding: "utf8"});
+            assert.equal(result.status, 0, result.stderr);
+            assert.deepStrictEqual(result.stdout.replace(/\n+$/, "").split(" "), expected);
+            for (let i=0; i<expected.length; ++i) {
+                const key = i===0 ? "read_bytes" : "write_bytes";
+                const original = cp.spawnSync("awk", ['$1=="' + key + ':" {print $2; exit}', ioPath],{encoding:"utf8"});
+                assert.equal(original.status,0);
+                assert.equal(expected[i], original.stdout.trim());
+            }
+        }
+    } finally {
+        fixture.rmSync(dir, {recursive:true,force:true});
+    }
+});

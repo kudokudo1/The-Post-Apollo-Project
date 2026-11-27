@@ -2,6 +2,8 @@
 """Hosted disposable-process-only K8c contracts, no host modification."""
 import importlib.util
 import json
+import os
+import resource
 import pathlib
 import subprocess
 import sys
@@ -36,6 +38,13 @@ class ProbeTest(unittest.TestCase):
             name,birth=identity
             result=cap.observe(child.pid,birth,name)
             self.assertEqual(result["state"],"observed")
+            evidence=result["resources"]["cpu"]["priority_evidence"]
+            self.assertEqual(evidence["scope"],"leader_thread")
+            self.assertEqual(evidence["nice"],os.getpriority(os.PRIO_PROCESS,child.pid))
+            self.assertEqual(evidence["scheduler"],os.sched_getscheduler(child.pid))
+            self.assertEqual(evidence["mutation_permission"],"not_verified")
+            self.assertEqual(evidence["restoration_permission"],"not_verified")
+            self.assertEqual(evidence["rlimit_nice_soft"],resource.prlimit(child.pid,resource.RLIMIT_NICE)[0])
             self.assertEqual(set(result["resources"]),set(cap.CATEGORIES))
             for value in result["resources"].values():
                 self.assertEqual(value["actuation"],"not_verified")
@@ -50,6 +59,13 @@ class ProbeTest(unittest.TestCase):
         finally:
             child.terminate()
             child.wait(timeout=5)
+
+    def test_priority_permission_failure_is_not_a_zero_nice(self):
+        with mock.patch.object(cap.os,"getpriority",side_effect=PermissionError()):
+            evidence=cap.priority_evidence(123)
+        self.assertIsNone(evidence["nice"])
+        self.assertEqual(evidence["read_state"],"permission_denied")
+        self.assertEqual(evidence["restoration_permission"],"not_verified")
 
     def test_stale_during_observation_discards_evidence(self):
         with mock.patch.object(cap,"birth_identity",side_effect=[

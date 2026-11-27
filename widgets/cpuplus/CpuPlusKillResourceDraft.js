@@ -1,7 +1,7 @@
 // K8d: visual/draft-only resource editor. No actuation, defaults or host assumptions.
 function cards() {
     return [
-        {key:"cpu",title:"CPU",scope:"SCHEDULER / SINGLE PROCESS",controls:[
+        {key:"cpu",title:"CPU",scope:"PRIORITY / LEADER THREAD; QUOTA / GROUP",controls:[
             {key:"quota",title:"QUOTA DRAFT",min:10,max:100,step:5,unit:"% OF ONE CPU",initial:75},
             {key:"nice",title:"PRIORITY / NICE",min:-20,max:19,step:1,unit:"NICE",initial:0}
         ],note:"AFFINITY // CPU CORE SET NOT ENUMERATED"},
@@ -34,6 +34,21 @@ function identity(target) {
             ||!Number.isSafeInteger(Number(target.startTicks))||Number(target.startTicks)<=0
             ||typeof target.comm!=="string"||!target.comm) return "";
     return JSON.stringify([Number(target.pid),Number(target.startTicks),target.comm]);
+}
+function priorityPresets() {
+    return [{key:"normal",label:"NORMAL",nice:0},
+        {key:"background",label:"BACKGROUND",nice:10},
+        {key:"lowest",label:"LOWEST",nice:19}];
+}
+function hasValue(previous,key,field) {
+    var entry=previous[key];
+    return !!entry && !!entry.values && Object.prototype.hasOwnProperty.call(entry.values,field);
+}
+function stagePriorityPreset(previous,key) {
+    var presets=priorityPresets();
+    for(var i=0;i<presets.length;i++)
+        if(presets[i].key===key) return stageValue(previous,"cpu","nice",presets[i].nice);
+    return previous;
 }
 function stageMode(previous,key,mode) {
     var spec=find(key);
@@ -85,9 +100,12 @@ function summary(previous) {
             var fields=[];
             for(var j=0;j<spec.controls.length;j++) {
                 var c=spec.controls[j];
+                // Priority and quota are different kernel operations. Never
+                // turn a placeholder value into a requested CPU setting.
+                if(spec.key==="cpu"&&!hasValue(previous,spec.key,c.key)) continue;
                 fields.push(c.title+" "+value(previous,spec.key,c.key)+" "+c.unit);
             }
-            description+=" // "+fields.join(" · ");
+            description+=" // "+(fields.length?fields.join(" · "):"NO CPU VALUES SELECTED");
         }
         if(entry.mode==="auto") description+=" // POLICY NOT DEFINED";
         lines.push(description);

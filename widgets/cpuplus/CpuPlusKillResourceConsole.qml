@@ -54,6 +54,16 @@ Item {
         staged = Draft.stageValue(staged,key,field,number);
         reviewing = false;
     }
+    function choosePriorityPreset(key) {
+        if (!selectionReady || selectedKey !== "cpu") return;
+        staged = Draft.stagePriorityPreset(staged,key);
+        reviewing = false;
+    }
+    function priorityPresetSelected(nice) {
+        return modeFor("cpu") === "manual"
+            && Draft.hasValue(staged,"cpu","nice")
+            && valueFor("cpu","nice") === nice;
+    }
     function accentFor(key) {
         if (key === "cpu") return Colors.orange;
         if (key === "memory") return Colors.magenta;
@@ -345,15 +355,17 @@ Item {
                                     required property var modelData
                                     required property int index
                                     width: detailContent.width
+                                    readonly property bool priorityField: resourcePanel.key === "cpu" && modelData.key === "nice"
                                     spacing: 3
                                     Row {
                                         id: instrumentRow
                                         objectName: "cpuPlusResourceInstrumentRow-" + resourcePanel.key + "-" + field.modelData.key
                                         width: field.width
-                                        height: 58
+                                        height: field.priorityField ? 150 : 58
                                         spacing: 4
                                         CpuPlusDiagnosticSlider {
                                             objectName: "cpuPlusDraftSlider-" + resourcePanel.key + "-" + field.modelData.key
+                                            visible: !field.priorityField
                                             width: Math.max(75,instrumentRow.width - modeCluster.width - instrumentRow.spacing)
                                             height: 54
                                             compact: true
@@ -370,6 +382,75 @@ Item {
                                             adjustable: root.selectionReady && root.modeFor(resourcePanel.key) === "manual"
                                             onValueRequested: function(value) {
                                                 root.stageNumber(resourcePanel.key,field.modelData.key,Number(value));
+                                            }
+                                        }
+                                        // CPU priority uses the existing shared rotary instrument.
+                                        // No separate card or new actuator is introduced.
+                                        SelectorDial {
+                                            id: priorityDial
+                                            objectName: "cpuPlusPriorityDial"
+                                            visible: field.priorityField
+                                            width: Math.max(70, Math.min(142,(instrumentRow.width-instrumentRow.spacing)*0.54))
+                                            height: 148
+                                            labelText: "PRIORITY / NICE"
+                                            titleColor: Colors.orange
+                                            titlePixelSize: 9
+                                            selectorMode: "continuous"
+                                            minimumValue: -20
+                                            maximumValue: 19
+                                            valueStep: 1
+                                            valueDecimals: 0
+                                            snapContinuousToStep: true
+                                            currentValue: root.valueFor("cpu","nice")
+                                            readoutText: Draft.hasValue(root.staged,"cpu","nice")
+                                                ? (previewNumericValue>0?"+":"")+Math.round(previewNumericValue)
+                                                : "DRAFT"
+                                            options: ["-20","-10","0","+10","+19"]
+                                            displayOptions: options
+                                            numericReferenceValues: [-20,-10,0,10,19]
+                                            numericLabelPixelSize: 9
+                                            showInstrumentChassis: false
+                                            accentColor: Colors.orange
+                                            markerColor: Colors.orange
+                                            activeDetentColor: Colors.orange
+                                            labelColor: Colors.white
+                                            interactive: visible && root.selectionReady
+                                                && root.modeFor("cpu")==="manual"
+                                            onValueRequested: function(value) {
+                                                if (visible && interactive)
+                                                    root.stageNumber("cpu","nice",Math.round(value));
+                                            }
+                                        }
+                                        Column {
+                                            id: priorityPresetColumn
+                                            objectName: "cpuPlusPriorityPresets"
+                                            visible: field.priorityField
+                                            width: Math.max(1,instrumentRow.width-priorityDial.width-instrumentRow.spacing)
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 4
+                                            Repeater {
+                                                model: Draft.priorityPresets()
+                                                delegate: ActionButton {
+                                                    required property var modelData
+                                                    objectName: "cpuPlusPriorityPreset-"+modelData.key
+                                                    width: priorityPresetColumn.width
+                                                    height: 28
+                                                    label: modelData.label
+                                                    labelPixelSize: 10
+                                                    labelMinimumPixelSize: 7
+                                                    normalFace: true
+                                                    accentColor: Colors.orange
+                                                    selected: root.priorityPresetSelected(modelData.nice)
+                                                    available: field.priorityField && root.selectionReady
+                                                    onLeftClicked: root.choosePriorityPreset(modelData.key)
+                                                }
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "PRESETS // DRAFT"
+                                                color: Colors.white
+                                                font.pixelSize: 9
+                                                elide: Text.ElideRight
                                             }
                                         }
                                         Grid {
@@ -408,7 +489,7 @@ Item {
                                         GohuText {
                                             width: Math.max(1,parent.width-100)
                                             anchors.verticalCenter: parent.verticalCenter
-                                            text: "EXACT DRAFT // " + field.modelData.unit
+                                            text: field.priorityField ? "LEADER THREAD // NICE" : "EXACT DRAFT // " + field.modelData.unit
                                             color: Colors.white
                                             elide: Text.ElideRight
                                             font.pixelSize: 9
@@ -417,7 +498,9 @@ Item {
                                             objectName: "cpuPlusDraftInput-" + resourcePanel.key + "-" + field.modelData.key
                                             width: 92
                                             height: 26
-                                            text: String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            text: field.priorityField && !Draft.hasValue(root.staged,"cpu","nice")
+                                                ? "" : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            placeholderText: field.priorityField ? "UNSET" : ""
                                             color: Colors.white
                                             font.pixelSize: 11
                                             horizontalAlignment: TextInput.AlignHCenter

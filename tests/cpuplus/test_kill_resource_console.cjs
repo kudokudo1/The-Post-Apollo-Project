@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
@@ -183,4 +183,30 @@ test("K8d5 header uses two rules, no enclosing box, and no status before resourc
     assert.match(ui,/anchors.top: resourceHeaderSection.bottom/);
     assert.ok(ui.includes('objectName: "cpuPlusResourceInformationButton"'));
     assert.ok(ui.includes('label: "APPLY LOCKED // UNVERIFIED"'));
+});
+
+test("K8e1a priority presets stage only explicit priority; quota is not implied",()=>{
+    assert.deepEqual(draft.priorityPresets().map(x=>x.nice),[0,10,19]);
+    const empty={};
+    assert.equal(draft.stagePriorityPreset(empty,"invalid"),empty);
+    let v=draft.stagePriorityPreset(empty,"background");
+    assert.equal(draft.value(v,"cpu","nice"),10);
+    assert.equal(draft.mode(v,"cpu"),"manual");
+    assert.equal(draft.hasValue(v,"cpu","quota"),false);
+    assert.ok(draft.summary(v)[0].includes("NICE 10"));
+    assert.ok(!draft.summary(v)[0].includes("QUOTA DRAFT"));
+    v=draft.stageValue(v,"cpu","quota",60);
+    v=draft.stagePriorityPreset(v,"lowest");
+    assert.equal(draft.value(v,"cpu","nice"),19);
+    assert.equal(draft.value(v,"cpu","quota"),60);
+    assert.ok(draft.summary(v)[0].includes("QUOTA DRAFT 60"));
+    assert.ok(draft.summary(draft.stageMode({},"cpu","manual"))[0].includes("NO CPU VALUES SELECTED"));
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes('objectName: "cpuPlusPriorityDial"'));
+    assert.ok(ui.includes('objectName: "cpuPlusPriorityPresets"'));
+    assert.ok(ui.includes('selectorMode: "continuous"'));
+    assert.ok(ui.includes('snapContinuousToStep: true'));
+    assert.ok(ui.includes('onLeftClicked: root.choosePriorityPreset(modelData.key)'));
+    assert.ok(ui.includes('root.stageNumber("cpu","nice",Math.round(value))'));
+    assert.ok(ui.includes('showInstrumentChassis: false'));
 });

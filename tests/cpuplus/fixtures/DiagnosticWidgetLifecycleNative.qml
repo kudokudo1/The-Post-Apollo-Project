@@ -44,6 +44,7 @@ ShellRoot {
             "media": source14
         })
     }
+    Binding { target: CpuPlusDiagnostics; property: "lifecycleRecorder"; value: recorder }
     Timer {
         interval: 50
         running: true
@@ -53,7 +54,7 @@ ShellRoot {
                 source0.menuOpen=true;
                 if(!root.check(!recorder.active && recorder.report===null,"idle signal ignored"))return;
                 const ids=Object.keys(recorder.sources);
-                if(!root.check(recorder.start(ids,1000)&&!recorder.start(ids,1000),"one capture only"))return;
+                if(!root.check(CpuPlusDiagnostics.setLifecycleSelection(ids) && CpuPlusDiagnostics.setLifecycleDuration(1) && CpuPlusDiagnostics.startLifecycleCapture() && !CpuPlusDiagnostics.startLifecycleCapture() && !CpuPlusDiagnostics.request("threads") && !CpuPlusDiagnostics.loadWorkflowCatalog(),"one capture only, owner mutual exclusion"))return;
                 root.phase=1;return;
             }
             if(root.phase===1){
@@ -80,10 +81,10 @@ ShellRoot {
                 if(!root.check(r && r.status==="COMPLETE" && r.elapsedMs===1000 && r.completionDelayMs>=0
                     && r.events.length===15 && r.stats.length===15
                     && r.stats[0].closes===1 && r.stats[14].opens===1,"all 15 real QML signals"))return;
-                if(!root.check(recorder.start(["git"],1000),"single selection"))return;
+                if(!root.check(CpuPlusDiagnostics.lifecycleReport && CpuPlusDiagnostics.setLifecycleSelection(["git"]) && CpuPlusDiagnostics.startLifecycleCapture(),"single selection via owner"))return;
                 source0.menuOpen=true;
                 source4.menuOpen=false;
-                if(!root.check(recorder.cancel()&&recorder.report.status==="CANCELLED"
+                if(!root.check(CpuPlusDiagnostics.cancelLifecycleCapture()&&recorder.report.status==="CANCELLED"
                     && recorder.report.events.length===1 && recorder.report.events[0].id==="git",
                     "unselected ignored, cancellation bounded"))return;
                 recorder.blocked=true;

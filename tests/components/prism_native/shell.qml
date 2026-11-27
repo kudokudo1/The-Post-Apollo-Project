@@ -20,8 +20,8 @@ ShellRoot {
     }
     Window {
         id: preview
-        width: 180
-        height: 180
+        width: 300
+        height: 240
         visible: true
         color: "#000000"
         Ui.PrismButton {
@@ -30,6 +30,25 @@ ShellRoot {
             y: 40
             width: 50
             height: 50
+        }
+        Item {
+            id: spectrumWitness
+            x: 130
+            y: 20
+            width: 150
+            height: 200
+            Rectangle {
+                anchors.fill: parent
+                color: "#000000"
+            }
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 12
+                color: "#16051F"
+                border.width: 1
+                border.color: "#DCF3FA"
+                Ui.PrismBorderGlow { anchors.fill: parent }
+            }
         }
     }
     Timer {
@@ -91,8 +110,12 @@ ShellRoot {
             console.info("PRISM_NATIVE_SELECTED_GLOW",glow.opacity,glow.lastPaintDurationMs);
             prism.grabToImage(function(result) {
                 console.info("PRISM_NATIVE_COMPOSITE",result.saveToFile("/tmp/prism-render-composite.png"));
-                console.info("PRISM_NATIVE_DONE");
-                Qt.quit();
+                spectrumWitness.grabToImage(function(spectrumResult) {
+                    if (!spectrumResult.saveToFile("/tmp/prism-render-spectrum.png"))
+                        console.error("PRISM_NATIVE_FAIL spectrum snapshot");
+                    console.info("PRISM_NATIVE_DONE");
+                    Qt.quit();
+                });
             });
         }
     }

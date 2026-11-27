@@ -93,4 +93,25 @@ function setup() {
     assert.equal(owner.stop(),false);
     assert.equal(calls.find(c=>c[0]==="withdraw")[1],correlation);
 }
-console.log("FOREST_LOCAL_REQUEST_OWNER_PASS 7");
+for (const result of ["HELD", "REFUSED"]) {
+    const {owner,host,presentation,calls}=setup();
+    host.submit=(...args)=>{calls.push(["submit",...args]);return result;};
+    owner.observe(host,1,"granite",presentation);
+    const draft="  exact public text  ";
+    assert.equal(owner.submit("granite",draft,1),false);
+    assert.deepEqual(calls[1],["submit","granite",draft,1]);
+    assert.equal(owner.state().status,result);
+    assert.equal(owner.state().canSubmit,false);
+    assert.equal(owner.submit("granite",draft,1),false);
+    assert.equal(owner.stop(),false);
+    assert.equal(calls.filter(c=>c[0]==="submit").length,1);
+    assert.equal(calls.some(c=>c[0]==="attach"),false);
+}
+{
+    const {owner,host,presentation,calls}=setup();
+    owner.observe(host,1,"granite",presentation);
+    assert.equal(owner.submit("granite","a".repeat(4097),1),false);
+    assert.equal(calls.some(c=>c[0]==="submit"),false);
+    assert.equal(owner.submit("granite","a".repeat(4096),1),true);
+}
+console.log("FOREST_LOCAL_REQUEST_OWNER_PASS 10");

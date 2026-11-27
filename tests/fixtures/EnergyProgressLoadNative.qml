@@ -89,7 +89,7 @@ ShellRoot {
                 if (lab.stage%2===1) {
                     // Drain initial paints, pending scene updates and terminal
                     // impact animation before measuring a steady state.
-                    if (elapsed<(lab.stage===9?2200:1250)) return;
+                    if (elapsed<(lab.stage===9?2800:1250)) return;
                     lab.begin(); lab.stage++;
                     return;
                 }

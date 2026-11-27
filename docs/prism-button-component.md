@@ -51,10 +51,15 @@ header title, divider, index-card borders and source label use one border
 identity, not copied color values. This does **not** replace the Prism
 button's multicolored ray/glow artwork with a monochrome image.
 
-The header deliberately has two rows so that the title and existing close
-button remain legible in narrow sizes. Resize down/up, a static
-`COLOR // SYNTAGMA` source badge, the disabled standard reload button, and
-the shared diagnostic toggle occupy its second row. The badge is not a
+The header follows the operator's exact one-row right-to-left order:
+close, reload, compact `COLOR // SYNTAGMA` badge, diagnostics, resize up,
+resize down. The title uses the remaining width. At all three chassis
+sizes Prism grows upward from Trash's shared bottom edge (85px above the
+screen), rather than hanging from the top of the screen. The shared
+`PrismBorderGlow` component reads the same spectral stops and corner
+orientation as the original button, retains thin underlying border cores,
+and supplies the window, internal divider, index-card and header-control
+perimeter glows without changing the controls' glyph/fill semantics. The badge is not a
 heartbeat. Reload is unavailable until it has actual data to refresh.
 
 The diagnostic toggle owns `PrismW.indexOpen`; it switches the existing

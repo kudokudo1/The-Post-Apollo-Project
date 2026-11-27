@@ -65,16 +65,21 @@ function falloff(radius) {
 // Success advances to the real endpoint first; failure cools in place.
 function extinguish(phase,time,reduced,mode) {
     const t=Math.max(0,Number.isFinite(time)?time:0);
-    if(phase==="running") return {active:true,cooling:false,cool:0,flame:1,heat:1,embers:1,scale:1};
+    if(phase==="running") return {active:true,cooling:false,repairing:false,repair:0,cool:0,flame:1,heat:1,embers:1,scale:1};
     const result=phase==="success"||phase==="failure";
-    if(!result||reduced) return {active:false,cooling:false,cool:1,flame:0,heat:0,embers:0,scale:0};
+    if(!result||reduced) return {active:false,cooling:false,repairing:false,repair:phase==="success"?1:0,cool:1,flame:0,heat:0,embers:0,scale:0};
     const delay=phase==="success"?.42:0;
     const duration=mode==="burn-away"?1.48:mode==="ash-trail"?1.36:1.18;
     const q=Math.max(0,Math.min(1,(t-delay)/duration));
     const smooth=x=>{const u=Math.max(0,Math.min(1,x));return u*u*(3-2*u);};
+    // Repair is separate from combustion: it cannot emit heat or embers.
+    const repairDelay=delay+duration;
+    const repairDuration=mode==="burn-away"?.65:mode==="ash-trail"?.55:.45;
+    const repair=phase==="success"?smooth((t-repairDelay)/repairDuration):0;
+    const repairing=phase==="success" && t>=repairDelay && repair<1;
     const remaining=1-smooth(q/.72);
     const sputter=1-.24*Math.sin(q*22)*Math.sin(q*22)*Math.sin(Math.PI*q);
-    return {active:q<1,cooling:t>=delay,cool:q,
+    return {active:q<1,cooling:t>=delay && q<1,repairing:repairing,repair:repair,cool:q,
         flame:remaining*sputter,scale:remaining>0?.22+.78*remaining:0,
         heat:1-smooth(q),embers:1-smooth(q)};
 }

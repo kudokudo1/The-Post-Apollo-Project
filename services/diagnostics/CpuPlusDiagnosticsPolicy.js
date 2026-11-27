@@ -1,3 +1,134 @@
+
+// A dump is terminal observation evidence, never a runnable instrument plan.
+// Keep failure evidence distinct from completed or partial measurement data.
+function dumpEvidence(text) {
+    const int=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
+    const num=v=>typeof v==="number"&&Number.isFinite(v)&&v>=0;
+    const keys=(o,required,optional=[])=>!!o&&typeof o==="object"&&!Array.isArray(o)&&
+        required.every(k=>Object.prototype.hasOwnProperty.call(o,k))&&
+        Object.keys(o).every(k=>required.includes(k)||optional.includes(k));
+    const targets=["appcontrol","camera","hospital","finance","git","company-network","tasks","forest","apollo-hub","cpuplus","weather","social","time","notifications","media"];
+    const reasons=["INVALID TERMINAL WITNESS","INVALID OBSERVATION","CAPTURE DEADLINE EXCEEDED","EVENT LIMIT EXCEEDED","CAPTURE TIMING MISMATCH","COMPLETION CALLBACK LATE","CLOCK MOVED BACKWARDS","SOURCE MAP CHANGED"];
+    if(typeof text!=="string"||!text||text.length>300000||/[^\x00-\x7f]/.test(text))return null;
+    try {
+        const d=JSON.parse(text);
+        if(!d||d.schema!=="post-apollo-widget-lifecycle-v1"||!["COMPLETE","PARTIAL","CANCELLED","FAILED"].includes(d.status))return null;
+        if(d.resource!==undefined){
+            const r=d.resource;
+            if(!keys(r,["status","evidence"],["reason"])||
+                !["COMPLETE","CANCELLED","NOT VERIFIED"].includes(r.status)||
+                (r.reason!==undefined&&!["RESOURCE START REFUSED","COMPLETION NOT OBSERVED"].includes(r.reason)))return null;
+            if(r.status==="COMPLETE"){
+                const e=r.evidence;
+                if(!keys(e,["schema","scope","pid","startTicks","requestedMs","observedMs","intervalMs","overlapMs","firstOffsetMs","lastOffsetMs","samples"])||
+                    e.schema!=="post-apollo-dump-shell-resource-v1"||e.scope!=="launching-quickshell"||
+                    !int(e.pid,2,Number.MAX_SAFE_INTEGER)||!int(e.startTicks,1,Number.MAX_SAFE_INTEGER)||
+                    !int(e.requestedMs,5000,120000)||!int(e.observedMs,e.requestedMs,145000)||
+                    !int(e.intervalMs,5000,10000)||!int(e.firstOffsetMs,0,5000)||
+                    !int(e.lastOffsetMs,e.firstOffsetMs,e.requestedMs+10000)||
+                    !int(e.overlapMs,0,e.requestedMs)||e.overlapMs!==Math.max(0,Math.min(e.requestedMs,e.lastOffsetMs)-e.firstOffsetMs)||
+                    !Array.isArray(e.samples)||e.samples.length<2||e.samples.length>13)return null;
+                for(let i=0;i<e.samples.length;i++){
+                    const s=e.samples[i],p=i?e.samples[i-1]:null;
+                    if(!keys(s,["atMs","fromMs","cpuPct","rssKiB","pssKiB","swapPssKiB","withinWindow","intervalWithinWindow"])||
+                        !int(s.atMs,e.firstOffsetMs,e.lastOffsetMs)||!int(s.rssKiB,0,Number.MAX_SAFE_INTEGER)||
+                        !int(s.pssKiB,0,s.rssKiB)||!int(s.swapPssKiB,0,Number.MAX_SAFE_INTEGER)||
+                        s.withinWindow!==(s.atMs<=e.requestedMs)||s.intervalWithinWindow!==(!!p&&s.atMs<=e.requestedMs)||
+                        (p?(s.fromMs!==p.atMs||s.atMs<=p.atMs||!num(s.cpuPct)):(s.fromMs!==null||s.cpuPct!==null)))return null;
+                }
+                if(e.samples[0].atMs!==e.firstOffsetMs||e.samples[e.samples.length-1].atMs!==e.lastOffsetMs)return null;
+            }else if(r.evidence!==null)return null;
+        }
+        if(d.status==="FAILED"){
+            return keys(d,["schema","status","reason"],["completionDelayMs","lifecycleStatus","resource"])&&
+                reasons.includes(d.reason)&&
+                (d.completionDelayMs===undefined||int(d.completionDelayMs,0,Number.MAX_SAFE_INTEGER))&&
+                (d.lifecycleStatus===undefined||d.lifecycleStatus==="FAILED")?d:null;
+        }
+        if(!keys(d,["schema","status","elapsedMs","targets","events","stats","timings","timingRejected","eventLoop"],["completionDelayMs","lifecycleStatus","resource"])||
+            !int(d.elapsedMs,0,120000)||!Array.isArray(d.targets)||!d.targets.length||d.targets.length>15||
+            new Set(d.targets).size!==d.targets.length||d.targets.some(id=>!targets.includes(id))||
+            !Array.isArray(d.events)||d.events.length>512||!Array.isArray(d.stats)||d.stats.length!==d.targets.length||
+            !Array.isArray(d.timings)||d.timings.length>256||!int(d.timingRejected,0,1000000)||
+            (d.completionDelayMs!==undefined&&!int(d.completionDelayMs,0,250))||
+            (d.lifecycleStatus!==undefined&&!["COMPLETE","CANCELLED"].includes(d.lifecycleStatus)))return null;
+        if(d.resource&&d.lifecycleStatus===undefined)return null;
+        if(d.status==="PARTIAL"&&(!d.resource||d.lifecycleStatus!=="COMPLETE"))return null;
+        if(d.status==="COMPLETE"&&(d.elapsedMs<1000||
+            (d.resource&&(d.resource.status!=="COMPLETE"||d.lifecycleStatus!=="COMPLETE"||
+            d.resource.evidence.requestedMs!==d.elapsedMs||!d.eventLoop||!d.eventLoop.ticks||d.eventLoop.omittedGaps))))return null;
+        let previous=0;
+        for(const e of d.events){
+            if(!keys(e,["id","open","atMs"])||!d.targets.includes(e.id)||typeof e.open!=="boolean"||!int(e.atMs,previous,d.elapsedMs))return null;
+            previous=e.atMs;
+        }
+        for(let i=0;i<d.stats.length;i++){
+            const s=d.stats[i];
+            if(!keys(s,["id","initialOpen","finalOpen","opens","closes","openMs"])||s.id!==d.targets[i]||
+                typeof s.initialOpen!=="boolean"||typeof s.finalOpen!=="boolean")return null;
+            let open=s.initialOpen,since=0,openMs=0,opens=0,closes=0;
+            for(const e of d.events.filter(e=>e.id===s.id)){
+                if(e.open===open)return null;
+                if(open)openMs+=e.atMs-since;
+                since=e.atMs;open=e.open;if(open)opens++;else closes++;
+            }
+            if(open)openMs+=d.elapsedMs-since;
+            if(s.finalOpen!==open||s.opens!==opens||s.closes!==closes||s.openMs!==openMs)return null;
+        }
+        const stages={
+            opening:["graph-invalidation","mode-restore","selection","selection-state","selection-row","selection-detail","probe-schedule","refresh-dispatch","focus","handler-total"],
+            "kill-work":["cpu-history","hunter-history","history-revisions","task-order","task-rows","metric-alerts","snapshot-selection","mini-cpu-history","mini-hunter-history","mini-history-revisions"]
+        };
+        stages.work=stages["kill-work"].concat(["app-model-read","app-key-scan","app-index-write","app-position-view","resource-reconcile"]);
+        const seen=new Set();
+        for(const t of d.timings){
+            if(!keys(t,["id","channel","stage","mode","count","totalMs","maxMs"])||!d.targets.includes(t.id)||
+                !int(t.count,1,1000000)||!num(t.totalMs)||!num(t.maxMs)||t.maxMs>d.elapsedMs||
+                t.totalMs<t.maxMs||t.totalMs>t.count*t.maxMs+0.01)return null;
+            const allowed=t.id==="appcontrol"?["closed","app","kill","cpu-kill","mixed","other","unavailable"].includes(t.mode)&&
+                ["opening","kill-work","work"].includes(t.channel)&&stages[t.channel].includes(t.stage):
+                t.mode===""&&((["git","hospital"].includes(t.id)&&t.channel==="dock"&&t.stage==="toggle")||
+                (t.id==="media"&&t.channel==="frame"&&t.stage==="cava-apply"));
+            const k=[t.id,t.channel,t.stage,t.mode].join("/");
+            if(!allowed||seen.has(k))return null;seen.add(k);
+        }
+        const l=d.eventLoop;
+        if(!keys(l,["ticks","maxIntervalMs","firstOffsetMs","lastOffsetMs","gapCount","gaps","omittedGaps","rejected"])||
+            !int(l.ticks,0,2048)||!int(l.maxIntervalMs,0,d.elapsedMs)||!int(l.gapCount,0,l.ticks)||
+            !int(l.omittedGaps,0,l.gapCount)||!int(l.rejected,0,1000000)||!Array.isArray(l.gaps)||l.gaps.length>128||
+            l.gaps.length+l.omittedGaps!==l.gapCount)return null;
+        if(l.ticks?(!int(l.firstOffsetMs,0,d.elapsedMs)||!int(l.lastOffsetMs,l.firstOffsetMs,d.elapsedMs)||l.maxIntervalMs<1):
+            (l.firstOffsetMs!==null||l.lastOffsetMs!==null||l.maxIntervalMs!==0))return null;
+        let lastGap=0;
+        for(const g of l.gaps){
+            if(!keys(g,["fromMs","atMs","intervalMs"])||!int(g.fromMs,lastGap,d.elapsedMs)||
+                !int(g.atMs,g.fromMs,d.elapsedMs)||!int(g.intervalMs,350,l.maxIntervalMs)||
+                g.atMs-g.fromMs!==g.intervalMs)return null;
+            lastGap=g.atMs;
+        }
+        return d;
+    }catch(_){return null;}
+}
+function dumpArchiveStatus(d) {
+    return d.status==="COMPLETE"?"COMPLETE":d.status==="CANCELLED"?"CANCELLED":"NOT VERIFIED";
+}
+function dumpSummary(d) {
+    if(!d)return null;
+    if(d.status==="FAILED")return "DUMP FAILED // "+d.reason;
+    const r=d.resource,e=r&&r.evidence,l=d.eventLoop;
+    const fmt=n=>(n/1024).toFixed(1)+" MiB";
+    return "DUMP "+d.status+" // "+d.targets.length+" WIDGETS / "+(d.elapsedMs/1000).toFixed(2)+"s"+
+        "\nSHELL RESOURCE // "+(r?r.status:"NOT REQUESTED")+
+        (e?" / PID "+e.pid+" / "+(e.overlapMs/1000).toFixed(2)+"s overlap"+
+            "\nPSS START / PEAK / FINAL // "+fmt(e.samples[0].pssKiB)+" / "+fmt(Math.max(...e.samples.map(s=>s.pssKiB)))+" / "+fmt(e.samples[e.samples.length-1].pssKiB)+
+            "\nCPU PEAK (OBSERVED INTERVALS) // "+Math.max(...e.samples.slice(1).map(s=>s.cpuPct)).toFixed(1)+"% (100% = one core)":"")+
+        "\nEVENT LOOP // "+l.ticks+" ticks / "+l.gapCount+" gaps / "+l.maxIntervalMs+" ms max"+
+        "\nWIDGET STATE // "+d.events.length+" transitions"+
+        d.stats.map(s=>"\n"+s.id.toUpperCase()+" // "+s.opens+" opens / "+s.closes+" closes / "+(s.openMs/1000).toFixed(2)+"s open").join("")+
+        "\nSPECIALIZED TIMING // "+d.timings.length+" groups / "+d.timingRejected+" rejected observations"+
+        "\nShared shell resources, not exclusive widget usage. Sample overlap is explicit; menu state is not render readiness.";
+}
+
 function archiveResponse(doc, submitted) {
     if (!doc || doc.schema !== "post-apollo-diagnostic-archive-v1"
             || !Array.isArray(doc.rows) || doc.rows.length > 8 || !submitted) return null;
@@ -7,9 +138,13 @@ function archiveResponse(doc, submitted) {
                 || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(row.status) < 0
                 || typeof row.summary !== "string" || row.summary.length > 4096
                 || typeof row.text !== "string" || row.text.length > reportLimit(row.kind)
-                || (row.kind === "workflow" && /[^\x00-\x7f]/.test(row.text))
+                || (["workflow","dump"].includes(row.kind) && /[^\x00-\x7f]/.test(row.text))
                 || typeof row.finishedAt !== "string"
                 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.finishedAt)) return null;
+        if(row.kind==="dump"){
+            const evidence=dumpEvidence(row.text);
+            if(!evidence||dumpArchiveStatus(evidence)!==row.status||dumpSummary(evidence)!==row.summary)return null;
+        }
         ids.push(row.id);
     }
     if (submitted.action === "list") return doc.savedId === null ? doc.rows : null;
@@ -21,10 +156,10 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio", "netio"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio", "netio", "dump"].indexOf(kind) >= 0;
 }
 
-function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
+function reportLimit(kind) { return ["workflow","dump"].includes(kind) ? 300000 : 65536; }
 
 function validReportId(id) {
     return typeof id === "string" && /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*$/.test(id)
@@ -36,7 +171,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE", swapio: "SWAP OBSERVE", netio: "NETWORK OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE", swapio: "SWAP OBSERVE", netio: "NETWORK OBSERVE", dump: "POST-APOLLO DUMP"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -376,6 +511,7 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if(kind==="dump")return dumpSummary(dumpEvidence(text));
     if (kind==="netio") return netIoSummary(text);
     if (kind==="swapio") return swapIoSummary(text);
     if (kind==="diskio") return diskIoSummary(text);

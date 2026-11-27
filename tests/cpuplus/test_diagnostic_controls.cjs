@@ -321,8 +321,8 @@ assert.match(ui,/model: \[\{key:"WORK",label:"CONTROLS"\},\{key:"PRESETS",label:
 assert.match(ui,/objectName: "cpuplusDiagnosticWorkflowCatalog"/);
 assert.match(ui,/id: diagnosticIndex\s+objectName: "cpuplusDiagnosticContextRail"\s+height: 25/);
 assert.match(workshop,/Calibration.workshopPlanFromDraft\(d\)/);
-assert.match(owner,/function saveWorkshopPreset\(name\)/);
-assert.match(owner,/function loadWorkshopPreset\(name\)/);
+assert.match(owner,/function saveWorkshopPreset\(name, subject = "ALL"\)/);
+assert.match(owner,/function loadWorkshopPreset\(name, subject = "ALL"\)/);
 
 assert.match(ui,/model: root.viewMode==="PRESETS" \? \[\{key:"LIBRARY",label:"LIBRARY"\}/);
 assert.match(ui,/\{key:"RESULTS",label:"RESULTS"\}/);
@@ -434,3 +434,21 @@ assert.ok(chassis.indexOf("Fixed screen-space top-right catchlight") > chassis.i
 assert.match(chassis,/Math.atan2\(height\/2-y,width\/2-x\)-Math.PI\/4/);
 assert.doesNotMatch(chassis,/c.arc\(x\+0.35,y\+0.55/);
 assert.match(stopwatchDialSource,/externalUnitReadout: true/);
+
+// D6a resource workspace: common owner and isolated draft, not a second runner.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("CPU"))',c),'["threads","census"]');
+    assert.equal(vm.runInContext('workshopSubjectKinds("GPU").length',c),0);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"CPU")',c),true);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"storage"}]},"CPU")',c),false);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"GPU")',c),false);
+    assert.match(owner,/property var cpuWorkshopDraft:/);
+    assert.match(owner,/if \(subject==="CPU"\) cpuWorkshopDraft=draft;/);
+    assert.match(ui,/subject: root.workshopSubject/);
+    const resource=read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml");
+    assert.match(resource,/CpuPlusDiagnosticsPane\s*\{/);
+    assert.doesNotMatch(resource,/\b(?:Timer|Process)\s*\{|requestWorkshopCapture\(/);
+    assert.match(read("widgets/CpuPlusW.qml"),/sourceComponent: CpuPlusResourceDiagnosticsPane \{ subject: "CPU" \}/);
+}

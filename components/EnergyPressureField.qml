@@ -29,7 +29,7 @@ QtObject {
                     ? .12 + .88 * f.intensity
                     : source.phase === "success" ? f.impact : f.defeat || 0;
                 const v = Profiles.host(source.variant, source.elapsed, level,
-                    strength, source.phase, false);
+                    strength, source.phase, false, source.fireMode);
                 // Independent maxima: bulk requests cannot stack displacement,
                 // illumination, flash or debris amplitude without bound.
                 if (!best || v.score > best.score) best = v;

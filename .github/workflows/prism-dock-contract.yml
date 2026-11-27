@@ -1,0 +1,34 @@
+name: Prism bottom-left dock contract
+
+on:
+  pull_request:
+    paths:
+      - 'modules/PrismDock.qml'
+      - 'shell.qml'
+      - 'components/PrismButton.qml'
+      - 'components/PrismArtwork.js'
+      - 'tests/components/test_prism_dock.cjs'
+      - 'tests/components/test_prism_artwork.cjs'
+      - '.github/workflows/prism-dock-contract.yml'
+  push:
+    paths:
+      - 'modules/PrismDock.qml'
+      - 'shell.qml'
+      - 'components/PrismButton.qml'
+      - 'components/PrismArtwork.js'
+      - 'tests/components/test_prism_dock.cjs'
+      - 'tests/components/test_prism_artwork.cjs'
+      - '.github/workflows/prism-dock-contract.yml'
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Prism geometry and isolated dock placement
+        run: node --test tests/components/test_prism_artwork.cjs tests/components/test_prism_dock.cjs

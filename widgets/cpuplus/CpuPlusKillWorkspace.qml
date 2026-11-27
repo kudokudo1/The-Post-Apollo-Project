@@ -474,6 +474,8 @@ Item {
         function onPendingChanged() {
             if (workspace.gate
                     && workspace.gate.pending !== workspace.ownedPendingRef) {
+                if (workspace.ownedPendingRef && workspace.ownedPendingRef.action === "limit")
+                    workspace.stagedLimitPercent = -1;
                 workspace.locallyPending = false;
                 workspace.ownedPendingRef = null;
             }
@@ -547,6 +549,16 @@ Item {
         function relockDangerAction(entry, actionKind) {
             // The action gate consumes one-shot unlocks on confirm/cancel.
             // A slider preview must not silently mutate shared safety state.
+        }
+        function limitResultFor(entry) {
+            const target = entry || currentTask;
+            if (!presentation || !target || typeof presentation.limitResultFor !== "function")
+                return {state:"unknown",message:"LIMIT STATUS UNAVAILABLE"};
+            const result = presentation.limitResultFor(target);
+            if (result.state !== "unknown" && result.state !== "pending"
+                    && workspace.stagedLimitPercent >= 0)
+                return {state:"draft",message:"LIMIT DRAFT // NOT APPLIED"};
+            return result;
         }
         function hasSoftLimit() {
             return presentation && currentTask
@@ -1107,7 +1119,9 @@ Item {
                 GohuText {
                     width: parent.width
                     elide: Text.ElideRight
-                    text: workspace.gate ? workspace.gate.feedback : "NO SHARED ACTION OWNER"
+                    text: !workspace.gate ? "NO SHARED ACTION OWNER"
+                        : workspace.gate.feedback || (workspace.currentTask
+                            ? processView.limitResultFor(workspace.currentTask).message : "")
                     color: Colors.orange
                     font.pixelSize: 10
                 }

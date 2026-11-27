@@ -319,7 +319,7 @@ Item {
                 visible: !processExplore.confirming
                 width: parent.width
                 height: 18
-                text: "MEMORY LIMIT // " + processExplore.limitDraft + "%"
+                text: "MEMORY LIMIT DRAFT // " + processExplore.limitDraft + "%"
                 color: Colors.cyan
                 font.pixelSize: 11
             }
@@ -369,7 +369,10 @@ Item {
                           + (processExplore.processActionGate.pending.action === "limit"
                              ? " // " + processExplore.processActionGate.pending.percent + "%" : "")
                           + "\nCAN INTERRUPT WORK OR DESTABILIZE THIS SESSION."
-                        : processExplore.processActionGate.feedback
+                        : processExplore.processActionGate.feedback + "\n"
+                          + (typeof processExplore.processActionGate.currentLimitStatus === "function"
+                             ? processExplore.processActionGate.currentLimitStatus(processExplore.selectedPid,
+                                 processExplore.selectedStartTicks,processExplore.selectedName) : "LIMIT STATUS UNAVAILABLE")
             }
             Row {
                 visible: processExplore.confirming

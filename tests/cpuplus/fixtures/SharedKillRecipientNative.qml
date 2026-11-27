@@ -32,6 +32,7 @@ ShellRoot {
         id: fakePresentation
         function metricIsCritical(row, key) { return false; }
         function formatMemory(kib) { return Number(kib || 0).toFixed(0) + " KiB"; }
+        function limitResultFor(row) { return {state:"unmanaged",message:"NO KILL-MANAGED LIMIT"}; }
         function hasSoftLimit(row) { return false; }
         function limitMinimumMiB(row) { return 128; }
         function limitMaximumMiB(row) { return 4096; }

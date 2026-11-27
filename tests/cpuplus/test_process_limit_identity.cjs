@@ -109,3 +109,33 @@ test("actual helper restores original soft limit and refuses external drift",()=
     const r=spawnSync("/usr/bin/python3",["-c",harness,script],{encoding:"utf8",timeout:20000});
     assert.equal(r.status,0,r.stderr||String(r.error||""));
 });
+
+test("K8b6: correlated completion retains gateway custody and reports actual outcome",()=>{
+    const classify=new Function(fn("limitResult")+"\nreturn limitResult;")();
+    const req={serial:7,pid:123,startTicks:456,name:"test",key:"target"};
+    assert.equal(classify(req,{ok:true,mode:"managed",observedSoft:"1024"}).state,"applied");
+    assert.equal(classify(req,{ok:true,mode:"released",observedSoft:"2048"}).state,"restored");
+    assert.equal(classify(req,{ok:true,mode:"noop",observedSoft:"-1"}).state,"unchanged");
+    assert.equal(classify(req,{ok:false,attempted:false,conflict:false}).state,"refused");
+    assert.equal(classify(req,{ok:false,attempted:false,conflict:true}).state,"unknown");
+    assert.equal(classify(req,null).state,"unknown");
+    const gate=fs.readFileSync(path.resolve(__dirname,"../../services/kill/AppControlHubActionGate.qml"),"utf8");
+    const a=gate.indexOf("    function finishLimit("),b=gate.indexOf("\n    }",a);
+    assert.ok(a>=0&&b>a);
+    const run=new Function("let busy=true,limitDispatchSerial=7,pending={pid:123,startTicks:456,name:'test',action:'limit'},message='',refreshes=0;\n"+gate.slice(a,b+6)+"\nfunction finishRequest(s){message=s;busy=false;pending=null} const refreshOwner={restart:()=>refreshes++}; return {finishLimit,state:()=>({busy,limitDispatchSerial,pending,message,refreshes})};")();
+    assert.equal(run.finishLimit({...req,serial:8,message:"wrong"}),false);
+    assert.equal(run.finishLimit({...req,startTicks:457,message:"wrong"}),false);
+    assert.equal(run.finishLimit({...req,name:"other",message:"wrong"}),false);
+    assert.equal(run.state().busy,true);
+    assert.equal(run.finishLimit(classify(req,{ok:true,mode:"managed",observedSoft:"1024"})),true);
+    assert.equal(run.state().busy,false);
+    assert.equal(run.state().limitDispatchSerial,0);
+    assert.equal(run.state().refreshes,1);
+    assert.equal(run.finishLimit({...req,message:"late"}),false);
+    assert.ok(gate.includes("limitDispatchSerial = limitsOwner.requestSerial + 1"));
+    assert.ok(gate.includes("function onLimitCompleted(result) { gate.finishLimit(result); }"));
+    assert.match(source,/activeRequest = null;\s*applyLoading = false;\s*publishCompletion\(request,result\)/);
+    const presentation=fs.readFileSync(path.resolve(__dirname,"../../services/system/ProcessPresentationController.qml"),"utf8");
+    assert.match(presentation,/owner\.prepareLimitMiB/);
+    assert.match(presentation,/gateway === owner && owner.busy/);
+});

@@ -1615,8 +1615,10 @@ for token in (
     'controlOwner.identityRestartCommand(req.pid,req.startTicks,req.name)',
     'signalDispatch.exec(command)',
     'RESTART TIMEOUT // NO REPLACEMENT LAUNCHED',
-    'presentationOwner.setLimitPercent(req.percent,row)',
-    'REQUEST ISSUED // VERIFY OWNER STATE',
+    'presentationOwner.setLimitPercent(req.percent,row,gate)',
+    'limitDispatchSerial = limitsOwner.requestSerial + 1',
+    'function onLimitCompleted(result) { gate.finishLimit(result); }',
+    'result.serial !== limitDispatchSerial',
 ):
     assert token in owner_gate, f"Guarded AppControl gateway missing {token}"
 assert 'controlOwner.sendSignal(' not in owner_gate

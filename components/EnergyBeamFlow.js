@@ -1,6 +1,6 @@
 // Deterministic visual geometry only. Pixel speed scales with bar height,
 // not track length, and the number of streaks is bounded.
-function flow(variant, fireMode, side, span, height, time, reduced) {
+function flow(variant, fireMode, side, span, height, time, reduced, speedLevel) {
     const w=Math.max(0,Number.isFinite(span)?span:0);
     const h=Math.max(0,Number.isFinite(height)?height:0);
     if(w<1 || h<1) return [];
@@ -25,11 +25,13 @@ function flow(variant, fireMode, side, span, height, time, reduced) {
         }
     }
     if(tron) {
+        const speed=Number.isFinite(speedLevel)?Math.max(0,Math.min(1,speedLevel)):1;
+        const density=.08+.92*speed;
         // The fast visible wake remains attached to the head even on a
         // wall-wide track; faint internal current still covers the lane.
-        stream(w,0,Math.min(44,Math.max(12,Math.ceil(w/h*2.1))),h*23,1.45,.24,false);
+        stream(w,0,Math.ceil(Math.min(44,Math.max(12,Math.ceil(w/h*2.1)))*density),h*(5+18*speed),1.45,.24*(.35+.65*speed),false);
         const wake=Math.min(w,h*4.2);
-        stream(wake,w-wake,9,h*28,1.65,.84,true);
+        stream(wake,w-wake,Math.ceil(9*density),h*(6+22*speed),1.65,.84*(.35+.65*speed),true);
     } else if(ki) {
         stream(w,0,Math.min(32,Math.max(7,Math.ceil(w/h*1.55))),h*11,1.15,.68,false);
     } else {
@@ -75,22 +77,34 @@ function contact(fraction,heat,height,width) {
 
 // Short atmospheric lines outside the chamber. Anchored to the active
 // head, not to the window or a percentage of the entire track.
-function airFlow(span,height,time,reduced) {
+function airFlow(span,height,time,reduced,speedLevel) {
     if(reduced || span<1 || height<1) return [];
     const h=height,t=Math.max(0,time),w=Math.min(span,h*5.8);
     const lines=[];
     // Deterministic irregular bursts. Seed each new streak at its own
     // lifetime boundary rather than flickering random values every frame.
     function hash(n) { const v=Math.sin(n*127.1+31.73)*43758.5453; return v-Math.floor(v); }
-    for(let i=0;i<14;i++){
-        const clock=t*(1.8+hash(i+51)*2.4)+hash(i+13);
+    const speed=Number.isFinite(speedLevel)?Math.max(0,Math.min(1,speedLevel)):1;
+    const count=Math.round(14*speed);
+    for(let i=0;i<count;i++){
+        const clock=t*(1.8+hash(i+51)*2.4)*(.35+.65*speed)+hash(i+13);
         const cycle=Math.floor(clock), age=clock-cycle;
         const seed=i*101+cycle*37;
         const length=Math.min(w,h*(.30+hash(seed+7)*1.42));
         const distance=age*Math.max(0,w-length)*(.55+.45*hash(seed+17));
         const side=hash(seed+29)>.5?1:-1;
         lines.push({x:-distance-length,y:side*h*(.55+hash(seed+31)*.41),
-            length:length,alpha:Math.sin(Math.PI*age)*(.32+.60*hash(seed+41))});
+            length:length,alpha:Math.sin(Math.PI*age)*(.32+.60*hash(seed+41))*(.40+.60*speed)});
     }
     return lines;
+}
+
+// Normalize actual observed fractional advance per second, not elapsed
+// time or absolute progress. Short smoothing avoids measured-step flicker.
+function speedSample(previous,current,dt,prior) {
+    if(!Number.isFinite(dt)||dt<=0) return 0;
+    const rate=Math.max(0,(current-previous)/dt);
+    const target=Math.min(1,rate/.24);
+    const old=Math.max(0,Math.min(1,Number.isFinite(prior)?prior:0));
+    return old+(target-old)*(1-Math.exp(-dt/.16));
 }

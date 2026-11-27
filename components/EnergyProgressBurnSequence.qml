@@ -32,8 +32,11 @@ Item {
         if(operationStage === "" || operationStage === "clicked") {
             travelAnimation.stop();
             travel=0;
-        } else if(operationStage === "working" || verifiedResult) {
-            if(!travelAnimation.running && travel<.9)
+        } else if(operationStage === "working" || (operationStage === "result" && verified)) {
+            if(reducedMotion) {
+                travelAnimation.stop();
+                travel=.9;
+            } else if(!travelAnimation.running && travel<.9)
                 travelAnimation.start();
         } else {
             travelAnimation.stop();

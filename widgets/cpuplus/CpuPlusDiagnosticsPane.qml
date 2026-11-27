@@ -22,6 +22,7 @@ Column {
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
     property bool showReport: false
     property string viewMode: "WORK"
+    property bool manageQuickFavorites: false
     signal navigationChanged()
     onViewModeChanged: navigationChanged()
     readonly property bool workshopOpen: viewMode === "WORK"
@@ -41,6 +42,9 @@ Column {
         showHistory=mode==="HISTORY" || mode==="COMPARE";
         showComparison=mode==="COMPARE";
         viewMode=mode;
+        manageQuickFavorites=false;
+        if (mode==="QUICK" && CpuPlusDiagnostics.workflowCatalogStatus==="NOT LOADED")
+            CpuPlusDiagnostics.loadWorkflowCatalog();
         if (showHistory && !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
             CpuPlusDiagnostics.loadHistory();
     }
@@ -219,48 +223,89 @@ Column {
             label: CpuPlusDiagnostics.setActive ? (CpuPlusDiagnostics.setStopRequested?"SET STOPPING":"STOP SET") : CpuPlusDiagnostics.cancelled ? "STOPPING" : "STOP ACTIVE CAPTURE"
             onLeftClicked: CpuPlusDiagnostics.setActive ? CpuPlusDiagnostics.stopWorkshopSet() : CpuPlusDiagnostics.cancel()
         }
-        Grid {
-            id: captureGrid
+        Column {
+            id: quickCatalog
+            objectName: "cpuplusQuickFavorites"
             visible: root.viewMode === "QUICK"
             width: parent.width
-            columns: 2
             spacing: 3
-            Repeater {
-            model: [
-                {kind: "memory", label: "MEMORY OBSERVE // 120s"},
-                {kind: "inventory", label: "SOURCE WORKLOAD SCAN"},
-                {kind: "threads", label: "THREAD SAMPLE // 30s"},
-                {kind: "census", label: "PROCESS CENSUS // 30s"},
-                {kind: "storage", label: "STORAGE OBSERVE // 30s"},
-                {kind: "appcontrol", label: "APPCONTROL // TEST 30s"}
-            ].filter(row=>["ALL","SYSTEM"].includes(root.workshopSubject) || Calibration.workshopSubjectKinds(root.workshopSubject).includes(row.kind))
-            delegate: ActionButton {
-                required property var modelData
-                width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
-                height: 26
-                label: modelData.label
-                labelPixelSize: 10
-                labelFontSizeMode: Text.HorizontalFit
-                labelMinimumPixelSize: 8
-                contentPadding: 2
-                available: !CpuPlusDiagnostics.workshopPresetLocked
-                onLeftClicked: {
-                    if (CpuPlusDiagnostics.request(modelData.kind)) {
-                        root.showReport = false;
-                    }
+            GohuText {
+                width: parent.width
+                text: "QUICK // "+CpuPlusDiagnostics.workflowCatalogStatus
+                font.pixelSize: 10
+                color: Colors.cyan
+                wrapMode: Text.Wrap
+            }
+            Row {
+                width: parent.width
+                spacing: 3
+                ActionButton {
+                    width: (parent.width-3)/2
+                    height: 26
+                    normalFace: true
+                    label: root.manageQuickFavorites ? "FAVORITES" : "MANAGE"
+                    accentColor: Colors.magenta
+                    available: CpuPlusDiagnostics.workflowCatalogReady
+                    onLeftClicked: root.manageQuickFavorites=!root.manageQuickFavorites
+                }
+                ActionButton {
+                    width: (parent.width-3)/2
+                    height: 26
+                    normalFace: true
+                    label: "RELOAD"
+                    accentColor: Colors.cyan
+                    available: !CpuPlusDiagnostics.workshopPresetLocked
+                    onLeftClicked: CpuPlusDiagnostics.loadWorkflowCatalog()
                 }
             }
-        }
-        ActionButton {
-            objectName: "cpuplusDiagCancel"
-            width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
-            height: 26
-            accentColor: Colors.red
-            contentPadding: 2
-            available: CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.cancelled
-            label: CpuPlusDiagnostics.busy && CpuPlusDiagnostics.cancelled ? "STOPPING" : "CANCEL"
-            onLeftClicked: CpuPlusDiagnostics.cancel()
-        }
+            Grid {
+                id: captureGrid
+                width: parent.width
+                columns: 2
+                spacing: 3
+                Repeater {
+                    model: !CpuPlusDiagnostics.workflowCatalogReady ? [] :
+                        root.manageQuickFavorites ? CpuPlusDiagnostics.workflowRows : CpuPlusDiagnostics.workflowFavorites
+                    delegate: ActionButton {
+                        required property var modelData
+                        objectName: "cpuplusQuick-"+modelData.id
+                        width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
+                        height: 26
+                        label: (root.manageQuickFavorites ? (modelData.favorite ? "★ " : "☆ ") : "")+
+                            modelData.name+(modelData.execution==="configured"?" // "+modelData.plan.durationSeconds+"s":
+                                modelData.kind==="appcontrol"?" // 30s":"")
+                        labelPixelSize: 10
+                        labelFontSizeMode: Text.HorizontalFit
+                        labelMinimumPixelSize: 8
+                        contentPadding: 2
+                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        onLeftClicked: {
+                            if(root.manageQuickFavorites)
+                                CpuPlusDiagnostics.setWorkflowFavorite(modelData.id,!modelData.favorite);
+                            else if(CpuPlusDiagnostics.runFavoriteWorkflow(modelData.id))
+                                root.showReport=false;
+                        }
+                    }
+                }
+                ActionButton {
+                    objectName: "cpuplusDiagCancel"
+                    width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
+                    height: 26
+                    accentColor: Colors.red
+                    contentPadding: 2
+                    available: CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.cancelled
+                    label: CpuPlusDiagnostics.busy && CpuPlusDiagnostics.cancelled ? "STOPPING" : "CANCEL"
+                    onLeftClicked: CpuPlusDiagnostics.cancel()
+                }
+            }
+            GohuText {
+                width: parent.width
+                visible: CpuPlusDiagnostics.workflowCatalogReady && !root.manageQuickFavorites && CpuPlusDiagnostics.workflowFavorites.length===0
+                text: "NO FAVORITES // USE MANAGE"
+                color: Colors.yellow
+                font.pixelSize: 10
+                wrapMode: Text.Wrap
+            }
         }
     }
     Loader {
@@ -576,7 +621,7 @@ Column {
     GohuText {
         width: parent.width
         visible: root.viewMode === "QUICK"
-        text: root.workshopSubject==="MEMORY" ? "MEMORY OBSERVE // Quickshell resident and proportional memory, private memory, swap and host RAM context. Use CONTROLS for calibrated capture. Capacity and policy controls remain separate." : root.workshopSubject==="SYSTEM" ? "SYSTEM DIAG // all instruments available in CONTROLS. Select any combination of the ten instruments. Shared duration, per-instrument calibration and aggregate report limits apply. QUICK offers original fixed captures." : root.workshopSubject==="NETWORK" ? "NETWORK capture uses CONTROLS with explicit PREPARE and START. Observe interface counters; no generated traffic, internet latency test or endpoint inspection. QUICK provides cancellation while a shared capture is active." : root.workshopSubject==="SWAP" ? "SWAP capture uses CONTROLS with explicit PREPARE and START. VM swap traffic is not physical disk throughput. PSI is host memory pressure; ZRAM allocated bytes consume RAM. QUICK provides cancellation while a shared capture is active." : root.workshopSubject==="STORAGE" ? "STORAGE OBSERVE // fixed 30-second metadata capture. Use CONTROLS to configure sample/report cadence with PREPARE and START. For physical disk throughput select DISK I/O in CONTROLS; metadata alone does not measure it." : root.workshopSubject==="GPU" ? "GPU captures use CONTROLS with explicit PREPARE and START. QUICK provides cancellation while a shared capture is active." : "Close this menu and reproduce the issue, then return here. APPCONTROL TEST: open AppControl, spend time in APP and KILL, then close it; no process actions needed. CPU sampling runs outside Quickshell; opening markers run inside it. CANCEL stops early without a verified comparison. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
+        text: "QUICK // favorite saved configurations. MANAGE toggles favorites; RELOAD reads the local catalog. AppControl test observes the launching shell and menu modes for 30s; close this menu to reproduce the issue. Memory/thread tests currently select same-user Quickshell. CANCEL stops early. Custom session workflows remain in WORKFLOWS pending library migration."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

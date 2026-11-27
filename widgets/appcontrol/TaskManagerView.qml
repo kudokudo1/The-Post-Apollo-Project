@@ -583,80 +583,90 @@ import "../../components"
                                     z: 9
                                 }
 
-                                // Preserve the filled-graph look for COMBI too. Low
-                                // opacity keeps four overlapping fills readable.
-                                Repeater {
-                                    model: detailCombiTrace.metricPoints.length
-
-                                    delegate: Rectangle {
-                                        readonly property point graphPoint:
-                                            detailCombiTrace.metricPoints[index]
-                                        x: graphPoint.x - width / 2 + taskCpuCanvas.graphScrollOffset
-                                        y: graphPoint.y
-                                        width: Math.max(
-                                            2.0,
-                                            detailCombiTrace.width
-                                            / Math.max(
-                                                2,
-                                                presentationState.taskCombiRenderPointLimit - 1
-                                            )
-                                            + 1.0
-                                        )
-                                        height: Math.max(
-                                            0,
-                                            detailCombiTrace.height - graphPoint.y - 1
-                                        )
-                                        color: detailCombiTrace.modelData.accent
-                                        opacity: 0.060
-                                        antialiasing: true
-                                        z: 1
+                                // Four metric tracks retain their independent colors.
+                                // A single scene-graph translation per track moves
+                                // all fills and strokes while the legend stays fixed.
+                                Item {
+                                    id: detailCombiTraceLayer
+                                    anchors.fill: parent
+                                    transform: Translate {
+                                        x: taskCpuCanvas.graphScrollOffset
                                     }
-                                }
+                                    // Preserve the filled-graph look for COMBI too. Low
+                                    // opacity keeps four overlapping fills readable.
+                                    Repeater {
+                                        model: detailCombiTrace.metricPoints.length
 
-                                Repeater {
-                                    model: Math.max(
-                                        0,
-                                        detailCombiTrace.metricPoints.length - 1
-                                    )
-
-                                    delegate: Item {
-                                        anchors.fill: parent
-                                        z: 4
-                                        readonly property point p1:
-                                            detailCombiTrace.metricPoints[index]
-                                        readonly property point p2:
-                                            detailCombiTrace.metricPoints[index + 1]
-                                        readonly property real dx: p2.x - p1.x
-                                        readonly property real dy: p2.y - p1.y
-                                        readonly property real segmentLength:
-                                            Math.sqrt(dx * dx + dy * dy)
-                                        readonly property real segmentAngle:
-                                            Math.atan2(dy, dx) * 180 / Math.PI
-
-                                        Rectangle {
-                                            x: parent.p1.x + taskCpuCanvas.graphScrollOffset
-                                            y: parent.p1.y - height / 2
-                                            width: parent.segmentLength
-                                            height: 6
-                                            radius: 3
-                                            rotation: parent.segmentAngle
-                                            transformOrigin: Item.Left
+                                        delegate: Rectangle {
+                                            readonly property point graphPoint:
+                                                detailCombiTrace.metricPoints[index]
+                                            x: graphPoint.x - width / 2
+                                            y: graphPoint.y
+                                            width: Math.max(
+                                                2.0,
+                                                detailCombiTrace.width
+                                                / Math.max(
+                                                    2,
+                                                    presentationState.taskCombiRenderPointLimit - 1
+                                                )
+                                                + 1.0
+                                            )
+                                            height: Math.max(
+                                                0,
+                                                detailCombiTrace.height - graphPoint.y - 1
+                                            )
                                             color: detailCombiTrace.modelData.accent
-                                            opacity: 0.18
+                                            opacity: 0.060
                                             antialiasing: true
+                                            z: 1
                                         }
+                                    }
 
-                                        Rectangle {
-                                            x: parent.p1.x + taskCpuCanvas.graphScrollOffset
-                                            y: parent.p1.y - height / 2
-                                            width: parent.segmentLength
-                                            height: 2
-                                            radius: 1
-                                            rotation: parent.segmentAngle
-                                            transformOrigin: Item.Left
-                                            color: detailCombiTrace.modelData.accent
-                                            opacity: 1.0
-                                            antialiasing: true
+                                    Repeater {
+                                        model: Math.max(
+                                            0,
+                                            detailCombiTrace.metricPoints.length - 1
+                                        )
+
+                                        delegate: Item {
+                                            anchors.fill: parent
+                                            z: 4
+                                            readonly property point p1:
+                                                detailCombiTrace.metricPoints[index]
+                                            readonly property point p2:
+                                                detailCombiTrace.metricPoints[index + 1]
+                                            readonly property real dx: p2.x - p1.x
+                                            readonly property real dy: p2.y - p1.y
+                                            readonly property real segmentLength:
+                                                Math.sqrt(dx * dx + dy * dy)
+                                            readonly property real segmentAngle:
+                                                Math.atan2(dy, dx) * 180 / Math.PI
+
+                                            Rectangle {
+                                                x: parent.p1.x
+                                                y: parent.p1.y - height / 2
+                                                width: parent.segmentLength
+                                                height: 6
+                                                radius: 3
+                                                rotation: parent.segmentAngle
+                                                transformOrigin: Item.Left
+                                                color: detailCombiTrace.modelData.accent
+                                                opacity: 0.18
+                                                antialiasing: true
+                                            }
+
+                                            Rectangle {
+                                                x: parent.p1.x
+                                                y: parent.p1.y - height / 2
+                                                width: parent.segmentLength
+                                                height: 2
+                                                radius: 1
+                                                rotation: parent.segmentAngle
+                                                transformOrigin: Item.Left
+                                                color: detailCombiTrace.modelData.accent
+                                                opacity: 1.0
+                                                antialiasing: true
+                                            }
                                         }
                                     }
                                 }

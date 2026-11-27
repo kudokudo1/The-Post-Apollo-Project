@@ -19,8 +19,12 @@ Scope {
     // Shell enables collection only after both consumers are constructed.
     // Demand flags are presentation inputs, never a second collector.
     property bool collectionEnabled: false
+    onCollectionEnabledChanged: if (collectionEnabled && cpuVisible) compositor.refresh()
     property bool cpuVisible: false
-    onCpuVisibleChanged: if (!cpuVisible) cancelCpuBulkReview(cpuBulkReview)
+    onCpuVisibleChanged: {
+        if (!cpuVisible) cancelCpuBulkReview(cpuBulkReview);
+        else if (collectionEnabled) compositor.refresh();
+    }
     property bool donorResourceVisible: false
     property bool donorKillVisible: false
     property bool donorFavoritesVisible: false
@@ -44,8 +48,13 @@ Scope {
     // One long-lived execution lifecycle. Donor supplies legacy confirmation
     // presentation only; process policies and live rows belong to this store.
     property var donorHunterHost: null
-    // Transitional compositor snapshot; null is unknown, not an empty desktop.
-    property var hunterVisibleWindows: null
+    // One compositor inventory shared with APPS/WINDOWS; unknown is not empty.
+    readonly property var windowInventory: compositor
+    readonly property var hunterVisibleWindows: compositor.settled ? compositor.windows : null
+    SwayWindowInventory {
+        id: compositor
+        enabled: root.collectionEnabled
+    }
     readonly property var favoriteStore: FavoritesStore
     readonly property var hunterExecutor: hunterExecution
     readonly property var hunterOperation: hunterController

@@ -90,14 +90,21 @@ ActionButton {
             function onPrismPaletteChanged() { raster.requestPaint() }
         }
         onPaint: {
+            console.info("PRISM_PAINT_ENTER",width,height,available)
             const c=getContext("2d")
-            if (!c) return
+            if (!c) { console.error("PRISM_PAINT_NO_CONTEXT"); return }
             if (root.width<=0 || root.height<=0) {
                 c.clearRect(0,0,width,height)
                 return
             }
-            Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
-                          1,root.prismPalette,root.spectralGlowStrength)
+            try {
+                Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
+                              1,root.prismPalette,root.spectralGlowStrength)
+                const px=c.getImageData(Math.floor(width/2),Math.floor(height/2),1,1).data
+                console.info("PRISM_PAINT_DONE",px[0],px[1],px[2],px[3])
+            } catch (error) {
+                console.error("PRISM_PAINT_ERROR",String(error))
+            }
         }
     }
 

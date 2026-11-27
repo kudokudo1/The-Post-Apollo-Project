@@ -122,6 +122,7 @@ class Reader:
         self.stack = ExitStack()
         self.fds = ()
         self.used = False
+        self.failed = False
 
     def __enter__(self):
         require(not self.used, "SCOPE_ALREADY_USED")
@@ -153,6 +154,18 @@ class Reader:
                 os.close(fd)
 
     def sample(self):
+        # Any interrupted/failed observation invalidates this original
+        # Reader lifetime. A later apparently healthy sample cannot erase
+        # the missing interval or justify a retry of the original witness.
+        require(not self.failed, "OBSERVATION_LOST")
+        require(bool(self.fds), "SCOPE_NOT_ACTIVE")
+        try:
+            return self._sample()
+        except BaseException:
+            self.failed = True
+            raise
+
+    def _sample(self):
         self._check()
         start = time.monotonic_ns()
         host_a = _host_memory_available_mib()

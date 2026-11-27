@@ -117,8 +117,13 @@ Scope {
             + "stat_pair=$(sed 's/^[^)]*) //' /proc/$pid/stat 2>/dev/null "
             + "| awk '{print ($12+$13)\" \"$20}'); "
             + "ticks=${stat_pair%% *}; start=${stat_pair#* }; "
-            + "readb=$(awk '$1==\"read_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
-            + "writeb=$(awk '$1==\"write_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
+            // One read and one awk per PID instead of separate reads/processes
+            // for the two I/O counters. Keep first-key semantics and the
+            // existing zero fallback if procfs denies access or a key vanishes.
+            + "io_pair=$(awk '$1==\"read_bytes:\" && !got_read {read=$2; got_read=1} "
+            + "$1==\"write_bytes:\" && !got_write {write=$2; got_write=1} "
+            + "END {print read \" \" write}' /proc/$pid/io 2>/dev/null); "
+            + "readb=\${io_pair%% *}; writeb=\${io_pair#* }; "
             + "printf '%s %s %s %s %s %s\\n' \"$clk\" \"${ticks:-0}\" "
             + "\"${readb:-0}\" \"${writeb:-0}\" \"$pid:${start:-0}\" \"$rest\"; "
             + "done"

@@ -59,3 +59,4 @@ QuietText 1.0 QuietText.qml
 SecondaryText 1.0 SecondaryText.qml
 EnergyProgressFace 1.0 EnergyProgressFace.qml
 EnergyPressureField 1.0 EnergyPressureField.qml
+EnergyProgressBurnSequence 1.0 EnergyProgressBurnSequence.qml

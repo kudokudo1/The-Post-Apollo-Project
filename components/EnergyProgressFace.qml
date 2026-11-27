@@ -12,6 +12,7 @@ Item {
     property string variant: "omnitrix" // default | omnitrix | tron | ki-blast | flamethrower
     // Three retained fire treatments; existing hosts default to standard.
     property string fireMode: "standard" // standard | ash-trail | burn-away
+    property bool remainingAsh: false // opt-in staged combustion material
     readonly property bool materialExperiment: variant === "flamethrower"
         && (fireMode === "ash-trail" || fireMode === "burn-away")
     property real materialPeak: 0
@@ -298,7 +299,7 @@ Item {
                 // by a differently colored progress fill.
                 if (material.erosion && p>0) {
                     if(p<1) Material.drawRemaining(c,x+.5,y+.5,w-1,h-1,edge,
-                        fireState.heat,root.chassisColor,inset-.5);
+                        fireState.heat,root.chassisColor,inset-.5,root.remainingAsh);
                 } else {
                 // Low-cost perimeter: three nested outlines, no full-face shadow.
                 for (let i=3;i>=1;i--) {
@@ -311,6 +312,9 @@ Item {
                 c.strokeStyle=root.chassisColor;
                 c.lineWidth=1;
                 c.strokeRect(x+.5,y+.5,w-1,h-1);
+                }
+                if (material.erosion && root.remainingAsh && p===0) {
+                    Material.drawAsh(c,fx,fy,inner,fillHeight,fx+inner,0);
                 }
                 if (material.ash && p>0) {
                     Material.drawAsh(c,fx,fy,inner,fillHeight,edge,fireState.heat);

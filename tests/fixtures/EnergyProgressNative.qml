@@ -17,6 +17,9 @@ ShellRoot {
         property bool sawRepair: false
         property string mockBurnStage: ""
         property bool mockBurnVerified: false
+        property bool mockArmed: false
+        property bool mockArmReady: false
+        property real mockArmProgress: 0
         property string mockSavePhase: "idle"
         property real mockSaveProgress: 0
         property double pulseStarted: 0
@@ -76,25 +79,21 @@ ShellRoot {
             id: mockWorkSlot
             x: 18; y: 385; width: 184; height: 43
             clip: true
-            visible: lab.stage>=26 && lab.mockBurnStage!=="result" && lab.mockBurnStage!=="error"
+            visible: lab.stage>=26 && !mockBurn.receiptReady
+            EnergyProgressBurnSequence {
+                id: mockBurn
+                anchors.fill: parent
+                armed: lab.mockArmed
+                armReady: lab.mockArmReady
+                armProgress: lab.mockArmProgress
+                operationStage: lab.mockBurnStage
+                verified: lab.mockBurnVerified
+            }
         }
         Item {
             id: mockReceiptSlot
             x: 220; y: 385; width: 184; height: 43
-            clip: true
-            visible: lab.stage>=26 && (lab.mockBurnStage==="result" || lab.mockBurnStage==="error")
-        }
-        EnergyProgressFace {
-            id: mockBurn
-            parent: lab.mockBurnStage==="result" || lab.mockBurnStage==="error"
-                ? mockReceiptSlot : mockWorkSlot
-            anchors.fill: parent
-            variant: "flamethrower"; fireMode: "burn-away"
-            progressMode: "indeterminate"
-            phase: lab.mockBurnStage==="working" ? "running"
-                : lab.mockBurnStage==="result" && lab.mockBurnVerified ? "success"
-                : lab.mockBurnStage==="result" || lab.mockBurnStage==="error" ? "failure" : "idle"
-            visible: phase!=="idle"
+            visible: lab.stage>=26 && mockBurn.receiptReady
         }
         Loader {
             id: mockSave
@@ -138,46 +137,61 @@ ShellRoot {
                 }
                 if (lab.stage>=26) {
                     if(lab.stage===26) {
-                        lab.mockBurnStage="clicked";
+                        lab.mockArmed=true; lab.mockArmProgress=.55;
                         lab.mockSaveProgress=.90; lab.mockSavePhase="running";
                     } else if(lab.stage===27) {
-                        if(!lab.require(mockBurn.phase==="idle" && !mockBurn.visible,
-                            "confirmation does not activate combustion")) return;
+                        if(!lab.require(mockBurn.ashVisible && mockBurn.ashPhase==="running"
+                            && mockBurn.ashFraction===.55 && !mockBurn.operationVisible,
+                            "arming is timed ash without deletion")) return;
                         if(!lab.require(mockSave.item.variant==="omnitrix"
                             && mockSave.item.displayedFraction===.90,
                             "timed save preserves prefill")) return;
+                        lab.mockArmProgress=1; lab.mockArmReady=true;
+                    } else if(lab.stage===28) {
+                        if(!lab.require(mockBurn.ashPhase==="ready" && mockBurn.ashFraction===1,
+                            "armed ash stays full")) return;
+                        lab.mockBurnStage="clicked";
+                    } else if(lab.stage===29) {
+                        if(!lab.require(mockBurn.ashVisible && !mockBurn.operationVisible,
+                            "second click acknowledgement retains ash")) return;
                         lab.mockBurnStage="working";
                         lab.mockSaveProgress=1; lab.mockSavePhase="success";
                         lab.pulseStarted=Date.now();
-                    } else if(lab.stage===28) {
-                        if(Date.now()-lab.pulseStarted<1000) return;
-                        if(!lab.require(mockBurn.parent===mockWorkSlot && mockBurn.displayedFraction>0
-                            && mockBurn.phase==="running",
-                            "working burn has real visible motion")) return;
-                        if(!lab.require(mockSave.item.displayedFraction===1 && !mockSave.item.animationActive,
-                            "save completion settles")) return;
+                    } else if(lab.stage===30) {
+                        if(Date.now()-lab.pulseStarted<400) return;
+                        if(!lab.require(mockBurn.operationVisible && mockBurn.burnFraction>0
+                            && !mockBurn.receiptReady && mockWorkSlot.visible,
+                            "burn remains on original confirmation")) return;
                         lab.mockBurnVerified=false; lab.mockBurnStage="result";
                         lab.pulseStarted=Date.now();
-                    } else if(lab.stage===29) {
-                        if(Date.now()-lab.pulseStarted<1650) return;
-                        if(!lab.require(mockBurn.parent===mockReceiptSlot && mockBurn.phase==="failure"
-                            && mockBurn.fireState.repair===0 && !mockBurn.animationActive,
-                            "unverified receipt retains failed material")) return;
-                        lab.mockBurnStage=""; lab.mockSavePhase="idle";
-                    } else if(lab.stage===30) {
-                        if(!lab.require(!mockBurn.visible && !mockSave.visible,
-                            "dismissed operation faces inactive")) return;
-                        lab.mockBurnStage="working";
                     } else if(lab.stage===31) {
+                        if(Date.now()-lab.pulseStarted<1650) return;
+                        if(!lab.require(mockBurn.receiptReady && mockBurn.burnPhase==="failure"
+                            && mockReceiptSlot.visible && !mockWorkSlot.visible,
+                            "unverified receipt only after failure cooldown")) return;
+                        lab.mockBurnStage=""; lab.mockArmed=false; lab.mockArmReady=false;
+                        lab.mockSavePhase="idle";
+                    } else if(lab.stage===32) {
+                        if(!lab.require(!mockBurn.receiptReady && !mockBurn.operationVisible
+                            && !mockSave.visible,"dismissed operation faces inactive")) return;
+                        lab.mockArmed=true; lab.mockArmReady=true; lab.mockArmProgress=1;
+                        lab.mockBurnStage="clicked";
+                    } else if(lab.stage===33) {
+                        // Synchronous fast success: backend must not skip the sweep.
+                        lab.mockBurnStage="working";
                         lab.mockBurnVerified=true; lab.mockBurnStage="result";
                         lab.pulseStarted=Date.now();
-                    } else if(lab.stage===32) {
-                        if(Date.now()-lab.pulseStarted<2800) return;
-                        if(!lab.require(mockBurn.parent===mockReceiptSlot && mockBurn.phase==="success"
-                            && mockBurn.displayedFraction===1 && mockBurn.fireState.repair===1
-                            && !mockBurn.animationActive,
-                            "verified receipt repairs the same reparented face")) return;
-                        console.log("ENERGY_NATIVE_PASS seven treatments; save and burn mock host integration");
+                    } else if(lab.stage===34) {
+                        if(Date.now()-lab.pulseStarted<900) return;
+                        if(!lab.require(mockBurn.burnPhase==="running" && !mockBurn.receiptReady
+                            && mockBurn.burnFraction>0 && mockBurn.burnFraction<.9
+                            && mockWorkSlot.visible,"fast result preserves visible burn sweep")) return;
+                    } else if(lab.stage===35) {
+                        if(Date.now()-lab.pulseStarted<4700) return;
+                        if(!lab.require(mockBurn.receiptReady && mockBurn.burnPhase==="success"
+                            && mockBurn.burnFraction===1 && mockReceiptSlot.visible
+                            && !mockWorkSlot.visible,"verified receipt after full repair")) return;
+                        console.log("ENERGY_NATIVE_PASS seven treatments; timed save; two-stage burn and delayed receipt");
                         Qt.quit(); return;
                     }
                     lab.stage++; return;

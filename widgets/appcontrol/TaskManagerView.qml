@@ -1470,8 +1470,14 @@ import "../../components"
                     property bool editingValue: false
                     property string editText: ""
                     readonly property var currentTask: taskManagerBody.currentTask
+                    readonly property var limitResult:
+                        typeof processController.limitResultFor === "function"
+                        ? processController.limitResultFor(currentTask)
+                        : {state:"unknown",message:"LIMIT STATUS UNAVAILABLE"}
+                    Accessible.description: limitResult.message
                     readonly property bool canAdjust:
                         currentTask
+                        && limitResult.state !== "pending" && limitResult.state !== "unknown"
                         && Number(currentTask.pid || 0) > 1
                         && (
                             !processController.requiresDangerUnlock(currentTask)
@@ -1516,11 +1522,15 @@ import "../../components"
                     function displayValue() {
                         if (previewPercent >= 0) {
                             if (previewPercent >= 99.5)
-                                return "∞";
+                                return "REL";
                             return String(Math.round(mibForPercent(previewPercent)));
                         }
-                        if (!processController.hasSoftLimit())
-                            return "∞";
+                        if (limitResult.state === "pending") return "WAIT";
+                        if (limitResult.state === "unknown") return "N/A";
+                        if (limitResult.state === "refused") return "ERR";
+                        if (limitResult.state === "restored") return "REL";
+                        if (limitResult.state === "draft") return "EDIT";
+                        if (!processController.hasSoftLimit()) return "NONE";
                         return String(Math.round(processController.limitMiB()));
                     }
 
@@ -1542,10 +1552,7 @@ import "../../components"
 
                         previewPercent = -1;
                         processController.setLimitPercent(next);
-                        processController.relockDangerAction(
-                            taskManagerBody.currentTask,
-                            "limit"
-                        );
+                        // The shared gateway consumes the one-shot limit grant.
                     }
 
                     function commitEditorValue() {
@@ -1555,10 +1562,7 @@ import "../../components"
                         const value = Number(editText || 0);
                         if (isFinite(value) && value > 0) {
                             processController.setLimitMiB(value);
-                            processController.relockDangerAction(
-                                taskManagerBody.currentTask,
-                                "limit"
-                            );
+                            // The shared gateway consumes the one-shot limit grant.
                         }
 
                         previewPercent = -1;
@@ -1832,7 +1836,7 @@ import "../../components"
                         onReleased: function(mouse) {
                             if (taskLimitSlider.previewPercent >= 0) {
                                 processController.setLimitPercent(taskLimitSlider.previewPercent);
-                                processController.relockDangerAction(taskManagerBody.currentTask, "limit");
+                                // The shared gateway consumes the one-shot limit grant.
                             }
                             taskLimitSlider.previewPercent = -1;
                             dragOffsetX = 0;
@@ -1845,7 +1849,7 @@ import "../../components"
                                 taskLimitSlider.activePercent + (delta >= 0 ? 2 : -2)
                             ));
                             processController.setLimitPercent(next);
-                            processController.relockDangerAction(taskManagerBody.currentTask, "limit");
+                            // The shared gateway consumes the one-shot limit grant.
                             wheel.accepted = true;
                         }
                     }

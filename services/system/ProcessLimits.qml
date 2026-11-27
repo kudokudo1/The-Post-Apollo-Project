@@ -21,6 +21,43 @@ Scope {
     property string applyError: ""
 
     signal refreshRequested()
+    signal limitCompleted(var result)
+    property var lastLimitResults: ({})
+
+    function limitResultFor(entry) {
+        const key = identityKey(entry);
+        if (!key) return {state:"unknown",message:"LIMIT IDENTITY UNAVAILABLE"};
+        if ((activeRequest && activeRequest.key === key) || (queuedRequest && queuedRequest.key === key))
+            return {state:"pending",message:"LIMIT // VERIFYING KERNEL RESULT"};
+        if (lastLimitResults[key]) return lastLimitResults[key];
+        if (limitStateFor(entry) === "unknown")
+            return {state:"unknown",message:"LIMIT OWNERSHIP UNKNOWN // VERIFY"};
+        return {state:"unmanaged",message:"NO KILL-MANAGED LIMIT // KERNEL LIMIT UNOBSERVED"};
+    }
+
+    function limitResult(request, reply) {
+        const identity = {serial:request.serial,pid:request.pid,startTicks:request.startTicks,name:request.name,key:request.key};
+        if (reply && reply.ok) {
+            const bytes = Number(reply.observedSoft);
+            const value = reply.observedSoft === "-1" ? "UNLIMITED"
+                : Number.isSafeInteger(bytes) ? String(Math.round(bytes/1048576*100)/100)+" MiB"
+                : reply.observedSoft+" B";
+            const state = reply.mode === "managed" ? "applied" : reply.mode === "released" ? "restored" : "unchanged";
+            const message = state === "applied" ? "LIMIT APPLIED // VERIFIED "
+                : state === "restored" ? "ORIGINAL LIMIT RESTORED // VERIFIED " : "LIMIT UNCHANGED // OBSERVED ";
+            return Object.assign(identity,{state:state,message:message+value,observedSoft:reply.observedSoft});
+        }
+        if (reply && !reply.attempted && !reply.conflict)
+            return Object.assign(identity,{state:"refused",message:"LIMIT REFUSED // NO MUTATION"});
+        return Object.assign(identity,{state:"unknown",message:"LIMIT OUTCOME UNKNOWN // VERIFY PROCESS STATE"});
+    }
+
+    function publishCompletion(request,result) {
+        const next = Object.assign({},lastLimitResults);
+        next[request.key] = result;
+        lastLimitResults = next;
+        limitCompleted(result);
+    }
 
     property bool helperExited: false
     property bool stdoutDone: false
@@ -162,6 +199,7 @@ Scope {
         // for the same process may still be in flight.
         if (ownership && ownership.uncertain) {
             applyError = "LIMIT OWNERSHIP UNKNOWN // QUEUED REQUEST REFUSED";
+            publishCompletion(request,limitResult(request,null));
             refreshRequested();
             return;
         }
@@ -257,8 +295,10 @@ Scope {
         const reply = validatedReply(request, helperOutput, helperErrors,
             helperExitCode, helperExitStatus, helperTimedOut);
         consumeApply(request,reply);
+        const result = limitResult(request,reply);
         activeRequest = null;
         applyLoading = false;
+        publishCompletion(request,result);
         refreshRequested();
         Qt.callLater(function() { processLimits.startQueuedApply(); });
     }

@@ -169,3 +169,30 @@ test("Omnitrix has an expanding success pulse and non-fire heads are enlarged", 
     assert.match(preview,/field.flashColor/);
     assert.match(preview,/createRadialGradient\(origin.x,origin.y/);
 });
+
+test("Ki Blast enemy heat grows through defeat and extinguishes after impact", () => {
+    const running=frame("running","measured",.68,4,0,false,"ki-blast");
+    assert.ok(running.enemyHeat>0 && running.enemyHeat<.25);
+    assert.equal(running.enemyOpacity,1);
+    let previous=running.enemyHeat;
+    for(let i=0;i<=144;i++){
+        const f=frame("failure","measured",0,i/200,.68,false,"ki-blast");
+        assert.ok(f.enemyHeat>=previous-1e-12 && f.enemyHeat<=1);
+        assert.equal(f.enemyOpacity,1);
+        previous=f.enemyHeat;
+    }
+    const hit=frame("failure","measured",0,.72,.68,false,"ki-blast");
+    assert.equal(hit.fraction,0);
+    assert.equal(hit.enemyFraction,1);
+    assert.equal(hit.enemyHeat,1);
+    assert.equal(hit.enemyOpacity,1);
+    const fade=frame("failure","measured",0,.96,.68,false,"ki-blast");
+    assert.ok(fade.enemyOpacity>0 && fade.enemyOpacity<1);
+    const end=frame("failure","measured",0,1.08,.68,false,"ki-blast");
+    assert.equal(end.enemyOpacity,0);
+    assert.equal(end.clash,false);
+    const reduced=frame("failure","measured",0,0,.68,true,"ki-blast");
+    assert.equal(reduced.enemyOpacity,0);
+    for(const name of ["tron","omnitrix","flamethrower"])
+        assert.equal(frame("failure","measured",0,.5,.68,false,name).enemyHeat,0);
+});

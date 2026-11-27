@@ -915,3 +915,27 @@ test('COMBI CPU detail metric tracks translate shapes as groups while legends st
     assert.match(cpuPrefix,/model:\s*taskCpuGraph\.combiView\s*\?\s*taskCpuCanvas\.combiSeries\s*:\s*\[\]/,
         'same four COMBI series');
 });
+
+
+test('memory detail history scrolls one trace layer beneath stationary grid', () => {
+    const detail=fs.readFileSync(path.join(root,'widgets/appcontrol/TaskManagerView.qml'),'utf8');
+    const memAt=detail.indexOf('id: taskMemCanvas');
+    const actionAt=detail.indexOf('id: actionColumn',memAt);
+    assert.ok(memAt>0&&actionAt>memAt,'find memory detail canvas and action column');
+    const mem=detail.slice(memAt,actionAt);
+    const layerAt=mem.indexOf('id: taskMemTraceLayer');
+    assert.ok(layerAt>0,'one memory detail trace layer');
+    const grid=mem.slice(0,layerAt),trace=mem.slice(layerAt);
+    assert.match(grid,/model:\s*3\s+delegate:\s*Rectangle/,
+        'three stationary memory grid lines');
+    assert.match(trace,/anchors\.fill:\s*parent\s+transform:\s*Translate\s*\{\s*x:\s*taskMemCanvas\.graphScrollOffset\s*\}/);
+    assert.equal((trace.match(/taskMemCanvas\.graphScrollOffset/g)||[]).length,1,
+        'one per-canvas animated dependency, not per shape');
+    assert.equal(trace.split('model: taskMemCanvas.graphPoints.length').length-1,1);
+    assert.equal(trace.split('taskMemCanvas.graphPoints.length - 1').length-1,1);
+    assert.match(trace,/x:\s*graphPoint\.x\s*-\s*width\s*\/\s*2\s+y:\s*graphPoint\.y/);
+    assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y:\s*parent\.p1\.y/g)||[]).length,2);
+    for(const alpha of ['0.10','0.20','1.0'])
+        assert.ok(trace.includes('opacity: '+alpha),'preserve original fill/line '+alpha);
+    assert.match(mem,/duration:\s*presentationState\.taskGraphScrollDuration/);
+});

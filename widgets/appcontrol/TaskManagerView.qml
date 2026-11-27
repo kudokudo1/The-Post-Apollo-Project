@@ -1142,67 +1142,76 @@ import "../../components"
                             }
                         }
 
-                        // Stable translucent area under the memory trace.
-                        Repeater {
-                            model: taskMemCanvas.graphPoints.length
-
-                            delegate: Rectangle {
-                                readonly property point graphPoint:
-                                    taskMemCanvas.graphPoints[index]
-                                x: graphPoint.x - width / 2 + taskMemCanvas.graphScrollOffset
-                                y: graphPoint.y
-                                width: Math.max(2.0,
-                                    taskMemCanvas.width
-                                    / Math.max(2, presentationState.taskHistoryLimit - 1)
-                                    + 0.8)
-                                height: Math.max(0, taskMemCanvas.height - graphPoint.y - 1)
-                                color: Colors.magenta
-                                opacity: 0.10
-                                antialiasing: true
+                        // Keep the memory reference grid stationary. Move all
+                        // memory-history fills and strokes via one trace layer.
+                        Item {
+                            id: taskMemTraceLayer
+                            anchors.fill: parent
+                            transform: Translate {
+                                x: taskMemCanvas.graphScrollOffset
                             }
-                        }
+                            // Stable translucent area under the memory trace.
+                            Repeater {
+                                model: taskMemCanvas.graphPoints.length
 
-                        Repeater {
-                            model: Math.max(0, taskMemCanvas.graphPoints.length - 1)
-
-                            delegate: Item {
-                                anchors.fill: parent
-
-                                readonly property point p1:
-                                    taskMemCanvas.graphPoints[index]
-                                readonly property point p2:
-                                    taskMemCanvas.graphPoints[index + 1]
-                                readonly property real dx: p2.x - p1.x
-                                readonly property real dy: p2.y - p1.y
-                                readonly property real segmentLength:
-                                    Math.sqrt(dx * dx + dy * dy)
-                                readonly property real segmentAngle:
-                                    Math.atan2(dy, dx) * 180 / Math.PI
-
-                                Rectangle {
-                                    x: parent.p1.x + taskMemCanvas.graphScrollOffset
-                                    y: parent.p1.y - height / 2
-                                    width: parent.segmentLength
-                                    height: 7
-                                    radius: 3.5
-                                    rotation: parent.segmentAngle
-                                    transformOrigin: Item.Left
+                                delegate: Rectangle {
+                                    readonly property point graphPoint:
+                                        taskMemCanvas.graphPoints[index]
+                                    x: graphPoint.x - width / 2
+                                    y: graphPoint.y
+                                    width: Math.max(2.0,
+                                        taskMemCanvas.width
+                                        / Math.max(2, presentationState.taskHistoryLimit - 1)
+                                        + 0.8)
+                                    height: Math.max(0, taskMemCanvas.height - graphPoint.y - 1)
                                     color: Colors.magenta
-                                    opacity: 0.20
+                                    opacity: 0.10
                                     antialiasing: true
                                 }
+                            }
 
-                                Rectangle {
-                                    x: parent.p1.x + taskMemCanvas.graphScrollOffset
-                                    y: parent.p1.y - height / 2
-                                    width: parent.segmentLength
-                                    height: 2
-                                    radius: 1
-                                    rotation: parent.segmentAngle
-                                    transformOrigin: Item.Left
-                                    color: Colors.magenta
-                                    opacity: 1.0
-                                    antialiasing: true
+                            Repeater {
+                                model: Math.max(0, taskMemCanvas.graphPoints.length - 1)
+
+                                delegate: Item {
+                                    anchors.fill: parent
+
+                                    readonly property point p1:
+                                        taskMemCanvas.graphPoints[index]
+                                    readonly property point p2:
+                                        taskMemCanvas.graphPoints[index + 1]
+                                    readonly property real dx: p2.x - p1.x
+                                    readonly property real dy: p2.y - p1.y
+                                    readonly property real segmentLength:
+                                        Math.sqrt(dx * dx + dy * dy)
+                                    readonly property real segmentAngle:
+                                        Math.atan2(dy, dx) * 180 / Math.PI
+
+                                    Rectangle {
+                                        x: parent.p1.x
+                                        y: parent.p1.y - height / 2
+                                        width: parent.segmentLength
+                                        height: 7
+                                        radius: 3.5
+                                        rotation: parent.segmentAngle
+                                        transformOrigin: Item.Left
+                                        color: Colors.magenta
+                                        opacity: 0.20
+                                        antialiasing: true
+                                    }
+
+                                    Rectangle {
+                                        x: parent.p1.x
+                                        y: parent.p1.y - height / 2
+                                        width: parent.segmentLength
+                                        height: 2
+                                        radius: 1
+                                        rotation: parent.segmentAngle
+                                        transformOrigin: Item.Left
+                                        color: Colors.magenta
+                                        opacity: 1.0
+                                        antialiasing: true
+                                    }
                                 }
                             }
                         }

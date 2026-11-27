@@ -1366,8 +1366,13 @@ ShellRoot {
                 break;
             case 73: {
                 const item=preview.item, feed=actualFeed();
+                const label=child(item,"publicDemoStatus");
                 check(item.demoState==="OFF" && !item.beginDemo(),"default mock off");
+                check(label && !label.visible && label.height===0,"inactive mock label reserves no height");
                 item.developmentDemoMode=true;
+                check(label && label.visible && label.height===20
+                    && feed.y>=label.y+label.height && feed.height>0,
+                    "bounded mock label and transcript do not overlap");
                 check(item.demoAvailable && feed.messages.length===0
                     && !item.beginConnectedHistory(),"explicit empty mock view");
                 check(!item.beginDemo("arbitrary draft"),"mock accepts no caller text");

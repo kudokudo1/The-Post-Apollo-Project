@@ -319,7 +319,10 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         visible: root._demoSelected
-        height: visible ? implicitHeight : 0
+        // A single elided line has a fixed bounded height. Using Text's
+        // implicitHeight here feeds its layout result back into itself.
+        height: root._demoSelected ? 20 : 0
+        verticalAlignment: Text.AlignVCenter
         text: root.demoStatusText + " // NO MODEL"
         textFormat: Text.PlainText
         color: "#ED981A"

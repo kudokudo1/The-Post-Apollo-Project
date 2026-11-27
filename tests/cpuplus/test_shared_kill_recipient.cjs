@@ -174,14 +174,16 @@ test("master and per-action lock state is rendered with donor glyphs and exact-o
 test("PROCESS visibility increases only the existing owner sampling cadence", () => {
     const owner=read("widgets/AppControlW.qml");
     const shell=read("shell.qml");
-    assert.match(shell,/AppControlW\s*\{[\s\S]*?cpuPlusProcessVisible:\s*cpuPlusWindow\.menuOpen\s*&& cpuPlusWindow\.selectedModeIndex === 1/);
-    assert.match(owner,/property bool cpuPlusProcessVisible: false/);
-    assert.match(owner,/property: "graphVisible"\s*value: appControlWindow\.menuOpen\s*\|\| appControlWindow\.cpuPlusProcessVisible/);
+    assert.doesNotMatch(shell+owner,/cpuPlusProcessVisible/);
+    assert.match(owner,/property: "donorGraphVisible"\s*value: appControlWindow\.menuOpen/);
     assert.match(owner,/function taskMiniProbeNeeded\(\) \{\s*return KillBackend\.KillStore\.miniProbeNeeded/);
     assert.match(shell,/property: "cpuVisible"\s*value: cpuPlusWindow\.menuOpen && cpuPlusWindow\.selectedModeIndex === 1/);
     assert.match(shell,/KillBackend\.KillStore\.collectionEnabled = true/);
     assert.doesNotMatch(owner,/id: taskManagerRefreshTimer|id: taskMiniDisplayTimer|id: taskRefreshAfterKillTimer/);
     const store=read("services/kill/KillStore.qml");
+    assert.match(store,/readonly property bool graphVisible: cpuVisible \|\| donorGraphVisible/);
+    assert.match(store,/readonly property bool hasTaskFavorites: FavoriteIdentity\.hasTaskFavorites\(/);
+    assert.doesNotMatch(owner,/property: "hasTaskFavorites"/);
     assert.match(store,/id: taskManagerRefreshTimer[\s\S]*?interval: root.snapshotInterval[\s\S]*?running: root.collectionEnabled/);
     assert.match(store,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: root.collectionEnabled && root.miniProbeNeeded/);
     assert.match(store,/id: afterAction[\s\S]*?interval: 320/);
@@ -989,4 +991,24 @@ test("K5d: workspace mounts without an AppControl instance and shares process de
     assert.ok(describe({comm:"sway"}).startsWith("Sway is the Wayland window manager"));
     assert.ok(describe({comm:"BRAVE"}).startsWith("BRAVE is part of the web browser."));
     assert.ok(describe({name:"synthetic-worker"}).startsWith("synthetic-worker is one live Linux process."));
+});
+
+test("K6a: independent history visibility and favorite warm demand", () => {
+    const store=read("services/kill/KillStore.qml");
+    const policy=read("services/favorites/FavoritesAppControlIdentityPolicy.js").replace(/^\.pragma library\s*/,"");
+    const identity=new Function(policy+"\nreturn {hasTaskFavorites};")();
+    const vis=store.match(/readonly property bool graphVisible: ([^\n]+)/)[1];
+    const visible=new Function("cpuVisible","donorGraphVisible","return "+vis);
+    assert.deepEqual([[false,false],[true,false],[false,true],[true,true]].map(a=>visible(...a)),[false,true,true,true]);
+    const a=store.indexOf("    readonly property bool hasTaskFavorites:");
+    const b=store.indexOf("\n\n",a);
+    const expr=store.slice(a,b).split("hasTaskFavorites:")[1].trim();
+    const favoriteStore={favoriteTaskMetricKeys:[],favoriteKeys:["app|other"]};
+    const demand=new Function("FavoriteIdentity","favoriteStore","root","return "+expr);
+    assert.equal(demand(identity,favoriteStore,{favoriteStore}),false);
+    favoriteStore.favoriteKeys.push("task|worker");
+    assert.equal(demand(identity,favoriteStore,{favoriteStore}),true);
+    favoriteStore.favoriteKeys=[];
+    favoriteStore.favoriteTaskMetricKeys=["taskmetric|worker|cpu"];
+    assert.equal(demand(identity,favoriteStore,{favoriteStore}),true);
 });

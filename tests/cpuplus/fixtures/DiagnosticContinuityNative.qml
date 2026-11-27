@@ -15,6 +15,7 @@ ShellRoot {
     property bool resourcePaneActive: false
     property string resourceSubject: "CPU"
     property string cpuDraftWitness: ""
+    property string gpuDraftWitness: ""
     property string generalDraftWitness: ""
     property int completions: 0
     property string diagnosticFooterGeometry: ""
@@ -150,7 +151,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 480) {
+            if (++root.ticks > 560) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -1038,6 +1039,70 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "GPU draft survives navigation, other drafts untouched"))return;
                 console.log("CPU_D7A_GPU_NATIVE_PASS");
+                root.gpuDraftWitness=JSON.stringify(CpuPlusDiagnostics.gpuWorkshopDraft);
+                root.resourceSubject="STORAGE";root.phase=48;return;
+            }
+            if(root.phase===48 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!w)return;
+                const storage=root.findItem(w,"cpuplusWorkshopStorageInstrument");
+                const footer=root.findItem(resourcePane.item,"cpuplusDiagBottomControls");
+                if(!root.check(w.subject==="STORAGE" && w.draft.selected.join(",")==="storage"
+                    && w.preview.ok && w.targetText==="TARGET // 18 KNOWN FILES"
+                    && storage && storage.visible && footer && footer.height===53
+                    && !root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-gpu")
+                    && !w.ready && !CpuPlusDiagnostics.busy,"storage mounts original instrument and common footer"))return;
+                w.edit("durationSeconds",4);
+                w.chooseStorageCadence("sample",2);
+                w.chooseStorageCadence("report",4);
+                if(!root.check(w.preview.ok && w.draft.storageCadenceExplicit
+                    && w.draft.storageSampleSeconds===2 && w.draft.storageReportSeconds===4
+                    && !CpuPlusDiagnostics.loadWorkshopPreset("GPU ONLY","STORAGE")
+                    && CpuPlusDiagnostics.saveWorkshopPreset("STORAGE ONLY","STORAGE")
+                    && JSON.stringify(CpuPlusDiagnostics.gpuWorkshopDraft)===root.gpuDraftWitness
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "storage cadence and preset scope remain independent"))return;
+                w.activate();root.phase=49;return;
+            }
+            if(root.phase===49 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"storage first click only prepares"))return;
+                w.activate();
+                if(!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="storage","storage capture started"))return;
+                root.phase=50;return;
+            }
+            if(root.phase===50 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.storageProgress)return;
+                if(!root.check(w && w.storageRunning && CpuPlusDiagnostics.storageProgress
+                    && !CpuPlusDiagnostics.storageProgressFault,"real storage progress reaches existing stopwatch"))return;
+                root.resourceSubject="GPU";root.phase=51;return;
+            }
+            if(root.phase===51 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && !w.recording && !w.ready && w.locked
+                    && CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="storage","GPU does not inherit storage recording"))return;
+                root.phase=52;return;
+            }
+            if(root.phase===52){
+                if(CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const report=CpuPlusDiagnostics.reports.storage;
+                if(!root.check(report && report.status==="COMPLETE"
+                    && report.summary.includes("STORAGE METADATA // 2 intervals / 18 targets")
+                    && CpuPlusDiagnostics.archiveRows.some(r=>r.id===report.id && r.kind==="storage"),
+                    "real storage metadata capture survives switching // "+CpuPlusDiagnostics.feedback))return;
+                root.resourceSubject="STORAGE";root.phase=53;return;
+            }
+            if(root.phase===53 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.draft.durationSeconds===4 && w.draft.storageSampleSeconds===2
+                    && w.draft.storageReportSeconds===4
+                    && JSON.stringify(CpuPlusDiagnostics.cpuWorkshopDraft)===root.cpuDraftWitness
+                    && JSON.stringify(CpuPlusDiagnostics.gpuWorkshopDraft)===root.gpuDraftWitness
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "storage navigation retains cadence without changing other drafts"))return;
+                console.log("CPU_D8A_STORAGE_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

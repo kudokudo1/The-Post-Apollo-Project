@@ -148,8 +148,12 @@ ShellRoot {
         const cpuGraphDemand = first.store.graphVisible
             && first.graphState.taskMiniHistoryKeepImmutable
             && !first.store.donorGraphVisible;
-        // Exercise the real signal route with no donor attached, no probe.
+        // Preserve the donor rule: when mini demand is active, census
+        // publication updates rows but only dedicated mini samples append graphs.
         first.store.telemetry.snapshotReady(sample);
+        const censusDidNotAppend = first.graphState.taskMiniDisplayRevision === 0
+            && !first.graphState.taskMiniCpuHistories["pid:4321"];
+        first.store.telemetry.miniProbeReady(sample);
         const next = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 52, rss: 3072, mem: 4, elapsed: "00:06"}];
         const previous = second.graphState.taskMiniCpuHistories["pid:4321"];
@@ -173,12 +177,12 @@ ShellRoot {
         first.store.donorFavoritesVisible=false;
         first.store.donorCombiVisible=false;
         if (!verifyActionGateway() || !verifyControlCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
-                || !cpuGraphDemand || !idleGraphDemand || !donorGraphDemand
+                || !cpuGraphDemand || !idleGraphDemand || !donorGraphDemand || !censusDidNotAppend
                 || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry
                 || first.graphState !== second.graphState
                 || first.store.graphController !== second.store.graphController
-                || previous.length !== 1 || previous[0] !== 31
+                || !previous || previous.length !== 1 || previous[0] !== 31
                 || second.graphState.taskMiniCpuHistories["pid:4321"].length !== 2
                 || second.graphState.taskMiniCpuHistories["pid:4321"][1] !== 52
                 || second.graphState.taskMiniHunterMetricHistories["mem:pid:4321"][1] !== 3

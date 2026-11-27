@@ -23,6 +23,7 @@ from ollama_chat_transport import (
 from ollama_inventory import InventoryFailure, _target
 from context_first_tree_m2 import (
     ContextRefusal, SessionContextRef, snapshot_in_transaction,
+    first_light_snapshot_in_transaction,
 )
 from capability_registry_b6r2 import SelectionPlan
 from runtime_stop_control_r2 import RuntimeStopControl, StopArbitrationRefusal
@@ -108,7 +109,8 @@ class ForestTurnBridge:
                  clock_ms: Callable[[], int],
                  streamer: Callable = stream_chat,
                  synthetic_terminal_outbox: bool = False,
-                 synthetic_outbox_expectation_b4g: bool = False):
+                 synthetic_outbox_expectation_b4g: bool = False,
+                 first_light_prompt: str | None = None):
         if not isinstance(journal, ForestSessionJournal):
             raise BridgeRefusal("INVALID_JOURNAL")
         if (not callable(clock_ms) or not callable(streamer)
@@ -117,6 +119,13 @@ class ForestTurnBridge:
             raise BridgeRefusal("INVALID_DEPENDENCY")
         if synthetic_outbox_expectation_b4g and not synthetic_terminal_outbox:
             raise BridgeRefusal("OUTBOX_EXPECTATION_REQUIRES_OUTBOX")
+        # Owner-side immutable-by-convention input for the explicitly
+        # selected disposable First Light bridge, not a caller grant.
+        if first_light_prompt is not None:
+            _messages([{"role": "user", "content": first_light_prompt}])
+            if streamer is stream_chat:
+                raise BridgeRefusal("FIRST_LIGHT_TEST_TRANSPORT_REQUIRED")
+        self._first_light_prompt = first_light_prompt
         self._synthetic_terminal_outbox = synthetic_terminal_outbox
         self._synthetic_outbox_expectation_b4g = synthetic_outbox_expectation_b4g
         if synthetic_terminal_outbox:
@@ -208,9 +217,16 @@ class ForestTurnBridge:
                     current_context_ref, capability_plan)
                 # M2 validates exact owner/Tree/session/revision/latest user
                 # and selects a bounded suffix in THIS reservation transaction.
-                snapshot = snapshot_in_transaction(
-                    self.journal, context_ref, current=current_context_ref,
-                    capability_plan=capability_plan)
+                if self._first_light_prompt is not None:
+                    if capability_plan is not None:
+                        raise BridgeRefusal("FIRST_LIGHT_CAPABILITY_REFUSED")
+                    snapshot = first_light_snapshot_in_transaction(
+                        self.journal, context_ref, current=current_context_ref,
+                        approved_prompt=self._first_light_prompt)
+                else:
+                    snapshot = snapshot_in_transaction(
+                        self.journal, context_ref, current=current_context_ref,
+                        capability_plan=capability_plan)
                 updated = self.db.execute(
                     "SELECT updated_at_ms FROM forest_sessions WHERE "
                     "owner_key=? AND tree_key=? AND session_id=?",
@@ -488,6 +504,8 @@ class ForestTurnBridge:
                 raise BridgeRefusal("OLLAMA_CANCELLED")
 
         try:
+            if self._first_light_prompt is not None and context_ref is None:
+                raise BridgeRefusal("CONTEXT_REQUIRED")
             if context_ref is not None or current_context_ref is not None:
                 if (type(context_ref) is not SessionContextRef
                         or type(current_context_ref) is not SessionContextRef

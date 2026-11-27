@@ -6,11 +6,13 @@ import unittest
 from dataclasses import replace
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/forest"))
 import first_light_trial_host as fl
 from ollama_chat_transport import stream_chat
 from runtime_events_r3 import RuntimeEventRefusal
+import turn_bridge_b3 as b3
 from test_ollama_chat_transport import FakeOllama, packet
 
 
@@ -124,9 +126,62 @@ class FirstLightHostTests(unittest.TestCase):
                          ("changed", op.context_ref.user_turn_id))
         host._db.commit()
         try:
-            self.assertEqual(list(host.run_internal())[-1].payload["event"], "UNKNOWN_HOLD")
+            frames = list(host.run_internal())
+            self.assertEqual([f.payload["event"] for f in frames],
+                             ["REQUESTED", "UNKNOWN_HOLD"])
             self.assertEqual(calls, [])
-            self.assertEqual(host.local_outcome(), "ABORTED_LOCAL")
+            self.assertEqual(host.local_outcome(), "UNKNOWN_HOLD")
+            self.assertEqual(host._db.execute(
+                "SELECT count(*) FROM forest_attempts_b3").fetchone(), (0,))
+        finally:
+            host.close()
+
+    def test_canonical_snapshot_runs_inside_original_reservation(self):
+        peer, transport = self.peer([packet("READY", done=True)])
+        host = fl.FirstLightTrialHost(test_transport=transport)
+        self.addCleanup(lambda: None if host._closed else host.close())
+        op = host.submit(fl.PROMPT)
+        original = b3.first_light_snapshot_in_transaction
+        checked = []
+
+        def observe(journal, requested, *, current, approved_prompt):
+            self.assertTrue(host._db.in_transaction)
+            self.assertEqual(requested, op.context_ref)
+            self.assertEqual(current, requested)
+            self.assertEqual(approved_prompt, fl.PROMPT)
+            self.assertEqual(host._db.execute(
+                "SELECT count(*) FROM forest_attempts_b3").fetchone(), (0,))
+            snapshot = original(journal, requested, current=current,
+                                approved_prompt=approved_prompt)
+            checked.append(snapshot.transport_messages())
+            return snapshot
+
+        with patch.object(b3, "first_light_snapshot_in_transaction", side_effect=observe), \
+             patch.object(b3, "snapshot_in_transaction", side_effect=AssertionError("fallback")):
+            frames = list(host.run_internal())
+        self.assertEqual(checked, [[{"role": "user", "content": fl.PROMPT}]])
+        self.assertEqual(frames[-1].payload["event"], "COMMITTED")
+        self.assertEqual(len(peer.observed), 1)
+        self.assertEqual(host.local_outcome(), "COMMITTED_LOCAL")
+
+    def test_first_light_bridge_refuses_legacy_context_and_default_transport(self):
+        host = fl.FirstLightTrialHost(test_transport=lambda **kw: iter(()))
+        op = host.submit(fl.PROMPT)
+        try:
+            from session_journal_v0 import ForestSessionJournal
+            journal = ForestSessionJournal(host._db)
+            with self.assertRaisesRegex(b3.BridgeRefusal, "FIRST_LIGHT_TEST_TRANSPORT_REQUIRED"):
+                b3.ForestTurnBridge(journal, clock_ms=host._tick,
+                                    first_light_prompt=fl.PROMPT)
+            bridge = b3.ForestTurnBridge(
+                journal, clock_ms=host._tick, streamer=lambda **kw: iter(()),
+                first_light_prompt=fl.PROMPT)
+            ref = op.context_ref
+            with self.assertRaisesRegex(b3.BridgeRefusal, "CONTEXT_REQUIRED"):
+                list(bridge.exchange(owner=fl.OWNER, session_id=ref.session_id,
+                                     expected_revision=1, model=fl.MODEL))
+            self.assertEqual(host._db.execute(
+                "SELECT count(*) FROM forest_attempts_b3").fetchone(), (0,))
         finally:
             host.close()
 

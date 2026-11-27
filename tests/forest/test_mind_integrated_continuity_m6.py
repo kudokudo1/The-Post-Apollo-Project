@@ -295,6 +295,97 @@ process.stdout.write(JSON.stringify(snapshots));
         self.assertEqual(list(second.run())[-1].payload["event"], "UNKNOWN_HOLD")
         self.assertEqual(len(peer.observed), 1)
 
+    def test_first_light_actual_host_isolates_two_trials_from_existing_history(self):
+        # Actual FL3 host, actual B2 HTTP, and a separate preexisting M6
+        # journal. This is a disposable sentinel, NOT personal data.
+        from unittest.mock import patch, call
+        import first_light_trial_host as fl
+        from ollama_chat_transport import stream_chat
+        from test_ollama_chat_transport import packet
+
+        self.append_user("Public sentinel: must not reach either trial.")
+        self.commit()
+        before = tuple(self.db.iterdump())
+        changes = self.db.total_changes
+        peer, endpoint = self.first_light_http(
+            lines=[packet("First trial reply"), packet(" complete", done=True)])
+
+        def transport(**options):
+            # Only the test endpoint is substituted; B2 builds the request.
+            options["endpoint"] = endpoint
+            yield from stream_chat(**options)
+
+        def reject_existing_access(action, *args):
+            accesses.append(action)
+            return sqlite3.SQLITE_DENY
+
+        accesses = []
+        original_connect = sqlite3.connect
+        self.db.set_authorizer(reject_existing_access)
+        try:
+            with patch.object(sqlite3, "connect", wraps=original_connect) as opened:
+                operations = []
+                for stop in (False, True):
+                    host = fl.FirstLightTrialHost(test_transport=transport)
+                    gen = None
+                    try:
+                        op = host.submit(fl.PROMPT)
+                        operations.append(op)
+                        trial_db = host._db
+                        self.assertEqual(
+                            [(name, filename) for _, name, filename in
+                             trial_db.execute("PRAGMA database_list")],
+                            [("main", "")])
+                        self.assertEqual(trial_db.execute(
+                            "SELECT revision FROM forest_sessions").fetchall(), [(1,)])
+                        self.assertEqual(trial_db.execute(
+                            "SELECT role,body FROM forest_turns").fetchall(),
+                            [("user", fl.PROMPT)])
+                        gen = host.run_internal()
+                        if stop:
+                            for event in ("REQUESTED", "RESERVED", "STARTED", "DELTA"):
+                                frame = next(gen)
+                                self.assertEqual(frame.payload["event"], event)
+                            self.assertEqual(host.request_stop(op, frame.attempt_id),
+                                             "STOP_LATCHED")
+                            self.assertEqual(list(gen)[-1].payload["event"], "UNKNOWN_HOLD")
+                            self.assertEqual(trial_db.execute(
+                                "SELECT role,body FROM forest_turns").fetchall(),
+                                [("user", fl.PROMPT)])
+                            expected = "ABORTED_LOCAL"
+                        else:
+                            terminal = list(gen)[-1]
+                            self.assertEqual(terminal.operation, op)
+                            self.assertEqual(terminal.payload["event"], "COMMITTED")
+                            self.assertEqual(trial_db.execute(
+                                "SELECT role,body FROM forest_turns ORDER BY ordinal").fetchall(),
+                                [("user", fl.PROMPT), ("assistant", "First trial reply complete")])
+                            expected = "COMMITTED_LOCAL"
+                        self.assertEqual(host.local_outcome(), expected)
+                        self.assertEqual(host.close(), expected)
+                        with self.assertRaises(sqlite3.ProgrammingError):
+                            trial_db.execute("SELECT 1")
+                    finally:
+                        if gen is not None:
+                            gen.close()
+                        if not host._closed:
+                            host.close()
+                self.assertNotEqual(operations[0].context_ref.session_id,
+                                    operations[1].context_ref.session_id)
+                self.assertNotEqual(operations[0].operation_id, operations[1].operation_id)
+                self.assertEqual(opened.call_args_list,
+                                 [call(":memory:"), call(":memory:")])
+            expected_post = ("POST", "/api/chat", {
+                "model": fl.MODEL, "messages": [{"role": "user", "content": fl.PROMPT}],
+                "stream": True, "options": {"num_predict": 32, "num_ctx": 2048},
+            })
+            self.assertEqual(peer.observed, [expected_post, expected_post])
+            self.assertEqual(accesses, [])
+        finally:
+            self.db.set_authorizer(None)
+        self.assertEqual(tuple(self.db.iterdump()), before)
+        self.assertEqual(self.db.total_changes, changes)
+
     def test_r4a_status_and_committed_history_after_restart(self):
         self.append_user("Public first question")
         op, runtime = self.runtime("status-first")

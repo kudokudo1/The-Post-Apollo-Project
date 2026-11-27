@@ -3481,6 +3481,17 @@ PanelWindow {
                 visible: gitAction.operationPhase !== "idle"
             }
 
+            GohuText {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.rightMargin: 3
+                font.pixelSize: 6
+                color: gitAction.semanticAccent
+                text: "NO NEW OUTPUT"
+                visible: gitAction.operationQuiet
+                z: 3
+            }
+
             // Label-only actions shrink before falling back to a compact glyph.
             GohuText {
                 anchors.centerIn: parent

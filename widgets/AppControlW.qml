@@ -1071,11 +1071,6 @@ PanelWindow {
         property: "donorHunterHost"
         value: appControlWindow
     }
-    Binding {
-        target: KillBackend.KillStore
-        property: "donorHunterFavorites"
-        value: appControlWindow.favoriteStore
-    }
 
     readonly property var thermalRows:
         systemTelemetry && Array.isArray(systemTelemetry.thermalRows)

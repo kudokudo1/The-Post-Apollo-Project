@@ -735,3 +735,46 @@ test("K4b: Hunter uses canonical process identity and one Favorites singleton", 
     favorites.favoriteKeys=null;
     assert.equal(api.isTaskFavorite({comm:"brave"}),true);
 });
+
+test("K4c: shared HOG and MICE rules retain thresholds and refuse unknown window inventory", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const a=store.indexOf("    function hunterTaskActive(");
+    const b=store.indexOf("    // Read the original Favorites membership;",a);
+    assert.ok(a>=0 && b>a);
+    const rows=[];
+    const presentation={metricCombined:0,metricCpu:1,metricMemory:2,metricIo:3,metricAge:4,
+        taskPeak:e=>e.peak,taskAverage:e=>e.avg,taskMemoryMiB:e=>e.rss,taskIoRate:e=>e.io,
+        elapsedSeconds:v=>Number(v),taskMetricScore:(e,m)=>m===2?e.rss:e.peak};
+    const root={rows};
+    const api=new Function("root","hunterPresentation","taskEligibleForKillAll","isTaskFavorite",
+        "let hunterVisibleWindows=null;\n"+store.slice(a,b)
+        +"\nreturn {hunterHogCandidates,hunterMouseCandidates,hunterMouseProtectedReason,windows:v=>hunterVisibleWindows=v};")
+        (root,presentation,e=>!!e._taskRecord&&!e.protected,e=>!!e.favorite);
+    const row=(pid,extra={})=>({_taskRecord:true,pid,ppid:9000,comm:"synthetic-leaf",tty:"?",state:"S",
+        elapsed:"3000",cpu:.05,mem:.1,peak:.1,avg:.04,rss:12,io:0,...extra});
+    const first=row(4001), favorite=row(4002,{favorite:true}), protectedRow=row(4003,{protected:true});
+    const visible=row(4004), interactive=row(4005,{tty:"pts/1"}), orphan=row(4006,{ppid:1});
+    const parent=row(4007), child=row(4008,{ppid:4007,elapsed:"10"});
+    const helper=row(4009,{comm:"brave-helper"}), frozen=row(4010,{state:"T"});
+    rows.push(first,favorite,protectedRow,visible,interactive,orphan,parent,child,helper,frozen);
+    assert.deepEqual(api.hunterMouseCandidates(),[]);
+    assert.equal(api.hunterMouseProtectedReason(first),"WINDOW INVENTORY UNAVAILABLE");
+    api.windows([{pid:visible.pid}]);
+    assert.deepEqual(api.hunterMouseCandidates(),[first]);
+    assert.equal(api.hunterMouseProtectedReason(favorite),"FAVORITE");
+    assert.equal(api.hunterMouseProtectedReason(protectedRow),"SESSION/PROTECTED");
+    assert.equal(api.hunterMouseProtectedReason(visible),"ACTIVE APP TREE");
+    assert.equal(api.hunterMouseProtectedReason(interactive),"INTERACTIVE/TTY TREE");
+    assert.equal(api.hunterMouseProtectedReason(orphan),"USER SERVICE/ORPHAN");
+    assert.equal(api.hunterMouseProtectedReason(parent),"PROCESS TREE");
+    assert.equal(api.hunterMouseProtectedReason(helper),"IMPORTANT HELPER");
+    assert.equal(api.hunterMouseProtectedReason(frozen),"FROZEN");
+    const top=row(5001,{peak:30}), above=row(5002,{peak:15}), below=row(5003,{peak:14}),
+        excluded=row(5004,{peak:80,favorite:true}), critical=row(5005,{peak:90,protected:true});
+    rows.splice(0,rows.length,top,above,below,excluded,critical);
+    assert.deepEqual(api.hunterHogCandidates(1),[top,above]);
+    assert.match(owner,/return KillBackend\.KillStore\.hunterHogCandidates\(/);
+    assert.match(owner,/return KillBackend\.KillStore\.hunterMouseCandidates\(\)/);
+    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.swayWindows/);
+});

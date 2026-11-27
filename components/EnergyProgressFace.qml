@@ -155,6 +155,27 @@ Item {
                     c.fillStyle=g; c.fillRect(start,y-spread,span,h+2*spread);
                 }
                 if(f.headVisible && !material.experimental) radiate(x+1,inner*p,ink,ki?.36:hot?.23:tron?.14:.27);
+                // Heat escaping under the actual combustion front, before the
+                // material is drawn. Taper the footprint along the wake.
+                if(hot && f.headVisible && p>0) {
+                    const reach=Math.min(inner*p,h*(root.fireMode==="standard"?3.8:root.fireMode==="ash-trail"?1.85:1.35));
+                    const under=c.createLinearGradient(edge-reach,mid,edge+h*.65,mid);
+                    under.addColorStop(0,tint(Colors.red,0));
+                    under.addColorStop(.38,tint(Colors.red,.18));
+                    under.addColorStop(.72,tint(Colors.orange,.48));
+                    under.addColorStop(1,tint(Colors.yellow,.06));
+                    // The underlight has a soft vertical falloff as well.
+                    c.save(); c.translate(edge-reach*.32,mid+h*.23);
+                    c.scale(Math.max(h,reach*.82),h*1.48);
+                    const halo=c.createRadialGradient(0,0,0,0,0,1);
+                    halo.addColorStop(0,tint(Colors.yellow,.69));
+                    halo.addColorStop(.35,tint(Colors.orange,.49));
+                    halo.addColorStop(.65,tint(Colors.red,.21));
+                    halo.addColorStop(1,tint(Colors.red,0));
+                    c.fillStyle=halo; c.fillRect(-1,-1,2,2); c.restore();
+                    c.fillStyle=under;
+                    c.fillRect(edge-reach,mid+h*.38,reach+h*.65,h*.32);
+                }
                 if(ki && f.clash) radiate(edge,inner*f.enemyFraction,
                     mix(Qt.rgba(.65,1,1,1),Qt.rgba(1,.10,.16,1),f.enemyHeat),.34*f.enemyOpacity);
                 // In Burn Away, the traversed chassis is gone, not covered
@@ -280,13 +301,13 @@ Item {
                     const pixel=PixelFire.fire(h,root.elapsed,root.reducedMotion,root.fireMode);
                     // Heat penetrates the material ahead of the flame.
                     // Keep the already eroded/ashed region unchanged.
-                    const contactWidth=Math.min(w-1-(edge-x),h*1.4);
+                    const contactWidth=Math.min(w-1-(edge-x),h*1.85);
                     if(contactWidth>0) {
                         c.save(); c.beginPath(); c.rect(edge,y+1,contactWidth,h-2); c.clip();
                         const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
-                        heated.addColorStop(0,tint(Colors.yellow,.76));
-                        heated.addColorStop(.23,tint(Colors.orange,.58));
-                        heated.addColorStop(.64,tint(Colors.red,.24));
+                        heated.addColorStop(0,tint(Colors.yellow,.94));
+                        heated.addColorStop(.23,tint(Colors.orange,.77));
+                        heated.addColorStop(.64,tint(Colors.red,.36));
                         heated.addColorStop(1,tint(Colors.red,0));
                         c.fillStyle=heated; c.fillRect(edge,y+1,contactWidth,h-2);
                         for(let i=0;i<6;i++){
@@ -320,11 +341,25 @@ Item {
                         }
                     }
                     const heat=root.fireMode==="burn-away"?1:root.fireMode==="ash-trail"?.83:.90;
-                    orb(h*1.65,h*1.30,[[0,tint(Colors.yellow,.64*heat)],
-                        [.27,tint(Colors.orange,.48*heat)],[.62,tint(Colors.red,.16*heat)],
-                        [1,tint(Colors.orange,0)]]);
-                    const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
+                    // The light footprint is derived from the actual pixel
+                    // silhouette, including the tail origin. Three overlapping
+                    // emitters avoid a detached circular light sticker.
                     const u=pixel.unit;
+                    const left=Math.min(...pixel.cells.map(cell=>cell.x))*u;
+                    const right=(Math.max(...pixel.cells.map(cell=>cell.x))+1)*u;
+                    if(pixel.cells.length>0) {
+                        const span=right-left;
+                        for(let i=0;i<3;i++){
+                            const offset=left+span*(.17+i*.28);
+                            const near=.44+i*.28;
+                            orb(Math.max(h*.64,span*.42),h*(.78+i*.25),[
+                                [0,tint(Colors.yellow,.34*heat*near)],
+                                [.28,tint(Colors.orange,.36*heat*near)],
+                                [.66,tint(Colors.red,.17*heat*near)],
+                                [1,tint(Colors.red,0)]],edge+offset);
+                        }
+                    }
+                    const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
                     for(const cell of pixel.cells) {
                         c.fillStyle=palette[cell.heat];
                         c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,u,u);
@@ -449,9 +484,11 @@ Item {
                 } else if(hot) {
                     // Preserve the pixel silhouette. The existing plasma is
                     // now a soft, low-opacity light layer, not a solid ball.
-                    orb(h*.94,h*.86,[[0,tint(Colors.white,.52)],
-                        [.26,tint(Colors.yellow,.42)],[.54,tint(Colors.orange,.30)],
-                        [.78,tint(Colors.red,.13)],[1,tint(ink,0)]],edge+h*.10);
+                    // Preserve hot pixels rather than painting a second
+                    // solid orb over the flame. The broader light is below it.
+                    orb(h*.70,h*.69,[[0,tint(Colors.white,.20)],
+                        [.30,tint(Colors.yellow,.16)],[.61,tint(Colors.orange,.08)],
+                        [1,tint(ink,0)]],edge);
                 } else {
                     orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
                         [0,tint(ink,Math.min(.98,.35*bright))],

@@ -9,10 +9,12 @@ QtObject {
     property bool enabled: true
     property bool reducedMotion: false
     property bool completionFlashEnabled: true
+    property bool localLightingEnabled: true
     property real strength: 1.0
     readonly property var reaction: {
         let best = null;
         let clashLight = null;
+        const localLights = [];
         let light = null;
         let flash = 0;
         let flashSource = null;
@@ -30,6 +32,17 @@ QtObject {
                     const level=source.phase==="failure" && !source.animationActive?.30:.48;
                     if(!clashLight || level>clashLight.level)
                         clashLight={source:source,fraction:p,heat:f.enemyHeat,level:level};
+                }
+                if(localLightingEnabled && (source.animationActive || (source.variant==="ki-blast" && f.clash))) {
+                    const fire=source.variant==="flamethrower";
+                    const level=source.variant==="ki-blast"?.26:fire?.22:source.variant==="tron"?.19:.17;
+                    const p=source.displayedFraction;
+                    if(p>0 && f.headVisible)
+                        localLights.push({source:source,fraction:p,color:source.energyColor,
+                            level:level*(.70+.30*f.intensity),fire:fire,side:-1});
+                    if(source.variant==="ki-blast" && f.clash && f.enemyFraction>0)
+                        localLights.push({source:source,fraction:p,color:Qt.rgba(1,.70-.59*f.enemyHeat,.32-.17*f.enemyHeat,1),
+                            level:.26*f.enemyOpacity,fire:false,side:1});
                 }
                 if(!source.animationActive) continue;
                 const level = source.phase === "running"
@@ -59,6 +72,7 @@ QtObject {
         }
         return {
             clashLight: clashLight,
+            localLights: localLights.sort((a,b)=>b.level-a.level).slice(0,8),
             power: light ? light.power : 0,
             time: light ? light.time : 0,
             color: light ? light.color : Colors.magenta,
@@ -75,6 +89,7 @@ QtObject {
         };
     }
     readonly property var clashLight: reaction.clashLight
+    readonly property var localLights: reaction.localLights
     readonly property real pressure: reaction.power
     readonly property real offsetX: reaction.dx
     readonly property real offsetY: reaction.dy

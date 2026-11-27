@@ -47,8 +47,8 @@ function head(variant,height,power,width) {
     if(!large) return null;
     const scale=Math.max(1,Math.min(2.5,power));
     // A core that covers the entire cross-section even at ignition.
-    return {rx:Math.min(h*(variant==="omnitrix"?.89:.82)*(1+.16*(scale-1)),w*.48),
-        ry:h*(.70+.055*(scale-1)),solid:.48};
+    return {rx:Math.min(h*(variant==="omnitrix"?.93:.82)*(1+.16*(scale-1)),w*.48),
+        ry:h*((variant==="omnitrix"?.72:.70)+.055*(scale-1)),solid:.48};
 }
 
 function clashSizes(fraction,heat) {
@@ -79,12 +79,18 @@ function airFlow(span,height,time,reduced) {
     if(reduced || span<1 || height<1) return [];
     const h=height,t=Math.max(0,time),w=Math.min(span,h*5.8);
     const lines=[];
+    // Deterministic irregular bursts. Seed each new streak at its own
+    // lifetime boundary rather than flickering random values every frame.
+    function hash(n) { const v=Math.sin(n*127.1+31.73)*43758.5453; return v-Math.floor(v); }
     for(let i=0;i<14;i++){
-        const age=(i*.173+t*(2.2+i%4*.31))%1;
-        const length=Math.min(w,h*(.45+i%4*.26));
-        const distance=age*Math.max(0,w-length);
-        lines.push({x:-distance-length,y:(i%2?1:-1)*h*(.58+.12*(i%3)),
-            length:length,alpha:(1-age)*(.52+.08*(i%3))});
+        const clock=t*(1.8+hash(i+51)*2.4)+hash(i+13);
+        const cycle=Math.floor(clock), age=clock-cycle;
+        const seed=i*101+cycle*37;
+        const length=Math.min(w,h*(.30+hash(seed+7)*1.42));
+        const distance=age*Math.max(0,w-length)*(.55+.45*hash(seed+17));
+        const side=hash(seed+29)>.5?1:-1;
+        lines.push({x:-distance-length,y:side*h*(.55+hash(seed+31)*.41),
+            length:length,alpha:Math.sin(Math.PI*age)*(.32+.60*hash(seed+41))});
     }
     return lines;
 }

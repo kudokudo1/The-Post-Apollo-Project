@@ -214,6 +214,20 @@ with (base/"observer-stdout.jsonl").open("w") as out,(base/"observer-stderr.txt"
             (base/"observer-exit.txt").write_text(str(e.code))
             raise
 """)
+    # On failure distinguish the two policy gates from the dump-specific
+    # parser. This diagnostic code lives only in the disposable copied scene.
+    capture_file=scene/"services/diagnostics/DiagnosticDumpResourceCapture.qml"
+    capture_source=capture_file.read_text()
+    anchor='        publish(evidence?{status:"COMPLETE",evidence:evidence}:'
+    assert anchor in capture_source
+    capture_source=capture_source.replace(anchor,'''        if(!cancelled&&!evidence){
+            const plan=Resource.dumpResourcePlan(request.seconds);
+            console.error("CPU_Q6_POLICY "+JSON.stringify({exitOk:exitOk,bytes:output.length,
+                configured:!!Policy.configuredEvidence("memory",output,plan),
+                summary:!!Policy.summarize("memory",output),origin:request.originMs,flatMap:typeof [].flatMap}));
+        }
+'''+anchor)
+    capture_file.write_text(capture_source)
     (scene/"smoke.qml").write_text(scene_text(mounted))
     env=os.environ.copy()
     for key in ("HOME","XDG_CACHE_HOME","XDG_CONFIG_HOME","XDG_STATE_HOME","XDG_DATA_HOME","XDG_RUNTIME_DIR"):
@@ -301,7 +315,7 @@ with (base/"observer-stdout.jsonl").open("w") as out,(base/"observer-stderr.txt"
             for line in output.read_text()[:65536].splitlines()[:14]:
                 try:
                     row=json.loads(line)
-                    print("CPU_Q6_OBSERVER_ROW",json.dumps({k:row.get(k) for k in ("event","pid","startTicks","tsMs","monotonicMs","cpuTicks","cpuPct","sampleIntervalMs","samples","observedMs","reason","calibration")}))
+                    print("CPU_Q6_OBSERVER_ROW",json.dumps({k:row.get(k) for k in ("event","pid","startTicks","tsMs","monotonicMs","cpuTicks","cpuPct","sampleIntervalMs","samples","observedMs","reason","calibration","memoryKiB","hostObservation")}))
                 except ValueError:
                     print("CPU_Q6_OBSERVER_ROW invalid JSON")
         for name in ("observer-exit.txt","observer-stderr.txt"):

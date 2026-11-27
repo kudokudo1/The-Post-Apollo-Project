@@ -30,7 +30,9 @@ Scope {
     property bool donorFavoritesVisible: false
     property bool donorFavoriteTasksVisible: false
     property bool donorCombiVisible: false
-    property bool hasTaskFavorites: false
+    readonly property bool hasTaskFavorites: FavoriteIdentity.hasTaskFavorites(
+        favoriteStore.favoriteTaskMetricKeys,
+        function() { return root.favoriteStore.favoriteKeys; })
 
     readonly property bool miniProbeNeeded:
         cpuVisible || donorKillVisible || donorFavoritesVisible
@@ -595,8 +597,10 @@ Scope {
     }
 
     // Both consumers read the authoritative graph-history state.
-    // Transitional donor bindings select visibility and its legacy detail mode.
-    property bool graphVisible: false
+    // Each visible consumer contributes its own demand. CPU++ no longer
+    // relies on AppControl to request immutable history publication.
+    property bool donorGraphVisible: false
+    readonly property bool graphVisible: cpuVisible || donorGraphVisible
     property int graphMetricMode: 0
     readonly property var graphState: histories
     readonly property var graphController: graph

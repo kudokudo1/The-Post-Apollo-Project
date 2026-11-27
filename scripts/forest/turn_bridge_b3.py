@@ -142,6 +142,53 @@ class ForestTurnBridge:
         ).fetchone() is None:
             raise BridgeRefusal("ATTEMPT_SCHEMA_MISSING")
 
+    def _preflight_context_attempt(self, owner, session_id, revision, now,
+                                   context_ref, current_context_ref,
+                                   capability_plan):
+        """Reject known local conflicts before M2 reads any message body.
+
+        Only the already scoped context-bound disposable path. Invalid or
+        inconsistent references remain subject to M2's normal refusal
+        ordering. This is not authentication or a separate reservation.
+        Caller holds the same writer transaction as the final unique INSERT.
+        """
+        if (type(context_ref) is not SessionContextRef
+                or type(current_context_ref) is not SessionContextRef
+                or context_ref != current_context_ref
+                or owner != context_ref.context.principal_key
+                or session_id != context_ref.session_id
+                or revision != context_ref.expected_revision
+                or (capability_plan is not None and (
+                    type(capability_plan) is not SelectionPlan
+                    or capability_plan.context != context_ref.context))):
+            return
+        scope = self.db.execute(
+            "SELECT state,revision,updated_at_ms FROM forest_sessions "
+            "WHERE owner_key=? AND tree_key=? AND session_id=?",
+            (owner, context_ref.context.tree_key, session_id),
+        ).fetchone()
+        if (scope is None or scope[0] != "OPEN" or scope[1] != revision
+                or now < scope[2]):
+            return
+        latest = self.db.execute(
+            "SELECT turn_id,ordinal,role FROM forest_turns "
+            "WHERE session_id=? ORDER BY ordinal DESC LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        if (latest is None or latest[0] != context_ref.user_turn_id
+                or latest[2] != "user" or type(latest[1]) is not int
+                or not 1 <= latest[1] <= revision):
+            return
+        # Both existing constraints remain authoritative. No body or title
+        # read here; no attempt state is returned to a client.
+        conflict = self.db.execute(
+            "SELECT 1 FROM forest_attempts_b3 WHERE session_id=? "
+            "AND (user_turn_id=? OR status='RESERVED') LIMIT 1",
+            (session_id, latest[0]),
+        ).fetchone()
+        if conflict is not None:
+            raise BridgeRefusal("ATTEMPT_ALREADY_EXISTS")
+
     def _reserve(self, owner: str, session_id: str, revision: int,
                  model: str, *,
                  context_ref: SessionContextRef | None = None,
@@ -156,6 +203,9 @@ class ForestTurnBridge:
 
         with _write(self.db):
             if context_ref is not None:
+                self._preflight_context_attempt(
+                    owner, session_id, revision, now, context_ref,
+                    current_context_ref, capability_plan)
                 # M2 validates exact owner/Tree/session/revision/latest user
                 # and selects a bounded suffix in THIS reservation transaction.
                 snapshot = snapshot_in_transaction(

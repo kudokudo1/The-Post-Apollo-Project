@@ -107,10 +107,51 @@ test("recipient restores existing owner graph and favorite semantics", () => {
     assert.match(row,/mini\.combi/);
     assert.match(row,/root\.controller\.miniHistory/);
     assert.match(row,/root\.favorite \? "✦" : "✧"/);
-    assert.match(recipient,/appControlWindow\.taskFavoriteKey\(row\)/);
-    assert.match(recipient,/ownerFavoriteStore\.favoriteKeys=next/);
-    assert.match(recipient,/appControlWindow\.toggleTaskMetricFavorite/);
+    assert.match(recipient,/FavoriteIdentity\.taskKey\(row\)/);
+    assert.match(recipient,/FavoritesService\.isFavoriteKey\(taskFavoriteKey\(row\)\)/);
+    assert.match(recipient,/FavoritesService\.toggleFavoriteKey\(key\)/);
+    assert.match(recipient,/FavoritesService\.isTaskMetricKey\(FavoriteIdentity\.taskMetricKey\(entry, metricId\)\)/);
+    assert.match(recipient,/FavoritesService\.toggleTaskMetricKey\(key\)/);
+    assert.doesNotMatch(recipient,/appControlWindow\.(?:favoriteStore|taskFavoriteKey|isTaskMetricFavorite|toggleTaskMetricFavorite)|ownerFavoriteStore/);
     assert.doesNotMatch(recipient,/new ProcessTelemetry/);
+});
+
+
+// K5b: execute actual workspace adapters against the shared identity and
+// Favorites service functions; no donor widget or persistence is required.
+test("K5b: direct favorite adapters retain key formats and toggle semantics", () => {
+    const identitySource=read("services/favorites/FavoritesAppControlIdentityPolicy.js").replace(/^\.pragma library\s*/,"");
+    const identity=new Function(identitySource+"\nreturn {taskKey,taskMetricKey};")();
+    const service=read("services/favorites/FavoritesService.qml");
+    const start=service.indexOf("    function keyString(");
+    const end=service.indexOf("    // Preferred detail actions",start);
+    assert.ok(start>=0 && end>start);
+    const saved={favoriteKeys:["app|existing"],favoriteMonitorBoxKeys:[],favoriteTaskMetricKeys:[]};
+    const api=new Function("store",service.slice(start,end)+"\nreturn {isFavoriteKey,toggleFavoriteKey,isTaskMetricKey,toggleTaskMetricKey};")(saved);
+    const a=recipient.indexOf("    function taskFavoriteKey(");
+    const b=recipient.indexOf("    readonly property var miniGeometry:",a);
+    const c=recipient.indexOf("        function isTaskMetricFavorite(");
+    const d=recipient.indexOf("\n    }\n\n    Component {",c);
+    assert.ok(a>=0 && b>a && c>b && d>c);
+    const workspace={active:true};
+    const adapters=new Function("FavoriteIdentity","FavoritesService","workspace","active",recipient.slice(a,b)+recipient.slice(c,d)+"\nreturn {taskFavoriteKey,isTaskFavorite,toggleTaskFavorite,isTaskMetricFavorite,toggleTaskMetricFavorite};")(identity,api,workspace,true);
+    const row={comm:"With Space",pid:123};
+    assert.equal(adapters.taskFavoriteKey(row),"task|with%20space");
+    adapters.toggleTaskFavorite(row);
+    assert.deepEqual(saved.favoriteKeys,["task|with%20space","app|existing"]);
+    assert.equal(adapters.isTaskFavorite({comm:"WITH SPACE",pid:456}),true);
+    adapters.toggleTaskFavorite(row);
+    assert.deepEqual(saved.favoriteKeys,["app|existing"]);
+    adapters.toggleTaskMetricFavorite(row," CPU ");
+    assert.deepEqual(saved.favoriteTaskMetricKeys,["taskmetric|with%20space|cpu"]);
+    assert.equal(adapters.isTaskMetricFavorite(row,"cpu"),true);
+    workspace.active=false;
+    adapters.toggleTaskMetricFavorite(row,"cpu");
+    assert.equal(adapters.isTaskMetricFavorite(row,"cpu"),true);
+    workspace.active=true;
+    adapters.toggleTaskMetricFavorite(row,"cpu");
+    adapters.toggleTaskMetricFavorite(null,"cpu");
+    assert.deepEqual(saved.favoriteTaskMetricKeys,[]);
 });
 
 test("master and per-action lock state is rendered with donor glyphs and exact-owner gating", () => {

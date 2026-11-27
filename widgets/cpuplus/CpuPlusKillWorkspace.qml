@@ -6,6 +6,8 @@ import "../../components"
 import "../appcontrol"
 import "../../services/system"
 import "../../services/kill" as KillBackend
+import qs.services.favorites
+import "../../services/favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
 
 // CPU++ owns navigation and presentation. KillStore owns live telemetry and
 // mini histories and the birth-time-verified action gate. No second poller,
@@ -51,8 +53,6 @@ Item {
     readonly property string metricKey: ["combined","cpu","mem","io","age"][hunterMetricMode]
     readonly property int miniHistoryRevision: graphSource
         ? Number(graphSource.taskMiniDisplayRevision || 0) : 0
-    readonly property var ownerFavoriteStore: appControlWindow
-        ? appControlWindow.favoriteStore : null
     property var bulkReview: null
     readonly property bool bulkAvailable: !!collectionSource
         && typeof collectionSource.prepareCpuBulkReview === "function"
@@ -240,22 +240,15 @@ Item {
             +" MiB • I/O "+hunterGraph.formatBytesPerSecond(hunterGraph.taskIoRate(row));
     }
     function taskFavoriteKey(row) {
-        return appControlWindow && appControlWindow.taskFavoriteKey
-            ? appControlWindow.taskFavoriteKey(row) : "";
+        return FavoriteIdentity.taskKey(row);
     }
     function isTaskFavorite(row) {
-        const key=taskFavoriteKey(row);
-        return !!key && !!ownerFavoriteStore
-            && ownerFavoriteStore.favoriteKeys.indexOf(key)!==-1;
+        return FavoritesService.isFavoriteKey(taskFavoriteKey(row));
     }
     function toggleTaskFavorite(row) {
         const key=taskFavoriteKey(row);
-        if (!active || !key || !ownerFavoriteStore) return;
-        // Use the donor's persistent key and singleton without moving its UI.
-        const next=ownerFavoriteStore.favoriteKeys.slice();
-        const index=next.indexOf(key);
-        if (index>=0) next.splice(index,1); else next.unshift(key);
-        ownerFavoriteStore.favoriteKeys=next;
+        if (!active || !key) return;
+        FavoritesService.toggleFavoriteKey(key);
     }
     readonly property var miniGeometry: graphGeometry
     readonly property int miniHistoryLimit: history.taskMiniHistoryLimit
@@ -617,13 +610,12 @@ Item {
                 actuatorScroll.contentY=Math.max(0,y+item.height-actuatorScroll.height);
         }
         function isTaskMetricFavorite(entry, metricId) {
-            return workspace.appControlWindow && entry
-                ? workspace.appControlWindow.isTaskMetricFavorite(entry, metricId)
-                : false;
+            return FavoritesService.isTaskMetricKey(FavoriteIdentity.taskMetricKey(entry, metricId));
         }
         function toggleTaskMetricFavorite(entry, metricId) {
-            if (workspace.appControlWindow && entry)
-                workspace.appControlWindow.toggleTaskMetricFavorite(entry, metricId);
+            const key = FavoriteIdentity.taskMetricKey(entry, metricId);
+            if (workspace.active && key)
+                FavoritesService.toggleTaskMetricKey(key);
         }
     }
 

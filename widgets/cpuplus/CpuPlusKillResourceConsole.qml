@@ -173,6 +173,18 @@ Item {
         staged=Draft.stageBandwidth(staged,direction,kind,mib);
         reviewing=false;
     }
+    readonly property var taskDraft: Draft.taskChoice(staged)
+    function taskPreviewCount() { return taskDraft.kind==="uncapped" ? 64 : taskDraft.count; }
+    function stageTasks(kind,count) {
+        if (!selectionReady || selectedKey!=="threads") return;
+        staged=Draft.stageTasks(staged,kind,count);
+        reviewing=false;
+    }
+    function stepTasks(delta) {
+        if (!selectionReady || selectedKey!=="threads") return;
+        staged=Draft.stepTasks(staged,delta);
+        reviewing=false;
+    }
     function accentFor(key) {
         if (key === "cpu") return Colors.orange;
         if (key === "memory") return Colors.magenta;
@@ -445,7 +457,7 @@ Item {
                         spacing: 5
                             GohuText {
                                 width: parent.width
-                                visible: resourcePanel.key!=="memory" && resourcePanel.key!=="swap" && resourcePanel.spec.controls.length > 0
+                                visible: resourcePanel.key!=="memory" && resourcePanel.key!=="swap" && resourcePanel.key!=="threads" && resourcePanel.spec.controls.length > 0
                                 text: root.modeFor(resourcePanel.key) === "auto"
                                     ? "AUTO // POLICY NOT CONFIGURED; DRAFT ONLY"
                                     : root.modeFor(resourcePanel.key) === "off"
@@ -461,7 +473,7 @@ Item {
                             // slider, sharing its footprint instead of another
                             // menu row. A future dial occupies the same left slot.
                             Repeater {
-                                model: resourcePanel.key==="memory" || resourcePanel.key==="swap" ? [] : resourcePanel.spec.controls
+                                model: resourcePanel.key==="memory" || resourcePanel.key==="swap" || resourcePanel.key==="threads" ? [] : resourcePanel.spec.controls
                                 delegate: Column {
                                     id: field
                                     required property var modelData
@@ -837,6 +849,132 @@ Item {
                                     wrapMode: Text.Wrap
                                     font.pixelSize: 9
                                     visible: Draft.summary(root.staged).length>0
+                                }
+                            }
+                            Loader {
+                                objectName: "cpuPlusTaskBudgetSlot"
+                                width: parent.width
+                                active: resourcePanel.key==="threads"
+                                visible: active
+                                height: active && item ? item.implicitHeight : 0
+                                sourceComponent: Column {
+                                    spacing: 5
+                                    GohuText {
+                                        width: parent.width
+                                        text: "CGROUP TASK BUDGET // DRAFT ONLY"
+                                        color: Colors.omnitrix
+                                        font.pixelSize: 11
+                                        wrapMode: Text.Wrap
+                                    }
+                                    Row {
+                                        id: taskNumberRow
+                                        width: parent.width
+                                        height: 40
+                                        spacing: 5
+                                        ActionButton {
+                                            objectName: "cpuPlusTaskMinus"
+                                            width: Math.min(40,taskNumberRow.width*0.2)
+                                            height: 40
+                                            normalFace: true
+                                            accentColor: Colors.omnitrix
+                                            label: "−"
+                                            labelPixelSize: 18
+                                            available: root.selectionReady && root.taskPreviewCount()>1
+                                            onLeftClicked: if (available) root.stepTasks(-1)
+                                        }
+                                        TextField {
+                                            id: taskExact
+                                            objectName: "cpuPlusTaskExactInput"
+                                            width: Math.max(1,taskNumberRow.width-2*Math.min(40,taskNumberRow.width*0.2)-2*taskNumberRow.spacing)
+                                            height: 40
+                                            enabled: root.selectionReady
+                                            color: Colors.omnitrix
+                                            font.pixelSize: 20
+                                            horizontalAlignment: TextInput.AlignHCenter
+                                            selectByMouse: true
+                                            placeholderText: "NO CAP"
+                                            validator: IntValidator { bottom: 1; top: 512 }
+                                            property string editIdentity: ""
+                                            onActiveFocusChanged: if (activeFocus) editIdentity=root.targetIdentity
+                                            Binding {
+                                                target: taskExact
+                                                property: "text"
+                                                value: root.taskDraft.kind==="uncapped" ? "" : String(root.taskPreviewCount())
+                                                when: !taskExact.activeFocus
+                                                restoreMode: Binding.RestoreNone
+                                            }
+                                            background: Rectangle {
+                                                color: Colors.black
+                                                border.width: 1
+                                                border.color: Colors.omnitrix
+                                            }
+                                            onAccepted: {
+                                                if (acceptableInput && editIdentity===root.targetIdentity && text.length>0)
+                                                    root.stageTasks("budget",Number(text));
+                                            }
+                                        }
+                                        ActionButton {
+                                            objectName: "cpuPlusTaskPlus"
+                                            width: Math.min(40,taskNumberRow.width*0.2)
+                                            height: 40
+                                            normalFace: true
+                                            accentColor: Colors.omnitrix
+                                            label: "+"
+                                            labelPixelSize: 18
+                                            available: root.selectionReady && root.taskPreviewCount()<512
+                                            onLeftClicked: if (available) root.stepTasks(1)
+                                        }
+                                    }
+                                    Row {
+                                        id: taskChoices
+                                        width: parent.width
+                                        height: 28
+                                        spacing: 3
+                                        Repeater {
+                                            model: [{key:"budget",label:"SET CAP"},{key:"uncapped",label:"NO CAP"},{key:"restore",label:"RESTORE"}]
+                                            delegate: ActionButton {
+                                                required property var modelData
+                                                objectName: "cpuPlusTaskChoice-"+modelData.key
+                                                width: Math.max(1,(taskChoices.width-2*taskChoices.spacing)/3)
+                                                height: 28
+                                                label: modelData.label
+                                                labelPixelSize: 9
+                                                labelMinimumPixelSize: 7
+                                                normalFace: true
+                                                accentColor: Colors.omnitrix
+                                                available: root.selectionReady && modelData.key!=="restore"
+                                                selected: root.taskDraft.kind===modelData.key
+                                                onLeftClicked: {
+                                                    if (!available) return;
+                                                    if (modelData.key==="budget") root.stageTasks("budget",root.taskPreviewCount());
+                                                    else if (modelData.key==="uncapped") root.stageTasks("uncapped",0);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        text: root.taskDraft.kind==="preview" ? "64 TASKS // PREVIEW, NOT OBSERVED"
+                                            : root.taskDraft.kind==="uncapped" ? "DRAFT // NO LOCAL CAP (max)"
+                                            : "DRAFT // "+root.taskDraft.count+" TASKS"
+                                        color: Colors.white
+                                        font.pixelSize: 10
+                                        wrapMode: Text.Wrap
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        text: "1–512 TASKS // ENTER TO STAGE. CAP RESTRICTS NEW TASK CREATION, NOT EXISTING THREADS."
+                                        color: Colors.white
+                                        font.pixelSize: 9
+                                        wrapMode: Text.Wrap
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        text: "GROUP COUNT / MEMBERSHIP UNVERIFIED. NO CAP IS NOT RESTORE. RESTORE LOCKED."
+                                        color: Colors.yellow
+                                        font.pixelSize: 9
+                                        wrapMode: Text.Wrap
+                                    }
                                 }
                             }
                             Loader {

@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap,quotaChoice,quotaRange,stageQuota,bandwidthChoice,stageBandwidth};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap,quotaChoice,quotaRange,stageQuota,bandwidthChoice,stageBandwidth,taskChoice,stageTasks,stepTasks};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
@@ -67,7 +67,7 @@ test("K8d2 top filters select one editor while retaining drafts",()=>{
     assert.ok(ui.includes("selected: root.selectedKey === modelData.key"));
     assert.ok(ui.includes("function selectResource(key)"));
     assert.ok(ui.includes("bodyScroll.contentY = 0"));
-    assert.ok(ui.includes('model: resourcePanel.key==="memory" || resourcePanel.key==="swap" ? [] : resourcePanel.spec.controls'));
+    assert.ok(ui.includes('model: resourcePanel.key==="memory" || resourcePanel.key==="swap" || resourcePanel.key==="threads" ? [] : resourcePanel.spec.controls'));
     assert.ok(ui.includes('model: ["off","manual","auto","hold"]'));
     assert.ok(ui.includes('visible: root.modeFor(resourcePanel.key) === "manual"'));
     const updated=draft.stageValue({}, "cpu", "nice", 8);
@@ -379,4 +379,39 @@ test("K8e7 read/write cap intents are independent of each other and I/O priority
     assert.ok(ui.includes('root.stageBandwidth(field.modelData.key,"budget",Number(text))'));
     assert.ok(ui.includes('if (field.quotaField || field.bandwidthField) return;'));
     assert.ok(ui.includes('64 MiB/s // PREVIEW, NOT OBSERVED'));
+});
+
+test("K8e8 task cap, numeric steps and uncapped intent are explicit",()=>{
+    const empty={};
+    assert.equal(draft.mode(empty,"threads"),"manual");
+    assert.deepEqual(draft.taskChoice(empty),{kind:"preview",count:64});
+    assert.equal(draft.summary(empty).length,0);
+    for(const count of [0,-1,513,1.5,NaN,"64"])
+        assert.equal(draft.stageTasks(empty,"budget",count),empty);
+    assert.equal(draft.stageTasks(empty,"restore",64),empty);
+    assert.equal(draft.stepTasks(empty,2),empty);
+    const lower=draft.stepTasks(empty,-1);
+    assert.deepEqual(draft.taskChoice(lower),{kind:"budget",count:63});
+    assert.ok(draft.summary(lower)[0].includes("TASK COUNT 63 TASKS"));
+    assert.deepEqual(draft.taskChoice(draft.stepTasks(lower,1)),{kind:"budget",count:64});
+    const min=draft.stageTasks(empty,"budget",1);
+    const max=draft.stageTasks(empty,"budget",512);
+    assert.equal(draft.stepTasks(min,-1),min);
+    assert.equal(draft.stepTasks(max,1),max);
+    const uncapped=draft.stageTasks(max,"uncapped",0);
+    assert.deepEqual(draft.taskChoice(uncapped),{kind:"uncapped"});
+    assert.equal(draft.hasValue(uncapped,"threads","tasks"),false);
+    assert.ok(draft.summary(uncapped)[0].includes("pids.max=max"));
+    assert.ok(!draft.summary(uncapped)[0].includes("TASK COUNT"));
+    assert.deepEqual(draft.taskChoice(draft.stepTasks(uncapped,1)),{kind:"budget",count:65});
+    assert.deepEqual(draft.taskChoice(draft.stageValue(empty,"threads","tasks",137)),{kind:"budget",count:137});
+    const other=draft.stagePriorityPreset(empty,"background");
+    assert.equal(draft.value(draft.stageTasks(other,"budget",32),"cpu","nice"),10);
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes('objectName: "cpuPlusTaskMinus"'));
+    assert.ok(ui.includes('objectName: "cpuPlusTaskPlus"'));
+    assert.ok(ui.includes('objectName: "cpuPlusTaskExactInput"'));
+    assert.ok(ui.includes('64 TASKS // PREVIEW, NOT OBSERVED'));
+    assert.ok(ui.includes('editIdentity===root.targetIdentity'));
+    assert.ok(ui.includes('CAP RESTRICTS NEW TASK CREATION, NOT EXISTING THREADS'));
 });

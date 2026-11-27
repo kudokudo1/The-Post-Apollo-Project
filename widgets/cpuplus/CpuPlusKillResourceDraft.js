@@ -17,7 +17,7 @@ function cards() {
         ],note:"BLOCK DEVICE / CGROUP UNVERIFIED; NO CAP IS NOT RESTORE"},
         {key:"threads",title:"THREADS",scope:"CGROUP / TASK COUNT",controls:[
             {key:"tasks",title:"TASK COUNT",min:1,max:512,step:1,unit:"TASKS",initial:64}
-        ],note:"SHARED CGROUP, NOT A PER-PID THREAD CAP"},
+        ],note:"SHARED CGROUP; LIMITS NEW TASKS, NOT EXISTING THREADS"},
         {key:"gpu",title:"GPU",scope:"READ-ONLY OBSERVATION",controls:[],
             note:"NO VERIFIED PER-PROCESS GPU / VRAM CONTROL"},
         {key:"network",title:"NETWORK",scope:"NAMESPACE OBSERVATION",controls:[],
@@ -61,6 +61,7 @@ function stageMode(previous,key,mode) {
 }
 function stageValue(previous,key,field,value) {
     if(key==="swap"&&field==="budget") return stageSwap(previous,"budget",value);
+    if(key==="threads"&&field==="tasks") return stageTasks(previous,"budget",value);
     if(key==="cpu"&&field==="quota") return stageQuota(previous,"budget",value,100);
     if(key==="disk"&&(field==="read"||field==="write")) {
         if(typeof value!=="number"||!isFinite(value)) return previous;
@@ -83,7 +84,7 @@ function stageValue(previous,key,field,value) {
     return result;
 }
 function mode(previous,key) {
-    return previous[key]?previous[key].mode:(key==="cpu"||key==="disk"||key==="swap"?"manual":"hold");
+    return previous[key]?previous[key].mode:(key==="cpu"||key==="disk"||key==="swap"||key==="threads"?"manual":"hold");
 }
 function value(previous,key,field) {
     var spec=find(key);
@@ -209,6 +210,27 @@ function stageBandwidth(previous,direction,kind,mib) {
     result.disk={mode:"manual",values:values};
     return result;
 }
+function taskChoice(previous) {
+    var entry=previous.threads, values=entry&&entry.values;
+    if(values&&values.taskKind==="uncapped") return {kind:"uncapped"};
+    if(values&&values.taskKind==="budget") return {kind:"budget",count:values.tasks};
+    return {kind:"preview",count:64};
+}
+function stageTasks(previous,kind,count) {
+    if(kind!=="budget"&&kind!=="uncapped") return previous;
+    if(kind==="budget"&&(!Number.isSafeInteger(count)||count<1||count>512)) return previous;
+    var result=Object.assign({},previous);
+    result.threads={mode:"manual",values:kind==="budget"?{taskKind:kind,tasks:count}:{taskKind:kind}};
+    return result;
+}
+function stepTasks(previous,delta) {
+    if(delta!==1&&delta!==-1) return previous;
+    var choice=taskChoice(previous);
+    var count=choice.kind==="uncapped"?64:choice.count;
+    var next=count+delta;
+    if(next<1||next>512) return previous;
+    return stageTasks(previous,"budget",next);
+}
 function summary(previous) {
     var lines=[];
     var rows=cards();
@@ -222,7 +244,7 @@ function summary(previous) {
                 var c=spec.controls[j];
                 // Priority and quota are different kernel operations. Never
                 // turn a placeholder value into a requested CPU setting.
-                if(spec.key==="swap"||((spec.key==="cpu"||spec.key==="disk")&&!hasValue(previous,spec.key,c.key))) continue;
+                if(spec.key==="swap"||spec.key==="threads"||((spec.key==="cpu"||spec.key==="disk")&&!hasValue(previous,spec.key,c.key))) continue;
                 fields.push(c.title+" "+value(previous,spec.key,c.key)+" "+c.unit);
             }
             if(spec.key==="cpu"&&quotaChoice(previous).kind==="uncapped") fields.push("CPU QUOTA NO CAP // cpu.max=max");
@@ -239,6 +261,11 @@ function summary(previous) {
                 var swap=swapChoice(previous);
                 if(swap.kind==="uncapped") fields.push("NO CAP // memory.swap.max=max");
                 else if(swap.kind==="budget") fields.push("SWAP BUDGET "+swap.mib+" MiB");
+            }
+            if(spec.key==="threads") {
+                var tasks=taskChoice(previous);
+                if(tasks.kind==="uncapped") fields.push("NO CAP // pids.max=max");
+                else if(tasks.kind==="budget") fields.push("TASK COUNT "+tasks.count+" TASKS");
             }
             description+=" // "+(fields.length?fields.join(" · "):"NO "+spec.key.toUpperCase()+" VALUES SELECTED");
         }

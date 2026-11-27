@@ -4,12 +4,14 @@ import Quickshell.Wayland
 import "../components"
 
 // PRISM // Standalone bottom-left dock module, immediately beside Trash.
-// This first pass presents the approved shared button artwork and its selected
-// border only. The contextual dictionary and menu are deliberately not mounted.
+// The button follows ordinary dock open/close behavior. The window owns
+// its panel frame, resizing and close controls; the contextual dictionary
+// remains empty until operator-authored meanings are available.
 PanelWindow {
     id: prismDock
     objectName: "prismDock"
-    property bool previewSelected: false
+    property bool menuOpen: false
+    signal toggleRequested()
 
     anchors {
         top: false
@@ -44,8 +46,8 @@ PanelWindow {
         y: 10
         width: 50
         height: 50
-        selected: prismDock.previewSelected
-        Accessible.description: "Prism artwork preview. Select to inspect the held-open border; dictionary not yet connected."
-        onLeftClicked: prismDock.previewSelected = !prismDock.previewSelected
+        selected: prismDock.menuOpen
+        Accessible.description: "Open the Post Apollo Prism visual-language widget"
+        onLeftClicked: prismDock.toggleRequested()
     }
 }

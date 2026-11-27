@@ -386,50 +386,54 @@ Item {
                                         }
                                         // CPU priority uses the existing shared rotary instrument.
                                         // No separate card or new actuator is introduced.
-                                        SelectorDial {
-                                            id: priorityDial
-                                            objectName: "cpuPlusPriorityDial"
-                                            visible: field.priorityField
+                                        Loader {
+                                            id: priorityDialSlot
+                                            active: field.priorityField
+                                            visible: active
                                             width: Math.max(70, Math.min(142,(instrumentRow.width-instrumentRow.spacing)*0.54))
                                             height: 148
-                                            labelText: "PRIORITY / NICE"
-                                            titleColor: Colors.orange
-                                            titlePixelSize: 9
-                                            selectorMode: "continuous"
-                                            minimumValue: -20
-                                            maximumValue: 19
-                                            valueStep: 1
-                                            valueDecimals: 0
-                                            snapContinuousToStep: true
-                                            currentValue: root.valueFor("cpu","nice")
-                                            readoutText: Draft.hasValue(root.staged,"cpu","nice")
-                                                ? (previewNumericValue>0?"+":"")+Math.round(previewNumericValue)
-                                                : "DRAFT"
-                                            options: ["-20","-10","0","+10","+19"]
-                                            displayOptions: options
-                                            numericReferenceValues: [-20,-10,0,10,19]
-                                            numericLabelPixelSize: 9
-                                            showInstrumentChassis: false
-                                            accentColor: Colors.orange
-                                            markerColor: Colors.orange
-                                            activeDetentColor: Colors.orange
-                                            labelColor: Colors.white
-                                            interactive: visible && root.selectionReady
-                                                && root.modeFor("cpu")==="manual"
-                                            onValueRequested: function(value) {
-                                                if (visible && interactive)
-                                                    root.stageNumber("cpu","nice",Math.round(value));
+                                            sourceComponent: SelectorDial {
+                                                id: priorityDial
+                                                objectName: "cpuPlusPriorityDial"
+                                                labelText: "PRIORITY / NICE"
+                                                titleColor: Colors.orange
+                                                titlePixelSize: 9
+                                                selectorMode: "continuous"
+                                                minimumValue: -20
+                                                maximumValue: 19
+                                                valueStep: 1
+                                                valueDecimals: 0
+                                                snapContinuousToStep: true
+                                                currentValue: root.valueFor("cpu","nice")
+                                                readoutText: Draft.hasValue(root.staged,"cpu","nice")
+                                                    ? (previewNumericValue>0?"+":"")+Math.round(previewNumericValue)
+                                                    : "DRAFT"
+                                                options: ["-20","-10","0","+10","+19"]
+                                                displayOptions: options
+                                                numericReferenceValues: [-20,-10,0,10,19]
+                                                numericLabelPixelSize: 9
+                                                showInstrumentChassis: false
+                                                accentColor: Colors.orange
+                                                markerColor: Colors.orange
+                                                activeDetentColor: Colors.orange
+                                                labelColor: Colors.white
+                                                interactive: visible && root.selectionReady
+                                                    && root.modeFor("cpu")==="manual"
+                                                onValueRequested: function(value) {
+                                                    if (visible && interactive)
+                                                        root.stageNumber("cpu","nice",Math.round(value));
+                                                }
                                             }
                                         }
                                         Column {
                                             id: priorityPresetColumn
                                             objectName: "cpuPlusPriorityPresets"
                                             visible: field.priorityField
-                                            width: Math.max(1,instrumentRow.width-priorityDial.width-instrumentRow.spacing)
+                                            width: Math.max(1,instrumentRow.width-priorityDialSlot.width-instrumentRow.spacing)
                                             anchors.verticalCenter: parent.verticalCenter
                                             spacing: 4
                                             Repeater {
-                                                model: Draft.priorityPresets()
+                                                model: field.priorityField ? Draft.priorityPresets() : []
                                                 delegate: ActionButton {
                                                     required property var modelData
                                                     objectName: "cpuPlusPriorityPreset-"+modelData.key

@@ -473,16 +473,21 @@ Item {
     Connections {
         target: workspace.graphController
         function onPrepareCpuMemAppend() {
-            if (workspace.ready && workspace.graphSession.matches(workspace.currentTask)) {
+            if (workspace.ready && workspace.active && workspace.graphSession.matches(workspace.currentTask)) {
                 details.cpuCanvas.requestPaint(true);
                 details.memCanvas.requestPaint(true);
             }
         }
         function onPrepareCombiAppend() {
-            if (workspace.ready && workspace.graphSession.matches(workspace.currentTask))
+            if (workspace.ready && workspace.active && workspace.graphSession.matches(workspace.currentTask))
                 details.combiScoreCanvas.requestPaint(true);
         }
-        function onRepaintCpuMem(reset) { workspace.repaintDetail(reset); }
+        function onRepaintCpuMem(reset) {
+            // Match the donor: CPU/MEM changes must not invalidate COMBI.
+            if (!workspace.ready || !workspace.active || !workspace.graphSession.matches(workspace.currentTask)) return;
+            details.cpuCanvas.requestPaint(false,!!reset);
+            details.memCanvas.requestPaint(false,!!reset);
+        }
         function onRepaintCpu(reset) {
             if (workspace.ready && workspace.active && workspace.graphSession.matches(workspace.currentTask))
                 details.cpuCanvas.requestPaint(false,!!reset);

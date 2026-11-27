@@ -1,6 +1,7 @@
 import QtQuick
 import qs.services.diagnostics
 import "../../services/diagnostics/DiagnosticCalibration.js" as Calibration
+import "../../services/diagnostics/DiagnosticWorkflowReceipt.js" as Receipt
 import "../../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as DiagnosticPolicy
 import "../../components"
 
@@ -168,11 +169,11 @@ Column {
     }
     Connections {
         target: CpuPlusDiagnostics
-        function onWorkflowCatalogBusyChanged() {
-            if (CpuPlusDiagnostics.workflowCatalogBusy || !root.pendingSaveName) return;
-            const row=CpuPlusDiagnostics.workshopPresets.find(r=>r.name===root.pendingSaveName);
-            if (CpuPlusDiagnostics.workflowCatalogReady && row && row.execution==="configured"
-                    && JSON.stringify(row.plan)===root.savePlanText) {
+        function onWorkflowCatalogCompleted(outcome,wasEdit,confirmedDocument) {
+            if (!wasEdit || !root.pendingSaveName) return;
+            const row=confirmedDocument && confirmedDocument.rows.find(r=>r.name===root.pendingSaveName);
+            if (outcome==="READY" && row && row.execution==="configured"
+                    && Receipt.sameValue(row.plan,JSON.parse(root.savePlanText))) {
                 root.closeSaveEditor();
                 root.saveNotice="SAVED // LOCAL WORKFLOW LIBRARY";
             } else {

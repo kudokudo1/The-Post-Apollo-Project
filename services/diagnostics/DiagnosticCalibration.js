@@ -317,3 +317,15 @@ function storageCadenceChoice(duration,sample,report,field,value) {
     }
     return null;
 }
+
+// Subject selection is presentation and draft custody, never launch authority.
+function workshopSubjectKinds(subject) {
+    if (subject==="CPU") return ["threads","census"];
+    if (subject==="ALL") return ["threads","memory","census","storage","stall"];
+    return [];
+}
+function workshopPlanMatchesSubject(plan, subject) {
+    const kinds=workshopSubjectKinds(subject);
+    const draft=workshopDraftFromPlan(plan);
+    return !!draft && draft.selected.every(k=>kinds.includes(k));
+}

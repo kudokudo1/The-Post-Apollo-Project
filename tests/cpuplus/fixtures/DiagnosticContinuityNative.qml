@@ -12,6 +12,8 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property bool paneActive: true
+    property bool resourcePaneActive: false
+    property string generalDraftWitness: ""
     property int completions: 0
     property string diagnosticFooterGeometry: ""
     property string completedId: ""
@@ -127,6 +129,12 @@ ShellRoot {
             anchors.fill: parent
             active: root.paneActive
             sourceComponent: CpuPlusMemoryActuatorPane {}
+        }
+        Loader {
+            id: resourcePane
+            anchors.fill: parent
+            active: root.resourcePaneActive
+            sourceComponent: CpuPlusResourceDiagnosticsPane { subject: "CPU" }
         }
     }
     Timer {
@@ -902,6 +910,47 @@ ShellRoot {
                     && CpuPlusDiagnostics.setFeedback.startsWith("SET CANCELLED"),
                     "cancel prevents next queued capture // "+CpuPlusDiagnostics.setFeedback))return;
                 console.log("CPU_D4B_NATIVE_PASS");
+                root.generalDraftWitness=JSON.stringify(CpuPlusDiagnostics.workshopDraft);
+                root.resourcePaneActive=true;
+                root.phase=35;
+                return;
+            }
+            if (root.phase===35 && resourcePane.item) {
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!w)return;
+                const footer=root.findItem(resourcePane.item,"cpuplusDiagBottomControls");
+                if(!root.check(w.subject==="CPU" && w.preview.ok && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.draft.selected.join(",")==="census"
+                    && !!root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-census")
+                    && !!root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-threads")
+                    && !root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-storage")
+                    && footer && footer.height===53 && footer.mapToItem(resourcePane.item,0,0).y>=0
+                    && footer.mapToItem(resourcePane.item,0,0).y+footer.height<=resourcePane.item.height+1,
+                    "CPU resource mounts shared instrument and pinned footer without starting capture"))return;
+                w.edit("durationSeconds",20);
+                if(!root.check(CpuPlusDiagnostics.cpuWorkshopDraft.durationSeconds===20
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness
+                    && !CpuPlusDiagnostics.loadWorkshopPreset("STALL SESSION","CPU")
+                    && CpuPlusDiagnostics.saveWorkshopPreset("CPU ONLY","CPU"),
+                    "CPU draft and preset scope isolated from general calibration"))return;
+                w.activate(); root.phase=36; return;
+            }
+            if(root.phase===36 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"CPU first click prepares without execution"))return;
+                root.resourcePaneActive=false; root.phase=37; return;
+            }
+            if(root.phase===37){
+                if(!root.check(!resourcePane.item && !CpuPlusDiagnostics.busy,"unload discards prepared authority"))return;
+                root.resourcePaneActive=true; root.phase=38; return;
+            }
+            if(root.phase===38 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!w)return;
+                if(!root.check(w.draft.durationSeconds===20 && !w.ready && !CpuPlusDiagnostics.busy
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "CPU calibration survives remount, readiness does not"))return;
+                console.log("CPU_D6A_RESOURCE_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

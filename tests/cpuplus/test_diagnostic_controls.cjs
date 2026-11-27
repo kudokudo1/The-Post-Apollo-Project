@@ -452,3 +452,24 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.doesNotMatch(resource,/\b(?:Timer|Process)\s*\{|requestWorkshopCapture\(/);
     assert.match(read("widgets/CpuPlusW.qml"),/sourceComponent: CpuPlusResourceDiagnosticsPane \{ subject: "CPU" \}/);
 }
+
+// D6b host CPU evidence and calibration, distinct from process CPU.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const p={durationSeconds:2,instruments:[{kind:"hostcpu",intervalMs:1000}]};
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"CPU")',c),true);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"ALL")',c),false);
+    assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"hostcpu",intervalMs:1000},{kind:"census",intervalMs:1000}]}).ok',c),false);
+    const cfg={kind:"hostcpu",durationSeconds:2,intervalMs:1000};
+    const a={schema:"post-apollo-host-cpu-v1",event:"hostcpu",sequence:1,elapsedMs:1000,intervalMs:1000,aggregate:[200,80,10],cores:[[0,100,50,5,2500000],[1,100,30,5,null]],psiSomeAvg10:2.5};
+    const b={...a,sequence:2,elapsedMs:2000};
+    const end={schema:a.schema,event:"complete",samples:2,observedMs:2000,calibration:cfg};
+    const valid=jsonl([a,b,end]);
+    assert.match(policy.summarize("hostcpu",valid),/mean 40.0%/);
+    assert.match(policy.summarize("hostcpu",valid),/1\/2 CPUs/);
+    assert.ok(policy.configuredEvidence("hostcpu",valid,cfg));
+    assert.equal(policy.configuredEvidence("hostcpu",valid,{...cfg,durationSeconds:3}),null);
+    for(const invalid of [[a,end],[{...a,aggregate:[100,101,0]},b,end],[a,{...b,cores:[[1,100,30,5,null]]},end],[{...a,psiSomeAvg10:101},b,end],[a,{...b,elapsedMs:1999},end]])
+        assert.equal(policy.summarize("hostcpu",jsonl(invalid)),null);
+}

@@ -12,7 +12,9 @@ serializes jobs but is not a durable once-only grant. No dispatch by
 this PR, no schedule/push/PR acquisition, no rerun or automatic retry.
 Before dispatch verify exact integrated revision, transitive code and
 checkout action pin; avoid a main revision race. If reviewed revision
-cannot be selected exactly, do not dispatch. No secrets or write token
+cannot be selected exactly, do not dispatch. Required reviewed_sha input
+must equal github.sha; mismatch skips the acquisition job. This is a
+revision check, not an approval verifier. No secrets or write token
 to verifier; contents read for pinned checkout, persist-credentials false.
 Clean env, closed extra FDs, no provider or downloaded executable run.
 Standard GitHub public runners advertised free, estimated one job up to
@@ -34,7 +36,7 @@ policy and whether runner scope is eligible before dispatch. If provider
 needs different acquisition endpoints, return HOLD rather than widening.
 
 Actual runner preflight: hosted environment/OS/arch/image metadata,
-read-only visible cgroup-v2 ancestry and memory/disk availability, no
+read-only visible cgroup-v2 non-root ancestry, unified mount root and memory/disk availability, no
 extra FDs, owned 0700 empty temp scope, >= archive + 1.56GB model cap +
 6GiB extraction cap + 2GiB free reserve. Refuse unknowns; environment
 metadata and visible ancestry are feasibility observations, not independent

@@ -7,7 +7,7 @@ ShellRoot {
     Window {
         id: lab
         width: 480
-        height: 300
+        height: 410
         visible: true
         color: Colors.dark
         property int stage: 0
@@ -45,6 +45,18 @@ ShellRoot {
                     caption: modelData
                 }
             }
+            EnergyProgressFace {
+                id: ash
+                width: parent.width; height: 36
+                variant: "flamethrower"; fireMode: "ash-trail"
+                caption: "ASH TRAIL"
+            }
+            EnergyProgressFace {
+                id: erosion
+                width: parent.width; height: 36
+                variant: "flamethrower"; fireMode: "burn-away"
+                caption: "BURN AWAY"
+            }
         }
         Timer {
             interval: 120
@@ -65,6 +77,40 @@ ShellRoot {
                     if (elapsed>4800 && !lab.require(field.pressure>.5,
                             "overdrive host pressure")) return;
                 }
+                if (lab.stage>=8) {
+                    for (const f of [ash,erosion]) {
+                        if (!lab.require(f.materialExperiment,"material mode mounted")) return;
+                        if (lab.stage===8) {
+                            f.progressMode="measured";
+                            f.phase="running";
+                            f.progress=.6;
+                        } else if (lab.stage===9) {
+                            if (!lab.require(f.displayedFraction===.6,"material exact progress")) return;
+                            f.phase="failure";
+                        } else if (lab.stage===10) {
+                            if (!lab.require(f.displayedFraction===.6 && !f.animationActive,
+                                    "material partial failure stays")) return;
+                            f.phase="running";
+                            f.progress=.7;
+                        } else if (lab.stage===11) {
+                            f.reducedMotion=true;
+                            f.phase="success";
+                        } else if (lab.stage===12) {
+                            if (!lab.require(f.displayedFraction===1 && !f.animationActive,
+                                    "material success settles")) return;
+                            f.phase="idle";
+                        } else if (lab.stage===13) {
+                            if (!lab.require(f.displayedFraction===0,"material resets")) return;
+                        }
+                    }
+                    if (lab.stage===13) {
+                        console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset; bounded host pressure; Omnitrix pulse; ash-trail and burn-away material lifecycle");
+                        Qt.quit();
+                        return;
+                    }
+                    lab.stage++;
+                    return;
+                }
                 if (lab.stage===7) {
                     const omni=faces.itemAt(0);
                     if (!lab.require(Math.abs(field.offsetX)<=.300001 && Math.abs(field.offsetY)<=.100001,
@@ -73,8 +119,7 @@ ShellRoot {
                     if (Date.now()-lab.pulseStarted>1000) {
                         if (!lab.require(lab.sawFlash && field.completionFlash===0 && !omni.animationActive,
                                 "single completion pulse settles")) return;
-                        console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset; bounded host pressure; Omnitrix pulse");
-                        Qt.quit();
+                        lab.stage=8;
                     }
                     return;
                 }

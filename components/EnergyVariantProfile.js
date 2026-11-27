@@ -21,7 +21,7 @@ function host(variant, time, level, strength, phase, reduced) {
     // A single soft green-white completion pulse, never a running strobe.
     const flash=phase==="success" && !reduced
         ? p.flash*smooth((t-.42)/.10)*(1-smooth((t-.52)/.30)) : 0;
-    return {power:power,dx:power*x*p.x,dy:power*y*p.y,
+    return {power:power,dx:power===0?0:power*x*p.x,dy:power===0?0:power*y*p.y,
         flash:flash,fragments:power*p.fragments,style:p.style,
         score:power*Math.max(p.x,p.y)};
 }

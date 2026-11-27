@@ -860,3 +860,29 @@ test('combined score detail history translates a shared trace layer, not individ
     assert.equal(trace.split('taskCombiScoreCanvas.graphPoints.length - 1').length-1,1,
         'original line count remains one less than the point count');
 });
+
+
+test('normal CPU detail graph moves one shared trace, leaving COMBI legend and grid fixed', () => {
+    const detail=fs.readFileSync(path.join(root,'widgets/appcontrol/TaskManagerView.qml'),'utf8');
+    const cpuAt=detail.indexOf('id: taskCpuCanvas');
+    const scoreAt=detail.indexOf('id: taskCombiScoreGraph',cpuAt);
+    assert.ok(cpuAt>0 && scoreAt>cpuAt,'find CPU detail and score graph boundaries');
+    const cpu=detail.slice(cpuAt,scoreAt);
+    const layerAt=cpu.indexOf('id: taskCpuNormalTraceLayer');
+    assert.ok(layerAt>0,'one normal CPU detail trace layer');
+    const fixed=cpu.slice(0,layerAt), trace=cpu.slice(layerAt);
+    assert.match(fixed,/model:\s*3\s+delegate:\s*Rectangle/,'CPU grid stationary');
+    assert.match(fixed,/id:\s*detailCombiTrace/,'COMBI metrics and legend remain outside normal trace');
+    assert.match(fixed,/text:\s*detailCombiTrace\.modelData\.label/,'COMBI legend stationary');
+    assert.match(trace,/anchors\.fill:\s*parent\s+transform:\s*Translate\s*\{\s*x:\s*taskCpuCanvas\.graphScrollOffset\s*\}/);
+    assert.equal((trace.match(/taskCpuCanvas\.graphScrollOffset/g)||[]).length,1,
+        'one normal CPU detail animation dependency instead of three per shape');
+    assert.equal(trace.split('model: taskCpuCanvas.graphPoints.length').length-1,1);
+    assert.equal(trace.split('model: Math.max(0, taskCpuCanvas.graphPoints.length - 1)').length-1,1);
+    assert.match(trace,/x:\s*graphPoint\.x\s*-\s*width\s*\/\s*2\s+y:\s*graphPoint\.y/);
+    assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y:\s*parent\.p1\.y/g)||[]).length,2);
+    for (const alpha of ['0.10','0.20','1.0']) {
+        assert.ok(trace.includes('opacity: '+alpha),'preserved '+alpha+' alpha');
+    }
+    assert.match(cpu,/duration:\s*presentationState\.taskGraphScrollDuration/);
+});

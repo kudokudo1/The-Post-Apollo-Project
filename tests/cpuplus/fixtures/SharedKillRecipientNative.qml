@@ -392,15 +392,17 @@ ShellRoot {
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "draft input never dispatches a process action")) return;
-                if (!smoke.check(consolePane.selectResource("network")
-                        && consolePane.selectedKey==="network"
+                // Fire the actual filter button signal, not the root helper,
+                // to verify the same handler a pointer press reaches.
+                netFilter.leftClicked(null);
+                if (!smoke.check(consolePane.selectedKey==="network"
                         && !cpuFilter.selected && netFilter.selected
                         && selectedPanel.key==="network"
                         && consolePane.reviewLines.length===1
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "top resource filters swap one editor without clearing the draft")) return;
-                if (!smoke.check(consolePane.selectResource("cpu")
-                        && selectedPanel.key==="cpu" && cpuFilter.selected
+                cpuFilter.leftClicked(null);
+                if (!smoke.check(selectedPanel.key==="cpu" && cpuFilter.selected
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0,
                         "CPU draft survives category navigation")) return;
                 consolePane.reviewing=true;

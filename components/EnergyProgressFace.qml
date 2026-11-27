@@ -9,7 +9,7 @@ import "EnergyPixelFire.js" as PixelFire
 // The owner supplies phase and, for measured/timed modes, actual progress.
 Item {
     id: root
-    property string variant: "omnitrix" // omnitrix | tron | ki-blast | flamethrower
+    property string variant: "omnitrix" // default | omnitrix | tron | ki-blast | flamethrower
     // Three retained fire treatments; existing hosts default to standard.
     property string fireMode: "standard" // standard | ash-trail | burn-away
     readonly property bool materialExperiment: variant === "flamethrower"
@@ -20,7 +20,7 @@ Item {
     property real progress: 0
     property string caption: ""
     property bool reducedMotion: false
-    property color energyColor: variant === "omnitrix" ? Colors.omnitrix
+    property color energyColor: (variant === "omnitrix" || variant === "default") ? Colors.omnitrix
         : variant === "tron" ? Colors.cyan
         : variant === "flamethrower" ? Colors.orange : "#55CFFF"
     property color chassisColor: phase === "failure" ? Colors.red : energyColor
@@ -155,7 +155,7 @@ Item {
             id: surface
             objectName: "energyProgressCanvas"
             anchors.fill: parent
-            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?2.1:root.variant==="ki-blast"?2.0:root.variant==="omnitrix"?1.45:1.1))
+            readonly property real spill: root.variant==="default" ? 0 : Math.max(10, root.height * (root.variant==="flamethrower"?2.1:root.variant==="ki-blast"?2.0:root.variant==="omnitrix"?1.45:1.1))
             anchors.margins: -spill
             renderTarget: Canvas.Image
             onWidthChanged: requestPaint()
@@ -168,6 +168,23 @@ Item {
                 if (w<4 || h<4) return;
                 const f=root.visualFrame, p=root.displayedFraction, mid=y+h/2;
                 const ink=root.phase==="failure" && root.variant!=="ki-blast" ? Colors.red : root.energyColor;
+                // Flat baseline: no radial gradients, external spill, or head.
+                if(root.variant==="default") {
+                    c.fillStyle=Colors.dark;
+                    c.fillRect(x,y,w,h);
+                    c.strokeStyle=root.chassisColor;
+                    c.lineWidth=1;
+                    c.strokeRect(x+.5,y+.5,w-1,h-1);
+                    if(p>0) {
+                        const fill=c.createLinearGradient(0,y+1,0,y+h-1);
+                        fill.addColorStop(0,Qt.rgba(ink.r*.70,ink.g*.70,ink.b*.70,1));
+                        fill.addColorStop(.5,Qt.rgba(ink.r*.38,ink.g*.38,ink.b*.38,1));
+                        fill.addColorStop(1,Qt.rgba(ink.r*.60,ink.g*.60,ink.b*.60,1));
+                        c.fillStyle=fill;
+                        c.fillRect(x+1,y+1,(w-2)*p,h-2);
+                    }
+                    return;
+                }
                 const hot=root.variant==="flamethrower";
                 const ki=root.variant==="ki-blast";
                 const tron=root.variant==="tron";
@@ -587,7 +604,7 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
-            style: Text.Outline
+            style: root.variant==="default" ? Text.Normal : Text.Outline
             styleColor: Colors.dark
         }
     }

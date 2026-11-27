@@ -89,7 +89,9 @@ ActionButton {
             function onSpectralGlowStrengthChanged() { raster.requestPaint() }
             function onPrismPaletteChanged() { raster.requestPaint() }
         }
+        property real lastPaintDurationMs: -1
         onPaint: {
+            const started=Date.now()
             const c=getContext("2d")
             if (!c) return
             if (root.width<=0 || root.height<=0) {
@@ -98,6 +100,7 @@ ActionButton {
             }
             Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
                           1,root.prismPalette,root.spectralGlowStrength)
+            lastPaintDurationMs=Date.now()-started
         }
     }
 

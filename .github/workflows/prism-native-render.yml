@@ -1,0 +1,68 @@
+name: Prism native Canvas rendering
+
+on:
+  pull_request:
+    paths:
+      - 'components/PrismButton.qml'
+      - 'components/PrismArtwork.js'
+      - 'tests/components/prism_native/**'
+      - '.github/workflows/prism-native-render.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: fedora:44
+    steps:
+      - name: Install coherent Fedora Quickshell and Qt runtime
+        run: |
+          dnf install -y --setopt=install_weak_deps=False dnf5-plugins
+          dnf copr enable -y errornointernet/quickshell
+          dnf install -y --setopt=install_weak_deps=False quickshell qt6-qtdeclarative qt6-qt5compat qt6-qtbase-gui qt6-qtsvg git coreutils python3 python3-pillow
+          quickshell --version
+          quickshell --version | grep '0.3.'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Probe actual Prism Canvas pixels and composited button
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          QT_LOGGING_RULES: 'qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true'
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"; rm -f /tmp/prism-render-composite.png' EXIT
+          export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/run"
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          scene="$work/config/prism"
+          mkdir -p "$scene/components"
+          cp tests/components/prism_native/shell.qml "$scene/shell.qml"
+          for name in ActionButton PrismButton PrismArtwork Colors VisualLanguage GohuText SafeDropShadow; do
+            if [ "$name" = PrismArtwork ]; then ext=js; else ext=qml; fi
+            cp "components/$name.$ext" "$scene/components/$name.$ext"
+          done
+          grep -E '^(singleton Colors|singleton VisualLanguage|ActionButton|PrismButton|GohuText|SafeDropShadow) ' components/qmldir > "$scene/components/qmldir"
+          timeout --signal=TERM --kill-after=3s 18s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
+          grep -q PRISM_NATIVE_DONE "$work/output"
+          if grep -q PRISM_NATIVE_FAIL "$work/output"; then exit 1; fi
+          python3 - <<'PY'
+          from PIL import Image
+          with Image.open("/tmp/prism-render-composite.png") as original:
+              im=original.convert("RGBA")
+              box=im.getbbox()
+              center=im.getpixel((im.width//2, im.height//2))
+              pixels=list(im.getdata())
+              colorful=sum(1 for r,g,b,a in pixels if a>100 and
+                           max(r,g,b)-min(r,g,b)>28)
+              print(f"PRISM_NATIVE_IMAGE_COMPOSITE {im.size} bbox={box} center={center} colorful={colorful}",flush=True)
+              if not box or colorful<40:
+                  raise SystemExit("Composed Prism artwork missing, not just its white frame")
+          PY

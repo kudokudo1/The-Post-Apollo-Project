@@ -580,8 +580,10 @@ test("K3b: independent guarded gateway and presentation share service custody", 
 test("K3c: service lock adapters reject stale, busy, bulk and unsupported requests", () => {
     const store=read("services/kill/KillStore.qml");
     const a=store.indexOf("    function lockModeForIdentity(");
-    const b=store.indexOf("    function snapshotCadence(",a);
-    assert.ok(a>=0 && b>a);
+    const toggleStart=store.indexOf("    function toggleLockForIdentity(",a);
+    const close=store.indexOf("\n    }",toggleStart);
+    const b=close+"\n    }".length;
+    assert.ok(a>=0 && toggleStart>a && close>toggleStart);
     const row={pid:4321,startTicks:98765,comm:"sway"};
     const calls=[];
     const actionGate={

@@ -13,6 +13,8 @@ ShellRoot {
     property bool done: false
     property bool paneActive: true
     property bool resourcePaneActive: false
+    property string resourceSubject: "CPU"
+    property string cpuDraftWitness: ""
     property string generalDraftWitness: ""
     property int completions: 0
     property string diagnosticFooterGeometry: ""
@@ -134,7 +136,7 @@ ShellRoot {
             id: resourcePane
             anchors.fill: parent
             active: root.resourcePaneActive
-            sourceComponent: CpuPlusResourceDiagnosticsPane { subject: "CPU" }
+            sourceComponent: CpuPlusResourceDiagnosticsPane { subject: root.resourceSubject }
         }
     }
     Timer {
@@ -148,7 +150,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 420) {
+            if (++root.ticks > 480) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -985,6 +987,57 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "host remount retains calibration without authority"))return;
                 console.log("CPU_D6B_HOST_NATIVE_PASS");
+                root.cpuDraftWitness=JSON.stringify(CpuPlusDiagnostics.cpuWorkshopDraft);
+                w.activate();
+                root.phase=42;return;
+            }
+            if(root.phase===42 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"CPU ready before switch"))return;
+                root.resourceSubject="GPU";root.phase=43;return;
+            }
+            if(root.phase===43 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const slider=root.findItem(w,"cpuplusWorkshopGpuInterval");
+                if(!root.check(w && w.subject==="GPU" && !w.ready && w.preview.ok
+                    && slider && slider.visible && w.draft.selected.join(",")==="gpu"
+                    && w.targetText==="TARGET // ALL DRM DEVICES"
+                    && !root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-hostcpu")
+                    && !CpuPlusDiagnostics.busy,"same workspace switches to GPU without carrying readiness"))return;
+                w.edit("durationSeconds",2);
+                if(!root.check(JSON.stringify(CpuPlusDiagnostics.cpuWorkshopDraft)===root.cpuDraftWitness
+                    && !CpuPlusDiagnostics.loadWorkshopPreset("CPU ONLY","GPU")
+                    && CpuPlusDiagnostics.saveWorkshopPreset("GPU ONLY","GPU"),"GPU calibration and preset scope isolated"))return;
+                w.activate();root.phase=44;return;
+            }
+            if(root.phase===44 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"GPU prepare does not launch"))return;
+                w.activate();
+                if(!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="gpu","GPU capture started"))return;
+                root.resourceSubject="CPU";root.phase=45;return;
+            }
+            if(root.phase===45 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && !w.recording && !w.ready && w.locked
+                    && CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="gpu","CPU does not display foreign GPU recording as its own"))return;
+                root.phase=46;return;
+            }
+            if(root.phase===46){
+                if(CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const report=CpuPlusDiagnostics.reports.gpu;
+                if(!root.check(report && report.status==="COMPLETE" && report.summary.includes("CARD0")
+                    && report.summary.includes("CARD1") && report.summary.includes("BUSY // N/A")
+                    && CpuPlusDiagnostics.archiveRows.some(r=>r.id===report.id && r.kind==="gpu"),"GPU reader and archive survive subject switch // "+CpuPlusDiagnostics.feedback))return;
+                root.resourceSubject="GPU";root.phase=47;return;
+            }
+            if(root.phase===47 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && !w.ready && !CpuPlusDiagnostics.busy && w.draft.durationSeconds===2
+                    && JSON.stringify(CpuPlusDiagnostics.cpuWorkshopDraft)===root.cpuDraftWitness
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "GPU draft survives navigation, other drafts untouched"))return;
+                console.log("CPU_D7A_GPU_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

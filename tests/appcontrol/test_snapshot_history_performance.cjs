@@ -886,3 +886,31 @@ test('normal CPU detail graph moves one shared trace, leaving COMBI legend and g
     }
     assert.match(cpu,/duration:\s*presentationState\.taskGraphScrollDuration/);
 });
+
+
+test('COMBI CPU detail metric tracks translate shapes as groups while legends stay still', () => {
+    const detail=fs.readFileSync(path.join(root,'widgets/appcontrol/TaskManagerView.qml'),'utf8');
+    const start=detail.indexOf('id: detailCombiTrace');
+    const end=detail.indexOf('id: taskCpuNormalTraceLayer',start);
+    assert.ok(start>0 && end>start,'locate COMBI CPU detail renderer');
+    const combi=detail.slice(start,end);
+    const layerAt=combi.indexOf('id: detailCombiTraceLayer');
+    assert.ok(layerAt>0,'each metric gets a translated trace layer');
+    const stationary=combi.slice(0,layerAt);
+    const trace=combi.slice(layerAt);
+    assert.match(stationary,/text:\s*detailCombiTrace\.modelData\.label/,'legend outside moving layer');
+    assert.match(trace,/anchors\.fill:\s*parent\s+transform:\s*Translate\s*\{\s*x:\s*taskCpuCanvas\.graphScrollOffset\s*\}/);
+    assert.equal((trace.match(/taskCpuCanvas\.graphScrollOffset/g)||[]).length,1,
+        'one animation dependency per metric, not per fill/stroke rectangle');
+    assert.equal(trace.split('model: detailCombiTrace.metricPoints.length').length-1,1,
+        'same COMBI fill point count');
+    assert.equal(trace.split('detailCombiTrace.metricPoints.length - 1').length-1,1,
+        'same COMBI line segment count');
+    assert.match(trace,/x:\s*graphPoint\.x\s*-\s*width\s*\/\s*2\s+y:\s*graphPoint\.y/);
+    assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y:\s*parent\.p1\.y/g)||[]).length,2,
+        'same soft and bright line geometry');
+    for (const alpha of ['0.060','0.18','1.0'])
+        assert.ok(trace.includes('opacity: '+alpha),'preserved '+alpha+' alpha');
+    assert.match(combi,/model:\s*taskCpuGraph\.combiView\s*\?\s*taskCpuCanvas\.combiSeries\s*:\s*\[\]/,
+        'same four COMBI series');
+});

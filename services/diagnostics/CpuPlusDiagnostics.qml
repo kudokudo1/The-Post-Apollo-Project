@@ -24,7 +24,7 @@ Scope {
     function selectComparison(side, reportId) {
         if (archiveBusy || archiveStatus !== "READY") return false;
         const row = archiveRows.find(item => item.id === reportId);
-        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu","diskio","swapio"].includes(row.kind)) return false;
+        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu","diskio","swapio","netio"].includes(row.kind)) return false;
         if (side === "before") compareBeforeId = row.id;
         else if (side === "after") compareAfterId = row.id;
         else return false;
@@ -132,18 +132,20 @@ Scope {
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
         hostCpuIntervalMs:1000, gpuIntervalMs:1000, diskIoIntervalMs:1000, storageCadenceExplicit:true, storageSampleSeconds:1, storageReportSeconds:10})
     property var swapWorkshopDraft: ({durationSeconds:10, selected:["swapio"], swapIoIntervalMs:1000})
+    property var netWorkshopDraft: ({durationSeconds:10, selected:["netio"], netIoIntervalMs:1000})
     function draftForSubject(subject) {
         return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft
-            : subject==="STORAGE" ? storageWorkshopDraft : subject==="SWAP" ? swapWorkshopDraft : workshopDraft;
+            : subject==="STORAGE" ? storageWorkshopDraft : subject==="SWAP" ? swapWorkshopDraft : subject==="NETWORK" ? netWorkshopDraft : workshopDraft;
     }
     function setDraftForSubject(subject, draft) {
         if (workshopPresetLocked || !draft || !Array.isArray(draft.selected)
-                || !["CPU","GPU","STORAGE","SWAP","ALL"].includes(subject)
+                || !["CPU","GPU","STORAGE","SWAP","NETWORK","ALL"].includes(subject)
                 || !draft.selected.every(k=>Calibration.workshopSubjectKinds(subject).includes(k))) return false;
         if (subject==="CPU") cpuWorkshopDraft=draft;
         else if (subject==="GPU") gpuWorkshopDraft=draft;
         else if (subject==="STORAGE") storageWorkshopDraft=draft;
         else if (subject==="SWAP") swapWorkshopDraft=draft;
+        else if (subject==="NETWORK") netWorkshopDraft=draft;
         else workshopDraft=draft;
         return true;
     }

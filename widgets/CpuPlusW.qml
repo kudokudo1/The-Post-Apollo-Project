@@ -3188,7 +3188,7 @@ PanelWindow {
                 ? String((cpuPlusWindow.selectedMonitorEntry() || {}).category || "").toUpperCase()
                 : cpuPlusWindow.systemSubMode
             active: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 3
-                    && ["CPU","GPU","STORAGE"].includes(resourceSubject)
+                    && ["CPU","GPU","STORAGE","NETWORK"].includes(resourceSubject)
             visible: active
             sourceComponent: CpuPlusResourceDiagnosticsPane { subject: cpuResourceDiagnosticsLoader.resourceSubject }
         }

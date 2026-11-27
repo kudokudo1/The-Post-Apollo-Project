@@ -16,6 +16,7 @@ Column {
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
     readonly property string targetText: {
+        if (draft.selected.includes("netio")) return "TARGET // ALL VISIBLE INTERFACES";
         if (draft.selected.includes("swapio")) return "TARGET // HOST SWAP";
         if (draft.selected.includes("diskio")) return "TARGET // WHOLE BLOCK DEVICES";
         if (draft.selected.includes("gpu")) return "TARGET // ALL DRM DEVICES";
@@ -115,7 +116,7 @@ Column {
     function toggle(kind) {
         if (locked || !filterKinds.includes(kind)) return;
         // Host capture is standalone in D6b; mixed sequential sets remain supported.
-        if (kind==="hostcpu" || kind==="gpu" || kind==="diskio" || kind==="swapio") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
+        if (kind==="hostcpu" || kind==="gpu" || kind==="diskio" || kind==="swapio" || kind==="netio") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
         const selected=draft.selected.filter(k=>k!=="hostcpu"&&k!=="diskio");
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
@@ -170,6 +171,7 @@ Column {
                 {kind:"census",symbol:"",subject:"CPU"},
                 {kind:"hostcpu",symbol:"▥",subject:"CPU"},
                 {kind:"gpu",symbol:"󰢮",subject:"GPU"},
+                {kind:"netio",symbol:"⇄",subject:"NETWORK"},
                 {kind:"swapio",symbol:"⇅",subject:"SWAP"},
                 {kind:"diskio",symbol:"▥",subject:"STORAGE"},
                 {kind:"storage",symbol:"",subject:"STORAGE"},
@@ -280,6 +282,29 @@ Column {
         currentValue: root.subject==="GPU" ? (root.draft.gpuIntervalMs||1000)/1000 : (root.draft.hostCpuIntervalMs||1000)/1000
         adjustable: !root.locked
         onValueRequested: value=>root.edit(root.subject==="GPU"?"gpuIntervalMs":"hostCpuIntervalMs",value*1000)
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopNetIoInterval"
+        width: parent.width
+        compact: root.compactLayout
+        subjectColor: Colors.resourceColor("NETWORK")
+        fillColor: subjectColor
+        visible: root.draft.selected.includes("netio")
+        title: "NETWORK SAMPLE INTERVAL"
+        readout: currentValue+" SEC"
+        minimumValue: 1
+        maximumValue: 5
+        currentValue: (root.draft.netIoIntervalMs||1000)/1000
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("netIoIntervalMs",value*1000)
+    }
+    GohuText {
+        width: parent.width
+        visible: root.draft.selected.includes("netio")
+        text: "RX / TX / PACKETS / ERRORS / DROPS · 12 INTERVALS MAX"
+        color: Colors.resourceColor("NETWORK")
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
     }
     CpuPlusDiagnosticSlider {
         objectName: "cpuplusWorkshopSwapIoInterval"

@@ -21,7 +21,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio", "netio"].indexOf(kind) >= 0;
 }
 
 function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
@@ -36,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE", swapio: "SWAP OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE", swapio: "SWAP OBSERVE", netio: "NETWORK OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -148,6 +148,7 @@ function storageCadence(c) {
 // Observer receipts extend the terminal record rather than prepend a row,
 // keeping existing memory, census and storage projections compatible.
 function configuredEvidence(kind,text,expected) {
+    if (kind==="netio") { const d=netIoEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="swapio") { const d=swapIoEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="diskio") { const d=diskIoEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="gpu") { const d=gpuEvidence(text,expected); return d ? d.calibration : null; }
@@ -375,6 +376,7 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind==="netio") return netIoSummary(text);
     if (kind==="swapio") return swapIoSummary(text);
     if (kind==="diskio") return diskIoSummary(text);
     if (kind==="gpu") return gpuSummary(text);
@@ -1039,4 +1041,69 @@ function swapIoSummary(text) {
             (d.pressureTotals[0]/1000).toFixed(1)+" / "+(d.pressureTotals[1]/1000).toFixed(1)+" ms over "+d.pressureMs+" ms observed")
         +"\nACTIVE ZRAM // "+(zram.length?"\n"+zram.join("\n"):"NONE")
         +"\nVM swap counters are not disk throughput. PSI covers all host memory pressure, not just swap. ZRAM allocation consumes RAM. Snapshots are non-atomic; no process attribution.";
+}
+
+
+// D10a-b: per-interface counters, no aggregate across stacked links.
+function netIoEvidence(text,expected) {
+    try {
+        if(typeof text!=="string"||text.length>65536||/[^\x00-\x7f]/.test(text))return null;
+        const records=text.trim().split("\n").map(line=>JSON.parse(line)),end=records.pop();
+        const schema="post-apollo-network-io-v1",max=Number.MAX_SAFE_INTEGER;
+        const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        const keys=(o,k)=>!!o&&Object.keys(o).length===k.length&&k.every(x=>Object.prototype.hasOwnProperty.call(o,x));
+        const c=end&&end.calibration;
+        if(!keys(end,["schema","event","samples","observedMs","calibration"])
+            ||end.schema!==schema||end.event!=="complete"||!keys(c,["kind","durationSeconds","intervalMs"])
+            ||c.kind!=="netio"||!integer(c.durationSeconds,1,30)
+            ||!integer(c.intervalMs,1000,Math.min(5000,c.durationSeconds*1000))||c.intervalMs%1000
+            ||(expected&&(!keys(expected,Object.keys(c))||Object.keys(c).some(k=>c[k]!==expected[k]))))return null;
+        const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+        if(n>12||records.length!==n||end.samples!==n||!integer(end.observedMs,c.durationSeconds*1000,45000))return null;
+        let elapsed=0,identity=null,totals=null;
+        const states=["unknown","notpresent","down","lowerlayerdown","testing","dormant","up"];
+        for(let i=0;i<n;i++){
+            const row=records[i],devs=row&&row.interfaces;
+            if(!keys(row,["schema","event","sequence","elapsedMs","intervalMs","interfaces"])
+                ||row.schema!==schema||row.event!=="netio"||row.sequence!==i+1
+                ||!integer(row.elapsedMs,Math.min((i+1)*c.intervalMs,c.durationSeconds*1000),end.observedMs)
+                ||!integer(row.intervalMs,1,45000)||row.elapsedMs!==elapsed+row.intervalMs
+                ||!Array.isArray(devs)||devs.length<1||devs.length>32)return null;
+            if(!devs.every((d,j)=>Array.isArray(d)&&d.length===13
+                &&typeof d[0]==="string"&&/^[A-Za-z0-9_.+@-]{1,15}$/.test(d[0])
+                &&(j===0||d[0]>devs[j-1][0])
+                &&integer(d[1],1,2147483647)&&integer(d[2],1,2147483647)
+                &&integer(d[3],0,65535)&&(d[4]===null||states.includes(d[4]))
+                &&d.slice(5).every(v=>integer(v,0,max)))
+                ||new Set(devs.map(d=>d[1])).size!==devs.length)return null;
+            const next=JSON.stringify(devs.map(d=>d.slice(0,4)));
+            if(identity!==null&&identity!==next)return null;
+            if(totals===null)totals=devs.map(()=>Array(8).fill(0));
+            for(let j=0;j<devs.length;j++)for(let k=0;k<8;k++){
+                totals[j][k]+=devs[j][k+5];
+                if(!Number.isSafeInteger(totals[j][k]))return null;
+            }
+            identity=next;elapsed=row.elapsedMs;
+        }
+        if(elapsed!==end.observedMs)return null;
+        return {calibration:c,records:records,observedMs:elapsed,totals:totals};
+    }catch(_){return null;}
+}
+function netIoSummary(text) {
+    const d=netIoEvidence(text,null);
+    if(!d)return null;
+    const rows=d.records,last=rows[rows.length-1],sec=d.observedMs/1000;
+    const mbps=x=>(x/sec*8/1000000).toFixed(3);
+    const ranked=last.interfaces.map((dev,i)=>({dev:dev,i:i,total:d.totals[i]}))
+        .sort((a,b)=>(b.total[0]+b.total[4])-(a.total[0]+a.total[4])||a.i-b.i);
+    const lines=ranked.slice(0,8).map(o=>{
+        const a=o.total;
+        return o.dev[0]+" ["+o.dev[1]+"] // "+(o.dev[4]===null?"N/A":o.dev[4].toUpperCase())+" last"
+            +"\nRX / TX // "+mbps(a[0])+" / "+mbps(a[4])+" Mb/s mean"
+            +" | "+(a[1]/sec).toFixed(1)+" / "+(a[5]/sec).toFixed(1)+" pkt/s"
+            +"\nERRORS RX / TX // "+a[2]+" / "+a[6]+" | DROPS "+a[3]+" / "+a[7];
+    });
+    return "NETWORK // "+rows.length+" intervals / "+last.interfaces.length+" interfaces / "+d.observedMs+" ms\n"
+        +lines.join("\n\n")+"\nTop "+Math.min(8,last.interfaces.length)+" by bytes; raw report retains all interfaces."
+        +" No stacked-interface aggregate. Interface errors and drops are not end-to-end packet loss. No latency test or application attribution.";
 }

@@ -112,6 +112,27 @@ assert sys.argv[1:]==["--workshop","--duration","1","--interval","1"]
 base=Path(__file__).resolve().parents[2]/"swap-fixture"
 sys.stdout.write(capture(1,1,base/"proc",base/"block",4096))
 """)
+    # Real Network observer against disposable proc/sysfs, no sockets.
+    shutil.copy2(ROOT / "scripts/cpuplus_network_io_observer.py", scripts / "net_reader_fixture.py")
+    net_base = base / "net-fixture"
+    net = net_base / "net"
+    net.mkdir(parents=True)
+    for name, index, kind in (("eth0", 2, 1), ("lo", 1, 772)):
+        interface = net_base / "devices" / name
+        interface.mkdir(parents=True)
+        (interface / "ifindex").write_text(str(index))
+        (interface / "iflink").write_text(str(index))
+        (interface / "type").write_text(str(kind))
+        (interface / "operstate").write_text("up")
+        (net / name).symlink_to(interface)
+    (net_base / "dev").write_text("Inter-| Receive | Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\neth0: "+" ".join(["0"]*16)+"\nlo: "+" ".join(["0"]*16)+"\n")
+    (scripts / "cpuplus_network_io_observer.py").write_text("""import sys
+from pathlib import Path
+from net_reader_fixture import capture
+assert sys.argv[1:]==["--workshop","--duration","1","--interval","1"]
+base=Path(__file__).resolve().parents[2]/"net-fixture"
+sys.stdout.write(capture(1,1,base/"dev",base/"net",base/"devices"))
+""")
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')
@@ -185,7 +206,7 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                WAYLAND_DISPLAY="", DISPLAY="")
     result = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=85, check=False)
+                            stderr=subprocess.STDOUT, timeout=90, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_D9A_SWAP_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_D9A_SWAP_NATIVE_PASS" not in result.stdout or "CPU_D10A_NETWORK_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

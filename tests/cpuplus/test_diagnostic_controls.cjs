@@ -512,7 +512,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+JSON.stringify(p)+')))'),JSON.stringify(p));
     assert.match(owner,/property var storageWorkshopDraft:/);
     assert.match(owner,/else if \(subject==="STORAGE"\) storageWorkshopDraft=draft;/);
-    assert.match(read("widgets/CpuPlusW.qml"),/\["CPU","GPU","STORAGE"\]\.includes\(resourceSubject\)/);
+    assert.match(read("widgets/CpuPlusW.qml"),/\["CPU","GPU","STORAGE","NETWORK"\]\.includes\(resourceSubject\)/);
     assert.match(workshop,/TARGET \/\/ 18 KNOWN FILES/);
     assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/does not measure physical disk throughput/);
 }
@@ -609,4 +609,43 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     ])assert.equal(policy.summarize("swapio",jsonl(bad)),null);
     assert.match(workshop,/cpuplusWorkshopSwapIoInterval/);
     assert.match(parent,/workshopSubject: root\.diagnosticSubject/);
+}
+
+
+// D10a-b: independent Network calibration and bounded interface receipt.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const call=expr=>vm.runInContext(expr,c);
+    const cfg={kind:"netio",durationSeconds:2,intervalMs:1000};
+    const plan={durationSeconds:2,instruments:[{kind:"netio",intervalMs:1000}]};
+    const expr=JSON.stringify(plan);
+    assert.equal(call('JSON.stringify(workshopSubjectKinds("NETWORK"))'),'["netio"]');
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"NETWORK")'),true);
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"ALL")'),false);
+    assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+expr+')))'),expr);
+    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"netio",intervalMs:1000},{kind:"census",intervalMs:1000}]}).ok'),false);
+    const launch=JSON.parse(call('JSON.stringify(observerLaunchPlan('+JSON.stringify(cfg)+',p=>"/local/"+p))'));
+    assert.deepEqual(launch.args.slice(-6),["/local/scripts/cpuplus_network_io_observer.py","--workshop","--duration","2","--interval","1"]);
+    assert.equal(args("netio"),null);
+    const a={schema:"post-apollo-network-io-v1",event:"netio",sequence:1,elapsedMs:1000,intervalMs:1000,interfaces:[["eth0",2,2,1,"up",125000,10,1,2,250000,20,3,4],["lo",1,1,772,null,0,0,0,0,0,0,0,0]]};
+    const b={...a,sequence:2,elapsedMs:2000,interfaces:[["eth0",2,2,1,"down",125000,10,1,2,250000,20,3,4],a.interfaces[1]]};
+    const end={schema:a.schema,event:"complete",samples:2,observedMs:2000,calibration:cfg};
+    const valid=jsonl([a,b,end]);
+    assert.match(policy.summarize("netio",valid),/1\.000 \/ 2\.000 Mb\/s mean/);
+    assert.match(policy.summarize("netio",valid),/eth0 \[2\] \/\/ DOWN last/);
+    assert.match(policy.summarize("netio",valid),/lo \[1\] \/\/ N\/A last/);
+    assert.ok(policy.configuredEvidence("netio",valid,cfg));
+    assert.equal(policy.configuredEvidence("netio",valid,{...cfg,durationSeconds:3}),null);
+    for(const bad of [
+        [a,b],
+        [a,{...b,interfaces:[["eth0",3,...b.interfaces[0].slice(2)],b.interfaces[1]]},end],
+        [a,{...b,interfaces:[b.interfaces[0],["lo",2,...b.interfaces[1].slice(2)]]},end],
+        [a,{...b,interfaces:[["eth0",2,2,1,"invalid",...b.interfaces[0].slice(5)],b.interfaces[1]]},end],
+        [a,{...b,interfaces:[["eth0",2,2,1,"up",-1,...b.interfaces[0].slice(6)],b.interfaces[1]]},end],
+        [a,{...b,elapsedMs:1999},end],
+        [a,b,{...end,extra:true}]
+    ])assert.equal(policy.summarize("netio",jsonl(bad)),null);
+    assert.match(workshop,/cpuplusWorkshopNetIoInterval/);
+    assert.match(read("widgets/CpuPlusW.qml"),/\["CPU","GPU","STORAGE","NETWORK"\]\.includes\(resourceSubject\)/);
 }

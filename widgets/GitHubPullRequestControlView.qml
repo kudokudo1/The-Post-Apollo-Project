@@ -378,6 +378,17 @@ Rectangle {
         }
 
         GohuText {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 3
+            font.pixelSize: 6
+            color: button.accent
+            text: "NO NEW PHASE"
+            visible: button.quietOperation
+            z: 2
+        }
+
+        GohuText {
             anchors.centerIn: parent
             width: parent.width - 8
             z: 2

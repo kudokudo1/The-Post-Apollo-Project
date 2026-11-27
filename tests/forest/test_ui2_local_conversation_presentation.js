@@ -91,4 +91,38 @@ check("invalid input and hidden view cannot attach",()=>{
     for(const bad of ["","é".repeat(2049),"a\x00b","\ud800"])assert.equal(c.attach(1,bad),false);
     feed.visible=false;assert.equal(c.attach(1,"prompt"),false);
 });
+check("owner STOP fence freezes even synchronous late generation; original commit-won may settle",()=>{
+    const {c,feed}=start();c.receive(1,snap(1,"GENERATING","RE","UNKNOWN_HOLD",true,true));
+    const rows=feed.messages;
+    assert.equal(c.requestStop(2),false);assert.equal(c.requestStop(1),true);
+    assert.equal(c.requestStop(1),false);
+    assert.equal(c.receive(1,snap(2,"GENERATING","REA","UNKNOWN_HOLD",true,true)),false);
+    assert.equal(c.receive(1,snap(3,"STOP_REQUESTED","READ","UNKNOWN_HOLD",true,true)),true);
+    assert.equal(feed.tail,"RE");assert.equal(feed.messages,rows);
+    assert.equal(c.state().terminal,false);
+    assert.equal(c.receive(1,snap(4,"LOCAL_COMMITTED","READY","COMMITTED_LOCAL",false,true)),true);
+    assert.equal(feed.tail,"READY");assert.equal(feed.messages,rows);
+    assert.equal(c.state().status,"LOCAL_COMMITTED");
+});
+check("first STOP packet cannot introduce a new provisional row",()=>{
+    const {c,feed}=start();
+    assert.equal(c.receive(1,snap(1,"STOP_REQUESTED","late","UNKNOWN_HOLD",true,true)),true);
+    assert.equal(feed.messages.length,1);assert.equal(feed.tail,"");
+    assert.equal(c.receive(1,snap(2,"UNKNOWN_HOLD","","ABORTED_LOCAL",false,true)),true);
+    assert.equal(c.state().terminal,true);
+});
+check("owner STOP then unknown discards partial; withdrawal remains sticky",()=>{
+    const {c,feed}=start();c.receive(1,snap(1,"GENERATING","RE","UNKNOWN_HOLD",true,true));
+    assert.equal(c.requestStop(1),true);
+    assert.equal(c.receive(1,snap(2,"UNKNOWN_HOLD","","UNKNOWN_HOLD",false,true)),true);
+    assert.equal(feed.messages.length,1);assert.equal(feed.tail,"");
+    c.observe(2);assert.equal(c.receive(1,snap(3,"LOCAL_COMMITTED","READY","COMMITTED_LOCAL",false,true)),false);
+    assert.equal(feed.messages.length,0);
+});
+check("cheap length guard rejects giant ASCII input and response",()=>{
+    const {c}=make();c.observe(1);assert.equal(c.attach(1,"x".repeat(100000)),false);
+    assert.equal(c.attach(1,"prompt"),true);
+    assert.equal(c.receive(1,snap(1,"GENERATING","x".repeat(100000),"UNKNOWN_HOLD",true,true)),false);
+    assert.equal(c.state().status,"UNKNOWN_HOLD");
+});
 console.log("UI2_REAL_PRESENTATION_PASS",n);

@@ -74,6 +74,7 @@ Column {
         ? Math.max(0,Math.min(0.96,(displayNow-CpuPlusDiagnostics.workshopStartedMs)
             / Math.max(1000,CpuPlusDiagnostics.workshopDurationSeconds*1000))) : 0
     readonly property string phase: recording ? (CpuPlusDiagnostics.cancelled ? "STOPPING" : "RECORDING")
+        : CpuPlusDiagnostics.busy ? "SHARED BUSY"
         : calibrating ? "CALIBRATING" : ready ? "READY"
         : terminal && terminal.status==="COMPLETE" ? "COMPLETE"
         : terminal ? "RETRY" : "PREPARE"
@@ -268,7 +269,7 @@ Column {
         fillColor: subjectColor
         visible: root.draft.selected.includes("hostcpu") || root.draft.selected.includes("gpu")
         title: root.subject==="GPU" ? "GPU SAMPLE INTERVAL" : "HOST SAMPLE INTERVAL"
-        readout: currentValue/1+" SEC"
+        readout: currentValue+" SEC"
         minimumValue: 1
         maximumValue: 5
         currentValue: root.subject==="GPU" ? (root.draft.gpuIntervalMs||1000)/1000 : (root.draft.hostCpuIntervalMs||1000)/1000

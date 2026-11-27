@@ -3184,7 +3184,10 @@ PanelWindow {
             objectName: "cpuplusResourceDiagnosticsLoader"
             anchors.fill: memoryActuatorLoader
             active: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 3
-                    && cpuPlusWindow.systemSubMode === "CPU"
+                    && (cpuPlusWindow.systemSubMode === "CPU"
+                        || (cpuPlusWindow.systemSubMode === "ALL" && String(
+                            (cpuPlusWindow.selectedMonitorEntry() || {}).category || ""
+                        ).toUpperCase() === "CPU"))
             visible: active
             sourceComponent: CpuPlusResourceDiagnosticsPane { subject: "CPU" }
         }

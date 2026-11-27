@@ -127,15 +127,27 @@ ShellRoot {
                         const source=light.source;
                         const p=source.mapToItem(localRadiance,source.width*light.fraction,source.height/2);
                         const h=source.height;
-                        const rx=h*(light.fire?5.2:4.8), ry=h*(light.fire?3.7:3.5);
+                        const flame=light.fire?source.flameMotion:null;
+                        const rx=h*(light.fire?5.2*flame.stretch:4.8);
+                        const ry=h*(light.fire?3.7*flame.breath:3.5);
                         if(rx<=0 || ry<=0) continue;
-                        const ink=light.color, a=light.level*(light.fire?.66:1);
-                        c.save(); c.translate(p.x+(light.fire?source.flameTipOffset:light.side*h*.38),p.y); c.scale(rx,ry);
+                        const ink=light.color, a=light.level*(light.fire?.48*flame.pulse:1);
+                        c.save(); c.translate(p.x+(light.fire?source.flameTipOffset-h*(.38+flame.drag):light.side*h*.38),
+                            p.y+(light.fire?h*flame.sway:0)); c.scale(rx,ry);
                         const g=c.createRadialGradient(0,0,0,0,0,1);
-                        g.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,light.fire?a*.20:a));
-                        g.addColorStop(.25,Qt.rgba(ink.r,ink.g,ink.b,light.fire?a*.62:a*.85));
-                        g.addColorStop(.62,Qt.rgba(ink.r,ink.g,ink.b,a*.40));
-                        g.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,0));
+                        if(light.fire || source.variant==="omnitrix") {
+                            // Smooth, monotonic optical falloff. No bright ring
+                            // or flat band over the source itself.
+                            for(let i=0;i<=16;i++) {
+                                const r=i/16, fade=(1-r)*(1-r)*(1+2*r);
+                                g.addColorStop(r,Qt.rgba(ink.r,ink.g,ink.b,a*fade));
+                            }
+                        } else {
+                            g.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,a));
+                            g.addColorStop(.25,Qt.rgba(ink.r,ink.g,ink.b,a*.85));
+                            g.addColorStop(.62,Qt.rgba(ink.r,ink.g,ink.b,a*.40));
+                            g.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,0));
+                        }
                         c.fillStyle=g; c.fillRect(-1,-1,2,2); c.restore();
                     }
                 }

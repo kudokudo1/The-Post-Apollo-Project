@@ -91,7 +91,9 @@ ShellRoot {
                     } else if (lab.stage===16) {
                         if (!lab.require(ki.displayedFraction<.68 && ki.displayedFraction>=0,
                                 "native defeat retreat")) return;
-                        if (Date.now()-lab.pulseStarted<1000) return;
+                        if (Date.now()-lab.pulseStarted<1300) return;
+                        if (!lab.require(ki.visualFrame.enemyHeat===1 && ki.visualFrame.enemyOpacity===0,
+                                "native red defeat extinguished")) return;
                         if (!lab.require(ki.displayedFraction===0 && !ki.animationActive,
                                 "native defeat drained and stopped")) return;
                         console.log("ENERGY_NATIVE_PASS variants; host pulse; fire materials; opposing beam and defeat lifecycle");

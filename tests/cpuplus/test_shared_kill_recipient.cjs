@@ -98,10 +98,10 @@ test("recipient restores existing owner graph and favorite semantics", () => {
     assert.match(recipient,/details\.cpuCanvas\.requestPaint\(true\)/);
     assert.match(recipient,/details\.combiScoreCanvas\.requestPaint\(true\)/);
     assert.doesNotMatch(recipient,/detailGraph\.appendSelectedTaskHunterHistories/);
-    assert.match(host,/graphSource: KillBackend\.KillStore\.graphState/);
+    assert.match(host,/graphSource: KillBackend\.KillStore\.cpuGraphState/);
     assert.match(recipient,/readonly property var history: graphSource/);
-    assert.match(host,/graphController: KillBackend\.KillStore\.graphController/);
-    assert.match(host,/graphSession: KillBackend\.KillStore\.detailSession/);
+    assert.match(host,/graphController: KillBackend\.KillStore\.cpuGraphController/);
+    assert.match(host,/graphSession: KillBackend\.KillStore\.cpuDetailSession/);
     assert.doesNotMatch(recipient,/appControlWindow\.taskMini(?:CpuHistories|HunterMetricHistories|DisplayRevision)/);
     assert.match(row,/width: 82/);
     assert.match(row,/mini\.combi/);
@@ -188,7 +188,8 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.match(store,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: root.collectionEnabled && root.miniProbeNeeded/);
     assert.match(store,/id: afterAction[\s\S]*?interval: 320/);
     assert.match(store,/^pragma Singleton/m);
-    assert.equal((store.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,2);
+    assert.match(store,/ProcessTelemetry\s*\{\s*id: cpuDetailSampler\s*detailOnly: true/);
     assert.doesNotMatch(owner,/^\s*ProcessTelemetry\s*\{/m);
     assert.match(owner,/readonly property var processTelemetry: KillBackend\.KillStore\.telemetry/);
     assert.match(owner,/readonly property var taskRows: KillBackend\.KillStore\.rows/);
@@ -465,8 +466,8 @@ test("K2a: service owns donor graph controller and history; views consume the sa
     const owner=read("widgets/AppControlW.qml");
     const store=read("services/kill/KillStore.qml");
     const legacy=read("widgets/appcontrol/TaskGraphController.qml");
-    assert.equal((store.match(/^\s*ProcessPresentationState\s*\{/gm)||[]).length,1);
-    assert.equal((store.match(/^\s*TaskGraphController\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*ProcessPresentationState\s*\{/gm)||[]).length,2);
+    assert.equal((store.match(/^\s*TaskGraphController\s*\{/gm)||[]).length,2);
     assert.match(store,/taskMiniHistoryKeepImmutable: root\.graphVisible/);
     assert.match(owner,/readonly property var processPresentationState: KillBackend\.KillStore\.graphState/);
     assert.match(owner,/readonly property var taskGraphController: KillBackend\.KillStore\.graphController/);
@@ -1086,4 +1087,20 @@ test("K7b: CPU++ process identity, glow clearance and yellow cancellation", () =
     assert.match(recipient,/objectName: "cpuPlusProcessStateLabel"[\s\S]*?anchors.bottom: parent.bottom[\s\S]*?layer.effect: DropShadow/);
     assert.match(recipient,/objectName: "cpuPlusProcessGlowGutter"[\s\S]*?x: 8\s*y: 8\s*width: Math.max\(0,actuatorScroll.width-30\)/);
     assert.match(recipient,/contentHeight: actuatorBody.implicitHeight \+ 20/);
+});
+
+test("K7c: independent selected detail channels share one mini publication", () => {
+    const store=read("services/kill/KillStore.qml");
+    const telemetry=read("services/system/ProcessTelemetry.qml");
+    const session=read("services/kill/KillDetailSession.qml");
+    assert.match(store,/id: cpuHistories[\s\S]*?taskMiniCpuHistories: histories\.taskMiniCpuHistories[\s\S]*?taskMiniDisplayRevision: histories\.taskMiniDisplayRevision/);
+    assert.match(store,/id: cpuGraph[\s\S]*?telemetry: cpuDetailSampler[\s\S]*?sharedMiniController: graph/);
+    assert.match(store,/id: cpuSelectedDetail[\s\S]*?state: cpuHistories[\s\S]*?collectionAllowed: root\.collectionEnabled/);
+    assert.match(store,/id: selectedDetail[\s\S]*?collectionAllowed: root\.collectionEnabled/);
+    assert.match(store,/id: cpuDetailSampler\s*detailOnly: true\s*onDetailProbeReady: function\(sample\) \{ cpuSelectedDetail\.accept\(sample\); \}/);
+    assert.match(telemetry,/function refreshSnapshot\(\)\s*\{\s*if \(detailOnly \|\| snapshotLoading\)/);
+    assert.match(telemetry,/function refreshMiniProbe\(request\)\s*\{\s*if \(detailOnly \|\| miniProbeLoading\)/);
+    assert.match(session,/requestedKey: !collectionAllowed \? "" : cpuActive/);
+    assert.equal((store.match(/id: taskManagerRefreshTimer/g)||[]).length,1);
+    assert.equal((store.match(/id: taskMiniDisplayTimer/g)||[]).length,1);
 });

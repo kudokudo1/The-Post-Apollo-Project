@@ -402,7 +402,8 @@ Item {
                     // Heat penetrates the material ahead of the flame.
                     // Keep the already eroded/ashed region unchanged.
                     const bed=Material.heatBed(root.elapsed,root.flameSpeed,root.reducedMotion);
-                    const contactWidth=Math.min(fx+inner-edge,(h*1.85+root.flameTipOffset)*bed.reach*fireState.heat);
+                    const footprint=Material.heatFootprint(h,root.flameTipOffset,bed.reach,flame.speed);
+                    const contactWidth=Math.min(fx+inner-edge,footprint.ahead*fireState.heat);
                     if(contactWidth>0) {
                         c.save(); c.globalAlpha=fireState.heat; c.beginPath(); c.rect(edge,fy,contactWidth,fillHeight); c.clip();
                         const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
@@ -428,11 +429,11 @@ Item {
                     // the midpoint of the elongated flame.
                     const tip=edge+root.flameTipOffset;
                     fireHalo(tip-h*(.36+flame.drag),mid+h*(.20+flame.sway),
-                        h*1.48*flame.stretch,h*1.08*flame.breath,.28*flame.pulse*fireState.heat);
+                        h*1.02*(1+.35*(flame.stretch-1)),h*1.08*flame.breath,.28*flame.pulse*fireState.heat);
                     // Live heat reflected on the retained material behind the front.
                     // Burn Away has no material here, so never repaint it.
                     if(!material.erosion && inner*p>0) {
-                        const span=Math.min(inner*p,h*(1.1+flame.speed*.75)*bed.reach);
+                        const span=Math.min(inner*p,footprint.behind);
                         c.save(); c.globalAlpha=fireState.heat; c.beginPath(); c.rect(fx,fy,inner*p,fillHeight); c.clip();
                         for(const row of bed.rows) {
                             const yy=fy+row.y*fillHeight;

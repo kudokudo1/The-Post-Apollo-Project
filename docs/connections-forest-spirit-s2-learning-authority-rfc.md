@@ -240,3 +240,118 @@ implementation. No new executable source, test, protected read, grant,
 credential, external effect, host operation or production activation.
 Review this exact completed proposal with affected owners and Nurse;
 operator integration remains separate.
+
+## S5 // Multi-author room audience and delegated work (design only)
+
+Operator group conversation clarification #2161 7215166665/7215453268,
+UI2 S5 #2999, Nurse 7215502409 and Runtime source analysis 7215535828.
+This proposal refines S4: one durable room may contain independently
+authorized authors across Trees and Clones. A versioned association
+does not designate the sole speaker. Serialize conflicting actual
+effects and durable message appends separately, not the right to speak.
+S4 source and stewardship protections remain. No A/B transaction
+choice, real roster, issuer, new grant, default policy or execution.
+
+### Concrete existing source gap
+
+Main 916ebb03: B1 session_journal_v0.py d1533f15 has one owner/Tree
+per session, ordered user/assistant roles and owner-filtered body
+reads, not authenticated member authorship or per-message audience.
+B3 turn_bridge_b3.py c5dbbc29 reserves one attempt per user turn and
+one live attempt per session; original revision/latest-user checks
+also prevent simply admitting two group replies. M2 1085bc56 refuses
+Clone scope; retain refusal. C5 ForestC5AuthorityBoundary.py 55949fd1
+refuses every protected operation; LIST, title, READ, provisional
+disclosure, committed release, tool input/execution and delegation
+are already separate. None establishes membership, a message audience,
+attachment access or a durable room grant. Do not reinterpret signed
+V0/V1 session references, weaken existing checks or create a parallel
+authority to make group chat work.
+
+### Separate independent boundaries
+
+| Boundary | Required scope (logical fields, not a wire schema) |
+| --- | --- |
+| Room membership / join / leave | Actual room, authenticated member and Tree, current membership incarnation and policy revision. Join grants no retrospective history by itself. |
+| Visible room projection | Authorized recipient/view and field groups before source enumeration; relevant completeness separately qualified. No hidden names, participant counts, unread counts, message ordinals/gaps or attachment existence leaked. |
+| Message / attachment delivery | Exact original message/author, version/content commitment, independently permitted audience, actual recipient/channel and current scope. Attachment metadata, preview, body, download and external release independently scoped; a link is not access. |
+| Address / response routing | Actual authenticated speaker, deliberate addressed member(s), trigger message, current room and individual mode, eligible audience and bounded causal root. A quoted or proposed address does not create a response job. |
+| Model context / submission | Each member's independently eligible room-message subset and private Task context, exact input and provider recipient; actual serialized send fenced per S3. Shared room never grants private Leaf or cross-Tree history access. |
+| Delegated assignment | Original operator authorization, permitted delegation chain, approved revision, exact receiving role/member/Task/workspace/target/actions and current scope; separate original assignment and effect identity. |
+| Tool / state mutation | Actual resource/effect owner, independently current grant and claim, conflict ordering, exact operation and actual terminal outcome. A spoken reply or approved design is not execution or a receipt. |
+
+Room mode is a ceiling on participation, not an access or resource
+grant. Per-member mode and optional suggestion preference narrow it.
+For the S5 example, collaborative Maple may offer relevant bounded
+dialogue, observing Cedar receives only independently permitted
+messages and stays silent absent deliberate permitted mode change,
+directed DOC 1 may volunteer bounded proposals where room policy
+permits, directed DOC 2 does not volunteer. These are example labels,
+not authenticated identities or configured policy. No automatic
+fan-out. A directed participant can address another only within
+user-approved communication bounds; that does not delegate a tool.
+A mention, quote, suggestion, address, assignment, design acceptance,
+implementation authorization, execution and user acceptance remain
+distinct. A text token or model intent guess cannot establish an
+authorization. Ambiguous effect intent is non-executing.
+
+### Covered handoff and independent original effect
+
+An already approved bounded standing grant can cover multiple
+delegated work steps without repeated operator prompts. Before
+admission the receiver must independently establish the authentic
+original grant, exact approved revision and intended scope, delegation
+eligibility and any limits on subdelegation, current sender and
+receiver roles/assignment, recipient and actual target/action,
+remaining effect/resource budget and current revocation. A relay
+message, summary of approval, room role, mode or checked UI control
+is not that evidence. Attenuate at every delegation; no widening
+scope, forwarding credentials, transferring old execution authority
+or self-authorizing a new effect.
+
+The actual source must authorize before metadata or body access.
+A response job independently binds original trigger, recipient,
+allowed input snapshot, policy revisions and causal root. Recheck
+before context assembly and actual provider submission; separately
+qualify outgoing answer/artifact audience and original message append.
+An intervening append cannot silently refresh old context or change
+recipient. A delivery envelope for several recipients must be
+qualified for each; do not leak who was excluded, and do not treat
+authorization for one recipient as authorization for the group.
+Revoke or leave invalidates affected pending admissions, derived
+eligibility and delivery, not unrelated authorized work. Distinguish
+local durable append, external delivery and actual tool effect.
+A committed room message does not prove all recipients received it
+or any described change occurred. Unknown original effect remains
+fenced across restart; no replay, alternate recipient, implicit
+rollback or new operation to bypass original custody. Already delivered
+bytes cannot be recalled by revocation. STOP does not prove terminal
+or release resources. Heart independently accounts for each workload.
+
+### Negative acceptance cases
+
+| Case | Required result |
+| --- | --- |
+| Member joins a room with older restricted messages | No automatic historical read, ordinal/count leak or private Leaf access. |
+| Observer or directed non-volunteer is merely mentioned | No response job, model invocation or tool effect. |
+| Authorized member addresses another | Only independently permitted response; no inherited tool grant. |
+| Quoted/negated command or proposal to assign | No assignment or dispatch. |
+| User accepts design, but implementation grant absent | Proposal/design state only; no write. |
+| Exact approved delegated scope remains current | Covered work can proceed without redundant consent; actual separate effect fence required. |
+| Sender claims approval, stale revision or widened delegation | No grant, source read or effect from that assertion. |
+| Two eligible speakers respond to one trigger | Distinct original jobs and ordered append, not a shared effect claim or one-speaker restriction. |
+| Attachment or message visible to only part of room | Per-recipient disclosure; no global metadata/body or excluded-audience leak. |
+| Leave/revoke during response or recipient replacement | Withdraw affected new delivery/admission; original pending effect retained, no retarget or retry. |
+| Repeated relay/reconnect or unknown tool receipt | Reconcile original job/effect; no duplicate response/tool call or inferred success. |
+| Cross-Tree room with private member memory | No automatic Mycelium transfer, shared memory absorption or universal context broadcast. |
+
+Runtime owns actual multi-author append, job and effect ordering; Mind
+owns exact input/approval revision and Leaf lineage; Heart owns bounded
+turn/resource claims; UI owns deliberate addressing and honest
+presentation. Spirit owns purpose, audience and delegation semantics;
+Connections owns actual independent issuer/custodian/currentness and
+recipient evidence. Existing F1–F6 and hardware deferral #2119 remain.
+This completed design proposal does not change C5, choose a signer,
+policy source, registry, database, wire format, queue or budget,
+or authorize protected data, model/tool execution or host operations.
+Native/protected/production HOLD.

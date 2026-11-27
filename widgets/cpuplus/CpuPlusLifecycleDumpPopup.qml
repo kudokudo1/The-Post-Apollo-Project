@@ -22,7 +22,7 @@ Controls.Popup {
     property string notice: ""
     function openSave() {
         if(locked||!CpuPlusDiagnostics.lifecycleAvailable)return false;
-        saveOpen=true; notice="";
+        saveOpen=true; notice=""; favoriteButton.selected=false;
         if(CpuPlusDiagnostics.workflowCatalogStatus==="NOT LOADED")CpuPlusDiagnostics.loadWorkflowCatalog();
         return true;
     }
@@ -30,6 +30,7 @@ Controls.Popup {
         if(!saveOpen||locked||pendingName)return false;
         if(!CpuPlusDiagnostics.workflowCatalogReady)return CpuPlusDiagnostics.loadWorkflowCatalog();
         const name=nameInput.text.trim(), plan=CpuPlusDiagnostics.lifecyclePlan();
+        if(!name){notice="ENTER WORKFLOW NAME";return false;}
         const favorite=favoriteButton.selected;
         if(!CpuPlusDiagnostics.saveLifecyclePreset(name,favorite)){notice=CpuPlusDiagnostics.workshopPresetFeedback;return false;}
         pendingName=name;pendingPlan=plan;pendingFavorite=favorite;
@@ -123,7 +124,7 @@ Controls.Popup {
             text: root.notice || (CpuPlusDiagnostics.lifecycleActive?(CpuPlusDiagnostics.lifecycleRecorder.finalizing?"FINALIZING // RESOURCE RECEIPT":"RECORDING // USE WIDGETS NORMALLY"):
                 CpuPlusDiagnostics.lifecycleReport ? CpuPlusDiagnostics.lifecycleReport.status+" // "+
                 (CpuPlusDiagnostics.lifecycleReport.stats?CpuPlusDiagnostics.lifecycleReport.stats.length+" WIDGETS / "+CpuPlusDiagnostics.lifecycleReport.events.length+" EVENTS":CpuPlusDiagnostics.lifecycleReport.reason):
-                LIFECYCLE + SHELL CPU / MEMORY / STALL")
+                "LIFECYCLE + SHELL CPU / MEMORY / STALL")
             color: CpuPlusDiagnostics.lifecycleActive?Colors.green:Colors.cyan
             font.pixelSize: 9; elide: Text.ElideRight
         }

@@ -833,7 +833,7 @@ test("GitHub PR controls keep their established accent hues and mutation authori
     assert.match(action,/id: progressSlow[\s\S]*?to: 0.9[\s\S]*?duration: 3600/);
     assert.match(action,/id: progressFinish[\s\S]*?to: 1.0[\s\S]*?duration: 260/);
     assert.match(action,/root.completedLifecycleAction === actionToken[\s\S]*?root.completedLifecycleSuccess/);
-    assert.match(action,/root.completedLifecycleAction === actionToken\) \{[\s\S]*?visualPhase = "failure"/);
+    assert.match(action,/root.completedLifecycleAction === actionToken\)[\s\S]*?\|\| queueCompletionMatches\) \{[\s\S]*?visualPhase = "failure"/);
     assert.match(action,/visualPhase = "idle";[\s\S]*?progressReset.stop\(\)/);
     assert.match(pr,/actionToken: "review-approve"[\s\S]*?accent: Colors.green/);
     assert.match(pr,/actionToken: "merge-" \+ modelData[\s\S]*?accent: Colors.red/);
@@ -857,4 +857,38 @@ test("EnergyProgress can stop and resume its visual clock without a fake result"
     assert.match(face,/startedAt = Date.now\(\) - elapsed \* 1000/);
     assert.match(face,/!root.activityMotionEnabled \? 0/);
     assert.match(face,/!activityMotionEnabled \|\| phase !== "running"/);
+});
+
+test("queue uses bounded scroll layout and preserves each independent button hue",()=>{
+    const pr=fs.readFileSync(path.join(root,"widgets/GitHubPullRequestControlView.qml"),"utf8");
+    const pane=pr.slice(pr.indexOf("id: queuePane"),pr.indexOf("id: threadsPane"));
+    assert.match(pane,/ListView \{[\s\S]*?id: syntagmaPane3[\s\S]*?anchors.fill: parent[\s\S]*?clip: true/);
+    assert.match(pane,/header: Column \{/);
+    assert.match(pane,/footer: GohuText \{/);
+    assert.match(pane,/text: root.queueEmptyText/);
+    assert.match(pane,/height: queuePreviewColumn.implicitHeight \+ 16/);
+    assert.doesNotMatch(pane,/height: parent.height - 176/);
+    assert.match(pane,/model: root.queueUsable \? root.queueProvider.entries : \[\]/);
+    assert.match(pane,/flickable: syntagmaPane3/);
+    const controls=[["REFRESH QUEUE","blue","queue-refresh"],["PREVIEW ENQUEUE","blue","queue-preview-enqueue"],["PREVIEW DEQUEUE","orange","queue-preview-dequeue"],["EXECUTE ENQUEUE","green","queue-execute-enqueue"],["EXECUTE DEQUEUE","red","queue-execute-dequeue"]];
+    for(const [label,color,token] of controls) {
+        const i=pane.indexOf('"'+label+'"');
+        const block=pane.slice(i,pane.indexOf("onTriggered:",i));
+        assert.ok(i>=0 && block.includes("accent: Colors."+color) && block.includes('queueActionToken: "'+token+'"'));
+    }
+    assert.match(pr,/root.activeQueueAction === queueActionToken/);
+    assert.match(pr,/queueCompletionMatches && root.completedQueueSuccess/);
+    assert.match(pr,/root.finishQueueAction\("queue-execute-" \+ operation,\s*mutationSucceeded && evidenceVerified\)/);
+    assert.match(pr,/function onPreviewReady\(preview\)/);
+    assert.match(pr,/function onPreviewFailed\(detail\)/);
+    assert.match(pr,/function onRefreshed\(\)/);
+    assert.match(pr,/activeQueueTarget !== queueTargetKey/);
+    assert.match(pr,/p.repository === repositorySlug && Number\(p.number\) === pullRequestNumber/);
+    assert.match(pr,/p.baseBranch === pullRequestBaseRef/);
+    assert.match(pr,/String\(p.headSha \|\| ""\).toLowerCase\(\) === pullRequestHeadSha.toLowerCase\(\)/);
+    assert.match(pr,/NO MERGE QUEUE CONFIGURED/);
+    assert.match(pr,/QUEUE EMPTY/);
+    assert.match(pr,/QUEUE READ FAILED/);
+    assert.match(pane,/root.armOrRun\("dequeue"/);
+    assert.match(pane,/root.queueLifecycleService.executeDequeue\(true\)/);
 });

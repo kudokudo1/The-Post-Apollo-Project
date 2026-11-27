@@ -36,6 +36,10 @@ Column {
         return !!row && row.available && row.route==="configured" &&
             row.kinds.some(k=>filterKinds.includes(k));
     }
+    function openLifecycleDump() {
+        if(!CpuPlusDiagnostics.lifecycleAvailable||locked||calibrating)return false;
+        disarm(); targetPicker.close(); lifecyclePicker.open(); return true;
+    }
     function selectTarget(id) {
         if(locked || saveEditorOpen || !targetCanSelect(Targets.findDiagnosticTarget(id))) return false;
         disarm();

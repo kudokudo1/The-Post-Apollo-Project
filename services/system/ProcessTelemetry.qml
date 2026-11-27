@@ -123,7 +123,7 @@ Scope {
             + "io_pair=$(awk '$1==\"read_bytes:\" && !got_read {read=$2; got_read=1} "
             + "$1==\"write_bytes:\" && !got_write {write=$2; got_write=1} "
             + "END {print read \" \" write}' /proc/$pid/io 2>/dev/null); "
-            + "readb=\${io_pair%% *}; writeb=\${io_pair#* }; "
+            + "readb=${io_pair%% *}; writeb=${io_pair#* }; "
             + "printf '%s %s %s %s %s %s\\n' \"$clk\" \"${ticks:-0}\" "
             + "\"${readb:-0}\" \"${writeb:-0}\" \"$pid:${start:-0}\" \"$rest\"; "
             + "done"

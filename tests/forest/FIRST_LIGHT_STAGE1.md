@@ -25,9 +25,13 @@ Fixed initial sources: GitHub Ollama v0.32.14 linux-amd64 release archive
 1421191399 bytes; registry.ollama.ai/v2/library/granite3.3/manifests/2b
 and digest-addressed blobs under that repository from the verified raw
 manifest. Exact SHA256 pins in helper. One HTTPS redirect only:
-release-assets.githubusercontent.com fixed release asset path prefix,
+release-assets.githubusercontent.com exact upstream repository 658928958
+namespace and UUID-shaped path, signed filename ollama-linux-amd64.tar.zst,
 or exact candidate R2 host and digest path for a blob. Public historical
 redirect evidence: github.com/ollama/ollama/issues/11428 and /18716.
+Release API metadata: https://api.github.com/repos/ollama/ollama/releases/assets/517039292
+(release 371138535, asset 517039292, exact name/size/digest); the actual
+opaque CDN UUID is not available in that metadata and is NOT claimed pinned.
 Actual redirect/auth behavior not verified; unexpected redirect or
 challenge refuses, no bearer token exchange, broad host fallback or retry.
 This is direct TLS client destination restriction, not independent
@@ -44,10 +48,12 @@ host attestation or preventive model capacity proof. Standard runner
 advertised 14GB disk; actual free space can be less. No cleanup of other
 runner content. Exact manifest digest before blobs, every config/layer
 byte/size/digest verified, no external descriptor URLs. Archive exact
-size/digest before system zstd decompression. Streaming bounded tar
-regular-file extraction only, no executable mode, no devices/hardlinks,
-no path traversal; internal symlink descriptors validated but never
-materialized. Per-file size/hash inventory derived; publish only fixed
+size/digest before system zstd decompression. Bounded seekable decompressed tar spool replaces regular-file extraction;
+no member materialized. Read regular member bytes for hashes, reject
+unsupported types, traversal, repeated normalized names and invalid links.
+Check physical end offset for at least two zero terminator blocks and all
+remaining bounded padding zero, including buffered bytes. No extra disk
+allocation beyond the 6GiB decompressed cap. Per-file size/hash inventory derived; publish only fixed
 aggregate digest/counts, main binary hash and aggregate public runner
 measurements in job log. No upload. Per-member hashes are derived, not
 independent expected binary pins; no materialized runtime layout or
@@ -62,3 +68,16 @@ archive member hashing and unsafe path/link/device refusals; no network.
 No actual staging, inference, resource admission, model trial, source
 authentication or native release claimed. Stage 2 requires separate
 operator approval and independent evidence.
+
+## Corrected source / review limits
+
+Trusted public runner acquisition requires exact independent Spirit/Nurse
+review of GitHub-hosted eligibility and the reviewed client policy. The
+runtime process environment is scrubbed and no token is passed; no claim
+of independently verified absence of every runner credential or network
+route. The actual CDN UUID and anonymous registry redirect availability
+remain unresolved until separately reviewed; do not dispatch if the
+source policy cannot be accepted. No extra source fetch or broadened
+allowlist. Template/config role evidence is not separately emitted; use
+the same verified manifest for later authorized qualification. Offline
+PR/push workflow runs synthetic verifier tests only, no acquisition.

@@ -7,7 +7,8 @@ The caller must independently observe every view incarnation transition.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+import secrets
 import threading
 
 from first_light_trial_host import FirstLightTrialHost, RealLocalTrialHost, FirstLightRefusal
@@ -285,6 +286,8 @@ class RealLocalDelivery:
             if epoch is not None and (not self._valid_epoch(epoch)
                     or epoch <= self._last_epoch):
                 return False
+            if self._view is not None:
+                self._delivery.request_stop(self._view)
             if epoch is not None:
                 self._last_epoch = epoch
             self._epoch = epoch
@@ -313,9 +316,10 @@ class RealLocalDelivery:
         try:
             self._delivery.submit(view, prompt)
         except DeliveryRefusal:
-            return "REFUSED"
+            # Staging may already have claimed the original attempt.
+            return "UNKNOWN_HOLD"
         status, _ = self._delivery.owner_outcome()
-        return "ACCEPTED" if status == "PREPARED" else "HELD"
+        return "ACCEPTED" if status == "PREPARED" else "UNKNOWN_HOLD"
 
     def advance(self):
         self._delivery.advance()
@@ -351,3 +355,125 @@ class RealLocalDelivery:
     def close(self):
         self.observe(None)
         return self._delivery.close()
+
+
+class RealLocalRequestBridge:
+    """Runtime-owned typed boundary for the UI1 original request owner.
+
+    In-process owner API, not an IPC listener or permission issuer. Submit,
+    advance and close belong to the owner worker; observe/attach/take/stop/
+    withdraw may be called from its independently observed control side.
+    A future IPC wrapper must keep one canonical JS correlation object per
+    original token, validate bounded frames, and call attach only after the
+    existing feed successfully attaches. No callbacks from this bridge.
+    """
+    def __init__(self, *, endpoint=None):
+        self._runtime = RealLocalDelivery(endpoint=endpoint)
+        self._lock = threading.Lock()
+        self._epoch = None
+        self._used = False
+        self._token = None
+        self._attached = False
+        self._stop = False
+        self._terminal = False
+        self._closed = False
+
+    def _matches(self, correlation):
+        return (self._token is not None and type(correlation) is dict
+                and set(correlation) == {"token"}
+                and type(correlation["token"]) is str
+                and correlation["token"] == self._token)
+
+    def _retire_locked(self):
+        # Retire the original before a replacement can observe any result.
+        epoch = self._epoch
+        self._token = None
+        self._attached = False
+        self._epoch = None
+        if epoch is not None:
+            self._runtime.withdraw(epoch)
+
+    def observe(self, epoch):
+        with self._lock:
+            if self._closed:
+                return False
+            if epoch is not None and not RealLocalDelivery._valid_epoch(epoch):
+                return False
+            if epoch == self._epoch:
+                return True
+            self._retire_locked()
+            if not self._runtime.observe(epoch):
+                return False
+            self._epoch = epoch
+            return True
+
+    def submit(self, model, prompt, epoch):
+        with self._lock:
+            if (self._closed or self._used or self._epoch is None
+                    or not RealLocalDelivery._valid_epoch(epoch)
+                    or epoch != self._epoch):
+                return "REFUSED"
+            # One original bridge lifetime, even on HELD or unknown.
+            self._used = True
+            try:
+                result = self._runtime.submit(model, prompt, epoch)
+            except Exception:
+                return "UNKNOWN_HOLD"
+            if result in ("HELD", "REFUSED"):
+                return result
+            if result != "ACCEPTED":
+                return "UNKNOWN_HOLD"
+            self._token = secrets.token_hex(16)
+            return {"accepted": True, "correlation": {"token": self._token}}
+
+    def attach(self, correlation):
+        """Explicit successful original UI attachment, not a native grant."""
+        with self._lock:
+            if (self._closed or self._attached or self._stop or self._terminal
+                    or not self._matches(correlation)):
+                return False
+            self._attached = True
+            return True
+
+    def take(self, correlation):
+        with self._lock:
+            if (self._closed or not self._attached or self._terminal
+                    or not self._matches(correlation)):
+                return None
+            snapshot = self._runtime.take(self._epoch)
+            if snapshot is None:
+                return None
+            # STOP freeze: suppress additional provisional output; original
+            # commit-won/unknown terminal is delivered, not a provider receipt.
+            if self._stop and snapshot.status not in ("LOCAL_COMMITTED", "UNKNOWN_HOLD"):
+                return None
+            if snapshot.status in ("LOCAL_COMMITTED", "UNKNOWN_HOLD"):
+                self._terminal = True
+            return {"epoch": self._epoch, "correlation": {"token": self._token},
+                    "snapshot": asdict(snapshot)}
+
+    def stop(self, correlation):
+        with self._lock:
+            if (self._closed or self._stop or self._terminal
+                    or not self._matches(correlation)):
+                return False
+            # Fence provisional display before calling original R3 control,
+            # including an uncertain or commit-won cancellation result.
+            self._stop = True
+            return self._runtime.stop(self._epoch) == "STOP_LATCHED"
+
+    def withdraw(self, correlation):
+        with self._lock:
+            if self._closed or not self._matches(correlation):
+                return False
+            self._retire_locked()
+            return True
+
+    def advance(self):
+        self._runtime.advance()
+
+    def close(self):
+        with self._lock:
+            self._retire_locked()
+            self._closed = True
+        return self._runtime.close()

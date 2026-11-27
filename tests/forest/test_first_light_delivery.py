@@ -9,7 +9,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/forest"))
-from first_light_delivery import FirstLightDelivery, RealLocalDelivery, DeliveryRefusal
+from first_light_delivery import (FirstLightDelivery, RealLocalDelivery,
+    RealLocalRequestBridge, TrialSnapshot, DeliveryRefusal)
 from first_light_trial_host import PROMPT, MODEL
 import test_first_light_trial_host as host_tests
 from test_ollama_chat_transport import packet
@@ -54,6 +55,76 @@ class DeliveryTests(unittest.TestCase):
             self.assertIsNone(d.take(2))
             self.assertEqual(d.submit(MODEL, PROMPT, 2), "HELD")
             self.assertEqual(d.close(), "UNKNOWN_HOLD")
+
+    def test_bridge_actual_hold_has_no_correlation_or_effect(self):
+        with patch("first_light_trial_host.sqlite3.connect",
+                   side_effect=AssertionError("storage")), \
+             patch("first_light_trial_host.stream_chat",
+                   side_effect=AssertionError("network")):
+            bridge = RealLocalRequestBridge(endpoint="http://127.0.0.1:22114")
+            self.assertTrue(bridge.observe(1))
+            self.assertEqual(bridge.submit(MODEL, PROMPT, 1), "HELD")
+            self.assertFalse(bridge.attach({"token": "x"}))
+            self.assertIsNone(bridge.take({"token": "x"}))
+            self.assertFalse(bridge.stop({"token": "x"}))
+            self.assertTrue(bridge.observe(2))
+            self.assertEqual(bridge.submit(MODEL, PROMPT, 2), "REFUSED")
+            self.assertEqual(bridge.close(), "UNKNOWN_HOLD")
+
+    def test_bridge_correlation_attach_and_stop_ordering_only(self):
+        # Strictly a unit test of translation, no actual admission or provider.
+        from unittest.mock import Mock
+        bridge = RealLocalRequestBridge()
+        original = bridge._runtime
+        original.close()
+        fake = Mock(spec=RealLocalDelivery)
+        bridge._runtime = fake
+        fake.observe.return_value = True
+        fake.submit.return_value = "ACCEPTED"
+        fake.stop.return_value = "STOP_LATCHED"
+        self.assertTrue(bridge.observe(1))
+        result = bridge.submit(MODEL, PROMPT, 1)
+        self.assertIs(result["accepted"], True)
+        corr = result["correlation"]
+        fake.submit.assert_called_once_with(MODEL, PROMPT, 1)
+        self.assertIsNone(bridge.take(corr))
+        fake.take.assert_not_called()
+        self.assertFalse(bridge.attach({"token": "wrong"}))
+        self.assertTrue(bridge.attach(corr))
+        self.assertFalse(bridge.attach(corr))
+        fake.take.return_value = TrialSnapshot(1,"PREPARED","","UNKNOWN_HOLD",False)
+        self.assertEqual(bridge.take(corr), {"epoch":1,"correlation":corr,
+            "snapshot":{"sequence":1,"status":"PREPARED","text":"",
+                        "local_outcome":"UNKNOWN_HOLD","provisional":False,
+                        "native_admitted":False}})
+        self.assertFalse(bridge.stop({"token":"wrong"}))
+        self.assertTrue(bridge.stop(corr))
+        self.assertFalse(bridge.stop(corr))
+        fake.stop.assert_called_once_with(1)
+        fake.take.return_value = TrialSnapshot(2,"STOP_REQUESTED","","UNKNOWN_HOLD",False)
+        self.assertIsNone(bridge.take(corr))
+        fake.take.return_value = TrialSnapshot(3,"UNKNOWN_HOLD","","ABORTED_LOCAL",False)
+        self.assertEqual(bridge.take(corr)["snapshot"]["local_outcome"],"ABORTED_LOCAL")
+        self.assertIsNone(bridge.take(corr))
+        self.assertTrue(bridge.observe(2))
+        fake.withdraw.assert_called_once_with(1)
+        self.assertFalse(bridge.withdraw(corr))
+        self.assertEqual(bridge.submit(MODEL,PROMPT,2),"REFUSED")
+        bridge.close()
+
+    def test_bridge_unknown_submit_cannot_retry(self):
+        from unittest.mock import Mock
+        bridge = RealLocalRequestBridge()
+        bridge._runtime.close()
+        fake = Mock(spec=RealLocalDelivery)
+        bridge._runtime = fake
+        fake.observe.return_value = True
+        fake.submit.side_effect = RuntimeError("uncertain")
+        self.assertTrue(bridge.observe(1))
+        self.assertEqual(bridge.submit(MODEL,PROMPT,1),"UNKNOWN_HOLD")
+        self.assertEqual(bridge.submit(MODEL,PROMPT,1),"REFUSED")
+        fake.submit.assert_called_once()
+        bridge.close()
 
     def test_actual_public_response_one_row_and_terminal_after_exhaustion(self):
         d, view, peer = self.setup_trial([packet("RE"), packet("ADY", done=True)])

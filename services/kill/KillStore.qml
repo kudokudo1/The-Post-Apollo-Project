@@ -89,6 +89,7 @@ Scope {
         safetyService: root.safety
         limitsService: root.limits
         controlService: root.control
+        individualActionGate: guardedActions
         currentTask: root.donorTask
         taskRows: root.rows
         onRefreshRequested: afterAction.restart()

@@ -11,6 +11,8 @@ Scope {
     required property var limitsService
     required property var controlService
 
+    // The donor THAW path uses the same guarded action owner as CPU++.
+    property var individualActionGate: null
     property var currentTask: null
     property var taskRows: []
     property var frozenOptimistic: ({})
@@ -21,7 +23,8 @@ Scope {
         string message,
         string actionLabel,
         var targetPids,
-        string targetName
+        string targetName,
+        double targetStartTicks
     )
     signal refreshRequested()
 
@@ -62,12 +65,21 @@ Scope {
         safetyService.relockDangerAction(entry, actionKind);
     }
 
+    function frozenIdentityKey(entry) {
+        if (!entry || !Number.isSafeInteger(Number(entry.pid)) || Number(entry.pid) <= 1
+                || !Number.isSafeInteger(Number(entry.startTicks)) || Number(entry.startTicks) <= 0
+                || !String(entry.comm || ""))
+            return "";
+        return JSON.stringify([Number(entry.pid), Number(entry.startTicks), String(entry.comm)]);
+    }
+
     function isFrozen(entry) {
         const target = entry || currentTask;
         if (!target)
             return false;
 
-        const key = "pid:" + String(Number(target.pid || 0));
+        const key = frozenIdentityKey(target);
+        if (!key) return String(target.state || "").indexOf("T") !== -1;
 
         if (frozenOptimistic[key] !== undefined)
             return !!frozenOptimistic[key];
@@ -80,8 +92,10 @@ Scope {
         if (!target || Number(target.pid || 0) <= 1)
             return;
 
+        const key = frozenIdentityKey(target);
+        if (!key) return;
         const next = Object.assign({}, frozenOptimistic);
-        next["pid:" + String(Number(target.pid))] = !!frozen;
+        next[key] = !!frozen;
         frozenOptimistic = next;
         optimisticReset.restart();
     }
@@ -289,7 +303,8 @@ Scope {
             ),
             "RESTART PROCESS",
             [Number(target.pid)],
-            String(target.comm || target.name || "").trim()
+            String(target.comm || ""),
+            Number(target.startTicks || 0)
         );
     }
 
@@ -324,7 +339,8 @@ Scope {
             ),
             "END PROCESS",
             [Number(target.pid)],
-            String(target.comm || target.name || "").trim()
+            String(target.comm || ""),
+            Number(target.startTicks || 0)
         );
     }
 
@@ -341,10 +357,13 @@ Scope {
             return;
 
         if (frozen) {
-            markFrozen(target, false);
-            controlService.sendSignal(target.pid, "-CONT");
-            relockDangerAction(target, "freeze");
-            refreshRequested();
+            const gate = individualActionGate;
+            if (!gate || !gate.prepare(Number(target.pid), Number(target.startTicks),
+                    String(target.comm || ""), "resume", 0))
+                return;
+            const captured = gate.pending;
+            if (!gate.confirm() && !gate.busy && gate.pending === captured)
+                gate.cancel();
             return;
         }
 
@@ -368,7 +387,8 @@ Scope {
             ),
             "FREEZE",
             [Number(target.pid)],
-            String(target.comm || target.name || "").trim()
+            String(target.comm || ""),
+            Number(target.startTicks || 0)
         );
     }
 

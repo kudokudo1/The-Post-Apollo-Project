@@ -1233,3 +1233,48 @@ test("K8b1: gateway dispatch binds signals to a pidfd and checks actual results"
     const result=require("node:child_process").spawnSync("/usr/bin/python3",["-c",harness,command[2]],{encoding:"utf8",timeout:20000});
     assert.equal(result.status,0,result.stderr || String(result.error || ""));
 });
+
+test("K8b2: donor confirmations carry exact birth and reuse the individual gateway", () => {
+    const owner=read("widgets/AppControlW.qml");
+    const legacy=read("widgets/appcontrol/GlobalTaskActionController.qml");
+    const presentation=read("services/system/ProcessPresentationController.qml");
+    const store=read("services/kill/KillStore.qml");
+    assert.match(owner,/destructiveConfirmTargetStartTicks = Number\(targetStartTicks\)/);
+    assert.match(owner,/executeProtectedTaskSignal\(targetPids\.length[^\n]*targetStartTicks\)/);
+    assert.match(presentation,/string targetName,\s*double targetStartTicks/);
+    assert.equal((presentation.match(/Number\(target\.startTicks \|\| 0\)\n        \);/g)||[]).length,3);
+    assert.match(store,/individualActionGate: guardedActions/);
+    assert.doesNotMatch(legacy,/processControlObject\.sendSignal\(/);
+    assert.doesNotMatch(presentation,/controlService\.sendSignal\(/);
+    const begin=legacy.indexOf("    function taskEntryForCapturedIdentity(");
+    const end=legacy.indexOf("    function requestKillAllEligibleTasks(",begin);
+    const row={pid:123,startTicks:456,comm:"test"};
+    let prepared=[],confirmed=0,cancelled=0,accept=true;
+    const ownerGate={
+        busy:false,pending:null,
+        exactRow:(p,b,n)=>p===row.pid&&b===row.startTicks&&n===row.comm?row:null,
+        prepare:(...args)=>{if(!accept)return false;prepared.push(args);ownerGate.pending={};return true;},
+        confirm:()=>{confirmed++;return true;},
+        cancel:()=>{cancelled++;}
+    };
+    const dispatch=new Function("host",legacy.slice(begin,end)+"\nreturn executeProtectedTaskSignal;")({hubProcessActionGate:ownerGate});
+    assert.equal(dispatch(123,"test","-TERM",455),false);
+    assert.equal(dispatch(123,"TEST","-TERM",456),false);
+    assert.equal(dispatch(123,"test","-KILL",456),false);
+    assert.equal(dispatch(123,"test","-TERM",undefined),false);
+    assert.equal(confirmed,0);
+    assert.equal(dispatch(123,"test","-STOP",456),true);
+    assert.equal(dispatch(123,"test","-TERM",456),true);
+    assert.deepEqual(prepared,[[123,456,"test","freeze",0],[123,456,"test","end",0]]);
+    assert.equal(confirmed,2);
+    accept=false;
+    assert.equal(dispatch(123,"test","-TERM",456),false);
+    assert.equal(confirmed,2);
+    assert.equal(cancelled,0);
+    const first=presentation.indexOf("    function frozenIdentityKey(");
+    const last=presentation.indexOf("\n    }",first);
+    const key=new Function(presentation.slice(first,last+6)+"\nreturn frozenIdentityKey;")();
+    assert.notEqual(key(row),key({...row,startTicks:457}));
+    assert.equal(key({...row,startTicks:0}),"");
+    assert.match(presentation,/gate\.prepare\(Number\(target\.pid\), Number\(target\.startTicks\),\s*String\(target\.comm \|\| ""\), "resume", 0\)/);
+});

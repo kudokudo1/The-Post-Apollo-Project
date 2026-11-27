@@ -10,6 +10,8 @@ import time
 import sqlite3
 import stat
 from contextlib import closing
+from dataclasses import asdict
+import json
 
 if os.environ.get("CI") != "true" or os.environ.get("GITHUB_ACTIONS") != "true":
     raise SystemExit("FOREST_HOST_REQUIRES_GITHUB_ACTIONS")
@@ -99,6 +101,64 @@ def observe_joined_db(qs, scene, log):
         print("FOREST_HOST_DB_OBSERVED " + stage, flush=True)
 
 
+def capture_first_light():
+    """Actual FL5 disposable snapshots, not a live native control protocol."""
+    from test_first_light_trial_host import FirstLightHostTests
+    from test_ollama_chat_transport import packet
+    from first_light_delivery import FirstLightDelivery
+    from first_light_trial_host import PROMPT, MODEL, NUM_CTX, MAX_PREDICT
+
+    captures = {}
+    for stopped in (False, True):
+        helper = FirstLightHostTests()
+        d = None
+        try:
+            peer, transport = helper.peer([packet("RE"), packet("ADY", done=True)])
+            d = FirstLightDelivery(test_transport=transport)
+            view = object()
+            d.observe_view(view)
+            d.submit(view, PROMPT)
+            prepared = d.take(view)
+            for _ in range(4):
+                d.advance()
+            partial = d.take(view)
+            if (prepared.status != "PREPARED" or partial.status != "GENERATING"
+                    or partial.text != "RE" or not partial.provisional):
+                raise AssertionError("FIRST_LIGHT_CAPTURE_INITIAL")
+            snapshots = [prepared, partial]
+            if stopped:
+                if d.request_stop(view) != "STOP_LATCHED":
+                    raise AssertionError("FIRST_LIGHT_CAPTURE_STOP")
+                observed = d.take(view)
+                if observed.status != "STOP_REQUESTED" or not observed.provisional:
+                    raise AssertionError("FIRST_LIGHT_CAPTURE_STOP_STATE")
+                snapshots.append(observed)
+            for _ in range(12):
+                if d.owner_outcome()[0] in ("LOCAL_COMMITTED", "UNKNOWN_HOLD"):
+                    break
+                d.advance()
+            final = d.take(view)
+            expected = ("UNKNOWN_HOLD", "ABORTED_LOCAL", "") if stopped else (
+                "LOCAL_COMMITTED", "COMMITTED_LOCAL", "READY")
+            if ((final.status, final.local_outcome, final.text) != expected
+                    or final.provisional or d.owner_outcome() != expected[:2]):
+                raise AssertionError("FIRST_LIGHT_CAPTURE_TERMINAL")
+            snapshots.append(final)
+            if (any(s.native_admitted for s in snapshots)
+                    or any(a.sequence >= b.sequence for a, b in zip(snapshots, snapshots[1:]))
+                    or peer.observed != [("POST", "/api/chat", {
+                        "model": MODEL, "messages": [{"role": "user", "content": PROMPT}],
+                        "stream": True, "options": {"num_predict": MAX_PREDICT, "num_ctx": NUM_CTX}
+                    })]):
+                raise AssertionError("FIRST_LIGHT_CAPTURE_SCOPE")
+            captures["stop" if stopped else "commit"] = [asdict(s) for s in snapshots]
+        finally:
+            if d is not None:
+                d.close()
+            helper.doCleanups()
+    return {"prompt": PROMPT, "trials": captures}
+
+
 def trial(width, height, count):
     with tempfile.TemporaryDirectory(prefix="forest-private-wayland-") as name:
         work = Path(name)
@@ -142,6 +202,11 @@ def trial(width, height, count):
                      "capability_registry_b6r2.py", "runtime_stop_control_r2.py", "local_terminal_outbox_b4f.py"):
             shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
+        # A finite, pre-captured public witness from actual owner delivery.
+        # No command receiver, provider connection, or native admission.
+        capture = capture_first_light() if width >= 770 else {}
+        (scene / "FirstLightCapture.js").write_text(
+            "var capture = " + json.dumps(capture, ensure_ascii=True) + ";\n", encoding="ascii")
         for relative in ("widgets/ForestW.qml", "widgets/ForestChatList.qml",
                          "widgets/forest/ui2/PublicConversationFixture.qml",
                          "widgets/forest/ui2/PublicPreviewGate.qml",
@@ -223,6 +288,11 @@ def trial(width, height, count):
                            if "FOREST_HOST_TREE_PREFERENCE_ISOLATION_PASS " in line]
             if preferences != [str(expected_rail)]:
                 raise AssertionError("FOREST_HOST_TREE_PREFERENCE_ISOLATION_MISSING_OR_MISMATCH")
+            fl5 = [line.split("FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS ", 1)[1].strip()
+                   for line in output.splitlines()
+                   if "FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS " in line]
+            if fl5 != ([str(i) for i in range(11)] if width >= 770 else []):
+                raise AssertionError("FIRST_LIGHT_CAPTURE_PHASES")
             if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
                     season != ([str(i) for i in range(9)] if width >= 770 else []) or
                     output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

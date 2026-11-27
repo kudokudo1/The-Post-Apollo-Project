@@ -3,6 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "./widgets" as Widgets
 import "./widgets/forest/ui2" as Review
+import "./components" as Shared
+import "FirstLightCapture.js" as FirstLight
 
 // Actual ForestW PanelWindow, never an operator desktop or native model host.
 ShellRoot {
@@ -26,6 +28,9 @@ ShellRoot {
     property int reviewPhase: 0
     property int dormantPhase: 0
     property int seasonPhase: 0
+    property int firstLightPhase: 0
+    property var firstLightTail: null
+    property var firstLightOriginalComponent: null
     property var seasonRows: []
     property bool catalogDismissed: false
     property var originalPreviewComponent: null
@@ -985,8 +990,132 @@ ShellRoot {
             if (n===8) {
                 stop();
                 console.info("FOREST_HOST_SEASON_PLACEMENT_PASS");
-                finish();
+                firstLightPhase=0;
+                firstLightTimer.start();
             }
+        }
+    }
+    // CI-only placement of actual captured FL5 producer snapshots. This is
+    // deliberately NOT a new wire/control protocol or installed sender.
+    Component {
+        id: firstLightCaptureType
+        Shared.ConversationFeed {
+            showHeader: false
+            showComposer: false
+            sendEnabled: false
+            richMessageActions: false
+            messageTextFormat: Text.PlainText
+            streamingTailEnabled: true
+        }
+    }
+    function firstLightGeometry(item) {
+        const a=parts;
+        check(item && a.loader.active && a.loader.visible && a.loader.item===item
+            && item.width===a.pane.width && item.height===a.pane.height
+            && item.width>=300 && item.height>=160 && !a.empty.visible
+            && a.pane.y>=a.heading.y+a.heading.height
+            && a.pane.y+a.pane.height<=a.prompt.y
+            && a.pane.x+a.pane.width<=a.rail.x, "FL5 native capture placement");
+        check(!forest.chatHostTrusted && !a.send.enabledAction && !a.voice.backendReady
+            && item && !item.showComposer && !item.sendEnabled
+            && !item.richMessageActions, "FL5 capture must not unlock controls");
+    }
+    function firstLightBaseline(item, snapshot, scope) {
+        item.scopeId=scope;
+        item.conversation=({id:scope, displayNameInProfile:"Public First Light capture"});
+        item.messages=[{direction:"outgoing",body:FirstLight.capture.prompt},
+            {direction:"incoming",body:snapshot.text}];
+    }
+    function firstLightStep(n) {
+        const a=parts, data=FirstLight.capture;
+        if (n===0) {
+            check(!forest.menuOpen && !a.loader.active, "FL5 capture default off");
+            check(data.prompt==="Reply with READY." && data.trials.commit.length===3
+                && data.trials.stop.length===4
+                && data.trials.commit.concat(data.trials.stop).every(s=>s.native_admitted===false),
+                "FL5 actual capture scope");
+            firstLightOriginalComponent=a.loader.sourceComponent;
+            a.loader.sourceComponent=firstLightCaptureType;
+            forest.selectedTreeIndex=0;
+            forest.chassisLevel=0;
+            forest.menuOpen=true;
+        } else if (n===1) {
+            check(a.preview.interactive && !a.loader.active,"FL5 explicit capture entry");
+            a.input.text=data.prompt;
+            a.preview.leftClicked(null);
+        } else if (n===2) {
+            const item=a.loader.item;
+            firstLightGeometry(item);
+            if (failed) return;
+            check(item.messages.length===0 && item.conversation===null,"FL5 no sample fallback");
+            firstLightBaseline(item,data.trials.commit[1],"fl5-capture-commit");
+        } else if (n===3) {
+            const item=a.loader.item, list=find(item,"conversationMessages");
+            firstLightGeometry(item);
+            if (failed || !list) { check(false,"FL5 actual list missing"); return; }
+            list.forceLayout(); list.positionViewAtEnd(); list.forceLayout();
+            firstLightTail=list.itemAtIndex(1);
+            const final=data.trials.commit[2];
+            check(list.count===2 && firstLightTail && firstLightTail.renderedBody==="RE"
+                && final.status==="LOCAL_COMMITTED" && !final.provisional
+                && item.updateStreamingTail(item.effectiveScope,final.text),
+                "FL5 exact committed body");
+        } else if (n===4) {
+            const item=a.loader.item, list=find(item,"conversationMessages");
+            check(list && list.count===2 && list.itemAtIndex(1)===firstLightTail
+                && firstLightTail && firstLightTail.renderedBody==="READY"
+                && item.messages[1].body==="RE" && a.input.text===data.prompt,
+                "FL5 stable response row and unconsumed draft");
+            firstLightTail=null;
+            a.preview.leftClicked(null);
+        } else if (n===5) {
+            check(!a.loader.active && a.loader.item===null && a.input.text===data.prompt,
+                "FL5 original capture withdrawn");
+            a.preview.leftClicked(null);
+        } else if (n===6) {
+            const item=a.loader.item;
+            firstLightGeometry(item);
+            if (failed) return;
+            check(item.messages.length===0 && item.conversation===null
+                && !item._streamingTailActive,"FL5 replacement starts empty");
+            firstLightBaseline(item,data.trials.stop[1],"fl5-capture-stop");
+        } else if (n===7) {
+            const item=a.loader.item, list=find(item,"conversationMessages");
+            const observed=data.trials.stop[2], final=data.trials.stop[3];
+            check(list && list.count===2 && observed.status==="STOP_REQUESTED"
+                && observed.provisional && observed.local_outcome==="UNKNOWN_HOLD"
+                && final.status==="UNKNOWN_HOLD" && final.local_outcome==="ABORTED_LOCAL"
+                && final.text==="" && !final.provisional, "FL5 STOP distinct from local abort");
+            if (failed) return;
+            // Captured unknown policy discards provisional text, not user draft.
+            item.messages=[{direction:"outgoing",body:data.prompt}];
+        } else if (n===8) {
+            const item=a.loader.item, list=find(item,"conversationMessages");
+            check(list && list.count===1 && !item._streamingTailActive
+                && a.input.text===data.prompt && !a.send.enabledAction,
+                "FL5 unknown removes provisional response only");
+            forest.selectedTreeIndex=1;
+        } else if (n===9) {
+            check(!a.loader.active && a.loader.item===null && a.input.text===data.prompt,
+                "FL5 Tree change withdraws capture");
+            a.loader.sourceComponent=firstLightOriginalComponent;
+            forest.selectedTreeIndex=0;
+            forest.menuOpen=false;
+        } else if (n===10) {
+            check(!a.loader.active && a.loader.item===null && a.input.text==="",
+                "FL5 original host restored and closed");
+        }
+    }
+    Timer {
+        id: firstLightTimer
+        interval: 350
+        repeat: true
+        onTriggered: {
+            const n=firstLightPhase++;
+            firstLightStep(n);
+            if (failed) { stop(); finish(); return; }
+            console.info("FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS "+n);
+            if (n===10) { stop(); finish(); }
         }
     }
     Timer { id: joinedDrive; interval: 30; onTriggered: witness.driveJoined() }

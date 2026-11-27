@@ -41,8 +41,8 @@ Scope {
     readonly property var safety: safetyState
     readonly property var control: controlBackend
     readonly property var limits: limitBackend
-    // One long-lived execution lifecycle. Transitional donor supplies
-    // candidate policy and legacy confirmation presentation, not execution state.
+    // One long-lived execution lifecycle. Donor supplies legacy confirmation
+    // presentation only; process policies and live rows belong to this store.
     property var donorHunterHost: null
     // Transitional compositor snapshot; null is unknown, not an empty desktop.
     property var hunterVisibleWindows: null
@@ -52,6 +52,7 @@ Scope {
     HunterOperationController {
         id: hunterController
         host: root.donorHunterHost
+        policyOwner: root
         favoriteStoreObject: root.favoriteStore
         executor: hunterExecution
         refreshTimer: afterAction
@@ -160,7 +161,7 @@ Scope {
         if (!review || cpuBulkReview !== review || !cpuVisible
                 || donorActionBlocked || hunterOperationPhase !== "idle"
                 || actionGate.pending || actionGate.busy
-                || !hunterOperation.host || !hunterOperation.favoriteStoreObject) return false;
+                || !hunterOperation.policyReady) return false;
         // Consume the exact review once; never recompute or broaden it.
         if (!releaseCpuBulkReview(review)) return false;
         hunterOperation.start(review.kind, review.targets, true);

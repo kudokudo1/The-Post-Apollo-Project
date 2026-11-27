@@ -120,11 +120,27 @@ Scope {
     property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
         storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
+    // CPU has independent session calibration; switching SYSTEM targets never
+    // overwrites the general workshop or starts a capture.
+    property var cpuWorkshopDraft: ({durationSeconds:30, selected:["census"],
+        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
+        storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
+    function draftForSubject(subject) {
+        return subject==="CPU" ? cpuWorkshopDraft : workshopDraft;
+    }
+    function setDraftForSubject(subject, draft) {
+        if (workshopPresetLocked || !draft || !Array.isArray(draft.selected)
+                || !["CPU","ALL"].includes(subject)
+                || !draft.selected.every(k=>Calibration.workshopSubjectKinds(subject).includes(k))) return false;
+        if (subject==="CPU") cpuWorkshopDraft=draft;
+        else workshopDraft=draft;
+        return true;
+    }
     // D4a session presets. Persistence is a separate catalog milestone.
     property var workshopPresets: []
     property string workshopPresetFeedback: "SESSION ONLY // NO DISK SAVE"
     readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive
-    function saveWorkshopPreset(name) {
+    function saveWorkshopPreset(name, subject = "ALL") {
         if (workshopPresetLocked) return false;
         if (typeof name!=="string" || !/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(name) || name.trim()!==name) {
             workshopPresetFeedback="NAME // 1–32 LETTERS, NUMBERS, SPACE, _ OR -"; return false;
@@ -132,18 +148,20 @@ Scope {
         if (workshopPresets.length>=12 || workshopPresets.some(p=>p.name.toLowerCase()===name.toLowerCase())) {
             workshopPresetFeedback="NAME EXISTS OR SESSION LIMIT 12"; return false;
         }
-        const plan=Calibration.workshopPlanFromDraft(workshopDraft);
-        if (!Calibration.workshopDraftFromPlan(plan)) {workshopPresetFeedback="INVALID CALIBRATION";return false;}
+        const plan=Calibration.workshopPlanFromDraft(draftForSubject(subject));
+        if (!Calibration.workshopPlanMatchesSubject(plan,subject)) {workshopPresetFeedback="INVALID CALIBRATION";return false;}
         workshopPresets=workshopPresets.concat([{name:name,plan:JSON.parse(JSON.stringify(plan))}]);
         workshopPresetFeedback="SAVED FOR THIS SESSION";
         return true;
     }
-    function loadWorkshopPreset(name) {
+    function loadWorkshopPreset(name, subject = "ALL") {
         if (workshopPresetLocked) return false;
         const p=workshopPresets.find(row=>row.name===name);
         const next=p && Calibration.workshopDraftFromPlan(p.plan);
         if (!next) {workshopPresetFeedback="PRESET UNAVAILABLE";return false;}
-        workshopDraft=next;
+        if (!Calibration.workshopPlanMatchesSubject(p.plan,subject) || !setDraftForSubject(subject,next)) {
+            workshopPresetFeedback="WORKFLOW OUTSIDE SUBJECT"; return false;
+        }
         workshopPresetFeedback="LOADED // PREPARE REQUIRED";
         return true;
     }

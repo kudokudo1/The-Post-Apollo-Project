@@ -104,14 +104,14 @@ ShellRoot {
                         const source=light.source;
                         const p=source.mapToItem(localRadiance,source.width*light.fraction,source.height/2);
                         const h=source.height;
-                        const rx=h*(light.fire?4.2:3.6), ry=h*(light.fire?2.9:2.5);
+                        const rx=h*(light.fire?5.2:4.8), ry=h*(light.fire?3.7:3.5);
                         if(rx<=0 || ry<=0) continue;
                         const ink=light.color, a=light.level;
-                        c.save(); c.translate(p.x+light.side*h*.38,p.y); c.scale(rx,ry);
+                        c.save(); c.translate(p.x+(light.fire?source.flameTipOffset:light.side*h*.38),p.y); c.scale(rx,ry);
                         const g=c.createRadialGradient(0,0,0,0,0,1);
                         g.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,a));
-                        g.addColorStop(.25,Qt.rgba(ink.r,ink.g,ink.b,a*.72));
-                        g.addColorStop(.62,Qt.rgba(ink.r,ink.g,ink.b,a*.24));
+                        g.addColorStop(.25,Qt.rgba(ink.r,ink.g,ink.b,a*.85));
+                        g.addColorStop(.62,Qt.rgba(ink.r,ink.g,ink.b,a*.40));
                         g.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,0));
                         c.fillStyle=g; c.fillRect(-1,-1,2,2); c.restore();
                     }

@@ -168,11 +168,11 @@ ShellRoot {
                         // Let Burn Away expose the actual panel instead of a
                         // duplicate opaque ActionButton chassis underneath.
                         idleFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.black
-                        hoverFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.black
-                        pressedFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.black
+                        hoverFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.yellow
+                        pressedFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.magenta
                         idleBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
-                        hoverBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
-                        pressedBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
+                        hoverBorderColor: card.fireMode==="burn-away" ? "transparent" : Colors.orange
+                        pressedBorderColor: card.fireMode==="burn-away" ? "transparent" : Colors.magenta
                         contentGlowEnabled: false
                         softGlowEnabled: false
                         wideGlowEnabled: false

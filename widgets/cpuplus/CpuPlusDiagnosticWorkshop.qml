@@ -12,6 +12,10 @@ Column {
     spacing: compactLayout ? 1 : 2
     property real viewportHeight: 0
     property Item filterTarget: null
+    property Item executionTarget: null
+    readonly property int sliderCount: 1+["threads","memory","census","hostcpu","gpu","netio","swapio","diskio"].filter(k=>draft.selected.includes(k)).length
+    readonly property bool verticalLayout: subject!=="ALL" && viewportHeight>0 && (width<340 || (sliderCount>=3 && viewportHeight < sliderCount*(compactLayout?38:52)+(lowerInstrumentCount>0?176:0)+90))
+    readonly property real rackTravel: Math.max(45,Math.min(150,viewportHeight-(lowerInstrumentCount>0?instrumentHeight:0)-38))
     property string subject: "ALL"
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
@@ -28,7 +32,7 @@ Column {
         return qs && system ? "TARGET // QS + USER" : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
     }
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
-    readonly property int instrumentHeight: compactLayout ? 112 : Math.min(240,176+Math.floor(Math.max(0,viewportHeight-540)*0.35))
+    readonly property int instrumentHeight: verticalLayout ? Math.max(76,Math.min(112,Math.floor(viewportHeight*0.47))) : compactLayout ? 112 : Math.min(240,176+Math.floor(Math.max(0,viewportHeight-540)*0.35))
     readonly property int filterSize: compactLayout ? 24 : 32
     readonly property int filterGap: compactLayout ? 3 : 4
     readonly property int filterWidth: Math.min(filterSize,Math.max(16,Math.floor((width-68-filterCount*filterGap)/Math.max(1,filterCount))))
@@ -218,157 +222,191 @@ Column {
             maximumLineCount: 2
         }
     }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopDuration"
+    Grid {
+        objectName: "cpuplusWorkshopSliderRack"
         width: parent.width
-        compact: root.compactLayout
-        title: "DURATION"
-        readout: root.draft.durationSeconds+" SEC"
-        minimumValue: 1
-        maximumValue: 120
-        currentValue: root.draft.durationSeconds
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("durationSeconds",value)
-    }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopThreadInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.cyan
-        fillColor: Colors.cyan
-        visible: root.draft.selected.includes("threads")
-        title: "THREAD INTERVAL"
-        readout: root.draft.threadIntervalMs+" MS"
-        minimumValue: 0
-        maximumValue: 5
-        currentValue: root.threadIntervals.indexOf(root.draft.threadIntervalMs)
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("threadIntervalMs",root.threadIntervals[Math.round(value)])
-    }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopMemoryInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.magenta
-        fillColor: Colors.magenta
-        visible: root.draft.selected.includes("memory")
-        title: "MEMORY INTERVAL"
-        readout: root.draft.memoryIntervalMs/1000+" SEC"
-        minimumValue: 5
-        maximumValue: 60
-        currentValue: root.draft.memoryIntervalMs/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("memoryIntervalMs",value*1000)
-    }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopCensusInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.orange
-        fillColor: Colors.orange
-        visible: root.draft.selected.includes("census")
-        title: "PROCESS INTERVAL"
-        readout: root.draft.censusIntervalMs/1000+" SEC"
-        minimumValue: 1
-        maximumValue: 60
-        currentValue: root.draft.censusIntervalMs/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
-    }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopHostCpuInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.orange
-        fillColor: subjectColor
-        visible: root.draft.selected.includes("hostcpu")
-        title: "HOST SAMPLE INTERVAL"
-        readout: currentValue+" SEC"
-        minimumValue: 1
-        maximumValue: 5
-        currentValue: (root.draft.hostCpuIntervalMs||1000)/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("hostCpuIntervalMs",value*1000)
-    }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopGpuInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.omnitrix
-        fillColor: subjectColor
-        visible: root.draft.selected.includes("gpu")
-        title: "GPU SAMPLE INTERVAL"
-        readout: currentValue+" SEC"
-        minimumValue: 1
-        maximumValue: 5
-        currentValue: (root.draft.gpuIntervalMs||1000)/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("gpuIntervalMs",value*1000)
-    }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopNetIoInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.resourceColor("NETWORK")
-        fillColor: subjectColor
-        visible: root.draft.selected.includes("netio")
-        title: "NETWORK SAMPLE INTERVAL"
-        readout: currentValue+" SEC"
-        minimumValue: 1
-        maximumValue: 5
-        currentValue: (root.draft.netIoIntervalMs||1000)/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("netIoIntervalMs",value*1000)
+        columns: root.verticalLayout ? root.sliderCount : 1
+        spacing: root.verticalLayout ? 2 : root.spacing
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopDuration"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "DUR"
+            compact: root.compactLayout
+            title: "DURATION"
+            readout: root.draft.durationSeconds+" SEC"
+            minimumValue: 1
+            maximumValue: 120
+            currentValue: root.draft.durationSeconds
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("durationSeconds",value)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopThreadInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "THR"
+            compact: root.compactLayout
+            subjectColor: Colors.cyan
+            fillColor: Colors.cyan
+            visible: root.draft.selected.includes("threads")
+            title: "THREAD INTERVAL"
+            readout: root.draft.threadIntervalMs+" MS"
+            minimumValue: 0
+            maximumValue: 5
+            currentValue: root.threadIntervals.indexOf(root.draft.threadIntervalMs)
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("threadIntervalMs",root.threadIntervals[Math.round(value)])
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopMemoryInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "RAM"
+            compact: root.compactLayout
+            subjectColor: Colors.magenta
+            fillColor: Colors.magenta
+            visible: root.draft.selected.includes("memory")
+            title: "MEMORY INTERVAL"
+            readout: root.draft.memoryIntervalMs/1000+" SEC"
+            minimumValue: 5
+            maximumValue: 60
+            currentValue: root.draft.memoryIntervalMs/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("memoryIntervalMs",value*1000)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopCensusInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "PROC"
+            compact: root.compactLayout
+            subjectColor: Colors.orange
+            fillColor: Colors.orange
+            visible: root.draft.selected.includes("census")
+            title: "PROCESS INTERVAL"
+            readout: root.draft.censusIntervalMs/1000+" SEC"
+            minimumValue: 1
+            maximumValue: 60
+            currentValue: root.draft.censusIntervalMs/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopHostCpuInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "CPU"
+            compact: root.compactLayout
+            subjectColor: Colors.orange
+            fillColor: subjectColor
+            visible: root.draft.selected.includes("hostcpu")
+            title: "HOST SAMPLE INTERVAL"
+            readout: currentValue+" SEC"
+            minimumValue: 1
+            maximumValue: 5
+            currentValue: (root.draft.hostCpuIntervalMs||1000)/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("hostCpuIntervalMs",value*1000)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopGpuInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "GPU"
+            compact: root.compactLayout
+            subjectColor: Colors.omnitrix
+            fillColor: subjectColor
+            visible: root.draft.selected.includes("gpu")
+            title: "GPU SAMPLE INTERVAL"
+            readout: currentValue+" SEC"
+            minimumValue: 1
+            maximumValue: 5
+            currentValue: (root.draft.gpuIntervalMs||1000)/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("gpuIntervalMs",value*1000)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopNetIoInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "NET"
+            compact: root.compactLayout
+            subjectColor: Colors.resourceColor("NETWORK")
+            fillColor: subjectColor
+            visible: root.draft.selected.includes("netio")
+            title: "NETWORK SAMPLE INTERVAL"
+            readout: currentValue+" SEC"
+            minimumValue: 1
+            maximumValue: 5
+            currentValue: (root.draft.netIoIntervalMs||1000)/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("netIoIntervalMs",value*1000)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopSwapIoInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "SWAP"
+            compact: root.compactLayout
+            subjectColor: Colors.yellow
+            fillColor: subjectColor
+            visible: root.draft.selected.includes("swapio")
+            title: "SWAP SAMPLE INTERVAL"
+            readout: currentValue+" SEC"
+            minimumValue: 1
+            maximumValue: 5
+            currentValue: (root.draft.swapIoIntervalMs||1000)/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("swapIoIntervalMs",value*1000)
+        }
+        CpuPlusDiagnosticSlider {
+            objectName: "cpuplusWorkshopDiskIoInterval"
+            width: root.verticalLayout ? Math.max(1,Math.floor((parent.width-2*(root.sliderCount-1))/root.sliderCount)) : parent.width
+            vertical: root.verticalLayout
+            verticalTravel: root.rackTravel
+            shortTitle: "I/O"
+            compact: root.compactLayout
+            subjectColor: Colors.resourceColor("STORAGE")
+            fillColor: subjectColor
+            visible: root.draft.selected.includes("diskio")
+            title: "DISK I/O SAMPLE INTERVAL"
+            readout: currentValue+" SEC"
+            minimumValue: 1
+            maximumValue: 5
+            currentValue: (root.draft.diskIoIntervalMs||1000)/1000
+            adjustable: !root.locked
+            onValueRequested: value=>root.edit("diskIoIntervalMs",value*1000)
+        }
+    
     }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("netio")
+        visible: !root.verticalLayout && !root.compactLayout && root.draft.selected.includes("netio")
         text: "RX / TX / PACKETS / ERRORS / DROPS · 12 INTERVALS MAX"
         color: Colors.resourceColor("NETWORK")
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopSwapIoInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.yellow
-        fillColor: subjectColor
-        visible: root.draft.selected.includes("swapio")
-        title: "SWAP SAMPLE INTERVAL"
-        readout: currentValue+" SEC"
-        minimumValue: 1
-        maximumValue: 5
-        currentValue: (root.draft.swapIoIntervalMs||1000)/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("swapIoIntervalMs",value*1000)
-    }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("swapio")
+        visible: !root.verticalLayout && !root.compactLayout && root.draft.selected.includes("swapio")
         text: "SWAP IN / OUT / PSI / ZRAM · HOST · 12 INTERVALS MAX"
         color: Colors.yellow
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
-    CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopDiskIoInterval"
-        width: parent.width
-        compact: root.compactLayout
-        subjectColor: Colors.resourceColor("STORAGE")
-        fillColor: subjectColor
-        visible: root.draft.selected.includes("diskio")
-        title: "DISK I/O SAMPLE INTERVAL"
-        readout: currentValue+" SEC"
-        minimumValue: 1
-        maximumValue: 5
-        currentValue: (root.draft.diskIoIntervalMs||1000)/1000
-        adjustable: !root.locked
-        onValueRequested: value=>root.edit("diskIoIntervalMs",value*1000)
-    }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("diskio")
+        visible: !root.verticalLayout && !root.compactLayout && root.draft.selected.includes("diskio")
         text: "READ / WRITE / IOPS / IO TIME · WHOLE DEVICES · 12 INTERVALS MAX"
         color: Colors.resourceColor("STORAGE")
         font.pixelSize: 10
@@ -376,7 +414,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("hostcpu")
+        visible: !root.verticalLayout && !root.compactLayout && root.draft.selected.includes("hostcpu")
         text: "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
         color: Colors.orange
         font.pixelSize: 10
@@ -384,7 +422,7 @@ Column {
     }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("gpu")
+        visible: !root.verticalLayout && !root.compactLayout && root.draft.selected.includes("gpu")
         text: "BUSY / VRAM / TEMP1 · ALL DRM DEVICES · 12 SAMPLES MAX"
         color: Colors.omnitrix
         font.pixelSize: 10
@@ -731,50 +769,60 @@ Column {
             }
         }
     }
-    CpuPlusMemoryReadout {
-        objectName: "cpuplusWorkshopCalibrationStatus"
+    Column {
+        objectName: "cpuplusWorkshopPinnedExecution"
+        parent: root.executionTarget || root
         width: parent.width
-        text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
-            : CpuPlusDiagnostics.busy ? "SHARED CAPTURE ACTIVE // "+CpuPlusDiagnostics.kind.toUpperCase()
-            : root.ready ? "SECOND CLICK STARTS CAPTURE"
-            : root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
-            : root.preview.reason
-        // Multi-instrument previews have a separate aggregate observation field.
-        color: root.recording ? Colors.green : root.ready ? Colors.orange : root.preview.ok ? Colors.omnitrix : Colors.yellow
-        font.pixelSize: 10
-        wrapMode: Text.Wrap
-    }
-    Row {
-        width: parent.width
-        spacing: 4
-        CpuPlusDiagnosticExecutionButton {
-            objectName: "cpuplusWorkshopExecute"
-            width: Math.max(0,parent.width-40)
-            height: root.compactLayout ? 28 : 34
-            phase: root.phase
-            caption: root.phase==="READY" ? "READY // START"
-                : root.phase==="RECORDING" ? "RECORDING // "+Math.floor(root.elapsedFraction*100)+"% TIME"
-                : root.phase==="RETRY" ? "NOT VERIFIED // PREPARE" : root.phase
-            progress: root.phase==="READY" || root.phase==="COMPLETE" ? 1
-                : root.phase==="RECORDING" || root.phase==="STOPPING" ? root.elapsedFraction : 0
-            available: true
-            interactive: !root.locked && !root.calibrating && root.preview.ok
-            onLeftClicked: root.activate()
+        spacing: 2
+    
+        CpuPlusMemoryReadout {
+            objectName: "cpuplusWorkshopCalibrationStatus"
+            width: parent.width
+            text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
+                : CpuPlusDiagnostics.busy ? "SHARED CAPTURE ACTIVE // "+CpuPlusDiagnostics.kind.toUpperCase()
+                : root.ready ? "SECOND CLICK STARTS CAPTURE"
+                : root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
+                : root.preview.reason
+            // Multi-instrument previews have a separate aggregate observation field.
+            color: root.recording ? Colors.green : root.ready ? Colors.orange : root.preview.ok ? Colors.omnitrix : Colors.yellow
+            font.pixelSize: 10
+            height: 14
+            elide: Text.ElideRight
+            wrapMode: Text.NoWrap
         }
-        ActionButton {
-            objectName: "cpuplusWorkshopStop"
-            width: 36
-            height: root.compactLayout ? 28 : 34
-            label: "■"
-            labelPixelSize: 21
-            accentColor: Colors.red
-            destructive: true
-            available: root.recording && !CpuPlusDiagnostics.cancelled
-            acceptedButtons: Qt.LeftButton
-            Accessible.name: "Stop diagnostic recording"
-            Accessible.role: Accessible.Button
-            Accessible.onPressAction: if (available) CpuPlusDiagnostics.cancel()
-            onLeftClicked: CpuPlusDiagnostics.cancel()
+        Row {
+            width: parent.width
+            spacing: 4
+            CpuPlusDiagnosticExecutionButton {
+                objectName: "cpuplusWorkshopExecute"
+                width: Math.max(0,parent.width-40)
+                height: 28
+                phase: root.phase
+                caption: root.phase==="READY" ? "READY // START"
+                    : root.phase==="RECORDING" ? "RECORDING // "+Math.floor(root.elapsedFraction*100)+"% TIME"
+                    : root.phase==="RETRY" ? "NOT VERIFIED // PREPARE" : root.phase
+                progress: root.phase==="READY" || root.phase==="COMPLETE" ? 1
+                    : root.phase==="RECORDING" || root.phase==="STOPPING" ? root.elapsedFraction : 0
+                available: true
+                interactive: !root.locked && !root.calibrating && root.preview.ok
+                onLeftClicked: root.activate()
+            }
+            ActionButton {
+                objectName: "cpuplusWorkshopStop"
+                width: 36
+                height: 28
+                label: "■"
+                labelPixelSize: 21
+                accentColor: Colors.red
+                destructive: true
+                available: root.recording && !CpuPlusDiagnostics.cancelled
+                acceptedButtons: Qt.LeftButton
+                Accessible.name: "Stop diagnostic recording"
+                Accessible.role: Accessible.Button
+                Accessible.onPressAction: if (available) CpuPlusDiagnostics.cancel()
+                onLeftClicked: CpuPlusDiagnostics.cancel()
+            }
         }
+    
     }
 }

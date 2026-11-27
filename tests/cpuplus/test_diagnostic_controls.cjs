@@ -259,8 +259,8 @@ const workshopSlider=read("widgets/cpuplus/CpuPlusDiagnosticSlider.qml");
 const executionFace=read("widgets/cpuplus/CpuPlusDiagnosticExecutionButton.qml");
 assert.match(ui,/sourceComponent: CpuPlusDiagnosticWorkshop\s*\{/);
 assert.match(workshopSlider,/SelectorSlider\s*\{/);
-assert.match(workshopSlider,/rotation: 90/);
-assert.match(workshopSlider,/horizontalStepPresentation: true/);
+assert.match(workshopSlider,/rotation: root\.vertical \? 0 : 90/);
+assert.match(workshopSlider,/horizontalStepPresentation: !root\.vertical/);
 assert.match(workshopSlider,/property color subjectColor: Colors.white/);
 assert.match(workshopSlider,/property color fillColor: Colors.omnitrix/);
 assert.match(workshop,/SelectorDial\s*\{/);
@@ -297,8 +297,8 @@ assert.match(workshop,/storagePreview.observations/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
 assert.match(workshop,/instrumentHeight: compactLayout \? 112 : Math.min\(240,176\+/);
-assert.match(workshopSlider,/height: root.compact \? 22 : 32/);
-assert.match(workshopSlider,/width: parent.height\s+height: parent.width/);
+assert.match(workshopSlider,/height: root\.vertical \? root\.verticalTravel : \(root\.compact \? 22 : 32\)/);
+assert.match(workshopSlider,/width: root\.vertical \? Math\.min\(parent\.width,32\) : parent\.height\s+height: root\.vertical \? parent\.height : parent\.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
 console.log("DIAG D3c adaptive full-width layout contracts PASS");
 
@@ -694,6 +694,15 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.match(parent,/objectName: "cpuplusMemoryDiagnosticsInfo"/);
     const resource=read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml");
     assert.match(resource,/readonly property int railColumns: general \? 5/);
-    assert.match(resource,/readonly property bool stacked: general && width<270/);
+    assert.match(resource,/readonly property bool stacked: false/);
     assert.match(resource,/wrapMode: Text.NoWrap/);
 }
+
+assert.match(workshopSlider,/focusBorderColor: Colors.magenta/);
+assert.match(workshopSlider,/compactVerticalStep: root\.vertical/);
+assert.match(workshop,/objectName: "cpuplusWorkshopSliderRack"/);
+assert.match(workshop,/parent: root\.executionTarget \|\| root/);
+assert.match(ui,/id: pinnedExecutionHost/);
+assert.match(parent,/memoryDiagnosticInfo\.hovered/);
+assert.match(parent,/objectName: "cpuplusMemoryDiagnosticsInfoPopup"/);
+assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/resourceInfoButton\.hovered/);

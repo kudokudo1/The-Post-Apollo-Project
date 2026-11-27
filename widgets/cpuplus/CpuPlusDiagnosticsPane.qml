@@ -15,6 +15,7 @@ Column {
     property Item workshopFilterTarget: null
     readonly property string workshopTargetText: workshopLoader.item ? workshopLoader.item.targetText : ""
     property Item footerTarget: null
+    readonly property real footerHeight: workshopOpen && workshopSubject!=="ALL" ? 100 : 53
     property real workshopViewportHeight: 0
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
@@ -270,6 +271,7 @@ Column {
         sourceComponent: CpuPlusDiagnosticWorkshop {
             viewportHeight: root.workshopViewportHeight
             filterTarget: root.workshopFilterTarget
+            executionTarget: root.workshopSubject==="ALL" ? null : pinnedExecutionHost
             subject: root.workshopSubject
         }
     }
@@ -952,6 +954,16 @@ Column {
     }
     Column {
         parent: root.footerTarget || root
+        width: parent.width
+        spacing: 3
+        Item {
+            id: pinnedExecutionHost
+            objectName: "cpuplusDiagExecutionHost"
+            width: parent.width
+            height: 44
+            visible: root.workshopOpen && root.workshopSubject!=="ALL"
+        }
+        Column {
         objectName: "cpuplusDiagBottomControls"
         width: parent.width
         spacing: 3
@@ -1017,6 +1029,7 @@ Column {
                     onLeftClicked: root.selectView(modelData.key)
                 }
             }
+        }
         }
     }
     GohuText {

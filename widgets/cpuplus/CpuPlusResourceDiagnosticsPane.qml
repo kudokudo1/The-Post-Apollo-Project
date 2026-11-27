@@ -11,7 +11,7 @@ Item {
     required property string subject
     readonly property color subjectColor: Colors.resourceColor(subject)
     readonly property var instrumentKinds: Calibration.workshopSubjectKinds(subject)
-    property bool informationOpen: false
+    readonly property bool informationOpen: resourceInfoButton.hovered
 
     Column {
         id: header
@@ -20,6 +20,24 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         spacing: 4
+        Row {
+            objectName: "cpuplusResourceMenuRail"
+            width: parent.width
+            height: 28
+            ActionButton {
+                objectName: "cpuplusResourceMode-DIAG"
+                width: Math.max(0,Math.floor((parent.width-4*(parent.width>=240?5:2))/(parent.width>=240?6:3)))
+                height: 28
+                label: "DIAG"
+                contentPadding: 2
+                selected: true
+                accentColor: Colors.cyan
+                selectedForegroundColor: Colors.magenta
+                selectedBorderColor: Colors.magenta
+                normalFace: true
+                onLeftClicked: diagnostics.selectView("WORK")
+            }
+        }
         Row {
             width: parent.width
             spacing: 4
@@ -33,23 +51,10 @@ Item {
                 elide: Text.ElideRight
             }
             InformationButton {
+                id: resourceInfoButton
                 objectName: "cpuplusResourceDiagnosticsInfo"
                 selected: root.informationOpen
-                onLeftClicked: root.informationOpen=!root.informationOpen
             }
-        }
-        GohuText {
-            width: parent.width
-            visible: root.informationOpen
-            text: root.subject==="SYSTEM" ? "General diagnostic workshop: all ten instruments, shared reports and workflow sets. Select any combination; calibration and capture budgets still apply. Selecting a resource row does not change this workshop." : root.subject==="CPU"
-                ? "Read-only host CPU capture, same-user process census and Quickshell threads. Host busy is 0–100% of aggregate capacity; process CPU can exceed 100%. Driver frequency and kernel PSI may be unavailable. Host capture runs alone; the report archive and sequential workflow queue are shared."
-                : root.subject==="GPU" ? "All hardware DRM cards are observed independently, regardless of the selected SYSTEM row. Busy, VRAM and uniquely associated hwmon temp1 depend on driver support. No process attribution, stress test or clock changes. Reports and workflow queue are shared."
-                : root.subject==="NETWORK" ? "Read-only RX/TX bytes, packets, errors and drops per visible interface, including virtual and loopback. No aggregate across stacked interfaces, no test traffic, endpoint inspection or latency measurement. Reports and workflow queue are shared."
-                : root.subject==="STORAGE" ? "Observe 18 fixed Post-Apollo file metadata targets: size, modification time, replacement and availability. No file contents or directory traversal. Scope is independent of the selected disk row; this does not measure physical disk throughput, writes, transactions or writer identity. DISK I/O is a separate whole-device counter instrument; no partition or virtual-layer aggregation. Reports and workflow queue are shared."
-                : "No qualified resource-specific instrument."
-            color: Colors.white
-            font.pixelSize: 10
-            wrapMode: Text.WordWrap
         }
         Rectangle {
             objectName: "cpuplusResourceDiagnosticsDivider"
@@ -65,18 +70,18 @@ Item {
             objectName: "cpuplusResourceStatusBand"
             width: parent.width
             readonly property bool general: root.subject==="SYSTEM"
-            readonly property bool stacked: general && width<270 && filterHost.visible
-            readonly property int lineHeight: general ? 16 : Math.max(7,Math.min(11,
+            readonly property bool stacked: false
+            readonly property int lineHeight: general ? 12 : Math.max(7,Math.min(11,
                 Math.floor((Math.min(36,Math.floor((width*0.57-3*Math.max(0,root.instrumentKinds.length-1))/Math.max(1,root.instrumentKinds.length)))-2)/3)))
             readonly property int toolSize: 3*lineHeight+2
             readonly property int railColumns: general ? 5 : Math.max(1,root.instrumentKinds.length)
             readonly property int railRows: Math.max(1,Math.ceil(root.instrumentKinds.length/railColumns))
             readonly property int railButtonSize: general
-                ? Math.max(1,Math.min(35,Math.floor(((stacked?width:width-130)-12)/5)))
+                ? Math.max(1,Math.min(Math.floor((toolSize-3)/2),Math.floor((width*0.60-12)/5)))
                 : toolSize
             readonly property int railHeight: railRows*railButtonSize+3*(railRows-1)
-            readonly property real readoutHeight: general ? Math.max(lineHeight,(railHeight-2)/3) : (railHeight-2)/3
-            height: stacked ? statusBlock.height+4+filterHost.height : Math.max(statusBlock.height,filterHost.height)
+            readonly property real readoutHeight: general ? lineHeight : (railHeight-2)/3
+            height: Math.max(statusBlock.height,filterHost.height)
             clip: true
             Column {
                 id: statusBlock
@@ -104,7 +109,7 @@ Item {
                     height: statusBand.readoutHeight
                     clip: true
                     wrapMode: Text.NoWrap
-                    text: root.subject==="SYSTEM" ? "PSI // CPU / SWAP CAPTURES" : root.subject==="CPU" ? "PSI // HOST CAPTURE ONLY" : "PSI // NOT MEASURED"
+                    text: root.subject==="SYSTEM" ? (statusBlock.width<150?"PSI // CPU / SWAP":"PSI // CPU / SWAP CAPTURES") : root.subject==="CPU" ? "PSI // HOST CAPTURE ONLY" : "PSI // NOT MEASURED"
                     color: Colors.yellow
                     font.pixelSize: 10
                     fontSizeMode: Text.Fit
@@ -177,7 +182,34 @@ Item {
         Item {
             id: footerControls
             width: parent.width
-            height: 53
+            height: diagnostics.footerHeight
+        }
+    }
+    Rectangle {
+        objectName: "cpuplusResourceDiagnosticsInfoPopup"
+        visible: root.informationOpen && root.visible
+        z: 401
+        x: 0
+        y: resourceInfoButton.mapToItem(root,0,resourceInfoButton.height).y+3
+        width: root.width
+        height: Math.min(Math.max(0,root.height-y),resourceHelpText.implicitHeight+12)
+        color: Colors.black
+        border.color: Colors.yellow
+        clip: true
+        GohuText {
+            id: resourceHelpText
+            width: Math.max(0,parent.width-12)
+            x: 6
+            y: 6
+            text: root.subject==="SYSTEM" ? "General diagnostic workshop: all ten instruments, shared reports and workflow sets. Select any combination; calibration and capture budgets still apply. Selecting a resource row does not change this workshop." : root.subject==="CPU"
+                ? "Read-only host CPU capture, same-user process census and Quickshell threads. Host busy is 0–100% of aggregate capacity; process CPU can exceed 100%. Driver frequency and kernel PSI may be unavailable. Host capture runs alone; the report archive and sequential workflow queue are shared."
+                : root.subject==="GPU" ? "All hardware DRM cards are observed independently, regardless of the selected SYSTEM row. Busy, VRAM and uniquely associated hwmon temp1 depend on driver support. No process attribution, stress test or clock changes. Reports and workflow queue are shared."
+                : root.subject==="NETWORK" ? "Read-only RX/TX bytes, packets, errors and drops per visible interface, including virtual and loopback. No aggregate across stacked interfaces, no test traffic, endpoint inspection or latency measurement. Reports and workflow queue are shared."
+                : root.subject==="STORAGE" ? "Observe 18 fixed Post-Apollo file metadata targets: size, modification time, replacement and availability. No file contents or directory traversal. Scope is independent of the selected disk row; this does not measure physical disk throughput, writes, transactions or writer identity. DISK I/O is a separate whole-device counter instrument; no partition or virtual-layer aggregation. Reports and workflow queue are shared."
+                : "No qualified resource-specific instrument."
+            color: Colors.white
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
         }
     }
 }

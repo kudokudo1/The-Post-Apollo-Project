@@ -124,3 +124,21 @@ must survive crash or unknown. H14-D complete original lifetime
 Do not select relaxed limits or H15 CPU-only exception here. Local
 abort, STOP, observer loss or timeout never release a native claim.
 No actual model invocation, new issuer, or UI connection in FL4.
+
+
+## FL6 // Original worker iterator lifetime
+
+The direct host iterator is now acquired once on the original worker,
+not a bare suspended generator passed around by callers. Every next
+and close checks the original thread object (not a recyclable numeric
+thread ID) and refuses reentry. The owner host pins the original iterator
+until explicit owner closure or exhaustion. An unstarted iterator that
+is closed remains spent, with UNKNOWN_HOLD and no reservation or POST.
+Foreign resume/close cannot consume the reservation or run cleanup.
+STOP still uses the separate R2/R3 control path. FL5 uses the same
+iterator/close contract, with no UI raw-frame exposure.
+
+This is local lifecycle enforcement, not a Python sandbox or process
+isolation. The owner must explicitly close/exhaust the iterator; abandoned
+host/object finalization and process death are not independently recoverable
+effect custody. No native permission, release inference or safe retry.

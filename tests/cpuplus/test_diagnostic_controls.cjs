@@ -423,6 +423,11 @@ for(const source of [chassis,automotive,stopwatchDialSource]) assert.match(sourc
 assert.match(automotive,/screwColor: root.screwColor/);
 assert.equal((stopwatchDialSource.match(/screwColor: dialRoot.screwColor/g)||[]).length,2);
 assert.match(chassis,/function onScrewColorChanged\(\) \{ plate.requestPaint\(\) \}/);
+for(const source of [chassis,automotive,stopwatchDialSource]) assert.match(source,/property real screwColorStrength: 0\.75/);
+assert.match(automotive,/screwColorStrength: root.screwColorStrength/);
+assert.equal((stopwatchDialSource.match(/screwColorStrength: dialRoot.screwColorStrength/g)||[]).length,2);
+assert.match(chassis,/function onScrewColorStrengthChanged\(\) \{ plate.requestPaint\(\) \}/);
+assert.match(chassis,/Math.max\(0,Math.min\(1,screwColorStrength\)\)/);
 for(const [property,value] of [["screwShadow","0.75"],["screwDirectLight","0.20"],["screwReflectedLight","0.10"],["screwCatchlight","0.40"],["screwRecessDepth","0.14"]]) assert.ok(chassis.includes("readonly property real "+property+": "+value));
 assert.ok(chassis.indexOf("disk(head,shade)") > chassis.indexOf("cross(half,arm,metal"));
 assert.ok(chassis.indexOf("Fixed screen-space top-right catchlight") > chassis.indexOf("disk(head,shade)"));

@@ -68,7 +68,10 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         # original vertical ruler insets and usable thumb travel.
         self.assertIn('selectorProfile: "index"', rail)
         self.assertNotIn("horizontalStepPresentation: true", rail)
+        self.assertNotIn("compactVerticalStep: true", rail)
         self.assertIn("property bool horizontalStepPresentation: false", slider)
+        self.assertIn("property bool compactVerticalStep: false", slider)
+        self.assertIn('readonly property bool stepMode: selectorProfile === "step"', slider)
         self.assertIn("readonly property bool horizontalStep: stepMode && horizontalStepPresentation", slider)
         scale = slider.split("id: scaleArea", 1)[1].split("Repeater {", 1)[0]
         # An external STEP readout now includes compact vertical STEP, not

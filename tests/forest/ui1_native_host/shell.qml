@@ -31,6 +31,23 @@ ShellRoot {
     property int firstLightPhase: 0
     property var firstLightTail: null
     property var firstLightOriginalComponent: null
+    property bool fl7Active: false
+    property int fl7Case: 0
+    property int fl7Epoch: 0
+    property var fl7View: null
+    property bool fl7ObservedVisible: false
+    property var fl7OriginalView: null
+    property int fl7OriginalEpoch: 0
+    property bool fl7Withdrawn: false
+    property var fl7Parent: null
+    property var fl7Plan: []
+    property int fl7Index: 0
+    property int fl7Stage: 0
+    property int fl7Sequence: 0
+    property var fl7Tail: null
+    property var fl7Late: null
+    property bool fl8FinalObserved: false
+    property int fl8Polls: 0
     property var seasonRows: []
     property bool catalogDismissed: false
     property var originalPreviewComponent: null
@@ -1115,9 +1132,267 @@ ShellRoot {
             firstLightStep(n);
             if (failed) { stop(); finish(); return; }
             console.info("FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS "+n);
-            if (n===10) { stop(); finish(); }
+            if (n===10) { stop(); fl7Case=0; beginFL7(); }
         }
     }
+
+    // FL7 uses the actual Runtime-owned test child. The parent only drives
+    // its exact fixed commands, never opens a provider or owns a journal.
+    Component { id: fl7ParentType; FirstLightProcess {} }
+    function observeFL7() {
+        if (!fl7Active || !parts.loader) return;
+        const candidate = forest.menuOpen && forest.activeTree.sessionKey==="CHERRY"
+            && parts.loader.active && parts.loader.visible ? parts.loader.item : null;
+        // A destroyed QML wrapper can already compare equal to null.
+        // Preserve the previously observed visibility independently.
+        const visible=candidate!==null;
+        if (candidate===fl7View && visible===fl7ObservedVisible) return;
+        if (fl7OriginalEpoch>0)
+            fl7Withdrawn=true;
+        fl7View=candidate;
+        fl7ObservedVisible=visible;
+        fl7Epoch++;
+    }
+    Connections {
+        target: forest
+        function onMenuOpenChanged() { witness.observeFL7(); }
+        function onSelectedTreeIndexChanged() { witness.observeFL7(); }
+    }
+    Connections {
+        target: witness.parts.loader || null
+        function onItemChanged() { witness.observeFL7(); }
+        function onVisibleChanged() { witness.observeFL7(); }
+        function onActiveChanged() { witness.observeFL7(); }
+    }
+    function fl7Current() {
+        observeFL7();
+        return fl7Active && !fl7Withdrawn && fl7OriginalView!==null
+            && fl7View===fl7OriginalView && fl7Epoch===fl7OriginalEpoch
+            && parts.loader.item===fl7OriginalView;
+    }
+    function beginFL7() {
+        check(!forest.menuOpen && !parts.loader.active, "FL7 closed baseline");
+        fl7Epoch=0; fl7OriginalEpoch=0; fl7View=null; fl7ObservedVisible=false;
+        fl7OriginalView=null; fl7Withdrawn=false;
+        fl7Sequence=0; fl7Tail=null; fl7Late=null; fl7Stage=0; fl7Index=0;
+        fl8FinalObserved=false; fl8Polls=0;
+        fl7Active=true;
+        parts.loader.sourceComponent=firstLightCaptureType;
+        forest.selectedTreeIndex=0;
+        forest.menuOpen=true;
+        fl7Timer.start();
+    }
+    function fl7Exact(value, keys) {
+        return value!==null && typeof value==="object" && !Array.isArray(value)
+            && Object.keys(value).sort().join(",")===keys.slice().sort().join(",");
+    }
+    function fl7Equal(value, expected) {
+        return JSON.stringify(value)===JSON.stringify(expected);
+    }
+    function fl7Snapshot(reply, status, text, local, provisional, render) {
+        if (!fl7Exact(reply,["ok","epoch","snapshot"]) || reply.ok!==true
+                || reply.epoch!==fl7OriginalEpoch) return false;
+        const s=reply.snapshot;
+        if (!fl7Exact(s,["sequence","status","text","local_outcome","provisional","native_admitted"])
+                || !Number.isSafeInteger(s.sequence) || s.sequence<=fl7Sequence
+                || s.status!==status || s.text!==text || s.local_outcome!==local
+                || s.provisional!==provisional || s.native_admitted!==false) return false;
+        fl7Sequence=s.sequence;
+        return fl7Render(s,render);
+    }
+    function fl7Render(s, render) {
+        // Same gate for immediate and already-dequeued delayed snapshots.
+        if (!fl7Current()) return false;
+        const item=fl7OriginalView;
+        if (render==="BASE")
+            firstLightBaseline(item,s,"fl7-"+String(fl7Case));
+        else if (render==="GROW")
+            return item.updateStreamingTail(item.effectiveScope,s.text);
+        else if (render==="DISCARD")
+            item.messages=[{direction:"outgoing",body:FirstLight.capture.prompt}];
+        else if (render==="HOLD")
+            fl7Late=s; // intentionally delayed past Tree withdrawal in case 3
+        return true;
+    }
+    function fl7Stable(body, captureTail) {
+        if (!fl7Current()) return false;
+        const item=fl7OriginalView, list=find(item,"conversationMessages");
+        if (!list) return false;
+        list.forceLayout();
+        if (captureTail) {
+            list.positionViewAtEnd(); list.forceLayout();
+            fl7Tail=list.itemAtIndex(1);
+        }
+        firstLightGeometry(item);
+        return !failed && list.count===2 && fl7Tail && list.itemAtIndex(1)===fl7Tail
+            && fl7Tail.renderedBody===body && item.messages[1].body==="RE"
+            && parts.input.text===FirstLight.capture.prompt;
+    }
+    function makeFL7Plan() {
+        const e=fl7OriginalEpoch, prompt=parts.input.text;
+        const plan=[];
+        const cmd=(c,v)=>plan.push({cmd:c,verify:v});
+        const local=(f)=>plan.push({local:f});
+        const eq=(v)=>r=>fl7Equal(r,v);
+        const okay=eq({ok:true});
+        const take=(s,t,l,p,r)=>cmd({op:"TAKE",epoch:e},v=>fl7Snapshot(v,s,t,l,p,r));
+        cmd({op:"OBSERVE",epoch:e,visible:true},eq({ok:true,epoch:e}));
+        cmd({op:"SUBMIT",epoch:e,prompt:prompt},okay);
+        take("PREPARED","","UNKNOWN_HOLD",false,"");
+        for (let n=0;n<4;n++) cmd({op:"STEP"},okay);
+        take("GENERATING","RE","UNKNOWN_HOLD",true,"BASE");
+        local(()=>fl7Stable("RE",true));
+        if (fl7Case===0) {
+            cmd({op:"STEP"},okay); cmd({op:"STEP"},okay);
+            take("LOCAL_COMMITTED","READY","COMMITTED_LOCAL",false,"GROW");
+            local(()=>fl7Stable("READY",false));
+            cmd({op:"OUTCOME"},eq({ok:true,status:"LOCAL_COMMITTED",local_outcome:"COMMITTED_LOCAL"}));
+            cmd({op:"CLOSE"},eq({ok:true,local_outcome:"COMMITTED_LOCAL"}));
+        } else if (fl7Case===1) {
+            cmd({op:"STOP",epoch:e},eq({ok:true,ack:"STOP_LATCHED"}));
+            take("STOP_REQUESTED","RE","UNKNOWN_HOLD",true,"");
+            cmd({op:"STEP"},okay);
+            take("UNKNOWN_HOLD","","ABORTED_LOCAL",false,"DISCARD");
+            local(()=>{
+                if (!fl7Current()) return false;
+                const list=find(fl7OriginalView,"conversationMessages");
+                return list && list.count===1 && !fl7OriginalView._streamingTailActive
+                    && parts.input.text===prompt && !parts.send.enabledAction;
+            });
+            cmd({op:"OUTCOME"},eq({ok:true,status:"UNKNOWN_HOLD",local_outcome:"ABORTED_LOCAL"}));
+            cmd({op:"CLOSE"},eq({ok:true,local_outcome:"ABORTED_LOCAL"}));
+        } else if (fl7Case===2) {
+            cmd({op:"STEP"},okay);
+            take("GENERATING","READY","UNKNOWN_HOLD",true,"HOLD");
+            local(()=>{
+                fl7Tail=null;
+                forest.selectedTreeIndex=1;
+                observeFL7();
+                return fl7Withdrawn && fl7Epoch===e+1 && fl7View===null
+                    && !fl7Current() && fl7Late!==null;
+            });
+            cmd({op:"OBSERVE",epoch:e+1,visible:false},eq({ok:true,epoch:e+1}));
+            local(()=>{
+                forest.selectedTreeIndex=0;
+                return !parts.loader.active && parts.loader.item===null;
+            });
+            local(()=>{ parts.preview.leftClicked(null); return true; });
+            local(()=>{
+                observeFL7();
+                const item=parts.loader.item;
+                // Actually attempt the same render gate with the previously
+                // validated, dequeued old snapshot; absence alone is not proof.
+                return fl7Withdrawn && fl7Epoch===e+2 && fl7View===item
+                    && item && fl7Late!==null && !fl7Render(fl7Late,"GROW")
+                    && item.messages.length===0 && !item._streamingTailActive;
+            });
+            cmd({op:"OBSERVE",epoch:e+2,visible:true},eq({ok:true,epoch:e+2}));
+            cmd({op:"TAKE",epoch:e+2},eq({ok:true,epoch:e+2,snapshot:null}));
+            cmd({op:"STOP",epoch:e+2},eq({ok:true,ack:"STOP_UNAVAILABLE"}));
+            cmd({op:"STEP"},okay);
+            cmd({op:"OUTCOME"},eq({ok:true,status:"LOCAL_COMMITTED",local_outcome:"COMMITTED_LOCAL"}));
+            cmd({op:"TAKE",epoch:e+2},eq({ok:true,epoch:e+2,snapshot:null}));
+            cmd({op:"CLOSE"},eq({ok:true,local_outcome:"COMMITTED_LOCAL"}));
+        } else {
+            // FL8: one outstanding step, independent control before poll.
+            // The CLI peer emits both deltas immediately; the worker may
+            // finish the step before STOP arrives. This proves the pending
+            // control boundary, not an independently blocked socket read.
+            const refused=eq({ok:false,error:"COMMAND_REFUSED"});
+            cmd({op:"STEP_BEGIN"},okay);
+            cmd({op:"STEP_BEGIN"},refused);
+            cmd({op:"OUTCOME"},refused);
+            cmd({op:"STOP",epoch:e},eq({ok:true,ack:"STOP_LATCHED"}));
+            cmd({op:"CLOSE"},refused);
+            plan.push({cmd:{op:"STEP_POLL"},poll:true,
+                verify:eq({ok:true,done:true})});
+            cmd({op:"TAKE",epoch:e},r=>{
+                const s=r&&r.snapshot;
+                if (!s) return false;
+                if (s.status==="UNKNOWN_HOLD") {
+                    const ok=fl7Snapshot(r,"UNKNOWN_HOLD","","ABORTED_LOCAL",false,"DISCARD");
+                    fl8FinalObserved=ok;
+                    return ok;
+                }
+                if (s.text!=="RE" && s.text!=="READY") return false;
+                return fl7Snapshot(r,"STOP_REQUESTED",s.text,"UNKNOWN_HOLD",true,"");
+            });
+            // If the outstanding advance emitted the second delta before
+            // STOP, only the next original advance observes terminal abort.
+            plan.push({cmd:{op:"STEP"},verify:okay,when:()=>!fl8FinalObserved});
+            plan.push({cmd:{op:"TAKE",epoch:e},when:()=>!fl8FinalObserved,
+                verify:r=>fl7Snapshot(r,"UNKNOWN_HOLD","","ABORTED_LOCAL",false,"DISCARD")});
+            local(()=>{
+                if (!fl7Current()) return false;
+                const item=fl7OriginalView, list=find(item,"conversationMessages");
+                return list && list.count===1 && !item._streamingTailActive
+                    && parts.input.text===prompt && !parts.send.enabledAction;
+            });
+            cmd({op:"OUTCOME"},eq({ok:true,status:"UNKNOWN_HOLD",local_outcome:"ABORTED_LOCAL"}));
+            cmd({op:"CLOSE"},eq({ok:true,local_outcome:"ABORTED_LOCAL"}));
+        }
+        return plan;
+    }
+    function driveFL7() {
+        if (failed) { fl7Timer.stop(); finish(); return; }
+        if (fl7Stage===0) {
+            check(parts.preview.interactive && !parts.loader.active,"FL7 actual entry");
+            parts.input.text=FirstLight.capture.prompt;
+            parts.preview.leftClicked(null);
+            fl7Stage=1;
+            return;
+        }
+        if (fl7Stage===1) {
+            observeFL7();
+            const item=parts.loader.item;
+            firstLightGeometry(item);
+            check(item && item.messages.length===0 && fl7Epoch>0
+                && parts.input.text==="Reply with READY.","FL7 empty original view and exact public input");
+            if (failed) return;
+            fl7OriginalView=item; fl7OriginalEpoch=fl7Epoch;
+            fl7Parent=fl7ParentType.createObject(witness);
+            check(fl7Parent!==null,"FL7 create child owner");
+            if (failed) return;
+            fl7Plan=makeFL7Plan();
+            fl7Parent.start();
+            fl7Stage=2;
+            return;
+        }
+        const p=fl7Parent;
+        if (!p || p.failure!=="") { check(false,"FL7 child "+(p?p.failure:"missing")); return; }
+        if (fl7Index===fl7Plan.length) {
+            if (!p.finished) return;
+            check(!p.running && !p.pending && p.cleanExit,"FL7 child not cleanly reaped");
+            if (failed) return;
+            console.info("FOREST_HOST_FIRST_LIGHT_CHILD_PASS "+["COMMIT","STOP","WITHDRAW","PENDING_STOP"][fl7Case]);
+            fl7Active=false; fl7Tail=null; fl7Late=null; fl7OriginalView=null; fl7View=null;
+            fl7Plan=[]; fl7Parent=null; p.destroy();
+            forest.menuOpen=false;
+            parts.loader.sourceComponent=firstLightOriginalComponent;
+            fl7Timer.stop();
+            if (++fl7Case<4) fl7Next.restart(); else finish();
+            return;
+        }
+        const action=fl7Plan[fl7Index];
+        if (action.when && !action.when()) {
+            fl7Index++;
+        } else if (action.local) {
+            check(action.local(),"FL7 local action "+fl7Index);
+            fl7Index++;
+        } else if (p.reply!==null) {
+            const reply=p.consume();
+            if (action.poll && fl7Equal(reply,{ok:true,done:false})) {
+                check(++fl8Polls<=12,"FL8 original pending step deadline");
+                return; // poll only, never repeat an advance or STOP
+            }
+            check(action.verify(reply),"FL7 reply "+fl7Index);
+            fl7Index++;
+        } else if (!p.pending && p.ready) {
+            check(p.request(action.cmd),"FL7 request "+fl7Index);
+        }
+    }
+    Timer { id: fl7Timer; interval: 125; repeat:true; onTriggered: witness.driveFL7() }
+    Timer { id: fl7Next; interval: 350; onTriggered: witness.beginFL7() }
     Timer { id: joinedDrive; interval: 30; onTriggered: witness.driveJoined() }
     Timer { id: joinedMount; interval: 350; repeat:true
         onTriggered: {

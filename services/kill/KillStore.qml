@@ -3,6 +3,8 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import "../system"
+import qs.services.favorites
+import "../favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
 
 // Authoritative runtime KILL store. No widget dependency, persistence,
 // or extra polling loop. Mutation primitives retain existing guarded callers.
@@ -41,13 +43,13 @@ Scope {
     // One long-lived execution lifecycle. Transitional donor supplies
     // candidate policy and legacy confirmation presentation, not execution state.
     property var donorHunterHost: null
-    property var donorHunterFavorites: null
+    readonly property var favoriteStore: FavoritesStore
     readonly property var hunterExecutor: hunterExecution
     readonly property var hunterOperation: hunterController
     HunterOperationController {
         id: hunterController
         host: root.donorHunterHost
-        favoriteStoreObject: root.donorHunterFavorites
+        favoriteStoreObject: root.favoriteStore
         executor: hunterExecution
         refreshTimer: afterAction
     }
@@ -141,6 +143,17 @@ Scope {
         if (!review || cpuBulkReview !== review) return false;
         cpuBulkReview = null;
         return true;
+    }
+
+    // Read the original Favorites membership; never create or mutate keys here.
+    function taskPersistentIdentity(entry) {
+        return FavoriteIdentity.taskIdentity(entry);
+    }
+
+    function isTaskFavorite(entry) {
+        if (!favoriteStore || !favoriteStore.favoriteKeys) return true;
+        const key = FavoriteIdentity.taskKey(entry);
+        return !!key && favoriteStore.favoriteKeys.indexOf(key) !== -1;
     }
 
     // Preserve the donor's existing eligibility rules and current snapshot.

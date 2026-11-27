@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests" / "contract_levels"))
 from contract_levels import Contract, structural_invariants
 
-ROOT = Path(__file__).resolve().parents[2]
 SERVICE = (ROOT / "services/time/TimeSettings.qml").read_text(encoding="utf-8")
 PANE = (ROOT / "widgets/TimeSettingsPane.qml").read_text(encoding="utf-8")
 DIAL = (ROOT / "components/SelectorDial.qml").read_text(encoding="utf-8")

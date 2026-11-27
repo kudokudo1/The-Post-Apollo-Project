@@ -741,3 +741,140 @@ controls and selection. A qualifying actual owner projection and
 independent review must precede implementation. Native/protected/
 production HOLD. No new store, issuer, source, API, schema, model
 execution, tool call or installed UI in this document.
+
+
+## S6 // Coordinated room interaction acceptance contract (proposal)
+
+Continuation of S5, not a replacement or executable authorization.
+Source: operator clarifications #2161 7215166665/7215453268; Nurse
+7215502409; UI2 predecessor 7215555784; Runtime #3003, Spirit #3001,
+Mind #3005, UI1 7215538179/7215785914, Heart #2999 comment
+7215563624 and #2161 7215569936; Connections delta #2119 7215785707.
+At preflight main 4db02b49, those three owner design PRs and S5 #2999
+are merged. Preserve original Tree/Clone/Colony architecture: a Clone
+extends its Tree with independent active work, not independent base
+identity or automatic privilege. This document coordinates interface
+acceptance; it selects no backend schema, scheduler, storage or issuer.
+
+### Independent visible targets
+
+| Surface | Meaning and invariant |
+| --- | --- |
+| Tree browser / Colony | Navigation or inspection of Tree and Clone identities; never implicitly switches the selected room, recipient or draft. |
+| Conversation rail | Explicit selection of durable room independent of Tree ownership; authorized members nested under selected room, not a fourth permanent column. |
+| Room header | Qualified room identity and room participation ceiling; not a Tree label reused as a room ID. |
+| Conversation feed | Original attributed authors and eligible message/attachment projection only; display names are not routing identities. |
+| Composer target line | Explicit intended addressee(s), distinct from qualified readers and actual effect owner; no invisible, ambiguous or stale target. |
+| Member inspection | Current authorized membership, speaking mode, suggestion preference and independently sourced activity; room-specific override distinct from Tree/Clone preference. |
+| Equipment / reasoning | Explicit control target: Tree default preference or independently qualified exact member/task override, never inferred from composer target. |
+| Task / effect inspection | Original assignment, owner, exact scope, receipt and current status where permitted; contextual STOP, not global cancellation or room deletion. |
+
+Actual ForestW 28f7993a lines 34–38, 68–74, 91, 115–137, 153:
+equipment/form, reasoning and B0 selected model currently follow
+selectedTreeIndex; browsing changes these preferences' target.
+Preserve their existing disconnected behavior. A future room mount
+must label the actual Tree preference target and keep it separate from
+recipient or actual provider settings. Freeze qualified identity and
+revision at start of a control gesture; reject stale release rather
+than apply it to a newly browsed Tree. Do not duplicate selectors,
+change Heart semantics or infer model availability from inventory.
+At 184/148/0 rail widths retain existing geometry and 300x160 preview
+minimum. At hidden rail, evaluate explicit in-panel inspection; if
+target cannot be safely identified, lock affected action. No fake
+roster, invented queue, hidden count, new overlay or live SEND.
+
+### Response and work interaction
+
+The S5 Maple/Cedar/DOC 1/DOC 2 settings remain illustrative.
+Room ceiling plus per-member mode governs eligible speech, not
+read permission, grant, resource admission, or required answers.
+Deliberate address differs from mention, quote, negation, proposal,
+task assignment and independently verified execution authorization.
+A participant may explicitly address another within the user's
+communication bounds; a proposal about them cannot dispatch them.
+Suggestion ON allows bounded optional proposals, not an automatic
+response to a mention or a state-changing action.
+
+An observer one-shot reply is the remaining product-policy question:
+UI2 proposes an explicit user invitation that does not persistently
+change mode, only if Spirit/Runtime independently support it. Until
+that choice is accepted and supported, keep observer silent or show
+neutral inability to route. Spirit's deliberate mode-change option
+remains valid; neither interpretation licenses hidden override.
+Addressing all means separately eligible bounded responses, not all
+members must answer and not a blanket audience or execution grant.
+
+Runtime's per-room serialized response-admission candidate and
+Heart's host-wide aggregate capacity candidate are compatible layers:
+room ordering determines eligible jobs; shared resource admission
+determines actual dispatch across rooms. Neither is selected scheduler
+policy or one-speaker restriction. Each original trigger/recipient
+response has independent job and actual claim; bounded root, room,
+member, host, cadence and work limits apply to replies and proposals.
+A queued job does not reserve a grant or guarantee generation.
+Do not spawn separate governors to evade shared capacity. Independent
+authorized nonconflicting background tasks may progress separately.
+
+One canonical immutable ordered room journal; UI pages and model
+input cuts are independently qualified per actual recipient/purpose.
+Mind #3005 requires source-filtered eligible messages before bodies,
+not filtering a complete private transcript on the client. No global
+ordinal, hidden gap/count, unauthorized attachment metadata or
+false complete/empty. A displayed message is not provider permission.
+Provider mapping must preserve original peer authorship; do not
+fabricate a latest user turn or treat peer content as operator
+instructions. Private Leaves, task context and approvals stay scoped;
+remembered approval only locates the authentic original grant.
+
+Covered handoff requires receiver verification of original grant,
+approved revision, delegation eligibility, receiving assignment,
+owner, target/action, scope/currentness and remaining budget.
+No repeated approval for identical valid scope; changed or unknown
+scope holds only affected effect. A message append, per-recipient
+delivery, model terminal, actual tool effect, claim release and user
+acceptance are independently evidenced outcomes. Local commit is
+not protected settlement. Preserve original pending effect through
+STOP, leave, mode changes, rebind or lost acknowledgement; no replay,
+retarget, silent input refresh, inferred rollback or resource release.
+
+### Interface acceptance matrix (future synthetic/qualified tests)
+
+| Case | Required presentation / routing |
+| --- | --- |
+| Browse another Tree while composing | Same room, recipient and draft; equipment label reflects actual separate Tree target. |
+| Gesture spans Tree/member/revision change | Reject stale action; never write preference or send to replacement. |
+| Duplicate participant labels | Require deliberate stable identity selection; no first-name match. |
+| Mention or quoted proposal about DOC 1 | No directed job or tool dispatch; independent optional proposal still bounded. |
+| Explicit question from Maple to DOC 2 | One eligible response candidate only if scoped peer address permits. |
+| Invite Cedar / address all | Observer stays silent absent explicit qualified allowance; no compulsory fanout. |
+| Two eligible replies to same trigger | Distinct original jobs and authors; ordered append, no duplicate solely by trigger. |
+| Room queue vs provider capacity | Distinct pending/admitted/speaking states; no invented progress or guaranteed capacity. |
+| Hidden members or restricted history | No hidden identities, counts, global gaps, attachments or false complete-empty. |
+| New message arrives during prepared reply | Preserve original trigger/cut; owner requalifies, no silent refresh or automatic retry. |
+| Exact covered handoff | Verify original grant independently; report assignment apart from effect success. |
+| STOP / revoke / lost acknowledgement | Affected admission/delivery held; original unresolved custody visible only when permitted. |
+| Compact rail, filter or membership withdrawal | Keep explicitly safe target or lock; no invisible target, auto-rebind, unrelated draft clear or durable deletion. |
+
+### Ownership and sequencing
+
+Current B1 d1533f15 stores one Tree/owner per session and user/assistant
+roles, not authenticated member/audience. B3 c5dbbc29 uniquely binds
+session/user turn and one live reservation; preserve existing checks.
+M2/M4/B2 and C5 remain constrained/deny-only for the proposed use.
+Runtime owns actual journal, response identity, ordering and recovery;
+Spirit/Connections own recipient authority and fences; Mind owns
+projection/input/provenance; Heart owns aggregate resource claims;
+UI1 owns actual native mounting and geometry; UI2 owns semantic
+interaction and acceptance. No other owner's source modified.
+
+First qualified read-only room/author/recipient projection can be
+evaluated independently from send, membership mutations and actual
+effects. UI2 may develop isolated presentation acceptance against
+explicit synthetic inputs under standing ordinary development,
+without claiming a real producer. Existing SEND remains locked.
+No new preliminary approval cycle for owned safe work. Request
+targeted completed-source review of this proposal, then coordinate
+actual producer contract. Genuine operator choices: observer invitation
+vs explicit mode change; later join/history visibility and preference
+lifetime where not already decided. No silent default or authorization
+from those choices. Native/protected/production HOLD.

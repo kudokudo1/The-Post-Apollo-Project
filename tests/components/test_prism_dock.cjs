@@ -88,7 +88,10 @@ test("Full Prism uses standard window controls but claims no invented dictionary
     assert.match(panel,/ResizeButton\s*\{/);
     assert.match(panel,/CloseButton\s*\{/);
     assert.match(panel,/borderWidth: 1/);
-    assert.match(panel,/NO DEFINITIONS YET/);
+    assert.match(panel,/PrismHelpContent\s*\{/);
+    const help=fs.readFileSync(path.join(base,"widgets/PrismHelpContent.qml"),"utf8");
+    assert.match(help,/NO DEFINITIONS YET/);
+    assert.doesNotMatch(help,/\b(?:PanelWindow|Process|FileView|Popup|Timer)\s*\{/);
     assert.doesNotMatch(panel,/\b(?:Process|FileView|Popup|Timer)\s*\{/);
     assert.doesNotMatch(dock,/(?:save|remove|delete|trash|burn)\s*\(/);
 });

@@ -5,6 +5,8 @@ on:
     paths:
       - 'modules/PrismDock.qml'
       - 'widgets/PrismW.qml'
+      - 'widgets/PrismHelpContent.qml'
+      - 'services/prism/PrismAtlas.js'
       - 'widgets/TasksChassisPolicy.js'
       - 'shell.qml'
       - 'components/PrismButton.qml'
@@ -21,6 +23,8 @@ on:
     paths:
       - 'modules/PrismDock.qml'
       - 'widgets/PrismW.qml'
+      - 'widgets/PrismHelpContent.qml'
+      - 'services/prism/PrismAtlas.js'
       - 'widgets/TasksChassisPolicy.js'
       - 'shell.qml'
       - 'components/PrismButton.qml'

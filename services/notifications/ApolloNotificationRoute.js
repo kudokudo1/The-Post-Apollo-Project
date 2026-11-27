@@ -35,7 +35,7 @@ function routeFor(entry) {
 
     if (id === "cpu-plus-diagnostics" && event === "diagnostic-result") {
         const reportId = ctx.reportId;
-        if (["memory", "inventory", "threads", "census", "storage", "appcontrol", "hostcpu"].indexOf(ctx.reportKind) >= 0
+        if (["memory", "inventory", "threads", "census", "storage", "appcontrol", "hostcpu", "gpu"].indexOf(ctx.reportKind) >= 0
                 && typeof reportId === "string" && reportId.length <= 128
                 && /^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*$/.test(reportId)
                 && ctx.origin === "apollo" && ctx.domain === "system"

@@ -46,3 +46,30 @@ function verify(assert,P) {
 
 vm.runInContext(verify.toString()+"\nverify(assert,{lifecycleIds,validSelection,lifecycleStart,lifecycleObserve,lifecycleFinish});",ctx);
 console.log("universal lifecycle contract PASS");
+
+vm.runInContext(`
+    const delayed=lifecycleStart(["git"],{git:false},1000,1000);
+    assert(lifecycleFinishObserved(delayed,1999)===null);
+    const completed=lifecycleFinishObserved(delayed,2037);
+    assert(completed.status==="COMPLETE"&&completed.elapsedMs===1000&&completed.completionDelayMs===37);
+    assert(lifecycleFinishObserved(delayed,2251).status==="FAILED");
+`,ctx);
+const shell=fs.readFileSync(path.join(__dirname,"../../shell.qml"),"utf8");
+const adapter=fs.readFileSync(path.join(__dirname,"../../services/diagnostics/DiagnosticWidgetLifecycleAdapter.qml"),"utf8");
+assert(shell.includes('"appcontrol": appControlWindow'));assert(adapter.includes('recorder.subscribed("appcontrol")'));
+assert(shell.includes('"camera": cameraWindow'));assert(adapter.includes('recorder.subscribed("camera")'));
+assert(shell.includes('"hospital": hospitalWindow'));assert(adapter.includes('recorder.subscribed("hospital")'));
+assert(shell.includes('"finance": financeWindow'));assert(adapter.includes('recorder.subscribed("finance")'));
+assert(shell.includes('"git": gitWindow'));assert(adapter.includes('recorder.subscribed("git")'));
+assert(shell.includes('"company-network": companyNetworkWindow'));assert(adapter.includes('recorder.subscribed("company-network")'));
+assert(shell.includes('"tasks": tasksWindow'));assert(adapter.includes('recorder.subscribed("tasks")'));
+assert(shell.includes('"forest": forestWindow'));assert(adapter.includes('recorder.subscribed("forest")'));
+assert(shell.includes('"apollo-hub": apolloHubWindow'));assert(adapter.includes('recorder.subscribed("apollo-hub")'));
+assert(shell.includes('"cpuplus": cpuPlusWindow'));assert(adapter.includes('recorder.subscribed("cpuplus")'));
+assert(shell.includes('"weather": weatherStationWindow'));assert(adapter.includes('recorder.subscribed("weather")'));
+assert(shell.includes('"social": messagingWindow'));assert(adapter.includes('recorder.subscribed("social")'));
+assert(shell.includes('"time": timewWindow'));assert(adapter.includes('recorder.subscribed("time")'));
+assert(shell.includes('"notifications": notificationsHubWindow'));assert(adapter.includes('recorder.subscribed("notifications")'));
+assert(shell.includes('"media": sharedMediaDock'));assert(adapter.includes('recorder.subscribed("media")'));
+assert(!/\bProcess\s*\{/.test(adapter));
+assert(!/repeat:\s*true/.test(adapter));

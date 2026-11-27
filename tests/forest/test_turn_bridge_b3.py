@@ -125,6 +125,92 @@ class BridgeTests(unittest.TestCase):
             self.assertIsNone(self.attempt(sid))
         self.assertEqual(self.requests, [])
 
+    def test_fl2_context_conflicts_refuse_before_body_read(self):
+        # Exercise the actual context-bound B3 path and SQLite authorizer.
+        # Neither a locally aborted same-trigger attempt nor a live slot
+        # for a different trigger should require another history read.
+        for live in (False, True):
+            with self.subTest(live=live):
+                sid = self.new_session()
+                first = self.exchange(sid, **self.context_args(sid))
+                original = next(first)["attempt_id"]
+                revision = 1
+                if live:
+                    self.store.append_turn(
+                        "owner_a", sid, expected_revision=1, role="user",
+                        body="Later public trigger", now_ms=201)
+                    revision = 2
+                    self.now = 202
+                else:
+                    first.close()
+                args = self.context_args(sid, revision=revision)
+                before = self.attempt(sid)
+                body_reads = []
+
+                def authorizer(action, table, column, *_):
+                    if action == sqlite3.SQLITE_READ and table == "forest_turns" and column == "body":
+                        body_reads.append(column)
+                        return sqlite3.SQLITE_DENY
+                    return sqlite3.SQLITE_OK
+
+                self.db.set_authorizer(authorizer)
+                try:
+                    with self.assertRaisesRegex(b3.BridgeRefusal,
+                                                "ATTEMPT_ALREADY_EXISTS"):
+                        list(self.exchange(sid, revision=revision, **args))
+                    self.assertEqual(body_reads, [])
+                    self.assertEqual(self.requests, [])
+                    self.assertEqual(self.attempt(sid), before)
+                    self.assertEqual(self.db.execute(
+                        "SELECT attempt_id FROM forest_attempts_b3 WHERE session_id=?",
+                        (sid,)).fetchall(), [(original,)])
+                finally:
+                    self.db.set_authorizer(None)
+                    first.close()
+                self.now = 200
+
+    def test_fl2_conflict_does_not_mask_invalid_context_scope_or_trigger(self):
+        sid = self.new_session()
+        first = self.exchange(sid, **self.context_args(sid))
+        next(first)
+        first.close()
+        before = self.attempt(sid)
+        for kind, reason in (("tree", "SESSION_SCOPE_MISMATCH"),
+                             ("trigger", "LATEST_USER_MISMATCH"),
+                             ("revision", "STALE_REVISION")):
+            with self.subTest(kind=kind):
+                args = self.context_args(sid)
+                ref = args["context_ref"]
+                if kind == "tree":
+                    ref = replace(ref, context=replace(ref.context, tree_key="other"))
+                elif kind == "trigger":
+                    ref = replace(ref, user_turn_id="wrong")
+                else:
+                    ref = replace(ref, expected_revision=0)
+                args.update(context_ref=ref, current_context_ref=ref,
+                            resolve_current_context=lambda: ref,
+                            stop_control=RuntimeStopControl(ref.context, "operation"))
+                # The invalid scope must not inspect reservation rows or body.
+                reads = []
+
+                def authorizer(action, table, column, *_):
+                    if action == sqlite3.SQLITE_READ and (
+                            table == "forest_attempts_b3"
+                            or (table == "forest_turns" and column == "body")):
+                        reads.append((table, column))
+                        return sqlite3.SQLITE_DENY
+                    return sqlite3.SQLITE_OK
+
+                self.db.set_authorizer(authorizer)
+                try:
+                    with self.assertRaisesRegex(b3.BridgeRefusal, reason):
+                        list(self.exchange(sid, revision=ref.expected_revision, **args))
+                    self.assertEqual(reads, [])
+                finally:
+                    self.db.set_authorizer(None)
+                self.assertEqual(self.attempt(sid), before)
+        self.assertEqual(self.requests, [])
+
     def test_context_older_large_turn_omitted_without_mutating_history(self):
         sid = self.new_session()
         self.store.append_turn("owner_a", sid, expected_revision=1,

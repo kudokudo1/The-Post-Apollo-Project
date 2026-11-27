@@ -14,7 +14,7 @@ const read = p => fs.readFileSync(path.join(root, p), "utf8");
 const appSource = read("widgets/AppControlW.qml");
 const serviceSource = read("services/favorites/FavoritesService.qml");
 const storeSource = read("services/favorites/FavoritesStore.qml");
-const hunterSource = read("widgets/appcontrol/HunterOperationController.qml");
+const hunterSource = read("services/kill/HunterOperationController.qml");
 
 // Extract source definitions, not a copied/reimplemented favorite toggle.
 // The selected functions currently use normal JS bodies in their QML scope.

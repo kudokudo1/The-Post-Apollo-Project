@@ -343,6 +343,17 @@ ShellRoot {
                 const memoryFilter=smoke.find(view,"cpuPlusResourceFilter-memory");
                 const netFilter=smoke.find(view,"cpuPlusResourceFilter-network");
                 const selectedPanel=smoke.find(view,"cpuPlusResourceSelectedPanel");
+                const resourceInfo=smoke.find(view,"cpuPlusResourceInformationButton");
+                const resourcePopup=smoke.find(view,"cpuPlusResourceInformationPopup");
+                const headerDivider=smoke.find(view,"cpuPlusResourceHeaderDivider");
+                const footerDivider=smoke.find(view,"cpuPlusResourceFooterDivider");
+                const draftActions=smoke.find(view,"cpuPlusResourceDraftActionsStrip");
+                const clearDraft=smoke.find(view,"cpuPlusResourceClearDraft");
+                const reviewDraft=smoke.find(view,"cpuPlusResourceReviewDraft");
+                const primaryInstrument=smoke.find(view,"cpuPlusResourceInstrumentRow-cpu-quota");
+                const primarySlider=smoke.find(view,"cpuPlusDraftSlider-cpu-quota");
+                const primaryModes=smoke.find(view,"cpuPlusResourceInlineModes");
+                const manualMode=smoke.find(view,"cpuPlusResourceMode-manual");
                 const applyLocked=smoke.find(view,"cpuPlusResourceApplyLocked");
                 const detailState = "console=" + (!!consolePane)
                     + " ready=" + (consolePane ? consolePane.selectionReady : "missing")
@@ -386,6 +397,47 @@ ShellRoot {
                 if (!smoke.check(oneRow && selectedCount===1
                         && filterButtons.every(function(button) { return !!button; }),
                         "seven resource filters remain on one visible non-overlapping row")) return;
+                // Match the Time widget: modes sit beside the first slider,
+                // help is right-aligned below filters, and workspace actions
+                // stay ABOVE the red divider. No process operation is possible.
+                const infoPosition=resourceInfo ? resourceInfo.mapToItem(consolePane,0,0) : null;
+                const filterPosition=cpuFilter ? cpuFilter.mapToItem(consolePane,0,0) : null;
+                const modePosition=primaryModes && primaryInstrument
+                    ? primaryModes.mapToItem(primaryInstrument,0,0) : null;
+                const sliderPosition=primarySlider && primaryInstrument
+                    ? primarySlider.mapToItem(primaryInstrument,0,0) : null;
+                const clearPosition=clearDraft ? clearDraft.mapToItem(consolePane,0,0) : null;
+                const footerPosition=footerDivider ? footerDivider.mapToItem(consolePane,0,0) : null;
+                if (!smoke.check(resourceInfo && resourcePopup && !resourcePopup.visible
+                        && headerDivider && Qt.colorEqual(headerDivider.color,"#D16041")
+                        && infoPosition && filterPosition
+                        && Math.abs(infoPosition.x+resourceInfo.width-consolePane.width)<2
+                        && infoPosition.y>=filterPosition.y+cpuFilter.height-1,
+                        "resource information control is top-right below filters with red header rule")) return;
+                if (!smoke.check(primaryModes && primaryInstrument && primarySlider
+                        && manualMode && modePosition && sliderPosition
+                        && modePosition.x>=sliderPosition.x+primarySlider.width-1
+                        && Math.abs(modePosition.y-sliderPosition.y)<2,
+                        "mode buttons occupy the primary slider row, not another control box")) return;
+                if (!smoke.check(draftActions && clearDraft && reviewDraft && footerDivider
+                        && clearPosition && footerPosition
+                        && clearDraft.parent===reviewDraft.parent
+                        && clearPosition.y+clearDraft.height<=footerPosition.y+1
+                        && Qt.colorEqual(footerDivider.color,"#D16041")
+                        && Qt.colorEqual(clearDraft.accentColor,"#D16041")
+                        && Qt.colorEqual(reviewDraft.accentColor,"#F2BE4E")
+                        && Qt.colorEqual(applyLocked.accentColor,"#9ECE6A")
+                        && !applyLocked.available,
+                        "draft actions above divider; clear red, review yellow, locked apply green")) return;
+                resourceInfo.leftClicked(null);
+                if (!smoke.check(resourcePopup.visible && fakeGate.preparations===0,
+                        "resource information button opens read-only help")) return;
+                resourceInfo.leftClicked(null);
+                if (!smoke.check(!resourcePopup.visible,
+                        "resource information button closes read-only help")) return;
+                manualMode.leftClicked(null);
+                if (!smoke.check(manualMode.selected && consolePane.modeFor("cpu")==="manual",
+                        "inline MANUAL mode button stages only local draft state")) return;
                 consolePane.stageMode("cpu","manual");
                 consolePane.stageNumber("cpu","nice",9);
                 if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1
@@ -405,10 +457,13 @@ ShellRoot {
                 if (!smoke.check(selectedPanel.key==="cpu" && cpuFilter.selected
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0,
                         "CPU draft survives category navigation")) return;
-                consolePane.reviewing=true;
-                consolePane.clearDraft();
-                if (!smoke.check(!consolePane.hasDraft && !consolePane.reviewing,
-                        "clear draft does not affect owner state")) return;
+                reviewDraft.leftClicked(null);
+                if (!smoke.check(consolePane.reviewing && fakeGate.confirmations===0,
+                        "yellow review operates only on staged values")) return;
+                clearDraft.leftClicked(null);
+                if (!smoke.check(!consolePane.hasDraft && !consolePane.reviewing
+                        && fakeGate.confirmations===0 && fakeGate.preparations===0,
+                        "red clear draft does not affect owner state")) return;
                                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");
                 const identityText=smoke.find(view,"cpuPlusProcessIdentityText");

@@ -74,3 +74,52 @@ test("K8d2 top filters select one editor while retaining drafts",()=>{
     assert.equal(draft.value(updated,"memory","virtual"),2048);
     assert.equal(draft.summary(updated).length,1);
 });
+
+test("K8d3 places modes beside the primary instrument and actions above divider",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    // The mode cluster must be a child of the FIRST instrument row; the
+    // selected editor is frameless rather than another boxed filter card.
+    assert.match(ui,/Item \{\s*id: resourcePanel/);
+    assert.ok(!ui.includes("id: modeRow"));
+    assert.ok(ui.includes("id: instrumentRow"));
+    assert.ok(ui.includes("id: modeCluster"));
+    const instrument=ui.indexOf('id: instrumentRow');
+    const slider=ui.indexOf('CpuPlusDiagnosticSlider {',instrument);
+    const modes=ui.indexOf('id: modeCluster',slider);
+    const number=ui.indexOf('EXACT DRAFT // ',modes);
+    assert.ok(instrument < slider && slider < modes && modes < number);
+    assert.match(ui,/visible: field.index === 0/);
+    assert.match(ui,/columns: 2/);
+    assert.match(ui,/model: \["off","manual","auto","hold"\]/);
+    assert.match(ui,/adjustable: root.selectionReady && root.modeFor\(resourcePanel.key\) === "manual"/);
+    assert.ok(ui.includes('objectName: "cpuPlusResourceWorkspaceActions"'));
+    const actions=ui.indexOf('objectName: "cpuPlusResourceWorkspaceActions"');
+    const divider=ui.indexOf('objectName: "cpuPlusResourceFooterDivider"');
+    const apply=ui.indexOf('objectName: "cpuPlusResourceApplyLocked"');
+    assert.ok(actions>number && actions<divider && divider<apply);
+    const clear=ui.indexOf('objectName: "cpuPlusResourceClearDraft"',actions);
+    const review=ui.indexOf('objectName: "cpuPlusResourceReviewDraft"',actions);
+    assert.match(ui.slice(clear,review),/accentColor: Colors.red/);
+    assert.match(ui.slice(review,divider),/accentColor: Colors.yellow/);
+    assert.match(ui.slice(apply),/accentColor: Colors.green/);
+    assert.match(ui.slice(apply),/available: false/);
+    assert.match(ui,/objectName: "cpuPlusResourceFooterDivider"[\s\S]*?color: Colors.red/);
+    assert.ok(ui.includes('objectName: "cpuPlusResourceDraftActionsStrip"'));
+    assert.ok(ui.includes('anchors.bottom: draftActionsStrip.top'));
+    assert.match(ui,/id: draftActionsStrip[\s\S]*?anchors.bottom: footer.top/);
+    assert.match(ui,/objectName: "cpuPlusResourceWorkspaceActions"/);
+    assert.match(ui,/text: "RESOURCE CONTROL \/\/ DRAFT"[\s\S]*?color: Colors.orange[\s\S]*?color: Colors.red/);
+});
+
+test("K8d3 has a functional right-aligned information button directly below filters",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.match(ui,/import "\.\.\/appcontrol"/);
+    assert.match(ui,/id: resourceInfoStrip[\s\S]*?anchors.top: resourceFilters.bottom/);
+    assert.match(ui,/id: resourceInformationButton[\s\S]*?anchors.right: parent.right/);
+    assert.match(ui,/objectName: "cpuPlusResourceInformationButton"/);
+    assert.match(ui,/onLeftClicked: root.informationOpen = !root.informationOpen/);
+    assert.match(ui,/objectName: "cpuPlusResourceInformationPopup"/);
+    assert.match(ui,/visible: root.informationOpen/);
+    assert.match(ui,/anchors.top: resourceInfoStrip.bottom/);
+    assert.match(ui,/APPLY REMAINS LOCKED UNTIL THE RESOURCE BACKEND IS VERIFIED/);
+});

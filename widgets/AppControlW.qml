@@ -1071,7 +1071,8 @@ PanelWindow {
     Binding {
         target: KillBackend.KillStore
         property: "hunterVisibleWindows"
-        value: appControlWindow.swayWindows
+        value: appControlWindow.windowDataReady && !appControlWindow.windowDataError
+            ? appControlWindow.swayWindows : null
     }
 
     readonly property var thermalRows:

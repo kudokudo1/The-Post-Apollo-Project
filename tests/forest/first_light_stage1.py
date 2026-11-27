@@ -74,11 +74,17 @@ def parse_manifest(raw):
     entries = [obj.get("config")] + obj["layers"]
     blobs = {}
     for entry in entries:
-        require(type(entry) is dict and set(entry) == {"mediaType", "digest", "size"}
-                and type(entry["mediaType"]) is str
-                and type(entry["digest"]) is str and DIGEST.fullmatch(entry["digest"])
-                and type(entry["size"]) is int and 0 < entry["size"] <= MODEL_LIMIT,
-                "BLOB_DESCRIPTOR")
+        # Preserve exactly the reviewed acceptance set. Fixed refusal
+        # categories identify the failing predicate without echoing any
+        # manifest key, value, path, digest or descriptor index.
+        require(type(entry) is dict, "BLOB_DESCRIPTOR_TYPE")
+        require(set(entry) == {"mediaType", "digest", "size"},
+                "BLOB_DESCRIPTOR_KEYS")
+        require(type(entry["mediaType"]) is str, "BLOB_MEDIA_TYPE")
+        require(type(entry["digest"]) is str and DIGEST.fullmatch(entry["digest"]),
+                "BLOB_DIGEST_FORMAT")
+        require(type(entry["size"]) is int and 0 < entry["size"] <= MODEL_LIMIT,
+                "BLOB_SIZE")
         require(entry["digest"] not in blobs, "DUPLICATE_BLOB")
         blobs[entry["digest"]] = entry["size"]
     require(entries[0]["size"] <= CHUNK and sum(blobs.values()) <= MODEL_LIMIT,
@@ -112,7 +118,7 @@ def target(url, kind, digest=None, redirected=False):
                 and len(query.get("sig", [])) == 1
                 and bool(query["sig"][0]), "REDIRECT_REFUSED")
     elif kind == "blob":
-        require(type(digest) is str and DIGEST.fullmatch(digest), "BLOB_DESCRIPTOR")
+        require(type(digest) is str and DIGEST.fullmatch(digest), "BLOB_REDIRECT_DIGEST_FORMAT")
         hexval = digest[7:]
         require(p.hostname == R2
                 and p.path == "/ollama/docker/registry/v2/blobs/sha256/"

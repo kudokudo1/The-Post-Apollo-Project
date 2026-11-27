@@ -663,76 +663,85 @@ import "../../components"
                             }
                         }
 
-                        // Stable translucent area under the trace. Each point
-                        // contributes a narrow vertical strip down to the graph floor;
-                        // this recreates the old filled-graph look without Canvas.
-                        Repeater {
-                            model: taskCpuCanvas.graphPoints.length
-
-                            delegate: Rectangle {
-                                readonly property point graphPoint:
-                                    taskCpuCanvas.graphPoints[index]
-                                x: graphPoint.x - width / 2 + taskCpuCanvas.graphScrollOffset
-                                y: graphPoint.y
-                                width: Math.max(
-                                    2.0,
-                                    taskCpuCanvas.width
-                                    / Math.max(
-                                        2,
-                                        presentationState.taskHistoryLimit - 1
-                                    )
-                                    + 1.4
-                                )
-                                height: Math.max(0, taskCpuCanvas.height - graphPoint.y - 1)
-                                color: taskCpuGraph.accent
-                                opacity: 0.10
-                                antialiasing: true
+                        // Preserve the fixed grid and COMBI legend. Translate
+                        // normal CPU/HUNTER detail fill and stroke as one trace.
+                        Item {
+                            id: taskCpuNormalTraceLayer
+                            anchors.fill: parent
+                            transform: Translate {
+                                x: taskCpuCanvas.graphScrollOffset
                             }
-                        }
+                            // Stable translucent area under the trace. Each point
+                            // contributes a narrow vertical strip down to the graph floor;
+                            // this recreates the old filled-graph look without Canvas.
+                            Repeater {
+                                model: taskCpuCanvas.graphPoints.length
 
-                        Repeater {
-                            model: Math.max(0, taskCpuCanvas.graphPoints.length - 1)
-
-                            delegate: Item {
-                                anchors.fill: parent
-
-                                readonly property point p1:
-                                    taskCpuCanvas.graphPoints[index]
-                                readonly property point p2:
-                                    taskCpuCanvas.graphPoints[index + 1]
-                                readonly property real dx: p2.x - p1.x
-                                readonly property real dy: p2.y - p1.y
-                                readonly property real segmentLength:
-                                    Math.sqrt(dx * dx + dy * dy)
-                                readonly property real segmentAngle:
-                                    Math.atan2(dy, dx) * 180 / Math.PI
-
-                                // Soft under-trace. This replaces the old Canvas
-                                // shadow/fill without depending on retained paint state.
-                                Rectangle {
-                                    x: parent.p1.x + taskCpuCanvas.graphScrollOffset
-                                    y: parent.p1.y - height / 2
-                                    width: parent.segmentLength
-                                    height: 7
-                                    radius: 3.5
-                                    rotation: parent.segmentAngle
-                                    transformOrigin: Item.Left
+                                delegate: Rectangle {
+                                    readonly property point graphPoint:
+                                        taskCpuCanvas.graphPoints[index]
+                                    x: graphPoint.x - width / 2
+                                    y: graphPoint.y
+                                    width: Math.max(
+                                        2.0,
+                                        taskCpuCanvas.width
+                                        / Math.max(
+                                            2,
+                                            presentationState.taskHistoryLimit - 1
+                                        )
+                                        + 1.4
+                                    )
+                                    height: Math.max(0, taskCpuCanvas.height - graphPoint.y - 1)
                                     color: taskCpuGraph.accent
-                                    opacity: 0.20
+                                    opacity: 0.10
                                     antialiasing: true
                                 }
+                            }
 
-                                Rectangle {
-                                    x: parent.p1.x + taskCpuCanvas.graphScrollOffset
-                                    y: parent.p1.y - height / 2
-                                    width: parent.segmentLength
-                                    height: 2
-                                    radius: 1
-                                    rotation: parent.segmentAngle
-                                    transformOrigin: Item.Left
-                                    color: taskCpuGraph.accent
-                                    opacity: 1.0
-                                    antialiasing: true
+                            Repeater {
+                                model: Math.max(0, taskCpuCanvas.graphPoints.length - 1)
+
+                                delegate: Item {
+                                    anchors.fill: parent
+
+                                    readonly property point p1:
+                                        taskCpuCanvas.graphPoints[index]
+                                    readonly property point p2:
+                                        taskCpuCanvas.graphPoints[index + 1]
+                                    readonly property real dx: p2.x - p1.x
+                                    readonly property real dy: p2.y - p1.y
+                                    readonly property real segmentLength:
+                                        Math.sqrt(dx * dx + dy * dy)
+                                    readonly property real segmentAngle:
+                                        Math.atan2(dy, dx) * 180 / Math.PI
+
+                                    // Soft under-trace. This replaces the old Canvas
+                                    // shadow/fill without depending on retained paint state.
+                                    Rectangle {
+                                        x: parent.p1.x
+                                        y: parent.p1.y - height / 2
+                                        width: parent.segmentLength
+                                        height: 7
+                                        radius: 3.5
+                                        rotation: parent.segmentAngle
+                                        transformOrigin: Item.Left
+                                        color: taskCpuGraph.accent
+                                        opacity: 0.20
+                                        antialiasing: true
+                                    }
+
+                                    Rectangle {
+                                        x: parent.p1.x
+                                        y: parent.p1.y - height / 2
+                                        width: parent.segmentLength
+                                        height: 2
+                                        radius: 1
+                                        rotation: parent.segmentAngle
+                                        transformOrigin: Item.Left
+                                        color: taskCpuGraph.accent
+                                        opacity: 1.0
+                                        antialiasing: true
+                                    }
                                 }
                             }
                         }

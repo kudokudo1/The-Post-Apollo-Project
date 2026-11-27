@@ -90,7 +90,7 @@ test("four personalities preserve bounded motion, distinct intensity and flash i
 });
 
 const material = vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining,heatBed,heatFootprint});",
+    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining,heatBed,heatFootprint,rearHeatSpan,drawRepair});",
     {Qt:{rgba:(r,g,b,a)=>({r,g,b,a})}});
 test("material experiments preserve standard and partition the chassis", () => {
     for(const mode of ["standard","ash-trail","burn-away","unknown"]){
@@ -586,7 +586,7 @@ test("reactive heat bed moves while stalled, stretches with speed and respects r
     }
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
     assert.match(source,/Material.heatBed\(root.elapsed,root.flameSpeed,root.reducedMotion\)/);
-    assert.match(source,/if\(!material.erosion && inner\*p>0\)/);
+    assert.match(source,/if\(rearSpan>0\)/);
     assert.match(source,/const active=c.createLinearGradient\(edge-span,mid,edge,mid\)/);
     assert.match(source,/c.fillRect\(edge-cap,fy,cap,fillHeight\)/);
 });
@@ -641,5 +641,67 @@ test("compact under-burn stays near the flame at every speed and size",()=>{
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
     assert.match(source,/Material.heatFootprint\(h,root.flameTipOffset,bed.reach,flame.speed\)/);
     assert.match(source,/footprint.ahead\*fireState.heat/);
-    assert.match(source,/Math.min\(inner\*p,footprint.behind\)/);
+    assert.match(source,/footprint.behind,fireState.heat,inner\*p/);
+});
+
+test("fire success rebuilds the empty shell only after cooling, failure never repairs",()=>{
+    for(const mode of ["standard","ash-trail","burn-away"]){
+        let prior=0, sawRepair=false;
+        for(let i=0;i<=310;i++){
+            const t=i/100, f=pixel.extinguish("success",t,false,mode);
+            assert.ok(f.repair>=prior&&f.repair<=1);
+            if(f.active) assert.equal(f.repair,0);
+            if(f.repairing){
+                sawRepair=true;
+                assert.equal(f.active,false);
+                assert.equal(f.heat,0);
+                assert.equal(f.embers,0);
+                assert.equal(frame("success","measured",0,t,.65,false,"flamethrower").fraction,1);
+            }
+            const fail=pixel.extinguish("failure",t,false,mode);
+            assert.equal(fail.repair,0);
+            assert.equal(fail.repairing,false);
+            prior=f.repair;
+        }
+        assert.ok(sawRepair);
+        assert.equal(prior,1);
+        assert.equal(pixel.extinguish("success",0,true,mode).repair,1);
+        assert.equal(pixel.extinguish("running",5,false,mode).repair,0);
+        assert.equal(pixel.extinguish("idle",5,false,mode).repair,0);
+    }
+    const calls=[];
+    const c=new Proxy({}, {get:(o,k)=>(...a)=>calls.push([k,...a])});
+    material.drawRepair(c,0,0,200,34,0,"dark","orange");
+    assert.equal(calls.length,0);
+    material.drawRepair(c,0,0,200,34,.4,"dark","orange");
+    assert.ok(calls.some(a=>a[0]==="rect"&&a[3]===80));
+    assert.ok(calls.some(a=>a[0]==="clip"));
+    assert.ok(calls.some(a=>a[0]==="strokeRect"));
+    calls.length=0;
+    material.drawRepair(c,0,0,200,34,1,"dark","orange");
+    assert.equal(calls.filter(a=>a[0]==="fillRect").length,1);
+    assert.equal(calls.filter(a=>a[0]==="clip").length,0);
+    assert.ok(calls.some(a=>a[0]==="strokeRect"&&a[3]===199));
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/fireState.active \|\| fireState.repairing/);
+    assert.match(source,/if\(hot && fireState.repair>=1\)/);
+    assert.match(source,/Material.drawRepair\(c,x,y,w,h,fireState.repair/);
+});
+test("rear combustion follows the actual tail with a short transparent margin",()=>{
+    for(const h of [12,24,34,68]){
+        for(let i=0;i<100;i++){
+            const tail=h*(.5+i/100), bed=material.heatBed(i/30,i/100,false);
+            const footprint=material.heatFootprint(h,h*.55,bed.reach,i/100);
+            const span=material.rearHeatSpan(h,tail,bed.reach,footprint.behind,1,500);
+            assert.ok(span>=Math.min(tail,500));
+            assert.ok(span<=Math.max(footprint.behind,tail+h*.36)+1e-9);
+            assert.ok(material.rearHeatSpan(h,tail,bed.reach,footprint.behind,.5,500)<=span);
+            assert.equal(material.rearHeatSpan(h,tail,bed.reach,footprint.behind,0,500),0);
+            assert.ok(material.rearHeatSpan(h,tail,bed.reach,footprint.behind,1,5)<=5);
+        }
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/Material.rearHeatSpan\(h,root.flameRearOffset,bed.reach/);
+    assert.match(source,/back.addColorStop\(1,tint\(Colors.red,0\)\)/);
+    assert.match(source,/c.rect\(edge-rearSpan,fy,rearSpan,fillHeight\)/);
 });

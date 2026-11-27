@@ -911,6 +911,7 @@ test('COMBI CPU detail metric tracks translate shapes as groups while legends st
         'same soft and bright line geometry');
     for (const alpha of ['0.060','0.18','1.0'])
         assert.ok(trace.includes('opacity: '+alpha),'preserved '+alpha+' alpha');
-    assert.match(combi,/model:\s*taskCpuGraph\.combiView\s*\?\s*taskCpuCanvas\.combiSeries\s*:\s*\[\]/,
+    const cpuPrefix=detail.slice(detail.indexOf('id: taskCpuCanvas'),start);
+    assert.match(cpuPrefix,/model:\s*taskCpuGraph\.combiView\s*\?\s*taskCpuCanvas\.combiSeries\s*:\s*\[\]/,
         'same four COMBI series');
 });

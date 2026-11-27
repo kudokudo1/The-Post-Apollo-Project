@@ -79,3 +79,48 @@ Ollama or personal content. No actual capacity or provider behavior claim.
 No separate preliminary approval for ordinary reversible development.
 No native/protected/production permission, actual model invocation or
 selected live host by this candidate. Operator integration separate.
+
+
+## FL4 // canonical reservation and next owner delivery seam
+
+Nurse #2161 7217350418, Mind #3030. The FL3 bridge opts into a
+fixed approved prompt when constructed by the disposable owner. The
+existing B3 context conflict metadata preflight remains first;
+the canonical Mind first_light_snapshot_in_transaction validates
+single input and selects the snapshot in the same BEGIN IMMEDIATE
+as the unique reservation INSERT. No general M2 fallback, legacy
+exchange, capability selection or default native transport in this
+mode. Wrong body now refuses before reservation (not local abort).
+FL3's metadata resolver remains an independent currentness check
+before/after reservation and before commit. Its transport parameter
+comparison still binds the original exact B2 payload/settings.
+This is local test composition, not authorization.
+
+Next delivery interface requirements for Runtime/UI1/UI2/Spirit:
+owner retains original operation and attempt outside the view.
+Separate prepared local intent, admitted execution, original
+provisional response and independently recorded local terminal.
+Pin one independently observed view incarnation and its original
+operation, observe withdrawal explicitly and before every delivery;
+never reopen the old delivery or retarget replacement view.
+Consume internal R3 sequence in order, bounded UTF-8 response at B1
+MAX_BODY (16000), with no raw operation/attempt/session identifiers,
+raw error or provider diagnostics in presentation. Coalesced response
+snapshots have their own sequence and one response row; final commit
+label only after exact original worker completion and journal linkage.
+A failed or withdrawn delivery does not cancel/settle the operation
+or imply receipt. Stop remains an explicit separately correlated
+owner action. Do not relabel R4 status-only fixtures or count a
+successful callback as authenticated receipt. Actual owner-side
+delivery implementation and recipient authority remain separate
+from this reservation patch.
+
+Heart/Spirit native gates remain explicit: actual POST fence on
+qualified original source/claim, independently observed pinned
+artifact/runner and preventive isolation/egress; independently
+current recipient before output release; original effect evidence
+must survive crash or unknown. H14-D complete original lifetime
+<=60s and <=1s observation gap do not follow from B2 120s deadline.
+Do not select relaxed limits or H15 CPU-only exception here. Local
+abort, STOP, observer loss or timeout never release a native claim.
+No actual model invocation, new issuer, or UI connection in FL4.

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "forest
 from context_first_tree_m2 import (
     ContextRefusal, SessionContextRef, HistoryTurn, select_history,
     snapshot_in_transaction, list_open_metadata_fixture,
+    first_light_snapshot_in_transaction,
     WorkshopContextRef, snapshot_with_workshop_in_transaction,
 )
 from session_journal_v0 import ForestSessionJournal, bootstrap_synthetic
@@ -48,6 +49,109 @@ class ContextTests(unittest.TestCase):
                 current=self.ref if current is None else current, **kwargs)
         finally:
             self.db.rollback()
+
+    def read_first_light(self, prompt="First public question", requested=None,
+                         current=None):
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            return first_light_snapshot_in_transaction(
+                self.journal, self.ref if requested is None else requested,
+                current=self.ref if current is None else current,
+                approved_prompt=prompt)
+        finally:
+            self.db.rollback()
+
+    def test_first_light_exact_unicode_without_write_or_normalization(self):
+        prompt = " Public café\\n "
+        self.db.execute("UPDATE forest_turns SET body=? WHERE turn_id=?",
+                        (prompt, self.ref.user_turn_id))
+        self.db.commit()
+        before = self.db.total_changes
+        snapshot = self.read_first_light(prompt)
+        self.assertEqual(snapshot.ref, self.ref)
+        self.assertEqual(snapshot.omitted_prefix_count, 0)
+        self.assertIsNone(snapshot.capability_plan)
+        self.assertEqual(snapshot.transport_messages(),
+                         [{"role": "user", "content": prompt}])
+        self.assertEqual(self.db.total_changes, before)
+        with self.assertRaisesRegex(ContextRefusal, "FIRST_LIGHT_INPUT_MISMATCH"):
+            self.read_first_light(prompt.strip())
+
+    def test_first_light_refuses_invalid_input_or_scope_before_body(self):
+        blocked = []
+
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                blocked.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            for prompt in (None, "", "é" * 2049, "x\\x00y"):
+                with self.subTest(prompt_type=type(prompt)), self.assertRaisesRegex(
+                        ContextRefusal, "FIRST_LIGHT_INPUT_REFUSED"):
+                    self.read_first_light(prompt)
+            for ref in (replace(self.ref, expected_revision=2),
+                        replace(self.ref, context=replace(self.context, tree_key="other")),
+                        replace(self.ref, context=replace(self.context, origin="BACKGROUND"))):
+                with self.assertRaisesRegex(ContextRefusal, "FIRST_LIGHT_SCOPE_REFUSED"):
+                    self.read_first_light(requested=ref, current=ref)
+            wrong = replace(self.ref, user_turn_id="other")
+            with self.assertRaisesRegex(ContextRefusal, "FIRST_LIGHT_TRIGGER_REFUSED"):
+                self.read_first_light(requested=wrong, current=wrong)
+            with self.assertRaisesRegex(ContextRefusal, "CONTEXT_CHANGED"):
+                self.read_first_light(requested=wrong)
+            self.assertEqual(blocked, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_first_light_rejects_extra_turn_even_with_stale_revision_metadata(self):
+        original = self.ref
+        self.append("user", "Extra public turn")
+        self.db.execute("UPDATE forest_sessions SET revision=1 WHERE session_id=?",
+                        (self.sid,))
+        self.db.commit()
+        blocked = []
+
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column == "body":
+                blocked.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "FIRST_LIGHT_TRIGGER_REFUSED"):
+                self.read_first_light(requested=original, current=original)
+            self.assertEqual(blocked, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_first_light_rejects_second_session_without_title_or_body_read(self):
+        self.journal.create_session("other", "other-tree", "Other public fixture",
+                                    now_ms=3)
+        blocked = []
+
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                blocked.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "FIRST_LIGHT_JOURNAL_NOT_SINGLE"):
+                self.read_first_light()
+            self.assertEqual(blocked, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_first_light_requires_existing_transaction(self):
+        with self.assertRaisesRegex(ContextRefusal, "TRANSACTION_REQUIRED"):
+            first_light_snapshot_in_transaction(
+                self.journal, self.ref, current=self.ref,
+                approved_prompt="First public question")
 
     def test_order_and_model_metadata(self):
         self.append("assistant", "Public answer")

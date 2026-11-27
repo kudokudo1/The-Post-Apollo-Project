@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
@@ -66,7 +66,7 @@ test("K8d2 top filters select one editor while retaining drafts",()=>{
     assert.ok(ui.includes("selected: root.selectedKey === modelData.key"));
     assert.ok(ui.includes("function selectResource(key)"));
     assert.ok(ui.includes("bodyScroll.contentY = 0"));
-    assert.ok(ui.includes('model: resourcePanel.key==="memory" ? [] : resourcePanel.spec.controls'));
+    assert.ok(ui.includes('model: resourcePanel.key==="memory" || resourcePanel.key==="swap" ? [] : resourcePanel.spec.controls'));
     assert.ok(ui.includes('model: ["off","manual","auto","hold"]'));
     assert.ok(ui.includes('visible: root.modeFor(resourcePanel.key) === "manual"'));
     const updated=draft.stageValue({}, "cpu", "nice", 8);
@@ -284,4 +284,32 @@ test("K8e4 memory editor shares existing owner draft, explicit restore and guard
     // a finite 97% request stays below the legacy 99.5% release threshold.
     for (const ratio of [0,0.01,0.1,0.25])
         assert.ok(ratio+(1-ratio)*97/98.5<0.995);
+});
+
+test("K8e5 swap finite zero, max and restoration have separate semantics",()=>{
+    const empty={};
+    assert.equal(draft.mode(empty,"swap"),"manual");
+    assert.deepEqual(draft.swapChoice(empty),{kind:"preview",mib:1024});
+    assert.equal(draft.summary(empty).length,0);
+    for(const value of [-1,8193,1.5,NaN,"512"])
+        assert.equal(draft.stageSwap(empty,"budget",value),empty);
+    assert.equal(draft.stageSwap(empty,"restore",0),empty);
+    const exact=draft.stageSwap(empty,"budget",513);
+    assert.deepEqual(draft.swapChoice(exact),{kind:"budget",mib:513});
+    assert.ok(draft.summary(exact)[0].includes("513 MiB"));
+    const zero=draft.stageSwap(exact,"budget",0);
+    assert.deepEqual(draft.swapChoice(zero),{kind:"budget",mib:0});
+    assert.ok(draft.summary(zero)[0].includes("0 MiB"));
+    const max=draft.stageSwap(zero,"uncapped",0);
+    assert.deepEqual(draft.swapChoice(max),{kind:"uncapped"});
+    assert.equal(draft.hasValue(max,"swap","budget"),false);
+    assert.ok(draft.summary(max)[0].includes("memory.swap.max=max"));
+    assert.ok(!draft.summary(max)[0].includes("0 MiB"));
+    assert.deepEqual(draft.swapChoice(draft.stageValue(max,"swap","budget",517)),{kind:"budget",mib:517});
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes('objectName: "cpuPlusSwapBudgetSlider"'));
+    assert.ok(ui.includes('objectName: "cpuPlusSwapExactInput"'));
+    assert.ok(ui.includes('modelData.key!=="restore"'));
+    assert.ok(ui.includes('editIdentity===root.targetIdentity'));
+    assert.ok(ui.includes('NO CAP IS NOT RESTORE'));
 });

@@ -589,6 +589,31 @@ ShellRoot {
                 if (!smoke.check(fakeGate.pending===null && fakeGate.cancels===1
                         && fakeGate.confirmations===0 && view.stagedLimitPercent===-1,
                         "memory owner review cancellation clears captured draft")) return;
+                const swapFilter=smoke.find(view,"cpuPlusResourceFilter-swap");
+                swapFilter.leftClicked(null);
+                const swapSlider=smoke.find(view,"cpuPlusSwapBudgetSlider");
+                const swapZero=smoke.find(view,"cpuPlusSwapChoice-zero");
+                const swapMax=smoke.find(view,"cpuPlusSwapChoice-uncapped");
+                const swapRestore=smoke.find(view,"cpuPlusSwapChoice-restore");
+                if (!smoke.check(swapSlider && swapSlider.adjustable && swapZero && swapMax
+                        && swapRestore && !swapRestore.available && !consolePane.hasDraft,
+                        "swap opens ready with no draft and restoration locked")) return;
+                swapSlider.valueRequested(512);
+                if (!smoke.check(consolePane.swapDraft.mib===512 && consolePane.reviewLines[0].includes("512 MiB"),
+                        "swap slider stages a finite budget")) return;
+                consolePane.stageSwap("budget",513);
+                if (!smoke.check(consolePane.swapDraft.mib===513,"exact swap value retains one MiB precision")) return;
+                swapZero.leftClicked(null);
+                if (!smoke.check(swapZero.selected && consolePane.swapDraft.mib===0
+                        && consolePane.reviewLines[0].includes("0 MiB"),"zero budget is not uncapped")) return;
+                swapMax.leftClicked(null);
+                if (!smoke.check(swapMax.selected && !swapZero.selected && consolePane.swapDraft.kind==="uncapped"
+                        && consolePane.reviewLines[0].includes("memory.swap.max=max")
+                        && !applyLocked.available && fakeGate.preparations===1 && fakeGate.confirmations===0,
+                        "uncapped draft never dispatches; restore remains locked")) return;
+                clearDraft.leftClicked(null);
+                if (!smoke.check(!consolePane.hasDraft && consolePane.swapDraft.kind==="preview",
+                        "clear swap draft restores preview only")) return;
                 fakeOwner.protectTargets=true;
                 cpuFilter.leftClicked(null);
                 const header=smoke.find(view,"cpuPlusProcessIdentity");

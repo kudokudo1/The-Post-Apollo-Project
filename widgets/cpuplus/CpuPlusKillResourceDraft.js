@@ -9,8 +9,8 @@ function cards() {
             {key:"virtual",title:"ADDRESS SPACE",min:128,max:8192,step:128,unit:"MiB",initial:2048}
         ],note:"NOT AN RSS OR PHYSICAL RAM CAP"},
         {key:"swap",title:"SWAP",scope:"CGROUP / SHARED-GROUP BUDGET",controls:[
-            {key:"budget",title:"SWAP BUDGET",min:0,max:8192,step:128,unit:"MiB",initial:1024}
-        ],note:"CGROUP MEMBERSHIP AND DELEGATION UNVERIFIED"},
+            {key:"budget",title:"SWAP BUDGET",min:0,max:8192,step:1,unit:"MiB",initial:1024}
+        ],note:"CGROUP MEMBERSHIP AND DELEGATION UNVERIFIED; ZERO IS NOT SWAP PURGE"},
         {key:"disk",title:"DISK I/O",scope:"I/O PRIORITY / THREAD; BANDWIDTH / GROUP",controls:[
             {key:"read",title:"READ DRAFT",min:1,max:512,step:1,unit:"MiB/s",initial:64},
             {key:"write",title:"WRITE DRAFT",min:1,max:512,step:1,unit:"MiB/s",initial:64}
@@ -60,6 +60,7 @@ function stageMode(previous,key,mode) {
     return result;
 }
 function stageValue(previous,key,field,value) {
+    if(key==="swap"&&field==="budget") return stageSwap(previous,"budget",value);
     var spec=find(key);
     if(!spec) return previous;
     var control=null;
@@ -77,7 +78,7 @@ function stageValue(previous,key,field,value) {
     return result;
 }
 function mode(previous,key) {
-    return previous[key]?previous[key].mode:(key==="cpu"||key==="disk"?"manual":"hold");
+    return previous[key]?previous[key].mode:(key==="cpu"||key==="disk"||key==="swap"?"manual":"hold");
 }
 function value(previous,key,field) {
     var spec=find(key);
@@ -141,6 +142,21 @@ function stageIoPriority(previous,kind,level) {
     result.disk={mode:"manual",values:Object.assign({},entry.values,{ioPriority:priority})};
     return result;
 }
+// A finite zero and the kernel's "max" token are different requests.
+function swapChoice(previous) {
+    var entry=previous.swap, values=entry&&entry.values;
+    if(values&&values.swapKind==="uncapped") return {kind:"uncapped"};
+    if(values&&values.swapKind==="budget") return {kind:"budget",mib:values.budget};
+    return {kind:"preview",mib:1024};
+}
+function stageSwap(previous,kind,mib) {
+    if(kind!=="budget"&&kind!=="uncapped") return previous;
+    if(kind==="budget"&&(!Number.isSafeInteger(mib)||mib<0||mib>8192)) return previous;
+    var result=Object.assign({},previous);
+    var values=kind==="budget"?{swapKind:kind,budget:mib}:{swapKind:kind};
+    result.swap={mode:"manual",values:values};
+    return result;
+}
 function summary(previous) {
     var lines=[];
     var rows=cards();
@@ -154,7 +170,7 @@ function summary(previous) {
                 var c=spec.controls[j];
                 // Priority and quota are different kernel operations. Never
                 // turn a placeholder value into a requested CPU setting.
-                if((spec.key==="cpu"||spec.key==="disk")&&!hasValue(previous,spec.key,c.key)) continue;
+                if(spec.key==="swap"||((spec.key==="cpu"||spec.key==="disk")&&!hasValue(previous,spec.key,c.key))) continue;
                 fields.push(c.title+" "+value(previous,spec.key,c.key)+" "+c.unit);
             }
             if(spec.key==="cpu"&&hasValue(previous,"cpu","affinity")) fields.push("AFFINITY "+entry.values.affinity.join(","));
@@ -162,7 +178,12 @@ function summary(previous) {
                 var p=entry.values.ioPriority;
                 fields.push(p.kind==="idle"?"I/O PRIORITY IDLE":"I/O PRIORITY BEST EFFORT "+p.level);
             }
-            description+=" // "+(fields.length?fields.join(" · "):spec.key==="cpu"?"NO CPU VALUES SELECTED":"NO DISK VALUES SELECTED");
+            if(spec.key==="swap") {
+                var swap=swapChoice(previous);
+                if(swap.kind==="uncapped") fields.push("NO CAP // memory.swap.max=max");
+                else if(swap.kind==="budget") fields.push("SWAP BUDGET "+swap.mib+" MiB");
+            }
+            description+=" // "+(fields.length?fields.join(" · "):"NO "+spec.key.toUpperCase()+" VALUES SELECTED");
         }
         if(entry.mode==="auto") description+=" // POLICY NOT DEFINED";
         lines.push(description);

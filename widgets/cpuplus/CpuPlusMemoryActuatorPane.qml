@@ -432,6 +432,7 @@ Item {
         required property bool showRefresh
         required property bool canRefresh
         property string refreshName: "cpuplusWorkRefresh"
+        readonly property real dividerBottom: capacityDivider.y+capacityDivider.height
         signal refreshRequested()
         spacing: 5
         Row {
@@ -472,6 +473,7 @@ Item {
             formatGiB: sharedHeader.formatGiB
         }
         Rectangle {
+            id: capacityDivider
             objectName: "cpuplusSharedCapacityDivider"
             width: parent.width
             height: 1
@@ -511,6 +513,7 @@ Item {
             }
         }
         LiveCapacityHeader {
+            id: diagnosticCapacityHeader
             objectName: "cpuplusSharedCapacityHeader"
             width: parent.width
             sample: root.displaySample
@@ -580,7 +583,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         spacing: 3
-        Rectangle { width: parent.width; height: 1; color: Colors.cyan }
+        Rectangle { width: parent.width; height: 1; color: Colors.cyan; visible: root.page!=="DIAG" || root.diagnosticSubject==="ALL" }
         CpuPlusMemoryReadout {
             width: parent.width
             visible: root.page !== "DIAG" || MemoryOperation.busy
@@ -1625,7 +1628,7 @@ Item {
         visible: root.diagnosticInfoOpen && root.visible && root.diagnosticSubject!=="ALL"
         z: 401
         x: 5
-        y: memoryDiagnosticInfo.mapToItem(root,0,memoryDiagnosticInfo.height).y+3
+        y: workHeader.y+diagnosticCapacityHeader.y+diagnosticCapacityHeader.dividerBottom+3
         width: Math.max(0,root.width-10)
         height: Math.min(Math.max(0,root.height-y),memoryHelpText.implicitHeight+12)
         color: Colors.black

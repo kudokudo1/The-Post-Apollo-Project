@@ -15,7 +15,7 @@ Column {
     property Item workshopFilterTarget: null
     readonly property string workshopTargetText: workshopLoader.item ? workshopLoader.item.targetText : ""
     property Item footerTarget: null
-    readonly property real footerHeight: workshopOpen && workshopSubject!=="ALL" ? 100 : 53
+    readonly property real footerHeight: workshopSubject==="ALL" ? 53 : workshopOpen ? 104 : 57
     property real workshopViewportHeight: 0
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
@@ -962,6 +962,13 @@ Column {
             width: parent.width
             height: 44
             visible: root.workshopOpen && root.workshopSubject!=="ALL"
+        }
+        Rectangle {
+            objectName: "cpuplusDiagFooterDivider"
+            visible: root.workshopSubject!=="ALL"
+            width: parent.width
+            height: 1
+            color: Colors.cyan
         }
         Column {
         objectName: "cpuplusDiagBottomControls"

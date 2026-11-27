@@ -439,7 +439,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
 {
     const c=vm.createContext({});
     vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
-    assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("CPU"))',c),'["threads","census"]');
+    assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("CPU"))',c),'["threads","census","hostcpu"]');
     assert.equal(vm.runInContext('workshopSubjectKinds("GPU").length',c),0);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"CPU")',c),true);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"storage"}]},"CPU")',c),false);

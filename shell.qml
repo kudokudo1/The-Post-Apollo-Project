@@ -43,6 +43,29 @@ PanelWindow {
 
     // Keep the idle diagnostic session referenced by the root, not a transient pane.
     readonly property var diagnosticSessionOwner: CpuPlusDiagnostics
+    // Passive lifecycle observer; no capture is started by mounting the shell.
+    DiagnosticWidgetLifecycleAdapter {
+        id: universalLifecycle
+        blocked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy ||
+            CpuPlusDiagnostics.workflowCatalogBusy || CpuPlusDiagnostics.setActive
+        sources: ({
+            "appcontrol": appControlWindow,
+            "camera": cameraWindow,
+            "hospital": hospitalWindow,
+            "finance": financeWindow,
+            "git": gitWindow,
+            "company-network": companyNetworkWindow,
+            "tasks": tasksWindow,
+            "forest": forestWindow,
+            "apollo-hub": apolloHubWindow,
+            "cpuplus": cpuPlusWindow,
+            "weather": weatherStationWindow,
+            "social": messagingWindow,
+            "time": timewWindow,
+            "notifications": notificationsHubWindow,
+            "media": sharedMediaDock
+        })
+    }
     Binding {
         target: CpuPlusDiagnostics
         property: "appControlMode"

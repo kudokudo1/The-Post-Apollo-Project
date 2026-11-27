@@ -47,7 +47,7 @@ test("K8d QML is a contained presentation, no process mutator or helper",()=>{
     assert.ok(ui.includes('objectName: "cpuPlusResourceFilter-"'));
     assert.ok(ui.includes("id: resourcePanel"));
     assert.ok(ui.includes("readonly property var spec: root.selectedResource"));
-    assert.ok(ui.includes("anchors.top: resourceFilters.bottom"));
+    assert.ok(ui.includes("anchors.top: resourceHeaderSection.bottom"));
     assert.ok(!ui.includes("id: resourceCard"));
     assert.ok(ui.includes("onLeftClicked: root.selectResource(modelData.key)"));
     assert.match(ui,/label: "REVIEW"/);

@@ -68,17 +68,40 @@ ShellRoot {
                     const heat=light.heat;
                     const enemy=Qt.rgba(1,.67-.56*heat,.35-.20*heat,1);
                     const blue=source.energyColor;
-                    const left=light.fraction>0?Math.min(.53,light.level*(.65+.55*light.fraction)):0;
-                    const right=light.fraction<1?Math.min(.53,light.level*(.65+.55*(1-light.fraction))):0;
-                    const blend=Math.min(source.height*.65,split,width-split);
-                    const lo=Math.max(0,(split-blend)/width);
-                    const hi=Math.min(1,(split+blend)/width);
-                    const g=c.createLinearGradient(0,0,width,0);
-                    g.addColorStop(0,Qt.rgba(blue.r,blue.g,blue.b,left));
-                    g.addColorStop(lo,Qt.rgba(blue.r,blue.g,blue.b,left));
-                    g.addColorStop(hi,Qt.rgba(enemy.r,enemy.g,enemy.b,right));
-                    g.addColorStop(1,Qt.rgba(enemy.r,enemy.g,enemy.b,right));
-                    c.fillStyle=g; c.fillRect(0,0,width,height);
+                    const p=light.fraction, h=source.height;
+                    const dominance=Math.min(1,Math.abs(p-.5)*2);
+                    const playerWins=p>=.5+heat*(.22/2.4);
+                    const winner=playerWins?blue:enemy;
+                    function bloom(cx,cy,rx,ry,color,alpha) {
+                        if(rx<=0 || ry<=0 || alpha<=0) return;
+                        c.save(); c.translate(cx,cy); c.scale(rx,ry);
+                        const g=c.createRadialGradient(0,0,0,0,0,1);
+                        g.addColorStop(0,Qt.rgba(color.r,color.g,color.b,alpha));
+                        g.addColorStop(.26,Qt.rgba(color.r,color.g,color.b,alpha*.75));
+                        g.addColorStop(.60,Qt.rgba(color.r,color.g,color.b,alpha*.28));
+                        g.addColorStop(1,Qt.rgba(color.r,color.g,color.b,0));
+                        c.fillStyle=g; c.fillRect(-1,-1,2,2); c.restore();
+                    }
+                    const start=source.mapToItem(battlefieldLight,0,source.height/2).x;
+                    const end=source.mapToItem(battlefieldLight,source.width,source.height/2).x;
+                    // Extended sources follow the actual occupied beam lengths.
+                    // Falloff occurs both vertically and horizontally. No flat
+                    // territory tint or hard boundary is drawn.
+                    const left=Math.max(0,split-start),right=Math.max(0,end-split);
+                    const reach=Math.max(h*5,height*.78);
+                    if(p>0) bloom(start+left*.53,origin.y,Math.max(h*2,left*.86),reach,
+                        blue,light.level*(.62+.38*p));
+                    if(p<1) bloom(split+right*.47,origin.y,Math.max(h*2,right*.86),reach,
+                        enemy,light.level*(.62+.38*(1-p)));
+                    // Broader collision-centered light is brighter than either
+                    // beam, with the dominant hue extending into its opponent.
+                    if(p>0 && p<1) {
+                        const offset=(playerWins?1:-1)*h*(.5+dominance*2.0);
+                        bloom(split+offset,origin.y,h*(4+dominance*4),h*5,
+                            winner,light.level*(.55+.35*dominance));
+                        bloom(split,origin.y,h*3.2,h*3.8,Qt.rgba(1,.96,.87,1),light.level*.85);
+                    }
+
                 }
             }
             // Local foreground spill is shared by all variants, including
@@ -106,11 +129,11 @@ ShellRoot {
                         const h=source.height;
                         const rx=h*(light.fire?5.2:4.8), ry=h*(light.fire?3.7:3.5);
                         if(rx<=0 || ry<=0) continue;
-                        const ink=light.color, a=light.level;
+                        const ink=light.color, a=light.level*(light.fire?.66:1);
                         c.save(); c.translate(p.x+(light.fire?source.flameTipOffset:light.side*h*.38),p.y); c.scale(rx,ry);
                         const g=c.createRadialGradient(0,0,0,0,0,1);
-                        g.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,a));
-                        g.addColorStop(.25,Qt.rgba(ink.r,ink.g,ink.b,a*.85));
+                        g.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,light.fire?a*.20:a));
+                        g.addColorStop(.25,Qt.rgba(ink.r,ink.g,ink.b,light.fire?a*.62:a*.85));
                         g.addColorStop(.62,Qt.rgba(ink.r,ink.g,ink.b,a*.40));
                         g.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,0));
                         c.fillStyle=g; c.fillRect(-1,-1,2,2); c.restore();

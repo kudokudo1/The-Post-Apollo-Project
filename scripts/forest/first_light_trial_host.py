@@ -12,6 +12,7 @@ import threading
 import uuid
 
 from context_first_tree_m2 import SessionContextRef
+from ollama_chat_transport import prepare_chat_request, stream_chat, ChatRefusal
 from runtime_events_r3 import OperationRef, RuntimeExchange
 from session_journal_v0 import ForestSessionJournal, MAX_BODY, bootstrap_synthetic
 from shared_context_b6r1 import TaskContext
@@ -88,7 +89,7 @@ class _OwnerStream:
             self._busy = False
 
 
-class FirstLightTrialHost:
+class _SingleInputTrialHost:
     """One fresh journal and one original operation per disposable host.
 
     Construct, submit, consume and close on the same owner worker thread.
@@ -98,11 +99,12 @@ class FirstLightTrialHost:
     In-memory storage is not crash-resistant original effect custody.
     """
 
-    def __init__(self, *, test_transport):
-        if not callable(test_transport):
+    def __init__(self, *, transport, endpoint):
+        if not callable(transport):
             raise FirstLightRefusal("TRANSPORT_REQUIRED")
         self._owner_thread = threading.current_thread()
-        self._transport = test_transport
+        self._transport = transport
+        self._endpoint = endpoint
         self._db = None
         self._runtime = None
         self._operation = None
@@ -160,7 +162,7 @@ class FirstLightTrialHost:
                 bridge, self._operation,
                 resolve_current_context=self._resolve_context,
                 model=MODEL, num_ctx=NUM_CTX, max_predict=MAX_PREDICT,
-                endpoint=ENDPOINT)
+                endpoint=self._endpoint)
         except Exception:
             raise FirstLightRefusal("TRIAL_SETUP_HOLD") from None
         self._phase = "PREPARED"
@@ -188,7 +190,7 @@ class FirstLightTrialHost:
         # transport parameters to the original fixed public trial.
         if (set(options) != {"model", "messages", "endpoint", "num_ctx",
                              "max_predict", "cancel_event"}
-                or options["model"] != MODEL or options["endpoint"] != ENDPOINT
+                or options["model"] != MODEL or options["endpoint"] != self._endpoint
                 or options["num_ctx"] != NUM_CTX
                 or options["max_predict"] != MAX_PREDICT
                 or options["messages"] != [{"role": "user", "content": PROMPT}]
@@ -296,3 +298,70 @@ class FirstLightTrialHost:
         self._committed_bytes = None
         self._closed = True
         return self._local
+
+
+class FirstLightTrialHost(_SingleInputTrialHost):
+    """Unchanged public test host; never an admitted native transport."""
+    def __init__(self, *, test_transport):
+        super().__init__(transport=test_transport, endpoint=ENDPOINT)
+
+
+class RealLocalTrialHost(_SingleInputTrialHost):
+    """Real B2 path composition, deliberately not executable under HOLD.
+
+    The endpoint is supplied by the independently reviewed host owner,
+    never by the composer; no default shared-service endpoint or injected
+    test transport. Fixed first-trial candidates are not approved settings.
+    No UI flag, environment variable, callback or constructor argument can
+    lift the native hold. Future admission must bind original effect custody,
+    current recipient, provider and preventive limits at the POST boundary.
+    """
+    def __init__(self, *, endpoint=None):
+        self._prepared = None
+        super().__init__(transport=self._native_stream, endpoint=endpoint)
+
+    def _require_native_admission(self):
+        # H9/H13: the independently enforced one-use native admission
+        # implementation does not exist yet. Do not replace with a bool.
+        raise FirstLightRefusal("NATIVE_ADMISSION_HOLD")
+
+    def stage_submission(self, model, prompt):
+        self._owner()
+        if self._phase != "IDLE" or self._prepared is not None:
+            raise FirstLightRefusal("TRIAL_ALREADY_USED")
+        if type(model) is not str or model != MODEL:
+            raise FirstLightRefusal("PUBLIC_MODEL_MISMATCH")
+        if type(prompt) is not str or prompt != PROMPT:
+            raise FirstLightRefusal("PUBLIC_INPUT_MISMATCH")
+        if self._endpoint is None:
+            raise FirstLightRefusal("NATIVE_ADMISSION_HOLD")
+        try:
+            prepared = prepare_chat_request(model=model,
+                messages=[{"role": "user", "content": prompt}],
+                endpoint=self._endpoint, num_ctx=NUM_CTX,
+                max_predict=MAX_PREDICT)
+        except ChatRefusal:
+            raise FirstLightRefusal("NATIVE_REQUEST_REFUSED") from None
+        self._require_native_admission()
+        # A future independently approved owner stages exactly once.
+        self._prepared = prepared
+
+    def submit(self, prompt):
+        self._owner()
+        self._require_native_admission()
+        if self._prepared is None:
+            raise FirstLightRefusal("NATIVE_ADMISSION_HOLD")
+        return super().submit(prompt)
+
+    def _native_stream(self, **options):
+        # Never reconstruct the original commitment from the later B3 input.
+        # B2 checks exact bytes and destination again before connecting.
+        self._require_native_admission()
+        if self._prepared is None:
+            raise FirstLightRefusal("NATIVE_ADMISSION_HOLD")
+        yield from stream_chat(**options, expected_request=self._prepared)
+
+    def close(self):
+        result = super().close()
+        self._prepared = None
+        return result

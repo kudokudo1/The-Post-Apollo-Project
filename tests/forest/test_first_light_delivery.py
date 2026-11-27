@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/forest"))
-from first_light_delivery import FirstLightDelivery, DeliveryRefusal
-from first_light_trial_host import PROMPT
+from first_light_delivery import FirstLightDelivery, RealLocalDelivery, DeliveryRefusal
+from first_light_trial_host import PROMPT, MODEL
 import test_first_light_trial_host as host_tests
 from test_ollama_chat_transport import packet
 
@@ -33,6 +33,27 @@ class DeliveryTests(unittest.TestCase):
                 return
             d.advance()
         self.fail("trial did not finish")
+
+    def test_real_held_submit_never_attaches_or_retargets(self):
+        with patch("first_light_trial_host.sqlite3.connect",
+                   side_effect=AssertionError("storage")), \
+             patch("first_light_trial_host.stream_chat",
+                   side_effect=AssertionError("network")):
+            d = RealLocalDelivery(endpoint="http://127.0.0.1:22114")
+            self.assertEqual(d.submit(MODEL, PROMPT, 1), "REFUSED")
+            self.assertTrue(d.observe(1))
+            self.assertEqual(d.submit(MODEL, "changed text", 1), "REFUSED")
+            self.assertEqual(d.submit(MODEL, PROMPT, 1), "HELD")
+            self.assertIsNone(d.take(1))
+            self.assertEqual(d.stop(1), "STOP_UNAVAILABLE")
+            self.assertTrue(d.withdraw(1))
+            self.assertFalse(d.observe(1))
+            self.assertTrue(d.observe(2))
+            self.assertEqual(d.submit(MODEL, PROMPT, 1), "REFUSED")
+            self.assertFalse(d.withdraw(1))
+            self.assertIsNone(d.take(2))
+            self.assertEqual(d.submit(MODEL, PROMPT, 2), "HELD")
+            self.assertEqual(d.close(), "UNKNOWN_HOLD")
 
     def test_actual_public_response_one_row_and_terminal_after_exhaustion(self):
         d, view, peer = self.setup_trial([packet("RE"), packet("ADY", done=True)])

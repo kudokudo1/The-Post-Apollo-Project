@@ -40,6 +40,33 @@ class FirstLightHostTests(unittest.TestCase):
             yield from stream_chat(**kw)
         return Peer, transport
 
+    def test_real_owner_seam_holds_before_storage_or_network(self):
+        with patch.object(fl.sqlite3, "connect", side_effect=AssertionError("storage")), \
+             patch.object(fl, "stream_chat", side_effect=AssertionError("network")):
+            host = fl.RealLocalTrialHost(endpoint="http://127.0.0.1:22114")
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "^PUBLIC_MODEL_MISMATCH$"):
+                host.stage_submission("another-model", fl.PROMPT)
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "^PUBLIC_INPUT_MISMATCH$"):
+                host.stage_submission(fl.MODEL, "different input")
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "^NATIVE_ADMISSION_HOLD$"):
+                host.stage_submission(fl.MODEL, fl.PROMPT)
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "^NATIVE_ADMISSION_HOLD$"):
+                host.submit(fl.PROMPT)
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "^NATIVE_ADMISSION_HOLD$"):
+                list(host._native_stream())
+            self.assertIsNone(host._prepared)
+            self.assertIsNone(host._db)
+            self.assertEqual(host.phase, "IDLE")
+            self.assertEqual(host.close(), "UNKNOWN_HOLD")
+
+    def test_real_owner_requires_explicit_endpoint_and_no_test_transport(self):
+        host = fl.RealLocalTrialHost()
+        with self.assertRaisesRegex(fl.FirstLightRefusal, "^NATIVE_ADMISSION_HOLD$"):
+            host.stage_submission(fl.MODEL, fl.PROMPT)
+        self.assertEqual(host.close(), "UNKNOWN_HOLD")
+        with self.assertRaises(TypeError):
+            fl.RealLocalTrialHost(test_transport=lambda **kw: iter(()))
+
     def test_fixed_public_exact_request_and_one_original_commit(self):
         peer, transport = self.peer([packet("RE"), packet("ADY", done=True)])
         host = fl.FirstLightTrialHost(test_transport=transport)

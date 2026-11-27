@@ -48,7 +48,7 @@ test("header preserves the requested right-to-left single-row control order",()=
     }
 });
 
-test("all structural and header control glows reuse the Prism button spectrum",()=>{
+test("structural glows reuse the Prism button spectrum",()=>{
     const halo=file("components/PrismBorderGlow.qml");
     assert.match(halo,/Artwork\.prismGeometry\(\)/);
     assert.match(halo,/recipe\.spectrumStops/);
@@ -60,9 +60,28 @@ test("all structural and header control glows reuse the Prism button spectrum",(
     assert.doesNotMatch(halo,/ctx\.putImageData\(/);
     assert.match(widget,/borderVisible: false/);
     assert.match(widget,/border\.width: 1/);
-    assert.equal((widget.match(/PrismBorderGlow\s*\{/g)||[]).length,10);
+    assert.equal((widget.match(/PrismBorderGlow\s*\{/g)||[]).length,5);
     assert.equal((widget.match(/divider: true/g)||[]).length,2);
     assert.match(file("components/qmldir"),/PrismBorderGlow 1.0 PrismBorderGlow.qml/);
+});
+
+test("ordinary buttons keep their own glow rules; only structure and text use Prism",()=>{
+    const header=widget.slice(widget.indexOf("id: prismHeader"),widget.indexOf("id: prismDivider"));
+    assert.doesNotMatch(header,/(?:softGlowEnabled|wideGlowEnabled|perimeterGlowEnabled)\s*:/);
+    assert.equal((header.match(/PrismBorderGlow\s*\{/g)||[]).length,1);
+    const badge=header.slice(header.indexOf("id: prismSourceIndicator"),header.indexOf("DiagnosticsDockButton {"));
+    assert.match(badge,/border.width: 1/);
+    assert.match(badge,/border.color: Colors.white/);
+    assert.match(badge,/PrismBorderGlow \{ anchors.fill: parent \}/);
+    assert.match(header,/PrismTextGlow \{ labelItem: prismTitleText \}/);
+    assert.match(badge,/PrismTextGlow \{ labelItem: prismSourceText/);
+    const glow=file("components/PrismTextGlow.qml");
+    assert.match(glow,/Artwork\.prismGeometry\(\)/);
+    assert.match(glow,/recipe\.spectrumStops/);
+    assert.match(glow,/c\.strokeText\(text,x,y\)/);
+    assert.match(glow,/metrics\.elidedText/);
+    assert.doesNotMatch(glow,/\b(?:Timer|Process|ShaderEffectSource)\s*\{/);
+    assert.match(file("components/qmldir"),/PrismTextGlow 1.0 PrismTextGlow.qml/);
 });
 
 test("Prism grows upward from Trash's shared bottom baseline",()=>{

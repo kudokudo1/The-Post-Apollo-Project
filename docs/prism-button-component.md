@@ -58,8 +58,12 @@ sizes Prism grows upward from Trash's shared bottom edge (85px above the
 screen), rather than hanging from the top of the screen. The shared
 `PrismBorderGlow` component reads the same spectral stops and corner
 orientation as the original button, retains thin underlying border cores,
-and supplies the window, internal divider, index-card and header-control
-perimeter glows without changing the controls' glyph/fill semantics. The badge is not a
+and supplies the window, internal divider, index-card and source badge
+perimeter glows. Ordinary action and feature buttons retain their complete
+shared component styling, including normal glow planes, unless the operator
+explicitly requests an exception. The source badge has a fixed white 1px
+border and spectral halo. `PrismTextGlow` adds glyph-shaped spectral halos
+behind the unchanged foreground text of the title and source badge. The badge is not a
 heartbeat. Reload is unavailable until it has actual data to refresh.
 
 The diagnostic toggle owns `PrismW.indexOpen`; it switches the existing

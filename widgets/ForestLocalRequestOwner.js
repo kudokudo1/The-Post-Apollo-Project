@@ -1,14 +1,16 @@
 // UI1: original local SEND/STOP event custody for the real host interface.
 // No provider, process, network, mock response, grant or storage here.
 // Host is independently owned. null submit result = explicit no-dispatch
-// refusal; accepted result = {accepted:true, correlation: opaque object}.
+// refusal; Runtime's HELD/REFUSED are non-acceptance and never attach.
+// Accepted result = {accepted:true, correlation: opaque object}; the
+// eventual IPC owner must bind it to the original Runtime operation.
 // Uncertain/malformed results are held, not permission to retry.
 // Every Tree/model/host/view withdrawal must be observed by the mounted owner.
 function createLocalRequestOwner() {
     let current = null, active = null, lastEpoch = 0, pending = false;
     let status = "HELD";
     function bounded(s, max) {
-        if (typeof s !== "string" || !s || s.indexOf("\x00") !== -1)
+        if (typeof s !== "string" || !s || s.length > max || s.indexOf("\x00") !== -1)
             return false;
         try { return encodeURIComponent(s).replace(/%[0-9a-fA-F]{2}|[^%]/g,"x").length <= max; }
         catch (_) { return false; }
@@ -72,6 +74,13 @@ function createLocalRequestOwner() {
         pending = false;
         if (result === null) {
             if (current === view) { view.used = false; status = "READY"; }
+            return false;
+        }
+        // Runtime currently returns these explicit non-acceptance states.
+        // Neither permits a second attempt from this view: REFUSED can
+        // also follow a delivery refusal, so do not infer no effect.
+        if (result === "HELD" || result === "REFUSED") {
+            if (current === view) status = result;
             return false;
         }
         if (!result || result.accepted !== true || !result.correlation

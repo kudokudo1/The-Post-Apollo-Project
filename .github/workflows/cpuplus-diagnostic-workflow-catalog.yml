@@ -1,0 +1,25 @@
+name: CPU++ saved diagnostic workflow catalog
+on:
+  pull_request:
+    paths:
+      - "services/diagnostics/DiagnosticWorkflowDefaults.js"
+      - "services/diagnostics/DiagnosticWorkflowCatalog.js"
+      - "services/diagnostics/DiagnosticCalibration.js"
+      - "services/diagnostics/CpuPlusDiagnosticsPolicy.js"
+      - "scripts/cpuplus_diagnostic_workflow_catalog.py"
+      - "scripts/cpuplus_diagnostic_archive.py"
+      - "scripts/cpuplus_diagnostic_workflow.py"
+      - "tests/cpuplus/test_diagnostic_workflow_defaults.cjs"
+      - "tests/cpuplus/test_diagnostic_workflow_catalog.cjs"
+      - "tests/cpuplus/test_diagnostic_workflow_storage.py"
+      - ".github/workflows/cpuplus-diagnostic-workflow-catalog.yml"
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_diagnostic_workflow_defaults.cjs
+      - run: node tests/cpuplus/test_diagnostic_workflow_catalog.cjs
+      - run: python3 -B tests/cpuplus/test_diagnostic_workflow_storage.py

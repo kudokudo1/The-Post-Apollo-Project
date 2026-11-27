@@ -15,9 +15,54 @@ ShellRoot {
         property bool reduced: false
         property bool measured: false
 
+        EnergyPressureField {
+            id: field
+            reducedMotion: lab.reduced
+        }
+
+        // The physical window stays fixed; the laboratory's whole interior
+        // panel responds as one unit. This is not a production input surface.
+        Item {
+            anchors.fill: parent
+            anchors.margins: 6
+            transform: Translate { x: field.offsetX; y: field.offsetY }
+
+            Rectangle {
+                anchors.fill: parent
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.magenta
+            }
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -2
+                color: "transparent"
+                border.width: 2
+                border.color: field.pressureColor
+                opacity: field.pressure * .55
+            }
+            // Small, rising fragments are deliberately outside the button.
+            // They are driven by the same existing visual clock, no extra timer.
+            Repeater {
+                model: 12
+                Rectangle {
+                    required property int index
+                    readonly property real drift: (field.motionTime*(.55+index*.035)+index*.19)%1
+                    width: 2 + index%3
+                    height: 1 + index%2
+                    x: index%2===0 ? 3+drift*12 : parent.width-3-drift*12
+                    y: parent.height*(.14+.066*index)-drift*18*field.pressure
+                    color: field.pressureColor
+                    opacity: Math.max(0,(field.pressure-.38)*1.25)*(1-drift)
+                    rotation: index*37+drift*65
+                    visible: field.pressure>.38
+                    z: 2
+                }
+            }
+
         Column {
             anchors.fill: parent
-            anchors.margins: 18
+            anchors.margins: 12
             spacing: 10
             GohuText { text: "ENERGY PROGRESS // SIMULATION ONLY"; color: Colors.magenta; font.pixelSize: 16 }
             GohuText { text: "No services, files, GitHub requests or production actions."; color: Colors.white }
@@ -47,6 +92,12 @@ ShellRoot {
                 }
             }
             Repeater {
+                onItemAdded: function(index, item) {
+                    field.sources = field.sources.concat([item.pressureSource]);
+                }
+                onItemRemoved: function(index, item) {
+                    field.sources = field.sources.filter(source => source !== item.pressureSource);
+                }
                 model: [{name:"OMNITRIX",key:"omnitrix"},{name:"TRON",key:"tron"},
                     {name:"KI BLAST",key:"ki-blast"},{name:"FLAMETHROWER",key:"flamethrower"}]
                 Item {
@@ -54,6 +105,7 @@ ShellRoot {
                     required property var modelData
                     width: parent.width
                     height: 84
+                    property alias pressureSource: energyFace
                     property string phase: "idle"
                     property int duration: 6500
                     property double started: 0
@@ -96,11 +148,12 @@ ShellRoot {
                         contentGlowEnabled: false
                         softGlowEnabled: false
                         wideGlowEnabled: false
-                        // Stable click geometry; only the inner face vibrates.
+                        // The lab panel itself moves by a bounded offset.
                         available: true
                         interactive: card.phase !== "running"
                         onLeftClicked: card.start()
                         EnergyProgressFace {
+                            id: energyFace
                             anchors.fill: parent
                             variant: card.modelData.key
                             phase: card.phase
@@ -132,6 +185,7 @@ ShellRoot {
                     }
                 }
             }
+        }
         }
     }
 }

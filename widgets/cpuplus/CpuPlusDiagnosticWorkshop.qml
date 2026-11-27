@@ -12,6 +12,9 @@ Column {
     spacing: compactLayout ? 1 : 2
     property real viewportHeight: 0
     property Item filterTarget: null
+    property string subject: "ALL"
+    readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
+    readonly property int filterCount: filterKinds.length
     readonly property string targetText: {
         const qs=draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
         const system=draft.selected.some(k=>k==="census"||k==="storage");
@@ -21,7 +24,7 @@ Column {
     readonly property int instrumentHeight: compactLayout ? 112 : Math.min(240,176+Math.floor(Math.max(0,viewportHeight-540)*0.35))
     readonly property int filterSize: compactLayout ? 24 : 32
     readonly property int filterGap: compactLayout ? 3 : 4
-    readonly property int filterWidth: Math.min(filterSize,Math.max(16,Math.floor((width-68-5*filterGap)/5)))
+    readonly property int filterWidth: Math.min(filterSize,Math.max(16,Math.floor((width-68-filterCount*filterGap)/Math.max(1,filterCount))))
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
@@ -33,7 +36,7 @@ Column {
     // Below that size use the existing readable digital controls instead.
     readonly property bool storageMechanical: !smallestStorageLayout && storageDialWidth>=92
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
-    readonly property var draft: CpuPlusDiagnostics.workshopDraft
+    readonly property var draft: CpuPlusDiagnostics.draftForSubject(subject)
     readonly property int storageSample: draft.storageSampleSeconds || 1
     readonly property int storageReport: draft.storageReportSeconds || 10
     readonly property bool storageRunning: recording && draft.selected.includes("storage") && !CpuPlusDiagnostics.cancelled
@@ -85,7 +88,7 @@ Column {
         disarm();
         const next=Object.assign({},draft);
         next[key]=value;
-        CpuPlusDiagnostics.workshopDraft=next;
+        CpuPlusDiagnostics.setDraftForSubject(subject,next);
     }
     function cadenceStep(field,direction) {
         return Calibration.storageCadenceStep(draft.durationSeconds,storageSample,storageReport,field,direction);
@@ -99,11 +102,11 @@ Column {
     function applyStorageCadence(pair) {
         if (locked || !draft.selected.includes("storage") || !pair) return;
         disarm();
-        CpuPlusDiagnostics.workshopDraft=Object.assign({},draft,{
-            storageCadenceExplicit:true,storageSampleSeconds:pair.sampleSeconds,storageReportSeconds:pair.reportSeconds});
+        CpuPlusDiagnostics.setDraftForSubject(subject,Object.assign({},draft,{
+            storageCadenceExplicit:true,storageSampleSeconds:pair.sampleSeconds,storageReportSeconds:pair.reportSeconds}));
     }
     function toggle(kind) {
-        if (locked) return;
+        if (locked || !filterKinds.includes(kind)) return;
         const selected=draft.selected.slice();
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
@@ -156,7 +159,7 @@ Column {
                 {kind:"memory",symbol:"",subject:"MEMORY"},
                 {kind:"census",symbol:"",subject:"CPU"},
                 {kind:"storage",symbol:"",subject:"STORAGE"},
-                {kind:"stall",symbol:"⚡",subject:"UPTIME"}]
+                {kind:"stall",symbol:"⚡",subject:"UPTIME"}].filter(row=>root.filterKinds.includes(row.kind))
             ActionButton {
                 id: instrumentFilter
                 required property var modelData
@@ -181,7 +184,7 @@ Column {
         }
         GohuText {
             visible: !root.filterTarget
-            width: Math.max(0,parent.width-5*(root.filterWidth+root.filterGap))
+            width: Math.max(0,parent.width-root.filterCount*(root.filterWidth+root.filterGap))
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             text: root.targetText

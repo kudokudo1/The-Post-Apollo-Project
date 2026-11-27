@@ -215,7 +215,7 @@ Column {
         function onSetActiveChanged() { if(CpuPlusDiagnostics.setActive) root.closeSaveEditor(); }
     }
     function activate() {
-        if (locked || calibrating || !preview.ok || saveEditorOpen || !targetCompatibility.ok || targetPicker.visible) return;
+        if (locked || calibrating || !preview.ok || saveEditorOpen || !targetCompatibility.ok || targetPicker.visible || lifecyclePicker.visible) return;
         saveNotice="";
         if (ready) {
             const frozen=JSON.parse(preparedText);
@@ -238,9 +238,9 @@ Column {
             }
         });
     }
-    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); }
+    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); if(lifecyclePicker) lifecyclePicker.close(); }
     onSelectedTargetIdChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
-    onVisibleChanged: if (!visible) { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); }
+    onVisibleChanged: if (!visible) { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); if(lifecyclePicker) lifecyclePicker.close(); }
     onLockedChanged: if (locked) disarm()
     onPlanTextChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
     onRecordingChanged: if (recording) displayNow=Date.now()
@@ -908,8 +908,8 @@ Column {
                 label: "TARGET"
                 normalFace: true
                 accentColor: Colors.purple
-                available: !root.locked && !root.calibrating
-                onLeftClicked: { root.disarm(); targetPicker.open(); }
+                available: CpuPlusDiagnostics.lifecycleActive || (!root.locked && !root.calibrating)
+                onLeftClicked: { root.disarm(); if(CpuPlusDiagnostics.lifecycleActive) lifecyclePicker.open(); else targetPicker.open(); }
             }
             CpuPlusDiagnosticExecutionButton {
                 objectName: "cpuplusWorkshopExecute"
@@ -922,7 +922,7 @@ Column {
                 progress: root.phase==="READY" || root.phase==="COMPLETE" ? 1
                     : root.phase==="RECORDING" || root.phase==="STOPPING" ? root.elapsedFraction : 0
                 available: true
-                interactive: !root.locked && !root.calibrating && root.preview.ok && root.targetCompatibility.ok && !targetPicker.visible
+                interactive: !root.locked && !root.calibrating && root.preview.ok && root.targetCompatibility.ok && !targetPicker.visible && !lifecyclePicker.visible
                 onLeftClicked: root.activate()
             }
             ActionButton {
@@ -1066,10 +1066,20 @@ Column {
                 font.pixelSize: 10
                 elide: Text.ElideRight
             }
+            ActionButton {
+                objectName: "cpuplusWorkshopOpenDump"
+                width: parent.width
+                height: 26
+                label: "POST-APOLLO DUMP"
+                normalFace: true
+                accentColor: Colors.purple
+                available: CpuPlusDiagnostics.lifecycleAvailable && !root.locked
+                onLeftClicked: { targetPicker.close(); lifecyclePicker.open(); }
+            }
             ListView {
                 objectName: "cpuplusWorkshopTargetResults"
                 width: parent.width
-                height: Math.max(0,parent.height-52)
+                height: Math.max(0,parent.height-82)
                 clip: true
                 spacing: 3
                 model: Targets.searchDiagnosticTargets(targetSearch.text,targetPicker.category)
@@ -1103,4 +1113,10 @@ Column {
         }
     }
 
+    CpuPlusLifecycleDumpPopup {
+        id: lifecyclePicker
+        parent: root
+        width: root.width
+        height: Math.min(340,Math.max(190,root.height))
+    }
 }

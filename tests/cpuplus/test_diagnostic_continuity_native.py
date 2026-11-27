@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-diag-native-") as temporary:
                  "CpuPlusMemoryCapacitySlider.qml",
                  "CpuPlusMemoryAddControl.qml", "CpuPlusSwapComposition.qml",
                  "CpuPlusMemorySnapshot.js", "CpuPlusMemoryReadout.qml", "CpuPlusMemoryReadout.js", "CpuPlusDiagnosticsPane.qml",
-                 "CpuPlusResourceDiagnosticsPane.qml", "CpuPlusDiagnosticWorkshop.qml", "CpuPlusDiagnosticSlider.qml", "CpuPlusDiagnosticExecutionButton.qml",
+                 "CpuPlusResourceDiagnosticsPane.qml", "CpuPlusDiagnosticWorkshop.qml", "CpuPlusLifecycleDumpPopup.qml", "CpuPlusDiagnosticSlider.qml", "CpuPlusDiagnosticExecutionButton.qml",
                  "CpuPlusZramPolicyPane.qml", "CpuPlusZramPolicy.js",
                  "CpuPlusAdvancedPolicyPane.qml", "CpuPlusAdvancedPolicy.js",
                  "CpuPlusQueuePane.qml", "CpuPlusQueuePresentation.js", "CpuPlusQueueConsumer.js"):

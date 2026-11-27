@@ -214,6 +214,16 @@ Column {
             elide: Text.ElideRight
         }
         ActionButton {
+            objectName: "cpuplusLifecycleGlobalStop"
+            width: parent.width
+            height: 26
+            visible: CpuPlusDiagnostics.lifecycleActive
+            accentColor: Colors.red
+            destructive: true
+            label: "STOP POST-APOLLO DUMP"
+            onLeftClicked: CpuPlusDiagnostics.cancelLifecycleCapture()
+        }
+        ActionButton {
             width: parent.width
             height: 26
             visible: CpuPlusDiagnostics.setActive || (CpuPlusDiagnostics.busy && (root.viewMode !== "WORK"

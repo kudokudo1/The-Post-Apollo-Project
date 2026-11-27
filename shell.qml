@@ -46,7 +46,7 @@ PanelWindow {
     // Passive lifecycle observer; no capture is started by mounting the shell.
     DiagnosticWidgetLifecycleAdapter {
         id: universalLifecycle
-        blocked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.archiveBusy ||
+        blocked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted || CpuPlusDiagnostics.archiveBusy ||
             CpuPlusDiagnostics.workflowCatalogBusy || CpuPlusDiagnostics.setActive
         sources: ({
             "appcontrol": appControlWindow,
@@ -65,6 +65,11 @@ PanelWindow {
             "notifications": notificationsHubWindow,
             "media": sharedMediaDock
         })
+    }
+    Binding {
+        target: CpuPlusDiagnostics
+        property: "lifecycleRecorder"
+        value: universalLifecycle
     }
     Binding {
         target: CpuPlusDiagnostics

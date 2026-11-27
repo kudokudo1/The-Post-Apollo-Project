@@ -5,6 +5,7 @@ import Quickshell.Io
 import "CpuPlusDiagnosticsPolicy.js" as Policy
 import "DiagnosticCalibration.js" as Calibration
 import "DiagnosticTargetRegistry.js" as Targets
+import "DiagnosticWidgetLifecycle.js" as Lifecycle
 
 // Session owner, independent of the demand-loaded CPU++ pane.
 // No process or timer runs until an explicit button request.
@@ -55,8 +56,33 @@ Scope {
     readonly property string workflowCatalogStatus: workflowStore.status
     readonly property bool workflowCatalogReady: workflowStore.ready
     readonly property bool workflowCatalogBusy: workflowStore.busy
+    property var lifecycleRecorder: null
+    readonly property bool lifecycleAvailable: lifecycleRecorder!==null
+    readonly property bool lifecycleActive: lifecycleAvailable && lifecycleRecorder.active
+    readonly property var lifecycleReport: lifecycleAvailable ? lifecycleRecorder.report : null
+    property var lifecycleSelection: Lifecycle.lifecycleIds()
+    property int lifecycleDurationSeconds: 30
+    function setLifecycleSelection(ids) {
+        if(workshopPresetLocked||!Lifecycle.validSelection(ids))return false;
+        lifecycleSelection=ids.slice();
+        return true;
+    }
+    function setLifecycleDuration(seconds) {
+        if(workshopPresetLocked||!Number.isSafeInteger(seconds)||seconds<1||seconds>120)return false;
+        lifecycleDurationSeconds=seconds;
+        return true;
+    }
+    function startLifecycleCapture() {
+        if(!lifecycleAvailable||workshopPresetLocked||worker.running)return false;
+        if(!lifecycleRecorder.start(lifecycleSelection,lifecycleDurationSeconds*1000))return false;
+        captureSequence+=1;
+        return true;
+    }
+    function cancelLifecycleCapture() {
+        return lifecycleActive && lifecycleRecorder.cancel();
+    }
     function loadWorkflowCatalog() {
-        if (busy || archiveBusy || faulted || setActive || workflowStore.busy) return false;
+        if (busy || archiveBusy || faulted || setActive || workflowStore.busy || lifecycleActive) return false;
         return workflowStore.load();
     }
     function setWorkflowFavorite(id, value) {
@@ -73,7 +99,7 @@ Scope {
     }
 
     function loadHistory() {
-        if (busy || setActive || workflowCatalogBusy) return false;
+        if (busy || setActive || workflowCatalogBusy || lifecycleActive) return false;
         return archive.invoke({action: "list"});
     }
     function selectLatest(job) {
@@ -209,7 +235,7 @@ Scope {
     // Library and QUICK are projections of the same confirmed catalog.
     readonly property var workshopPresets: workflowStore.rows
     property string workshopPresetFeedback: "NOT LOADED // LOCAL WORKFLOW LIBRARY"
-    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive || workflowCatalogBusy
+    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive || workflowCatalogBusy || lifecycleActive
     function editWorkflowCatalog(change) {
         if (workshopPresetLocked || !workflowStore.ready) return false;
         if (!workflowStore.edit(change)) {
@@ -387,7 +413,7 @@ Scope {
     }
 
     function request(job, configuration) {
-        if (busy || faulted || worker.running || archive.busy || workflowCatalogBusy || (setActive && !setDispatching)) return false;
+        if (busy || faulted || worker.running || archive.busy || workflowCatalogBusy || lifecycleActive || (setActive && !setDispatching)) return false;
         const configured = configuration !== undefined;
         const plan = configured
             ? (job === "workflow"

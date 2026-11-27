@@ -51,7 +51,7 @@ def scene_text(mounted):
     function idle() { return true; }
     function startCapture() { return true; }
     function tickCapture(elapsed, now) {}
-    function finished() { return Date.now()-phaseStart>=5500; }
+    function finished() { return phase===5 || Date.now()-phaseStart>=5500; }
     function confirmCapture() { return true; }
     function stopCapture() { return true; }
     function confirmStop() { return true; }
@@ -107,7 +107,9 @@ ShellRoot {
                 root.mark("CLEANUP_BEGIN");root.advance(6,now);
             }else if(root.phase===6 && age>=1000){
                 if(!root.idle()){root.fail("cleanup not idle");return;}
-                root.mark("CLEANUP_END");console.log("CPU_Q6_PASS");Qt.quit();
+                root.mark("CLEANUP_END");root.advance(7,now);
+            }else if(root.phase===7 && age>=300){
+                console.log("CPU_Q6_PASS");Qt.quit();
             }
         }
     }
@@ -180,7 +182,7 @@ def run_scene(folder,mounted):
             lines.put(line)
         lines.put(None)
     threading.Thread(target=read,daemon=True).start()
-    marks={};peak={};observed_pids=set();phase="STARTUP";identity=None;passed=False;logs=[]
+    marks={};peak={};observed_pids={};phase="STARTUP";identity=None;passed=False;logs=[]
     until=time.monotonic()+40
     try:
         while time.monotonic()<until:
@@ -203,7 +205,15 @@ def run_scene(folder,mounted):
                 if "CPU_Q6_PASS" in line:
                     passed=True
             children=observer_children(proc.pid,scripts/SCRIPT)
-            observed_pids.update(children)
+            for child in children:
+                try:
+                    snap=proc_snapshot(child)
+                except (OSError, ValueError, IndexError):
+                    continue
+                key=(child,snap["startTicks"])
+                prev=observed_pids.get(key,{"maxCpuTicks":0,"peakPssKiB":0})
+                observed_pids[key]={"maxCpuTicks":max(prev["maxCpuTicks"],snap["ticks"]),
+                    "peakPssKiB":max(prev["peakPssKiB"],snap["memoryKiB"]["Pss"])}
             peak[phase]=max(peak.get(phase,0),len(children))
             if phase in ("STARTUP","IDLE","POST","CLEANUP") and children:
                 raise AssertionError("observer running outside capture: "+phase)
@@ -213,7 +223,13 @@ def run_scene(folder,mounted):
         if mounted:
             assert identity and identity["pid"]==proc.pid and identity["startTicks"]==marks["ACTIVE_BEGIN"]["startTicks"], "launching-shell identity mismatch"
             assert peak.get("ACTIVE",0)==1 and peak.get("STOP",0)==1, "expected exactly one observer per active operation"
-            assert not any((Path("/proc")/str(pid)).exists() for pid in observed_pids), "observer survived cleanup"
+            for pid,birth in observed_pids:
+                try:
+                    raw=(Path("/proc")/str(pid)/"stat").read_text()
+                    start=int(raw[raw.rfind(")")+1:].split()[19])
+                except OSError:
+                    continue
+                assert start!=birth, "observer survived cleanup"
         else:
             assert not observed_pids, "baseline unexpectedly collected resources"
         phases={}
@@ -225,7 +241,9 @@ def run_scene(folder,mounted):
                 cpuPct=round(100*(b["ticks"]-a["ticks"])/HZ/elapsed,3),
                 pssStartKiB=a["memoryKiB"]["Pss"],pssEndKiB=b["memoryKiB"]["Pss"],
                 rssStartKiB=a["memoryKiB"]["Rss"],rssEndKiB=b["memoryKiB"]["Rss"])
-        return dict(phases=phases,observerPeak=peak,identity=identity)
+        return dict(phases=phases,observerPeak=peak,identity=identity,
+                    observedWorkerCpuTicksLowerBound=sum(v["maxCpuTicks"] for v in observed_pids.values()),
+                    observedWorkerPeakPssKiB=max((v["peakPssKiB"] for v in observed_pids.values()),default=0))
     except BaseException:
         print("\n".join(logs[-80:]))
         raise
@@ -247,6 +265,6 @@ with tempfile.TemporaryDirectory(prefix="cpu-q6-disposable-") as tmp:
         idlePssDeltaKiB=m["IDLE"]["pssEndKiB"]-b["IDLE"]["pssEndKiB"],
         activeCpuDeltaPercentagePoints=round(m["ACTIVE"]["cpuPct"]-m["IDLE"]["cpuPct"],3),
         postCpuDeltaPercentagePoints=round(m["POST"]["cpuPct"]-m["IDLE"]["cpuPct"],3),
-        note="Disposable shell synthetic flag workload, real procfs sampler. Shell CPU excludes observer child CPU. Short CI windows are noisy; no production performance threshold inferred.")
+        note="Disposable shell synthetic flag workload, real procfs sampler. Shell CPU excludes observer child CPU; child sampled ticks are a lower bound and PSS a sampled peak. Short CI windows are noisy; no production performance threshold inferred.")
     print("CPU_Q6_METRICS "+json.dumps(result,sort_keys=True))
     print("CPU_Q6_REAL_NATIVE_PASS")

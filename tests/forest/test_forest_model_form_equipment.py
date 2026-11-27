@@ -73,7 +73,18 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         scale = slider.split("id: scaleArea", 1)[1].split("Repeater {", 1)[0]
         self.assertIn("topMargin: slider.horizontalStep ? 8 : 38", scale)
         self.assertIn("bottomMargin: slider.horizontalStep ? 8 : 26", scale)
-        self.assertIn("height: 52", slider)
+        # Responsive hardware is opt-in (#2944). The model-form INDEX
+        # consumer retains the original thumb geometry and travel.
+        self.assertNotIn("responsiveHardware: true", rail)
+        self.assertIn("property bool responsiveHardware: false", slider)
+        self.assertIn(
+            "readonly property real hardwareThumbWidth: responsiveHardware ? Math.min(28, Math.max(10, Math.round(width*0.78))) : 28",
+            slider)
+        self.assertIn(
+            "readonly property real hardwareThumbLength: responsiveHardware ? Math.min(52, Math.max(22, Math.round(height*0.105))) : 52",
+            slider)
+        self.assertIn("width: slider.hardwareThumbWidth", slider)
+        self.assertIn("height: slider.hardwareThumbLength", slider)
         for height in (320, 340, 360):
             rail_height = height - 33 - 19 - 62 - 2 - 2 - 17 - 4 - 3
             self.assertGreaterEqual(rail_height - 38 - 26 - 52, 60)

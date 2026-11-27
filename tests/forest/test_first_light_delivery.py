@@ -225,16 +225,28 @@ class DeliveryTests(unittest.TestCase):
             self.assertTrue(blocked.wait(2))
             partial = control.command({"op": "TAKE", "epoch": 1})["snapshot"]
             self.assertEqual(partial["text"], "partial")
-            control.command({"op": "STEP_BEGIN"})
-            self.assertFalse(control.command({"op": "STEP_POLL"})["done"])
-            for op in ("STEP", "STEP_BEGIN", "OUTCOME", "CLOSE"):
-                with self.assertRaises(ControlRefusal):
-                    control.command({"op": op})
-            self.assertEqual(control.command({"op": "STOP", "epoch": 1})["ack"],
-                             "STOP_LATCHED")
-            # Peer has not completed/released its response. Cancellation
-            # must interrupt B2 independently of the blocked owner read.
-            owner.pending.result(timeout=3)
+            # Observe the actual HTTPResponse read entry, rather than
+            # mistaking a queued future for a blocked socket operation.
+            import http.client
+            entered = threading.Event()
+            original_readline = http.client.HTTPResponse.readline
+
+            def observed_readline(response, *args, **kwargs):
+                entered.set()
+                return original_readline(response, *args, **kwargs)
+
+            with patch.object(http.client.HTTPResponse, "readline", observed_readline):
+                control.command({"op": "STEP_BEGIN"})
+                self.assertTrue(entered.wait(2))
+                self.assertFalse(control.command({"op": "STEP_POLL"})["done"])
+                for op in ("STEP", "STEP_BEGIN", "OUTCOME", "CLOSE"):
+                    with self.assertRaises(ControlRefusal):
+                        control.command({"op": op})
+                self.assertEqual(control.command({"op": "STOP", "epoch": 1})["ack"],
+                                 "STOP_LATCHED")
+                # Peer has not released its response. Cancellation must
+                # interrupt B2 independently of the outstanding read.
+                owner.pending.result(timeout=3)
             self.assertFalse(release.is_set())
             self.assertTrue(control.command({"op": "STEP_POLL"})["done"])
             final = control.command({"op": "TAKE", "epoch": 1})["snapshot"]

@@ -174,9 +174,10 @@ PanelWindow {
     }
 
     function reportSyntagmaToggleTime(widgetName, startMs, nowOpen) {
-        const now=Date.now();
-        if (startMs && universalLifecycle.measures(widgetName))
+        if (startMs && universalLifecycle.measures(widgetName)) {
+            const now=Date.now();
             universalLifecycle.timing(widgetName,"dock","toggle","",now-startMs,now);
+        }
         if (!syntagmaLagProbeEnabled)
             return;
 

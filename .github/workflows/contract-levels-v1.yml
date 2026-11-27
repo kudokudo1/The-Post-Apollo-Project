@@ -1,0 +1,23 @@
+name: Contract strength V1 self-tests
+
+on:
+  pull_request:
+    paths:
+      - "tests/contract_levels/**"
+      - "docs/testing/CONTRACT_LEVELS.md"
+      - ".github/workflows/contract-levels-v1.yml"
+  push:
+    paths:
+      - "tests/contract_levels/**"
+      - "docs/testing/CONTRACT_LEVELS.md"
+      - ".github/workflows/contract-levels-v1.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contract-level self-tests (stdlib, no host mutation)
+        run: python3 -m unittest discover -s tests/contract_levels -p 'test_*.py' -v

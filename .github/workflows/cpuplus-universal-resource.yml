@@ -1,0 +1,17 @@
+name: CPU++ universal shell resource capture
+on:
+  pull_request:
+    paths:
+      - "services/diagnostics/DiagnosticDumpResource*"
+      - "services/diagnostics/CpuPlusDiagnosticsPolicy.js"
+      - "scripts/cpuplus_quickshell_memory_observer.py"
+      - "tests/cpuplus/test_diagnostic_dump_resource.cjs"
+      - ".github/workflows/cpuplus-universal-resource.yml"
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_diagnostic_dump_resource.cjs

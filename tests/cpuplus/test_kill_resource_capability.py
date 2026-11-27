@@ -38,6 +38,7 @@ class ProbeTest(unittest.TestCase):
             name,birth=identity
             result=cap.observe(child.pid,birth,name)
             self.assertEqual(result["state"],"observed")
+            self.assertEqual(result["target"],{"pid":child.pid,"startTicks":birth,"comm":name})
             evidence=result["resources"]["cpu"]["priority_evidence"]
             self.assertEqual(evidence["scope"],"leader_thread")
             self.assertEqual(evidence["nice"],os.getpriority(os.PRIO_PROCESS,child.pid))

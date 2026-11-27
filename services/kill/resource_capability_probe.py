@@ -156,6 +156,7 @@ def observe(pid, birth, comm):
     return {
         "schema":"post-apollo-kill-capability-k8c-v1",
         "state":"observed",
+        "target":{"pid":pid,"startTicks":birth,"comm":comm},
         "resources":{
             category:{
                 "observation":sources[category],

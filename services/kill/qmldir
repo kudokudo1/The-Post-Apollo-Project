@@ -6,3 +6,4 @@ KillDetailSession 1.0 KillDetailSession.qml
 AppControlHubActionGate 1.0 AppControlHubActionGate.qml
 HunterOperationController 1.0 HunterOperationController.qml
 SwayWindowInventory 1.0 SwayWindowInventory.qml
+KillResourceEvidence 1.0 KillResourceEvidence.qml

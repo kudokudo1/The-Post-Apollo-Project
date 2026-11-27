@@ -415,3 +415,36 @@ test("K8e8 task cap, numeric steps and uncapped intent are explicit",()=>{
     assert.ok(ui.includes('editIdentity===root.targetIdentity'));
     assert.ok(ui.includes('CAP RESTRICTS NEW TASK CREATION, NOT EXISTING THREADS'));
 });
+
+test("K8e9 GPU and network evidence is explicit, identity-bound and read only",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    const parent=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillWorkspace.qml"),"utf8");
+    const service=fs.readFileSync(path.resolve(__dirname,"../../services/kill/KillResourceEvidence.qml"),"utf8");
+    const source=fs.readFileSync(path.resolve(__dirname,"../../services/kill/KillResourceEvidence.js"),"utf8");
+    const decode=new Function(source+"\nreturn decode;")();
+    const key=JSON.stringify([123,456,"target"]);
+    const reply={schema:"post-apollo-kill-capability-k8c-v1",state:"observed",target:{pid:123,startTicks:456,comm:"target"},
+        limits:{no_syscall_mutations:true,host_observation_is_not_authorization:true},
+        resources:{gpu:{actuation:"not_verified",permission_to_change:"not_verified",observation:{drm_fdinfo:"not_observed",per_process_gpu_control:"not_verified"}},
+            network:{actuation:"not_verified",permission_to_change:"not_verified",observation:{network_namespace:"observed",per_process_bandwidth_control:"not_verified",per_process_attribution:"not_verified"}}}};
+    assert.deepEqual(decode(JSON.stringify(reply),key),{key:key,gpu:"not_observed",network:"observed"});
+    assert.equal(decode(JSON.stringify(reply),JSON.stringify([123,457,"target"])),null);
+    assert.equal(decode("invalid",key),null);
+    assert.equal(decode("x".repeat(32769),key),null);
+    reply.resources.network.observation.per_process_attribution="observed";
+    assert.equal(decode(JSON.stringify(reply),key),null);
+    reply.resources.network.observation.per_process_attribution="not_verified";
+    reply.resources.gpu.actuation="verified";
+    assert.equal(decode(JSON.stringify(reply),key),null);
+    assert.ok(ui.includes('objectName: "cpuPlusResourceInspect"'));
+    assert.ok(ui.includes("NAMESPACE COUNTERS ARE NOT PER-PROCESS TRAFFIC"));
+    assert.ok(ui.includes("inspectionResult.key===targetIdentity"));
+    assert.ok(parent.includes("onInspectionRequested: resourceInspection.inspect()"));
+    assert.ok(service.includes("if (!eligible || busy || !targetKey) return false;"));
+    assert.ok(service.includes("onTargetKeyChanged: invalidate()"));
+    assert.ok(service.includes('requestKey=""'));
+    assert.ok(service.includes("!exited||!stdoutDone||!stderrDone"));
+    assert.ok(service.includes('repeat: false'));
+    assert.ok(service.includes('helper.exec(["/usr/bin/python3",path'));
+    assert.ok(!service.includes("repeat: true"));
+});

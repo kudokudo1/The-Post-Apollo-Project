@@ -296,7 +296,7 @@ assert.match(workshop,/root.changeStorageCadence\(cadenceRow.field,-1\)/);
 assert.match(workshop,/storagePreview.observations/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: compactLayout \? 112 : Math.min\(240,176\+/);
+assert.match(workshop,/instrumentHeight: verticalLayout \? Math.max\(76,Math.min\(112,Math.floor\(viewportHeight\*0\.47\)\)\) : compactLayout \? 112 : Math.min\(240,176\+/);
 assert.match(workshopSlider,/height: root\.vertical \? root\.verticalTravel : \(root\.compact \? 22 : 32\)/);
 assert.match(workshopSlider,/width: root\.vertical \? Math\.min\(parent\.width,32\) : parent\.height\s+height: root\.vertical \? parent\.height : parent\.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);

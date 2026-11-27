@@ -361,5 +361,43 @@ class ReaderPinTests(unittest.TestCase):
                     self.fail("reopened")
 
 
+    def test_failed_observation_cannot_be_replaced_by_healthy_sample(self):
+        for failure in (Hold("SCOPE_CHANGED"), OSError("unavailable"),
+                        KeyboardInterrupt()):
+            with self.subTest(failure=type(failure).__name__):
+                with (patch("h14d_resource_witness.I5._mount", return_value=(b"1", b"0:1")),
+                      patch("h14d_resource_witness.I5._open_group", return_value=10),
+                      patch("h14d_resource_witness.I5._identity", return_value=(1, 10)),
+                      patch("h14d_resource_witness.os.close")):
+                    with Reader("/scope", ((1, 10),), leaf=False) as reader:
+                        with patch.object(reader, "_sample", side_effect=[failure, object()]) as read:
+                            with self.assertRaises(type(failure)):
+                                reader.sample()
+                            with self.assertRaisesRegex(Hold, "OBSERVATION_LOST"):
+                                reader.sample()
+                            self.assertEqual(read.call_count, 1)
+                    self.assertEqual(reader.fds, ())
+                    with self.assertRaisesRegex(Hold, "SCOPE_ALREADY_USED"):
+                        with reader:
+                            self.fail("failed original lifetime reopened")
+
+    def test_sample_requires_active_scope_and_success_does_not_latch(self):
+        reader = Reader("/scope", ((1, 10),), leaf=False)
+        with self.assertRaisesRegex(Hold, "SCOPE_NOT_ACTIVE"):
+            reader.sample()
+        first, second = object(), object()
+        with (patch("h14d_resource_witness.I5._mount", return_value=(b"1", b"0:1")),
+              patch("h14d_resource_witness.I5._open_group", return_value=10),
+              patch("h14d_resource_witness.I5._identity", return_value=(1, 10)),
+              patch("h14d_resource_witness.os.close")):
+            with reader:
+                with patch.object(reader, "_sample", side_effect=[first, second]) as read:
+                    self.assertIs(reader.sample(), first)
+                    self.assertIs(reader.sample(), second)
+                    self.assertEqual(read.call_count, 2)
+            with self.assertRaisesRegex(Hold, "SCOPE_NOT_ACTIVE"):
+                reader.sample()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -235,6 +235,41 @@ ShellRoot {
         geometry(false);
         return !failed;
     }
+    // Exercise the actual mounted direct-button handler functions, not
+    // a second latch implementation or a physical-pointer timing claim.
+    function directFormGestureWitness() {
+        const button = find(parts.model, "forestModelForm-BIG");
+        check(button && button.formTarget() !== "", "direct form available");
+        if (failed) return false;
+        const original = forest.selectedTreeIndex;
+        const originalEquipment = forest.selectedTreeEquipment;
+        const before = JSON.stringify(originalEquipment);
+        button.beginFormGesture();
+        const old = button.gestureTicket;
+        check(old !== null, "direct form press captured");
+        forest.selectedTreeIndex = (original + 1) % 5;
+        forest.selectedTreeIndex = original;
+        forest.modelPopupOpen = true;
+        check(!button.commitFormGesture() && JSON.stringify(forest.selectedTreeEquipment) === before,
+            "direct form Tree ABA refused");
+        button.beginFormGesture();
+        const external = forest.selectedTreeEquipment.slice();
+        forest.selectedTreeEquipment = external;
+        check(!button.commitFormGesture() && JSON.stringify(forest.selectedTreeEquipment) === before,
+            "direct form equal-value external revision refused");
+        button.beginFormGesture();
+        const fresh = button.gestureTicket;
+        button.cancelFormGesture(old);
+        check(fresh !== null && button.gestureTicket === fresh,
+            "direct form stale cleanup preserves new press");
+        check(button.commitFormGesture() && forest.selectedModelForm === "BIG"
+            && !button.commitFormGesture(), "direct form valid commit single use");
+        forest.selectedTreeEquipment = originalEquipment;
+        check(JSON.stringify(forest.selectedTreeEquipment) === before,
+            "direct form restores disposable local baseline");
+        if (!failed) console.info("FOREST_HOST_DIRECT_FORM_GESTURE_PASS");
+        return !failed;
+    }
     function capture() {
         const names = {
             chat: "forestChatPane", heading: "forestChatHeading",
@@ -1517,6 +1552,7 @@ ShellRoot {
             case 4:
                 witness.geometry(true);
                 witness.check(forest.frameWidth > 930 && parts.model.visible, "full stage/model popup");
+                if (!witness.directFormGestureWitness()) return;
                 forest.modelPopupOpen = false;
                 forest.selectedTreeIndex = 1;
                 break;

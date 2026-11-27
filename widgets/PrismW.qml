@@ -187,7 +187,7 @@ PanelWindow {
                     id: prismSourceIndicator
                     objectName: "prismSourceIndicator"
                     width: Math.max(0, Math.min(126, prismToolbar.width
-                        - 28 - 28 - 30 - 38 - prismToolbar.spacing * 4))
+                        - 28 - 28 - 30 - 38 - prismToolbar.spacing * 5))
                     height: 27
                     radius: 0
                     color: Colors.dark

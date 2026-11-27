@@ -1,7 +1,7 @@
 """Disposable Quickshell mount smoke for CPU++ shared Kill view.
 
-No real processes are probed or mutated. A synthetic AppControl owner
-satisfies the live-row and guarded-action contracts.
+The UI action tests use a synthetic owner. The final read-only witness
+probes only its own disposable child; no resource settings are mutated.
 """
 from pathlib import Path
 import os
@@ -103,3 +103,39 @@ with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
     if (proc.returncode or "KILL_STORE_NATIVE_PASS" not in proc.stdout
             or "KILL_STORE_NATIVE_FAIL" in proc.stdout):
         raise SystemExit("Independent KillStore native mount failed")
+
+    # Real read-only inspection witness, isolated from synthetic action tests.
+    import json
+    import sys
+
+    shutil.copy2(ROOT / "tests/cpuplus/fixtures/KillResourceEvidenceNative.qml",
+                 config / "inspection.qml")
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        stat = Path(f"/proc/{child.pid}/stat").read_text()
+        end = stat.rindex(")")
+        identity = [child.pid, int(stat[end + 2:].split()[19]),
+                    stat[stat.index("(") + 1:end]]
+        env["POST_APOLLO_KILL_INSPECTION_CHILD"] = json.dumps(identity, separators=(",", ":"))
+        try:
+            proc = subprocess.run(
+                ["qs", "-p", str(config / "inspection.qml"), "--no-color"],
+                cwd=config, env=env, text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, timeout=22, check=False)
+        except subprocess.TimeoutExpired as exc:
+            print(exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes)
+                  else (exc.stdout or ""))
+            raise SystemExit("KILL inspection native fixture timed out") from exc
+        print(proc.stdout)
+        if (proc.returncode or "KILL_INSPECTION_NATIVE_PASS" not in proc.stdout
+                or "KILL_INSPECTION_NATIVE_FAIL" in proc.stdout or child.poll() is not None):
+            raise SystemExit("KILL inspection native lifecycle failed")
+    finally:
+        # Only the subprocess created by this disposable test runner.
+        if child.poll() is None:
+            child.terminate()
+        try:
+            child.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait(timeout=5)

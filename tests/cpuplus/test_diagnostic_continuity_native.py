@@ -47,6 +47,7 @@ Scope {
     scripts = config / "scripts"
     scripts.mkdir()
     shutil.copy2(ROOT / "scripts/cpuplus_stall_clock_witness.py", scripts / "cpuplus_stall_clock_witness.py")
+    shutil.copy2(ROOT / "scripts/cpuplus_host_cpu_observer.py", scripts / "cpuplus_host_cpu_observer.py")
     shutil.copy2(ROOT / "scripts/cpuplus_diagnostic_archive.py", scripts / "cpuplus_diagnostic_archive.py")
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
@@ -115,5 +116,5 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=55, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

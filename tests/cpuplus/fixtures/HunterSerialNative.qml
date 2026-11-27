@@ -18,7 +18,6 @@ ShellRoot {
         property bool destructiveConfirmOpen: false
         property var destructiveConfirmTargetPids: []
         property bool cancelled: false
-        function taskPersistentIdentity(row) { return row.identity; }
         function taskEligibleForKillAll(row) { return !row.protected; }
         function hunterMouseProtectedReason(row) { return row.protected ? "PROTECTED" : ""; }
         function cancelDestructiveConfirm() { cancelled=true; }

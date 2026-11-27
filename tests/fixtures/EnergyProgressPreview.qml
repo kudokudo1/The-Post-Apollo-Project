@@ -7,7 +7,7 @@ ShellRoot {
     Window {
         id: lab
         width: 620
-        height: 510
+        height: 710
         visible: true
         color: Colors.dark
         title: "Post-Apollo // Energy Progress Laboratory"
@@ -116,12 +116,15 @@ ShellRoot {
                     field.sources = field.sources.filter(source => source !== item.pressureSource);
                 }
                 model: [{name:"OMNITRIX",key:"omnitrix"},{name:"TRON",key:"tron"},
-                    {name:"KI BLAST",key:"ki-blast"},{name:"FLAMETHROWER",key:"flamethrower"}]
+                    {name:"KI BLAST",key:"ki-blast"},{name:"FLAMETHROWER",key:"flamethrower"},
+                    {name:"FLAMETHROWER // ASH TRAIL",key:"flamethrower",fireMode:"ash-trail"},
+                    {name:"FLAMETHROWER // BURN AWAY",key:"flamethrower",fireMode:"burn-away"}]
                 Item {
                     id: card
                     required property var modelData
                     width: parent.width
                     height: 84
+                    readonly property string fireMode: card.modelData.fireMode || "standard"
                     property alias pressureSource: energyFace
                     property string phase: "idle"
                     property int duration: 6500
@@ -162,6 +165,14 @@ ShellRoot {
                         width: Math.max(0,parent.width-180)
                         height: 42
                         showLabel: false
+                        // Let Burn Away expose the actual panel instead of a
+                        // duplicate opaque ActionButton chassis underneath.
+                        idleFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.black
+                        hoverFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.black
+                        pressedFillColor: card.fireMode==="burn-away" ? "transparent" : Colors.black
+                        idleBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
+                        hoverBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
+                        pressedBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
                         contentGlowEnabled: false
                         softGlowEnabled: false
                         wideGlowEnabled: false
@@ -173,6 +184,7 @@ ShellRoot {
                             id: energyFace
                             anchors.fill: parent
                             variant: card.modelData.key
+                            fireMode: card.fireMode
                             phase: card.phase
                             reducedMotion: lab.reduced
                             progressMode: card.exact ? "measured" : "indeterminate"

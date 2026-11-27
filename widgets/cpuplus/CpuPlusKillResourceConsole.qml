@@ -120,6 +120,7 @@ Item {
     }
     function stageNumber(key,field,number) {
         if (!selectionReady) return;
+        if (key==="cpu" && field==="quota") { stageQuota("budget",number); return; }
         staged = Draft.stageValue(staged,key,field,number);
         reviewing = false;
     }
@@ -151,6 +152,14 @@ Item {
         reviewing=false;
     }
     function swapPreviewMiB() { return swapDraft.kind==="uncapped" ? 1024 : swapDraft.mib; }
+    readonly property var quotaDraft: Draft.quotaChoice(staged)
+    readonly property int quotaMaximum: Draft.quotaRange(staged,allowedCpuIds)
+    function quotaPreviewPercent() { return quotaDraft.kind==="uncapped" ? 75 : quotaDraft.percent; }
+    function stageQuota(kind,percent) {
+        if (!selectionReady || selectedKey!=="cpu" || modeFor("cpu")!=="manual") return;
+        staged=Draft.stageQuota(staged,kind,percent,quotaMaximum);
+        reviewing=false;
+    }
     function accentFor(key) {
         if (key === "cpu") return Colors.orange;
         if (key === "memory") return Colors.magenta;
@@ -446,6 +455,7 @@ Item {
                                     required property int index
                                     width: detailContent.width
                                     readonly property bool priorityField: resourcePanel.key === "cpu" && modelData.key === "nice"
+                                    readonly property bool quotaField: resourcePanel.key === "cpu" && modelData.key === "quota"
                                     spacing: 3
                                     Row {
                                         id: instrumentRow
@@ -461,12 +471,12 @@ Item {
                                             compact: true
                                             title: field.modelData.title
                                             shortTitle: title
-                                            readout: String(root.valueFor(resourcePanel.key,field.modelData.key))
-                                                + " " + field.modelData.unit
+                                            readout: field.quotaField ? (root.quotaDraft.kind==="uncapped" ? "NO CAP" : root.quotaPreviewPercent()+"%")
+                                                : String(root.valueFor(resourcePanel.key,field.modelData.key))+" "+field.modelData.unit
                                             minimumValue: field.modelData.min
-                                            maximumValue: field.modelData.max
-                                            valueStep: field.modelData.step
-                                            currentValue: root.valueFor(resourcePanel.key,field.modelData.key)
+                                            maximumValue: field.quotaField ? root.quotaMaximum : field.modelData.max
+                                            valueStep: field.quotaField ? 1 : field.modelData.step
+                                            currentValue: field.quotaField ? root.quotaPreviewPercent() : root.valueFor(resourcePanel.key,field.modelData.key)
                                             subjectColor: resourcePanel.ink
                                             fillColor: resourcePanel.ink
                                             adjustable: root.selectionReady && root.modeFor(resourcePanel.key) === "manual"
@@ -591,7 +601,10 @@ Item {
                                             objectName: "cpuPlusDraftInput-" + resourcePanel.key + "-" + field.modelData.key
                                             width: 92
                                             height: 26
-                                            text: field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            text: field.quotaField ? (root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent()))
+                                                : field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            property string editIdentity: ""
+                                            onActiveFocusChanged: if (activeFocus) editIdentity=root.targetIdentity
                                             placeholderText: field.priorityField ? "UNSET" : ""
                                             color: Colors.white
                                             font.pixelSize: 11
@@ -600,20 +613,72 @@ Item {
                                             enabled: root.selectionReady
                                             validator: IntValidator {
                                                 bottom: field.modelData.min
-                                                top: field.modelData.max
+                                                top: field.quotaField ? root.quotaMaximum : field.modelData.max
                                             }
                                             background: Rectangle {
                                                 color: Colors.black
                                                 border.width: 1
                                                 border.color: resourcePanel.ink
                                             }
+                                            onAccepted: {
+                                                if (field.quotaField && acceptableInput && text.length>0
+                                                        && editIdentity===root.targetIdentity)
+                                                    root.stageQuota("budget",Number(text));
+                                            }
                                             onEditingFinished: {
+                                                if (field.quotaField) {
+                                                    text = root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent());
+                                                    return;
+                                                }
                                                 if (acceptableInput)
                                                     root.stageNumber(resourcePanel.key,field.modelData.key,Number(text));
                                                 else
                                                     text = String(field.priorityField ? root.priorityValue() : root.valueFor(resourcePanel.key,field.modelData.key));
                                             }
                                         }
+                                    }
+                                    Row {
+                                        id: quotaChoices
+                                        visible: field.quotaField
+                                        width: field.width
+                                        height: visible ? 28 : 0
+                                        spacing: 3
+                                        Repeater {
+                                            model: field.quotaField ? [{key:"one",label:"ONE CPU"},{key:"uncapped",label:"NO CAP"},{key:"restore",label:"RESTORE"}] : []
+                                            delegate: ActionButton {
+                                                required property var modelData
+                                                objectName: "cpuPlusQuotaChoice-"+modelData.key
+                                                width: Math.max(1,(quotaChoices.width-2*quotaChoices.spacing)/3)
+                                                height: 28
+                                                label: modelData.label
+                                                labelPixelSize: 9
+                                                labelMinimumPixelSize: 7
+                                                normalFace: true
+                                                accentColor: Colors.orange
+                                                available: root.selectionReady && root.modeFor("cpu")==="manual" && modelData.key!=="restore"
+                                                selected: root.modeFor("cpu")==="manual" && (modelData.key==="one"
+                                                    ? root.quotaDraft.kind==="budget" && root.quotaDraft.percent===100
+                                                    : modelData.key==="uncapped" && root.quotaDraft.kind==="uncapped")
+                                                onLeftClicked: {
+                                                    if (!available) return;
+                                                    if (modelData.key==="one") root.stageQuota("budget",100);
+                                                    else if (modelData.key==="uncapped") root.stageQuota("uncapped",0);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        visible: field.quotaField
+                                        height: visible ? implicitHeight : 0
+                                        text: (root.quotaDraft.kind==="preview" ? "PREVIEW // NOT OBSERVED"
+                                            : root.quotaDraft.kind==="uncapped" ? "DRAFT // NO LOCAL CAP"
+                                            : "DRAFT // "+(root.quotaDraft.percent/100).toFixed(2)+" CPU EQUIVALENT")
+                                            + "\\n"+(root.allowedCpuIds.length ? "RANGE REFERENCE // "+root.allowedCpuIds.length+" OBSERVED LEADER CPUs" : "RANGE REFERENCE // ONE CPU")
+                                            + "\\nGROUP CAPACITY UNVERIFIED // RESTORE LOCKED"
+                                        color: Colors.white
+                                        font.pixelSize: 9
+                                        wrapMode: Text.Wrap
                                     }
                                 }
                             }

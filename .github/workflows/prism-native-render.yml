@@ -71,8 +71,11 @@ jobs:
               print(f"PRISM_NATIVE_IMAGE_COMPOSITE {selected.size} "
                     f"center={selected.getpixel((25,25))} colorful={colorful} "
                     f"state_changed_pixels={differences}",flush=True)
-              if colorful<40 or differences<25:
-                  raise SystemExit("Prism glow failed to brighten in the actual native composite")
+              yellow=sum(1 for r,g,b,a in pixels if a>180 and r>180 and g>125 and b<145 and r-b>60)
+              magenta=sum(1 for r,g,b,a in pixels if a>180 and r>135 and b>135 and r-g>55 and b-g>55)
+              print("PRISM_NATIVE_OPEN_YELLOW_MAGENTA",yellow,magenta,flush=True)
+              if colorful<40 or differences<25 or yellow<200 or magenta<50:
+                  raise SystemExit("Prism open composite is missing the normal yellow face or magenta artwork")
           with Image.open("/tmp/prism-render-spectrum.png") as original:
               im=original.convert("RGB")
               # Sample 3px outside the edge at each corner, rather than

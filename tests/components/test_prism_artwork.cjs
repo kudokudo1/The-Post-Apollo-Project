@@ -91,3 +91,23 @@ test("Prism always uses one native pixel border underneath state-reactive cached
     assert.ok(qml.includes("root.prismPalette,root.spectralGlowStrength,true"));
     assert.ok(!qml.includes("onGlowEmphasisOpacityChanged"),"opacity should not rerasterize");
 });
+
+test("actual open state follows yellow/magenta module grammar while closed retains Prism",()=>{
+    const qml=fs.readFileSync(path.join(root,"components/PrismButton.qml"),"utf8");
+    assert.match(qml,/idleFillColor: Colors\.black/);
+    assert.match(qml,/idleBorderColor: Colors\.white/);
+    assert.match(qml,/selectedFillColor: Colors\.yellow/);
+    assert.match(qml,/selectedBorderColor: Colors\.magenta/);
+    assert.match(qml,/selectedForegroundColor: Colors\.magenta/);
+    assert.match(qml,/selectedSoftGlowColor: Colors\.magenta/);
+    assert.match(qml,/selectedWideGlowColor: Colors\.magenta/);
+    assert.match(qml,/pressedFillColor: selected \? Colors\.yellow : Colors\.black/);
+    assert.match(qml,/opacity: root\.selected \? 0 : 1/);
+    assert.match(qml,/active: root\.selected \|\| root\.openArtworkPrepared/);
+    assert.match(qml,/onLoaded: root\.openArtworkPrepared = true/);
+    assert.match(qml,/root\.openPalette,root\.spectralGlowStrength/);
+    assert.match(qml,/opacity: root\.selected \? 1 : 0/);
+    const dock=fs.readFileSync(path.join(root,"modules/PrismDock.qml"),"utf8");
+    assert.match(dock,/selected: prismDock\.menuOpen/);
+    assert.match(dock,/prismBorderColor: prismButton\.idleBorderColor/);
+});

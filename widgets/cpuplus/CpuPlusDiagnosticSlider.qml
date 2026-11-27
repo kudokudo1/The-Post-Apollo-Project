@@ -39,7 +39,7 @@ Column {
         SelectorSlider {
             objectName: root.objectName + "-hardware"
             anchors.centerIn: parent
-            width: root.vertical ? Math.min(parent.width,32) : parent.height
+            width: root.vertical ? Math.min(parent.width,48) : parent.height
             height: root.vertical ? parent.height : parent.width
             rotation: root.vertical ? 0 : 90
             horizontalStepPresentation: !root.vertical

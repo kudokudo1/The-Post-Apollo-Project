@@ -14,8 +14,9 @@ Column {
     property Item filterTarget: null
     property Item executionTarget: null
     readonly property int sliderCount: 1+["threads","memory","census","hostcpu","gpu","netio","swapio","diskio"].filter(k=>draft.selected.includes(k)).length
-    readonly property bool verticalLayout: subject!=="ALL" && viewportHeight>0 && (width<340 || (sliderCount>=3 && viewportHeight < sliderCount*(compactLayout?38:52)+(lowerInstrumentCount>0?176:0)+90))
-    readonly property real rackTravel: Math.max(45,Math.min(150,viewportHeight-(lowerInstrumentCount>0?instrumentHeight:0)-38))
+    readonly property bool verticalLayout: subject==="SYSTEM" && viewportHeight>0 && (width<340 || (sliderCount>=3 && viewportHeight < sliderCount*(compactLayout?38:52)+(lowerInstrumentCount>0?176:0)+90))
+    // Reserve the dial bank and its spacing, then give the rack the remaining viewport.
+    readonly property real rackTravel: Math.max(45,Math.floor(viewportHeight-(lowerInstrumentCount>0?instrumentHeight+spacing:0)-34))
     property string subject: "ALL"
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length

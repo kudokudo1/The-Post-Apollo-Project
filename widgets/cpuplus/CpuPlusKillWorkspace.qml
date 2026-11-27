@@ -1477,6 +1477,21 @@ Item {
             border.width: 1
             border.color: Colors.orange
 
+            // K8d draft-only resource console. The existing owner-owned review
+            // overlays it on demand; no additional process collector is mounted.
+            CpuPlusKillResourceConsole {
+                id: resourceConsole
+                objectName: "cpuPlusKillResourceConsoleSurface"
+                anchors.fill: parent
+                anchors.margins: 6
+                target: workspace.currentTask
+                selectionReady: workspace.active && workspace.exactTargetAvailable
+                    && !workspace.legacyActionBlocked && !workspace.hasBulkReview
+                    && !workspace.bulkOperation && !workspace.locallyPending
+                    && !!workspace.gate && !workspace.gate.busy && !workspace.gate.pending
+                visible: !reviewPanel.visible
+            }
+
             // A separate, top-aligned review surface. Only the captured list
             // or report body scrolls; the resource viewport and footer do not.
             Rectangle {

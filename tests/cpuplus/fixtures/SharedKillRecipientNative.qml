@@ -336,7 +336,29 @@ ShellRoot {
                     smoke.phase=18;
                     return;
                 }
-                const header=smoke.find(view,"cpuPlusProcessIdentity");
+                // K8d: the right surface is an identity-bound draft, never
+                // an alternate Linux executor or a second confirmation gate.
+                const consolePane=smoke.find(view,"cpuPlusKillResourceConsole");
+                const cpuCard=smoke.find(view,"cpuPlusResourceCard-cpu");
+                const applyLocked=smoke.find(view,"cpuPlusResourceApplyLocked");
+                if (!smoke.check(consolePane && consolePane.selectionReady
+                        && consolePane.targetIdentity.length>0
+                        && cpuCard && cpuCard.expanded
+                        && applyLocked && !applyLocked.available
+                        && consolePane.reviewLines.length===0
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "resource console mounts draft-only beside existing KILL controls")) return;
+                consolePane.stageMode("cpu","manual");
+                consolePane.stageNumber("cpu","nice",9);
+                if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1
+                        && consolePane.reviewLines[0].indexOf("NICE 9")>=0
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "draft input never dispatches a process action")) return;
+                consolePane.reviewing=true;
+                consolePane.clearDraft();
+                if (!smoke.check(!consolePane.hasDraft && !consolePane.reviewing,
+                        "clear draft does not affect owner state")) return;
+                                const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");
                 const identityText=smoke.find(view,"cpuPlusProcessIdentityText");
                 const name=smoke.find(view,"cpuPlusProcessIdentityName");

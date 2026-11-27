@@ -28,8 +28,14 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
                  "ProcessInformationPanel.qml"):
         shutil.copy2(ROOT / "widgets/appcontrol" / name,
                      config / "widgets/appcontrol")
-    shutil.copy2(ROOT / "widgets/cpuplus/CpuPlusKillWorkspace.qml",
-                 config / "widgets/cpuplus")
+    # K8d resource console is an explicitly mounted local component, not
+    # an optional plugin. Include its pure draft policy and reused instruments.
+    for name in ("CpuPlusKillWorkspace.qml",
+                 "CpuPlusKillResourceConsole.qml", "CpuPlusKillResourceDraft.js",
+                 "CpuPlusDiagnosticSlider.qml", "CpuPlusMemoryReadout.qml",
+                 "CpuPlusMemoryReadout.js"):
+        shutil.copy2(ROOT / "widgets/cpuplus" / name,
+                     config / "widgets/cpuplus")
     for name in ("GraphHistory.qml", "ProcessPresentationState.qml",
                  "HunterPresentation.qml", "ProcessTelemetry.qml",
                  "TaskSafety.qml", "ProcessControl.qml", "ProcessLimits.qml", "HunterExecutor.qml",

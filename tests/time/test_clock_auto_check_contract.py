@@ -74,7 +74,17 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         self.assertIn("property int readoutPixelSize: 11", DIAL)
         self.assertIn("dialRoot.numericLabelPixelSize", DIAL)
         self.assertIn("dialRoot.textLabelPixelSize", DIAL)
-        self.assertIn("font.pixelSize: dialRoot.readoutPixelSize", DIAL)
+        # The readout now fits responsively while retaining the 11px cap.
+        readout = DIAL.split('objectName: "selectorDialReadableValue"', 1)[1].split(
+            "layer.effect:", 1
+        )[0]
+        self.assertIn("font.pixelSize: dialRoot.stopwatchFace ?", readout)
+        self.assertIn(
+            "Math.min(dialRoot.readoutPixelSize,Math.max(10,Math.floor(dialRoot.width*0.15)))",
+            readout,
+        )
+        self.assertIn("fontSizeMode: Text.HorizontalFit", readout)
+        self.assertIn("minimumPixelSize: 9", readout)
         self.assertNotIn("font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7", DIAL)
 
     def test_clock_dial_captures_wheel_and_drag_without_page_flick(self):

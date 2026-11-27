@@ -371,6 +371,7 @@ class RealLocalRequestBridge:
         self._runtime = RealLocalDelivery(endpoint=endpoint)
         self._lock = threading.Lock()
         self._epoch = None
+        self._last_epoch = 0
         self._used = False
         self._token = None
         self._attached = False
@@ -401,10 +402,15 @@ class RealLocalRequestBridge:
                 return False
             if epoch == self._epoch:
                 return True
+            # Refuse stale/recycled epochs before withdrawing original custody.
+            if epoch is not None and epoch <= self._last_epoch:
+                return False
             self._retire_locked()
             if not self._runtime.observe(epoch):
                 return False
             self._epoch = epoch
+            if epoch is not None:
+                self._last_epoch = epoch
             return True
 
     def submit(self, model, prompt, epoch):
@@ -416,6 +422,10 @@ class RealLocalRequestBridge:
             # One original bridge lifetime, even on HELD or unknown.
             self._used = True
             try:
+                # Allocate the complete acceptance envelope before any original
+                # request effect. Entropy failure cannot orphan an acceptance.
+                token = secrets.token_hex(16)
+                accepted = {"accepted": True, "correlation": {"token": token}}
                 result = self._runtime.submit(model, prompt, epoch)
             except Exception:
                 return "UNKNOWN_HOLD"
@@ -423,8 +433,8 @@ class RealLocalRequestBridge:
                 return result
             if result != "ACCEPTED":
                 return "UNKNOWN_HOLD"
-            self._token = secrets.token_hex(16)
-            return {"accepted": True, "correlation": {"token": self._token}}
+            self._token = token
+            return accepted
 
     def attach(self, correlation):
         """Explicit successful original UI attachment, not a native grant."""

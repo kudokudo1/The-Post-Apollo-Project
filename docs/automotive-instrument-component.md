@@ -19,6 +19,7 @@ Import `qs.components` (or the existing relative components directory).
 | showValue / showSetValue | booleans | true |
 | accentColor / structuralColor | semantic colors | orange / cyan |
 | screwColor | opaque metal tint (any QML color) | `#40899b` cyan gunmetal |
+| screwColorStrength | blend from gunmetal toward screwColor, 0–1 | 0.75 |
 | fraction | normalized remaining/capacity fraction, clamped 0–1 | 1 |
 | rotationDegrees | caller-supplied angle, clockwise from top | 360 × boundedFraction |
 | valueText / valueUnit / setText | display data | 0 / empty / empty |
@@ -43,7 +44,7 @@ AutomotiveDial {
 
 The arm may enter the outer gauge but never exceed the 95-unit radial envelope within the 108-unit face radius. The recessed display stays behind the centrally mounted rotating arm; temporary occlusion is deliberate. No printed scale numbers by default. All four gauge styles remain supported; do not invent a second dial implementation to vary the visual appearance.
 
-`InstrumentChassis` is separately reusable: faceDiameter, clearance, chassisStyle, showScrews, structuralColor, screwColor. The square default plate is diameter + 20 logical pixels with four symmetric screws. The existing original rotary SelectorDial receives the mounting treatment by default; opt out with showInstrumentChassis: false. Its interaction, modes, ranges, and footprint remain unchanged. SelectorDial exposes stopwatchArmStyle, stopwatchArmReach, stopwatchGaugeStyle, stopwatchScaleStyle when stopwatchFace is true, plus the common chassis properties.
+`InstrumentChassis` is separately reusable: faceDiameter, clearance, chassisStyle, showScrews, structuralColor, screwColor, screwColorStrength. The square default plate is diameter + 20 logical pixels with four symmetric screws. The existing original rotary SelectorDial receives the mounting treatment by default; opt out with showInstrumentChassis: false. Its interaction, modes, ranges, and footprint remain unchanged. SelectorDial exposes stopwatchArmStyle, stopwatchArmReach, stopwatchGaugeStyle, stopwatchScaleStyle when stopwatchFace is true, plus the common chassis properties.
 
 SAMPLE and REPORT retain their owner-provided countdown fraction, observed flash, exact configuration, capture locking and calibration request. The smallest digital layout remains unchanged. No independent clocks, background processes, or new capture ownership. Future presets should store these property values rather than duplicate components.
 
@@ -63,14 +64,19 @@ Approved preview settings: shadow 75%, direct light 20%, reflected light 10%, to
 
 ```qml
 SelectorDial {
-    screwColor: "#a66c42" // muted copper / orange
+    screwColor: "#a66c42" // reserved legacy copper
+    screwColorStrength: 1.0
 }
 AutomotiveDial {
-    screwColor: "#914578" // magenta alloy
+    screwColor: "#914578" // reserved legacy magenta alloy
+    screwColorStrength: 1.0
 }
 InstrumentChassis {
-    screwColor: "#a84444" // red alloy
+    screwColor: Colors.red // only named red finish; 75% default
 }
 ```
 
-Omit screwColor for the approved cyan finish. Supply any QML color (including a semantic Colors value); the opaque metal palette is derived from that tone, while the fixed cool catchlight, shadows, step geometry and control behavior remain independent of the color. A color change requests a chassis repaint only. No timer, animation, process, service or capture owner is added. Native visual acceptance at the actual component size is still required.
+Omit screwColor for the approved cyan finish. Supply any QML color (including a semantic Colors value); the opaque metal palette is derived from a 75% RGB interpolation from the original gunmetal to that tone, then the original per-channel shading ratios, while the fixed cool catchlight, shadows, step geometry and control behavior remain independent of the color. A color change requests a chassis repaint only. No timer, animation, process, service or capture owner is added. Native visual acceptance at the actual component size is still required.
+
+### Semantic finish decision
+The default semantic blend is 75%, separate from the original approved cyan tint (55%). Use `screwColor: Colors.orange` (or any other canonical Colors value) without additional configuration. Keep the original cyan gunmetal, legacy copper #a66c42 and legacy magenta #914578 available unchanged with strength 1.0. Do not name or expose a second legacy red preset; use Colors.red for the canonical red finish. Arbitrary colors remain supported. This is an RGB interpolation matching the design preview, not a physical metal-light simulation. Strength 0 returns gunmetal; 1 returns the exact input tone; invalid values fall back to 0.75 and out-of-range finite values are clamped. Color and strength changes repaint only the chassis.

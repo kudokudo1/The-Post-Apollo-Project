@@ -14,6 +14,7 @@ ShellRoot {
         property double started: Date.now()
         property bool failed: false
         property bool sawFlash: false
+        property bool sawRepair: false
         property double pulseStarted: 0
         function require(ok, message) {
             if (!ok) {
@@ -114,13 +115,15 @@ ShellRoot {
                                 "fire extinguishes after actual success "+f.fireMode)) return;
                         }
                     } else if(lab.stage===25) {
-                        if(Date.now()-lab.pulseStarted<2050) return;
+                        if(erosion.fireState.repairing && erosion.fireState.repair>0) lab.sawRepair=true;
+                        if(Date.now()-lab.pulseStarted<2800) return;
+                        if(!lab.require(lab.sawRepair,"native visible repair phase")) return;
                         for(const f of fires) {
                             if(!lab.require(f.displayedFraction===1 && !f.animationActive
-                                && !f.fireState.active && f.fireState.heat===0,
-                                "fire settles without changing material extent "+f.fireMode)) return;
+                                && !f.fireState.active && f.fireState.heat===0 && f.fireState.repair===1,
+                                "fire settles repaired without changing progress "+f.fireMode)) return;
                         }
-                        console.log("ENERGY_NATIVE_PASS seven treatments; reactive heat; quiet default; extinguish and cooldown");
+                        console.log("ENERGY_NATIVE_PASS seven treatments; reactive heat; quiet default; extinguish and shell repair");
                         Qt.quit(); return;
                     }
                     lab.stage++; return;
@@ -190,7 +193,7 @@ ShellRoot {
                             lab.pulseStarted=Date.now();
                         } else if (lab.stage===10) {
                             if(Date.now()-lab.pulseStarted<1600) return;
-                            if (!lab.require(f.displayedFraction===.6 && !f.animationActive,
+                            if (!lab.require(f.displayedFraction===.6 && !f.animationActive && f.fireState.repair===0,
                                     "material partial failure stays")) return;
                             f.phase="running";
                             f.progress=.7;

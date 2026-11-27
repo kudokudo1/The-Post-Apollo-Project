@@ -36,7 +36,7 @@ Item {
     readonly property real headCenterY: height / 2
     readonly property var fireState: PixelFire.extinguish(phase,elapsed,reducedMotion,fireMode)
     readonly property bool animationActive: visible && !reducedMotion
-        && (phase === "running" || (phase === "success" && (variant==="flamethrower"?fireState.active:elapsed<.84))
+        && (phase === "running" || (phase === "success" && (variant==="flamethrower"?(fireState.active || fireState.repairing):elapsed<.84))
             || (variant==="flamethrower" && phase==="failure" && finishFrom>0 && fireState.active)
             || (variant==="ki-blast" && phase==="failure" && elapsed<1.08))
     property real speedLevel: 0
@@ -48,6 +48,8 @@ Item {
         ? PixelFire.fire(height,elapsed,reducedMotion,fireMode,flameSpeed) : null
     readonly property real flameTipOffset: flamePixels && flamePixels.cells.length
         ? (Math.max(...flamePixels.cells.map(cell=>cell.x))+1)*flamePixels.unit*fireState.scale : 0
+    readonly property real flameRearOffset: flamePixels && flamePixels.cells.length
+        ? Math.max(0,-Math.min(...flamePixels.cells.map(cell=>cell.x)))*flamePixels.unit*fireState.scale : 0
     property real elapsed: 0
     property double startedAt: 0
     property real finishFrom: 0
@@ -221,6 +223,10 @@ Item {
                     p,inner,fillHeight);
                 // Emitted light, behind the opaque track. Cooled material remains dark.
                 const flame=root.flameMotion, fireState=root.fireState;
+                if(hot && fireState.repair>=1) {
+                    Material.drawRepair(c,x,y,w,h,1,Colors.dark,root.chassisColor);
+                    return;
+                }
                 function radiate(start,span,color,amount) {
                     if(span<=0 || amount<=0) return;
                     if(!hot && !omni) {
@@ -310,6 +316,12 @@ Item {
                     c.fillStyle=tint(Colors.white,.075);
                     for (let yy=fy+3;yy<fy+fillHeight-1;yy+=4)
                         c.fillRect(fx,yy,inner*p,1);
+                }
+                // A successful fire rebuilds the empty shell after all
+                // combustion has cooled. Actual progress remains at 100%.
+                if(hot && fireState.repairing) {
+                    Material.drawRepair(c,x,y,w,h,fireState.repair,Colors.dark,root.chassisColor);
+                    return;
                 }
                 // Two contiguous beams share a single collision plane.
                 // The opposing blast occupies the right side until pushed off
@@ -430,19 +442,29 @@ Item {
                     const tip=edge+root.flameTipOffset;
                     fireHalo(tip-h*(.36+flame.drag),mid+h*(.20+flame.sway),
                         h*1.02*(1+.35*(flame.stretch-1)),h*1.08*flame.breath,.28*flame.pulse*fireState.heat);
-                    // Live heat reflected on the retained material behind the front.
-                    // Burn Away has no material here, so never repaint it.
-                    if(!material.erosion && inner*p>0) {
-                        const span=Math.min(inner*p,footprint.behind);
-                        c.save(); c.globalAlpha=fireState.heat; c.beginPath(); c.rect(fx,fy,inner*p,fillHeight); c.clip();
+                    // Mirrored contact heat follows the actual trailing
+                    // flame silhouette. Burn Away emits light here without
+                    // restoring solid material or its destroyed border.
+                    const rearSpan=Material.rearHeatSpan(h,root.flameRearOffset,bed.reach,
+                        footprint.behind,fireState.heat,inner*p);
+                    if(rearSpan>0) {
+                        c.save(); c.globalAlpha=fireState.heat;
+                        c.beginPath(); c.rect(edge-rearSpan,fy,rearSpan,fillHeight); c.clip();
+                        const back=c.createLinearGradient(edge,mid,edge-rearSpan,mid);
+                        back.addColorStop(0,tint(Colors.yellow,.66*bed.pulse));
+                        back.addColorStop(.23,tint(Colors.orange,.59*bed.pulse));
+                        back.addColorStop(.64,tint(Colors.red,.28*bed.pulse));
+                        back.addColorStop(1,tint(Colors.red,0));
+                        c.fillStyle=back; c.fillRect(edge-rearSpan,fy,rearSpan,fillHeight);
                         for(const row of bed.rows) {
                             const yy=fy+row.y*fillHeight;
-                            const left=edge-span*row.reach;
-                            const g=c.createLinearGradient(left,yy,edge,yy);
-                            g.addColorStop(0,tint(Colors.red,0));
-                            g.addColorStop(.55,tint(Colors.orange,row.alpha*.55));
-                            g.addColorStop(1,tint(Colors.yellow,row.alpha*bed.pulse));
-                            c.fillStyle=g; c.fillRect(left,yy,edge-left,Math.max(1,fillHeight*.075));
+                            const start=edge-rearSpan*row.shift;
+                            const length=rearSpan*row.reach;
+                            const wave=c.createLinearGradient(start,yy,start-length,yy);
+                            wave.addColorStop(0,tint(Colors.yellow,row.alpha*bed.pulse*.80));
+                            wave.addColorStop(.40,tint(Colors.orange,row.alpha*.70));
+                            wave.addColorStop(1,tint(Colors.red,0));
+                            c.fillStyle=wave; c.fillRect(start-length,yy,length,Math.max(1,fillHeight*.065));
                         }
                         c.restore();
                     }

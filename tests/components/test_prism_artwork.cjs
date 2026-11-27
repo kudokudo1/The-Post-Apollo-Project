@@ -9,13 +9,13 @@ const scope=vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(root,"components/PrismArtwork.js"),"utf8"),scope);
 const palette=["DCF3FA","ED981A","F2BE4E","9ECE6A","55CFCA","5B5FD4","A879ED","C74EC7","1B0623"]
     .map(s=>[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)/255));
-function render(size,strength=1,border=1,faceHeight=size) {
+function render(size,strength=1,border=1,faceHeight=size,glowOnly=false) {
     const face=Math.min(size,faceHeight),pad=Math.ceil(face*.09);
     const W=size+2*pad,H=faceHeight+2*pad,scale=Math.min(2,256/Math.max(W,H));
     const w=Math.min(256,Math.ceil(W*scale)),h=Math.min(256,Math.ceil(H*scale));
     let data;
     scope.paint({createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),
-        clearRect(){},putImageData(im){data=im.data;}},w,h,size,faceHeight,pad,border,palette,strength);
+        clearRect(){},putImageData(im){data=im.data;}},w,h,size,faceHeight,pad,border,palette,strength,glowOnly);
     const sample=(fx,fy)=>{
         const col=Math.floor((fx+W/2)/W*w),row=Math.floor((fy+H/2)/H*h);
         assert.ok(col>=0&&col<w&&row>=0&&row<h);
@@ -73,4 +73,21 @@ test("component uses canonical colors and existing action behavior without sampl
     assert.match(qml,/rasterLimit: 256/);
     assert.doesNotMatch(qml,/\b(?:Timer|Process|ShaderEffectSource)\s*\{/);
     assert.match(qmldir,/^PrismButton 1\.0 PrismButton\.qml$/m);
+});
+
+test("cached glow-only layer preserves opaque prism cores below it",()=>{
+    const base=render(50),halo=render(50,1,1,50,true);
+    assert.equal(base.icon(42,40)[3],255);
+    assert.ok(halo.icon(42,40)[3]<base.icon(42,40)[3],"glow-only must not redraw nucleus");
+    assert.ok(halo.sample(-26,26)[3]>0,"original spectral exterior exists on glow layer");
+});
+test("Prism always uses one native pixel border underneath state-reactive cached glow",()=>{
+    const qml=fs.readFileSync(path.join(root,"components/PrismButton.qml"),"utf8");
+    for(const state of ["idle","hover","pressed","selected","keyboardSelected"])
+        assert.ok(qml.includes(state+"BorderWidth: 1"),state+" one pixel");
+    assert.ok(!qml.includes("border.width: root.activeBorderWidth"),"no top overlay border");
+    assert.ok(qml.includes('objectName: "prismGlowArtwork"'));
+    assert.ok(qml.includes("opacity: root.glowEmphasisOpacity"));
+    assert.ok(qml.includes("root.prismPalette,root.spectralGlowStrength,true"));
+    assert.ok(!qml.includes("onGlowEmphasisOpacityChanged"),"opacity should not rerasterize");
 });

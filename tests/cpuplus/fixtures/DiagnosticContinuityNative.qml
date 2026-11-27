@@ -968,7 +968,11 @@ ShellRoot {
                 if(!root.check(row && JSON.stringify(row.plan)===workshop.planText
                     && !row.favorite && !workshop.saveEditorOpen && !workshop.ready
                     && !CpuPlusDiagnostics.busy && workshop.saveNotice.startsWith("SAVED //"),
-                    "direct save receipt, exact plan, no execution or prepared authority"))return;
+                    "direct save receipt, exact plan, no execution or prepared authority // "+
+                    JSON.stringify({rowPresent:!!row,exact:!!row&&JSON.stringify(row.plan)===workshop.planText,
+                        favorite:row?row.favorite:null,editor:workshop.saveEditorOpen,ready:workshop.ready,
+                        busy:CpuPlusDiagnostics.busy,catalog:CpuPlusDiagnostics.workflowCatalogStatus,
+                        notice:workshop.saveNotice,pending:!!workshop.pendingSaveName})))return;
                 root.findItem(workshop,"cpuplusWorkshopSave").leftClicked(null);
                 root.phase=326;return;
             }

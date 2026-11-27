@@ -1203,20 +1203,18 @@ PanelWindow {
             onAudioMuteRequested: function(muted) {
                 sharedVolumeDock.requestHubMute(muted);
             }
-            // Owner windows retain the controller, subprocesses and Sway
-            // geometry. Hub receives only a tiny state projection and
-            // explicit typed action routing at direct button presses.
+            // AppControl navigation remains a widget concern. Process state
+            // and explicit typed actions come from the single KILL service.
             appControlAvailable: appControlWindow !== null
-            processActionGate: appControlWindow
-                               ? appControlWindow.hubProcessActionGate : null
-            // The existing AppControl sampler runs with its own cadence.
+            processActionGate: KillBackend.KillStore.collectionEnabled
+                               ? KillBackend.KillStore.actionGate : null
             // Clone only bounded display fields, no argv, user, command or
             // mutation handles and no new ProcessTelemetry instance.
-            processSnapshot: appControlWindow
+            processSnapshot: KillBackend.KillStore.collectionEnabled
                              ? HubProcessesPolicy.snapshot(
-                                   appControlWindow.taskRows,
-                                   appControlWindow.taskSnapshotLoading,
-                                   appControlWindow.taskSnapshotError)
+                                   KillBackend.KillStore.rows,
+                                   KillBackend.KillStore.telemetry.snapshotLoading,
+                                   KillBackend.KillStore.telemetry.snapshotError)
                              : null
             socialActionsAvailable: messagingWindow !== null
             socialSnapshot: messagingWindow

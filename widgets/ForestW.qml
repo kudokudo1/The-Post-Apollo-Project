@@ -16,6 +16,9 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    // Explicit separate fixture host construction only; never a trust grant.
+    // The normal shell leaves this false. No operator runtime toggle.
+    property bool fixtureOnly: false
     // Forest B0 inventory only proves model discovery. It is not permission
     // to record audio, submit a prompt, or attach a provider session.
     // Until protected Forest host adapters exist both controls fail closed.
@@ -52,8 +55,10 @@ PanelWindow {
             }
         }
     }
-    Component.onCompleted: preferenceStore.load()
+    Component.onCompleted: if (!fixtureOnly) preferenceStore.load()
     function saveModelPreferences() {
+        if (fixtureOnly)
+            return false;
         if (!menuOpen || !modelPopupOpen || preferenceStore.busy)
             return false;
         if (preferenceStore.status !== "READY")
@@ -103,6 +108,8 @@ PanelWindow {
     readonly property var selectedModelProfile: ResidencyPolicy.modelProfile(
         modelResidency.status, modelResidency.records, selectedLocalModel)
     function refreshLocalModelEvidence() {
+        if (fixtureOnly)
+            return false;
         // One user gesture. Both fixed GET helpers target local Ollama.
         if (localInventory.scanning || modelResidency.scanning)
             return false;
@@ -162,7 +169,7 @@ PanelWindow {
             pendingModelScan = "";
             lastScannedModel = "";
             lastModelScanResult = "";
-            if (!localInventory.scanning && !modelResidency.scanning)
+            if (!fixtureOnly && !localInventory.scanning && !modelResidency.scanning)
                 refreshLocalModelEvidence();
         }
     }
@@ -376,7 +383,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.right: workshopButton.left
                 anchors.rightMargin: 8
-                text: "FOREST // AI WORKSPACE"
+                text: root.fixtureOnly ? "FOREST // DEV FIXTURE" : "FOREST // AI WORKSPACE"
                 font.pixelSize: 16
                 font.bold: true
                 color: Colors.magenta
@@ -384,6 +391,7 @@ PanelWindow {
             }
             Rectangle {
                 id: workshopButton
+                enabled: !root.fixtureOnly
                 anchors.right: forestDiagnosticsButton.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
@@ -407,6 +415,7 @@ PanelWindow {
             }
             DiagnosticsDockButton {
                 id: forestDiagnosticsButton
+                enabled: !root.fixtureOnly
                 anchors.right: collapseButton.left
                 anchors.rightMargin: 7
                 anchors.verticalCenter: parent.verticalCenter
@@ -455,6 +464,7 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     interactive: root.menuOpen && !localInventory.scanning && !modelResidency.scanning
+                        && !root.fixtureOnly
                     Accessible.name: localInventory.scanning
                         ? "Forest model inventory scan in progress"
                         : "Rescan local Ollama model inventory (read-only)"
@@ -833,7 +843,7 @@ PanelWindow {
                 width: 66
                 height: 24
                 radius: 0
-                label: "PREVIEW"
+                label: root.fixtureOnly ? "SAMPLE" : "PREVIEW"
                 labelPixelSize: 10
                 accentColor: Colors.orange
                 selected: publicPreviewGate.active
@@ -920,7 +930,8 @@ PanelWindow {
                             : "Load saved preferences, replacing current local choices"
                         GohuText {
                             anchors.centerIn: parent
-                            text: preferenceStore.busy ? "..."
+                            text: root.fixtureOnly ? "OFF"
+                                : preferenceStore.busy ? "..."
                                 : preferenceStore.status !== "READY" ? "LOAD"
                                 : root.preferenceDirty ? "SAVE"
                                 : preferenceStore.committed.revision > 0 ? "SAVED" : "DEFAULT"
@@ -929,7 +940,7 @@ PanelWindow {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            enabled: !preferenceStore.busy
+                            enabled: !root.fixtureOnly && !preferenceStore.busy
                                 && (preferenceStore.status !== "READY" || root.preferenceDirty)
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onClicked: root.saveModelPreferences()
@@ -948,13 +959,14 @@ PanelWindow {
                         Accessible.name: "Scan local Ollama models, read-only"
                         GohuText {
                             anchors.centerIn: parent
-                            text: localInventory.scanning || modelResidency.scanning ? "..." : "SCAN ALL"
+                            text: root.fixtureOnly ? "SCAN OFF"
+                                : localInventory.scanning || modelResidency.scanning ? "..." : "SCAN ALL"
                             color: Colors.cyan
                             font.pixelSize: 9
                         }
                         MouseArea {
                             anchors.fill: parent
-                            enabled: !localInventory.scanning && !modelResidency.scanning
+                            enabled: !localInventory.scanning && !modelResidency.scanning && !root.fixtureOnly
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onClicked: {
                                 root.lastScannedModel = "";
@@ -1544,7 +1556,8 @@ PanelWindow {
                     visible: !root.autoPreviewOpen && !root.benchmarkReportsOpen && localInventory.modelCount === 0
                     anchors.centerIn: modelList
                     width: modelList.width - 12
-                    text: localInventory.scanning ? "SCANNING INVENTORY"
+                    text: root.fixtureOnly ? "FIXTURE // NO MODEL SCAN"
+                        : localInventory.scanning ? "SCANNING INVENTORY"
                         : localInventory.status === "NOT_CHECKED" ? "PRESS SCAN ALL"
                         : localInventory.status === "REACHABLE" ? "NO MODELS FOUND"
                         : "OLLAMA NOT CONNECTED"
@@ -1556,7 +1569,7 @@ PanelWindow {
 
                 ForestAutoPolicyPreview {
                     id: autoPreview
-                    visible: root.modelPopupOpen && root.autoPreviewOpen
+                    visible: root.modelPopupOpen && root.autoPreviewOpen && !root.fixtureOnly
                     anchors.fill: modelList
                     equipment: root.selectedEquipment
                     inventoryStatus: localInventory.status
@@ -1564,6 +1577,7 @@ PanelWindow {
                 }
                 Rectangle {
                     id: autoPreviewButton
+                    enabled: !root.fixtureOnly
                     anchors.right: parent.right
                     anchors.rightMargin: 8
                     anchors.bottom: parent.bottom
@@ -1588,11 +1602,12 @@ PanelWindow {
                 }
                 ForestBenchmarkReportView {
                     id: benchmarkReportView
-                    visible: root.modelPopupOpen && root.benchmarkReportsOpen
+                    visible: root.modelPopupOpen && root.benchmarkReportsOpen && !root.fixtureOnly
                     anchors.fill: modelList
                 }
                 Rectangle {
                     id: benchmarkReportsButton
+                    enabled: !root.fixtureOnly
                     anchors.right: autoPreviewButton.left
                     anchors.rightMargin: 4
                     anchors.bottom: parent.bottom
@@ -2305,7 +2320,7 @@ PanelWindow {
         // Leave the model selector's right-side footprint clear at every stage.
         Rectangle {
             id: forestDiagnosticsPopup
-            visible: root.diagnosticsOpen
+            visible: root.diagnosticsOpen && !root.fixtureOnly
             z: 40
             anchors.top: header.bottom
             anchors.topMargin: 7
@@ -2384,7 +2399,7 @@ PanelWindow {
 
         Rectangle {
             id: forestWorkshopPopup
-            visible: root.workshopOpen
+            visible: root.workshopOpen && !root.fixtureOnly
             z: 40
             anchors.top: header.bottom
             anchors.topMargin: 7
@@ -2457,7 +2472,8 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                text: "LOCAL FIRST // OPTIONAL LOOPBACK MODEL SCAN"
+                text: root.fixtureOnly ? "FIXTURE ONLY // NO MODEL / NO SAVE"
+                    : "LOCAL FIRST // OPTIONAL LOOPBACK MODEL SCAN"
                 color: Colors.cyan
                 font.pixelSize: 10
             }

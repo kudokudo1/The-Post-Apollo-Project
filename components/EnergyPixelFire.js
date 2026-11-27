@@ -60,3 +60,31 @@ function falloff(radius) {
     const x=Math.max(0,Math.min(1,radius));
     return (1-x)*(1-x)*(1+2*x);
 }
+
+// The result is already known. Only the visible combustion cools down.
+// Success advances to the real endpoint first; failure cools in place.
+function extinguish(phase,time,reduced,mode) {
+    const t=Math.max(0,Number.isFinite(time)?time:0);
+    if(phase==="running") return {active:true,cooling:false,cool:0,flame:1,heat:1,embers:1,scale:1};
+    const result=phase==="success"||phase==="failure";
+    if(!result||reduced) return {active:false,cooling:false,cool:1,flame:0,heat:0,embers:0,scale:0};
+    const delay=phase==="success"?.42:0;
+    const duration=mode==="burn-away"?1.48:mode==="ash-trail"?1.36:1.18;
+    const q=Math.max(0,Math.min(1,(t-delay)/duration));
+    const smooth=x=>{const u=Math.max(0,Math.min(1,x));return u*u*(3-2*u);};
+    const remaining=1-smooth(q/.72);
+    const sputter=1-.24*Math.sin(q*22)*Math.sin(q*22)*Math.sin(Math.PI*q);
+    return {active:q<1,cooling:t>=delay,cool:q,
+        flame:remaining*sputter,scale:remaining>0?.22+.78*remaining:0,
+        heat:1-smooth(q),embers:1-smooth(q)};
+}
+// Each released ember travels once and cools instead of respawning.
+function releasedEmbers(cool) {
+    const q=Math.max(0,Math.min(1,cool)), rows=[];
+    for(let i=0;i<12;i++){
+        const age=Math.max(0,(q-i*.013)/(1-i*.013));
+        rows.push({x:-3-i*.45-age*(7+i%5),y:Math.sin(i*2.4)*(2+age*5)-age*4,
+            heat:age<.35?2:0,alpha:(1-age)*(1-age)*.72});
+    }
+    return rows;
+}

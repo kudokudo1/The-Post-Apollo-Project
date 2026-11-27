@@ -1060,8 +1060,24 @@ PanelWindow {
     readonly property var hunterExecutor: KillBackend.KillStore.hunterExecutor
     Binding {
         target: KillBackend.KillStore
-        property: "donorHunterHost"
-        value: appControlWindow
+        property: "donorHunterPresentationAvailable"
+        value: true
+    }
+    Connections {
+        target: appControlWindow.hunterOperationController
+        function onLegacyMessagePublished(value) {
+            appControlWindow.destructiveConfirmMessage = value;
+        }
+        function onLegacyWindowRequested(operationKind, title, resetChoice, clearTargets) {
+            if (clearTargets) appControlWindow.destructiveConfirmTargetPids = [];
+            appControlWindow.destructiveConfirmKind = operationKind;
+            if (resetChoice) appControlWindow.destructiveConfirmChoice = 0;
+            if (title) appControlWindow.destructiveConfirmTitle = title;
+            appControlWindow.destructiveConfirmOpen = true;
+        }
+        function onLegacyReviewRejected() {
+            appControlWindow.cancelDestructiveConfirm();
+        }
     }
 
     readonly property var thermalRows:

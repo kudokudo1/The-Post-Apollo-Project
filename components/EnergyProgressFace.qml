@@ -8,7 +8,7 @@ import "EnergyFireMaterial.js" as Material
 Item {
     id: root
     property string variant: "omnitrix" // omnitrix | tron | ki-blast | flamethrower
-    // Experimental presentation only; existing hosts default to standard.
+    // Three retained fire treatments; existing hosts default to standard.
     property string fireMode: "standard" // standard | ash-trail | burn-away
     readonly property bool materialExperiment: variant === "flamethrower"
         && (fireMode === "ash-trail" || fireMode === "burn-away")
@@ -28,13 +28,14 @@ Item {
         ? Math.max(materialPeak, visualFrame.fraction) : visualFrame.fraction
     readonly property real headCenterY: height / 2
     readonly property bool animationActive: visible && !reducedMotion
-        && (phase === "running" || (phase === "success" && elapsed < .84))
+        && (phase === "running" || (phase === "success" && elapsed < .84)
+            || (variant==="ki-blast" && phase==="failure" && elapsed<.84))
     property real elapsed: 0
     property double startedAt: 0
     property real finishFrom: 0
     property bool initialized: false
     readonly property var visualFrame: Motion.frame(phase, progressMode, progress,
-        elapsed, finishFrom, reducedMotion)
+        elapsed, finishFrom, reducedMotion, variant)
     implicitWidth: 150
     implicitHeight: 34
 
@@ -44,7 +45,8 @@ Item {
         if (phase === "running" || phase === "idle" || phase === "queued") materialPeak = 0;
         elapsed = 0;
         startedAt = Date.now();
-        lastFraction = displayedFraction;
+        lastFraction = Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion, variant).fraction;
+        if (materialExperiment && phase==="running" && progressMode==="indeterminate") materialPeak=lastFraction;
         surface.requestPaint();
     }
     property real lastFraction: 0
@@ -67,7 +69,7 @@ Item {
         }
     }
     onProgressChanged: if (initialized && phase === "running") {
-        const next=Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion).fraction;
+        const next=Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion, variant).fraction;
         if (materialExperiment && progressMode === "indeterminate") {
             materialPeak=Math.max(materialPeak,next);
             lastFraction=materialPeak;
@@ -88,7 +90,7 @@ Item {
             root.elapsed = Math.max(0, (Date.now()-root.startedAt)/1000);
             if (root.phase === "running") {
                 const next=Motion.frame(root.phase, root.progressMode, root.progress,
-                    root.elapsed, root.finishFrom, root.reducedMotion).fraction;
+                    root.elapsed, root.finishFrom, root.reducedMotion, root.variant).fraction;
                 if (root.materialExperiment && root.progressMode === "indeterminate")
                     root.materialPeak=Math.max(root.materialPeak,next);
                 root.lastFraction=root.materialExperiment && root.progressMode === "indeterminate"
@@ -109,7 +111,7 @@ Item {
             id: surface
             objectName: "energyProgressCanvas"
             anchors.fill: parent
-            readonly property real spill: Math.max(10, root.height * .65)
+            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?.65:1.0))
             anchors.margins: -spill
             renderTarget: Canvas.Image
             onWidthChanged: requestPaint()
@@ -121,7 +123,7 @@ Item {
                 const x=spill, y=spill, w=Math.max(0,root.width), h=Math.max(0,root.height);
                 if (w<4 || h<4) return;
                 const f=root.visualFrame, p=root.displayedFraction, mid=y+h/2;
-                const ink=root.phase==="failure" ? Colors.red : root.energyColor;
+                const ink=root.phase==="failure" && root.variant!=="ki-blast" ? Colors.red : root.energyColor;
                 const hot=root.variant==="flamethrower";
                 const ki=root.variant==="ki-blast";
                 const tron=root.variant==="tron";
@@ -168,6 +170,24 @@ Item {
                     for (let yy=y+4;yy<y+h-2;yy+=4)
                         c.fillRect(x+1,yy,inner*p,1);
                 }
+                // Two contiguous beams share a single collision plane.
+                // The opposing blast occupies the right side until pushed off
+                // the track; on defeat it drives the plane all the way left.
+                if (ki && f.clash && f.enemyFraction>0) {
+                    const g=c.createLinearGradient(0,y+1,0,y+h-1);
+                    g.addColorStop(0,"#B6FFFF");
+                    g.addColorStop(.18,"#83C8CD");
+                    g.addColorStop(.38,"#F9E4A3");
+                    g.addColorStop(.50,"#FFFFFF");
+                    g.addColorStop(.62,"#FFF1BC");
+                    g.addColorStop(.82,"#83C8CD");
+                    g.addColorStop(1,"#B6FFFF");
+                    c.fillStyle=g; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
+                    const rush=c.createLinearGradient(edge,mid,x+w-1,mid);
+                    rush.addColorStop(0,tint(Colors.white,.45));
+                    rush.addColorStop(1,tint(Colors.cyan,0));
+                    c.fillStyle=rush; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
+                }
                 if (!f.headVisible) return;
                 // All core and aura layers share the exact centerline.
                 function orb(rx,ry,stops) {
@@ -194,12 +214,12 @@ Item {
                     c.beginPath();
                     c.rect(edge-length,mid-h*1.1,length+h*.46,h*2.2);
                     c.clip();
-                    orb(h*.78, h*.90, [[0,tint(Colors.yellow,.75)],
-                        [.32,tint(Colors.orange,.65)],[.64,tint(Colors.red,.28)],
+                    orb(h*.78, h*.90, [[0,tint(Colors.yellow,.58)],
+                        [.32,tint(Colors.orange,.38)],[.64,tint(Colors.red,.13)],
                         [1,tint(Colors.red,0)]]);
-                    for (let i=0;i<7;i++) {
-                        const q=i/7;
-                        const wave=Math.sin(t*(5.7+i*.69)+i*2.1);
+                    for (let i=0;i<10;i++) {
+                        const q=i/10;
+                        const wave=.72*Math.sin(t*(4.2+i*.43)+i*2.1)+.28*Math.sin(t*2.1+i*.93);
                         // The upper curls rise more than the lower curls.
                         const sign=i%3===1 ? 1 : -1;
                         const tail=edge-length*(.25+q*.75);
@@ -207,9 +227,10 @@ Item {
                         const base=mid-sign*h*.30;
                         const g=c.createRadialGradient(edge-length*.12,mid,0,
                             edge-length*.12,mid,Math.max(h*.95,length));
-                        g.addColorStop(0,tint(Colors.yellow,.92));
-                        g.addColorStop(.34,tint(Colors.orange,.88));
-                        g.addColorStop(.65,tint(Colors.red,.48));
+                        g.addColorStop(0,tint(Colors.yellow,.38));
+                        g.addColorStop(.26,tint(Colors.orange,.32));
+                        g.addColorStop(.52,tint(Colors.orange,.16));
+                        g.addColorStop(.78,tint(Colors.red,.065));
                         g.addColorStop(1,tint(Colors.red,0));
                         c.fillStyle=g;
                         c.beginPath();
@@ -237,14 +258,20 @@ Item {
                     c.restore();
                 }
                 const scale=f.power*root.personality.head;
-                const rx=Math.min(h*(tron?.55:.78)*scale,w*.45);
-                const ry=Math.min(h*.66,h*.47*(1+(scale-1)*.18));
-                orb(rx*1.6,Math.min(h*.91,ry*1.55),[
+                const rx=Math.min(h*(tron?.55:.78)*scale*root.personality.headConsume,w*.48);
+                const ry=Math.min(h*(hot?.66:.84),h*(hot?.47:.58)*(1+(scale-1)*.22));
+                orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
                     [0,tint(ink,Math.min(.98,.35*bright))],
                     [.55,tint(ink,.22)],[1,tint(ink,0)]]);
                 orb(rx,ry,[[0,Colors.white],[Math.min(.36,.12*bright),Colors.white],
                     [.38,mix(ink,Colors.white,Math.min(.98,.4*bright))],[.57,tint(ink,.84)],
                     [1,tint(ink,0)]]);
+                if (ki && f.clash) {
+                    // Warm-white opposing energy mixes into the collision
+                    // rather than creating a second, disconnected orb.
+                    orb(rx*.78,ry*.82,[[0,Colors.white],[.22,"#FFF3C5"],
+                        [.5,tint(Colors.cyan,.42)],[1,tint(Colors.cyan,0)]]);
+                }
                 if (f.intensity>.08) {
                     const flare=c.createLinearGradient(edge-rx*1.4,mid,edge+rx*1.4,mid);
                     flare.addColorStop(0,tint(ink,0));

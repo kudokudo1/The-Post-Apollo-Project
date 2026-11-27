@@ -19,6 +19,28 @@ PanelWindow {
     // Explicit separate fixture host construction only; never a trust grant.
     // The normal shell leaves this false. No operator runtime toggle.
     property bool fixtureOnly: false
+    // Current mounted public fixture only. The typed draft is never forwarded.
+    readonly property var fixtureDemoView: fixtureOnly && menuOpen && visible
+        && publicPreviewGate.active && publicPreviewLoader.status === Loader.Ready
+        ? publicPreviewLoader.item : null
+    readonly property bool fixtureDemoStreaming: !!fixtureDemoView
+        && fixtureDemoView.demoState === "STREAMING"
+    readonly property bool fixtureDemoActionAvailable: !!fixtureDemoView
+        && (fixtureDemoView.demoAvailable || fixtureDemoStreaming)
+    function requestFixtureDemoAction() {
+        const view = fixtureDemoView;
+        if (!fixtureOnly || !view || !fixtureDemoActionAvailable)
+            return false;
+        if (view.demoState === "STREAMING")
+            return view.stopDemo();
+        if (view.demoAvailable)
+            return view.beginDemo();
+        return false;
+    }
+    onFixtureOnlyChanged: {
+        if (publicPreviewGate)
+            publicPreviewGate.dismissPreview();
+    }
     // Forest B0 inventory only proves model discovery. It is not permission
     // to record audio, submit a prompt, or attach a provider session.
     // Until protected Forest host adapters exist both controls fail closed.
@@ -1693,7 +1715,9 @@ PanelWindow {
 
                 Component {
                     id: publicPreviewComponent
-                    PublicPreview.PublicConversationFixture {}
+                    PublicPreview.PublicConversationFixture {
+                        developmentDemoMode: root.fixtureOnly
+                    }
                 }
 
                 Column {
@@ -1732,7 +1756,8 @@ PanelWindow {
                         // not hide any active chat or personal conversation.
                         visible: root.frameHeight >= 540
                         width: parent.width
-                        text: "LOCAL DRAFT ONLY // SEND LOCKED"
+                        text: root.fixtureOnly ? "SAMPLE THEN TEST // FIXED PROMPT"
+                            : "LOCAL DRAFT ONLY // SEND LOCKED"
                         textFormat: Text.PlainText
                         color: Colors.cyan
                         font.pixelSize: 10
@@ -2153,8 +2178,9 @@ PanelWindow {
                             color: Colors.orange
                         }
                         Accessible.name: "Forest local draft text input"
-                        Accessible.description:
-                            "In-memory draft only. SEND is locked until a trusted Forest chat host is connected."
+                        Accessible.description: root.fixtureOnly
+                            ? "In-memory draft only. TEST uses a fixed public prompt, not this draft."
+                            : "In-memory draft only. SEND is locked until a trusted Forest chat host is connected."
                         // Intentionally no onAccepted / transport / history.
                     }
                     GohuText {
@@ -2165,7 +2191,8 @@ PanelWindow {
                         verticalAlignment: Text.AlignVCenter
                         visible: forestPromptInput.text.length === 0
                                  && !forestPromptInput.activeFocus
-                        text: root.frameHeight < 540
+                        text: root.fixtureOnly ? "DRAFT NOT SENT // SAMPLE THEN TEST"
+                            : root.frameHeight < 540
                             ? "SEND LOCKED // HOST NOT CONNECTED"
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
                         color: Colors.magenta
@@ -2299,18 +2326,19 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     width: Math.max(54, Math.min(86,
                         Math.round(promptRow.width * 0.21)))
-                    enabledAction: root.chatHostTrusted
+                    enabledAction: root.fixtureOnly ? root.fixtureDemoActionAvailable : root.chatHostTrusted
                     recording: false
                     processing: false
                     idleAccent: Colors.green
                     recordingAccent: Colors.magenta
-                    askLabel: "SEND"
+                    askLabel: root.fixtureOnly ? (root.fixtureDemoStreaming ? "STOP" : "TEST") : "SEND"
                     sendLabel: "SEND"
                     allowSecondaryAction: false
-                    Accessible.name:
-                        "SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
-                    // No onPrimaryRequested/onSecondaryRequested:
-                    // a selected B0 model is not an authorized session.
+                    Accessible.name: root.fixtureOnly
+                        ? (root.fixtureDemoStreaming ? "Stop fixed simulated reply" : "Run fixed public test, no model or save")
+                        : "SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
+                    // Explicit fixture-only event, never model/session submission.
+                    onPrimaryRequested: root.requestFixtureDemoAction()
                 }
 
             }

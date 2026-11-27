@@ -29,7 +29,10 @@ class ForestSessionReadonlyContract(unittest.TestCase):
         self.assertIn("OLLAMA // ", rail)
         for prohibited in ("Process {", "MouseArea {", "onClicked:"):
             self.assertNotIn(prohibited, rail)
-        self.assertNotIn("onPrimaryRequested:", window)
+        self.assertEqual(window.count("onPrimaryRequested: root.requestFixtureDemoAction()"), 1)
+        self.assertNotIn("onPrimaryRequested:", window.replace(
+            "onPrimaryRequested: root.requestFixtureDemoAction()", "", 1))
+        self.assertIn("if (!fixtureOnly || !view || !fixtureDemoActionAvailable)", window)
 
     @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
     def test_policy_filters_open_sessions_and_refuses_bad_snapshots(self):

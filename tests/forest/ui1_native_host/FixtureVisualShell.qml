@@ -51,14 +51,52 @@ ShellRoot {
                 preview.leftClicked(null);
                 break;
             case 1:
-                witness.check(loader.active && loader.item && loader.item.transcriptReady
-                    && input.text === "local fixture draft" && !send.enabledAction,
-                    "fixture displays existing sample without submitting draft");
-                forest.menuOpen = false;
+                witness.check(loader.active && loader.item && loader.item.demoState === "READY"
+                    && input.text === "local fixture draft" && send.enabledAction
+                    && send.askLabel === "TEST" && !forest.chatHostTrusted,
+                    "fixture opens current fixed demo and preserves draft");
+                send.primaryRequested();
+                witness.check(loader.item.demoState === "STREAMING" && send.askLabel === "STOP",
+                    "actual composer TEST event starts fixed stream");
                 break;
             case 2:
-                witness.check(!loader.active && loader.item === null && input.text === "",
-                    "fixture close unloads and clears draft");
+                witness.check(loader.item.demoState === "STREAMING" && send.enabledAction,
+                    "actual composer STOP available");
+                send.primaryRequested();
+                witness.check(loader.item.demoState === "STOPPED" && !send.enabledAction,
+                    "actual composer STOP event retires stream");
+                send.primaryRequested();
+                witness.check(loader.item.demoState === "STOPPED", "stopped view refuses repeat");
+                break;
+            case 3:
+                witness.check(loader.item.demoState === "STOPPED", "late timer cannot restart STOP");
+                preview.leftClicked(null);
+                witness.check(!loader.active && !send.enabledAction,
+                    "sample close withdraws old view");
+                preview.leftClicked(null);
+                break;
+            case 4:
+                witness.check(loader.item && loader.item.demoState === "READY" && send.enabledAction,
+                    "explicit reopen creates a fresh view");
+                send.primaryRequested();
+                break;
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+                break;
+            case 9:
+                witness.check(loader.item.demoState === "COMPLETE" && !send.enabledAction
+                    && input.text === "local fixture draft", "fixed reply complete, draft unchanged");
+                const feed = witness.find(loader.item, "publicFixtureFeed");
+                witness.check(feed && feed.messages.length === 2
+                    && feed.messages[0].body === "Reply with READY.",
+                    "existing feed received fixed public prompt only");
+                forest.menuOpen = false;
+                break;
+            case 10:
+                witness.check(!loader.active && loader.item === null && input.text === ""
+                    && !send.enabledAction, "fixture close unloads and clears draft");
                 if (!witness.failed) console.info("FOREST_FIXTURE_VISUAL_PASS");
                 stop(); Qt.quit();
                 break;

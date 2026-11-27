@@ -15,6 +15,10 @@ ShellRoot {
         property bool failed: false
         property bool sawFlash: false
         property bool sawRepair: false
+        property string mockBurnStage: ""
+        property bool mockBurnVerified: false
+        property string mockSavePhase: "idle"
+        property real mockSaveProgress: 0
         property double pulseStarted: 0
         function require(ok, message) {
             if (!ok) {
@@ -67,6 +71,42 @@ ShellRoot {
                 caption: "BURN AWAY"
             }
         }
+        // Disposable host slots: no GitHub or Trash backend is instantiated.
+        Item {
+            id: mockWorkSlot
+            x: 18; y: 385; width: 184; height: 43
+            clip: true
+            visible: lab.stage>=26 && lab.mockBurnStage!=="result" && lab.mockBurnStage!=="error"
+        }
+        Item {
+            id: mockReceiptSlot
+            x: 220; y: 385; width: 184; height: 43
+            clip: true
+            visible: lab.stage>=26 && (lab.mockBurnStage==="result" || lab.mockBurnStage==="error")
+        }
+        EnergyProgressFace {
+            id: mockBurn
+            parent: lab.mockBurnStage==="result" || lab.mockBurnStage==="error"
+                ? mockReceiptSlot : mockWorkSlot
+            anchors.fill: parent
+            variant: "flamethrower"; fireMode: "burn-away"
+            progressMode: "indeterminate"
+            phase: lab.mockBurnStage==="working" ? "running"
+                : lab.mockBurnStage==="result" && lab.mockBurnVerified ? "success"
+                : lab.mockBurnStage==="result" || lab.mockBurnStage==="error" ? "failure" : "idle"
+            visible: phase!=="idle"
+        }
+        Loader {
+            id: mockSave
+            x: 18; y: 430; width: 184; height: 38
+            visible: lab.stage>=26 && lab.mockSavePhase!=="idle"
+            clip: true
+            sourceComponent: EnergyProgressFace {
+                variant: "omnitrix"; energyColor: Colors.blue
+                progressMode: "timed"; progress: lab.mockSaveProgress
+                phase: lab.mockSavePhase
+            }
+        }
         Timer {
             interval: 120
             running: !lab.failed
@@ -96,6 +136,52 @@ ShellRoot {
                     if (elapsed>4800 && !lab.require(field.pressure>.5,
                             "overdrive host pressure")) return;
                 }
+                if (lab.stage>=26) {
+                    if(lab.stage===26) {
+                        lab.mockBurnStage="clicked";
+                        lab.mockSaveProgress=.90; lab.mockSavePhase="running";
+                    } else if(lab.stage===27) {
+                        if(!lab.require(mockBurn.phase==="idle" && !mockBurn.visible,
+                            "confirmation does not activate combustion")) return;
+                        if(!lab.require(mockSave.item.variant==="omnitrix"
+                            && mockSave.item.displayedFraction===.90,
+                            "timed save preserves prefill")) return;
+                        lab.mockBurnStage="working";
+                        lab.mockSaveProgress=1; lab.mockSavePhase="success";
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===28) {
+                        if(Date.now()-lab.pulseStarted<1000) return;
+                        if(!lab.require(mockBurn.parent===mockWorkSlot && mockBurn.displayedFraction>0
+                            && mockBurn.phase==="running",
+                            "working burn has real visible motion")) return;
+                        if(!lab.require(mockSave.item.displayedFraction===1 && !mockSave.item.animationActive,
+                            "save completion settles")) return;
+                        lab.mockBurnVerified=false; lab.mockBurnStage="result";
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===29) {
+                        if(Date.now()-lab.pulseStarted<1650) return;
+                        if(!lab.require(mockBurn.parent===mockReceiptSlot && mockBurn.phase==="failure"
+                            && mockBurn.fireState.repair===0 && !mockBurn.animationActive,
+                            "unverified receipt retains failed material")) return;
+                        lab.mockBurnStage=""; lab.mockSavePhase="idle";
+                    } else if(lab.stage===30) {
+                        if(!lab.require(!mockBurn.visible && !mockSave.visible,
+                            "dismissed operation faces inactive")) return;
+                        lab.mockBurnStage="working";
+                    } else if(lab.stage===31) {
+                        lab.mockBurnVerified=true; lab.mockBurnStage="result";
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===32) {
+                        if(Date.now()-lab.pulseStarted<2800) return;
+                        if(!lab.require(mockBurn.parent===mockReceiptSlot && mockBurn.phase==="success"
+                            && mockBurn.displayedFraction===1 && mockBurn.fireState.repair===1
+                            && !mockBurn.animationActive,
+                            "verified receipt repairs the same reparented face")) return;
+                        console.log("ENERGY_NATIVE_PASS seven treatments; save and burn mock host integration");
+                        Qt.quit(); return;
+                    }
+                    lab.stage++; return;
+                }
                 if (lab.stage>=22) {
                     const fires=[faces.itemAt(3),ash,erosion];
                     if(lab.stage===22) {
@@ -123,8 +209,7 @@ ShellRoot {
                                 && !f.fireState.active && f.fireState.heat===0 && f.fireState.repair===1,
                                 "fire settles repaired without changing progress "+f.fireMode)) return;
                         }
-                        console.log("ENERGY_NATIVE_PASS seven treatments; reactive heat; quiet default; extinguish and shell repair");
-                        Qt.quit(); return;
+                        lab.stage=26; return;
                     }
                     lab.stage++; return;
                 }

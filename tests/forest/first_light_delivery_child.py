@@ -2,11 +2,13 @@
 
 One stdin/stdout bounded NDJSON command at a time, no argv settings,
 path/model/endpoint/user-content override, native adapter or authority.
-This synchronous stepped fixture is not a native asynchronous service.
+Optional independent STOP while one asynchronous STEP is outstanding.
+This is still a fixed disposable fixture, not a native service.
 """
 import json
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from http.server import ThreadingHTTPServer
 
@@ -33,9 +35,64 @@ def pairs(items):
     return result
 
 
+class OwnerWorker:
+    """One original worker, at most one pending advance; test-only.
+
+    The control thread can observe, take and request STOP during B2 I/O.
+    No worker replacement, second queued step, native timeout settlement
+    or automatic cancellation on view withdrawal.
+    """
+    def __init__(self, transport):
+        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fl8-owner")
+        self.pending = None
+        self.closed = False
+        try:
+            self.delivery = self.executor.submit(
+                FirstLightDelivery, test_transport=transport).result()
+        except BaseException:
+            self.executor.shutdown(wait=True)
+            raise
+
+    def call(self, method, *args):
+        if self.closed or self.pending is not None:
+            raise ControlRefusal("OWNER_STEP_PENDING")
+        return self.executor.submit(method, *args).result()
+
+    def begin(self):
+        if self.closed or self.pending is not None:
+            raise ControlRefusal("OWNER_STEP_PENDING")
+        self.pending = self.executor.submit(self.delivery.advance)
+
+    def poll(self):
+        if self.pending is None:
+            raise ControlRefusal("NO_PENDING_STEP")
+        if not self.pending.done():
+            return False
+        future, self.pending = self.pending, None
+        future.result()
+        return True
+
+    def dispose(self):
+        # Wait for the original fixture step, never close its iterator
+        # from the control thread. B2 has its existing finite deadline.
+        try:
+            if self.pending is not None:
+                future, self.pending = self.pending, None
+                try:
+                    future.result()
+                except Exception:
+                    pass
+            if not self.closed:
+                self.call(self.delivery.close)
+                self.closed = True
+        finally:
+            self.executor.shutdown(wait=True)
+
+
 class Control:
-    def __init__(self, delivery):
-        self.delivery = delivery
+    def __init__(self, owner):
+        self.owner = owner
+        self.delivery = owner.delivery
         self.epoch = 0
         self.view = None
         self.closed = False
@@ -53,7 +110,8 @@ class Control:
             "OBSERVE": {"op", "epoch", "visible"},
             "SUBMIT": {"op", "epoch", "prompt"},
             "TAKE": {"op", "epoch"}, "STOP": {"op", "epoch"},
-            "STEP": {"op"}, "OUTCOME": {"op"}, "CLOSE": {"op"},
+            "STEP": {"op"}, "STEP_BEGIN": {"op"}, "STEP_POLL": {"op"},
+            "OUTCOME": {"op"}, "CLOSE": {"op"},
         }
         if op not in fields or set(cmd) != fields[op]:
             raise ControlRefusal("INVALID_COMMAND")
@@ -70,7 +128,7 @@ class Control:
             view = self.current(cmd["epoch"])
             if type(cmd["prompt"]) is not str or cmd["prompt"] != PROMPT:
                 raise ControlRefusal("PUBLIC_INPUT_MISMATCH")
-            self.delivery.submit(view, PROMPT)
+            self.owner.call(self.delivery.submit, view, PROMPT)
             return {"ok": True}  # not admission or draft consumption
         if op == "TAKE":
             snapshot = self.delivery.take(self.current(cmd["epoch"]))
@@ -80,12 +138,18 @@ class Control:
             ack = self.delivery.request_stop(self.current(cmd["epoch"]))
             return {"ok": True, "ack": ack}
         if op == "STEP":
-            self.delivery.advance()
+            self.owner.call(self.delivery.advance)
             return {"ok": True}
+        if op == "STEP_BEGIN":
+            self.owner.begin()
+            return {"ok": True}  # queued, not completion
+        if op == "STEP_POLL":
+            return {"ok": True, "done": self.owner.poll()}
         if op == "OUTCOME":
-            status, local = self.delivery.owner_outcome()
+            status, local = self.owner.call(self.delivery.owner_outcome)
             return {"ok": True, "status": status, "local_outcome": local}
-        local = self.delivery.close()
+        local = self.owner.call(self.delivery.close)
+        self.owner.closed = True
         self.closed = True
         return {"ok": True, "local_outcome": local}
 
@@ -108,7 +172,8 @@ def main():
         kw["endpoint"] = endpoint
         yield from stream_chat(**kw)
 
-    control = Control(FirstLightDelivery(test_transport=transport))
+    owner = OwnerWorker(transport)
+    control = Control(owner)
     try:
         for _ in range(MAX_COMMANDS):
             line = sys.stdin.buffer.readline(MAX_COMMAND + 1)
@@ -132,8 +197,7 @@ def main():
         return 2
     finally:
         try:
-            if not control.closed:
-                control.delivery.close()
+            owner.dispose()
         finally:
             server.shutdown()
             server.server_close()

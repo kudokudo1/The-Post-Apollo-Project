@@ -25,6 +25,7 @@ class FakeOllama(BaseHTTPRequestHandler):
     response_type = "application/x-ndjson"
     lines = [packet("Hello", done=False), packet(" world", done=True)]
     observed: list[tuple[str, str, dict]] = []
+    observed_bytes: list[bytes] = []
 
     def do_POST(self):
         size = int(self.headers.get("Content-Length", "0"))
@@ -34,6 +35,7 @@ class FakeOllama(BaseHTTPRequestHandler):
         except ValueError:
             parsed = {}
         type(self).observed.append((self.command, self.path, parsed))
+        type(self).observed_bytes.append(body)
         self.send_response(type(self).response_status)
         self.send_header("Content-Type", type(self).response_type)
         self.end_headers()
@@ -68,6 +70,7 @@ class TransportTests(unittest.TestCase):
         FakeOllama.response_type = "application/x-ndjson"
         FakeOllama.lines = [packet("Hello"), packet(" world", done=True)]
         FakeOllama.observed = []
+        FakeOllama.observed_bytes = []
 
     def run_chat(self, **kwargs):
         params = dict(model="qwen3:1.7b",
@@ -99,6 +102,47 @@ class TransportTests(unittest.TestCase):
                          ["one", "two", "three"])
         for forbidden in ("tools", "think", "system", "format", "keep_alive"):
             self.assertNotIn(forbidden, data)
+
+    def test_prepared_request_exact_unicode_bytes_and_no_io(self):
+        messages = [{"role": "user", "content": "Public café request ☀"}]
+        with patch.object(chat.http.client, "HTTPConnection",
+                          side_effect=AssertionError("network")):
+            prepared = chat.prepare_chat_request(model="qwen3:1.7b",
+                messages=messages, endpoint=self.endpoint, num_ctx=2048,
+                max_predict=32)
+        self.assertEqual(FakeOllama.observed, [])
+        self.assertNotIn("caf", repr(prepared))
+        self.assertNotIn(prepared.body_sha256, repr(prepared))
+        self.assertEqual(json.loads(prepared.body)["messages"], messages)
+        self.run_chat(messages=messages, num_ctx=2048, max_predict=32,
+                      expected_request=prepared)
+        self.assertEqual(FakeOllama.observed_bytes, [prepared.body])
+        self.assertEqual(chat.hashlib.sha256(FakeOllama.observed_bytes[0]).hexdigest(),
+                         prepared.body_sha256)
+
+    def test_request_binding_mismatch_before_connect(self):
+        messages = [{"role": "user", "content": "Original public input"}]
+        prepared = chat.prepare_chat_request(model="qwen3:1.7b",
+            messages=messages, endpoint=self.endpoint)
+        messages[0]["content"] = "Changed public input"
+        cases = [
+            dict(messages=messages),
+            dict(model="granite3.3:2b"),
+            dict(num_ctx=2048),
+            dict(max_predict=32),
+            dict(endpoint="http://127.0.0.1:11434"),
+            dict(expected_request=True),
+        ]
+        with patch.object(chat.http.client, "HTTPConnection",
+                          side_effect=AssertionError("network")):
+            for change in cases:
+                params = dict(messages=[{"role": "user", "content": "Original public input"}],
+                              expected_request=prepared)
+                params.update(change)
+                with self.subTest(fields=tuple(change)):
+                    with self.assertRaisesRegex(chat.ChatRefusal, "^REQUEST_BINDING_MISMATCH$"):
+                        self.run_chat(**params)
+        self.assertEqual(FakeOllama.observed, [])
 
     def test_no_network_for_bad_model_prompt_or_history(self):
         cases = [

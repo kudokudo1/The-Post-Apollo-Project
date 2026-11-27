@@ -1939,30 +1939,11 @@ PanelWindow {
     }
 
     function taskEligibleForKillAll(entry) {
-        if (!entry || !entry._taskRecord || Number(entry.pid || 0) <= 1)
-            return false;
-
-        const currentUser = String(Quickshell.env("USER") || "").trim();
-        const taskUser = String(entry.user || "").trim();
-
-        if (currentUser.length > 0
-                && taskUser.length > 0
-                && taskUser !== currentUser)
-            return false;
-
-        if (String(entry.state || "").indexOf("Z") !== -1)
-            return false;
-
-        return !taskProtectedFromKillAll(entry);
+        return KillBackend.KillStore.taskEligibleForKillAll(entry);
     }
 
     function killAllEligibleTasks() {
-        const rows = [];
-        for (let i = 0; i < taskRows.length; i++) {
-            if (taskEligibleForKillAll(taskRows[i]))
-                rows.push(taskRows[i]);
-        }
-        return rows;
+        return KillBackend.KillStore.killAllEligibleTasks();
     }
 
     function requestKillAllEligibleTasks() {

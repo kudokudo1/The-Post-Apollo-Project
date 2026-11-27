@@ -45,36 +45,30 @@ QtObject {
     }
 
 
-    function taskEntryForCapturedIdentity(pid, expectedName) {
-        const wantedPid = Number(pid || 0);
-        const wantedName = String(expectedName || "").trim().toLowerCase();
-        if (wantedPid <= 1)
+    function taskEntryForCapturedIdentity(pid, expectedName, expectedStartTicks) {
+        const gate = host.hubProcessActionGate;
+        if (!gate)
             return null;
-        for (let i = 0; i < host.taskRows.length; i++) {
-            const row = host.taskRows[i];
-            if (Number(row && row.pid || 0) !== wantedPid)
-                continue;
-            const rowName = String(row.comm || row.name || "").trim().toLowerCase();
-            if (wantedName && rowName !== wantedName)
-                return null;
-            return row;
-        }
-        return null;
+        return gate.exactRow(Number(pid), Number(expectedStartTicks), String(expectedName || ""));
     }
 
-
-    function executeProtectedTaskSignal(pid, expectedName, signalName) {
-        const entry = taskEntryForCapturedIdentity(pid, expectedName);
-        if (!entry)
-            return;
-        processControlObject.sendSignal(entry.pid, signalName);
-        if (signalName === "-STOP") {
-            processControllerObject.markFrozen(entry, true);
-            relockTaskDangerAction(entry, "freeze");
-        } else {
-            relockTaskDangerAction(entry, "kill");
-        }
-        refreshTimer.restart();
+    function executeProtectedTaskSignal(pid, expectedName, signalName, expectedStartTicks) {
+        const gate = host.hubProcessActionGate;
+        const entry = taskEntryForCapturedIdentity(pid, expectedName, expectedStartTicks);
+        const action = signalName === "-STOP" ? "freeze" : signalName === "-TERM" ? "end" : "";
+        if (!entry || !action || !gate)
+            return false;
+        // The donor has already shown its existing confirmation dialog.
+        // Reuse the shared exact-target gateway, including lock revalidation,
+        // mutual exclusion, pidfd dispatch and result observation.
+        if (!gate.prepare(Number(pid), Number(expectedStartTicks), expectedName, action, 0))
+            return false;
+        const captured = gate.pending;
+        if (gate.confirm())
+            return true;
+        if (!gate.busy && gate.pending === captured)
+            gate.cancel();
+        return false;
     }
 
 
@@ -143,8 +137,8 @@ QtObject {
 
 
 
-    function executeTaskRestart(pid, expectedName) {
-        const entry = taskEntryForCapturedIdentity(pid, expectedName);
+    function executeTaskRestart(pid, expectedName, expectedStartTicks) {
+        const entry = taskEntryForCapturedIdentity(pid, expectedName, expectedStartTicks);
 
         if (!entry || Number(entry.pid || 0) <= 1)
             return;

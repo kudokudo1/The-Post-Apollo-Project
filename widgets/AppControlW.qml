@@ -1031,8 +1031,18 @@ PanelWindow {
             message,
             actionLabel,
             targetPids,
-            targetName
+            targetName,
+            targetStartTicks
         ) {
+            if (appControlWindow.destructiveConfirmOpen || appControlWindow.cpuBulkReview
+                    || appControlWindow.cpuBulkOperation || appControlWindow.hubProcessActionGate.pending
+                    || appControlWindow.hubProcessActionGate.busy
+                    || appControlWindow.hunterOperationPhase !== "idle")
+                return;
+            if (!Array.isArray(targetPids) || targetPids.length !== 1
+                    || !appControlWindow.hubProcessActionGate.exactRow(
+                        Number(targetPids[0]), Number(targetStartTicks), String(targetName || "")))
+                return;
             appControlWindow.openDestructiveConfirm(
                 kind,
                 title,
@@ -1043,6 +1053,7 @@ PanelWindow {
                 Array.isArray(targetPids) ? targetPids.slice() : [];
             appControlWindow.destructiveConfirmTargetName =
                 String(targetName || "");
+            appControlWindow.destructiveConfirmTargetStartTicks = Number(targetStartTicks);
         }
     }
 
@@ -1285,6 +1296,7 @@ PanelWindow {
     property int destructiveConfirmChoice: 0 // 0=CANCEL, 1=CONFIRM
     property var destructiveConfirmTargetPids: []
     property string destructiveConfirmTargetName: ""
+    property double destructiveConfirmTargetStartTicks: 0
 
     // Per-process safety override for session-critical rows. Values are:
     //   "once"   = left-click one-shot unlock; auto-relocks after the first
@@ -1321,6 +1333,7 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
+        destructiveConfirmTargetStartTicks = 0;
         hunterOperationController.pendingTargets = [];
         destructiveConfirmOpen = true;
         detailFocused = false;
@@ -1356,7 +1369,8 @@ PanelWindow {
                         ? destructiveConfirmTargetPids[0] : 0;
             const entry = taskEntryForCapturedIdentity(
                 pid,
-                destructiveConfirmTargetName
+                destructiveConfirmTargetName,
+                destructiveConfirmTargetStartTicks
             );
             if (entry)
                 relockTaskDangerAction(
@@ -1371,6 +1385,7 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
+        destructiveConfirmTargetStartTicks = 0;
         hunterOperationController.pendingTargets = [];
         Qt.callLater(function() { searchInput.forceActiveFocus(); });
     }
@@ -1381,6 +1396,7 @@ PanelWindow {
         const kind = destructiveConfirmKind;
         const targetPids = destructiveConfirmTargetPids.slice();
         const targetName = destructiveConfirmTargetName;
+        const targetStartTicks = destructiveConfirmTargetStartTicks;
 
         if (kind === "kill-all" || kind === "kill-hogs" || kind === "kill-mice") {
             const captured = hunterPendingTargets.slice();
@@ -1398,16 +1414,17 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
+        destructiveConfirmTargetStartTicks = 0;
         hunterOperationController.pendingTargets = [];
 
         if (kind === "reboot")
             Quickshell.execDetached(["systemctl", "reboot"]);
         else if (kind === "protected-freeze" || kind === "task-freeze")
-            executeProtectedTaskSignal(targetPids.length > 0 ? targetPids[0] : 0, targetName, "-STOP");
+            executeProtectedTaskSignal(targetPids.length > 0 ? targetPids[0] : 0, targetName, "-STOP", targetStartTicks);
         else if (kind === "protected-term" || kind === "task-term")
-            executeProtectedTaskSignal(targetPids.length > 0 ? targetPids[0] : 0, targetName, "-TERM");
+            executeProtectedTaskSignal(targetPids.length > 0 ? targetPids[0] : 0, targetName, "-TERM", targetStartTicks);
         else if (kind === "protected-restart" || kind === "task-restart")
-            executeTaskRestart(targetPids.length > 0 ? targetPids[0] : 0, targetName);
+            executeTaskRestart(targetPids.length > 0 ? targetPids[0] : 0, targetName, targetStartTicks);
     }
 
     function systemComponentWarning(entry) {
@@ -1891,12 +1908,12 @@ PanelWindow {
         globalTaskActionController.relockTaskDanger(entry);
     }
 
-    function taskEntryForCapturedIdentity(pid, expectedName) {
-        return globalTaskActionController.taskEntryForCapturedIdentity(pid, expectedName);
+    function taskEntryForCapturedIdentity(pid, expectedName, expectedStartTicks) {
+        return globalTaskActionController.taskEntryForCapturedIdentity(pid, expectedName, expectedStartTicks);
     }
 
-    function executeProtectedTaskSignal(pid, expectedName, signalName) {
-        globalTaskActionController.executeProtectedTaskSignal(pid, expectedName, signalName);
+    function executeProtectedTaskSignal(pid, expectedName, signalName, expectedStartTicks) {
+        globalTaskActionController.executeProtectedTaskSignal(pid, expectedName, signalName, expectedStartTicks);
     }
 
     function taskEligibleForKillAll(entry) {
@@ -2252,8 +2269,8 @@ PanelWindow {
         globalTaskActionController.terminateSelectedTask();
     }
 
-    function executeTaskRestart(pid, expectedName) {
-        globalTaskActionController.executeTaskRestart(pid, expectedName);
+    function executeTaskRestart(pid, expectedName, expectedStartTicks) {
+        globalTaskActionController.executeTaskRestart(pid, expectedName, expectedStartTicks);
     }
 
     function restartSelectedTask() {

@@ -401,6 +401,29 @@ Item {
             collectionSource.refreshSnapshot();
     }
 
+    // Right-side memory editor is another presentation of the existing
+    // percentage draft. Keep finite caps away from the old release sentinel.
+    readonly property bool memoryEditorReady: active && exactTargetAvailable && !!gate
+        && !gate.pending && !gate.busy && !gate.bulkBlocked && !locallyPending
+        && !hasBulkReview && !bulkOperation && !legacyActionBlocked
+        && !!processView.presentation && processView.dangerActionUnlocked(currentTask,"limit")
+        && processView.presentation.limitResultFor(currentTask).state!=="unknown"
+        && processView.presentation.limitResultFor(currentTask).state!=="pending"
+    function stageResourceMemory(percent) {
+        if (!memoryEditorReady || !Number.isInteger(percent)
+                || !((percent>=0 && percent<=97) || (percent===100 && processView.hasSoftLimit())))
+            return false;
+        stagedLimitPercent=percent;
+        return true;
+    }
+    function reviewResourceMemory(percent) {
+        if (!memoryEditorReady || resourceConsole.selectedKey!=="memory"
+                || !resourceConsole.memoryCanReview || percent!==stagedLimitPercent
+                || !Number.isInteger(percent)
+                || !((percent>=0 && percent<=97) || (percent===100 && processView.hasSoftLimit())))
+            return false;
+        return prepareAction("limit",percent);
+    }
     function prepareAction(action, percent) {
         const row = currentTask;
         if (!active || !exactTargetAvailable || !gate || locallyPending
@@ -1486,6 +1509,21 @@ Item {
                 anchors.margins: 6
                 target: workspace.currentTask
                 resourceEvidence: workspace.graphSession.resourceEvidence
+                memoryDraftPercent: workspace.stagedLimitPercent
+                memoryMinimumMiB: processView.presentation && workspace.currentTask
+                    ? processView.limitMinimumMiB(workspace.currentTask) : 0
+                memoryMaximumMiB: processView.presentation && workspace.currentTask
+                    ? processView.limitMaximumMiB(workspace.currentTask) : 0
+                memoryCurrentPercent: processView.presentation && workspace.currentTask
+                    ? processView.presentation.limitPercent(workspace.currentTask) : 100
+                memoryManaged: processView.hasSoftLimit()
+                memoryOwnerReady: workspace.memoryEditorReady
+                memoryStatus: processView.presentation && workspace.currentTask
+                    ? processView.presentation.limitResultFor(workspace.currentTask).message : "LIMIT STATUS UNAVAILABLE"
+                onMemoryStageRequested: function(percent) { workspace.stageResourceMemory(percent); }
+                onMemoryClearRequested: if (workspace.exactTargetAvailable && !workspace.locallyPending
+                        && !workspace.gate.busy && !workspace.gate.pending) workspace.stagedLimitPercent=-1
+                onMemoryReviewRequested: function(percent) { workspace.reviewResourceMemory(percent); }
                 selectionReady: workspace.active && workspace.exactTargetAvailable
                     && !workspace.legacyActionBlocked && !workspace.hasBulkReview
                     && !workspace.bulkOperation && !workspace.locallyPending
@@ -1681,6 +1719,8 @@ Item {
                             textFormat: Text.PlainText
                             text: reviewPanel.single
                                 ? ("CONFIRM " + String(reviewPanel.singleTarget.action).toUpperCase()
+                                    + (reviewPanel.singleTarget.action==="limit"
+                                        ? "\n"+(reviewPanel.singleTarget.percent===100 ? "RESTORE ORIGINAL LIMIT" : "LIMIT CONTROL RANGE "+reviewPanel.singleTarget.percent+"%") : "")
                                     + "\nNO COMMAND HAS BEEN SENT"
                                     + (workspace.isProtected(workspace.currentTask)
                                         ? "\nWARNING // PROTECTED PROCESS\n" + workspace.protectedProcessRisk(workspace.currentTask)

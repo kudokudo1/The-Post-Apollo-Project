@@ -22,29 +22,62 @@ test("widget color identity is directly bound to Prism's real fixed border",()=>
     assert.match(shell,/prismBorderColor: prismDock\.prismBorderColor/);
     assert.match(widget,/property color prismBorderColor: Colors\.white/);
     assert.match(widget,/borderColor: root\.prismBorderColor/);
-    assert.match(widget,/glowColor: root\.prismBorderColor/);
+    assert.match(widget,/glowVisible: false/);
     assert.match(widget,/color: root\.prismBorderColor/);
     assert.match(widget,/border\.color: root\.prismBorderColor/);
     assert.doesNotMatch(widget,/borderColor: Colors\.cyan/);
 });
 
-test("header is an accessible two-row family, not a squeezed narrow strip",()=>{
-    assert.match(widget,/id: prismHeader/);
-    assert.match(widget,/height: 84/);
-    assert.match(widget,/id: prismToolbar/);
-    assert.match(widget,/id: prismSourceIndicator/);
-    assert.match(widget,/text: "COLOR \/\/ SYNTAGMA"/);
-    assert.doesNotMatch(widget,/text: "●.*SYNTAGMA"/);
-    assert.match(widget,/ResizeButton\s*\{/);
-    assert.match(widget,/CloseButton\s*\{/);
-    // All the controls have a bounded slot at both 432px and a 300px frame.
-    for(const frameWidth of [300,349,432,560,760]) {
-        const rowWidth=frameWidth-24;
-        const spacing=5, fixed=28+28+30+38, gaps=spacing*5;
-        const badge=Math.max(0,Math.min(126,rowWidth-fixed-gaps));
-        const spacer=Math.max(0,rowWidth-fixed-badge-gaps);
-        assert.ok(fixed+badge+spacer+gaps<=rowWidth);
+test("header preserves the requested right-to-left single-row control order",()=>{
+    const header=widget.slice(widget.indexOf("id: prismHeader"),widget.indexOf("id: prismDivider"));
+    assert.match(header,/height: 40/);
+    assert.match(header,/layoutDirection: Qt.RightToLeft/);
+    const ids=["closePrismButton","prismReloadButton","prismSourceIndicator","prismIndexButton","expandPrismButton","collapsePrismButton"];
+    let last=-1;
+    for(const id of ids) {
+        const at=header.indexOf("id: "+id);
+        assert.ok(at>last,id+" follows the preceding right-to-left control");
+        last=at;
     }
+    assert.match(header,/Math.min\(94,/);
+    assert.match(header,/text: "COLOR \/\/ SYNTAGMA"/);
+    for(const frameWidth of [260,300,349,432,560,760]) {
+        const control=Math.max(16,Math.min(28,Math.floor((frameWidth-100)/6)));
+        const badge=Math.max(0,Math.min(94,frameWidth-5*control-15-45));
+        assert.ok(5*control+badge+15<=frameWidth-45);
+    }
+});
+
+test("all structural and header control glows reuse the Prism button spectrum",()=>{
+    const halo=file("components/PrismBorderGlow.qml");
+    assert.match(halo,/Artwork\.prismGeometry\(\)/);
+    assert.match(halo,/recipe\.spectrumStops/);
+    assert.match(halo,/recipe\.spectrumIndices/);
+    assert.match(halo,/Colors.orange, Colors.yellow, Colors.green, Colors.cyan/);
+    assert.match(halo,/Colors.blue, Colors.purple, Colors.magenta/);
+    assert.match(halo,/c\.createLinearGradient\(p,p\+h,p\+2\/w\/norm,p\+h-2\/h\/norm\)/);
+    assert.match(halo,/c\.strokeRect/);
+    assert.doesNotMatch(halo,/ctx\.putImageData\(/);
+    assert.match(widget,/borderVisible: false/);
+    assert.match(widget,/border\.width: 1/);
+    assert.equal((widget.match(/PrismBorderGlow\s*\{/g)||[]).length,10);
+    assert.equal((widget.match(/divider: true/g)||[]).length,2);
+    assert.match(file("components/qmldir"),/PrismBorderGlow 1.0 PrismBorderGlow.qml/);
+});
+
+test("Prism grows upward from Trash's shared bottom baseline",()=>{
+    assert.match(widget,/frameBottomClearance: Math\.max\(0, fullHeightReserve - chassisTopY\)/);
+    assert.match(widget,/top: false\s+bottom: true/);
+    assert.match(widget,/bottom: Math\.max\(0, root\.frameBottomClearance - root\.bottomScreenGap\)/);
+    assert.match(widget,/height: root\.frameHeight/);
+    assert.match(shell,/chassisTopY: 80/);
+    const reserve=165, top=80, bottom=reserve-top;
+    assert.equal(bottom,85);
+    for(const screenHeight of [900,1080,1440,2000])
+        for(const targetHeight of [790,1020,1345]) {
+            const h=Math.min(targetHeight,screenHeight-reserve);
+            assert.ok(screenHeight-bottom-h>=top);
+        }
 });
 
 test("reload is a visible disabled shared control with no fake refresh",()=>{

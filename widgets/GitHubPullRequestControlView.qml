@@ -283,10 +283,17 @@ Rectangle {
                         && root.completedLifecycleSuccess) {
                     loadingComplete = true;
                     progressFinish.restart();
-                } else {
+                } else if (actionToken.length > 0
+                        && root.completedLifecycleAction === actionToken) {
                     loadingComplete = false;
                     visualPhase = "failure";
                     progressReset.restart();
+                } else {
+                    // A changed PR target or abandoned action is not failure.
+                    loadingComplete = false;
+                    loadingProgress = 0.0;
+                    visualPhase = "idle";
+                    progressReset.stop();
                 }
             }
         }

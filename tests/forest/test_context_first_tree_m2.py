@@ -273,6 +273,46 @@ class ContextTests(unittest.TestCase):
         finally:
             self.db.set_authorizer(None)
 
+    def test_suffix_gap_refused_before_body_query(self):
+        self.append("assistant", "Public answer")
+        self.append("user", "Next public question")
+        self.db.execute("DELETE FROM forest_turns WHERE session_id=? AND ordinal=2",
+                        (self.sid,))
+        self.db.commit()
+        blocked = []
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                blocked.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(authorizer)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "INVALID_HISTORY_ORDER"):
+                self.read()
+            self.assertEqual(blocked, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_suffix_invalid_older_metadata_refused_before_body_query(self):
+        self.append("assistant", "Public answer")
+        self.append("user", "Next public question")
+        self.db.execute("UPDATE forest_turns SET model_key='' "
+                        "WHERE session_id=? AND ordinal=2", (self.sid,))
+        self.db.commit()
+        blocked = []
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                blocked.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(authorizer)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "INVALID_IDENTIFIER"):
+                self.read()
+            self.assertEqual(blocked, [])
+        finally:
+            self.db.set_authorizer(None)
+
     def test_transaction_required(self):
         with self.assertRaisesRegex(ContextRefusal, "TRANSACTION_REQUIRED"):
             snapshot_in_transaction(self.journal, self.ref, current=self.ref)

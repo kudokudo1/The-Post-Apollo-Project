@@ -890,5 +890,218 @@ class WarmMatcherWitnessTests(unittest.TestCase):
             resolve(empty, owner)
         self.assertEqual(owner.body_reads, [])
 
+
+# M7j-b: fixed-public, same-record refinement preview only.
+# No durable writer, identity allocation, authority or generation advancement.
+@dataclass(frozen=True, slots=True)
+class RefinementRequest:
+    context: TaskContext
+    operation: str
+    input_generation: int
+    input_commitment: str
+    policy_generation: int
+    revocation_generation: int
+    user_generation: int
+    operational_generation: int
+    recipient: str
+    base: Version
+    dependencies: tuple
+
+
+@dataclass(frozen=True, slots=True)
+class RefinementObservation:
+    request: RefinementRequest
+    current: bool
+    complete: bool
+    metadata_allowed: bool
+    derivation_allowed: bool
+    retention_known: bool
+    normal_retention: bool
+    restrictions_clear: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RefinementPreview:
+    status: str
+    request: RefinementRequest | None = None
+    proposed_revision: int | None = None
+
+
+REFINEMENT_HOLD = RefinementPreview("HOLD")
+
+
+def refinement_request_valid(request):
+    # No arbitrary objects, collections or unbounded fields before equality.
+    if (type(request) is not RefinementRequest
+            or type(request.context) is not TaskContext
+            or request.context != CONTEXT
+            or type(request.recipient) is not str
+            or request.recipient != RECIPIENT
+            or warm_text_bytes(request.operation, 128) is None
+            or type(request.input_commitment) is not str
+            or len(request.input_commitment) != 64
+            or any(c not in "0123456789abcdef" for c in request.input_commitment)
+            or not all(warm_generation(clock) for clock in (
+                request.input_generation, request.policy_generation,
+                request.revocation_generation, request.user_generation,
+                request.operational_generation))
+            or type(request.dependencies) is not tuple
+            or not 1 <= len(request.dependencies) <= MAX_RECORDS):
+        return False
+    # The base is counted in the dependency set, not an extra allowance.
+    # Only already supplied, fixed-public version references are examined.
+    try:
+        valid_version(request.base)
+        for item in request.dependencies:
+            valid_version(item)
+            if warm_text_bytes(item.record_id, 128) is None:
+                return False
+            ceiling = (request.operational_generation
+                       if item.kind == "operational-learning"
+                       else request.user_generation)
+            if not item.active or item.record_generation > ceiling:
+                return False
+    except ContextRefusal:
+        return False
+    if (request.base.revision == MAX_GENERATION
+            or request.dependencies[0] != request.base
+            or len({v.record_id for v in request.dependencies})
+               != len(request.dependencies)):
+        return False
+    return True
+
+
+def preview_refinement(request, *, initial, final):
+    """Compare two independent literal observations; return a proposal only.
+
+    Restricted witness: an existing, normal-retention semantic record, no
+    synthesis identity, Loose/Sturdy policy choice or absorption. A known
+    compatible restriction observation is required even for a preview.
+    Observations are supplied fixtures, never authenticated authority.
+    No body, writer, generation, cache, resolver, or assembly operation.
+    """
+    if not refinement_request_valid(request):
+        return REFINEMENT_HOLD
+    for observation in (initial, final):
+        if (type(observation) is not RefinementObservation
+                or not all(flag is True for flag in (
+                    observation.current, observation.complete,
+                    observation.metadata_allowed, observation.derivation_allowed,
+                    observation.retention_known, observation.normal_retention,
+                    observation.restrictions_clear))
+                or not refinement_request_valid(observation.request)
+                or observation.request != request):
+            return REFINEMENT_HOLD
+    return RefinementPreview("PROPOSED", request, request.base.revision + 1)
+
+
+class RefinementPreviewTests(unittest.TestCase):
+    def setUp(self):
+        self.request = RefinementRequest(
+            CONTEXT, "public-refinement-a", 4, digest("public input"),
+            2, 1, 3, 2, RECIPIENT, CATALOG[1],
+            (CATALOG[1], CATALOG[2]))
+        self.initial = RefinementObservation(
+            self.request, True, True, True, True, True, True, True)
+        self.final = replace(self.initial)
+
+    def preview(self, request=None, initial=None, final=None):
+        return preview_refinement(
+            self.request if request is None else request,
+            initial=self.initial if initial is None else initial,
+            final=self.final if final is None else final)
+
+    def same_observations(self, request):
+        return self.preview(request, replace(self.initial, request=request),
+                            replace(self.final, request=request))
+
+    def test_exact_preview_preserves_original_and_never_reads_or_assembles(self):
+        from unittest.mock import patch
+        with patch(__name__ + ".resolve") as resolver, \\
+                patch(__name__ + ".assemble_hot_context") as assembler, \\
+                patch.object(FixtureOwner, "body") as body, \\
+                patch.object(FixtureOwner, "metadata") as metadata:
+            result = self.preview()
+            self.assertEqual(result.status, "PROPOSED")
+            self.assertEqual(result.proposed_revision, 3)
+            self.assertIs(result.request, self.request)
+            self.assertEqual(self.request.base, CATALOG[1])
+            self.assertEqual((self.request.user_generation,
+                              self.request.operational_generation), (3, 2))
+            for mock in (resolver, assembler, body, metadata):
+                mock.assert_not_called()
+        self.assertEqual(self.preview(), result)  # not a commit or lease
+        self.assertFalse(hasattr(result, "committed_generation"))
+
+    def test_unknown_or_denied_initial_or_final_is_neutral(self):
+        for field in ("current", "complete", "metadata_allowed",
+                      "derivation_allowed", "retention_known",
+                      "normal_retention", "restrictions_clear"):
+            for value in (False, None, 1):
+                self.assertIs(self.preview(initial=replace(
+                    self.initial, **{field: value})), REFINEMENT_HOLD)
+                self.assertIs(self.preview(final=replace(
+                    self.final, **{field: value})), REFINEMENT_HOLD)
+
+    def test_changed_base_or_dependency_content_not_rebased(self):
+        for base in (CATALOG[0], replace(CATALOG[1],
+                                       commitment=digest("other"))):
+            changed = replace(self.request, base=base,
+                              dependencies=(base, CATALOG[2]))
+            self.assertIs(self.preview(final=replace(
+                self.final, request=changed)), REFINEMENT_HOLD)
+        for dependency in (replace(CATALOG[2], commitment=digest("other")),
+                           replace(CATALOG[2], revision=2),
+                           replace(CATALOG[2], active=False)):
+            changed = replace(self.request,
+                              dependencies=(CATALOG[1], dependency))
+            self.assertIs(self.preview(final=replace(
+                self.final, request=changed)), REFINEMENT_HOLD)
+
+    def test_exact_operation_scope_and_independent_clocks(self):
+        for changes in ({"operation": "different"}, {"input_generation": 5},
+                        {"input_commitment": digest("different")},
+                        {"policy_generation": 3}, {"revocation_generation": 2},
+                        {"user_generation": 4}, {"operational_generation": 3},
+                        {"recipient": "other"},
+                        {"context": replace(CONTEXT, generation=2)}):
+            changed = replace(self.request, **changes)
+            self.assertIs(self.preview(final=replace(
+                self.final, request=changed)), REFINEMENT_HOLD)
+
+    def test_bound_dependency_set_includes_base_and_refuses_duplicates(self):
+        dependencies = (self.request.base,) + tuple(
+            replace(CATALOG[2], record_id="lesson-" + str(i))
+            for i in range(MAX_RECORDS - 1))
+        full = replace(self.request, dependencies=dependencies)
+        self.assertEqual(self.same_observations(full).status, "PROPOSED")
+        for values in ((), dependencies + (CATALOG[2],),
+                       (CATALOG[2], self.request.base),
+                       (self.request.base, self.request.base),
+                       (self.request.base, replace(self.request.base, revision=1)),
+                       list(dependencies)):
+            self.assertIs(self.same_observations(replace(
+                self.request, dependencies=values)), REFINEMENT_HOLD)
+
+    def test_malformed_or_future_domain_versions_and_revision_overflow(self):
+        for dependency in (replace(CATALOG[2], record_generation=3),
+                           replace(CATALOG[2], record_generation=True),
+                           replace(CATALOG[2], record_id="bad id"),
+                           replace(CATALOG[2], source="other"),
+                           replace(CATALOG[2], active=False)):
+            self.assertIs(self.same_observations(replace(self.request,
+                dependencies=(self.request.base, dependency))), REFINEMENT_HOLD)
+        for clock in (True, -1, MAX_GENERATION + 1):
+            self.assertIs(self.same_observations(replace(
+                self.request, user_generation=clock)), REFINEMENT_HOLD)
+        for revision in (MAX_GENERATION - 1, MAX_GENERATION):
+            base = replace(self.request.base, revision=revision)
+            result = self.same_observations(replace(
+                self.request, base=base, dependencies=(base,)))
+            if revision == MAX_GENERATION:
+                self.assertIs(result, REFINEMENT_HOLD)
+            else:
+                self.assertEqual(result.proposed_revision, MAX_GENERATION)
+
 if __name__ == "__main__":
     unittest.main()

@@ -34,18 +34,20 @@ Item {
     readonly property real fillGap: track.gap
     readonly property real headCenterX: track.front
     readonly property real headCenterY: height / 2
+    readonly property var fireState: PixelFire.extinguish(phase,elapsed,reducedMotion,fireMode)
     readonly property bool animationActive: visible && !reducedMotion
-        && (phase === "running" || (phase === "success" && elapsed < .84)
+        && (phase === "running" || (phase === "success" && (variant==="flamethrower"?fireState.active:elapsed<.84))
+            || (variant==="flamethrower" && phase==="failure" && finishFrom>0 && fireState.active)
             || (variant==="ki-blast" && phase==="failure" && elapsed<1.08))
     property real speedLevel: 0
     property real speedFraction: 0
     property real speedTime: 0
     property real flameSpeed: 0
     readonly property var flameMotion: PixelFire.lightMotion(elapsed,flameSpeed,reducedMotion)
-    readonly property var flamePixels: variant==="flamethrower" && visualFrame.headVisible
+    readonly property var flamePixels: variant==="flamethrower" && fireState.active
         ? PixelFire.fire(height,elapsed,reducedMotion,fireMode,flameSpeed) : null
     readonly property real flameTipOffset: flamePixels && flamePixels.cells.length
-        ? (Math.max(...flamePixels.cells.map(cell=>cell.x))+1)*flamePixels.unit : 0
+        ? (Math.max(...flamePixels.cells.map(cell=>cell.x))+1)*flamePixels.unit*fireState.scale : 0
     property real elapsed: 0
     property double startedAt: 0
     property real finishFrom: 0
@@ -173,7 +175,7 @@ Item {
                 const inset=root.track.inset, fx=x+inset, fy=y+inset;
                 const inner=root.track.width, fillHeight=root.track.height, edge=x+root.headCenterX;
                 const ink=root.phase==="failure" && root.variant!=="ki-blast" ? Colors.red : root.energyColor;
-                // Flat baseline: no radial gradients, external spill, or head.
+                // Quiet baseline: only a tiny fill-local leading highlight.
                 if(root.variant==="default") {
                     c.fillStyle=Colors.dark;
                     c.fillRect(x,y,w,h);
@@ -187,6 +189,21 @@ Item {
                         fill.addColorStop(1,Qt.rgba(ink.r*.60,ink.g*.60,ink.b*.60,1));
                         c.fillStyle=fill;
                         c.fillRect(fx,fy,inner*p,fillHeight);
+                        if(root.phase==="running" || (root.phase==="success" && root.elapsed<.42)) {
+                            const span=Math.min(inner*p,h*1.25);
+                            if(span>0) {
+                                const active=c.createLinearGradient(edge-span,mid,edge,mid);
+                                active.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,0));
+                                active.addColorStop(.65,Qt.rgba(ink.r,ink.g,ink.b,.07));
+                                active.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,.19));
+                                c.fillStyle=active; c.fillRect(edge-span,fy,span,fillHeight);
+                                const cap=Math.min(span,Math.max(1,h*.13));
+                                const tip=c.createLinearGradient(edge-cap,mid,edge,mid);
+                                tip.addColorStop(0,Qt.rgba(1,1,1,0));
+                                tip.addColorStop(1,Qt.rgba(ink.r*.7+.3,ink.g*.7+.3,ink.b*.7+.3,.15));
+                                c.fillStyle=tip; c.fillRect(edge-cap,fy,cap,fillHeight);
+                            }
+                        }
                     }
                     return;
                 }
@@ -203,7 +220,7 @@ Item {
                 const material=Material.geometry(root.materialExperiment ? root.fireMode : "standard",
                     p,inner,fillHeight);
                 // Emitted light, behind the opaque track. Cooled material remains dark.
-                const flame=root.flameMotion;
+                const flame=root.flameMotion, fireState=root.fireState;
                 function radiate(start,span,color,amount) {
                     if(span<=0 || amount<=0) return;
                     if(!hot && !omni) {
@@ -238,7 +255,7 @@ Item {
                         c.fillRect(side<0?-1:0,-1,1,2); c.restore();
                     }
                 }
-                if(f.headVisible && !material.experimental) radiate(fx,inner*p,ink,ki?.47:hot?.34:tron?.25:.38);
+                if((hot?fireState.active:f.headVisible) && !material.experimental) radiate(fx,inner*p,ink,ki?.47:hot?.34*fireState.heat:tron?.25:.38);
                 // Shared flame-attached optical field: smooth orange falloff
                 // and a short velocity-dependent backward stretch.
                 function fireHalo(cx,cy,rx,ry,amount) {
@@ -253,11 +270,11 @@ Item {
                     }
                     c.fillStyle=halo; c.fillRect(-1,-1,2,2); c.restore();
                 }
-                if(hot && f.headVisible && p>0) {
+                if(hot && fireState.active && p>0) {
                     const tip=edge+root.flameTipOffset;
                     const center=tip-h*(.38+flame.drag);
                     fireHalo(center,mid+h*(.12+flame.sway),
-                        h*1.55*flame.stretch,h*1.46*flame.breath,.60*flame.pulse);
+                        h*1.55*flame.stretch,h*1.46*flame.breath,.60*flame.pulse*fireState.heat);
                 }
                 if(ki && f.clash) radiate(edge,inner*f.enemyFraction,
                     mix(Qt.rgba(.65,1,1,1),Qt.rgba(1,.10,.16,1),f.enemyHeat),.34*f.enemyOpacity);
@@ -265,7 +282,7 @@ Item {
                 // by a differently colored progress fill.
                 if (material.erosion && p>0) {
                     if(p<1) Material.drawRemaining(c,x+.5,y+.5,w-1,h-1,edge,
-                        f.headVisible,root.chassisColor,inset-.5);
+                        fireState.heat,root.chassisColor,inset-.5);
                 } else {
                 // Low-cost perimeter: three nested outlines, no full-face shadow.
                 for (let i=3;i>=1;i--) {
@@ -280,7 +297,7 @@ Item {
                 c.strokeRect(x+.5,y+.5,w-1,h-1);
                 }
                 if (material.ash && p>0) {
-                    Material.drawAsh(c,fx,fy,inner,fillHeight,edge,f.headVisible);
+                    Material.drawAsh(c,fx,fy,inner,fillHeight,edge,fireState.heat);
                 } else if (!material.erosion && p>0) {
                     const g=c.createLinearGradient(0,fy,0,fy+fillHeight);
                     g.addColorStop(0,ink);
@@ -347,8 +364,8 @@ Item {
                     }
                     c.restore();
                 }
-                if(f.headVisible && p>0) current(fx,inner*p,"player",
-                    hot?Colors.yellow:ink,1);
+                if((hot?fireState.active:f.headVisible) && p>0) current(fx,inner*p,"player",
+                    hot?Colors.yellow:ink,hot?fireState.flame:1);
                 if(ki && f.clash && f.enemyFraction>0) {
                     const enemyInk=mix(Colors.white,Qt.rgba(1,.10,.16,1),f.enemyHeat);
                     current(edge,inner*f.enemyFraction,"enemy",enemyInk,f.enemyOpacity);
@@ -365,7 +382,7 @@ Item {
                         c.fillStyle=g; c.fillRect(left,yy,line.length,Math.max(1,h*.04));
                     }
                 }
-                if (!f.headVisible && !(ki && f.clash && f.enemyOpacity>0)) return;
+                if (!f.headVisible && !(ki && f.clash && f.enemyOpacity>0) && !(hot && fireState.active)) return;
                 // All core and aura layers share the exact centerline.
                 function orb(rx,ry,stops,centerX) {
                     if(rx<=0 || ry<=0) return;
@@ -380,23 +397,29 @@ Item {
                 }
                 // Crisp, animated pixel-fire underneath a translucent
                 // optical glow. Detached embers rise from the moving front.
-                if(hot && p>0) {
+                if(hot && p>0 && fireState.active) {
                     const pixel=root.flamePixels;
                     // Heat penetrates the material ahead of the flame.
                     // Keep the already eroded/ashed region unchanged.
-                    const contactWidth=Math.min(fx+inner-edge,h*1.85+root.flameTipOffset);
+                    const bed=Material.heatBed(root.elapsed,root.flameSpeed,root.reducedMotion);
+                    const contactWidth=Math.min(fx+inner-edge,(h*1.85+root.flameTipOffset)*bed.reach*fireState.heat);
                     if(contactWidth>0) {
-                        c.save(); c.beginPath(); c.rect(edge,fy,contactWidth,fillHeight); c.clip();
+                        c.save(); c.globalAlpha=fireState.heat; c.beginPath(); c.rect(edge,fy,contactWidth,fillHeight); c.clip();
                         const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
-                        heated.addColorStop(0,tint(Colors.yellow,.94));
-                        heated.addColorStop(.23,tint(Colors.orange,.77));
-                        heated.addColorStop(.64,tint(Colors.red,.36));
+                        heated.addColorStop(0,tint(Colors.yellow,.94*bed.pulse));
+                        heated.addColorStop(.23,tint(Colors.orange,.77*bed.pulse));
+                        heated.addColorStop(.64,tint(Colors.red,.36*bed.pulse));
                         heated.addColorStop(1,tint(Colors.red,0));
                         c.fillStyle=heated; c.fillRect(edge,fy,contactWidth,fillHeight);
-                        for(let i=0;i<6;i++){
-                            const yy=fy+1+i*Math.max(0,fillHeight-2)/5;
-                            c.fillStyle=tint(Colors.yellow,.25);
-                            c.fillRect(edge,yy,contactWidth*(.22+.28*(i%3)),1);
+                        for(const row of bed.rows) {
+                            const yy=fy+row.y*fillHeight;
+                            const start=edge+contactWidth*row.shift;
+                            const length=contactWidth*row.reach;
+                            const wave=c.createLinearGradient(start,yy,start+length,yy);
+                            wave.addColorStop(0,tint(Colors.yellow,row.alpha*bed.pulse));
+                            wave.addColorStop(.40,tint(Colors.orange,row.alpha*.82));
+                            wave.addColorStop(1,tint(Colors.red,0));
+                            c.fillStyle=wave; c.fillRect(start,yy,length,Math.max(1,fillHeight*.065));
                         }
                         c.restore();
                     }
@@ -405,14 +428,31 @@ Item {
                     // the midpoint of the elongated flame.
                     const tip=edge+root.flameTipOffset;
                     fireHalo(tip-h*(.36+flame.drag),mid+h*(.20+flame.sway),
-                        h*1.48*flame.stretch,h*1.08*flame.breath,.28*flame.pulse);
+                        h*1.48*flame.stretch,h*1.08*flame.breath,.28*flame.pulse*fireState.heat);
+                    // Live heat reflected on the retained material behind the front.
+                    // Burn Away has no material here, so never repaint it.
+                    if(!material.erosion && inner*p>0) {
+                        const span=Math.min(inner*p,h*(1.1+flame.speed*.75)*bed.reach);
+                        c.save(); c.globalAlpha=fireState.heat; c.beginPath(); c.rect(fx,fy,inner*p,fillHeight); c.clip();
+                        for(const row of bed.rows) {
+                            const yy=fy+row.y*fillHeight;
+                            const left=edge-span*row.reach;
+                            const g=c.createLinearGradient(left,yy,edge,yy);
+                            g.addColorStop(0,tint(Colors.red,0));
+                            g.addColorStop(.55,tint(Colors.orange,row.alpha*.55));
+                            g.addColorStop(1,tint(Colors.yellow,row.alpha*bed.pulse));
+                            c.fillStyle=g; c.fillRect(left,yy,edge-left,Math.max(1,fillHeight*.075));
+                        }
+                        c.restore();
+                    }
                     // Rocket exhaust: tapered back from the round head, hot
                     // inner core and softer outer plume. The material modes
                     // keep a shorter, localized combustion wake.
-                    const plume=Math.min(inner*p,h*(root.fireMode==="standard"?3.8:root.fireMode==="ash-trail"?1.85:1.35)*flame.stretch);
-                    if(plume>0) {
+                    const plume=Math.min(inner*p,h*(root.fireMode==="standard"?3.8:root.fireMode==="ash-trail"?1.85:1.35)*flame.stretch)*fireState.scale;
+                    if(plume>0 && fireState.flame>0) {
+                        c.save(); c.globalAlpha=fireState.flame;
                         for(let layer=0;layer<3;layer++){
-                            const breadth=h*(.55-layer*.12)*flame.breath;
+                            const breadth=h*(.55-layer*.12)*flame.breath*fireState.scale;
                             const end=edge-plume*(1-layer*.16);
                             const g=c.createLinearGradient(end,mid,edge+h*.22,mid);
                             g.addColorStop(0,tint(Colors.red,0));
@@ -428,6 +468,7 @@ Item {
                                 end+plume*.35,mid+breadth*.18,end,mid);
                             c.closePath(); c.fill();
                         }
+                        c.restore();
                     }
                     const heat=root.fireMode==="burn-away"?1:root.fireMode==="ash-trail"?.83:.90;
                     const u=pixel.unit;
@@ -437,15 +478,22 @@ Item {
                         Qt.rgba(1,.57,.10,1),Qt.rgba(1,.72,.24,1)];
                     const fireTip=[Qt.rgba(.95,.36,.06,1),Qt.rgba(1,.65,.16,1),
                         Qt.rgba(1,.87,.39,1),Qt.rgba(1,.97,.72,1)];
-                    const front=root.flameTipOffset/u;
+                    const front=(root.flameTipOffset/u)/Math.max(.001,fireState.scale);
                     const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
-                    for(const cell of pixel.cells) {
-                        const k=Math.max(0,Math.min(1,1-(front-cell.x)/8));
-                        c.fillStyle=mix(fireOrange[cell.heat],fireTip[cell.heat],k*heat);
-                        c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,u,u);
+                    if(fireState.flame>0) {
+                        c.save(); c.globalAlpha=fireState.flame;
+                        c.translate(edge,mid); c.scale(fireState.scale,fireState.scale);
+                        for(const cell of pixel.cells) {
+                            const k=Math.max(0,Math.min(1,1-(front-cell.x)/8));
+                            const hotColor=mix(fireOrange[cell.heat],fireTip[cell.heat],k*heat);
+                            c.fillStyle=fireState.cooling?mix(hotColor,fireOrange[0],fireState.cool):hotColor;
+                            c.fillRect(cell.x*u,cell.y*u,u,u);
+                        }
+                        c.restore();
                     }
-                    for(const ember of pixel.embers) {
-                        c.save(); c.globalAlpha=ember.alpha;
+                    const sparks=fireState.cooling?PixelFire.releasedEmbers(fireState.cool):pixel.embers;
+                    for(const ember of sparks) {
+                        c.save(); c.globalAlpha=ember.alpha*fireState.embers;
                         c.fillStyle=palette[ember.heat];
                         c.fillRect(Math.round(edge)+ember.x*u,Math.round(mid)+ember.y*u,u,u);
                         c.restore();
@@ -455,12 +503,12 @@ Item {
                 // around the advancing ember, not down the entire beam.
                 // Soft flame lobes can spill beyond the beam vertically;
                 // the plasma core remains independently centered.
-                if (hot && p>0) {
+                if (hot && p>0 && fireState.flame>0) {
                     const t=root.reducedMotion ? 0 : root.elapsed;
-                    const length=Math.min(h*1.5,inner*p);
-                    const reach=h*(.78+.12*f.intensity)*flame.breath;
+                    const length=Math.min(h*1.5,inner*p)*fireState.scale;
+                    const reach=h*(.78+.12*f.intensity)*flame.breath*fireState.scale;
                     c.save();
-                    c.globalAlpha=.35;
+                    c.globalAlpha=.35*fireState.flame;
                     // Constrain the fire to the terminal region, while
                     // letting it consume the full height of the beam tip.
                     c.beginPath();

@@ -37,9 +37,9 @@ QtObject {
                     const fire=source.variant==="flamethrower";
                     const level=source.variant==="ki-blast"?.38:fire?.36:source.variant==="tron"?.32:.30;
                     const p=source.displayedFraction;
-                    if(p>0 && f.headVisible)
+                    if(p>0 && (fire?source.fireState.active:f.headVisible))
                         localLights.push({source:source,fraction:p,color:source.energyColor,
-                            level:level*(.85+.15*f.intensity),fire:fire,side:-1});
+                            level:level*(.85+.15*f.intensity)*(fire?source.fireState.heat:1),fire:fire,side:-1});
                     if(source.variant==="ki-blast" && f.clash && f.enemyFraction>0)
                         localLights.push({source:source,fraction:p,color:Qt.rgba(1,.70-.59*f.enemyHeat,.32-.17*f.enemyHeat,1),
                             level:.38*f.enemyOpacity,fire:false,side:1});

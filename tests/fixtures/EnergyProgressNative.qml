@@ -95,6 +95,36 @@ ShellRoot {
                     if (elapsed>4800 && !lab.require(field.pressure>.5,
                             "overdrive host pressure")) return;
                 }
+                if (lab.stage>=22) {
+                    const fires=[faces.itemAt(3),ash,erosion];
+                    if(lab.stage===22) {
+                        for(const f of fires) {
+                            f.reducedMotion=false; f.visible=true; f.progressMode="measured";
+                            f.phase="running"; f.progress=.65;
+                        }
+                    } else if(lab.stage===23) {
+                        for(const f of fires) f.phase="success";
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===24) {
+                        const t=Date.now()-lab.pulseStarted;
+                        if(t<850) return;
+                        for(const f of fires) {
+                            if(!lab.require(f.displayedFraction===1 && f.animationActive && f.fireState.cooling
+                                && f.fireState.flame<1 && f.fireState.heat>0,
+                                "fire extinguishes after actual success "+f.fireMode)) return;
+                        }
+                    } else if(lab.stage===25) {
+                        if(Date.now()-lab.pulseStarted<2050) return;
+                        for(const f of fires) {
+                            if(!lab.require(f.displayedFraction===1 && !f.animationActive
+                                && !f.fireState.active && f.fireState.heat===0,
+                                "fire settles without changing material extent "+f.fireMode)) return;
+                        }
+                        console.log("ENERGY_NATIVE_PASS seven treatments; reactive heat; quiet default; extinguish and cooldown");
+                        Qt.quit(); return;
+                    }
+                    lab.stage++; return;
+                }
                 if (lab.stage>=17) {
                     if (!lab.require(field.pressure===0 && field.offsetX===0 && field.offsetY===0
                         && field.localLights.length===0 && field.completionFlash===0,
@@ -117,8 +147,7 @@ ShellRoot {
                         quiet.phase="idle";
                     } else if(lab.stage===21) {
                         if(!lab.require(quiet.displayedFraction===0,"default resets")) return;
-                        console.log("ENERGY_NATIVE_PASS all seven treatments; host pulse; pixel fire; persistent defeat; quiet default lifecycle");
-                        Qt.quit(); return;
+                        lab.stage=22; return;
                     }
                     lab.stage++; return;
                 }
@@ -158,7 +187,9 @@ ShellRoot {
                         } else if (lab.stage===9) {
                             if (!lab.require(f.displayedFraction===.6,"material exact progress")) return;
                             f.phase="failure";
+                            lab.pulseStarted=Date.now();
                         } else if (lab.stage===10) {
+                            if(Date.now()-lab.pulseStarted<1600) return;
                             if (!lab.require(f.displayedFraction===.6 && !f.animationActive,
                                     "material partial failure stays")) return;
                             f.phase="running";

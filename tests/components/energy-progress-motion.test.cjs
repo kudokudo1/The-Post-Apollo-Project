@@ -90,7 +90,7 @@ test("four personalities preserve bounded motion, distinct intensity and flash i
 });
 
 const material = vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining});",
+    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining,heatBed});",
     {Qt:{rgba:(r,g,b,a)=>({r,g,b,a})}});
 test("material experiments preserve standard and partition the chassis", () => {
     for(const mode of ["standard","ash-trail","burn-away","unknown"]){
@@ -266,7 +266,7 @@ test("dominant clash lobe grows while losing lobe shrinks",()=>{
     assert.ok(currents.clashSizes(0,1).enemy>=1.8);
 });
 const pixel=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyPixelFire.js"),"utf8")+"\n({fire,velocity,lightMotion,falloff});");
+    "components/EnergyPixelFire.js"),"utf8")+"\n({fire,velocity,lightMotion,falloff,extinguish,releasedEmbers});");
 test("pixel fire waves, emits detached embers and stays static in reduced motion",()=>{
     const a=pixel.fire(42,0,false), b=pixel.fire(42,.75,false);
     assert.ok(a.cells.length>40 && a.cells.length<200);
@@ -400,7 +400,7 @@ test("local light is shared and bounded; fire light follows the pixel silhouette
     assert.match(source,/Math.max\(\.\.\.flamePixels.cells.map/);
     assert.match(source,/edge\+root.flameTipOffset/);
     assert.match(source,/const halo=c.createRadialGradient/);
-    assert.match(source,/heated.addColorStop\(0,tint\(Colors.yellow,.94\)\)/);
+    assert.match(source,/heated.addColorStop\(0,tint\(Colors.yellow,.94\*bed.pulse\)\)/);
 });
 
 test("TRON streak density follows sampled forward advance, not time or completion",()=>{
@@ -500,7 +500,7 @@ test("flame turbulence and illumination remain attached and vary continuously",(
     assert.match(preview,/flame.drag/);
 });
 
-test("DEFAULT is monotonic, bounded, and does not emit energy effects",()=>{
+test("DEFAULT is monotonic, bounded, and does not emit host energy effects",()=>{
     let prev=0;
     for(let i=0;i<1000;i++){
         const t=i*.05;
@@ -571,4 +571,58 @@ test("surviving burn-away material is inset and does not restore erased structur
     assert.equal(fill[4],26);
     assert.ok(calls.some(c=>c[0]==="clip"));
     assert.ok(calls.some(c=>c[0]==="stroke"));
+});
+
+test("reactive heat bed moves while stalled, stretches with speed and respects reduced motion",()=>{
+    const a=material.heatBed(0,0,false), b=material.heatBed(.43,0,false);
+    assert.ok(JSON.stringify(a.rows)!==JSON.stringify(b.rows));
+    assert.ok(material.heatBed(.43,1,false).reach>b.reach);
+    assert.equal(JSON.stringify(material.heatBed(0,0,true)),JSON.stringify(material.heatBed(80,1,true)));
+    for(let i=0;i<250;i++){
+        const h=material.heatBed(i/30,(i%11)/10,false);
+        assert.ok(h.pulse>=.63&&h.pulse<=1.001&&h.reach>=.75&&h.reach<=1.19);
+        assert.equal(h.rows.length,7);
+        for(const r of h.rows) assert.ok(r.y>0&&r.y<1&&r.reach>0&&r.shift+r.reach<1&&r.alpha<=.40);
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/Material.heatBed\(root.elapsed,root.flameSpeed,root.reducedMotion\)/);
+    assert.match(source,/if\(!material.erosion && inner\*p>0\)/);
+    assert.match(source,/const active=c.createLinearGradient\(edge-span,mid,edge,mid\)/);
+    assert.match(source,/c.fillRect\(edge-cap,fy,cap,fillHeight\)/);
+});
+
+test("all fire treatments extinguish on result without changing actual progress",()=>{
+    for(const mode of ["standard","ash-trail","burn-away"]){
+        assert.equal(pixel.extinguish("running",200,false,mode).flame,1);
+        assert.equal(pixel.extinguish("success",.4,false,mode).cooling,false);
+        const first=pixel.extinguish("success",.6,false,mode);
+        const mid=pixel.extinguish("success",1.1,false,mode);
+        assert.ok(first.active&&first.cooling&&first.flame<1&&first.flame>0);
+        assert.ok(mid.flame<first.flame&&mid.heat>mid.flame&&mid.scale<first.scale);
+        assert.equal(frame("success","measured",0,.6,.65,false,"flamethrower").fraction,1);
+        assert.equal(frame("failure","measured",0,.6,.65,false,"flamethrower").fraction,.65);
+        let heat=1;
+        for(let i=0;i<240;i++){
+            const s=pixel.extinguish("failure",i/100,false,mode);
+            assert.ok(s.heat<=heat+1e-9&&s.heat>=0&&s.flame>=0&&s.flame<=1);
+            heat=s.heat;
+        }
+        const end=pixel.extinguish("success",2.1,false,mode);
+        assert.equal(end.active,false); assert.equal(end.heat,0);
+        assert.equal(end.flame,0); assert.equal(end.embers,0);
+        assert.equal(pixel.extinguish("success",0,true,mode).active,false);
+        assert.equal(pixel.extinguish("idle",0,false,mode).active,false);
+    }
+    const a=pixel.releasedEmbers(.2),b=pixel.releasedEmbers(.8),end=pixel.releasedEmbers(1);
+    assert.equal(a.length,12);
+    for(let i=0;i<a.length;i++){
+        assert.ok(b[i].x<a[i].x&&b[i].alpha<a[i].alpha);
+        assert.equal(end[i].alpha,0);
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const field=fs.readFileSync(path.join(root,"components/EnergyPressureField.qml"),"utf8");
+    assert.match(source,/PixelFire.extinguish\(phase,elapsed,reducedMotion,fireMode\)/);
+    assert.match(source,/PixelFire.releasedEmbers\(fireState.cool\)/);
+    assert.match(source,/c.scale\(fireState.scale,fireState.scale\)/);
+    assert.match(field,/fire\?source.fireState.heat:1/);
 });

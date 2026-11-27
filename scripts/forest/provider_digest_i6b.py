@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import http.client
 import json
 import re
@@ -24,6 +25,79 @@ def _digest(value):
     if not match:
         raise DigestRefusal("INVALID_PROVIDER_DIGEST")
     return "sha256:" + match.group(1)
+
+
+
+@dataclass(frozen=True, slots=True)
+class ThinkingDescriptor:
+    """Reported control values only; not model identity or permission."""
+    values: tuple[bool | str, ...]
+    default: bool | str
+
+
+@dataclass(frozen=True, slots=True)
+class ThinkingMetadataReport:
+    """Supplied version and show response, not a joined live observation."""
+    version_reported: str
+    descriptor: ThinkingDescriptor | None
+
+
+_THINK_LEVEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z", re.ASCII)
+_MAX_THINK_VALUES = 32
+
+
+def _metadata_json(body):
+    # Reuse the existing provider body ceiling and duplicate-key policy.
+    # Never return or echo arbitrary show fields.
+    if type(body) is not bytes or len(body) > p0.MAX_BODY_BYTES:
+        raise DigestRefusal("THINK_METADATA_BODY_INVALID")
+    try:
+        value = json.loads(body.decode("utf-8"), object_pairs_hook=p0._unique_pairs,
+                           parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+    except (ValueError, UnicodeError, RecursionError):
+        raise DigestRefusal("THINK_METADATA_JSON_INVALID") from None
+    if type(value) is not dict:
+        raise DigestRefusal("THINK_METADATA_SCHEMA_INVALID")
+    return value
+
+
+def _think_value(value):
+    # Conservative supported subset of upstream's bool/nonempty string
+    # descriptor. Preserve exact spelling, never normalize provider values.
+    if type(value) is bool:
+        return value
+    if type(value) is str and _THINK_LEVEL.fullmatch(value):
+        return value
+    raise DigestRefusal("THINK_DESCRIPTOR_INVALID")
+
+
+def parse_thinking_metadata(version_body, show_body):
+    """Decode bounded supplied provider response bytes without I/O.
+
+    Older ShowResponse schemas omit thinking; absence is unknown, not
+    false/default. No authentication, version inference, selected model
+    association, currentness, local/cloud qualification or dispatch.
+    A future authorized collector must independently bind the original
+    version, exact model/digest and response lineage before any use.
+    """
+    try:
+        version = p0._version(_metadata_json(version_body))
+    except p0.ProbeFailure:
+        raise DigestRefusal("THINK_VERSION_INVALID") from None
+    show = _metadata_json(show_body)
+    if "thinking" not in show:
+        return ThinkingMetadataReport(version, None)
+    descriptor = show["thinking"]
+    if (type(descriptor) is not dict
+            or set(descriptor) != {"values", "default"}
+            or type(descriptor["values"]) is not list
+            or not 1 <= len(descriptor["values"]) <= _MAX_THINK_VALUES):
+        raise DigestRefusal("THINK_DESCRIPTOR_INVALID")
+    values = tuple(_think_value(value) for value in descriptor["values"])
+    default = _think_value(descriptor["default"])
+    if len(set(values)) != len(values) or default not in values:
+        raise DigestRefusal("THINK_DESCRIPTOR_INVALID")
+    return ThinkingMetadataReport(version, ThinkingDescriptor(values, default))
 
 
 def _tags(host, port):

@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/first_light_trial_host.py'
+      - 'tests/forest/test_first_light_trial_host.py'
+      - 'scripts/forest/FIRST_LIGHT_TRIAL_HOST.md'
       - 'scripts/forest/TURN_BRIDGE_B3.md'
       - 'tests/forest/test_turn_bridge_b3.py'
       - '.github/workflows/forest-core-b3-turn-bridge.yml'
   push:
     paths:
       - 'scripts/forest/turn_bridge_b3.py'
+      - 'scripts/forest/first_light_trial_host.py'
+      - 'tests/forest/test_first_light_trial_host.py'
+      - 'scripts/forest/FIRST_LIGHT_TRIAL_HOST.md'
       - 'scripts/forest/TURN_BRIDGE_B3.md'
       - 'tests/forest/test_turn_bridge_b3.py'
       - '.github/workflows/forest-core-b3-turn-bridge.yml'
@@ -21,5 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test durable B3 reservations and admission
         run: python3 -m unittest discover -s tests/forest -p 'test_turn_bridge_b3.py' -v
+      - name: Test First Light single original public trial host
+        run: python3 -m unittest discover -s tests/forest -p 'test_first_light_trial_host.py' -v
       - name: Check Python syntax
-        run: python3 -m py_compile scripts/forest/turn_bridge_b3.py tests/forest/test_turn_bridge_b3.py
+        run: python3 -m py_compile scripts/forest/turn_bridge_b3.py tests/forest/test_turn_bridge_b3.py scripts/forest/first_light_trial_host.py tests/forest/test_first_light_trial_host.py

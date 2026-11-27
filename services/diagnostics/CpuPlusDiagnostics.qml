@@ -59,6 +59,9 @@ Scope {
     property var lifecycleRecorder: null
     property string lifecycleCaptureId: ""
     property string lifecycleArchiveFeedback: ""
+    readonly property string dumpArchiveReceipt: !reports.dump ? "" : archiveBusy ? "ARCHIVE // WAITING" :
+        archiveRows.some(row=>row.kind==="dump"&&row.id===reports.dump.id) ? "ARCHIVE // CONFIRMED" :
+        "ARCHIVE // SESSION ONLY / NOT CONFIRMED"
     Connections {
         target: owner.lifecycleRecorder
         function onCompleted(result) { owner.publishLifecycleReport(result); }

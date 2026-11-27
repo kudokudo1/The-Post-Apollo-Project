@@ -59,6 +59,8 @@ PanelWindow {
         localRequestState = localRequestOwner.state();
     }
     function retireLocalRequestView() {
+        if (!localRequestOwner)
+            return;
         localRequestOwner.withdraw();
         publishLocalRequestState();
     }
@@ -130,7 +132,10 @@ PanelWindow {
                 Qt.callLater(root.synchronizeLocalRequestView);
         }
     }
-    Component.onDestruction: retireLocalRequestView()
+    Component.onDestruction: {
+        localMountCompleted = false;
+        retireLocalRequestView();
+    }
 
     // Forest B0 inventory only proves model discovery. It is not permission
     // to record audio, submit a prompt, or attach a provider session.

@@ -159,7 +159,7 @@ def capture_first_light():
     return {"prompt": PROMPT, "trials": captures}
 
 
-def trial(width, height, count, fixture_only=False):
+def trial(width, height, count, fixture_only=False, real_mount=False):
     with tempfile.TemporaryDirectory(prefix="forest-private-wayland-") as name:
         work = Path(name)
         for d in ("run", "home", "cache", "config-home", "data", "config"):
@@ -201,7 +201,18 @@ def trial(width, height, count, fixture_only=False):
                      "recovery_inspect_b4d.py", "ollama_chat_transport.py", "ollama_inventory.py",
                      "capability_registry_b6r2.py", "runtime_stop_control_r2.py", "local_terminal_outbox_b4f.py"):
             shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
-        shell_name = "FixtureVisualShell.qml" if fixture_only else "shell.qml"
+        shell_name = ("RealLocalMountShell.qml" if real_mount else
+                      "FixtureVisualShell.qml" if fixture_only else "shell.qml")
+        if real_mount:
+            # Test-only inventory response, no actual Ollama or network.
+            inventory = {"schema_version": 1, "provider": "ollama", "status": "REACHABLE",
+                         "generation_enabled": False, "tools_enabled": False,
+                         "sessions_enabled": False, "capabilities": ["list_models"],
+                         "model_count": 1, "models": [{"name": "fixture:local", "size_bytes": 1}]}
+            (scene / "scripts/forest/ollama_inventory.py").write_text(
+                "print(" + repr(json.dumps(inventory)) + ")\n", encoding="utf-8")
+            (scene / "scripts/forest/performance_snapshot_p0.py").write_text(
+                "raise SystemExit(2)\n", encoding="utf-8")
         shutil.copy2(ROOT / "tests/forest/ui1_native_host" / shell_name, scene / "shell.qml")
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/FirstLightProcess.qml",
                      scene / "FirstLightProcess.qml")
@@ -218,7 +229,7 @@ def trial(width, height, count, fixture_only=False):
                 raise AssertionError("FIRST_LIGHT_CHILD_SOURCE_MISMATCH")
         # A finite, pre-captured public witness from actual owner delivery.
         # No command receiver, provider connection, or native admission.
-        capture = capture_first_light() if width >= 770 and not fixture_only else {}
+        capture = capture_first_light() if width >= 770 and not fixture_only and not real_mount else {}
         (scene / "FirstLightCapture.js").write_text(
             "var capture = " + json.dumps(capture, ensure_ascii=True) + ";\n", encoding="ascii")
         for relative in ("widgets/ForestW.qml", "widgets/ForestChatList.qml",
@@ -269,10 +280,16 @@ def trial(width, height, count, fixture_only=False):
                     "--no-color", "--log-rules", env["QT_LOGGING_RULES"]],
                     env=env, cwd=work, stdin=subprocess.DEVNULL, stdout=log,
                     stderr=subprocess.STDOUT, start_new_session=True)
-                if width == 1366 and not fixture_only:
+                if width == 1366 and not fixture_only and not real_mount:
                     observe_joined_db(qs, scene, qs_log)
                 code = qs.wait(timeout=85)
             output = qs_log.read_text(errors="replace")
+            if real_mount:
+                if (code != 0 or output.count("FOREST_REAL_LOCAL_MOUNT_PASS") != 1
+                        or "FOREST_HOST_FAIL" in output
+                        or (work / "data" / "post-apollo" / "forest" / "ui-preferences").exists()):
+                    raise AssertionError("REAL_LOCAL_MOUNT_INCOMPLETE")
+                return
             if fixture_only:
                 if (code != 0 or output.count("FOREST_FIXTURE_VISUAL_PASS") != 1
                         or "FOREST_HOST_FAIL" in output
@@ -357,3 +374,4 @@ if __name__ == "__main__":
     trial(770, 450, 10)
     trial(420, 340, 3)
     trial(770, 450, 0, fixture_only=True)
+    trial(770, 450, 0, real_mount=True)

@@ -106,7 +106,7 @@ assert.strictEqual(p.parse(JSON.stringify(bad)),null);
     def test_explicit_save_and_existing_locks(self):
         view=(ROOT/"widgets/ForestW.qml").read_text()
         store=(ROOT/"services/forest/ForestPreferenceStore.qml").read_text()
-        self.assertIn("Component.onCompleted: if (!fixtureOnly) preferenceStore.load()",view)
+        self.assertIn("Component.onCompleted: {\n        if (!fixtureOnly) preferenceStore.load();",view)
         self.assertIn("function saveModelPreferences() {\n        if (fixtureOnly)\n            return false;",view)
         self.assertIn("function refreshLocalModelEvidence() {\n        if (fixtureOnly)\n            return false;",view)
         self.assertIn("onClicked: root.saveModelPreferences()",view)

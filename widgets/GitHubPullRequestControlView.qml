@@ -254,6 +254,12 @@ Rectangle {
         property string actionToken: ""
         property real loadingProgress: 0.0
         property bool loadingComplete: false
+        property string visualPhase: "idle"
+        property double visualClock: 0
+        property double lastPhaseEvidenceAt: 0
+        readonly property bool quietOperation: loading
+            && lastPhaseEvidenceAt > 0
+            && visualClock - lastPhaseEvidenceAt >= 8000
         readonly property bool loading:
             actionToken.length > 0
             && root.activeLifecycleAction === actionToken
@@ -264,6 +270,9 @@ Rectangle {
             if (loading) {
                 loadingComplete = false;
                 loadingProgress = 0.0;
+                visualPhase = "running";
+                lastPhaseEvidenceAt = Date.now();
+                visualClock = lastPhaseEvidenceAt;
                 progressSlow.restart();
                 progressFinish.stop();
                 progressReset.stop();
@@ -276,9 +285,27 @@ Rectangle {
                     progressFinish.restart();
                 } else {
                     loadingComplete = false;
-                    loadingProgress = 0.0;
+                    visualPhase = "failure";
+                    progressReset.restart();
                 }
             }
+        }
+
+        // GitHub CLI stdout is collected at completion; a stage transition
+        // is evidence, silence is only "no new evidence", not a failure.
+        Connections {
+            target: root.lifecycleService
+            ignoreUnknownSignals: true
+            function onPhaseChanged() {
+                if (button.loading)
+                    button.lastPhaseEvidenceAt = Date.now();
+            }
+        }
+        Timer {
+            interval: 400
+            repeat: true
+            running: button.loading && button.visible
+            onTriggered: button.visualClock = Date.now()
         }
 
         NumberAnimation {
@@ -296,7 +323,10 @@ Rectangle {
             property: "loadingProgress"
             to: 1.0
             duration: 260
-            onFinished: progressReset.restart()
+            onFinished: {
+                button.visualPhase = "success";
+                progressReset.restart();
+            }
         }
         Timer {
             id: progressReset
@@ -305,6 +335,7 @@ Rectangle {
             onTriggered: {
                 button.loadingComplete = false;
                 button.loadingProgress = 0.0;
+                button.visualPhase = "idle";
             }
         }
 
@@ -319,18 +350,24 @@ Rectangle {
         border.width: selectedAction ? 2 : 1
         border.color: selectedAction ? Colors.orange : accent
 
-        Rectangle {
-            id: progressFill
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+        Item {
+            id: progressSurface
+            anchors.fill: parent
             anchors.margins: 1
-            width: Math.max(0, (parent.width - 2) * button.loadingProgress)
-            visible: button.loading || button.loadingComplete
-                     || button.loadingProgress > 0
-            color: button.accent
-            opacity: 0.91
+            clip: true
             z: 1
+            visible: button.visualPhase !== "idle"
+            EnergyProgressFace {
+                anchors.fill: parent
+                variant: "omnitrix"
+                // The button owns its existing hue, not the animation.
+                energyColor: button.accent
+                chassisColor: button.accent
+                phase: button.visualPhase
+                progressMode: "timed"
+                progress: button.loadingProgress
+                activityMotionEnabled: !button.quietOperation
+            }
         }
 
         GohuText {

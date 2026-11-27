@@ -150,3 +150,24 @@ are still required. Source-only tests prove current HOLD before journal
 or transport and stale epoch refusal; existing fixture regressions prove
 unchanged offline lifecycle. No test claims real model invocation or
 native admission; do not activate by replacing the hold with a boolean.
+
+
+### Typed original correlation bridge
+
+RealLocalRequestBridge is the Runtime-owned in-process translation for
+UI1 ForestLocalRequestOwner and UI2 LocalConversationPresentation. Worker
+submit(model,prompt,epoch) returns HELD/REFUSED/UNKNOWN_HOLD or, only after
+original worker acceptance, {accepted:true,correlation:{token}}. The
+single lifetime never rearms on refusal or uncertainty. No native effect
+is enabled. Observe new view before submit and retire old before observing
+replacement. attach(correlation) is an explicit post-UI-attachment ACK;
+take(correlation) returns null until attach, otherwise original epoch,
+correlation and six-field snapshot, coalesced in the existing mailbox.
+stop/withdraw(correlation) return booleans, not provider settlement. STOP
+fences further provisional output, preserves original terminal outcome.
+The actual RealLocalDelivery still suppresses unadmitted native output.
+The future IPC owner must preserve one canonical JS correlation object,
+enforce byte bounds before decode and never derive admission from token
+or snapshot. No IPC/process launcher or host containment in this change.
+No inference, fake reply, new persistent store or grant. Tests use actual
+held host and a separate mocked translation-only control case.

@@ -117,9 +117,9 @@ test("master and per-action lock state is rendered with donor glyphs and exact-o
     assert.match(lock,/enabled: root.isProtected\s+&& root.controller.canChangeLock/);
     assert.match(recipient,/objectName: "cpuPlusProcessMasterLock"/);
     assert.match(recipient,/function canChangeLock\(row\)[\s\S]*?exactTargetAvailable[\s\S]*?!gate\.pending && !gate\.busy/);
-    assert.match(recipient,/appControlWindow\.taskDangerActionUnlockMode/);
-    assert.match(recipient,/appControlWindow\.toggleTaskDangerActionStickyUnlock/);
-    assert.match(recipient,/appControlWindow\.toggleTaskDangerStickyUnlock/);
+    assert.match(recipient,/collectionSource\.lockModeForIdentity/);
+    assert.match(recipient,/collectionSource\.toggleLockForIdentity/);
+    assert.doesNotMatch(recipient,/appControlWindow\.(taskDanger(?:Action(?:Local)?)?UnlockMode|toggleTaskDanger(?:Action)?StickyUnlock|toggleTaskDangerActionUnlock)/);
     assert.match(donorView,/property Item actionTarget: null/);
     assert.match(recipient,/actionTarget: leftActions/);
     assert.equal((donorView.match(/parent: taskManagerBody\.actionTarget \|\| taskManagerBody/g)||[]).length,1);
@@ -572,4 +572,52 @@ test("K3b: independent guarded gateway and presentation share service custody", 
     assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow.cpuBulkReview !== null\s*\|\| appControlWindow.hunterOperationPhase !== "idle"\s*\|\| appControlWindow.destructiveConfirmOpen/);
     assert.match(owner,/function onConfirmationRequested\([\s\S]*?appControlWindow.openDestructiveConfirm\(/);
     assert.match(read("widgets/appcontrol/AppControlHubActionGate.qml"),/KillBackend\.AppControlHubActionGate \{\}/);
+});
+
+test("K3c: service lock adapters reject stale, busy, bulk and unsupported requests", () => {
+    const store=read("services/kill/KillStore.qml");
+    const a=store.indexOf("    function lockModeForIdentity(");
+    const b=store.indexOf("    function snapshotCadence(",a);
+    assert.ok(a>=0 && b>a);
+    const row={pid:4321,startTicks:98765,comm:"sway"};
+    const calls=[];
+    const actionGate={
+        pending:null,busy:false,bulkBlocked:false,
+        exactRow:(pid,birth,name)=>pid===row.pid && birth===row.startTicks && name===row.comm ? row:null,
+        toggleOneShotUnlock:()=>{calls.push("master-once");return true;}
+    };
+    const safety={
+        requiresDangerUnlock:()=>true,
+        dangerUnlockMode:()=>"sticky",
+        dangerActionLocalUnlockMode:()=>"once",
+        dangerActionUnlockMode:()=>"sticky",
+        toggleDangerStickyUnlock:r=>calls.push(["master-sticky",r]),
+        toggleDangerActionStickyUnlock:(r,a)=>calls.push(["action-sticky",r,a]),
+        toggleDangerActionUnlock:(r,a)=>calls.push(["action-once",r,a])
+    };
+    const {lockModeForIdentity:mode,toggleLockForIdentity:toggle}
+        =new Function("actionGate","safety",store.slice(a,b)
+            +"\nreturn {lockModeForIdentity,toggleLockForIdentity};")(actionGate,safety);
+    const args=[row.pid,row.startTicks,row.comm];
+    assert.equal(mode(...args,"",false),"sticky");
+    assert.equal(mode(...args,"freeze",true),"once");
+    assert.equal(mode(...args,"freeze",false),"sticky");
+    assert.equal(mode(row.pid,row.startTicks+1,row.comm,"freeze",false),"");
+    assert.equal(toggle(row.pid,row.startTicks+1,row.comm,"freeze",true),false);
+    assert.equal(toggle(...args,"invalid",true),false);
+    assert.equal(toggle(...args,"freeze",null),false);
+    for(const flag of ["pending","busy","bulkBlocked"]) {
+        actionGate[flag]=true;
+        assert.equal(toggle(...args,"freeze",true),false);
+        actionGate[flag]=false;
+    }
+    safety.requiresDangerUnlock=()=>false;
+    assert.equal(toggle(...args,"freeze",true),false);
+    safety.requiresDangerUnlock=()=>true;
+    assert.deepEqual(calls,[]);
+    assert.equal(toggle(...args,"",false),true);
+    assert.equal(toggle(...args,"",true),true);
+    assert.equal(toggle(...args,"restart",true),true);
+    assert.equal(toggle(...args,"limit",false),true);
+    assert.deepEqual(calls,["master-once",["master-sticky",row],["action-sticky",row,"restart"],["action-once",row,"limit"]]);
 });

@@ -412,44 +412,27 @@ Item {
     }
 
     function lockMode(row, action) {
-        if (!row || !gate || !appControlWindow) return "";
-        const exact=gate.exactRow(Number(row.pid),Number(row.startTicks),String(row.comm || ""));
-        if (!exact) return "";
-        if (!action)
-            return appControlWindow.taskDangerUnlockMode
-                ? appControlWindow.taskDangerUnlockMode(exact) : "";
-        return appControlWindow.taskDangerActionUnlockMode
-            ? appControlWindow.taskDangerActionUnlockMode(exact,action) : "";
+        if (!row || !collectionSource || !gate) return "";
+        return collectionSource.lockModeForIdentity(Number(row.pid), Number(row.startTicks),
+            String(row.comm || ""), action || "", false);
     }
     function localLockMode(row, action) {
-        if (!row || !gate || !appControlWindow || !action) return "";
-        const exact=gate.exactRow(Number(row.pid),Number(row.startTicks),String(row.comm || ""));
-        return exact && appControlWindow.taskDangerActionLocalUnlockMode
-            ? appControlWindow.taskDangerActionLocalUnlockMode(exact,action) : "";
+        if (!row || !collectionSource || !gate || !action) return "";
+        return collectionSource.lockModeForIdentity(Number(row.pid), Number(row.startTicks),
+            String(row.comm || ""), action, true);
     }
     function canChangeLock(row) {
         return active && exactTargetAvailable && sameTarget(row)
-            && !!gate && !gate.pending && !gate.busy
+            && !!gate && !gate.pending && !gate.busy && !gate.bulkBlocked
             && !hasBulkReview && !bulkOperation
             && !appControlWindow.destructiveConfirmOpen && isProtected(row);
     }
     function toggleLock(row,action,sticky) {
-        if (!canChangeLock(row)) return false;
-        const exact=gate.exactRow(selectedPid,selectedStartTicks,selectedComm);
-        if (!exact) return false;
+        if (!canChangeLock(row) || !collectionSource) return false;
         if (!action && !sticky)
             return gate.toggleOneShotUnlock(selectedPid,selectedStartTicks,selectedComm);
-        // Reuse the existing shared owner's master/per-action runtime states.
-        // No new grant store; the existing action gate still verifies birth
-        // identity before a confirmed command. Sticky state is owner policy.
-        if (!action && sticky && appControlWindow.toggleTaskDangerStickyUnlock)
-            appControlWindow.toggleTaskDangerStickyUnlock(exact);
-        else if (action && sticky && appControlWindow.toggleTaskDangerActionStickyUnlock)
-            appControlWindow.toggleTaskDangerActionStickyUnlock(exact,action);
-        else if (action && !sticky && appControlWindow.toggleTaskDangerActionUnlock)
-            appControlWindow.toggleTaskDangerActionUnlock(exact,action);
-        else return false;
-        return true;
+        return collectionSource.toggleLockForIdentity(selectedPid,selectedStartTicks,
+            selectedComm,action || "",sticky);
     }
     onCurrentTaskChanged: {
         if (!currentTask && locallyPending) cancelOwned();

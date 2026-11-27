@@ -1388,3 +1388,52 @@ test("P2: process snapshot reads procfs I/O counters once with legacy first-key 
         fixture.rmSync(dir, {recursive:true,force:true});
     }
 });
+
+
+test("P6: process snapshot stat probe uses one awk while retaining CPU and birth fields", () => {
+    const telemetry=read("services/system/ProcessTelemetry.qml");
+    const os=require("node:os");
+    const fs=require("node:fs");
+    const cp=require("node:child_process");
+    const snapshot=telemetry.slice(telemetry.indexOf("    function refreshSnapshot() {"),
+        telemetry.indexOf("    function parseSnapshot(output) {"));
+    assert.match(snapshot,/stat_pair=\$\(awk/);
+    assert.doesNotMatch(snapshot,/stat_pair=\$\(sed/);
+    assert.ok(snapshot.includes('sub(/^[^)]*\\\\) /'),
+        "preserves the original sed prefix match, including the closing parenthesis");
+    assert.match(snapshot,/print \(\$12\+\$13\)/);
+    assert.match(snapshot,/\$20/);
+    assert.match(snapshot,/start=\$\{stat_pair#\* \}/);
+    const old="sed 's/^[^)]*) //' \"$1\" | awk '{print ($12+$13)\" \"$20}'";
+    const next="awk '{sub(/^[^)]*\\) /, \"\"); print ($12+$13)\" \"$20}' \"$1\"";
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),"cpuplus-pidstat-"));
+    try {
+        const base=Array.from({length:34},(_,i)=>String(i+2));
+        base[0]="S"; base[11]="1234"; base[12]="2026"; base[19]="7812345";
+        const cases=[
+            "123 (quickshell) "+base.join(" ")+"\n",
+            "55 (normal app name) "+base.join(" ")+"\n",
+            "77 (odd)rest) "+base.join(" ")+"\n",
+            "45 (name ) with spaces) "+base.join(" ")+"\n",
+            "444 (test) S 4 5 6\n",
+            "",
+        ];
+        const file=path.join(dir,"stat");
+        for(const content of cases){
+            fs.writeFileSync(file,content);
+            const run=cmd=>cp.spawnSync("/bin/sh",["-c",cmd,"_",file],{
+                encoding:"utf8",timeout:5000
+            });
+            const previous=run(old),current=run(next);
+            assert.equal(previous.status,0,previous.stderr);
+            assert.equal(current.status,0,current.stderr);
+            assert.equal(current.stdout,previous.stdout,
+                "CPU ticks and startTicks exactly match existing pipeline");
+        }
+        fs.writeFileSync(file,cases[0]);
+        const real=cp.spawnSync("/bin/sh",["-c",next,"_",file],{encoding:"utf8"});
+        assert.equal(real.stdout.trim(),"3260 7812345");
+    } finally {
+        fs.rmSync(dir,{recursive:true,force:true});
+    }
+});

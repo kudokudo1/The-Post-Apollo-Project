@@ -114,8 +114,10 @@ Scope {
             + "--sort=-pcpu | "
             + "while read -r pid rest; do "
             + "[ -n \"$pid\" ] || continue; "
-            + "stat_pair=$(sed 's/^[^)]*) //' /proc/$pid/stat 2>/dev/null "
-            + "| awk '{print ($12+$13)\" \"$20}'); "
+            // Preserve the same stat field extraction without a sed child
+            // and pipe for every PID in every live process snapshot.
+            + "stat_pair=$(awk '{sub(/^[^)]*\\) /, \"\"); "
+            + "print ($12+$13)\" \"$20}' /proc/$pid/stat 2>/dev/null); "
             + "ticks=${stat_pair%% *}; start=${stat_pair#* }; "
             // One read and one awk per PID instead of separate reads/processes
             // for the two I/O counters. Keep first-key semantics and the

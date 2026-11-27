@@ -672,7 +672,9 @@ test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results wi
     assert.match(store,/onFinished: hunterController\.finish\(\)/);
     assert.match(store,/onErrorRaised: function\(message\)/);
     assert.match(owner,/property: "donorHunterHost"\s*value: appControlWindow/);
-    assert.match(owner,/property: "donorHunterFavorites"\s*value: appControlWindow\.favoriteStore/);
+    assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
+    assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
+    assert.doesNotMatch(owner,/property: "donorHunterFavorites"/);
     assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!host \|\| !favoriteStoreObject\) return;/);
     assert.match(controller,/if \(!host \|\| !favoriteStoreObject\) \{ stopRemaining\(\); return; \}/);
     assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
@@ -699,4 +701,37 @@ test("K4a: donor and service share original bulk eligibility policy", () => {
     const owner=read("widgets/AppControlW.qml");
     assert.match(owner,/return KillBackend\.KillStore\.taskEligibleForKillAll\(entry\)/);
     assert.match(owner,/return KillBackend\.KillStore\.killAllEligibleTasks\(\)/);
+});
+
+test("K4b: Hunter uses canonical process identity and one Favorites singleton", () => {
+    const store=read("services/kill/KillStore.qml");
+    const controller=read("services/kill/HunterOperationController.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const js=read("services/favorites/FavoritesAppControlIdentityPolicy.js");
+    const policy=new Function(js.replace(/^\.pragma library\s*/,"")+"\nreturn {taskIdentity,taskKey};")();
+    assert.match(store,/import qs\.services\.favorites/);
+    assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
+    assert.match(owner,/readonly property var favoriteStore: FavoritesStore/);
+    assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
+    assert.doesNotMatch(store+owner,/donorHunterFavorites/);
+    assert.match(controller,/identity: FavoriteIdentity\.taskIdentity\(entry\)/);
+    assert.match(controller,/FavoriteIdentity\.taskIdentity\(row\) === target\.identity/);
+    assert.doesNotMatch(controller,/host\.taskPersistentIdentity/);
+    const a=store.indexOf("    function taskPersistentIdentity(");
+    const b=store.indexOf("    // Preserve the donor",a);
+    assert.ok(a>=0 && b>a);
+    const favorites={favoriteKeys:["task|brave","task|with%20space"]};
+    const api=new Function("FavoriteIdentity","favoriteStore",store.slice(a,b)
+        +"\nreturn {taskPersistentIdentity,isTaskFavorite};")(policy,favorites);
+    assert.equal(api.taskPersistentIdentity({comm:" Brave "}),"brave");
+    assert.equal(api.isTaskFavorite({comm:"BRAVE",pid:22}),true);
+    assert.equal(api.isTaskFavorite({comm:"BRAVE",pid:99}),true);
+    assert.equal(api.isTaskFavorite({comm:"With Space"}),true);
+    assert.equal(api.isTaskFavorite({args:"/usr/bin/brave --x"}),true);
+    assert.equal(api.isTaskFavorite({comm:"other"}),false);
+    assert.equal(api.isTaskFavorite({}),false);
+    favorites.favoriteKeys=[];
+    assert.equal(api.isTaskFavorite({comm:"brave"}),false);
+    favorites.favoriteKeys=null;
+    assert.equal(api.isTaskFavorite({comm:"brave"}),true);
 });

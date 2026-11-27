@@ -24,6 +24,7 @@ ShellRoot {
     QtObject { id: source12; property bool menuOpen: false }
     QtObject { id: source13; property bool menuOpen: false }
     QtObject { id: source14; property bool deckOpen: false }
+    DiagnosticDumpResourceCapture { id: resources }
     DiagnosticWidgetLifecycleAdapter {
         id: recorder
         sources: ({
@@ -91,6 +92,37 @@ ShellRoot {
                     "unselected ignored, cancellation bounded"))return;
                 recorder.blocked=true;
                 if(!root.check(!recorder.start(["git"],1000),"shared busy admission"))return;
+                recorder.blocked=false;
+                recorder.resourceCapture=resources;
+                if(!root.check(!resources.busy && CpuPlusDiagnostics.setLifecycleDuration(5) && CpuPlusDiagnostics.startLifecycleCapture() && resources.busy,"joint explicit start"))return;
+                root.phase=3;return;
+            }
+            if(root.phase===3){
+                if(recorder.observing) {
+                    const now=Date.now();
+                    const last=recorder.run.loop.lastOffsetMs;
+                    const elapsed=last===null?100:now-recorder.run.startedMs-last;
+                    if(elapsed>=100)recorder.loopTick(elapsed,now);
+                    return;
+                }
+                if(recorder.active){
+                    if(!root.check(!CpuPlusDiagnostics.request("threads") && !CpuPlusDiagnostics.startLifecycleCapture(),"drain lock"))return;
+                    return;
+                }
+                const r=recorder.report;
+                if(!root.check(r && r.status==="COMPLETE" && r.resource.status==="COMPLETE" && r.resource.evidence.pid===123
+                    && r.eventLoop.ticks>0 && !resources.busy,"joint completion evidence"))return;
+                if(!root.check(CpuPlusDiagnostics.startLifecycleCapture(),"joint second capture"))return;
+                root.phase=4;return;
+            }
+            if(root.phase===4){
+                if(!root.check(CpuPlusDiagnostics.cancelLifecycleCapture(),"joint cancel"))return;
+                root.phase=5;return;
+            }
+            if(root.phase===5){
+                if(recorder.active)return;
+                if(!root.check(recorder.report.status==="CANCELLED" && !resources.busy,"joint cancel terminal"))return;
+                console.log("CPU_Q5E_JOINT_PASS");
                 console.log("CPU_Q5_NATIVE_PASS");Qt.quit();
             }
         }

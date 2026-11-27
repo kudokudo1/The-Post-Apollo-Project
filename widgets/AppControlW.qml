@@ -1012,19 +1012,10 @@ PanelWindow {
         // The service's existing one-second detail cadence handles retries.
     }
 
-    TaskSafety {
-        id: taskSafety
-    }
-
-    ProcessControl {
-        id: processControl
-    }
-
-    ProcessLimits {
-        id: processLimits
-
-        onRefreshRequested: taskRefreshAfterKillTimer.restart()
-    }
+    // K3a: preserve all guarded callers; custody now lives in KillStore.
+    readonly property var taskSafety: KillBackend.KillStore.safety
+    readonly property var processControl: KillBackend.KillStore.control
+    readonly property var processLimits: KillBackend.KillStore.limits
 
     ProcessPresentationController {
         id: processPresentationController
@@ -1876,9 +1867,9 @@ PanelWindow {
     // KILL MODE / GLOBAL TASK ACTIONS
     // ============================================================
 
-    property alias taskSoftLimitPids: processLimits.softLimitPids
-    property alias taskLimitApplyLoading: processLimits.applyLoading
-    property alias taskLimitApplyError: processLimits.applyError
+    readonly property var taskSoftLimitPids: processLimits.softLimitPids
+    readonly property bool taskLimitApplyLoading: processLimits.applyLoading
+    readonly property string taskLimitApplyError: processLimits.applyError
 
     function taskProtectedFromKillAll(entry) {
         return taskSafety.protectedFromKillAll(entry);

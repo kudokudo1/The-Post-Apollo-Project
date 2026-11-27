@@ -533,3 +533,25 @@ test("K2d: sampler publishes without donor and retains ordering and immutable re
     assert.equal(state.taskMiniPreloadSnapshots,2);
     assert.deepEqual(sampler.rows,[]);
 });
+
+test("K3a: one shared runtime safety, mutation primitive and limit queue", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    for(const [type,prop,id] of [
+        ["TaskSafety","safety","safetyState"],
+        ["ProcessControl","control","controlBackend"],
+        ["ProcessLimits","limits","limitBackend"]
+    ]) {
+        assert.equal((store.match(new RegExp("^\\s*"+type+"\\s*\\{","gm"))||[]).length,1);
+        assert.match(store,new RegExp("readonly property var "+prop+": "+id));
+        assert.doesNotMatch(owner,new RegExp("^\\s*"+type+"\\s*\\{","m"));
+    }
+    assert.match(owner,/readonly property var taskSafety: KillBackend\.KillStore\.safety/);
+    assert.match(owner,/readonly property var processControl: KillBackend\.KillStore\.control/);
+    assert.match(owner,/readonly property var processLimits: KillBackend\.KillStore\.limits/);
+    assert.match(store,/ProcessLimits \{\s*id: limitBackend\s*onRefreshRequested: afterAction.restart\(\)/);
+    assert.match(owner,/safetyOwner: taskSafety/);
+    assert.match(owner,/controlOwner: processControl/);
+    assert.match(owner,/limitsOwner: processLimits/);
+    assert.match(owner,/bulkBlocked: appControlWindow.cpuBulkReview !== null/);
+});

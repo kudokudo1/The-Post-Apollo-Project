@@ -4,8 +4,9 @@ import QtQuick
 import Quickshell
 import "../system"
 
-// Authoritative runtime acquisition store. No widget dependency, persistence,
-// process mutation, or extra polling loop. Shell owns service admission;
+// Authoritative runtime KILL store. No widget dependency, persistence,
+// or extra polling loop. Mutation primitives retain existing guarded callers.
+// Shell owns service admission;
 // the original snapshot, mini and detail cadences live in this module.
 Scope {
     id: root
@@ -31,6 +32,19 @@ Scope {
         donorCombiVisible, histories.taskMiniPreloadSnapshots,
         histories.taskMiniPreloadTarget, hasTaskFavorites)
     readonly property var refreshAfterActionTimer: afterAction
+
+    // Single custody for existing runtime locks, process mutation primitives
+    // and the serialized limit queue. No policy or execution changes in K3a.
+    readonly property var safety: safetyState
+    readonly property var control: controlBackend
+    readonly property var limits: limitBackend
+
+    TaskSafety { id: safetyState }
+    ProcessControl { id: controlBackend }
+    ProcessLimits {
+        id: limitBackend
+        onRefreshRequested: afterAction.restart()
+    }
 
     function snapshotCadence(cpu, resource, kill, taskFavorites, combi,
                              preload, target, favorites) {

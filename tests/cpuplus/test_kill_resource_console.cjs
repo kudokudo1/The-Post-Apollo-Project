@@ -114,7 +114,7 @@ test("K8d3 places modes beside the primary instrument and actions above divider"
 test("K8d3 has a functional right-aligned information button directly below filters",()=>{
     const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
     assert.match(ui,/import "\.\.\/appcontrol"/);
-    assert.match(ui,/id: resourceInfoStrip[\s\S]*?anchors.top: resourceFilters.bottom/);
+    assert.match(ui,/id: headerContent[\s\S]*?id: resourceFilters[\s\S]*?id: resourceInfoStrip/);
     assert.match(ui,/id: resourceInformationButton[\s\S]*?anchors.right: parent.right/);
     assert.match(ui,/objectName: "cpuPlusResourceInformationButton"/);
     assert.match(ui,/onLeftClicked: root.informationOpen = !root.informationOpen/);
@@ -122,4 +122,35 @@ test("K8d3 has a functional right-aligned information button directly below filt
     assert.match(ui,/visible: root.informationOpen/);
     assert.match(ui,/anchors.top: resourceInfoStrip.bottom/);
     assert.match(ui,/APPLY REMAINS LOCKED UNTIL THE RESOURCE BACKEND IS VERIFIED/);
+});
+
+test("K8d4 fixed Favorites-style header separates metadata from control workspace",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    const header=ui.indexOf('id: resourceHeaderSection');
+    const filters=ui.indexOf('id: resourceFilters');
+    const info=ui.indexOf('id: resourceInfoStrip');
+    const body=ui.indexOf('id: bodyScroll');
+    const actions=ui.indexOf('id: draftActionsStrip');
+    const footer=ui.indexOf('id: footer');
+    assert.ok(header>0 && filters>header && info>filters && body>info
+        && actions>body && footer>actions);
+    const top=ui.slice(header,body);
+    assert.ok(top.includes('objectName: "cpuPlusResourceHeaderTitle"'));
+    assert.ok(top.includes('objectName: "cpuPlusResourceIdentityStatus"'));
+    assert.ok(top.includes('objectName: "cpuPlusResourceCategoryFilters"'));
+    assert.ok(top.includes('objectName: "cpuPlusResourceSelectedTitle"'));
+    assert.ok(top.includes('objectName: "cpuPlusResourceCapabilityStatus"'));
+    assert.ok(top.includes('objectName: "cpuPlusResourceInformationButton"'));
+    assert.ok(top.includes('objectName: "cpuPlusResourceHeaderDivider"'));
+    assert.ok(top.includes('height: headerContent.implicitHeight + 16'));
+    assert.ok(top.includes('color: Colors.red'));
+    const middle=ui.slice(body,actions);
+    assert.ok(middle.includes('anchors.top: resourceHeaderSection.bottom'));
+    assert.ok(middle.includes('id: resourcePanel'));
+    assert.ok(middle.includes('id: modeCluster'));
+    assert.ok(middle.includes('CpuPlusDiagnosticSlider {'));
+    assert.ok(!middle.includes('text: resourcePanel.spec.scope'));
+    assert.ok(!middle.includes('CAPABILITY AND WRITE PERMISSION // NOT VERIFIED'));
+    assert.ok(ui.slice(actions,footer).includes('objectName: "cpuPlusResourceWorkspaceActions"'));
+    assert.ok(ui.slice(footer).includes('APPLY LOCKED // UNVERIFIED'));
 });

@@ -43,4 +43,4 @@ jobs:
             GITHUB_ACTIONS="$GITHUB_ACTIONS" GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \
             GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
             /usr/bin/timeout --signal=TERM --kill-after=10s 720s \
-            /usr/bin/python3 -I -B tests/forest/first_light_stage1.py "$work" </dev/null
+            /usr/bin/python3 -I -B tests/forest/first_light_stage1_launcher.py --stage "$work" </dev/null

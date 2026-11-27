@@ -617,6 +617,10 @@ Scope {
     readonly property var graphController: graph
     readonly property var hunterPresentation: hunter
     readonly property var detailSession: selectedDetail
+    readonly property var cpuDetailSession: cpuSelectedDetail
+    readonly property var cpuGraphState: cpuHistories
+    readonly property var cpuGraphController: cpuGraph
+    readonly property var cpuDetailTelemetry: cpuDetailSampler
 
     ProcessPresentationState {
         id: histories
@@ -642,6 +646,37 @@ Scope {
         graph: root.graphController
         state: histories
         rows: root.rows
+        collectionAllowed: root.collectionEnabled
+    }
+
+    // Independent detail state; mini histories and lookup remain shared.
+    ProcessPresentationState {
+        id: cpuHistories
+        taskMiniHistoryKeepImmutable: histories.taskMiniHistoryKeepImmutable
+        taskMiniCpuHistories: histories.taskMiniCpuHistories
+        taskMiniHunterMetricHistories: histories.taskMiniHunterMetricHistories
+        taskMiniCpuIdentityHistories: histories.taskMiniCpuIdentityHistories
+        taskMiniHistoryRevision: histories.taskMiniHistoryRevision
+        taskMiniDisplayRevision: histories.taskMiniDisplayRevision
+        taskMiniPreloadSnapshots: histories.taskMiniPreloadSnapshots
+    }
+    HunterPresentation {
+        id: cpuHunter
+        presentationState: cpuHistories
+    }
+    TaskGraphController {
+        id: cpuGraph
+        presentationState: cpuHistories
+        telemetry: cpuDetailSampler
+        hunterPresentation: cpuHunter
+        sharedMiniController: graph
+    }
+    KillDetailSession {
+        id: cpuSelectedDetail
+        graph: cpuGraph
+        state: cpuHistories
+        rows: root.rows
+        collectionAllowed: root.collectionEnabled
     }
 
     // Publication never requires a widget. Transitional observers preserve
@@ -706,5 +741,10 @@ Scope {
         onSnapshotReady: function(rows) { root.publishSnapshot(rows); }
         onMiniProbeReady: function(rows) { root.publishMiniSamples(rows); }
         onDetailProbeReady: function(sample) { selectedDetail.accept(sample); }
+    }
+    ProcessTelemetry {
+        id: cpuDetailSampler
+        detailOnly: true
+        onDetailProbeReady: function(sample) { cpuSelectedDetail.accept(sample); }
     }
 }

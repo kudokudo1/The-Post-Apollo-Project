@@ -118,3 +118,35 @@ Regression uses the actual owner control and B2 loopback fake peer
 with deliberately blocked response, independent original STOP, local
 ABORTED/UNKNOWN_HOLD before peer release, one POST. Socket interruption
 does not establish real provider quiescence or resource settlement.
+
+
+## Real local P0 owner seam (source only; execution HOLD)
+
+Nurse #2161 7226638507, Runtime #7226719916, UI2 #7226727949.
+The existing single-input B1/M2/B3/R3 owner and latest-snapshot mailbox
+are factored into private shared bases, with the unchanged fixed test
+host retaining false native admission. RealLocalTrialHost has no injected
+test transport; its actual transport method uses B2 stream_chat with the
+original prepared request from #3143. No default shared provider endpoint;
+the future reviewed owner must supply a private local provider endpoint.
+The first candidate model/prompt/settings remain fixed as above, not
+qualified or approved. There is no callable grant, UI flag or environment
+override: stage/submit and the actual B2 invocation fail closed until
+the H9/H13 original admission implementation exists. No fake native
+admission can be projected to the real feed.
+
+Owner-worker interface: RealLocalDelivery(endpoint=None), observe(epoch)
+for every new positive safe-integer view (strictly increasing), observe(None)
+on disappearance; submit(model, exact_prompt, epoch) returns HELD or
+REFUSED now, no attach or draft consumption. The future accepted route
+uses the same single-input journal and R3 iterator; advance() is worker
+only and can block, never GUI thread. take(epoch) returns the existing
+TrialSnapshot six-field shape, only for current view; stop(epoch) is
+original contextual STOP; withdraw(epoch) requests original STOP then
+retires output, without promising provider settlement. close() is worker
+only. No new process, timer, sender wire or persistent store; future
+independent IPC/lifetime adapter and native-admission snapshot witness
+are still required. Source-only tests prove current HOLD before journal
+or transport and stale epoch refusal; existing fixture regressions prove
+unchanged offline lifecycle. No test claims real model invocation or
+native admission; do not activate by replacing the hold with a boolean.

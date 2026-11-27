@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import threading
 
-from first_light_trial_host import FirstLightTrialHost
+from first_light_trial_host import FirstLightTrialHost, RealLocalTrialHost, FirstLightRefusal
 from session_journal_v0 import MAX_BODY
 
 
@@ -30,7 +30,7 @@ class TrialSnapshot:
     native_admitted: bool = False
 
 
-class FirstLightDelivery:
+class _OwnerDelivery:
     """One trial, one original view, one bounded latest-snapshot mailbox.
 
     Worker constructs/submits/advances/closes; a view observer or consumer
@@ -39,9 +39,9 @@ class FirstLightDelivery:
     for this original lifetime, not STOP or worker cancellation.
     """
 
-    def __init__(self, *, test_transport):
+    def __init__(self, *, host):
         self._owner_thread = threading.current_thread()
-        self._host = FirstLightTrialHost(test_transport=test_transport)
+        self._host = host
         self._lock = threading.Lock()
         self._observed = None
         self._view = None
@@ -249,3 +249,105 @@ class FirstLightDelivery:
             return local
         finally:
             self._busy = False
+
+
+class FirstLightDelivery(_OwnerDelivery):
+    """Existing offline fixture, with unchanged methods and false admission."""
+    def __init__(self, *, test_transport):
+        super().__init__(host=FirstLightTrialHost(test_transport=test_transport))
+
+
+class RealLocalDelivery:
+    """Owner-worker seam for actual ForestW, not an executable IPC service.
+
+    Owner thread: submit, advance, close. Independent view/control thread:
+    observe, take, stop, withdraw. The GUI must never block on advance.
+    Epochs are local correlation, not authorization. Under current HOLD
+    submit returns HELD, retains the draft and never attaches a response.
+    No real native snapshot is emitted until the admission implementation
+    exists; fixture snapshots must never be relabeled as native.
+    """
+    def __init__(self, *, endpoint=None):
+        self._host = RealLocalTrialHost(endpoint=endpoint)
+        self._delivery = _OwnerDelivery(host=self._host)
+        self._view_lock = threading.Lock()
+        self._epoch = None
+        self._last_epoch = 0
+        self._view = None
+
+    @staticmethod
+    def _valid_epoch(epoch):
+        return type(epoch) is int and 0 < epoch <= 2**53 - 1
+
+    def observe(self, epoch):
+        """Each new view has a strictly increasing owner-observed epoch."""
+        with self._view_lock:
+            if epoch is not None and (not self._valid_epoch(epoch)
+                    or epoch <= self._last_epoch):
+                return False
+            if epoch is not None:
+                self._last_epoch = epoch
+            self._epoch = epoch
+            self._view = object() if epoch is not None else None
+            self._delivery.observe_view(self._view)
+            return True
+
+    def _current(self, epoch):
+        with self._view_lock:
+            if self._valid_epoch(epoch) and epoch == self._epoch:
+                return self._view
+            return None
+
+    def submit(self, model, prompt, epoch):
+        """Do not attach or clear draft unless original submission accepted."""
+        self._delivery._worker()
+        view = self._current(epoch)
+        if view is None:
+            return "REFUSED"
+        try:
+            self._host.stage_submission(model, prompt)
+        except FirstLightRefusal as exc:
+            return "HELD" if str(exc) == "NATIVE_ADMISSION_HOLD" else "REFUSED"
+        # No alternate sender, no simulated response. This is unreachable
+        # until independent admission and native snapshot release exist.
+        try:
+            self._delivery.submit(view, prompt)
+        except DeliveryRefusal:
+            return "REFUSED"
+        status, _ = self._delivery.owner_outcome()
+        return "ACCEPTED" if status == "PREPARED" else "HELD"
+
+    def advance(self):
+        self._delivery.advance()
+
+    def take(self, epoch):
+        view = self._current(epoch)
+        if view is None:
+            return None
+        snapshot = self._delivery.take(view)
+        # Never expose a fixture/non-admitted answer on the real path.
+        # Native admission projection remains an explicit future boundary.
+        if snapshot is not None and (snapshot.text or snapshot.status in
+                ("GENERATING", "LOCAL_COMMITTED")) and not snapshot.native_admitted:
+            self.withdraw(epoch)
+            return None
+        return snapshot
+
+    def stop(self, epoch):
+        view = self._current(epoch)
+        if view is None:
+            return "STOP_UNAVAILABLE"
+        return self._delivery.request_stop(view)
+
+    def withdraw(self, epoch):
+        with self._view_lock:
+            if not self._valid_epoch(epoch) or epoch != self._epoch:
+                return False
+            self._delivery.request_stop(self._view)
+            self._delivery.observe_view(None)
+            self._epoch = self._view = None
+            return True
+
+    def close(self):
+        self.observe(None)
+        return self._delivery.close()

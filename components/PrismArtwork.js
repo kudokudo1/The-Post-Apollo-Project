@@ -109,6 +109,8 @@ function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, bor
         data[at+2]=a>0?Math.round(clamp(p[2]/a)*255):0;
         data[at+3]=Math.round(clamp(a)*255);
     }
+    const center=(Math.floor(h/2)*w+Math.floor(w/2))*4;
+    console.info("PRISM_BUFFER_CENTER",data[center],data[center+1],data[center+2],data[center+3],data.length);
     ctx.clearRect(0,0,w,h);
     ctx.putImageData(image,0,0);
 }

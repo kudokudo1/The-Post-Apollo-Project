@@ -1,6 +1,7 @@
 import QtQuick
 import qs.services.diagnostics
 import "../../services/diagnostics/DiagnosticComparison.js" as Compare
+import "../../services/diagnostics/DiagnosticCalibration.js" as Calibration
 import "../../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as Policy
 import "../../components"
 
@@ -9,6 +10,8 @@ Column {
     id: root
     objectName: "cpuplusDiagnosticControls"
     property Item headerTarget: null
+    property string workshopSubject: "ALL"
+    function presetMatchesSubject(plan) { return Calibration.workshopPlanMatchesSubject(plan,workshopSubject); }
     property Item workshopFilterTarget: null
     readonly property string workshopTargetText: workshopLoader.item ? workshopLoader.item.targetText : ""
     property Item footerTarget: null
@@ -228,7 +231,7 @@ Column {
                 {kind: "census", label: "PROCESS CENSUS // 30s"},
                 {kind: "storage", label: "STORAGE OBSERVE // 30s"},
                 {kind: "appcontrol", label: "APPCONTROL // TEST 30s"}
-            ]
+            ].filter(row=>root.workshopSubject==="ALL" || Calibration.workshopSubjectKinds(root.workshopSubject).includes(row.kind))
             delegate: ActionButton {
                 required property var modelData
                 width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
@@ -267,6 +270,7 @@ Column {
         sourceComponent: CpuPlusDiagnosticWorkshop {
             viewportHeight: root.workshopViewportHeight
             filterTarget: root.workshopFilterTarget
+            subject: root.workshopSubject
         }
     }
     Column {
@@ -295,7 +299,7 @@ Column {
         GohuText {
             width: parent.width
             visible: presets.mixerPage==="LIBRARY"
-            text: "SAVE CURRENT CALIBRATION // LOAD OR + QUEUE"
+            text: "SAVE "+(root.workshopSubject==="ALL"?"CURRENT":root.workshopSubject)+" CALIBRATION // SHARED QUEUE"
             color: Colors.cyan
             font.pixelSize: 10
             wrapMode: Text.Wrap
@@ -337,7 +341,7 @@ Column {
                 normalFace: true
                 accentColor: Colors.omnitrix
                 available: !CpuPlusDiagnostics.workshopPresetLocked && presetName.text.length>0
-                onLeftClicked: if (CpuPlusDiagnostics.saveWorkshopPreset(presetName.text)) presetName.text=""
+                onLeftClicked: if (CpuPlusDiagnostics.saveWorkshopPreset(presetName.text,root.workshopSubject)) presetName.text=""
             }
         }
         GohuText {
@@ -379,9 +383,9 @@ Column {
                         label: "LOAD"
                         normalFace: true
                         accentColor: Colors.cyan
-                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        available: !CpuPlusDiagnostics.workshopPresetLocked && root.presetMatchesSubject(modelData.plan)
                         onLeftClicked: {
-                            if (CpuPlusDiagnostics.loadWorkshopPreset(modelData.name)) {
+                            if (CpuPlusDiagnostics.loadWorkshopPreset(modelData.name,root.workshopSubject)) {
                                 presets.deleteName=""; root.selectView("WORK");
                             }
                         }

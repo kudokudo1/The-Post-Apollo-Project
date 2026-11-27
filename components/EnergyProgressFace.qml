@@ -34,6 +34,13 @@ Item {
     readonly property bool animationActive: visible && !reducedMotion
         && (phase === "running" || (phase === "success" && elapsed < .84)
             || (variant==="ki-blast" && phase==="failure" && elapsed<1.08))
+    property real speedLevel: 0
+    property real speedFraction: 0
+    property real speedTime: 0
+    readonly property var flamePixels: variant==="flamethrower" && visualFrame.headVisible
+        ? PixelFire.fire(height,elapsed,reducedMotion,fireMode) : null
+    readonly property real flameTipOffset: flamePixels && flamePixels.cells.length
+        ? (Math.max(...flamePixels.cells.map(cell=>cell.x))+1)*flamePixels.unit : 0
     property real elapsed: 0
     property double startedAt: 0
     property real finishFrom: 0
@@ -51,6 +58,9 @@ Item {
         startedAt = Date.now();
         lastFraction = Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion, variant).fraction;
         if (materialExperiment && phase==="running" && progressMode==="indeterminate") materialPeak=lastFraction;
+        speedLevel=0;
+        speedFraction=lastFraction;
+        speedTime=elapsed;
         surface.requestPaint();
     }
     property real lastFraction: 0
@@ -62,6 +72,9 @@ Item {
     onVisibleChanged: {
         if (initialized && visible) {
             if (animationActive) elapsed = Math.max(0, (Date.now()-startedAt)/1000);
+            speedLevel=0;
+            speedFraction=displayedFraction;
+            speedTime=elapsed;
             surface.requestPaint();
         }
     }
@@ -95,6 +108,13 @@ Item {
             if (root.phase === "running") {
                 const next=Motion.frame(root.phase, root.progressMode, root.progress,
                     root.elapsed, root.finishFrom, root.reducedMotion, root.variant).fraction;
+                if(root.variant==="tron") {
+                    root.speedLevel=Flow.speedSample(root.speedFraction,next,
+                        root.elapsed-root.speedTime,root.speedLevel);
+                    root.speedFraction=next;
+                    root.speedTime=root.elapsed;
+                    surface.requestPaint();
+                }
                 if (root.materialExperiment && root.progressMode === "indeterminate")
                     root.materialPeak=Math.max(root.materialPeak,next);
                 root.lastFraction=root.materialExperiment && root.progressMode === "indeterminate"
@@ -144,7 +164,7 @@ Item {
                 // Emitted light, behind the opaque track. Cooled material remains dark.
                 function radiate(start,span,color,amount) {
                     if(span<=0 || amount<=0) return;
-                    const spread=h*.48;
+                    const spread=h*.70;
                     const g=c.createLinearGradient(0,y-spread,0,y+h+spread);
                     g.addColorStop(0,tint(color,0));
                     g.addColorStop(.19,tint(color,amount*.28));
@@ -154,7 +174,7 @@ Item {
                     g.addColorStop(1,tint(color,0));
                     c.fillStyle=g; c.fillRect(start,y-spread,span,h+2*spread);
                 }
-                if(f.headVisible && !material.experimental) radiate(x+1,inner*p,ink,ki?.36:hot?.23:tron?.14:.27);
+                if(f.headVisible && !material.experimental) radiate(x+1,inner*p,ink,ki?.47:hot?.34:tron?.25:.38);
                 // Heat escaping under the actual combustion front, before the
                 // material is drawn. Taper the footprint along the wake.
                 if(hot && f.headVisible && p>0) {
@@ -247,7 +267,7 @@ Item {
                 function current(start,span,side,color,alpha) {
                     if(span<1 || alpha<=0) return;
                     const rows=Flow.flow(root.variant,root.fireMode,side,span,h-2,
-                        root.elapsed,root.reducedMotion);
+                        root.elapsed,root.reducedMotion,root.speedLevel);
                     c.save();
                     c.beginPath(); c.rect(start,y+1,span,h-2); c.clip();
                     for(const line of rows) {
@@ -272,7 +292,7 @@ Item {
                 }
                 // Exterior air currents are attached to the TRON front.
                 if(tron && f.headVisible) {
-                    const air=Flow.airFlow(inner*p,h,root.elapsed,root.reducedMotion);
+                    const air=Flow.airFlow(inner*p,h,root.elapsed,root.reducedMotion,root.speedLevel);
                     for(const line of air) {
                         const left=edge+line.x, right=left+line.length, yy=mid+line.y;
                         const g=c.createLinearGradient(left,yy,right,yy);
@@ -298,10 +318,10 @@ Item {
                 // Crisp, animated pixel-fire underneath a translucent
                 // optical glow. Detached embers rise from the moving front.
                 if(hot && p>0) {
-                    const pixel=PixelFire.fire(h,root.elapsed,root.reducedMotion,root.fireMode);
+                    const pixel=root.flamePixels;
                     // Heat penetrates the material ahead of the flame.
                     // Keep the already eroded/ashed region unchanged.
-                    const contactWidth=Math.min(w-1-(edge-x),h*1.85);
+                    const contactWidth=Math.min(w-1-(edge-x),h*1.85+root.flameTipOffset);
                     if(contactWidth>0) {
                         c.save(); c.beginPath(); c.rect(edge,y+1,contactWidth,h-2); c.clip();
                         const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
@@ -317,6 +337,18 @@ Item {
                         }
                         c.restore();
                     }
+                    // Visible heat reflection above the opaque ash/material.
+                    // Anchor its hot end at the actual leading pixel, not
+                    // the midpoint of the elongated flame.
+                    const tip=edge+root.flameTipOffset;
+                    c.save(); c.translate(tip-h*.23,mid+h*.27);
+                    c.scale(h*1.85,h*1.20);
+                    const reflected=c.createRadialGradient(0,0,0,0,0,1);
+                    reflected.addColorStop(0,tint(Colors.orange,.48));
+                    reflected.addColorStop(.40,tint(Colors.orange,.30));
+                    reflected.addColorStop(.72,tint(Colors.red,.12));
+                    reflected.addColorStop(1,tint(Colors.red,0));
+                    c.fillStyle=reflected; c.fillRect(-1,-1,2,2); c.restore();
                     // Rocket exhaust: tapered back from the round head, hot
                     // inner core and softer outer plume. The material modes
                     // keep a shorter, localized combustion wake.
@@ -341,24 +373,13 @@ Item {
                         }
                     }
                     const heat=root.fireMode==="burn-away"?1:root.fireMode==="ash-trail"?.83:.90;
-                    // The light footprint is derived from the actual pixel
-                    // silhouette, including the tail origin. Three overlapping
-                    // emitters avoid a detached circular light sticker.
                     const u=pixel.unit;
-                    const left=Math.min(...pixel.cells.map(cell=>cell.x))*u;
-                    const right=(Math.max(...pixel.cells.map(cell=>cell.x))+1)*u;
-                    if(pixel.cells.length>0) {
-                        const span=right-left;
-                        for(let i=0;i<3;i++){
-                            const offset=left+span*(.17+i*.28);
-                            const near=.44+i*.28;
-                            orb(Math.max(h*.64,span*.42),h*(.78+i*.25),[
-                                [0,tint(Colors.yellow,.34*heat*near)],
-                                [.28,tint(Colors.orange,.36*heat*near)],
-                                [.66,tint(Colors.red,.17*heat*near)],
-                                [1,tint(Colors.red,0)]],edge+offset);
-                        }
-                    }
+                    // Hot forward emitter; the body remains a tapered
+                    // luminous trail rather than a second central sphere.
+                    orb(h*1.18,h*1.10,[[0,tint(Colors.yellow,.57*heat)],
+                        [.25,tint(Colors.orange,.46*heat)],
+                        [.58,tint(Colors.orange,.19*heat)],
+                        [1,tint(Colors.red,0)]],tip);
                     const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
                     for(const cell of pixel.cells) {
                         c.fillStyle=palette[cell.heat];
@@ -386,9 +407,7 @@ Item {
                     c.beginPath();
                     c.rect(edge-length,mid-h*1.1,length+h*.46,h*2.2);
                     c.clip();
-                    orb(h*.78, h*.90, [[0,tint(Colors.yellow,.58)],
-                        [.32,tint(Colors.orange,.38)],[.64,tint(Colors.red,.13)],
-                        [1,tint(Colors.red,0)]]);
+
                     for (let i=0;i<10;i++) {
                         const q=i/10;
                         const wave=.72*Math.sin(t*(4.2+i*.43)+i*2.1)+.28*Math.sin(t*2.1+i*.93);
@@ -486,9 +505,9 @@ Item {
                     // now a soft, low-opacity light layer, not a solid ball.
                     // Preserve hot pixels rather than painting a second
                     // solid orb over the flame. The broader light is below it.
-                    orb(h*.70,h*.69,[[0,tint(Colors.white,.20)],
-                        [.30,tint(Colors.yellow,.16)],[.61,tint(Colors.orange,.08)],
-                        [1,tint(ink,0)]],edge);
+                    orb(h*.65,h*.62,[[0,tint(Colors.white,.30)],
+                        [.30,tint(Colors.yellow,.21)],[.61,tint(Colors.orange,.10)],
+                        [1,tint(ink,0)]],edge+root.flameTipOffset);
                 } else {
                     orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
                         [0,tint(ink,Math.min(.98,.35*bright))],
@@ -497,7 +516,7 @@ Item {
                         [.38,mix(ink,Colors.white,Math.min(.98,.4*bright))],[.57,tint(ink,.84)],
                         [1,tint(ink,0)]]);
                 }
-                if (f.intensity>.08) {
+                if (!hot && f.intensity>.08) {
                     const flare=c.createLinearGradient(edge-rx*1.4,mid,edge+rx*1.4,mid);
                     flare.addColorStop(0,tint(ink,0));
                     flare.addColorStop(.5,tint(Colors.white,f.intensity*.8));

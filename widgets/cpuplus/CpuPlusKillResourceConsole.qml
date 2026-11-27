@@ -121,6 +121,9 @@ Item {
     function stageNumber(key,field,number) {
         if (!selectionReady) return;
         if (key==="cpu" && field==="quota") { stageQuota("budget",number); return; }
+        if (key==="disk" && (field==="read" || field==="write")) {
+            stageBandwidth(field,"budget",number); return;
+        }
         staged = Draft.stageValue(staged,key,field,number);
         reviewing = false;
     }
@@ -158,6 +161,16 @@ Item {
     function stageQuota(kind,percent) {
         if (!selectionReady || selectedKey!=="cpu" || modeFor("cpu")!=="manual") return;
         staged=Draft.stageQuota(staged,kind,percent,quotaMaximum);
+        reviewing=false;
+    }
+    function bandwidthChoice(direction) { return Draft.bandwidthChoice(staged,direction); }
+    function bandwidthPreview(direction) {
+        const choice=bandwidthChoice(direction);
+        return !choice || choice.kind==="uncapped" ? 64 : choice.mib;
+    }
+    function stageBandwidth(direction,kind,mib) {
+        if (!selectionReady || selectedKey!=="disk" || modeFor("disk")!=="manual") return;
+        staged=Draft.stageBandwidth(staged,direction,kind,mib);
         reviewing=false;
     }
     function accentFor(key) {
@@ -456,6 +469,8 @@ Item {
                                     width: detailContent.width
                                     readonly property bool priorityField: resourcePanel.key === "cpu" && modelData.key === "nice"
                                     readonly property bool quotaField: resourcePanel.key === "cpu" && modelData.key === "quota"
+                                    readonly property bool bandwidthField: resourcePanel.key==="disk" && (modelData.key==="read" || modelData.key==="write")
+                                    readonly property var bandwidth: bandwidthField ? root.bandwidthChoice(modelData.key) : null
                                     spacing: 3
                                     Row {
                                         id: instrumentRow
@@ -472,11 +487,12 @@ Item {
                                             title: field.modelData.title
                                             shortTitle: title
                                             readout: field.quotaField ? (root.quotaDraft.kind==="uncapped" ? "NO CAP" : root.quotaPreviewPercent()+"%")
+                                                : field.bandwidthField ? (field.bandwidth.kind==="uncapped" ? "NO CAP" : root.bandwidthPreview(field.modelData.key)+" MiB/s")
                                                 : String(root.valueFor(resourcePanel.key,field.modelData.key))+" "+field.modelData.unit
                                             minimumValue: field.modelData.min
                                             maximumValue: field.quotaField ? root.quotaMaximum : field.modelData.max
                                             valueStep: field.quotaField ? 1 : field.modelData.step
-                                            currentValue: field.quotaField ? root.quotaPreviewPercent() : root.valueFor(resourcePanel.key,field.modelData.key)
+                                            currentValue: field.quotaField ? root.quotaPreviewPercent() : field.bandwidthField ? root.bandwidthPreview(field.modelData.key) : root.valueFor(resourcePanel.key,field.modelData.key)
                                             subjectColor: resourcePanel.ink
                                             fillColor: resourcePanel.ink
                                             adjustable: root.selectionReady && root.modeFor(resourcePanel.key) === "manual"
@@ -602,12 +618,13 @@ Item {
                                             objectName: "cpuPlusDraftInput-" + resourcePanel.key + "-" + field.modelData.key
                                             width: 92
                                             height: 26
-                                            text: field.quotaField ? "" : field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            text: field.quotaField || field.bandwidthField ? "" : field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
                                             Binding {
                                                 target: exactField
                                                 property: "text"
-                                                value: root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent())
-                                                when: field.quotaField && !exactField.activeFocus
+                                                value: field.bandwidthField ? (field.bandwidth.kind==="uncapped" ? "" : String(root.bandwidthPreview(field.modelData.key)))
+                                                    : root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent())
+                                                when: (field.quotaField || field.bandwidthField) && !exactField.activeFocus
                                                 restoreMode: Binding.RestoreNone
                                             }
                                             property string editIdentity: ""
@@ -631,15 +648,58 @@ Item {
                                                 if (field.quotaField && acceptableInput && text.length>0
                                                         && editIdentity===root.targetIdentity)
                                                     root.stageQuota("budget",Number(text));
+                                                else if (field.bandwidthField && acceptableInput && text.length>0
+                                                        && editIdentity===root.targetIdentity)
+                                                    root.stageBandwidth(field.modelData.key,"budget",Number(text));
                                             }
                                             onEditingFinished: {
-                                                if (field.quotaField) return;
+                                                if (field.quotaField || field.bandwidthField) return;
                                                 if (acceptableInput)
                                                     root.stageNumber(resourcePanel.key,field.modelData.key,Number(text));
                                                 else
                                                     text = String(field.priorityField ? root.priorityValue() : root.valueFor(resourcePanel.key,field.modelData.key));
                                             }
                                         }
+                                    }
+                                    Row {
+                                        id: bandwidthChoices
+                                        visible: field.bandwidthField
+                                        width: field.width
+                                        height: visible ? 28 : 0
+                                        spacing: 3
+                                        Repeater {
+                                            model: field.bandwidthField ? [{key:"budget",label:"SET CAP"},{key:"uncapped",label:"NO CAP"},{key:"restore",label:"RESTORE"}] : []
+                                            delegate: ActionButton {
+                                                required property var modelData
+                                                objectName: "cpuPlusBandwidth-"+field.modelData.key+"-"+modelData.key
+                                                width: Math.max(1,(bandwidthChoices.width-2*bandwidthChoices.spacing)/3)
+                                                height: 28
+                                                label: modelData.label
+                                                labelPixelSize: 9
+                                                labelMinimumPixelSize: 7
+                                                normalFace: true
+                                                accentColor: Colors.blue
+                                                available: root.selectionReady && root.modeFor("disk")==="manual" && modelData.key!=="restore"
+                                                selected: field.bandwidthField && root.modeFor("disk")==="manual" && field.bandwidth.kind===modelData.key
+                                                onLeftClicked: {
+                                                    if (!available) return;
+                                                    if (modelData.key==="budget") root.stageBandwidth(field.modelData.key,"budget",root.bandwidthPreview(field.modelData.key));
+                                                    else if (modelData.key==="uncapped") root.stageBandwidth(field.modelData.key,"uncapped",0);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        visible: field.bandwidthField
+                                        height: visible ? implicitHeight : 0
+                                        text: !field.bandwidthField ? "" : field.bandwidth.kind==="preview"
+                                            ? "64 MiB/s // PREVIEW, NOT OBSERVED"
+                                            : field.bandwidth.kind==="uncapped" ? "DRAFT // NO LOCAL CAP"
+                                            : "DRAFT // "+field.bandwidth.mib+" MiB/s"
+                                        color: Colors.white
+                                        font.pixelSize: 9
+                                        wrapMode: Text.Wrap
                                     }
                                     Row {
                                         id: quotaChoices

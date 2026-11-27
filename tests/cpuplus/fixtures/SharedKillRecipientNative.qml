@@ -576,6 +576,34 @@ ShellRoot {
                 if (!smoke.check(bestClass.selected && ioDial.interactive
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "best effort reenables dial without dispatch")) return;
+                const readSlider=smoke.find(view,"cpuPlusDraftSlider-disk-read");
+                const writeSlider=smoke.find(view,"cpuPlusDraftSlider-disk-write");
+                const readMax=smoke.find(view,"cpuPlusBandwidth-read-uncapped");
+                const writeMax=smoke.find(view,"cpuPlusBandwidth-write-uncapped");
+                const readRestore=smoke.find(view,"cpuPlusBandwidth-read-restore");
+                const writeRestore=smoke.find(view,"cpuPlusBandwidth-write-restore");
+                if (!smoke.check(readSlider && writeSlider && readMax && writeMax && readRestore && writeRestore
+                        && !readRestore.available && !writeRestore.available
+                        && consolePane.bandwidthChoice("read").kind==="preview"
+                        && consolePane.bandwidthChoice("write").kind==="preview",
+                        "both disk rate controls open with unstaged previews and locked restore")) return;
+                readSlider.valueRequested(73);
+                if (!smoke.check(consolePane.bandwidthChoice("read").mib===73
+                        && consolePane.bandwidthChoice("write").kind==="preview"
+                        && !consolePane.reviewLines[0].includes("WRITE DRAFT"),
+                        "read slider stages only read bandwidth")) return;
+                writeSlider.valueRequested(27);
+                readMax.leftClicked(null);
+                if (!smoke.check(readMax.selected && consolePane.bandwidthChoice("read").kind==="uncapped"
+                        && consolePane.bandwidthChoice("write").mib===27
+                        && consolePane.reviewLines[0].includes("rbps=max")
+                        && consolePane.reviewLines[0].includes("WRITE DRAFT 27")
+                        && bestClass.selected,"uncapping read leaves write and priority unchanged")) return;
+                writeMax.leftClicked(null);
+                if (!smoke.check(writeMax.selected && readMax.selected
+                        && consolePane.reviewLines[0].includes("wbps=max")
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0
+                        && !applyLocked.available,"both directions remain draft only")) return;
                 clearDraft.leftClicked(null);
                 memoryFilter.leftClicked(null);
                 const memorySlider=smoke.find(view,"cpuPlusSharedMemorySlider");

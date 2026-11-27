@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap,quotaChoice,quotaRange,stageQuota};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap,quotaChoice,quotaRange,stageQuota,bandwidthChoice,stageBandwidth};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
@@ -344,4 +344,39 @@ test("K8e6 CPU quota is explicit multi-CPU time, never implicit affinity or prio
     assert.ok(ui.includes('objectName: "cpuPlusQuotaChoice-"'));
     assert.ok(ui.includes('GROUP CAPACITY UNVERIFIED // RESTORE LOCKED'));
     assert.ok(ui.includes('maximumValue: field.quotaField ? root.quotaMaximum'));
+});
+
+test("K8e7 read/write cap intents are independent of each other and I/O priority",()=>{
+    const empty={};
+    assert.equal(draft.summary(empty).length,0);
+    assert.deepEqual(draft.bandwidthChoice(empty,"read"),{kind:"preview",mib:64});
+    assert.deepEqual(draft.bandwidthChoice(empty,"write"),{kind:"preview",mib:64});
+    for (const v of [0,-1,513,1.5,NaN,"32"])
+        assert.equal(draft.stageBandwidth(empty,"read","budget",v),empty);
+    assert.equal(draft.stageBandwidth(empty,"read","restore",64),empty);
+    assert.equal(draft.stageBandwidth(empty,"wrong","budget",64),empty);
+    const read=draft.stageBandwidth(empty,"read","budget",73);
+    assert.ok(draft.summary(read)[0].includes("READ DRAFT 73 MiB/s"));
+    assert.ok(!draft.summary(read)[0].includes("WRITE DRAFT"));
+    assert.ok(!draft.summary(read)[0].includes("I/O PRIORITY"));
+    const write=draft.stageBandwidth(read,"write","budget",27);
+    const priority=draft.stageIoPriority(write,"idle",0);
+    const max=draft.stageBandwidth(priority,"read","uncapped",0);
+    assert.deepEqual(draft.bandwidthChoice(max,"read"),{kind:"uncapped"});
+    assert.equal(draft.hasValue(max,"disk","read"),false);
+    assert.deepEqual(draft.bandwidthChoice(max,"write"),{kind:"budget",mib:27});
+    assert.deepEqual(draft.ioPriority(max),{kind:"idle"});
+    assert.ok(draft.summary(max)[0].includes("READ NO CAP // rbps=max"));
+    assert.ok(draft.summary(max)[0].includes("WRITE DRAFT 27"));
+    assert.ok(!draft.summary(max)[0].includes("READ DRAFT"));
+    const both=draft.stageBandwidth(max,"write","uncapped",0);
+    assert.ok(draft.summary(both)[0].includes("WRITE NO CAP // wbps=max"));
+    const again=draft.stageBandwidth(both,"read","budget",11);
+    assert.deepEqual(draft.bandwidthChoice(again,"read"),{kind:"budget",mib:11});
+    assert.deepEqual(draft.bandwidthChoice(again,"write"),{kind:"uncapped"});
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes('objectName: "cpuPlusBandwidth-"+field.modelData.key+"-"+modelData.key'));
+    assert.ok(ui.includes('root.stageBandwidth(field.modelData.key,"budget",Number(text))'));
+    assert.ok(ui.includes('if (field.quotaField || field.bandwidthField) return;'));
+    assert.ok(ui.includes('64 MiB/s // PREVIEW, NOT OBSERVED'));
 });

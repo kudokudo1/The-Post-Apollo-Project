@@ -342,6 +342,90 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual([row["body"] for row in turns],
                          ["Help with a test", "Newer request"])
 
+    def test_r7j_distinct_trigger_still_blocked_by_live_session_reservation(self):
+        # Existing B3 behavior, not a group queue or a new admission grant.
+        # A different durable trigger avoids the per-user-turn unique key,
+        # but the original RESERVED attempt still occupies the session slot.
+        sid = self.new_session()
+        original_trigger = self.store.turns("owner_a", sid)[0]["turn_id"]
+        first = self.exchange(sid)
+        original = next(first)["attempt_id"]
+        second_db = sqlite3.connect(self.path, timeout=2)
+        try:
+            other = journal.ForestSessionJournal(second_db)
+            other_calls = []
+
+            def second_stream(**kwargs):
+                other_calls.append(kwargs)
+                yield from standard_stream(**kwargs)
+
+            bridge = b3.ForestTurnBridge(
+                other, clock_ms=lambda: 203, streamer=second_stream)
+            new = other.append_turn(
+                "owner_a", sid, expected_revision=1, role="user",
+                body="Independent later trigger", now_ms=201)
+            self.assertNotEqual(new["turn_id"], original_trigger)
+            with self.assertRaisesRegex(b3.BridgeRefusal, "ATTEMPT_ALREADY_EXISTS"):
+                list(bridge.exchange(owner="owner_a", session_id=sid,
+                                     expected_revision=2, model="other-model"))
+            self.assertEqual(other_calls, [])
+            self.assertEqual(second_db.execute(
+                "SELECT attempt_id,user_turn_id,status FROM forest_attempts_b3 "
+                "WHERE session_id=?", (sid,)).fetchall(),
+                [(original, original_trigger, "RESERVED")])
+            first.close()
+            self.assertEqual(self.requests, [])
+            self.assertEqual(list(bridge.exchange(
+                owner="owner_a", session_id=sid, expected_revision=2,
+                model="other-model"))[-1]["event"], "COMMITTED")
+            self.assertEqual(len(other_calls), 1)
+            self.assertEqual(second_db.execute(
+                "SELECT user_turn_id,status FROM forest_attempts_b3 "
+                "WHERE session_id=? ORDER BY created_at_ms", (sid,)).fetchall(),
+                [(original_trigger, "ABORTED"), (new["turn_id"], "COMMITTED")])
+            self.assertEqual(other.session("owner_a", sid)["revision"], 3)
+        finally:
+            first.close()
+            second_db.close()
+
+    def test_r7j_intervening_assistant_append_does_not_settle_original_attempt(self):
+        # B1 can append an assistant row without B3's attempt identity.
+        # It is a disposable legacy row, NOT an authenticated peer message.
+        sid = self.new_session()
+        first = self.exchange(sid)
+        original = next(first)["attempt_id"]
+        self.assertEqual(next(first)["event"], "STARTED")
+        self.assertEqual(next(first)["event"], "DELTA")
+        second_db = sqlite3.connect(self.path, timeout=2)
+        try:
+            other = journal.ForestSessionJournal(second_db)
+            row = other.append_turn(
+                "owner_a", sid, expected_revision=1, role="assistant",
+                body="Independent legacy append", provider="ollama",
+                model="other-model", now_ms=201)
+            self.assertEqual(second_db.execute(
+                "SELECT attempt_id,status,reply_turn_id FROM forest_attempts_b3 "
+                "WHERE session_id=?", (sid,)).fetchall(),
+                [(original, "RESERVED", None)])
+            self.now = 202
+            with self.assertRaisesRegex(b3.BridgeRefusal, "STALE_OR_CLOSED_SESSION"):
+                list(first)
+            self.assertEqual(second_db.execute(
+                "SELECT attempt_id,status,reply_turn_id FROM forest_attempts_b3 "
+                "WHERE session_id=?", (sid,)).fetchall(),
+                [(original, "ABORTED", None)])
+            self.assertEqual(other.session("owner_a", sid)["revision"], 2)
+            turns = other.turns("owner_a", sid)
+            self.assertEqual(len(turns), 2)
+            self.assertEqual(turns[-1]["turn_id"], row["turn_id"])
+            self.assertEqual(turns[-1]["body"], "Independent legacy append")
+            with self.assertRaisesRegex(b3.BridgeRefusal, "USER_TURN_REQUIRED"):
+                list(self.exchange(sid, revision=2))
+            self.assertEqual(len(self.requests), 1)
+        finally:
+            first.close()
+            second_db.close()
+
     def test_paused_session_rejected_before_model_invocation(self):
         sid = self.new_session()
         self.store.set_state(

@@ -2,7 +2,7 @@
 function cards() {
     return [
         {key:"cpu",title:"CPU",scope:"PRIORITY / LEADER THREAD; QUOTA / GROUP",controls:[
-            {key:"quota",title:"QUOTA DRAFT",min:10,max:100,step:5,unit:"% OF ONE CPU",initial:75},
+            {key:"quota",title:"QUOTA DRAFT",min:1,max:409600,step:1,unit:"% OF ONE CPU",initial:75},
             {key:"nice",title:"PRIORITY / NICE",min:-20,max:19,step:1,unit:"NICE",initial:0}
         ],note:"AFFINITY // CURRENT LEADER MASK ONLY; EXPANSION UNVERIFIED"},
         {key:"memory",title:"MEMORY",scope:"RLIMIT_AS / VIRTUAL ADDRESS SPACE",controls:[
@@ -61,6 +61,7 @@ function stageMode(previous,key,mode) {
 }
 function stageValue(previous,key,field,value) {
     if(key==="swap"&&field==="budget") return stageSwap(previous,"budget",value);
+    if(key==="cpu"&&field==="quota") return stageQuota(previous,"budget",value,100);
     var spec=find(key);
     if(!spec) return previous;
     var control=null;
@@ -157,6 +158,31 @@ function stageSwap(previous,kind,mib) {
     result.swap={mode:"manual",values:values};
     return result;
 }
+// Range is a planning reference derived from the observed leader mask,
+ // never a claim about cgroup capacity or write permission.
+function quotaChoice(previous) {
+    var entry=previous.cpu, values=entry&&entry.values;
+    if(values&&values.quotaKind==="uncapped") return {kind:"uncapped"};
+    if(values&&Number.isSafeInteger(values.quota)) return {kind:"budget",percent:values.quota};
+    return {kind:"preview",percent:75};
+}
+function quotaRange(previous,allowed) {
+    var count=Array.isArray(allowed)?Math.min(4096,allowed.length):0;
+    var choice=quotaChoice(previous);
+    return Math.max(100,count*100,choice.kind==="budget"?choice.percent:0);
+}
+function stageQuota(previous,kind,percent,maximum) {
+    if(kind!=="budget"&&kind!=="uncapped") return previous;
+    if(kind==="budget"&&(!Number.isSafeInteger(maximum)||maximum<100||maximum>409600
+        ||!Number.isSafeInteger(percent)||percent<1||percent>maximum)) return previous;
+    var result=Object.assign({},previous);
+    var entry=previous.cpu||{mode:"manual",values:{}};
+    var values=Object.assign({},entry.values,{quotaKind:kind});
+    if(kind==="budget") values.quota=percent;
+    else delete values.quota;
+    result.cpu={mode:"manual",values:values};
+    return result;
+}
 function summary(previous) {
     var lines=[];
     var rows=cards();
@@ -173,6 +199,7 @@ function summary(previous) {
                 if(spec.key==="swap"||((spec.key==="cpu"||spec.key==="disk")&&!hasValue(previous,spec.key,c.key))) continue;
                 fields.push(c.title+" "+value(previous,spec.key,c.key)+" "+c.unit);
             }
+            if(spec.key==="cpu"&&quotaChoice(previous).kind==="uncapped") fields.push("CPU QUOTA NO CAP // cpu.max=max");
             if(spec.key==="cpu"&&hasValue(previous,"cpu","affinity")) fields.push("AFFINITY "+entry.values.affinity.join(","));
             if(spec.key==="disk"&&hasValue(previous,"disk","ioPriority")) {
                 var p=entry.values.ioPriority;

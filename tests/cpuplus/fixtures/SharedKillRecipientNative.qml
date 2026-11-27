@@ -513,6 +513,26 @@ ShellRoot {
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "draft input never dispatches a process action")) return;
+                const quotaOne=smoke.find(view,"cpuPlusQuotaChoice-one");
+                const quotaMax=smoke.find(view,"cpuPlusQuotaChoice-uncapped");
+                const quotaRestore=smoke.find(view,"cpuPlusQuotaChoice-restore");
+                if (!smoke.check(quotaOne && quotaMax && quotaRestore && !quotaRestore.available
+                        && primarySlider.maximumValue===300 && consolePane.quotaDraft.kind==="preview",
+                        "quota reference uses three observed sparse CPU IDs; no implicit quota")) return;
+                primarySlider.valueRequested(237);
+                if (!smoke.check(consolePane.quotaDraft.percent===237
+                        && consolePane.reviewLines[0].includes("237 % OF ONE CPU")
+                        && consolePane.reviewLines[0].includes("NICE 9")
+                        && consolePane.reviewLines[0].includes("AFFINITY 0,2,8"),
+                        "multi-CPU quota draft preserves priority and affinity")) return;
+                quotaMax.leftClicked(null);
+                if (!smoke.check(quotaMax.selected && consolePane.quotaDraft.kind==="uncapped"
+                        && consolePane.reviewLines[0].includes("cpu.max=max") && !applyLocked.available,
+                        "uncapped quota separate from restore and locked apply")) return;
+                quotaOne.leftClicked(null);
+                if (!smoke.check(quotaOne.selected && consolePane.quotaDraft.percent===100
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "one CPU time budget is a draft only")) return;
                 // Fire the actual filter button signal, not the root helper,
                 // to verify the same handler a pointer press reaches.
                 netFilter.leftClicked(null);

@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority,swapChoice,stageSwap,quotaChoice,quotaRange,stageQuota};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
@@ -22,7 +22,8 @@ test("K8d exact process identity and draft-only mode/value validation",()=>{
     assert.equal(draft.stageMode(values,"cpu","nonsense"),values);
     values=draft.stageMode(values,"cpu","manual");
     assert.equal(draft.mode(values,"cpu"),"manual");
-    values=draft.stageValue(values,"cpu","quota",999);
+    assert.equal(draft.stageValue(values,"cpu","quota",999),values);
+    values=draft.stageValue(values,"cpu","quota",100);
     assert.equal(draft.value(values,"cpu","quota"),100);
     values=draft.stageValue(values,"cpu","nice",-999);
     assert.equal(draft.value(values,"cpu","nice"),-20);
@@ -312,4 +313,35 @@ test("K8e5 swap finite zero, max and restoration have separate semantics",()=>{
     assert.ok(ui.includes('modelData.key!=="restore"'));
     assert.ok(ui.includes('editIdentity===root.targetIdentity'));
     assert.ok(ui.includes('NO CAP IS NOT RESTORE'));
+});
+
+test("K8e6 CPU quota is explicit multi-CPU time, never implicit affinity or priority",()=>{
+    const empty={};
+    assert.deepEqual(draft.quotaChoice(empty),{kind:"preview",percent:75});
+    assert.equal(draft.quotaRange(empty,[]),100);
+    assert.equal(draft.quotaRange(empty,[0,2,8]),300);
+    assert.equal(draft.summary(empty).length,0);
+    for(const value of [0,-1,301,1.5,NaN,"150"])
+        assert.equal(draft.stageQuota(empty,"budget",value,300),empty);
+    assert.equal(draft.stageQuota(empty,"restore",100,300),empty);
+    const q=draft.stageQuota(empty,"budget",237,300);
+    assert.deepEqual(draft.quotaChoice(q),{kind:"budget",percent:237});
+    assert.ok(draft.summary(q)[0].includes("237 % OF ONE CPU"));
+    assert.ok(!draft.hasValue(q,"cpu","nice"));
+    assert.ok(!draft.hasValue(q,"cpu","affinity"));
+    assert.equal(draft.quotaRange(q,[0]),237);
+    const priority=draft.stagePriorityPreset(q,"background");
+    const max=draft.stageQuota(priority,"uncapped",0,300);
+    assert.deepEqual(draft.quotaChoice(max),{kind:"uncapped"});
+    assert.equal(draft.hasValue(max,"cpu","quota"),false);
+    assert.equal(draft.value(max,"cpu","nice"),10);
+    assert.ok(draft.summary(max)[0].includes("cpu.max=max"));
+    assert.ok(!draft.summary(max)[0].includes("QUOTA DRAFT 75"));
+    const again=draft.stageQuota(max,"budget",100,300);
+    assert.deepEqual(draft.quotaChoice(again),{kind:"budget",percent:100});
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes("Draft.quotaRange(staged,allowedCpuIds)"));
+    assert.ok(ui.includes('objectName: "cpuPlusQuotaChoice-"'));
+    assert.ok(ui.includes('GROUP CAPACITY UNVERIFIED // RESTORE LOCKED'));
+    assert.ok(ui.includes('maximumValue: field.quotaField ? root.quotaMaximum'));
 });

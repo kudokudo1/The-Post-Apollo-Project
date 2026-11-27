@@ -3383,7 +3383,7 @@ PanelWindow {
         z: 1200
         active: cpuPlusWindow.menuOpen
                 && cpuPlusWindow.selectedModeIndex === 1
-                && !!cpuPlusWindow.appControlWindow
+                && KillBackend.KillStore.collectionEnabled
         visible: active
         sourceComponent: CpuPlusKillWorkspace {
             graphSource: KillBackend.KillStore.graphState
@@ -3392,7 +3392,6 @@ PanelWindow {
             collectionSource: KillBackend.KillStore
             instrumentWidth: sharedInstrumentPane.width
             targetWidth: targetPane.width
-            appControlWindow: cpuPlusWindow.appControlWindow
             active: cpuPlusWindow.menuOpen
                     && cpuPlusWindow.selectedModeIndex === 1
         }

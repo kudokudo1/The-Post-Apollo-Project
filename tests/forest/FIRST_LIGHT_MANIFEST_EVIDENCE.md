@@ -26,8 +26,9 @@ the specific method and future execution separately.
 ## Offline evidence module
 
 `first_light_manifest_evidence.classify(raw)` accepts bytes only, checks
-the existing pin and cap, rejects duplicate JSON keys/nonstandard
-constants, and invokes the unchanged strict Stage 1 parser to report
+the existing pin and cap, rejects duplicate JSON keys, nonstandard
+constants and exponent overflow to nonfinite floats before invoking
+the unchanged strict Stage 1 parser to report
 its fixed first refusal category. Its independent observation of a
 bounded config and up to 16 layers reports only fixed role labels,
 required-key presence, counts of unknown keys, from/name value-type
@@ -42,7 +43,9 @@ string is emitted. This is classification, not a policy relaxation.
 Tests exercise synthetic bytes with patched fixture SHA only, pin-first
 refusal before JSON, optional/unknown fields including urls, unknown
 media, strict parser refusal, invalid sizes/digests, aggregate cap,
-duplicate keys, shape/size limits and no file/network I/O. The offline
+duplicate keys, explicit nonfinite literals and exponent overflow (including
+nested metadata), finite noninteger refusal, shape/size limits and no
+file/network I/O. The offline
 workflow executes only these synthetic tests. Actual pinned bytes are
 not available; no evidence of exact rejected field or manifest role
 structure yet. Future actual evidence adapter must be separately

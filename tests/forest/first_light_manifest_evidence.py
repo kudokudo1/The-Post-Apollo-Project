@@ -4,6 +4,7 @@ No CLI, network adapter, acquisition, file I/O or policy change. Output is
 bounded fixed categories and aggregate integers, not raw descriptor data.
 """
 import json
+import math
 
 import first_light_stage1 as stage
 
@@ -31,6 +32,15 @@ def _reject_constant(_):
     raise stage.Hold("MANIFEST_JSON")
 
 
+def _finite_float(token):
+    # JSON exponent syntax can overflow even when parse_constant rejects
+    # explicit NaN/Infinity literals. Never admit a nonfinite value.
+    value = float(token)
+    if not math.isfinite(value):
+        raise stage.Hold("MANIFEST_JSON")
+    return value
+
+
 def _metadata_kind(entry, key):
     if key not in entry:
         return "ABSENT"
@@ -49,7 +59,7 @@ def classify(raw):
                   "MANIFEST_DIGEST")
     try:
         obj = json.loads(raw, object_pairs_hook=stage.unique_pairs,
-                         parse_constant=_reject_constant)
+                         parse_constant=_reject_constant, parse_float=_finite_float)
     except stage.Hold as exc:
         if str(exc) == "DUPLICATE_JSON_KEY":
             raise stage.Hold("DUPLICATE_JSON_KEY") from None

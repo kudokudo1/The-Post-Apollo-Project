@@ -6,6 +6,7 @@ import "DiagnosticWorkflowCatalog.js" as Catalog
 import "DiagnosticCalibration.js" as Calibration
 import "DiagnosticTargetRegistry.js" as Targets
 import "DiagnosticWorkflowReceipt.js" as Receipt
+import "DiagnosticWidgetLifecycle.js" as Lifecycle
 
 // Single catalog transport. Owner mounts once, loads explicitly on demand.
 // A successful storage receipt is required before publishing edits.
@@ -27,7 +28,8 @@ Scope {
     property bool exitOk: false
     signal completed(string outcome)
     function calibration() {
-        return {workshopDraftFromPlan:plan=>Calibration.workshopDraftFromPlan(plan),
+        return {dumpSelectionValid:ids=>Lifecycle.validSelection(ids),
+                workshopDraftFromPlan:plan=>Calibration.workshopDraftFromPlan(plan),
                 workshopPlanFromDraft:draft=>Calibration.workshopPlanFromDraft(draft),
                 targetCompatible:(id,plan)=>Targets.targetPlanCompatibility(id,plan,{
                     workshopDraftFromPlan:p=>Calibration.workshopDraftFromPlan(p),

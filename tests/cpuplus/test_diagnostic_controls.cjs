@@ -854,3 +854,8 @@ assert.match(owner,/DUMP \/\/ QUEUE NOT SUPPORTED/);
 assert.match(ui,/POST-APOLLO DUMP \/\/ /);
 assert.match(workshop,/function openLifecycleDump\(\)/);
 assert.match(read("widgets/cpuplus/CpuPlusLifecycleDumpPopup.qml"),/Receipt.sameValue\(r.plan,root.pendingPlan\)/);
+
+assert.match(owner,/function publishLifecycleReport\(result\)/);
+assert.match(owner,/archive.invoke\(\{action:"save",record:Object.assign\(\{kind:"dump"\},record\)\}\)/);
+assert.match(ui,/objectName: "cpuplusDumpReport"/);
+assert.match(ui,/objectName: "cpuplusDumpEvidence"/);

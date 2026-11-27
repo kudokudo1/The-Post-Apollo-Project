@@ -2,6 +2,7 @@ import QtQuick
 import "EnergyProgressMotion.js" as Motion
 import "EnergyVariantProfile.js" as Profiles
 import "EnergyFireMaterial.js" as Material
+import "EnergyBeamFlow.js" as Flow
 
 // Opt-in presentation only. No input handling or service calls.
 // The owner supplies phase and, for measured/timed modes, actual progress.
@@ -111,7 +112,7 @@ Item {
             id: surface
             objectName: "energyProgressCanvas"
             anchors.fill: parent
-            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?.65:1.0))
+            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?.65:1.35))
             anchors.margins: -spill
             renderTarget: Canvas.Image
             onWidthChanged: requestPaint()
@@ -200,11 +201,40 @@ Item {
                     c.fillStyle=rush; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
                     c.restore();
                 }
-                if (!f.headVisible) return;
-                // All core and aura layers share the exact centerline.
-                function orb(rx,ry,stops) {
+                // Paint the current over the material but under the head.
+                // Reduced motion retains a stationary, legible pattern.
+                function current(start,span,side,color,alpha) {
+                    if(span<1 || alpha<=0) return;
+                    const rows=Flow.flow(root.variant,root.fireMode,side,span,h-2,
+                        root.elapsed,root.reducedMotion);
                     c.save();
-                    c.translate(edge,mid);
+                    c.beginPath(); c.rect(start,y+1,span,h-2); c.clip();
+                    for(const line of rows) {
+                        const left=start+line.x, right=left+line.length;
+                        const yy=y+1+line.y;
+                        const g=c.createLinearGradient(left,yy,right,yy);
+                        const a=line.alpha*alpha;
+                        g.addColorStop(0,tint(color,side==="enemy"?a:0));
+                        g.addColorStop(.32,tint(color,a*.8));
+                        g.addColorStop(.72,tint(Colors.white,a));
+                        g.addColorStop(1,tint(color,side==="enemy"?0:a*.62));
+                        c.fillStyle=g;
+                        c.fillRect(left,yy,line.length,line.wake?Math.max(1,h*.055):Math.max(1,h*.036));
+                    }
+                    c.restore();
+                }
+                if(f.headVisible && p>0) current(x+1,inner*p,"player",
+                    hot?Colors.yellow:ink,1);
+                if(ki && f.clash && f.enemyFraction>0) {
+                    const enemyInk=mix(Colors.white,Qt.rgba(1,.10,.16,1),f.enemyHeat);
+                    current(edge,inner*f.enemyFraction,"enemy",enemyInk,f.enemyOpacity);
+                }
+                if (!f.headVisible && !(ki && f.clash && f.enemyOpacity>0)) return;
+                // All core and aura layers share the exact centerline.
+                function orb(rx,ry,stops,centerX) {
+                    if(rx<=0 || ry<=0) return;
+                    c.save();
+                    c.translate(centerX===undefined?edge:centerX,mid);
                     c.scale(rx,ry);
                     const g=c.createRadialGradient(0,0,0,0,0,1);
                     for (const stop of stops) g.addColorStop(stop[0],stop[1]);
@@ -256,38 +286,70 @@ Item {
                     }
                     c.restore();
                 }
-                // TRON speed lines stream backward only in the terminal trail.
-                if (tron && p>0 && !root.reducedMotion) {
-                    c.save();
-                    c.beginPath(); c.rect(x+1,y+1,inner*p,h-2); c.clip();
-                    for (let i=0;i<5;i++) {
-                        const drift=(root.elapsed*(1.1+i*.17)+i*.31)%1;
-                        const span=Math.min(inner*p,h*(2+f.intensity*2));
-                        const xx=edge-drift*span;
-                        c.fillStyle=tint(Colors.white,(1-drift)*(.10+f.intensity*.18));
-                        c.fillRect(xx-h*(.45+i*.10),mid+(i-2)*h*.14,h*(.45+i*.10),1);
-                    }
-                    c.restore();
-                }
                 const scale=f.power*root.personality.head;
-                const rx=Math.min(h*(tron?.55:.78)*scale*root.personality.headConsume,w*.48);
-                const ry=Math.min(h*(hot?.66:.84),h*(hot?.47:.58)*(1+(scale-1)*.22));
-                orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
-                    [0,tint(ink,Math.min(.98,.35*bright))],
-                    [.55,tint(ink,.22)],[1,tint(ink,0)]]);
-                orb(rx,ry,[[0,Colors.white],[Math.min(.36,.12*bright),Colors.white],
-                    [.38,mix(ink,Colors.white,Math.min(.98,.4*bright))],[.57,tint(ink,.84)],
-                    [1,tint(ink,0)]]);
+                const enlarged=Flow.head(root.variant,h,f.power,w);
+                const rx=enlarged?enlarged.rx:Math.min(h*.78*scale*root.personality.headConsume,w*.48);
+                const ry=enlarged?enlarged.ry:Math.min(h*(hot?.66:.84),h*(hot?.47:.58)*(1+(scale-1)*.22));
                 if (ki && f.clash) {
-                    // Warm-white opposing energy mixes into the collision
-                    // rather than creating a second, disconnected orb.
+                    // Two compressed, independently colored lobes. A hard
+                    // shared plane separates their flat contact faces; only
+                    // the narrow white seam crosses the plane.
                     const red=Qt.rgba(1,.10,.16,1);
-                    const clashInk=mix(Colors.cyan,red,f.enemyHeat);
-                    orb(rx*.78,ry*.82,[[0,mix(Colors.white,red,f.enemyHeat*.55)],
-                        [.22,mix(Qt.rgba(1,.95,.77,1),red,f.enemyHeat)],
-                        [.5,tint(clashInk,.48)],[1,tint(clashInk,0)]]);
-                    orb(rx*1.28,ry*1.18,[[0,tint(red,0)],
-                        [.55,tint(red,f.enemyHeat*.32)],[1,tint(red,0)]]);
+                    const enemyInk=mix(Qt.rgba(.65,1,1,1),red,f.enemyHeat);
+                    const enemyCore=mix(Qt.rgba(1,.94,.74,1),red,f.enemyHeat*.82);
+                    const lobe=Math.min(h*1.05,w*.25);
+                    const tall=h*(.80+.15*f.intensity);
+                    function compressed(side,color,core,alpha) {
+                        if(alpha<=0 || lobe<=0) return;
+                        c.save(); c.globalAlpha=alpha;
+                        c.beginPath();
+                        if(side<0) c.rect(0,0,edge,height);
+                        else c.rect(edge,0,width-edge,height);
+                        c.clip();
+                        const center=edge+side*lobe*.40;
+                        orb(lobe*1.50,tall*1.30,[[0,tint(color,.7)],
+                            [.60,tint(color,.31)],[1,tint(color,0)]],center);
+                        orb(lobe,tall,[[0,core],[.24,core],[.48,color],
+                            [.72,tint(color,.78)],[1,tint(color,0)]],center);
+                        c.restore();
+                    }
+                    compressed(-1,ink,Qt.rgba(.70,.91,1,1),Math.min(1,p*12));
+                    compressed(1,enemyInk,enemyCore,Math.min(1,f.enemyFraction*12)*f.enemyOpacity);
+                    if(p>0 && f.enemyFraction>0) {
+                        const seam=c.createLinearGradient(edge,mid-tall,edge,mid+tall);
+                        seam.addColorStop(0,tint(Colors.white,0));
+                        seam.addColorStop(.20,tint(Colors.white,.55));
+                        seam.addColorStop(.50,Colors.white);
+                        seam.addColorStop(.80,tint(Colors.white,.55));
+                        seam.addColorStop(1,tint(Colors.white,0));
+                        c.fillStyle=seam; c.fillRect(edge-1.25,mid-tall,2.5,tall*2);
+                    }
+                    return;
+                }
+                if(enlarged) {
+                    // Long light wake directly behind the substantial core.
+                    // Its bright shoulders cover the full chamber height.
+                    const tail=Math.min(inner*p,h*(tron?8:3));
+                    if(tail>0) {
+                        const g=c.createLinearGradient(edge-tail,mid,edge,mid);
+                        g.addColorStop(0,tint(ink,0));
+                        g.addColorStop(.65,tint(ink,.32));
+                        g.addColorStop(1,tint(ink,.95));
+                        c.fillStyle=g;
+                        c.fillRect(edge-tail,mid-h*.16,tail,h*.32);
+                    }
+                    orb(rx*1.45,ry*1.32,[[0,tint(ink,.9)],
+                        [.55,tint(ink,.44)],[1,tint(ink,0)]]);
+                    orb(rx,ry,[[0,Colors.white],[.26,Colors.white],
+                        [.48,mix(ink,Colors.white,.45)],[enlarged.solid,ink],
+                        [.82,tint(ink,.88)],[1,tint(ink,0)]]);
+                } else {
+                    orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
+                        [0,tint(ink,Math.min(.98,.35*bright))],
+                        [.55,tint(ink,.22)],[1,tint(ink,0)]]);
+                    orb(rx,ry,[[0,Colors.white],[Math.min(.36,.12*bright),Colors.white],
+                        [.38,mix(ink,Colors.white,Math.min(.98,.4*bright))],[.57,tint(ink,.84)],
+                        [1,tint(ink,0)]]);
                 }
                 if (f.intensity>.08) {
                     const flare=c.createLinearGradient(edge-rx*1.4,mid,edge+rx*1.4,mid);

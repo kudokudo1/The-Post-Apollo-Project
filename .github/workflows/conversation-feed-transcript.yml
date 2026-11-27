@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Native layout, draft, send and focus regressions
+      - name: Native layout, draft, send, focus and streaming regressions
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
@@ -63,8 +63,8 @@ jobs:
             echo "Missing native fixture startup witness" >&2
             exit 1
           fi
-          observed="$(grep -oE 'FEED_TRANSCRIPT_PHASE_PASS [0-7]' "$work/output" || true)"
-          expected="$(printf 'FEED_TRANSCRIPT_PHASE_PASS %s\n' 0 1 2 3 4 5 6 7)"
+          observed="$(grep -oE 'FEED_TRANSCRIPT_PHASE_PASS [0-9]+' "$work/output" || true)"
+          expected="$(printf 'FEED_TRANSCRIPT_PHASE_PASS %s\n' 0 1 2 3 4 5 6 7 8 9 10 11 12 13)"
           if [ "$observed" != "$expected" ]; then
             printf 'Incomplete or out-of-order native phases:\n%s\n' "$observed" >&2
             exit 1

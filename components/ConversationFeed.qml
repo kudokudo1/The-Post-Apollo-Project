@@ -49,6 +49,55 @@ Rectangle {
     property bool showHeader: true
     property bool showComposer: true
 
+    // Opt-in presentation only: the owner keeps a stable, last incoming
+    // message row while publishing bounded whole-body snapshots. The owner
+    // must independently fence source, original operation and view lifetime.
+    // No transport, admission, terminal state or receipt is inferred here.
+    property bool streamingTailEnabled: false
+    readonly property bool streamingTailEligible: streamingTailEnabled
+        && visible && !discordMode && !showComposer && !sendEnabled
+        && !richMessageActions && messageTextFormat === Text.PlainText
+        && !loading && error === "" && conversation !== null
+        && effectiveScope !== "" && messages.length > 0
+        && messages[messages.length - 1].direction === "incoming"
+    property bool _streamingTailActive: false
+    property string _streamingTailBody: ""
+
+    function clearStreamingTail() {
+        _streamingTailActive = false;
+        _streamingTailBody = "";
+    }
+
+    // Replace display text without resetting the ListView model. Never use
+    // this scope string as authority; it is only a local display correlation.
+    // Owner must keep the baseline messages immutable for this lifetime.
+    function updateStreamingTail(scope, body) {
+        if (!streamingTailEligible || scope !== effectiveScope
+                || typeof body !== "string" || !body || body.indexOf("\x00") !== -1)
+            return false;
+        try {
+            if (encodeURIComponent(body).replace(/%[0-9a-fA-F]{2}|[^%]/g, "x").length > 16000)
+                return false;
+        } catch (_) {
+            return false;
+        }
+        messageList.forceLayout();
+        const follow = messageList.atYEnd && !messageList.moving;
+        _streamingTailBody = body;
+        _streamingTailActive = true;
+        messageList.forceLayout();
+        if (follow)
+            messageList.positionViewAtEnd();
+        return true;
+    }
+
+    onStreamingTailEligibleChanged: {
+        if (!streamingTailEligible)
+            clearStreamingTail();
+    }
+    onMessagesChanged: clearStreamingTail()
+    onConversationChanged: clearStreamingTail()
+
     onShowComposerChanged: {
         if (!showComposer && messageInput)
             messageInput.focus = false;
@@ -333,6 +382,12 @@ Rectangle {
             id: messageDelegate
 
             required property var modelData
+            required property int index
+
+            readonly property string renderedBody: chatFeed.streamingTailEligible
+                && chatFeed._streamingTailActive && index === messageList.count - 1
+                && modelData.direction === "incoming"
+                ? chatFeed._streamingTailBody : (modelData.body || "")
 
             width: messageList.width
 
@@ -356,7 +411,7 @@ Rectangle {
 
                 visible: false
 
-                text: modelData.body || ""
+                text: messageDelegate.renderedBody
 
                 textFormat: chatFeed.messageTextFormat
 
@@ -418,7 +473,7 @@ Rectangle {
 
                     width: messageBubble.width - 24
 
-                    text: modelData.body || ""
+                    text: messageDelegate.renderedBody
 
                     wrapMode: Text.Wrap
                     textFormat: chatFeed.messageTextFormat
@@ -942,6 +997,7 @@ Rectangle {
     // Preserve separate drafts. A late acknowledgement from a previous
     // provider/thread is never allowed to erase the text being composed now.
     onEffectiveScopeChanged: {
+        clearStreamingTail();
         if (previousScope !== "")
             draftByScope[previousScope] = messageInput.text;
         previousScope = effectiveScope;

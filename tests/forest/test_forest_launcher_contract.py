@@ -657,7 +657,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("selectedTreeReasoningSteps = steps", view)
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
-        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertEqual(view.count("onPrimaryRequested: root.requestFixtureDemoAction()"), 1)
+        self.assertNotRegex(view.replace("onPrimaryRequested: root.requestFixtureDemoAction()", "", 1),
+                            r"(?m)^\s*onPrimaryRequested\s*:")
         # The only permitted toggle signal is the shared diagnostics button.
         diagnostic_toggle = "onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen"
         self.assertEqual(view.count(diagnostic_toggle), 1)
@@ -914,7 +916,9 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("selectedTreeReasoningSteps: [0, 0, 0, 0, 0]", view)
         self.assertIn("readonly property bool chatHostTrusted: false", view)
         self.assertIn("readonly property bool voiceHostTrusted: false", view)
-        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertEqual(view.count("onPrimaryRequested: root.requestFixtureDemoAction()"), 1)
+        self.assertNotRegex(view.replace("onPrimaryRequested: root.requestFixtureDemoAction()", "", 1),
+                            r"(?m)^\s*onPrimaryRequested\s*:")
         # The only permitted toggle signal is the shared diagnostics button.
         diagnostic_toggle = "onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen"
         self.assertEqual(view.count(diagnostic_toggle), 1)
@@ -997,12 +1001,12 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("anchors.right: modelPickerButton.left", view)
         self.assertIn("anchors.right: parent.right", view)
         self.assertIn("available: root.voiceHostTrusted && !processing", view)
-        self.assertIn("enabledAction: root.chatHostTrusted", view)
+        self.assertIn("enabledAction: root.fixtureOnly ? root.fixtureDemoActionAvailable : root.chatHostTrusted", view)
         self.assertIn("backendReady: root.voiceHostTrusted", view)
         self.assertIn("busy: false", view)
         self.assertIn("recording: false", view)
         self.assertIn("allowSecondaryAction: false", view)
-        self.assertIn('askLabel: "SEND"', view)
+        self.assertIn('askLabel: root.fixtureOnly ? (root.fixtureDemoStreaming ? "STOP" : "TEST") : "SEND"', view)
         self.assertIn('sendLabel: "SEND"', view)
         self.assertIn("VOICE LOCKED // TRUSTED FOREST AUDIO HOST NOT CONNECTED", view)
         self.assertIn("SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED", view)
@@ -1012,7 +1016,9 @@ class ForestLauncherContract(unittest.TestCase):
         diagnostic_toggle = "onToggleRequested: root.diagnosticsOpen = !root.diagnosticsOpen"
         self.assertEqual(view.count(diagnostic_toggle), 1)
         self.assertNotRegex(view.replace(diagnostic_toggle, "", 1), r"(?m)^\s*onToggleRequested\s*:")
-        self.assertNotRegex(view, r"(?m)^\s*onPrimaryRequested\s*:")
+        self.assertEqual(view.count("onPrimaryRequested: root.requestFixtureDemoAction()"), 1)
+        self.assertNotRegex(view.replace("onPrimaryRequested: root.requestFixtureDemoAction()", "", 1),
+                            r"(?m)^\s*onPrimaryRequested\s*:")
         self.assertNotRegex(view, r"(?m)^\s*onSecondaryRequested\s*:")
         self.assertNotIn("HospitalSpeechInputService {", view)
         self.assertNotIn("HospitalLiveDictationService {", view)
@@ -1319,7 +1325,8 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("{ width: 930, height: 99999 }", policy)
         self.assertIn("{ width: 99999, height: 99999 }", policy)
         self.assertIn("visible: root.frameHeight >= 540", view)
-        self.assertIn("text: root.frameHeight < 540", view)
+        self.assertIn('text: root.fixtureOnly ? "DRAFT NOT SENT // SAMPLE THEN TEST"', view)
+        self.assertIn(": root.frameHeight < 540", view)
         self.assertIn("gitWidth", policy)
         self.assertIn("gitHeight", policy)
 
@@ -1352,7 +1359,8 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
             "sourceComponent: publicPreviewComponent",
             "if (status === Loader.Error)",
             "publicPreviewGate.dismissPreview()",
-            "PublicPreview.PublicConversationFixture {}",
+            "PublicPreview.PublicConversationFixture {",
+            "developmentDemoMode: root.fixtureOnly",
             "visible: !publicPreviewLoader.visible",
             '"CHAT HOST OFFLINE"',
             '"CHAT COVERAGE UNKNOWN"',
@@ -1376,6 +1384,22 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("readonly property var activeChatSessions: []", view)
         self.assertNotIn("PublicRuntimeStatus", pane)
         self.assertNotIn("onSendRequested:", pane)
+
+    def test_fixture_composer_only_calls_current_public_demo(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        handler = view.split("function requestFixtureDemoAction() {", 1)[1].split("onFixtureOnlyChanged:", 1)[0]
+        for contract in ("const view = fixtureDemoView;",
+                         "if (!fixtureOnly || !view || !fixtureDemoActionAvailable)",
+                         'if (view.demoState === "STREAMING")',
+                         "return view.stopDemo();", "return view.beginDemo();"):
+            self.assertIn(contract, handler)
+        self.assertNotIn("forestPromptInput", handler)
+        self.assertNotIn("Process", handler)
+        self.assertIn("publicPreviewGate.active && publicPreviewLoader.status === Loader.Ready", view)
+        self.assertIn("onPrimaryRequested: root.requestFixtureDemoAction()", view)
+        self.assertIn("developmentDemoMode: root.fixtureOnly", view)
+        self.assertIn("readonly property bool chatHostTrusted: false", view)
+        self.assertIn("readonly property bool voiceHostTrusted: false", view)
 
     def test_geometry_script(self):
         script = ROOT / "tests/forest/forest_geometry_test.cjs"

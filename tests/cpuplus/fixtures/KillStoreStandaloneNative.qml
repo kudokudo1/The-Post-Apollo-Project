@@ -97,7 +97,7 @@ ShellRoot {
                 || first.store.hunterExecutor.completionVerified
                 || first.store.hunterOperation !== second.store.hunterOperation
                 || first.store.hunterOperation.phase !== "idle"
-                || first.store.hunterOperation.host !== null
+                || first.store.hunterOperation.legacyPresentationAvailable
                 || first.store.hunterOperation.policyOwner !== first.store
                 || first.store.hunterOperation.policyReady
                 || first.store.windowInventory !== second.store.windowInventory

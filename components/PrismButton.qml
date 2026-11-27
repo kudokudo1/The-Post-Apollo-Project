@@ -89,26 +89,18 @@ ActionButton {
             function onSpectralGlowStrengthChanged() { raster.requestPaint() }
             function onPrismPaletteChanged() { raster.requestPaint() }
         }
+        property real lastPaintDurationMs: -1
         onPaint: {
-            console.info("PRISM_PAINT_ENTER",width,height,available)
+            const started=Date.now()
             const c=getContext("2d")
-            if (!c) { console.error("PRISM_PAINT_NO_CONTEXT"); return }
+            if (!c) return
             if (root.width<=0 || root.height<=0) {
                 c.clearRect(0,0,width,height)
                 return
             }
-            try {
-                Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
-                              1,root.prismPalette,root.spectralGlowStrength)
-                const before=c.getImageData(Math.floor(width/2),Math.floor(height/2),1,1).data
-                console.info("PRISM_PAINT_PUT_IMAGE",before[0],before[1],before[2],before[3])
-                c.fillStyle="#ffffff"
-                c.fillRect(Math.floor(width/2),Math.floor(height/2),2,2)
-                const px=c.getImageData(Math.floor(width/2),Math.floor(height/2),1,1).data
-                console.info("PRISM_PAINT_FILL_RECT",px[0],px[1],px[2],px[3])
-            } catch (error) {
-                console.error("PRISM_PAINT_ERROR",String(error))
-            }
+            Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
+                          1,root.prismPalette,root.spectralGlowStrength)
+            lastPaintDurationMs=Date.now()-started
         }
     }
 

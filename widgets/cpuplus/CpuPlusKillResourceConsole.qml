@@ -85,7 +85,12 @@ Item {
             color: root.selectionReady ? Colors.white : Colors.yellow
             elide: Text.ElideRight
         }
-        Rectangle { width: parent.width; height: 1; color: Colors.red }
+        Rectangle {
+            objectName: "cpuPlusResourceHeaderDivider"
+            width: parent.width
+            height: 1
+            color: Colors.red
+        }
     }
 
     // All resource categories remain visible in a single filter row.
@@ -191,8 +196,8 @@ Item {
         anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: footer.top
-        anchors.bottomMargin: 4
+        anchors.bottom: draftActionsStrip.top
+        anchors.bottomMargin: 5
         clip: true
         contentWidth: width
         contentHeight: cardStack.implicitHeight + 8
@@ -425,53 +430,6 @@ Item {
                                 wrapMode: Text.Wrap
                                 font.pixelSize: 10
                             }
-                            GohuText {
-                                objectName: "cpuPlusResourceDraftStatus"
-                                width: parent.width
-                                text: root.selectionReady
-                                    ? root.hasDraft ? "DRAFT CHANGES // " + root.reviewLines.length + " CATEGORIES"
-                                        : "NO RESOURCE CHANGES STAGED"
-                                    : "DRAFT INPUT LOCKED // VERIFY TARGET"
-                                color: root.hasDraft ? Colors.yellow : Colors.white
-                                font.pixelSize: 10
-                                elide: Text.ElideRight
-                            }
-                            // Actions act on this resource workspace, not the
-                            // operating mode; they belong ABOVE the footer rule.
-                            Row {
-                                id: resourceActions
-                                objectName: "cpuPlusResourceWorkspaceActions"
-                                width: parent.width
-                                height: 30
-                                spacing: 5
-                                ActionButton {
-                                    objectName: "cpuPlusResourceClearDraft"
-                                    width: Math.max(1,(parent.width-parent.spacing)/2)
-                                    height: 30
-                                    label: "CLEAR DRAFT"
-                                    labelPixelSize: 10
-                                    normalFace: true
-                                    accentColor: Colors.red
-                                    available: root.selectionReady && root.hasDraft
-                                    onLeftClicked: root.clearDraft()
-                                }
-                                ActionButton {
-                                    objectName: "cpuPlusResourceReviewDraft"
-                                    width: Math.max(1,(parent.width-parent.spacing)/2)
-                                    height: 30
-                                    label: "REVIEW"
-                                    labelPixelSize: 10
-                                    selected: root.reviewing
-                                    normalFace: true
-                                    accentColor: Colors.yellow
-                                    available: root.selectionReady && root.hasDraft
-                                    onLeftClicked: {
-                                        root.reviewing = !root.reviewing;
-                                        if (root.reviewing) bodyScroll.contentY = 0;
-                                    }
-                                }
-                            }
-
                         }
                 }
             }
@@ -493,6 +451,65 @@ Item {
         handleColor: Colors.magenta
         visible: bodyScroll.contentHeight > bodyScroll.height + 1
         wheelEnabled: false
+    }
+
+    // These are workspace actions, not modes. Keep them visible above the
+    // red footer divider even when the selected resource has many controls.
+    Column {
+        id: draftActionsStrip
+        objectName: "cpuPlusResourceDraftActionsStrip"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: footer.top
+        anchors.bottomMargin: 6
+        spacing: 4
+        GohuText {
+            objectName: "cpuPlusResourceDraftStatus"
+            width: parent.width
+            text: root.selectionReady
+                ? root.hasDraft ? "DRAFT CHANGES // " + root.reviewLines.length + " CATEGORIES"
+                    : "NO RESOURCE CHANGES STAGED"
+                : "DRAFT INPUT LOCKED // VERIFY TARGET"
+            color: root.hasDraft ? Colors.yellow : Colors.white
+            font.pixelSize: 10
+            elide: Text.ElideRight
+        }
+        // Actions act on this resource workspace, not the
+        // operating mode; they belong ABOVE the footer rule.
+        Row {
+            id: resourceActions
+            objectName: "cpuPlusResourceWorkspaceActions"
+            width: parent.width
+            height: 30
+            spacing: 5
+            ActionButton {
+                objectName: "cpuPlusResourceClearDraft"
+                width: Math.max(1,(parent.width-parent.spacing)/2)
+                height: 30
+                label: "CLEAR DRAFT"
+                labelPixelSize: 10
+                normalFace: true
+                accentColor: Colors.red
+                available: root.selectionReady && root.hasDraft
+                onLeftClicked: root.clearDraft()
+            }
+            ActionButton {
+                objectName: "cpuPlusResourceReviewDraft"
+                width: Math.max(1,(parent.width-parent.spacing)/2)
+                height: 30
+                label: "REVIEW"
+                labelPixelSize: 10
+                selected: root.reviewing
+                normalFace: true
+                accentColor: Colors.yellow
+                available: root.selectionReady && root.hasDraft
+                onLeftClicked: {
+                    root.reviewing = !root.reviewing;
+                    if (root.reviewing) bodyScroll.contentY = 0;
+                }
+            }
+        }
+
     }
 
     // Only final actuation occupies the lower footer. It remains deliberately

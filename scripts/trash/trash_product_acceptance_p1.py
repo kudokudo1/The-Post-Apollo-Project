@@ -20,6 +20,7 @@ import tempfile
 # -I omits the script parent; load only this checked-out application tree.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.trash import gio_disposable_roundtrip_u9 as u9
+from scripts.trash.archive_v2_location import archive_directory
 
 SCHEMA = "post-apollo.trashpp.disposable-product-acceptance.p1"
 PREFIX = "trashpp-product-p1-"
@@ -208,6 +209,19 @@ def run_managed_archive(root: Path, env: dict) -> None:
 
 
 
+def archive_readonly_witness(index: dict) -> dict:
+    """Compare durable Archive data, not the host's changing free disk space."""
+    cap = index.get("capacity")
+    need(isinstance(cap, dict)
+         and type(cap.get("filesystemAvailableBytes")) is int
+         and cap["filesystemAvailableBytes"] >= 0,
+         "ARCHIVE_CAPACITY_WITNESS_MISSING")
+    stable = dict(index)
+    stable["capacity"] = {key: value for key, value in cap.items()
+                          if key != "filesystemAvailableBytes"}
+    return stable
+
+
 def run_combined_all(root: Path, env: dict) -> None:
     """Use both real independently guarded stores inside private GVfs CI."""
     home = root / "home"
@@ -217,6 +231,11 @@ def run_combined_all(root: Path, env: dict) -> None:
     source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
     snapshots = backend(V2_INDEX, ["index", data_arg], env, "ALL_V2_BEFORE")
     need(snapshots.get("total") == 1, "ALL_V2_MISSING")
+    # Independently pin the actual private Archive bytes before any burn.
+    archive_root = archive_directory(data_arg, create=False)
+    need(archive_root is not None, "ALL_V2_ROOT_MISSING")
+    archive_file = archive_root / "trashpp-archive-v2.sqlite3"
+    archive_digest = hashlib.sha256(archive_file.read_bytes()).hexdigest()
     gio = shutil.which("gio", path=env.get("PATH"))
     need(gio is not None, "ALL_GIO_UNAVAILABLE")
 
@@ -276,8 +295,13 @@ def run_combined_all(root: Path, env: dict) -> None:
     need(backend(MANAGED_BACKEND, ["list", data_arg], env,
                  "ALL_MANAGED_AFTER")["binCount"] == 0,
          "ALL_MANAGED_BIN_NOT_EMPTY")
-    need(backend(V2_INDEX, ["index", data_arg], env, "ALL_V2_AFTER") == snapshots,
+    after_archive = backend(V2_INDEX, ["index", data_arg], env, "ALL_V2_AFTER")
+    # Host filesystemAvailableBytes fluctuates when unrelated disposable
+    # GIO and managed files are burned; it is not Archive mutation evidence.
+    need(archive_readonly_witness(after_archive) == archive_readonly_witness(snapshots),
          "ALL_CHANGED_READ_ONLY_ARCHIVE")
+    need(hashlib.sha256(archive_file.read_bytes()).hexdigest() == archive_digest,
+         "ALL_CHANGED_READ_ONLY_ARCHIVE_BYTES")
     need(hashlib.sha256(source.read_bytes()).hexdigest() == source_digest,
          "ALL_CHANGED_ORIGINAL_SOURCE")
 

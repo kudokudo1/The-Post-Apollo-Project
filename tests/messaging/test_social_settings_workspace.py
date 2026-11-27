@@ -338,10 +338,13 @@ class SettingsContactChatWorkspaceContracts(unittest.TestCase):
         # ActionButton owns the selected yellow fill / magenta label + glow
         # palette, so no custom local hover/press behavior is necessary.
         action = (ROOT / "components/ActionButton.qml").read_text()
-        self.assertIn("property color selectedFillColor: Colors.yellow", action)
-        self.assertIn("property color selectedForegroundColor: Colors.magenta", action)
-        self.assertIn("property color selectedBorderColor: Colors.magenta", action)
-        self.assertIn("property color selectedContentGlowColor: Colors.magenta", action)
+        # Shared red-action exceptions retain their own selected palette.
+        # This cyan edit action still receives yellow/magenta by default.
+        self.assertIn("property color selectedFillColor: redActionFace ? Colors.black : Colors.yellow", action)
+        self.assertIn("property color selectedForegroundColor: redActionFace ? Colors.red : Colors.magenta", action)
+        self.assertIn("property color selectedBorderColor: redActionFace ? Colors.red : Colors.magenta", action)
+        self.assertIn("property color selectedContentGlowColor: redActionFace ? Colors.red : Colors.magenta", action)
+        self.assertIn("property bool redActionFace: !normalFace && Qt.colorEqual(accentColor, Colors.red)", action)
 
         hide = app.split("label: appSelector.selectedAppOption()", 1)[1].split(
             "onTriggered:", 1

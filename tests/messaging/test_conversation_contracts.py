@@ -130,8 +130,13 @@ assert "Quickshell.execDetached" not in providers
 
 assert DOCTORS.is_file(), DOCTORS
 doctors = DOCTORS.read_text()
-assert '"hospital",\n            "doctors"' in doctors
-assert '"doctor-put"' in doctors
+# Native H1 read-only Doctor directory replaces the legacy desktop PX
+# command. Missing protected native access must fail closed; no write fallback.
+assert '"/usr/libexec/post-apollo/hospital/hospital-room-read"' in doctors
+assert 'process.exec([nativeReaderPath, "doctor-directory"]);' in doctors
+assert 'readonly property bool protectedDoctorWritesReady: false' in doctors
+assert 'HOSPITAL DOCTOR WRITE // PROTECTED ROUTE NOT ENABLED' in doctors
+assert '"doctor-put"' not in doctors
 assert "function doctorById(value)" in doctors
 assert "function saveDoctor(idValue, nameValue, roleValue, statusValue)" in doctors
 assert "function releaseDoctor(idValue)" in doctors
@@ -201,12 +206,17 @@ print("hospital Room provider recovery and explicit-write contracts: PASS")
 print("hospital room AI dock contracts: PASS")
 
 
-for service_path in (ADAPTER, PROVIDERS, DOCTORS):
+# Existing Room/Provider adapter still enforces desktop PX compatibility;
+# Doctor directory has deliberately cut over to the protected native reader.
+for service_path in (ADAPTER, PROVIDERS):
     service = service_path.read_text()
     assert '.local/share/post-apollo-dev-runtime/bin/px' in service, service_path
     assert '.local/bin/px' in service, service_path
     assert 'function compactPxError(value, context)' in service, service_path
     assert 'PX RUNTIME OUT OF DATE // UPDATE POST-APOLLO DEV EXPERIENCE' in service, service_path
+assert 'process.exec([nativeReaderPath, "doctor-directory"]);' in doctors
+assert '.local/share/post-apollo-dev-runtime/bin/px' not in doctors
+assert '.local/bin/px' not in doctors
 
 shared = SHARED.read_text()
 assert "maximumLineCount: 5" in shared

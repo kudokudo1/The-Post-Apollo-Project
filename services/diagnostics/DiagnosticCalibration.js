@@ -207,7 +207,7 @@ function workshopPlanFromDraft(d) {
         if (kind==="threads") instruments.push({kind:kind,intervalMs:d.threadIntervalMs,topCount:d.topCount});
         else if (kind==="memory") instruments.push({kind:kind,intervalMs:d.memoryIntervalMs});
         else if (kind==="census") instruments.push({kind:kind,intervalMs:d.censusIntervalMs});
-        else if (kind==="hostcpu") instruments.push({kind:kind,intervalMs:d.hostCpuIntervalMs||1000});
+        else if (kind==="hostcpu") instruments.push({kind:kind,intervalMs:d.hostCpuIntervalMs});
         else if (kind==="stall") instruments.push({kind:kind,thresholdMs:d.stallThresholdMs});
         else if (kind==="storage" && d.storageCadenceExplicit===true)
             instruments.push({kind:kind,sampleSeconds:d.storageSampleSeconds,reportSeconds:d.storageReportSeconds});

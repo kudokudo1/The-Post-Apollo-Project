@@ -59,6 +59,8 @@ Rectangle {
     property string completedQueueAction: ""
     property bool completedQueueSuccess: false
     property string activeQueueTarget: ""
+    property string queueLifecycleTarget: ""
+    readonly property bool queueLifecycleCurrent: queueLifecycleTarget === queueTargetKey
     readonly property bool queueScopeCurrent: !!queueProvider && hasTarget
         && queueProvider.repositorySlug === repositorySlug
         && queueProvider.branchName === pullRequestBaseRef
@@ -85,6 +87,7 @@ Rectangle {
             return false;
         completedQueueAction = "";
         activeQueueTarget = queueTargetKey;
+        if (token !== "queue-refresh") queueLifecycleTarget = queueTargetKey;
         activeQueueAction = token;
         const accepted = callback();
         if (!accepted && activeQueueAction === token)
@@ -263,8 +266,8 @@ Rectangle {
         ignoreUnknownSignals: true
 
         function onPreviewReady(preview) {
-            if (root.currentQueuePreview.action === preview.action)
-                root.finishQueueAction("queue-preview-" + preview.action, true);
+            root.finishQueueAction("queue-preview-" + preview.action,
+                root.currentQueuePreview.action === preview.action);
         }
 
         function onPreviewFailed(detail) {
@@ -721,7 +724,8 @@ Rectangle {
             id: prActionStatus
             width: parent.width
             detail: root.mode === "queue"
-                ? !!root.queueLifecycleService.lastError || (root.queueScopeCurrent && !!root.queueProvider.lastError)
+                ? (root.queueLifecycleCurrent && !!root.queueLifecycleService.lastError)
+                    || (root.queueScopeCurrent && !!root.queueProvider.lastError)
                 : !!root.lifecycleService.lastError
                     || root.lifecycleService.busy
                     || !!root.factsError
@@ -731,11 +735,13 @@ Rectangle {
                     + root.armedAction.toUpperCase()
                     + " // PRESS AGAIN TO EXECUTE"
                 : root.mode === "queue"
-                ? (root.queueLifecycleService.lastError
+                ? (root.queueLifecycleCurrent && root.queueLifecycleService.lastError
                     ? String(root.queueLifecycleService.lastError)
                     : root.queueScopeCurrent && root.queueProvider.lastError
                     ? String(root.queueProvider.lastError)
-                    : root.queueLifecycleService.busy || root.activeQueueAction.indexOf("queue-execute-") === 0
+                    : root.queueLifecycleCurrent && (root.queueLifecycleService.busy
+                        || root.completedQueueAction.indexOf("queue-execute-") === 0
+                        || root.completedQueueAction.indexOf("queue-preview-") === 0)
                     ? String(root.queueLifecycleService.status || "QUEUE READY")
                     : root.queueScopeCurrent
                     ? String(root.queueProvider.status || "QUEUE READY")
@@ -1562,9 +1568,12 @@ Rectangle {
                             queueActionToken: "queue-refresh"
                             enabledAction: root.hasTarget && !root.queueProvider.busy
                                 && root.activeQueueAction === ""
-                            onTriggered: root.startQueueAction("queue-refresh", function() {
-                                return root.queueProvider.refresh(root.repositorySlug, root.pullRequestBaseRef);
-                            })
+                            onTriggered: {
+                                root.clearArm();
+                                root.startQueueAction("queue-refresh", function() {
+                                    return root.queueProvider.refresh(root.repositorySlug, root.pullRequestBaseRef);
+                                });
+                            }
                         }
                         ActionButton {
                             width: 126
@@ -1707,7 +1716,7 @@ Rectangle {
 
                 delegate: Rectangle {
                     required property var modelData
-        
+
                     width: Math.max(0, ListView.view.width - 20)
                     height: 48
                     color: Colors.black
@@ -1719,12 +1728,12 @@ Rectangle {
                         ) === root.pullRequestNumber
                         ? Colors.orange
                         : Colors.blue
-        
+
                     Row {
                         anchors.fill: parent
                         anchors.margins: 7
                         spacing: 8
-        
+
                         GohuText {
                             width: 62
                             anchors.verticalCenter: parent.verticalCenter
@@ -1735,7 +1744,7 @@ Rectangle {
                             font.pixelSize: 10
                             color: Colors.magenta
                         }
-        
+
                         GohuText {
                             width: Math.max(0, parent.width - 210)
                             anchors.verticalCenter: parent.verticalCenter
@@ -1748,7 +1757,7 @@ Rectangle {
                             color: Colors.white
                             elide: Text.ElideRight
                         }
-        
+
                         GohuText {
                             width: 126
                             anchors.verticalCenter: parent.verticalCenter
@@ -1768,7 +1777,7 @@ Rectangle {
                         }
                     }
                 }
-        
+
             }
             NeonScrollBar {
                 flickable: syntagmaPane3

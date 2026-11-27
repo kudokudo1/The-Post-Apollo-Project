@@ -66,9 +66,9 @@ ShellRoot {
                         const span=end-start;
                         if(span<=1 || power<=0) return;
                         c.save();
-                        c.beginPath(); c.rect(start,0,span,height); c.clip();
+                        // Let the soft fields overlap instead of imposing a hard split.
                         c.translate((start+end)/2,origin.y);
-                        c.scale(Math.max(span*.95,1),Math.max(height*.95,1));
+                        c.scale(Math.max(span*.85,1),Math.max(height*.95,1));
                         const g=c.createRadialGradient(0,0,0,0,0,1);
                         g.addColorStop(0,Qt.rgba(color.r,color.g,color.b,power));
                         g.addColorStop(.48,Qt.rgba(color.r,color.g,color.b,power*.55));

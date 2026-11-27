@@ -29,7 +29,7 @@ Item {
     readonly property real headCenterY: height / 2
     readonly property bool animationActive: visible && !reducedMotion
         && (phase === "running" || (phase === "success" && elapsed < .84)
-            || (variant==="ki-blast" && phase==="failure" && elapsed<.84))
+            || (variant==="ki-blast" && phase==="failure" && elapsed<1.08))
     property real elapsed: 0
     property double startedAt: 0
     property real finishFrom: 0
@@ -174,19 +174,31 @@ Item {
                 // The opposing blast occupies the right side until pushed off
                 // the track; on defeat it drives the plane all the way left.
                 if (ki && f.clash && f.enemyFraction>0) {
+                    const heat=f.enemyHeat;
+                    const red=Qt.rgba(1,.10,.16,1);
+                    const crimson=Qt.rgba(.53,.015,.05,1);
+                    const cyan=Qt.rgba(.71,1,1,1);
+                    const cool=Qt.rgba(.51,.78,.80,1);
+                    const warm=Qt.rgba(1,.91,.65,1);
+                    c.save();
+                    c.globalAlpha=f.enemyOpacity;
                     const g=c.createLinearGradient(0,y+1,0,y+h-1);
-                    g.addColorStop(0,"#B6FFFF");
-                    g.addColorStop(.18,"#83C8CD");
-                    g.addColorStop(.38,"#F9E4A3");
-                    g.addColorStop(.50,"#FFFFFF");
-                    g.addColorStop(.62,"#FFF1BC");
-                    g.addColorStop(.82,"#83C8CD");
-                    g.addColorStop(1,"#B6FFFF");
+                    g.addColorStop(0,mix(cyan,red,heat));
+                    g.addColorStop(.18,mix(cool,crimson,heat));
+                    g.addColorStop(.38,mix(warm,red,heat));
+                    g.addColorStop(.50,mix(Colors.white,red,heat*.82));
+                    g.addColorStop(.62,mix(warm,red,heat));
+                    g.addColorStop(.82,mix(cool,crimson,heat));
+                    g.addColorStop(1,mix(cyan,red,heat));
                     c.fillStyle=g; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
+                    // Red pressure concentrates at the advancing collision
+                    // front first, then progressively consumes the enemy core.
                     const rush=c.createLinearGradient(edge,mid,x+w-1,mid);
-                    rush.addColorStop(0,tint(Colors.white,.45));
-                    rush.addColorStop(1,tint(Colors.cyan,0));
+                    rush.addColorStop(0,tint(red,.18+.48*heat));
+                    rush.addColorStop(.35,tint(red,.06+.22*heat));
+                    rush.addColorStop(1,tint(red,0));
                     c.fillStyle=rush; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
+                    c.restore();
                 }
                 if (!f.headVisible) return;
                 // All core and aura layers share the exact centerline.
@@ -269,8 +281,13 @@ Item {
                 if (ki && f.clash) {
                     // Warm-white opposing energy mixes into the collision
                     // rather than creating a second, disconnected orb.
-                    orb(rx*.78,ry*.82,[[0,Colors.white],[.22,"#FFF3C5"],
-                        [.5,tint(Colors.cyan,.42)],[1,tint(Colors.cyan,0)]]);
+                    const red=Qt.rgba(1,.10,.16,1);
+                    const clashInk=mix(Colors.cyan,red,f.enemyHeat);
+                    orb(rx*.78,ry*.82,[[0,mix(Colors.white,red,f.enemyHeat*.55)],
+                        [.22,mix(Qt.rgba(1,.95,.77,1),red,f.enemyHeat)],
+                        [.5,tint(clashInk,.48)],[1,tint(clashInk,0)]]);
+                    orb(rx*1.28,ry*1.18,[[0,tint(red,0)],
+                        [.55,tint(red,f.enemyHeat*.32)],[1,tint(red,0)]]);
                 }
                 if (f.intensity>.08) {
                     const flare=c.createLinearGradient(edge-rx*1.4,mid,edge+rx*1.4,mid);

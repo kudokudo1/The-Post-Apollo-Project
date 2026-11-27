@@ -1614,6 +1614,10 @@ PanelWindow {
         cameraCleanupBusy: cameraWindow.busy
     }
 
+    // First real Prism mounting: an independent bottom-left button/module.
+    // This is a visual/selection preview, not a dictionary or popup yet.
+    PrismDock {}
+
     // ===== POWER ================================================
 
     Power {}

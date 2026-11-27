@@ -126,8 +126,8 @@ class Stage1Tests(unittest.TestCase):
         launcher = str(Path(__file__).with_name("first_light_stage1_launcher.py"))
         raw = str(Path(__file__).resolve())
         base = ["/usr/bin/python3", "-I", "-B"]
-        with tempfile.TemporaryFile() as marker, socket.socketpair()[0] as sock:
-            # socketpair peer is not needed to prove the inherited descriptor.
+        sock, peer = socket.socketpair()
+        with tempfile.TemporaryFile() as marker, sock, peer:
             marker.write(b"fixture")
             marker.flush()
             marker.seek(0)
@@ -153,8 +153,8 @@ class Stage1Tests(unittest.TestCase):
                 self.assertEqual(os.read(high, 7), b"fixture")
                 os.write(wr, b"x")
                 self.assertEqual(os.read(rd, 1), b"x")
-                self.assertEqual(sock.getsockopt(socket.SOL_SOCKET, socket.SO_TYPE),
-                                 socket.SOCK_STREAM)
+                peer.sendall(b"s")
+                self.assertEqual(sock.recv(1), b"s")
             finally:
                 os.close(high)
                 os.close(rd)

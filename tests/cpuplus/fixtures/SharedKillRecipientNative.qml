@@ -45,6 +45,8 @@ ShellRoot {
         property var presentationOwner: fakePresentation
         property var pending: null
         property bool busy: false
+        readonly property bool bulkBlocked: fakeOwner.cpuBulkReview !== null
+            || fakeOwner.hunterOperationPhase !== "idle" || fakeOwner.destructiveConfirmOpen
         property string feedback: ""
         property int preparations: 0
         property int confirmations: 0
@@ -193,6 +195,23 @@ ShellRoot {
             let next=Object.assign({},actionModes);
             next[action]=next[action]?"":"once";
             actionModes=next;
+        }
+        function lockModeForIdentity(pid,birth,name,action,localOnly) {
+            const row=fakeGate.exactRow(pid,birth,name);
+            if (!row) return "";
+            if (!action) return localOnly ? "" : taskDangerUnlockMode(row);
+            return localOnly ? taskDangerActionLocalUnlockMode(row,action)
+                             : taskDangerActionUnlockMode(row,action);
+        }
+        function toggleLockForIdentity(pid,birth,name,action,sticky) {
+            const row=fakeGate.exactRow(pid,birth,name);
+            if (!row || fakeGate.pending || fakeGate.busy || fakeGate.bulkBlocked
+                    || !taskRequiresDangerUnlock(row)) return false;
+            if (!action && sticky) toggleTaskDangerStickyUnlock(row);
+            else if (action && sticky) toggleTaskDangerActionStickyUnlock(row,action);
+            else if (action) toggleTaskDangerActionUnlock(row,action);
+            else return fakeGate.toggleOneShotUnlock(pid,birth,name);
+            return true;
         }
         function taskFavoriteKey(row) { return "task|"+row.comm; }
         function taskSimplePurpose(row) { return "Synthetic purpose"; }

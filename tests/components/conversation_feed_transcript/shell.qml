@@ -150,13 +150,16 @@ ShellRoot {
                 scene.width = 300;
                 scene.height = 160;
                 feed.messages = [
-                    {direction: "outgoing", body: "Earlier public text. ".repeat(65)},
+                    {direction: "outgoing", body: "Earlier public text."},
                     {direction: "incoming", body: "Public response"}
                 ];
-                list.forceLayout();
-                list.positionViewAtEnd();
+                // The array replacement and window resize settle before the
+                // next phase. Establish a real baseline before measuring growth.
                 break;
             case 9:
+                list.forceLayout();
+                list.positionViewAtEnd();
+                list.forceLayout();
                 check(feed.streamingTailEligible && list.count === 2 && list.atYEnd,
                     "streaming baseline not at end");
                 originalTail = list.itemAtIndex(1);

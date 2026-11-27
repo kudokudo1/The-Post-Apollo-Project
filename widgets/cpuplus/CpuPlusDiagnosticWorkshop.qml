@@ -16,6 +16,7 @@ Column {
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
     readonly property string targetText: {
+        if (draft.selected.includes("hostcpu")) return "TARGET // HOST CPU";
         const qs=draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
         const system=draft.selected.some(k=>k==="census"||k==="storage");
         return qs && system ? "TARGET // QS + USER" : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
@@ -107,7 +108,9 @@ Column {
     }
     function toggle(kind) {
         if (locked || !filterKinds.includes(kind)) return;
-        const selected=draft.selected.slice();
+        // Host capture is standalone in D6b; mixed sequential sets remain supported.
+        if (kind==="hostcpu") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
+        const selected=draft.selected.filter(k=>k!=="hostcpu");
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
         edit("selected",selected);
@@ -159,6 +162,7 @@ Column {
             model: [{kind:"threads",symbol:"≋",subject:"THREADS"},
                 {kind:"memory",symbol:"",subject:"MEMORY"},
                 {kind:"census",symbol:"",subject:"CPU"},
+                {kind:"hostcpu",symbol:"▥",subject:"CPU"},
                 {kind:"storage",symbol:"",subject:"STORAGE"},
                 {kind:"stall",symbol:"⚡",subject:"UPTIME"}].filter(row=>root.filterKinds.includes(row.kind))
             ActionButton {
@@ -252,6 +256,29 @@ Column {
         currentValue: root.draft.censusIntervalMs/1000
         adjustable: !root.locked
         onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopHostCpuInterval"
+        width: parent.width
+        compact: root.compactLayout
+        subjectColor: Colors.orange
+        fillColor: Colors.orange
+        visible: root.draft.selected.includes("hostcpu")
+        title: "HOST SAMPLE INTERVAL"
+        readout: root.draft.hostCpuIntervalMs/1000+" SEC"
+        minimumValue: 1
+        maximumValue: 5
+        currentValue: root.draft.hostCpuIntervalMs/1000
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("hostCpuIntervalMs",value*1000)
+    }
+    GohuText {
+        width: parent.width
+        visible: root.draft.selected.includes("hostcpu")
+        text: "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
     }
     Row {
         width: parent.width

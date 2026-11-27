@@ -951,6 +951,40 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "CPU calibration survives remount, readiness does not"))return;
                 console.log("CPU_D6A_RESOURCE_NATIVE_PASS");
+                const host=root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-hostcpu");
+                if(!root.check(host && host.available,"host instrument available"))return;
+                host.leftClicked(null);
+                w.edit("durationSeconds",1);
+                w.edit("hostCpuIntervalMs",1000);
+                if(!root.check(w.draft.selected.join(",")==="hostcpu" && w.preview.ok
+                    && root.findItem(w,"cpuplusWorkshopHostCpuInterval").visible && !CpuPlusDiagnostics.busy,
+                    "standalone host calibration, no automatic launch"))return;
+                w.activate(); root.phase=39; return;
+            }
+            if(root.phase===39 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"host prepare only"))return;
+                w.activate();
+                if(!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="hostcpu","host capture started"))return;
+                root.resourcePaneActive=false;root.phase=40;return;
+            }
+            if(root.phase===40){
+                if(CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const report=CpuPlusDiagnostics.reports.hostcpu;
+                if(!root.check(report && report.status==="COMPLETE"
+                    && report.summary.includes("HOST CPU //")
+                    && CpuPlusDiagnostics.archiveRows.some(r=>r.id===report.id && r.kind==="hostcpu"),
+                    "actual host capture and archive survived unload // "+CpuPlusDiagnostics.feedback))return;
+                root.resourcePaneActive=true;root.phase=41;return;
+            }
+            if(root.phase===41 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!w)return;
+                if(!root.check(!w.ready && !CpuPlusDiagnostics.busy
+                    && w.draft.selected.join(",")==="hostcpu"
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "host remount retains calibration without authority"))return;
+                console.log("CPU_D6B_HOST_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

@@ -97,6 +97,11 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             archive.validate_rows([record(1),record(1)])
 
+    def test_host_cpu_kind(self):
+        row = dict(record(1), kind="hostcpu")
+        self.save(row)
+        self.assertEqual(self.read()["rows"], [row])
+
     def test_workflow_limit_and_aggregate_retention(self):
         large = dict(record(1, chr(92)*300000), kind="workflow")
         self.assertEqual(len(large["text"]),300000)

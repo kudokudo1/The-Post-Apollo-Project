@@ -42,7 +42,7 @@ Item {
             width: parent.width
             visible: root.informationOpen
             text: root.subject==="CPU"
-                ? "Read-only same-user process census and Quickshell thread sampling. CPU% may exceed 100% across cores. Not whole-host utilization, frequency or scheduling pressure. Reports and workflow queue are shared."
+                ? "Read-only host CPU capture, same-user process census and Quickshell threads. Host busy is 0–100% of aggregate capacity; process CPU can exceed 100%. Driver frequency and kernel PSI may be unavailable. Host capture runs alone; the report archive and sequential workflow queue are shared."
                 : "No qualified resource-specific instrument."
             color: Colors.white
             font.pixelSize: 10

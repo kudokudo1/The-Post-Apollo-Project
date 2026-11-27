@@ -189,7 +189,15 @@ test('Hunter display short circuits preserve thresholds and protection classes',
     const start=app.indexOf('    function hunterTaskActive(entry, requestedMetric) {');
     const end=app.indexOf('    function hunterMetricAccent()',start);
     assert.ok(start>=0&&end>start);
+    const service=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    const activeStart=service.indexOf('    function hunterTaskActive(entry, requestedMetric) {');
+    const activeEnd=service.indexOf('    function hunterHogCandidates(',activeStart);
+    assert.ok(activeStart>=0&&activeEnd>activeStart);
     const create=new Function('counts',app.slice(start,end)+`
+        const hunterPresentation={metricCombined:0,metricCpu:1,metricMemory:2,metricIo:3,metricAge:4,
+            taskPeak:e=>hunterTaskPeak(e),taskAverage:e=>hunterTaskAverage(e),
+            taskMemoryMiB:e=>hunterTaskMemoryMiB(e),taskIoRate:e=>hunterTaskIoRate(e),elapsedSeconds:v=>taskElapsedSeconds(v)};
+        const KillBackend={KillStore:new Function('hunterPresentation',${JSON.stringify(service.slice(activeStart,activeEnd))}+'\\nreturn {hunterTaskActive};')(hunterPresentation)};
         const hunterMetricCombined=0,hunterMetricCpu=1,hunterMetricMemory=2,
               hunterMetricIo=3,hunterMetricAge=4;
         const hunterVisibilityProtected=1,hunterVisibilityAll=2;

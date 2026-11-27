@@ -55,3 +55,36 @@ test("native renderer owns no operation or input; gallery has all four variants"
     for(const key of ["omnitrix","tron","ki-blast","flamethrower"]) assert.ok(preview.includes('"'+key+'"'));
     assert.doesNotMatch(preview,/\b(?:Process|XMLHttpRequest)\b|import qs\.services/);
 });
+
+const profiles = vm.runInNewContext(fs.readFileSync(path.join(root,
+    "components/EnergyVariantProfile.js"), "utf8") + "\n({profile,host});");
+
+test("four personalities preserve bounded motion, distinct intensity and flash isolation", () => {
+    const names=["ki-blast","flamethrower","tron","omnitrix"];
+    const max=names.map(name=>{
+        let dx=0,dy=0;
+        for(let t=0;t<30;t+=.007) {
+            const f=profiles.host(name,t,1,2,"running",false);
+            assert.ok(Math.abs(f.dx)<=3.000001 && Math.abs(f.dy)<=2.000001);
+            assert.equal(f.flash,0);
+            dx=Math.max(dx,Math.abs(f.dx));dy=Math.max(dy,Math.abs(f.dy));
+        }
+        return {dx,dy};
+    });
+    for(let i=1;i<max.length;i++){
+        assert.ok(max[i-1].dx>max[i].dx);
+        assert.ok(max[i-1].dy>max[i].dy);
+    }
+    assert.ok(profiles.profile("omnitrix").brightness>profiles.profile("ki-blast").brightness);
+    assert.ok(profiles.host("omnitrix",.52,1,1,"success",false).flash>.7);
+    for(const name of names) {
+        assert.equal(profiles.host(name,.52,1,1,"failure",false).flash,0);
+        assert.equal(profiles.host(name,.52,1,1,"success",true).flash,0);
+        assert.equal(profiles.host(name,.84,1,1,"success",false).flash,0);
+        assert.equal(profiles.host(name,.52,1,1,"success",true).dx,0);
+        if(name!=="omnitrix") assert.equal(profiles.host(name,.52,1,1,"success",false).flash,0);
+    }
+    assert.equal(profiles.host("tron",4,1,1,"running",false).fragments,0);
+    assert.equal(profiles.host("omnitrix",4,1,1,"running",false).fragments,0);
+    assert.ok(profiles.host("flamethrower",4,1,1,"running",false).fragments>0);
+});

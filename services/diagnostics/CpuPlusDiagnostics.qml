@@ -122,7 +122,7 @@ Scope {
         storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
     // CPU has independent session calibration; switching SYSTEM targets never
     // overwrites the general workshop or starts a capture.
-    property var cpuWorkshopDraft: ({durationSeconds:30, selected:["census"],
+    property var cpuWorkshopDraft: ({durationSeconds:30, selected:["census"], hostCpuIntervalMs:1000,
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
         storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
     function draftForSubject(subject) {

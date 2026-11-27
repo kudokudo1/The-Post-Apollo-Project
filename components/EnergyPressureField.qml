@@ -12,6 +12,7 @@ QtObject {
     property real strength: 1.0
     readonly property var reaction: {
         let best = null;
+        let clashLight = null;
         let light = null;
         let flash = 0;
         let flashSource = null;
@@ -22,9 +23,15 @@ QtObject {
         let fragmentStyle = "";
         if (enabled && !reducedMotion) {
             for (const source of sources) {
-                if (!source || !source.visible || !source.animationActive
-                    || source.reducedMotion) continue;
+                if (!source || !source.visible || source.reducedMotion) continue;
                 const f = source.visualFrame;
+                if(source.variant==="ki-blast" && f.clash) {
+                    const p=source.displayedFraction;
+                    const level=source.phase==="failure" && !source.animationActive?.30:.48;
+                    if(!clashLight || level>clashLight.level)
+                        clashLight={source:source,fraction:p,heat:f.enemyHeat,level:level};
+                }
+                if(!source.animationActive) continue;
                 const level = source.phase === "running"
                     ? .12 + .88 * f.intensity
                     : source.phase === "success" ? f.impact : f.defeat || 0;
@@ -51,6 +58,7 @@ QtObject {
             }
         }
         return {
+            clashLight: clashLight,
             power: light ? light.power : 0,
             time: light ? light.time : 0,
             color: light ? light.color : Colors.magenta,
@@ -66,6 +74,7 @@ QtObject {
             fragmentStyle: fragmentStyle
         };
     }
+    readonly property var clashLight: reaction.clashLight
     readonly property real pressure: reaction.power
     readonly property real offsetX: reaction.dx
     readonly property real offsetY: reaction.dy

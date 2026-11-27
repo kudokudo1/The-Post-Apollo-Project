@@ -115,7 +115,7 @@ Item {
             id: surface
             objectName: "energyProgressCanvas"
             anchors.fill: parent
-            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?1.05:root.variant==="ki-blast"?1.65:.85))
+            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?1.35:root.variant==="ki-blast"?2.0:1.1))
             anchors.margins: -spill
             renderTarget: Canvas.Image
             onWidthChanged: requestPaint()
@@ -141,6 +141,22 @@ Item {
                 const material=Material.geometry(root.materialExperiment ? root.fireMode : "standard",
                     p,w-2,h-2);
                 const inner=w-2, edge=x+1+inner*p;
+                // Emitted light, behind the opaque track. Cooled material remains dark.
+                function radiate(start,span,color,amount) {
+                    if(span<=0 || amount<=0) return;
+                    const spread=h*.48;
+                    const g=c.createLinearGradient(0,y-spread,0,y+h+spread);
+                    g.addColorStop(0,tint(color,0));
+                    g.addColorStop(.19,tint(color,amount*.28));
+                    g.addColorStop(.36,tint(color,amount));
+                    g.addColorStop(.64,tint(color,amount));
+                    g.addColorStop(.81,tint(color,amount*.28));
+                    g.addColorStop(1,tint(color,0));
+                    c.fillStyle=g; c.fillRect(start,y-spread,span,h+2*spread);
+                }
+                if(f.headVisible && !material.experimental) radiate(x+1,inner*p,ink,ki?.36:hot?.23:tron?.14:.27);
+                if(ki && f.clash) radiate(edge,inner*f.enemyFraction,
+                    mix(Qt.rgba(.65,1,1,1),Qt.rgba(1,.10,.16,1),f.enemyHeat),.34*f.enemyOpacity);
                 // In Burn Away, the traversed chassis is gone, not covered
                 // by a differently colored progress fill.
                 if (material.erosion && p>0) {
@@ -248,12 +264,16 @@ Item {
                 // Crisp, animated pixel-fire underneath a translucent
                 // optical glow. Detached embers rise from the moving front.
                 if(hot && p>0) {
-                    const pixel=PixelFire.fire(h,root.elapsed,root.reducedMotion);
+                    const pixel=PixelFire.fire(h,root.elapsed,root.reducedMotion,root.fireMode);
+                    const heat=root.fireMode==="burn-away"?1:root.fireMode==="ash-trail"?.83:.90;
+                    orb(h*1.65,h*1.30,[[0,tint(Colors.yellow,.64*heat)],
+                        [.27,tint(Colors.orange,.48*heat)],[.62,tint(Colors.red,.16*heat)],
+                        [1,tint(Colors.orange,0)]]);
                     const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
                     const u=pixel.unit;
                     for(const cell of pixel.cells) {
                         c.fillStyle=palette[cell.heat];
-                        c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,u,u);
+                        c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,Math.ceil(u*(root.fireMode==="burn-away"?1.05:root.fireMode==="ash-trail"?1.20:1.42)),u);
                     }
                     for(const ember of pixel.embers) {
                         c.save(); c.globalAlpha=ember.alpha;
@@ -312,9 +332,8 @@ Item {
                 const rx=enlarged?enlarged.rx:Math.min(h*.78*scale*root.personality.headConsume,w*.48);
                 const ry=enlarged?enlarged.ry:Math.min(h*(hot?.66:.84),h*(hot?.47:.58)*(1+(scale-1)*.22));
                 if (ki && (f.clash || (root.phase==="success" && f.headVisible))) {
-                    // Two compressed, independently colored lobes. A hard
-                    // shared plane separates their flat contact faces; only
-                    // the narrow white seam crosses the plane.
+                    // Two overlapping cores. The stronger rounded sphere
+                    // overdraws the weaker contact cap, never an empty plane.
                     const red=Qt.rgba(1,.10,.16,1);
                     const enemyInk=mix(Qt.rgba(.65,1,1,1),red,f.enemyHeat);
                     const enemyCore=mix(Qt.rgba(1,.94,.74,1),red,f.enemyHeat*.82);
@@ -324,40 +343,38 @@ Item {
                         const shape=side<0?contact.left:contact.right;
                         const lobe=shape.rx, tall=shape.ry;
                         if(alpha<=0 || lobe<=0) return;
-                        const center=edge+side*(touching?shape.offset:lobe*.12);
+                        const center=edge+side*(touching?shape.offset*.72:lobe*.12);
                         c.save(); c.globalAlpha=alpha;
-                        // Glow is never cut by the contact plane. Only the
-                        // small physical contact cap of the core is flattened.
-                        orb(lobe*1.38,tall*1.35,[[0,tint(color,.50)],
-                            [.60,tint(color,.20)],[1,tint(color,0)]],center);
-                        if(touching) {
-                            c.beginPath();
-                            if(side<0) c.rect(0,0,edge,height);
-                            else c.rect(edge,0,width-edge,height);
-                            c.clip();
-                        }
-                        orb(lobe,tall,[[0,core],[.24,core],[.48,color],
-                            [.72,tint(color,.78)],[1,tint(color,0)]],center);
+                        orb(lobe*1.60,tall*1.48,[[0,tint(color,.67)],
+                            [.53,tint(color,.30)],[1,tint(color,0)]],center);
+                        orb(lobe,tall,[[0,core],[.20,core],[.49,color],
+                            [.77,tint(color,.86)],[1,tint(color,0)]],center);
                         c.restore();
                     }
-                    compressed(-1,ink,Qt.rgba(.70,.91,1,1),Math.min(1,p*12));
-                    compressed(1,enemyInk,enemyCore,Math.min(1,f.enemyFraction*12)*f.enemyOpacity);
-                    if(p>0 && f.enemyFraction>0) {
+                    const playerAlpha=Math.min(1,p*12);
+                    const enemyAlpha=Math.min(1,f.enemyFraction*12)*f.enemyOpacity;
+                    const playerWins=contact.left.rx>=contact.right.rx;
+                    if(playerWins) {
+                        compressed(1,enemyInk,enemyCore,enemyAlpha);
+                        compressed(-1,ink,Qt.rgba(.70,.91,1,1),playerAlpha);
+                    } else {
+                        compressed(-1,ink,Qt.rgba(.70,.91,1,1),playerAlpha);
+                        compressed(1,enemyInk,enemyCore,enemyAlpha);
+                    }
+                    if(touching) {
+                        // A soft, overlapping hot bridge rather than a line.
                         const tall=contact.chord;
-                        const seam=c.createLinearGradient(edge,mid-tall,edge,mid+tall);
-                        seam.addColorStop(0,tint(Colors.white,0));
-                        seam.addColorStop(.20,tint(Colors.white,.55));
-                        seam.addColorStop(.50,Colors.white);
-                        seam.addColorStop(.80,tint(Colors.white,.55));
-                        seam.addColorStop(1,tint(Colors.white,0));
-                        c.fillStyle=seam; c.fillRect(edge-1.25,mid-tall,2.5,tall*2);
+                        const winner=playerWins?ink:enemyInk;
+                        orb(Math.max(h*.14,tall*.55),tall*1.1,[
+                            [0,tint(Colors.white,.72)],[.35,tint(winner,.56)],
+                            [.72,tint(winner,.19)],[1,tint(winner,0)]]);
                     }
                     return;
                 }
                 if(enlarged) {
                     // Long light wake directly behind the substantial core.
                     // Its bright shoulders cover the full chamber height.
-                    const tail=Math.min(inner*p,h*(tron?4.2:3));
+                    const tail=Math.min(inner*p,h*(tron?3.2:3));
                     if(tail>0) {
                         const g=c.createLinearGradient(edge-tail,mid,edge,mid);
                         g.addColorStop(0,tint(ink,0));
@@ -366,9 +383,12 @@ Item {
                         g.addColorStop(1,tint(ink,.95));
                         c.fillStyle=g;
                         c.fillRect(edge-tail,mid-h*.16,tail,h*.32);
+                        if(tron) {
+                            orb(tail*.64,h*.65,[[0,tint(ink,.44)],[.45,tint(ink,.24)],[1,tint(ink,0)]],edge-tail*.40);
+                        }
                     }
-                    orb(rx*1.55,ry*1.42,[[0,tint(ink,.68)],
-                        [.48,tint(ink,.32)],[.78,tint(ink,.09)],[1,tint(ink,0)]]);
+                    orb(rx*(tron?1.82:1.65),ry*1.48,[[0,tint(ink,tron?.92:.75)],
+                        [.48,tint(ink,tron?.53:.37)],[.78,tint(ink,.13)],[1,tint(ink,0)]]);
                     orb(rx,ry,[[0,Colors.white],[.16,Colors.white],
                         [enlarged.solid,mix(ink,Colors.white,.32)],
                         [.68,tint(ink,.58)],[1,tint(ink,0)]]);

@@ -250,8 +250,9 @@ test("TRON and Omnitrix core covers chamber height; clash lobes have separate co
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
     assert.match(source,/compressed\(-1,ink/);
     assert.match(source,/compressed\(1,enemyInk/);
-    assert.match(source,/c.rect\(0,0,edge,height\)/);
-    assert.match(source,/c.rect\(edge,0,width-edge,height\)/);
+    assert.match(source,/shape.offset\*\.72/);
+    assert.match(source,/if\(playerWins\)/);
+    assert.doesNotMatch(source,/c.rect\(0,0,edge,height\)/);
     assert.match(source,/f.enemyHeat/);
     assert.match(source,/Flow.flow/);
 });
@@ -267,7 +268,7 @@ const pixel=vm.runInNewContext(fs.readFileSync(path.join(root,
 test("pixel fire waves, emits detached embers and stays static in reduced motion",()=>{
     const a=pixel.fire(42,0,false), b=pixel.fire(42,.75,false);
     assert.ok(a.cells.length>40 && a.cells.length<200);
-    assert.ok(a.embers.length===12 && a.embers.some(e=>e.y<-8));
+    assert.ok(a.embers.length===12 && a.embers.some(e=>e.x<-8));
     assert.ok(JSON.stringify(a.cells)!==JSON.stringify(b.cells));
     assert.ok(JSON.stringify(a.embers)!==JSON.stringify(b.embers));
     assert.equal(JSON.stringify(pixel.fire(42,0,true)),JSON.stringify(pixel.fire(42,99,true)));
@@ -314,4 +315,30 @@ test("clash contact flattens only a shared cap and the winning sphere regains it
     assert.ok(q.left.offset/q.left.rx>q.right.offset/q.right.rx);
     const r=currents.contact(.1,.8,42,800);
     assert.ok(r.right.offset/r.right.rx>.95);
+});
+
+test("wind-swept pixel flames and embers point backward",()=>{
+    for(const mode of ["standard","ash-trail","burn-away"]){
+        for(let t=0;t<3;t+=.125){
+            const f=pixel.fire(42,t,false,mode);
+            assert.ok(Math.min(...f.cells.map(c=>c.x))< -4);
+            assert.ok(f.embers.every(e=>e.x<0));
+            assert.ok(f.cells.every(c=>Number.isInteger(c.x)&&Number.isInteger(c.y)));
+        }
+    }
+    const standard=pixel.fire(42,0,true,"standard");
+    const erosion=pixel.fire(42,0,true,"burn-away");
+    assert.ok(Math.min(...standard.cells.map(c=>c.x))<Math.min(...erosion.cells.map(c=>c.x)));
+});
+test("radiance is independent of core size and collision is overlapping",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    const field=fs.readFileSync(path.join(root,"components/EnergyPressureField.qml"),"utf8");
+    assert.match(source,/function radiate/);
+    assert.match(source,/shape.offset\*\.72/);
+    assert.match(source,/orb\(Math.max\(h\*\.14,tall\*\.55\)/);
+    assert.doesNotMatch(source,/c.fillRect\(edge-1.25/);
+    assert.match(source,/rx\*\(tron\?1.82:1.65\)/);
+    assert.match(preview,/id: battlefieldLight/);
+    assert.match(field,/clashLight: clashLight/);
 });

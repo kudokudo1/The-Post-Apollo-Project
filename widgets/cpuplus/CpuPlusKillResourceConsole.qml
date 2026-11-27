@@ -63,100 +63,143 @@ Item {
         return Colors.cyan;
     }
 
-    Column {
-        id: heading
-        objectName: "cpuPlusResourceConsoleHeader"
+    // Use the same fixed-header / changing-content / action-footer hierarchy
+    // seen in CPU++ FAVORITES and ID MANAGEMENT. The header is a real
+    // reserved region, not scattered labels in the scrolling controls.
+    Rectangle {
+        id: resourceHeaderSection
+        objectName: "cpuPlusResourceHeaderSection"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        spacing: 3
-        GohuText {
-            width: parent.width
-            text: "RESOURCE CONTROL // DRAFT"
-            font.pixelSize: 12
-            color: Colors.orange
-            elide: Text.ElideRight
-        }
-        GohuText {
-            width: parent.width
-            text: root.selectionReady ? "EXACT PROCESS SELECTED // NOT APPLIED"
-                : "SELECT VERIFIED PROCESS // READ ONLY"
-            font.pixelSize: 9
-            color: root.selectionReady ? Colors.white : Colors.yellow
-            elide: Text.ElideRight
-        }
-        Rectangle {
-            objectName: "cpuPlusResourceHeaderDivider"
-            width: parent.width
-            height: 1
-            color: Colors.red
-        }
-    }
-
-    // All resource categories remain visible in a single filter row.
-    Row {
-        id: resourceFilters
-        objectName: "cpuPlusResourceCategoryFilters"
-        anchors.top: heading.bottom
-        anchors.topMargin: 6
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 30
-        spacing: 2
-        Repeater {
-            model: root.categories
-            delegate: ActionButton {
-                required property var modelData
-                objectName: "cpuPlusResourceFilter-" + modelData.key
-                readonly property color filterInk: root.accentFor(modelData.key)
-                width: Math.max(1,(resourceFilters.width
-                    - resourceFilters.spacing * (root.categories.length-1))
-                    / root.categories.length)
-                height: resourceFilters.height
-                label: root.filterLabel(modelData.key)
-                labelPixelSize: 9
-                labelMinimumPixelSize: 7
-                contentPadding: 1
-                normalFace: true
-                selected: root.selectedKey === modelData.key
-                accentColor: filterInk
-                onLeftClicked: root.selectResource(modelData.key)
-            }
-        }
-    }
-
-    // The standard Post-Apollo information control stays in the top-right
-    // immediately beneath the category row, never in the left control area.
-    Item {
-        id: resourceInfoStrip
-        objectName: "cpuPlusResourceInformationStrip"
-        anchors.top: resourceFilters.bottom
-        anchors.topMargin: 3
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 24
+        height: headerContent.implicitHeight + 16
+        color: Colors.dark
+        border.width: 1
+        border.color: Colors.red
         z: 10
-        ProcessInformationButton {
-            id: resourceInformationButton
-            objectName: "cpuPlusResourceInformationButton"
+
+        Column {
+            id: headerContent
+            anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            selected: root.informationOpen
-            onLeftClicked: root.informationOpen = !root.informationOpen
+            anchors.leftMargin: 7
+            anchors.rightMargin: 7
+            anchors.topMargin: 8
+            spacing: 5
+
+            GohuText {
+                objectName: "cpuPlusResourceHeaderTitle"
+                width: parent.width
+                height: 17
+                text: "RESOURCE CONTROL // DRAFT"
+                font.pixelSize: 12
+                color: Colors.orange
+                elide: Text.ElideRight
+            }
+            GohuText {
+                objectName: "cpuPlusResourceIdentityStatus"
+                width: parent.width
+                height: 13
+                text: root.selectionReady ? "EXACT PROCESS SELECTED // NOT APPLIED"
+                    : "SELECT VERIFIED PROCESS // READ ONLY"
+                font.pixelSize: 9
+                color: root.selectionReady ? Colors.white : Colors.yellow
+                elide: Text.ElideRight
+            }
+
+            // The seven category selectors are one stable header rail.
+            Row {
+                id: resourceFilters
+                objectName: "cpuPlusResourceCategoryFilters"
+                width: parent.width
+                height: 30
+                spacing: 2
+                Repeater {
+                    model: root.categories
+                    delegate: ActionButton {
+                        required property var modelData
+                        objectName: "cpuPlusResourceFilter-" + modelData.key
+                        readonly property color filterInk: root.accentFor(modelData.key)
+                        width: Math.max(1,(resourceFilters.width
+                            - resourceFilters.spacing * (root.categories.length-1))
+                            / root.categories.length)
+                        height: resourceFilters.height
+                        label: root.filterLabel(modelData.key)
+                        labelPixelSize: 9
+                        labelMinimumPixelSize: 7
+                        contentPadding: 1
+                        normalFace: true
+                        selected: root.selectedKey === modelData.key
+                        accentColor: filterInk
+                        onLeftClicked: root.selectResource(modelData.key)
+                    }
+                }
+            }
+
+            // Selected-resource identity and contextual info belong to the
+            // fixed top region, not the instrument control workspace.
+            Item {
+                id: resourceInfoStrip
+                objectName: "cpuPlusResourceInformationStrip"
+                width: parent.width
+                height: 26
+                GohuText {
+                    id: activeResourceHeading
+                    objectName: "cpuPlusResourceSelectedTitle"
+                    anchors.left: parent.left
+                    anchors.right: resourceInformationButton.left
+                    anchors.rightMargin: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: 23
+                    text: root.selectedResource.title + " // " + root.selectedResource.scope
+                    color: root.accentFor(root.selectedKey)
+                    font.pixelSize: 10
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+                ProcessInformationButton {
+                    id: resourceInformationButton
+                    objectName: "cpuPlusResourceInformationButton"
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    selected: root.informationOpen
+                    onLeftClicked: root.informationOpen = !root.informationOpen
+                }
+            }
+            GohuText {
+                objectName: "cpuPlusResourceCapabilityStatus"
+                width: parent.width
+                height: 13
+                text: "CAPABILITY / WRITE PERMISSION // NOT VERIFIED"
+                color: Colors.yellow
+                font.pixelSize: 9
+                elide: Text.ElideRight
+            }
+            Rectangle {
+                objectName: "cpuPlusResourceHeaderDivider"
+                width: parent.width
+                height: 2
+                color: Colors.red
+            }
         }
+
+        // Overlay help while keeping the header's measured height fixed.
+        // This popup never controls a resource or authorizes a write.
         Rectangle {
             id: resourceInformationPopup
             objectName: "cpuPlusResourceInformationPopup"
-            anchors.right: parent.right
-            anchors.top: resourceInformationButton.bottom
+            anchors.right: headerContent.right
+            anchors.top: resourceInfoStrip.bottom
             anchors.topMargin: 3
-            width: Math.min(320, Math.max(0,root.width - 6))
+            width: Math.min(320,Math.max(0,root.width - 14))
             height: informationContent.implicitHeight + 12
             color: Colors.black
             border.width: 1
             border.color: Colors.yellow
             visible: root.informationOpen
-            z: 11
+            z: 12
             Column {
                 id: informationContent
                 x: 6
@@ -192,8 +235,8 @@ Item {
     Flickable {
         id: bodyScroll
         objectName: "cpuPlusResourceConsoleScroll"
-        anchors.top: resourceInfoStrip.bottom
-        anchors.topMargin: 4
+        anchors.top: resourceHeaderSection.bottom
+        anchors.topMargin: 7
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: draftActionsStrip.top
@@ -269,31 +312,12 @@ Item {
                     y: 2
                     width: Math.max(0,parent.width-4)
                     spacing: 5
-                    GohuText {
+                    // Controls begin immediately here; the selected title,
+                    // scope and capability status live in the fixed header.
+                    Column {
                         width: parent.width
-                        text: resourcePanel.spec.title + " // CONTROLS"
-                        color: resourcePanel.ink
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                    }
-                        Column {
-                            width: parent.width
-                            visible: true
-                            spacing: 5
-                            GohuText {
-                                width: parent.width
-                                text: resourcePanel.spec.scope
-                                color: resourcePanel.ink
-                                font.pixelSize: 9
-                                wrapMode: Text.Wrap
-                            }
-                            GohuText {
-                                width: parent.width
-                                text: "CAPABILITY AND WRITE PERMISSION // NOT VERIFIED"
-                                color: Colors.orange
-                                font.pixelSize: 9
-                                wrapMode: Text.Wrap
-                            }
+                        visible: true
+                        spacing: 5
                             GohuText {
                                 width: parent.width
                                 visible: resourcePanel.spec.controls.length > 0

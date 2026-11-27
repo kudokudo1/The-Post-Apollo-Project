@@ -34,7 +34,12 @@ class ForestLauncherContract(unittest.TestCase):
                            "onCompleted: run", "Quickshell.exec"):
             with self.subTest(prohibited=prohibited):
                 self.assertNotIn(prohibited, text)
-        self.assertIn("ADAPTER NOT CONNECTED", text)
+        self.assertIn('readonly property bool chatHostTrusted: false', text)
+        self.assertIn('"CHAT HOST OFFLINE"', text)
+        self.assertIn('"CHAT COVERAGE UNKNOWN"', text)
+        self.assertIn('"LOCAL DRAFT ONLY // SEND LOCKED"', text)
+        self.assertNotIn('"NO ACTIVE SESSION"', text)
+        self.assertNotIn("OLLAMA / HERMES ADAPTER NOT CONNECTED", text)
 
     def test_dock_is_wired_in_shell_only_once(self):
         text = (ROOT / "shell.qml").read_text()
@@ -1282,7 +1287,12 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("border.color: Colors.green", text)
         # Header reflects only last explicit P0 model residency observation.
         self.assertIn("last Ollama residency scan, not active inference", text)
-        self.assertIn("ADAPTER NOT CONNECTED", text)
+        self.assertIn('readonly property bool chatHostTrusted: false', text)
+        self.assertIn('"CHAT HOST OFFLINE"', text)
+        self.assertIn('"CHAT COVERAGE UNKNOWN"', text)
+        self.assertIn('"LOCAL DRAFT ONLY // SEND LOCKED"', text)
+        self.assertNotIn('"NO ACTIVE SESSION"', text)
+        self.assertNotIn("OLLAMA / HERMES ADAPTER NOT CONNECTED", text)
 
     def test_chassis_has_common_top_edge(self):
         text = (ROOT / "widgets/ForestChassisPolicy.js").read_text()

@@ -1317,14 +1317,7 @@ PanelWindow {
 
         // Closing a finished report acknowledges it. A running hunt continues
         // in the background and can be reopened by either HUNTER kill button.
-        if (hunterOperationPhase === "report") {
-            hunterOperationController.phase = "idle";
-            hunterOperationController.kind = "";
-            hunterOperationController.targets = [];
-            hunterOperationController.results = [];
-            hunterOperationController.completed = 0;
-            hunterOperationController.total = 0;
-        }
+        KillBackend.KillStore.acknowledgeDonorBulkReport();
 
         Qt.callLater(function() { searchInput.forceActiveFocus(); });
     }

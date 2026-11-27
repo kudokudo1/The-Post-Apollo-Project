@@ -46,8 +46,8 @@ PanelWindow {
     property bool menuOpen: false
     // Shell-owned visibility demand: read-only telemetry consumers do not start their own pollers.
     property bool cpuPlusProcessVisible: false
-    onCpuPlusProcessVisibleChanged: if (!cpuPlusProcessVisible) cpuBulkReview = null
-    property var cpuBulkReview: null
+    onCpuPlusProcessVisibleChanged: if (!cpuPlusProcessVisible) cancelCpuBulkReview(cpuBulkReview)
+    readonly property var cpuBulkReview: KillBackend.KillStore.cpuBulkReview
     readonly property bool cpuBulkOperation: hunterOperationController.recipientOwned
         && hunterOperationPhase !== "idle"
     readonly property string cpuBulkMessage: cpuBulkOperation
@@ -2028,28 +2028,19 @@ PanelWindow {
                 || hubProcessActionGate.busy) return null;
         const rows = cpuBulkCandidates(kind, metric, visibility);
         const captures = hunterTargetsFromRows(rows);
-        if (!captures.length || new Set(captures.map(t => t.pid)).size !== captures.length)
-            return null;
-        const targets = Object.freeze(captures.map(t => Object.freeze(t)));
-        const label = kind === "kill-all" ? "ALL ELIGIBLE PROCESSES"
-            : kind === "kill-mice" ? "DETACHED IDLE LEAVES"
-            : ["COMBI","CPU","MEMORY","I/O","AGE"][metric] + " HOGS";
-        cpuBulkReview = Object.freeze({kind:kind, metric:metric, visibility:visibility,
-            label:label, targets:targets});
-        return cpuBulkReview;
+        return KillBackend.KillStore.captureCpuBulkReview(kind, metric, visibility, captures);
     }
 
     function cancelCpuBulkReview(review) {
-        if (!review || cpuBulkReview !== review) return false;
-        cpuBulkReview = null;
-        return true;
+        return KillBackend.KillStore.releaseCpuBulkReview(review);
     }
 
     function confirmCpuBulkReview(review) {
         if (!review || cpuBulkReview !== review || !cpuPlusProcessVisible
                 || destructiveConfirmOpen || hunterOperationPhase !== "idle"
                 || hubProcessActionGate.pending || hubProcessActionGate.busy) return false;
-        cpuBulkReview = null; // consume once; never recompute or broaden the review
+        // Consume the exact review once; never recompute or broaden it.
+        if (!KillBackend.KillStore.releaseCpuBulkReview(review)) return false;
         hunterOperationController.start(review.kind, review.targets, true);
         return true;
     }

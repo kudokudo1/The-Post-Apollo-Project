@@ -85,7 +85,10 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     assert.match(owner,/cpuBulkReview !== review/);
     assert.match(owner,/hunterOperationController\.start\(review\.kind, review\.targets, true\)/);
     assert.match(owner,/hunterHogCandidates\(metric\)/);
-    assert.match(owner,/onCpuPlusProcessVisibleChanged: if \(!cpuPlusProcessVisible\) cpuBulkReview = null/);
+    assert.match(owner,/onCpuPlusProcessVisibleChanged: if \(!cpuPlusProcessVisible\) cancelCpuBulkReview\(cpuBulkReview\)/);
+    assert.match(owner,/readonly property var cpuBulkReview: KillBackend\.KillStore\.cpuBulkReview/);
+    assert.match(owner,/KillBackend\.KillStore\.captureCpuBulkReview\(kind, metric, visibility, captures\)/);
+    assert.match(owner,/if \(!KillBackend\.KillStore\.releaseCpuBulkReview\(review\)\) return false;\s*hunterOperationController\.start/);
 });
 
 test("recipient restores existing owner graph and favorite semantics", () => {
@@ -577,8 +580,10 @@ test("K3b: independent guarded gateway and presentation share service custody", 
 test("K3c: service lock adapters reject stale, busy, bulk and unsupported requests", () => {
     const store=read("services/kill/KillStore.qml");
     const a=store.indexOf("    function lockModeForIdentity(");
-    const b=store.indexOf("    function snapshotCadence(",a);
-    assert.ok(a>=0 && b>a);
+    const toggleStart=store.indexOf("    function toggleLockForIdentity(",a);
+    const close=store.indexOf("\n    }",toggleStart);
+    const b=close+"\n    }".length;
+    assert.ok(a>=0 && toggleStart>a && close>toggleStart);
     const row={pid:4321,startTicks:98765,comm:"sway"};
     const calls=[];
     const actionGate={
@@ -620,4 +625,33 @@ test("K3c: service lock adapters reject stale, busy, bulk and unsupported reques
     assert.equal(toggle(...args,"restart",true),true);
     assert.equal(toggle(...args,"limit",false),true);
     assert.deepEqual(calls,["master-once",["master-sticky",row],["action-sticky",row,"restart"],["action-once",row,"limit"]]);
+});
+
+test("K3c.2a: shared bulk review is immutable and consumed only by exact reference", () => {
+    const store=read("services/kill/KillStore.qml");
+    const a=store.indexOf("    function captureCpuBulkReview(");
+    const b=store.indexOf("    function snapshotCadence(",a);
+    assert.ok(a>=0 && b>a);
+    const gate={pending:null,busy:false,bulkBlocked:false};
+    const api=new Function("actionGate","let cpuBulkReview=null;"+store.slice(a,b)
+        +"\nreturn {captureCpuBulkReview,releaseCpuBulkReview,current:()=>cpuBulkReview};")(gate);
+    const make=()=>({pid:4321,startTicks:98765,name:"synthetic",identity:"synthetic"});
+    for(const flag of ["pending","busy","bulkBlocked"]) {
+        gate[flag]=true;
+        assert.equal(api.captureCpuBulkReview("kill-all",0,0,[make()]),null);
+        gate[flag]=false;
+    }
+    assert.equal(api.captureCpuBulkReview("kill-all",0,0,[]),null);
+    assert.equal(api.captureCpuBulkReview("kill-all",0,0,[make(),make()]),null);
+    const source=[make()];
+    const review=api.captureCpuBulkReview("kill-all",0,0,source);
+    assert.ok(Object.isFrozen(review) && Object.isFrozen(review.targets) && Object.isFrozen(review.targets[0]));
+    source.push({pid:4322});
+    assert.equal(review.targets.length,1);
+    assert.equal(api.current(),review);
+    assert.equal(api.captureCpuBulkReview("kill-mice",0,0,[make()]),null);
+    assert.equal(api.releaseCpuBulkReview({...review}),false);
+    assert.equal(api.releaseCpuBulkReview(review),true);
+    assert.equal(api.releaseCpuBulkReview(review),false);
+    assert.equal(api.current(),null);
 });

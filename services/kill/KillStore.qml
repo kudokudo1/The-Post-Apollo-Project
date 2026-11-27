@@ -97,6 +97,31 @@ Scope {
         return true;
     }
 
+    // One immutable recipient review. Candidate selection and final execution
+    // admission remain with the existing donor until Hunter custody moves.
+    property var cpuBulkReview: null
+
+    function captureCpuBulkReview(kind, metric, visibility, captures) {
+        if (cpuBulkReview || actionGate.pending || actionGate.busy || actionGate.bulkBlocked)
+            return null;
+        if (!Array.isArray(captures) || !captures.length
+                || new Set(captures.map(t => t.pid)).size !== captures.length)
+            return null;
+        const targets = Object.freeze(captures.map(t => Object.freeze(t)));
+        const label = kind === "kill-all" ? "ALL ELIGIBLE PROCESSES"
+            : kind === "kill-mice" ? "DETACHED IDLE LEAVES"
+            : ["COMBI","CPU","MEMORY","I/O","AGE"][metric] + " HOGS";
+        cpuBulkReview = Object.freeze({kind:kind, metric:metric, visibility:visibility,
+            label:label, targets:targets});
+        return cpuBulkReview;
+    }
+
+    function releaseCpuBulkReview(review) {
+        if (!review || cpuBulkReview !== review) return false;
+        cpuBulkReview = null;
+        return true;
+    }
+
     function snapshotCadence(cpu, resource, kill, taskFavorites, combi,
                              preload, target, favorites) {
         if (cpu) return 600;

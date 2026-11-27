@@ -11,6 +11,8 @@ PanelWindow {
     id: prismDock
     objectName: "prismDock"
     property bool menuOpen: false
+    // Expose the button's actual border identity to the associated widget.
+    readonly property color prismBorderColor: prismButton.idleBorderColor
     signal toggleRequested()
 
     anchors {

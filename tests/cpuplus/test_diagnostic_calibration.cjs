@@ -328,3 +328,36 @@ assert.deepEqual(plain(ctx.storageCadenceChoice(30,1,10,"sample",3)),{sampleSeco
 assert.deepEqual(plain(ctx.storageCadenceChoice(30,2,10,"report",7)),{sampleSeconds:2,reportSeconds:6});
 assert.equal(ctx.storageCadenceChoice(31,1,10,"sample",3),null);
 console.log("DIAG D5c-a responsive mechanical cadence choices PASS");
+
+
+// D10c mixed hardware evidence: exact calibration + absolute collector clocks.
+{
+    const configs=["hostcpu","gpu","diskio","swapio","netio"].map(kind=>({kind,durationSeconds:2,intervalMs:1000}));
+    const schemas=["post-apollo-host-cpu-v1","post-apollo-gpu-observation-v1","post-apollo-disk-io-v1","post-apollo-swap-io-v1","post-apollo-network-io-v1"];
+    const payloads=[
+        {aggregate:[200,80,10],cores:[[0,100,50,5,2500000],[1,100,30,5,null]],psiSomeAvg10:2.5},
+        {devices:[["card0","pci0000:00/0000:01:00.0",40,1048576,2097152,45000]]},
+        {devices:[["sda",8,0,42,2,1048576,4,3,2097152,6,7,10,1]]},
+        {memoryKiB:[16384,2048,8192,4096],swapBytes:[1048576,2097152],pressure:[2.5,.1,10000,1000],zram:[["zram0",4194304,1048576,1572864]]},
+        {interfaces:[["eth0",2,2,1,"up",125000,10,1,2,250000,20,3,4]]}
+    ];
+    const plan={durationSeconds:2,instruments:configs.map(({durationSeconds,...c})=>c)};
+    const instruments=configs.map((c,i)=>{
+        const first=1000+i*10,last=first+2000;
+        const sample={schema:schemas[i],event:c.kind,sequence:1,elapsedMs:1000,intervalMs:1000,...payloads[i]};
+        const end={schema:schemas[i],event:"complete",samples:2,observedMs:2000,calibration:c,
+            ...(c.kind==="swapio"?{pageSize:4096}:{}),startedMonotonicMs:first,monotonicMs:last};
+        return collected(c,[sample,{...sample,sequence:2,elapsedMs:2000},end],first,last);
+    });
+    const envelope={schema:"post-apollo-diagnostic-workflow-transport-v1",status:"COLLECTED",durationSeconds:2,
+        pinnedQuickshell:null,startedMonotonicMs:900,finishedMonotonicMs:3200,overlapMs:1960,instruments};
+    assert.equal(validateWorkflow(envelope,plan).complete,5);
+    for(const mutate of [
+        d=>d.instruments[0].records[2].startedMonotonicMs++,
+        d=>d.instruments[1].records[2].monotonicMs++,
+        d=>d.instruments[2].records[0].devices[0][5]=1,
+        d=>d.instruments[3].records[2].pageSize=3000,
+        d=>d.instruments[4].records[0].interfaces[0][5]=-1,
+        d=>d.overlapMs++,
+    ]){const bad=plain(envelope);mutate(bad);assert.equal(validateWorkflow(bad,plan),null);}
+}

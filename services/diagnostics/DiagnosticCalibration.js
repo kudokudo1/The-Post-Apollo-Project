@@ -152,9 +152,9 @@ function previewWorkflow(input) {
     const duration=input.durationSeconds, instruments=input.instruments;
     if (!Number.isSafeInteger(duration)||duration<1||duration>120)
         return refuse("INVALID SHARED DURATION");
-    if (!Array.isArray(instruments)||instruments.length<2||instruments.length>5
+    if (!Array.isArray(instruments)||instruments.length<2||instruments.length>10
             || Reflect.ownKeys(instruments).length!==instruments.length+1)
-        return refuse("SELECT TWO TO FIVE DISTINCT INSTRUMENTS");
+        return refuse("SELECT TWO TO TEN DISTINCT INSTRUMENTS");
     const seen=[], entries=[];
     for (let i=0;i<instruments.length;i++) {
         const descriptor=Object.getOwnPropertyDescriptor(instruments,String(i));
@@ -165,7 +165,7 @@ function previewWorkflow(input) {
         const kd=Object.getOwnPropertyDescriptor(item,"kind");
         if (!kd || !Object.prototype.hasOwnProperty.call(kd,"value")) return refuse("INVALID INSTRUMENT");
         const kind=kd.value;
-        if (!["threads","memory","census","storage","stall"].includes(kind)||seen.includes(kind))
+        if (!["threads","memory","census","storage","stall","hostcpu","gpu","diskio","swapio","netio"].includes(kind)||seen.includes(kind))
             return refuse("UNSUPPORTED OR DUPLICATE INSTRUMENT");
         const keys=kind==="threads"?["kind","intervalMs","topCount"]:
             kind==="storage"?(fields(item,["kind"])?["kind"]:["kind","sampleSeconds","reportSeconds"]):kind==="stall"?["kind","thresholdMs"]:["kind","intervalMs"];
@@ -177,7 +177,7 @@ function previewWorkflow(input) {
             estimatedObservations:preview.observations,maximumReportBytes:kind==="stall"?24000:65536});
     }
     // Canonical ordering is stable across UI selection order and saved presets.
-    const order=["threads","memory","census","storage","stall"];
+    const order=["threads","memory","census","storage","stall","hostcpu","gpu","diskio","swapio","netio"];
     entries.sort((a,b)=>order.indexOf(a.config.kind)-order.indexOf(b.config.kind));
     return {ok:true,schema:"post-apollo-diagnostic-workflow-plan-v1",durationSeconds:duration,
         instruments:entries,estimatedObservations:entries.reduce((sum,e)=>sum+e.estimatedObservations,0),
@@ -230,7 +230,7 @@ function workshopDraftFromPlan(plan) {
                 || Reflect.ownKeys(plan).length!==2 || !["durationSeconds","instruments"].every(k=>{
                     const d=Object.getOwnPropertyDescriptor(plan,k);return d && Object.prototype.hasOwnProperty.call(d,"value");
                 }) || !Array.isArray(plan.instruments)
-                || !plan.instruments.length || plan.instruments.length>5) return null;
+                || !plan.instruments.length || plan.instruments.length>10) return null;
         const kinds=["threads","memory","census","storage","stall","hostcpu","gpu","diskio","swapio","netio"];
         const items=plan.instruments;
         if (Reflect.ownKeys(items).length!==items.length+1 || items.some(c=>!c || Object.getPrototypeOf(c)!==Object.prototype

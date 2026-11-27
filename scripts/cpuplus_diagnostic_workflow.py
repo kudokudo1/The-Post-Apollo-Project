@@ -17,11 +17,16 @@ import time
 
 from syntagma_quickshell_thread_sampler import find_quickshell, parse_stat_line
 
-ORDER = ("threads", "memory", "census", "storage", "stall")
+CORE = ("threads", "memory", "census", "storage", "stall")
+HARDWARE = ("hostcpu", "gpu", "diskio", "swapio", "netio")
+ORDER = CORE + HARDWARE
+HARDWARE_SCHEMAS = {"hostcpu":"post-apollo-host-cpu-v1", "gpu":"post-apollo-gpu-observation-v1", "diskio":"post-apollo-disk-io-v1", "swapio":"post-apollo-swap-io-v1", "netio":"post-apollo-network-io-v1"}
 SCRIPTS = dict(zip(ORDER, ("syntagma_quickshell_thread_sampler.py",
                          "cpuplus_quickshell_memory_observer.py",
                          "cpuplus_process_census.py", "cpuplus_storage_observer.py",
-                         "cpuplus_stall_clock_witness.py")))
+                         "cpuplus_stall_clock_witness.py", "cpuplus_host_cpu_observer.py",
+                         "cpuplus_gpu_observer.py", "cpuplus_disk_io_observer.py",
+                         "cpuplus_swap_io_observer.py", "cpuplus_network_io_observer.py")))
 CHILD_BYTES = 65536
 ENVELOPE_BYTES = 300000
 PLAN_BYTES = 4096
@@ -50,7 +55,7 @@ def validate(plan):
     if type(plan) is not dict or set(plan) != {"durationSeconds", "instruments"}:
         raise ValueError("invalid workflow fields")
     duration, items = plan["durationSeconds"], plan["instruments"]
-    if not integer(duration, 1, 120) or type(items) is not list or not 2 <= len(items) <= 5:
+    if not integer(duration, 1, 120) or type(items) is not list or not 2 <= len(items) <= 10:
         raise ValueError("invalid workflow duration/count")
     configs = {}
     for item in items:
@@ -89,6 +94,9 @@ def validate(plan):
             elif kind == "memory":
                 if ms<5000 or ms%1000 or n>12:
                     raise ValueError("memory budget")
+            elif kind in HARDWARE:
+                if duration>30 or ms<1000 or ms>5000 or ms%1000 or n>12:
+                    raise ValueError("hardware budget")
             elif duration>60 or ms%1000 or n>3:
                 raise ValueError("census budget")
         configs[kind] = dict(item, durationSeconds=duration)
@@ -123,6 +131,8 @@ def commands(configs, data_dir, scripts, pinned):
                 args += ["--sample-seconds",str(c["sampleSeconds"]),"--report-seconds",str(c["reportSeconds"])]
         else:
             args += ["--interval", str(c["intervalMs"]/1000) if kind=="threads" else str(c["intervalMs"]//1000)]
+        if kind in HARDWARE:
+            args += ["--workflow-clock"]
         if kind == "threads":
             args += ["--top",str(c["topCount"])]
         if kind in ("threads","memory"):
@@ -151,11 +161,12 @@ def collect_children(argvs, duration, cancelled):
                 break
             try:
                 # No new process group: outer timeout can clean up the whole tree.
+                launch = now_ms()
                 child = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
                                          stdout=subprocess.PIPE,
                                          stderr=None if kind=="storage" else subprocess.DEVNULL)
                 children[kind]=child
-                launches[kind]=now_ms()
+                launches[kind]=launch
                 data[kind]=bytearray()
                 os.set_blocking(child.stdout.fileno(),False)
                 selector.register(child.stdout, selectors.EVENT_READ,kind)
@@ -233,6 +244,31 @@ def receipt(config, raw, pinned):
         return rows,first,last
     if end.get("event")!="complete":
         raise ValueError("missing terminal receipt")
+    if kind in HARDWARE:
+        # Relative sample times are bound to the collector's actual monotonic
+        # baseline, not guessed from process launch or completion.
+        first,last=end.get("startedMonotonicMs"),end.get("monotonicMs")
+        observed=end.get("observedMs")
+        count=(config["durationSeconds"]*1000+config["intervalMs"]-1)//config["intervalMs"]
+        if (end.get("schema")!=HARDWARE_SCHEMAS[kind]
+                or end.get("calibration")!=config or end.get("samples")!=count
+                or len(rows)!=count+1
+                or not integer(first,0,2**53-1) or not integer(last,first,2**53-1)
+                or not integer(observed,config["durationSeconds"]*1000,45000)
+                or last-first!=observed):
+            raise ValueError("hardware receipt mismatch")
+        previous=0
+        for i,row in enumerate(rows[:-1],1):
+            elapsed=row.get("elapsedMs")
+            if (row.get("schema")!=HARDWARE_SCHEMAS[kind] or row.get("event")!=kind
+                    or row.get("sequence")!=i or not integer(elapsed,previous+1,observed)
+                    or elapsed<min(i*config["intervalMs"],config["durationSeconds"]*1000)
+                    or row.get("intervalMs")!=elapsed-previous):
+                raise ValueError("hardware sample timing")
+            previous=elapsed
+        if previous!=observed:
+            raise ValueError("hardware terminal timing")
+        return rows,first,last
     if kind=="threads":
         start=rows[0]
         if (len(rows)<3 or start.get("event")!="start" or start.get("workshopSchema")!="post-apollo-thread-calibration-v1"

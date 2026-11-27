@@ -460,7 +460,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     const p={durationSeconds:2,instruments:[{kind:"hostcpu",intervalMs:1000}]};
     assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"CPU")',c),true);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"ALL")',c),false);
-    assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"hostcpu",intervalMs:1000},{kind:"census",intervalMs:1000}]}).ok',c),false);
+    assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"hostcpu",intervalMs:1000},{kind:"census",intervalMs:1000}]}).ok',c),true);
     const cfg={kind:"hostcpu",durationSeconds:2,intervalMs:1000};
     const a={schema:"post-apollo-host-cpu-v1",event:"hostcpu",sequence:1,elapsedMs:1000,intervalMs:1000,aggregate:[200,80,10],cores:[[0,100,50,5,2500000],[1,100,30,5,null]],psiSomeAvg10:2.5};
     const b={...a,sequence:2,elapsedMs:2000};
@@ -495,7 +495,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"GPU")',c),true);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"CPU")',c),false);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"ALL")',c),false);
-    assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"gpu",intervalMs:1000},{kind:"hostcpu",intervalMs:1000}]}).ok',c),false);
+    assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"gpu",intervalMs:1000},{kind:"hostcpu",intervalMs:1000}]}).ok',c),true);
 }
 
 
@@ -543,7 +543,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(call('workshopPlanMatchesSubject('+expr+',"ALL")'),false);
     assert.equal(call('workshopPlanMatchesSubject('+expr+',"GPU")'),false);
     assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+expr+')))'),expr);
-    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"diskio",intervalMs:1000},{kind:"storage"}]}).ok'),false);
+    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"diskio",intervalMs:1000},{kind:"storage"}]}).ok'),true);
     const launch=JSON.parse(call('JSON.stringify(observerLaunchPlan('+JSON.stringify(cfg)+',p=>"/local/"+p))'));
     assert.deepEqual(launch.args.slice(-6),["/local/scripts/cpuplus_disk_io_observer.py","--workshop","--duration","2","--interval","1"]);
     assert.equal(args("diskio"),null);
@@ -624,7 +624,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(call('workshopPlanMatchesSubject('+expr+',"NETWORK")'),true);
     assert.equal(call('workshopPlanMatchesSubject('+expr+',"ALL")'),false);
     assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+expr+')))'),expr);
-    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"netio",intervalMs:1000},{kind:"census",intervalMs:1000}]}).ok'),false);
+    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"netio",intervalMs:1000},{kind:"census",intervalMs:1000}]}).ok'),true);
     const launch=JSON.parse(call('JSON.stringify(observerLaunchPlan('+JSON.stringify(cfg)+',p=>"/local/"+p))'));
     assert.deepEqual(launch.args.slice(-6),["/local/scripts/cpuplus_network_io_observer.py","--workshop","--duration","2","--interval","1"]);
     assert.equal(args("netio"),null);
@@ -671,8 +671,29 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.match(w,/diagnosticSubject: cpuPlusWindow\.systemSubMode === "SWAP" \? "SWAP" : "MEMORY"/);
     assert.match(owner,/property var memoryWorkshopDraft:/);
     assert.match(workshop,/const standalone=\["hostcpu","gpu","diskio","swapio","netio"\]/);
-    assert.match(workshop,/draft\.selected\.filter\(k=>!standalone\.includes\(k\)\)/);
+    assert.match(workshop,/subject==="SYSTEM" \? draft\.selected\.slice\(\) : draft\.selected\.filter\(k=>!standalone\.includes\(k\)\)/);
     assert.match(workshop,/root\.filterTarget\.selectorColumns/);
     assert.match(parent,/property string diagnosticSubject: "MEMORY"/);
     assert.match(ui,/\["ALL","SYSTEM"\]\.includes\(root\.workshopSubject\)/);
+}
+
+
+// D10c: all ten can be active together; fixed pairs and independent GPU/host controls.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const plan={durationSeconds:10,instruments:[{kind:"threads",intervalMs:1000,topCount:4},{kind:"memory",intervalMs:10000},{kind:"census",intervalMs:10000},{kind:"storage"},{kind:"stall",thresholdMs:350},...["hostcpu","gpu","diskio","swapio","netio"].map(kind=>({kind,intervalMs:1000}))]};
+    const expr=JSON.stringify(plan);
+    assert.equal(vm.runInContext('previewWorkflow('+expr+').ok',c),true);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject('+expr+',"SYSTEM")',c),true);
+    assert.equal(vm.runInContext('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+expr+')))',c),expr);
+    assert.equal(vm.runInContext('previewWorkflow('+JSON.stringify({...plan,durationSeconds:30})+').ok',c),false);
+    assert.match(workshop,/const order=\["threads","hostcpu","memory","census","netio","stall","diskio","storage","gpu","swapio"\]/);
+    assert.match(workshop,/objectName: "cpuplusWorkshopHostCpuInterval"/);
+    assert.match(workshop,/objectName: "cpuplusWorkshopGpuInterval"/);
+    assert.match(parent,/objectName: "cpuplusMemoryDiagnosticsInfo"/);
+    const resource=read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml");
+    assert.match(resource,/readonly property int railColumns: general \? 5/);
+    assert.match(resource,/readonly property bool stacked: general && width<270/);
+    assert.match(resource,/wrapMode: Text.NoWrap/);
 }

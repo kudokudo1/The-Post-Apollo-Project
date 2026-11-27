@@ -61,15 +61,28 @@ Controls.Popup {
             clip: true
             spacing: 2
             model: Lifecycle.lifecycleTargets()
-            delegate: ActionButton {
+            delegate: Row {
+                id: targetRow
                 required property var modelData
-                objectName: "cpuplusLifecycle-"+modelData.id
                 width: ListView.view.width; height: 25
-                normalFace: true; accentColor: Colors.purple
-                label: (root.chosen.includes(modelData.id)?"✓ ":"")+modelData.label
-                selected: root.chosen.includes(modelData.id)
-                available: !root.locked
-                onLeftClicked: root.toggleId(modelData.id)
+                spacing: 3
+                ActionButton {
+                    objectName: "cpuplusLifecycle-"+targetRow.modelData.id
+                    width: Math.max(0,parent.width-47); height: parent.height
+                    normalFace: true; accentColor: Colors.purple
+                    label: (root.chosen.includes(targetRow.modelData.id)?"✓ ":"")+targetRow.modelData.label
+                    selected: root.chosen.includes(targetRow.modelData.id)
+                    available: !root.locked
+                    onLeftClicked: root.toggleId(targetRow.modelData.id)
+                }
+                ActionButton {
+                    objectName: "cpuplusLifecycleOnly-"+targetRow.modelData.id
+                    width: 44; height: parent.height
+                    normalFace: true; accentColor: Colors.cyan
+                    label: "ONLY"; labelPixelSize: 9
+                    available: !root.locked
+                    onLeftClicked: CpuPlusDiagnostics.setLifecycleSelection([targetRow.modelData.id])
+                }
             }
         }
         GohuText {

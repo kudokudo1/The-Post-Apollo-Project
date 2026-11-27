@@ -1,5 +1,11 @@
 name: Clock time settings contracts
 
+# Only the newest run for each PR/ref matters; cancel redundant older
+# Clock runs without skipping any check on the current code.
+concurrency:
+  group: clock-time-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     paths:
@@ -16,6 +22,7 @@ on:
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
       - "tests/time/test_clock_auto_check_contract.py"
+      - "tests/contract_levels/**"
       - "tests/time/test_clock_settings_submodes_contract.py"
       - "tests/time/test_clock_settings_compact_contract.py"
       - "tests/time/test_clock_auto_event_triggers_contract.py"
@@ -38,6 +45,7 @@ on:
       - "services/time/qmldir"
       - "tests/time/test_clock_settings_contract.py"
       - "tests/time/test_clock_auto_check_contract.py"
+      - "tests/contract_levels/**"
       - "tests/time/test_clock_settings_submodes_contract.py"
       - "tests/time/test_clock_settings_compact_contract.py"
       - "tests/time/test_clock_auto_event_triggers_contract.py"
@@ -53,13 +61,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify Python time control, popup and integration contracts
         run: |
-          python3 -m unittest discover -s tests/time -p 'test_clock_settings_contract.py' -v
-          python3 -m unittest discover -s tests/time -p 'test_clock_resync_popup_contract.py' -v
-          python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_contract.py' -v
-          python3 -m unittest discover -s tests/time -p 'test_clock_settings_submodes_contract.py' -v
-          python3 -m unittest discover -s tests/time -p 'test_clock_settings_compact_contract.py' -v
-          python3 -m unittest discover -s tests/time -p 'test_clock_auto_event_triggers_contract.py' -v
-          python3 -m unittest discover -s tests/time -p 'test_clock_auto_check_dedup_contract.py' -v
+          # Same seven suites, one Python startup and one aggregated report.
+          python3 -m unittest -v \
+            tests/time/test_clock_settings_contract.py \
+            tests/time/test_clock_resync_popup_contract.py \
+            tests/time/test_clock_auto_check_contract.py \
+            tests/time/test_clock_settings_submodes_contract.py \
+            tests/time/test_clock_settings_compact_contract.py \
+            tests/time/test_clock_auto_event_triggers_contract.py \
+            tests/time/test_clock_auto_check_dedup_contract.py
       - name: Check bounded visual calibration policy
         run: |
           node <<'JS'

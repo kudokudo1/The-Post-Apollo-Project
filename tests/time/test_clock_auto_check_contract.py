@@ -4,9 +4,14 @@ Static checks assert that no background path may invoke privileged RESYNC.
 The persisted cadence is tested separately through Node in the CI workflow.
 """
 from pathlib import Path
+import sys
 import unittest
 
+# Source-only contract helpers; this remains a Clock-owned test, not a native witness.
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tests" / "contract_levels"))
+from contract_levels import Contract, structural_invariants
+
 SERVICE = (ROOT / "services/time/TimeSettings.qml").read_text(encoding="utf-8")
 PANE = (ROOT / "widgets/TimeSettingsPane.qml").read_text(encoding="utf-8")
 DIAL = (ROOT / "components/SelectorDial.qml").read_text(encoding="utf-8")
@@ -74,18 +79,42 @@ class ClockAutoReferenceContracts(unittest.TestCase):
         self.assertIn("property int readoutPixelSize: 11", DIAL)
         self.assertIn("dialRoot.numericLabelPixelSize", DIAL)
         self.assertIn("dialRoot.textLabelPixelSize", DIAL)
-        # The readout now fits responsively while retaining the 11px cap.
-        readout = DIAL.split('objectName: "selectorDialReadableValue"', 1)[1].split(
-            "layer.effect:", 1
-        )[0]
-        self.assertIn("font.pixelSize: dialRoot.stopwatchFace ?", readout)
-        self.assertIn(
-            "Math.min(dialRoot.readoutPixelSize,Math.max(10,Math.floor(dialRoot.width*0.15)))",
-            readout,
-        )
-        self.assertIn("fontSizeMode: Text.HorizontalFit", readout)
-        self.assertIn("minimumPixelSize: 9", readout)
+        self.assert_readout_structure(DIAL)
         self.assertNotIn("font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7", DIAL)
+
+    @staticmethod
+    def assert_readout_structure(source):
+        # This is STRUCTURAL evidence, not a substitute for native font
+        # measurement. Protect the responsive cap/fit, not the exact formula.
+        marker = 'objectName: "selectorDialReadableValue"'
+        if marker not in source:
+            raise AssertionError("CLOCK-READOUT: MISSING_VIEW")
+        readout = source.split(marker, 1)[1].split("layer.effect:", 1)[0]
+        font_expression = readout.split("font.pixelSize:", 1)[-1].split(
+            "fontSizeMode:", 1
+        )[0]
+        requirement = Contract(
+            "CLOCK-READOUT-RESPONSIVE",
+            "Clock / shared SelectorDial",
+            "Readout remains bounded by its configured size and available width",
+            "STRUCTURAL",
+        )
+        structural_invariants(requirement, [
+            ("readout font expression present", "font.pixelSize:" in readout),
+            ("configured size bounds font", "dialRoot.readoutPixelSize" in font_expression),
+            ("available width contributes to sizing", "dialRoot.width" in font_expression),
+            ("font is upper-bounded", "Math.min(" in font_expression),
+            ("horizontal-fit rendering", "fontSizeMode: Text.HorizontalFit" in readout),
+            ("minimum readable size", "minimumPixelSize: 9" in readout),
+        ])
+
+    def test_readout_structure_rejects_regression(self):
+        # Negative witness: a fixed-size setting must not be silently accepted.
+        modified = DIAL.replace("fontSizeMode: Text.HorizontalFit",
+                                "fontSizeMode: Text.FixedSize")
+        self.assertNotEqual(modified, DIAL)
+        with self.assertRaisesRegex(AssertionError, "STRUCTURE_FAILED"):
+            self.assert_readout_structure(modified)
 
     def test_clock_dial_captures_wheel_and_drag_without_page_flick(self):
         # Both nested mouse areas must block their Flickable ancestor from

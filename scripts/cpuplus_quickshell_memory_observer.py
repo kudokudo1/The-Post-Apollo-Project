@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import time
 
-from syntagma_quickshell_thread_sampler import (find_quickshell, parse_stat_line,
+from syntagma_quickshell_thread_sampler import (find_quickshell, launching_quickshell, parse_stat_line,
                                                WorkshopOutput, WorkshopOutputLimit)
 
 FIELDS = ("Rss", "Pss", "Pss_Anon", "Pss_File", "Pss_Shmem",
@@ -110,11 +110,15 @@ def emit(record):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--pid", type=int)
+    p.add_argument("--parent-quickshell", action="store_true",
+                   help="Require the launching Quickshell; bounded workshop only")
     p.add_argument("--duration", type=int, default=120)
     p.add_argument("--interval", type=int, default=10)
     p.add_argument("--workshop", action="store_true")
     p.add_argument("--workshop-identity", nargs=2, type=int, metavar=("PID","START_TICKS"))
     a = p.parse_args(argv)
+    if a.parent_quickshell and (not a.workshop or a.pid is not None or a.workshop_identity):
+        p.error("parent Quickshell requires exclusive workshop selection")
     if a.workshop_identity and (not a.workshop or min(a.workshop_identity)<=0 or a.pid is not None):
         p.error("invalid workshop identity")
     if not 1 <= a.duration <= 1800 or not 5 <= a.interval <= 60:
@@ -128,7 +132,9 @@ def main(argv=None):
     send = WorkshopOutput().emit if a.workshop else emit
     uid = os.getuid()
     root = Path("/proc")
-    pid = a.pid if a.pid is not None else (a.workshop_identity[0] if a.workshop_identity else find_quickshell(root, uid))
+    pid = (launching_quickshell(root, uid=uid) if a.parent_quickshell else
+           a.pid if a.pid is not None else
+           a.workshop_identity[0] if a.workshop_identity else find_quickshell(root, uid))
     if pid is None:
         print("No same-user Quickshell found.", file=sys.stderr)
         return 2

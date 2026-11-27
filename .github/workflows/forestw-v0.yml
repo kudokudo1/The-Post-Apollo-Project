@@ -5,6 +5,7 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'widgets/ForestLocalRequestOwner.js'
       - 'widgets/ForestAutoPolicyPreview.qml'
       - 'scripts/forest/ui_routing_example.py'
       - 'scripts/forest/ui_binding_example.py'
@@ -37,6 +38,7 @@ on:
     paths:
       - 'modules/Forest.qml'
       - 'widgets/ForestW.qml'
+      - 'widgets/ForestLocalRequestOwner.js'
       - 'widgets/ForestAutoPolicyPreview.qml'
       - 'scripts/forest/ui_routing_example.py'
       - 'scripts/forest/ui_binding_example.py'
@@ -74,6 +76,7 @@ jobs:
       - name: Run Forest launcher and geometry regressions
         run: |
           python3 tests/forest/test_forest_launcher_contract.py
+          node tests/forest/test_forest_local_request_owner.cjs
           python3 tests/forest/test_forest_session_readonly_contract.py
           python3 tests/forest/test_forest_session_list_consumer_v1.py
           python3 tests/forest/test_forest_model_residency_ui.py

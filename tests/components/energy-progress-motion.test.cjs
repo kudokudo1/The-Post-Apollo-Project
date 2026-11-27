@@ -266,7 +266,7 @@ test("dominant clash lobe grows while losing lobe shrinks",()=>{
     assert.ok(currents.clashSizes(0,1).enemy>=1.8);
 });
 const pixel=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyPixelFire.js"),"utf8")+"\n({fire,velocity,lightMotion,falloff});");
+    "components/EnergyPixelFire.js"),"utf8")+"\n({fire,velocity,lightMotion,falloff,extinguish,releasedEmbers});");
 test("pixel fire waves, emits detached embers and stays static in reduced motion",()=>{
     const a=pixel.fire(42,0,false), b=pixel.fire(42,.75,false);
     assert.ok(a.cells.length>40 && a.cells.length<200);
@@ -589,4 +589,40 @@ test("reactive heat bed moves while stalled, stretches with speed and respects r
     assert.match(source,/if\(!material.erosion && inner\*p>0\)/);
     assert.match(source,/const active=c.createLinearGradient\(edge-span,mid,edge,mid\)/);
     assert.match(source,/c.fillRect\(edge-cap,fy,cap,fillHeight\)/);
+});
+
+test("all fire treatments extinguish on result without changing actual progress",()=>{
+    for(const mode of ["standard","ash-trail","burn-away"]){
+        assert.equal(pixel.extinguish("running",200,false,mode).flame,1);
+        assert.equal(pixel.extinguish("success",.4,false,mode).cooling,false);
+        const first=pixel.extinguish("success",.6,false,mode);
+        const mid=pixel.extinguish("success",1.1,false,mode);
+        assert.ok(first.active&&first.cooling&&first.flame<1&&first.flame>0);
+        assert.ok(mid.flame<first.flame&&mid.heat>mid.flame&&mid.scale<first.scale);
+        assert.equal(frame("success","measured",0,.6,.65,false,"flamethrower").fraction,1);
+        assert.equal(frame("failure","measured",0,.6,.65,false,"flamethrower").fraction,.65);
+        let heat=1;
+        for(let i=0;i<240;i++){
+            const s=pixel.extinguish("failure",i/100,false,mode);
+            assert.ok(s.heat<=heat+1e-9&&s.heat>=0&&s.flame>=0&&s.flame<=1);
+            heat=s.heat;
+        }
+        const end=pixel.extinguish("success",2.1,false,mode);
+        assert.equal(end.active,false); assert.equal(end.heat,0);
+        assert.equal(end.flame,0); assert.equal(end.embers,0);
+        assert.equal(pixel.extinguish("success",0,true,mode).active,false);
+        assert.equal(pixel.extinguish("idle",0,false,mode).active,false);
+    }
+    const a=pixel.releasedEmbers(.2),b=pixel.releasedEmbers(.8),end=pixel.releasedEmbers(1);
+    assert.equal(a.length,12);
+    for(let i=0;i<a.length;i++){
+        assert.ok(b[i].x<a[i].x&&b[i].alpha<a[i].alpha);
+        assert.equal(end[i].alpha,0);
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const field=fs.readFileSync(path.join(root,"components/EnergyPressureField.qml"),"utf8");
+    assert.match(source,/PixelFire.extinguish\(phase,elapsed,reducedMotion,fireMode\)/);
+    assert.match(source,/PixelFire.releasedEmbers\(fireState.cool\)/);
+    assert.match(source,/c.scale\(fireState.scale,fireState.scale\)/);
+    assert.match(field,/fire\?source.fireState.heat:1/);
 });

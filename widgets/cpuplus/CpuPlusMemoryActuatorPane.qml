@@ -575,6 +575,13 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
+        Item {
+            id: memoryCalibrationHost
+            objectName: "cpuplusMemoryCalibrationHost"
+            width: parent.width
+            height: 14
+            visible: root.page==="DIAG" && root.diagnosticSubject!=="ALL" && !!diagnosticPaneLoader.item && diagnosticPaneLoader.item.workshopOpen
+        }
     }
     Column {
         id: footer
@@ -828,6 +835,7 @@ Item {
                     workshopViewportHeight: scroll.height
                     workshopSubject: root.diagnosticSubject
                     workshopFilterTarget: diagnosticFilterHost
+                    workshopCalibrationTarget: root.diagnosticSubject==="ALL" ? null : memoryCalibrationHost
                     onNavigationChanged: scroll.contentY=0
                 }
             }

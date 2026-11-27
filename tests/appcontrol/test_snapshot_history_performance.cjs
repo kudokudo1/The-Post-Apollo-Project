@@ -799,6 +799,8 @@ test('APP row restore observes read, scan, assignment and deferred view without 
         const ix=body.indexOf(marker,prev+1);assert.ok(ix>prev,marker);prev=ix;
     }
     assert.match(app,/if \(!startMs \|\| !diagnosticCaptureActive\)\s*return 0/);
-    assert.match(app,/traceSequence = \(appControlSnapshotTraceEnabled \|\| diagnosticCaptureActive\)/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    assert.match(app,/property: "snapshotTraceEnabled"\s*value: appControlWindow\.appControlSnapshotTraceEnabled\s*\|\| appControlWindow\.diagnosticCaptureActive/);
+    assert.match(store,/const sequence = snapshotTraceEnabled \? \+\+snapshotTraceSequence : 0/);
     assert.match(app,/else if \(diagnosticCaptureActive\)\s*diagnosticWorkStage\(stage, elapsedMs, now\)/);
 });

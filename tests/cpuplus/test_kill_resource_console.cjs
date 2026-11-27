@@ -45,7 +45,7 @@ test("K8d QML is a contained presentation, no process mutator or helper",()=>{
     assert.match(ui,/label: "REVIEW"/);
     assert.match(ui,/label: "CLEAR DRAFT"/);
     assert.match(ui,/APPLY LOCKED/);
-    assert.match(ui,/function onValueRequested/);
+    assert.match(ui,/onValueRequested: function\(value\)/);
     for(const forbidden of ["Quickshell.execDetached","Process {","setLimitMiB(","setLimitPercent(","signalDispatch.exec(","prlimit(","onLeftClicked: workspace.gate.confirm"])
         assert.equal(ui.includes(forbidden),false,"forbidden actuator "+forbidden);
 });

@@ -3129,7 +3129,7 @@ PanelWindow {
                   : cpuPlusWindow.selectedModeIndex === 5
                   ? (cpuPlusWindow.idManagementSection === "IDS"
                      ? "ID MANAGEMENT // DETAILS" : "LOCAL // EDIT")
-                  : cpuResourceDiagnosticsLoader.active ? "CPU // DIAGNOSTICS"
+                  : cpuResourceDiagnosticsLoader.active ? cpuResourceDiagnosticsLoader.resourceSubject + " // DIAGNOSTICS"
                   : "CPU++ ACTUATORS"
 
             font.pixelSize: 12
@@ -3183,13 +3183,13 @@ PanelWindow {
             id: cpuResourceDiagnosticsLoader
             objectName: "cpuplusResourceDiagnosticsLoader"
             anchors.fill: memoryActuatorLoader
+            readonly property string resourceSubject: cpuPlusWindow.systemSubMode === "ALL"
+                ? String((cpuPlusWindow.selectedMonitorEntry() || {}).category || "").toUpperCase()
+                : cpuPlusWindow.systemSubMode
             active: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 3
-                    && (cpuPlusWindow.systemSubMode === "CPU"
-                        || (cpuPlusWindow.systemSubMode === "ALL" && String(
-                            (cpuPlusWindow.selectedMonitorEntry() || {}).category || ""
-                        ).toUpperCase() === "CPU"))
+                    && ["CPU","GPU"].includes(resourceSubject)
             visible: active
-            sourceComponent: CpuPlusResourceDiagnosticsPane { subject: "CPU" }
+            sourceComponent: CpuPlusResourceDiagnosticsPane { subject: cpuResourceDiagnosticsLoader.resourceSubject }
         }
 
         // All live Sway input mutations remain behind this exact-device

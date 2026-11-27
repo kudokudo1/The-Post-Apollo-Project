@@ -38,7 +38,17 @@ assert.match(owner,/if \(!busy \|\| !received \|\| !exited\) return/);
 assert.match(owner,/worker\.exec\(args\)/);
 assert.match(owner,/maximumReport: 65536/);
 assert.doesNotMatch(owner,/Component.onCompleted|repeat:\s*true|running:\s*true|pkexec|sudo/);
-assert.match(ui,/onLeftClicked:\s*\{\s*if \(CpuPlusDiagnostics.request\(modelData.kind\)\)/);
+// QUICK now dispatches only durable favorites through the existing bounded
+// fixed/configured capture entrypoints; the old per-kind button was retired.
+assert.match(ui,/model: !CpuPlusDiagnostics.workflowCatalogReady \? \[\] :/);
+assert.match(ui,/CpuPlusDiagnostics.workflowFavorites/);
+assert.match(ui,/CpuPlusDiagnostics.runFavoriteWorkflow\(modelData.id\)/);
+assert.match(ui,/CpuPlusDiagnostics.setWorkflowFavorite\(modelData.id,!modelData.favorite\)/);
+assert.match(owner,/if \(workshopPresetLocked \|\| !workflowStore.ready\) return false/);
+assert.match(owner,/const row=workflowStore.favorites.find\(r=>r.id===id\)/);
+assert.match(owner,/if \(!row\) return false/);
+assert.match(owner,/if \(row.execution==="fixed"\) return request\(row.kind\)/);
+assert.match(owner,/if \(row.execution==="configured"\) return requestWorkshopCapture\(row.plan\)/);
 assert.match(ui,/reportText.copy\(\)/);
 assert.match(parent,/active: root.page === "DIAG"\s+visible: active\s+sourceComponent: CpuPlusDiagnosticsPane/);
 assert.doesNotMatch(ui,/Process\s*\{|Timer\s*\{/);
@@ -55,7 +65,9 @@ assert.equal(policy.summarize("census",jsonl([sample,{...end,samples:2}])),null)
 assert.equal(policy.summarize("census",jsonl([{...sample,sequence:2},end])),null);
 assert.equal(policy.summarize("census",jsonl([{...sample,rows:[{...censusRow,writeBps:-1}]},end])),null);
 assert.match(policy.summarize("census",jsonl([{...sample,coverage:{truncated:true}},end])), /SCAN LIMIT REACHED/);
-assert.match(ui,/PROCESS CENSUS \/\/ 30s/);
+// QUICK labels are supplied by durable catalog rows, not the retired fixed list.
+assert.match(ui,/modelData.name\+\(modelData.execution==="configured"/);
+assert.match(ui,/modelData.kind==="appcontrol"\?" \/\/ 30s"/);
 
 const archived = {kind:"memory",id:"session-abc-def-1",status:"COMPLETE",summary:"summary",text:"raw",finishedAt:"2026-11-24T12:00:00.000Z"};
 const document = {schema:"post-apollo-diagnostic-archive-v1",rows:[archived],savedId:archived.id};
@@ -90,7 +102,10 @@ assert.equal(policy.summarize("storage",jsonl([{...storageSample,rows:[{...stora
 assert.equal(policy.argumentsFor("storage",p=>"/local/"+p),null);
 assert.deepEqual(JSON.parse(JSON.stringify(policy.argumentsFor("storage",p=>"/local/"+p,"/data"))).slice(-6),
     ["--data-dir","/data","--shell-dir","/local/.","--duration","30"]);
-assert.match(ui,/STORAGE OBSERVE \/\/ 30s/);
+// Storage's fixed adapter remains reachable through the durable QUICK
+// favorites owner; the retired hard-coded button label is not a contract.
+assert.match(owner,/if \(row.execution==="fixed"\) return request\(row.kind\)/);
+assert.match(ui,/modelData.name\+\(modelData.execution==="configured"/);
 assert.match(read("scripts/cpuplus_diagnostic_archive.py"),/KINDS = \{[^}]*"storage"/);
 const comparePolicy=vm.createContext({});
 vm.runInContext(read("services/diagnostics/DiagnosticComparison.js"),comparePolicy);

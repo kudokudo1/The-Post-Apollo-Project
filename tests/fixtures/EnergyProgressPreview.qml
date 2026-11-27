@@ -41,11 +41,13 @@ ShellRoot {
                 border.color: field.pressureColor
                 opacity: field.pressure * .55
             }
-            // Diffuse battlefield light behind all controls, tied to the
-            // occupied lengths of the two beams. Never changes input geometry.
+            // Foreground colored light washes over controls, not just the
+            // background. Strong territory color with a narrow soft overlap.
+            // Canvas has no input handler and stays below the success flash.
             Canvas {
                 id: battlefieldLight
                 anchors.fill: parent
+                z: 10
                 visible: field.clashLight !== null
                 renderTarget: Canvas.Image
                 onVisibleChanged: if(visible) requestPaint()
@@ -62,25 +64,21 @@ ShellRoot {
                     if(!light || width<=0 || height<=0) return;
                     const source=light.source;
                     const origin=source.mapToItem(battlefieldLight,source.width*light.fraction,source.height/2);
-                    function cast(start,end,color,power) {
-                        const span=end-start;
-                        if(span<=1 || power<=0) return;
-                        c.save();
-                        // Let the soft fields overlap instead of imposing a hard split.
-                        c.translate((start+end)/2,origin.y);
-                        c.scale(Math.max(span*.85,1),Math.max(height*.95,1));
-                        const g=c.createRadialGradient(0,0,0,0,0,1);
-                        g.addColorStop(0,Qt.rgba(color.r,color.g,color.b,power));
-                        g.addColorStop(.48,Qt.rgba(color.r,color.g,color.b,power*.55));
-                        g.addColorStop(1,Qt.rgba(color.r,color.g,color.b,0));
-                        c.fillStyle=g; c.fillRect(-1,-1,2,2);
-                        c.restore();
-                    }
                     const split=Math.max(0,Math.min(width,origin.x));
                     const heat=light.heat;
-                    const red=Qt.rgba(1,.90-.80*heat,.72-.56*heat,1);
-                    cast(0,split,source.energyColor,light.level*(.30+.70*light.fraction));
-                    cast(split,width,red,light.level*(.30+.70*(1-light.fraction)));
+                    const enemy=Qt.rgba(1,.67-.56*heat,.35-.20*heat,1);
+                    const blue=source.energyColor;
+                    const left=light.fraction>0?Math.min(.53,light.level*(.65+.55*light.fraction)):0;
+                    const right=light.fraction<1?Math.min(.53,light.level*(.65+.55*(1-light.fraction))):0;
+                    const blend=Math.min(source.height*.65,split,width-split);
+                    const lo=Math.max(0,(split-blend)/width);
+                    const hi=Math.min(1,(split+blend)/width);
+                    const g=c.createLinearGradient(0,0,width,0);
+                    g.addColorStop(0,Qt.rgba(blue.r,blue.g,blue.b,left));
+                    g.addColorStop(lo,Qt.rgba(blue.r,blue.g,blue.b,left));
+                    g.addColorStop(hi,Qt.rgba(enemy.r,enemy.g,enemy.b,right));
+                    g.addColorStop(1,Qt.rgba(enemy.r,enemy.g,enemy.b,right));
+                    c.fillStyle=g; c.fillRect(0,0,width,height);
                 }
             }
             // Small, rising fragments are deliberately outside the button.

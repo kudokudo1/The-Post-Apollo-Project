@@ -201,7 +201,7 @@ test("Ki Blast enemy heat grows through defeat and persists after impact", () =>
 });
 
 const currents=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact});");
+    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact,airFlow});");
 test("full-lane currents advance in opposite directions, with faster TRON", () => {
     const w=900,h=40;
     const left=currents.flow("ki-blast","standard","player",w,h,0,false);
@@ -227,10 +227,12 @@ test("fire wake distribution distinguishes live fire from cooled material", () =
     const a=currents.flow("flamethrower","ash-trail","player",w,h,2,false);
     const b=currents.flow("flamethrower","burn-away","player",w,h,2,false);
     const standard=currents.flow("flamethrower","standard","player",w,h,2,false);
-    assert.equal(JSON.stringify(a),JSON.stringify(b));
-    assert.ok(a.length>0 && a.every(r=>r.wake && r.x>=w-h*4.4-1e-9));
+    assert.ok(a.length===b.length && a.length>0);
+    assert.ok(a.every(r=>r.wake && r.x>=w-h*6-1e-9));
+    assert.ok(b.every(r=>r.wake && r.x>=w-h*4.4-1e-9));
+    assert.ok(Math.min(...a.map(r=>r.x))<Math.min(...b.map(r=>r.x)));
     assert.ok(standard.filter(r=>r.wake).length>standard.filter(r=>!r.wake).length);
-    assert.ok(standard.some(r=>!r.wake && r.x<w-h*4.4));
+    assert.ok(standard.some(r=>!r.wake && r.x<w-h*6.8));
     for(const variant of ["tron","ki-blast","flamethrower"]){
         assert.equal(currents.flow(variant,"standard","player",0,h,2,false).length,0);
         for(const r of currents.flow(variant,"standard","player",w,h,2,false)){
@@ -341,4 +343,32 @@ test("radiance is independent of core size and collision is overlapping",()=>{
     assert.match(source,/rx\*\(tron\?1.82:1.65\)/);
     assert.match(preview,/id: battlefieldLight/);
     assert.match(field,/clashLight: clashLight/);
+});
+
+test("rocket fire has a round head and a tapered tail; exterior speed stays local",()=>{
+    for(const mode of ["standard","ash-trail","burn-away"]){
+        const f=pixel.fire(42,0,true,mode);
+        const countAt=x=>f.cells.filter(c=>c.x===x).length;
+        const tip=Math.min(...f.cells.map(c=>c.x));
+        assert.ok(countAt(0)>countAt(5));
+        assert.ok(countAt(0)>countAt(tip));
+        assert.ok(countAt(0)>=10);
+    }
+    for(const w of [120,800,2400]){
+        const lines=currents.airFlow(w,40,.3,false);
+        assert.equal(lines.length,14);
+        for(const l of lines){
+            assert.ok(l.x>=-Math.min(w,40*5.8)-1e-9);
+            assert.ok(l.x+l.length<=1e-9);
+            assert.ok(Math.abs(l.y)>20 && l.alpha>=0 && l.alpha<=1);
+        }
+    }
+    assert.equal(currents.airFlow(800,40,1,true).length,0);
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/const contactWidth=/);
+    assert.match(source,/const plume=/);
+    assert.match(source,/Flow.airFlow/);
+    assert.match(source,/mix\(hotWhite,red,heat\*\.82\)/);
+    assert.match(preview,/id: battlefieldLight\s+anchors.fill: parent\s+z: 10/);
 });

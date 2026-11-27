@@ -197,16 +197,17 @@ Item {
                     const heat=f.enemyHeat;
                     const red=Qt.rgba(1,.10,.16,1);
                     const crimson=Qt.rgba(.53,.015,.05,1);
-                    const cyan=Qt.rgba(.71,1,1,1);
-                    const cool=Qt.rgba(.51,.78,.80,1);
-                    const warm=Qt.rgba(1,.91,.65,1);
+                    const cyan=Qt.rgba(.88,.88,.66,1);
+                    const cool=Qt.rgba(.77,.48,.34,1);
+                    const warm=Qt.rgba(1,.79,.39,1);
+                    const hotWhite=Qt.rgba(1,.94,.74,1);
                     c.save();
                     c.globalAlpha=f.enemyOpacity;
                     const g=c.createLinearGradient(0,y+1,0,y+h-1);
                     g.addColorStop(0,mix(cyan,red,heat));
                     g.addColorStop(.18,mix(cool,crimson,heat));
                     g.addColorStop(.38,mix(warm,red,heat));
-                    g.addColorStop(.50,mix(Colors.white,red,heat*.82));
+                    g.addColorStop(.50,mix(hotWhite,red,heat*.82));
                     g.addColorStop(.62,mix(warm,red,heat));
                     g.addColorStop(.82,mix(cool,crimson,heat));
                     g.addColorStop(1,mix(cyan,red,heat));
@@ -248,6 +249,18 @@ Item {
                     const enemyInk=mix(Colors.white,Qt.rgba(1,.10,.16,1),f.enemyHeat);
                     current(edge,inner*f.enemyFraction,"enemy",enemyInk,f.enemyOpacity);
                 }
+                // Exterior air currents are attached to the TRON front.
+                if(tron && f.headVisible) {
+                    const air=Flow.airFlow(inner*p,h,root.elapsed,root.reducedMotion);
+                    for(const line of air) {
+                        const left=edge+line.x, right=left+line.length, yy=mid+line.y;
+                        const g=c.createLinearGradient(left,yy,right,yy);
+                        g.addColorStop(0,tint(ink,0));
+                        g.addColorStop(.65,tint(ink,line.alpha*.75));
+                        g.addColorStop(1,tint(Colors.white,line.alpha));
+                        c.fillStyle=g; c.fillRect(left,yy,line.length,Math.max(1,h*.04));
+                    }
+                }
                 if (!f.headVisible && !(ki && f.clash && f.enemyOpacity>0)) return;
                 // All core and aura layers share the exact centerline.
                 function orb(rx,ry,stops,centerX) {
@@ -265,6 +278,47 @@ Item {
                 // optical glow. Detached embers rise from the moving front.
                 if(hot && p>0) {
                     const pixel=PixelFire.fire(h,root.elapsed,root.reducedMotion,root.fireMode);
+                    // Heat penetrates the material ahead of the flame.
+                    // Keep the already eroded/ashed region unchanged.
+                    const contactWidth=Math.min(w-1-(edge-x),h*1.4);
+                    if(contactWidth>0) {
+                        c.save(); c.beginPath(); c.rect(edge,y+1,contactWidth,h-2); c.clip();
+                        const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
+                        heated.addColorStop(0,tint(Colors.yellow,.76));
+                        heated.addColorStop(.23,tint(Colors.orange,.58));
+                        heated.addColorStop(.64,tint(Colors.red,.24));
+                        heated.addColorStop(1,tint(Colors.red,0));
+                        c.fillStyle=heated; c.fillRect(edge,y+1,contactWidth,h-2);
+                        for(let i=0;i<6;i++){
+                            const yy=y+2+i*(h-4)/5;
+                            c.fillStyle=tint(Colors.yellow,.25);
+                            c.fillRect(edge,yy,contactWidth*(.22+.28*(i%3)),1);
+                        }
+                        c.restore();
+                    }
+                    // Rocket exhaust: tapered back from the round head, hot
+                    // inner core and softer outer plume. The material modes
+                    // keep a shorter, localized combustion wake.
+                    const plume=Math.min(inner*p,h*(root.fireMode==="standard"?3.8:root.fireMode==="ash-trail"?1.85:1.35));
+                    if(plume>0) {
+                        for(let layer=0;layer<3;layer++){
+                            const breadth=h*(.55-layer*.12);
+                            const end=edge-plume*(1-layer*.16);
+                            const g=c.createLinearGradient(end,mid,edge+h*.22,mid);
+                            g.addColorStop(0,tint(Colors.red,0));
+                            g.addColorStop(.25,tint(Colors.red,.26+layer*.08));
+                            g.addColorStop(.68,tint(Colors.orange,.42+layer*.12));
+                            g.addColorStop(1,tint(Colors.yellow,.65+layer*.10));
+                            c.fillStyle=g;
+                            c.beginPath(); c.moveTo(end,mid);
+                            c.bezierCurveTo(end+plume*.35,mid-breadth*.18,
+                                edge-plume*.24,mid-breadth,edge+h*.22,mid-breadth*.50);
+                            c.lineTo(edge+h*.22,mid+breadth*.50);
+                            c.bezierCurveTo(edge-plume*.24,mid+breadth,
+                                end+plume*.35,mid+breadth*.18,end,mid);
+                            c.closePath(); c.fill();
+                        }
+                    }
                     const heat=root.fireMode==="burn-away"?1:root.fireMode==="ash-trail"?.83:.90;
                     orb(h*1.65,h*1.30,[[0,tint(Colors.yellow,.64*heat)],
                         [.27,tint(Colors.orange,.48*heat)],[.62,tint(Colors.red,.16*heat)],
@@ -273,7 +327,7 @@ Item {
                     const u=pixel.unit;
                     for(const cell of pixel.cells) {
                         c.fillStyle=palette[cell.heat];
-                        c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,Math.ceil(u*(root.fireMode==="burn-away"?1.05:root.fireMode==="ash-trail"?1.20:1.42)),u);
+                        c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,u,u);
                     }
                     for(const ember of pixel.embers) {
                         c.save(); c.globalAlpha=ember.alpha;
@@ -335,8 +389,8 @@ Item {
                     // Two overlapping cores. The stronger rounded sphere
                     // overdraws the weaker contact cap, never an empty plane.
                     const red=Qt.rgba(1,.10,.16,1);
-                    const enemyInk=mix(Qt.rgba(.65,1,1,1),red,f.enemyHeat);
-                    const enemyCore=mix(Qt.rgba(1,.94,.74,1),red,f.enemyHeat*.82);
+                    const enemyInk=mix(Qt.rgba(1,.70,.32,1),red,f.enemyHeat);
+                    const enemyCore=mix(Qt.rgba(1,.91,.66,1),red,f.enemyHeat*.82);
                     const contact=Flow.contact(p,f.enemyHeat,h,w);
                     const touching=p>0 && f.enemyFraction>0;
                     function compressed(side,color,core,alpha) {
@@ -395,9 +449,9 @@ Item {
                 } else if(hot) {
                     // Preserve the pixel silhouette. The existing plasma is
                     // now a soft, low-opacity light layer, not a solid ball.
-                    orb(rx*1.25,ry*1.22,[[0,tint(Colors.white,.45)],
-                        [.27,tint(Colors.yellow,.32)],[.55,tint(ink,.16)],
-                        [1,tint(ink,0)]]);
+                    orb(h*.94,h*.86,[[0,tint(Colors.white,.52)],
+                        [.26,tint(Colors.yellow,.42)],[.54,tint(Colors.orange,.30)],
+                        [.78,tint(Colors.red,.13)],[1,tint(ink,0)]],edge+h*.10);
                 } else {
                     orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
                         [0,tint(ink,Math.min(.98,.35*bright))],

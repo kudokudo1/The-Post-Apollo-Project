@@ -66,7 +66,7 @@ test("K8d2 top filters select one editor while retaining drafts",()=>{
     assert.ok(ui.includes("selected: root.selectedKey === modelData.key"));
     assert.ok(ui.includes("function selectResource(key)"));
     assert.ok(ui.includes("bodyScroll.contentY = 0"));
-    assert.ok(ui.includes("model: resourcePanel.spec.controls"));
+    assert.ok(ui.includes('model: resourcePanel.key==="memory" ? [] : resourcePanel.spec.controls'));
     assert.ok(ui.includes('model: ["off","manual","auto","hold"]'));
     assert.ok(ui.includes('visible: root.modeFor(resourcePanel.key) === "manual"'));
     const updated=draft.stageValue({}, "cpu", "nice", 8);
@@ -261,4 +261,27 @@ test("K8e3a disk class and level are explicit; no bandwidth defaults",()=>{
     assert.ok(ui.includes('root.modeFor("disk")==="manual" && ioRow.bestEffort'));
     assert.ok(ui.includes('PREVIEW // NOT OBSERVED'));
     assert.ok(ui.includes('objectName: "cpuPlusIoRealtimeLocked"'));
+});
+
+test("K8e4 memory editor shares existing owner draft, explicit restore and guarded review",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    const parent=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillWorkspace.qml"),"utf8");
+    assert.ok(ui.includes('objectName: "cpuPlusSharedMemorySlider"'));
+    assert.ok(ui.includes('maximumValue: 97'));
+    assert.ok(ui.includes('label: "RESTORE ORIGINAL"'));
+    assert.ok(ui.includes('available: root.memoryEditable && root.memoryManaged'));
+    assert.ok(ui.includes('Draft.summary(staged).length===0'));
+    assert.ok(ui.includes('root.memoryReviewRequested(root.memoryDraftPercent)'));
+    assert.ok(parent.includes('memoryDraftPercent: workspace.stagedLimitPercent'));
+    assert.ok(parent.includes('processView.presentation.limitResultFor(workspace.currentTask).message'));
+    assert.ok(parent.includes('return prepareAction("limit",percent);'));
+    assert.ok(parent.includes('percent!==stagedLimitPercent'));
+    assert.ok(parent.includes('percent>=0 && percent<=97'));
+    assert.ok(parent.includes('percent===100 && processView.hasSoftLimit()'));
+    assert.ok(parent.includes('RESTORE ORIGINAL LIMIT'));
+    assert.ok(parent.includes('processView.dangerActionUnlocked(currentTask,"limit")'));
+    // Existing percentage conversion plus maximum>=4*minimum guarantees
+    // a finite 97% request stays below the legacy 99.5% release threshold.
+    for (const ratio of [0,0.01,0.1,0.25])
+        assert.ok(ratio+(1-ratio)*97/98.5<0.995);
 });

@@ -199,11 +199,21 @@ Item {
                                 active.addColorStop(.65,Qt.rgba(ink.r,ink.g,ink.b,.07));
                                 active.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,.19));
                                 c.fillStyle=active; c.fillRect(edge-span,fy,span,fillHeight);
-                                const cap=Math.min(span,Math.max(1,h*.13));
-                                const tip=c.createLinearGradient(edge-cap,mid,edge,mid);
-                                tip.addColorStop(0,Qt.rgba(1,1,1,0));
-                                tip.addColorStop(1,Qt.rgba(ink.r*.7+.3,ink.g*.7+.3,ink.b*.7+.3,.15));
-                                c.fillStyle=tip; c.fillRect(edge-cap,fy,cap,fillHeight);
+                                // Narrow vertical light, not a solid cap or a
+                                // second Omnitrix sphere. Keep the dark gap clear.
+                                const rx=Math.min(inner*.25,Math.max(1.2,h*.16));
+                                const ry=Math.min(fillHeight*.5,Math.max(2.2,h*.42));
+                                c.save();
+                                c.beginPath(); c.rect(fx,fy,inner,fillHeight); c.clip();
+                                c.translate(edge,mid); c.scale(rx,ry);
+                                const eye=c.createRadialGradient(0,0,0,0,0,1);
+                                eye.addColorStop(0,Qt.rgba(1,1,1,.20));
+                                eye.addColorStop(.20,Qt.rgba(ink.r*.72+.28,ink.g*.72+.28,ink.b*.72+.28,.16));
+                                eye.addColorStop(.52,Qt.rgba(ink.r,ink.g,ink.b,.08));
+                                eye.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,0));
+                                c.fillStyle=eye;
+                                c.beginPath(); c.arc(0,0,1,0,2*Math.PI); c.fill();
+                                c.restore();
                             }
                         }
                     }

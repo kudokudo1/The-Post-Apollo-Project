@@ -1610,14 +1610,21 @@ for token in (
     'function finishProbe(exitCode)',
     'actual==comm and int(fields[19])==born',
     'safetyOwner.dangerActionUnlocked(row,kind)',
-    'controlOwner.sendSignal(req.pid,"-STOP")',
-    'controlOwner.sendSignal(req.pid,"-CONT")',
-    'controlOwner.sendSignal(req.pid,"-TERM")',
-    'controlOwner.restart(req.pid)',
+    'const sig = req.action === "freeze" ? "-STOP" : req.action === "resume" ? "-CONT" : "-TERM"',
+    'controlOwner.identitySignalCommand(req.pid,req.startTicks,req.name,sig)',
+    'controlOwner.identityRestartCommand(req.pid,req.startTicks,req.name)',
+    'signalDispatch.exec(command)',
+    'RESTART TIMEOUT // NO REPLACEMENT LAUNCHED',
     'presentationOwner.setLimitPercent(req.percent,row)',
     'REQUEST ISSUED // VERIFY OWNER STATE',
 ):
     assert token in owner_gate, f"Guarded AppControl gateway missing {token}"
+assert 'controlOwner.sendSignal(' not in owner_gate
+assert 'controlOwner.restart(' not in owner_gate
+process_control = (ROOT / "services/system/ProcessControl.qml").read_text(encoding="utf-8")
+for token in ('os.pidfd_open', 'signal.pidfd_send_signal', 'poll.poll(5000)', 'subprocess.Popen'):
+    assert token in process_control, f"Identity-bound process helper missing {token}"
+assert 'os.kill(pid,' not in process_control
 for token in (
     'pidToken.indexOf(":")',
     'startTicks: Number.isSafeInteger(startTicks)',

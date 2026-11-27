@@ -114,3 +114,30 @@ function heatFootprint(height,tipOffset,reach,speed) {
     const v=Math.max(0,Math.min(1,Number.isFinite(speed)?speed:0));
     return {ahead:tip+h*.55*r,behind:h*(.66+.32*v)*r};
 }
+
+// Rear contact follows the actual tail rather than painting a long fixed
+// strip. Only a compact margin extends beyond the last visible flame pixel.
+function rearHeatSpan(height,tailOffset,reach,baseSpan,heat,available) {
+    const h=Math.max(0,Number.isFinite(height)?height:0);
+    const tail=Math.max(0,Number.isFinite(tailOffset)?tailOffset:0);
+    const r=Math.max(0,Math.min(1.2,Number.isFinite(reach)?reach:0));
+    const base=Math.max(0,Number.isFinite(baseSpan)?baseSpan:0);
+    const cool=Math.max(0,Math.min(1,Number.isFinite(heat)?heat:0));
+    const space=Math.max(0,Number.isFinite(available)?available:0);
+    return Math.min(space,Math.max(base,tail+h*.30*r)*cool);
+}
+
+// Rebuild the empty chassis from left to right. The caller retains the
+// true completed progress and caption; no operation state changes here.
+function drawRepair(c,x,y,w,h,repair,background,border) {
+    const q=Math.max(0,Math.min(1,Number.isFinite(repair)?repair:0));
+    if(q<=0 || w<4 || h<4) return;
+    c.save();
+    if(q<1) {
+        c.beginPath(); c.rect(x,y,w*q,h); c.clip();
+    }
+    c.fillStyle=background; c.fillRect(x,y,w,h);
+    c.strokeStyle=border; c.lineWidth=1;
+    c.strokeRect(x+.5,y+.5,w-1,h-1);
+    c.restore();
+}

@@ -18,6 +18,7 @@ Column {
     readonly property string targetText: {
         if (draft.selected.includes("gpu")) return "TARGET // ALL DRM DEVICES";
         if (draft.selected.includes("hostcpu")) return "TARGET // HOST CPU";
+        if (subject==="STORAGE" && draft.selected.includes("storage")) return "TARGET // 18 KNOWN FILES";
         const qs=draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
         const system=draft.selected.some(k=>k==="census"||k==="storage");
         return qs && system ? "TARGET // QS + USER" : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";

@@ -332,6 +332,7 @@ function storageCadenceChoice(duration,sample,report,field,value) {
 function workshopSubjectKinds(subject) {
     if (subject==="CPU") return ["threads","census","hostcpu"];
     if (subject==="GPU") return ["gpu"];
+    if (subject==="STORAGE") return ["storage"];
     if (subject==="ALL") return ["threads","memory","census","storage","stall"];
     return [];
 }

@@ -1068,12 +1068,6 @@ PanelWindow {
         property: "donorHunterHost"
         value: appControlWindow
     }
-    Binding {
-        target: KillBackend.KillStore
-        property: "hunterVisibleWindows"
-        value: appControlWindow.windowDataReady && !appControlWindow.windowDataError
-            ? appControlWindow.swayWindows : null
-    }
 
     readonly property var thermalRows:
         systemTelemetry && Array.isArray(systemTelemetry.thermalRows)
@@ -2393,10 +2387,10 @@ PanelWindow {
     }
 
     // Live Sway window snapshot used by APPS/WINDOWS modes.
-    property var swayWindows: []
-    property var swayOutputNames: []
-    property bool windowDataReady: false
-    property string windowDataError: ""
+    readonly property var swayWindows: KillBackend.KillStore.windowInventory.windows
+    readonly property var swayOutputNames: KillBackend.KillStore.windowInventory.outputNames
+    readonly property bool windowDataReady: KillBackend.KillStore.windowInventory.ready
+    readonly property string windowDataError: KillBackend.KillStore.windowInventory.error
 
     // Real cross-application tab discovery through AT-SPI.
     //
@@ -12064,229 +12058,16 @@ PanelWindow {
         return names;
     }
 
-    function collectSwayOutputNames(node, names) {
-        if (!node)
-            return;
-
-        if (node.type === "output"
-                && node.name
-                && String(node.name).indexOf("__") !== 0
-                && names.indexOf(String(node.name)) === -1) {
-            names.push(String(node.name));
-        }
-
-        const children = node.nodes || [];
-
-        for (let i = 0; i < children.length; i++)
-            collectSwayOutputNames(children[i], names);
-
-        const floatingChildren = node.floating_nodes || [];
-
-        for (let i = 0; i < floatingChildren.length; i++)
-            collectSwayOutputNames(floatingChildren[i], names);
-    }
-
-    function collectSwayWindows(
-        node,
-        currentWorkspace,
-        currentOutput,
-        output,
-        inheritedFloating,
-        inheritedTabbed,
-        inheritedTabGroupId,
-        inheritedTabGroupName
-    ) {
-        if (!node)
-            return;
-
-        let workspace = currentWorkspace || "";
-        let outputName = currentOutput || "";
-        let floatingContext = !!inheritedFloating;
-        let tabbedContext = !!inheritedTabbed;
-        let tabGroupId = Number(inheritedTabGroupId || 0);
-        let tabGroupName = String(inheritedTabGroupName || "");
-
-        if (node.type === "output"
-                && node.name
-                && String(node.name).indexOf("__") !== 0)
-            outputName = String(node.name);
-
-        if (node.type === "workspace")
-            workspace = node.name || workspace;
-
-        // Sway commonly wraps floating clients in a floating_con. The client
-        // child itself may report floating:auto_off, so carry the state down.
-        if (node.type === "floating_con"
-                || String(node.floating || "").indexOf("_on") !== -1)
-            floatingContext = true;
-
-        // A client can sit several levels below the container that actually
-        // owns the tabbed layout, so carry tab-group ancestry down the tree.
-        //
-        // Sway normally reports layout:"tabbed". Some tree shapes are easier
-        // to recognize from representation:"T[...]", so support both.
-        const nodeLayout =
-            String(node.layout || "").trim().toLowerCase();
-        const nodeRepresentation =
-            String(node.representation || "").trim();
-
-        const beginsTabbedRepresentation =
-            nodeRepresentation.toUpperCase().indexOf("T[") === 0;
-
-        if (nodeLayout === "tabbed" || beginsTabbedRepresentation) {
-            tabbedContext = true;
-
-            if (node.id)
-                tabGroupId = Number(node.id);
-
-            tabGroupName =
-                String(node.name || workspace || "TABS");
-        }
-
-        const properties = node.window_properties || {};
-        const appId = node.app_id || "";
-        const className = properties.class || "";
-        const instance = properties.instance || "";
-        const hasIdentity = appId || className || instance;
-        const hasLiveClient = !!node.pid && !!node.name;
-
-        // Include ordinary tiled clients AND floating/centered clients whose
-        // compositor identity fields are sparse but still have a live pid/title.
-        if (node.type === "con" && (hasIdentity || hasLiveClient)) {
-            output.push({
-                id: node.id || 0,
-                name: node.name || "",
-                appId: appId,
-                className: className,
-                instance: instance,
-                pid: node.pid || 0,
-                focused: !!node.focused,
-                workspace: workspace,
-                output: outputName,
-                floating: floatingContext,
-                tabbed: tabbedContext || tabGroupId !== 0,
-                tabGroupId: tabGroupId,
-                tabGroupName: tabGroupName,
-                fullscreen: Number(node.fullscreen_mode || 0) !== 0,
-                rect: node.rect || {}
-            });
-        }
-
-        const children = node.nodes || [];
-
-        for (let i = 0; i < children.length; i++) {
-            collectSwayWindows(
-                children[i],
-                workspace,
-                outputName,
-                output,
-                floatingContext,
-                tabbedContext,
-                tabGroupId,
-                tabGroupName
-            );
-        }
-
-        const floatingChildren = node.floating_nodes || [];
-
-        for (let i = 0; i < floatingChildren.length; i++) {
-            collectSwayWindows(
-                floatingChildren[i],
-                workspace,
-                outputName,
-                output,
-                true,
-                tabbedContext,
-                tabGroupId,
-                tabGroupName
-            );
-        }
-    }
-
-    function consumeSwayTree(rawText) {
-        if (!rawText || rawText.trim().length === 0)
-            return;
-
-        try {
-            const tree = JSON.parse(rawText);
-            const windows = [];
-            const outputs = [];
-
-            collectSwayOutputNames(tree, outputs);
-            collectSwayWindows(
-                tree,
-                "",
-                "",
-                windows,
-                false,
-                false,
-                0,
-                ""
-            );
-
-            swayOutputNames = outputs;
-            swayWindows = windows;
-            pruneWindowMutePolicies(windows);
-            windowDataReady = true;
-            windowDataError = "";
-
-            let tabbedCount = 0;
-
-            for (let i = 0; i < windows.length; i++) {
-                if (windows[i].tabbed || windows[i].tabGroupId)
-                    tabbedCount++;
-            }
-
-            console.log(
-                "AppControl: Sway window snapshot:",
-                windows.length,
-                "windows,",
-                tabbedCount,
-                "tabbed clients on",
-                outputs.join(", ")
-            );
-
-            if (selectedModeIndex === windowsModeIndex)
-                scheduleWindowAudioProbe();
-        } catch (error) {
-            windowDataReady = false;
-            windowDataError = String(error);
-
-            console.log("AppControl: failed to parse Sway tree:", error);
-        }
-    }
-
     function refreshWindowState() {
-        swayTreeProcess.exec(["swaymsg", "-t", "get_tree"]);
+        KillBackend.KillStore.windowInventory.refresh();
     }
 
-    Process {
-        id: swayTreeProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                appControlWindow.consumeSwayTree(text);
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.trim().length > 0) {
-                    appControlWindow.windowDataError = text.trim();
-                    console.log("AppControl: swaymsg:", text.trim());
-                }
-            }
-        }
-    }
-
-    I3IpcListener {
-        subscriptions: ["window", "workspace"]
-
-        onIpcEvent: function (event) {
-            // Refresh from the authoritative tree after create/close/focus/move/
-            // title/workspace changes rather than trying to reconstruct state
-            // from individual events.
-            appControlWindow.refreshWindowState();
+    Connections {
+        target: KillBackend.KillStore.windowInventory
+        function onSnapshotPublished() {
+            appControlWindow.pruneWindowMutePolicies(appControlWindow.swayWindows);
+            if (appControlWindow.selectedModeIndex === appControlWindow.windowsModeIndex)
+                appControlWindow.scheduleWindowAudioProbe();
         }
     }
 

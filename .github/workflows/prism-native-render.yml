@@ -5,6 +5,7 @@ on:
     paths:
       - 'components/PrismButton.qml'
       - 'components/PrismBorderGlow.qml'
+      - 'components/PrismTextGlow.qml'
       - 'components/PrismArtwork.js'
       - 'tests/components/prism_native/**'
       - '.github/workflows/prism-native-render.yml'
@@ -46,11 +47,11 @@ jobs:
           scene="$work/config/prism"
           mkdir -p "$scene/components"
           cp tests/components/prism_native/shell.qml "$scene/shell.qml"
-          for name in ActionButton PrismButton PrismBorderGlow PrismArtwork Colors VisualLanguage GohuText SafeDropShadow; do
+          for name in ActionButton PrismButton PrismBorderGlow PrismTextGlow PrismArtwork Colors VisualLanguage GohuText SafeDropShadow; do
             if [ "$name" = PrismArtwork ]; then ext=js; else ext=qml; fi
             cp "components/$name.$ext" "$scene/components/$name.$ext"
           done
-          grep -E '^(singleton Colors|singleton VisualLanguage|ActionButton|PrismButton|PrismBorderGlow|GohuText|SafeDropShadow) ' components/qmldir > "$scene/components/qmldir"
+          grep -E '^(singleton Colors|singleton VisualLanguage|ActionButton|PrismButton|PrismBorderGlow|PrismTextGlow|GohuText|SafeDropShadow) ' components/qmldir > "$scene/components/qmldir"
           timeout --signal=TERM --kill-after=3s 18s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
           grep -q PRISM_NATIVE_DONE "$work/output"
           if grep -q PRISM_NATIVE_FAIL "$work/output"; then exit 1; fi
@@ -85,4 +86,11 @@ jobs:
                       bl[0]>bl[1]+8 and bl[1]>bl[2]+8 and
                       br[1]>br[0]+8 and br[2]>br[0]+8):
                   raise SystemExit("Prism rectangular halo missing or spectral corner orientation wrong")
+              # Interior glyph halo: exclude border and white lettering.
+              text_pixels=list(im.crop((30,85,120,115)).getdata())
+              colorful=sum(1 for r,g,b in text_pixels
+                           if max(r,g,b)-min(r,g,b)>35 and max(r,g,b)>65)
+              print("PRISM_NATIVE_TEXT_HALO",colorful,flush=True)
+              if colorful<20:
+                  raise SystemExit("Spectral text halo did not render")
           PY

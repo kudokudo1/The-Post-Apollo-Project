@@ -1,0 +1,15 @@
+name: CPU++ universal diagnostics
+on:
+  pull_request:
+    paths:
+      - "services/diagnostics/DiagnosticWidgetLifecycle.js"
+      - "tests/cpuplus/test_diagnostic_widget_lifecycle.cjs"
+      - ".github/workflows/cpuplus-universal-diagnostics.yml"
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/cpuplus/test_diagnostic_widget_lifecycle.cjs

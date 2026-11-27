@@ -24,6 +24,7 @@ ActionButton 1.0 ActionButton.qml
 InformationButton 1.0 InformationButton.qml
 PrismButton 1.0 PrismButton.qml
 PrismBorderGlow 1.0 PrismBorderGlow.qml
+PrismTextGlow 1.0 PrismTextGlow.qml
 DiagnosticsDockButton 1.0 DiagnosticsDockButton.qml
 DiagnosticsServicePopup 1.0 DiagnosticsServicePopup.qml
 VoiceToTextButton 1.0 VoiceToTextButton.qml

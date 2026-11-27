@@ -345,6 +345,10 @@ ShellRoot {
                 const selectedPanel=smoke.find(view,"cpuPlusResourceSelectedPanel");
                 const resourceInfo=smoke.find(view,"cpuPlusResourceInformationButton");
                 const resourcePopup=smoke.find(view,"cpuPlusResourceInformationPopup");
+                const headerSection=smoke.find(view,"cpuPlusResourceHeaderSection");
+                const headerResourceTitle=smoke.find(view,"cpuPlusResourceSelectedTitle");
+                const headerCapability=smoke.find(view,"cpuPlusResourceCapabilityStatus");
+                const controlsScroll=smoke.find(view,"cpuPlusResourceConsoleScroll");
                 const headerDivider=smoke.find(view,"cpuPlusResourceHeaderDivider");
                 const footerDivider=smoke.find(view,"cpuPlusResourceFooterDivider");
                 const draftActions=smoke.find(view,"cpuPlusResourceDraftActionsStrip");
@@ -408,10 +412,21 @@ ShellRoot {
                     ? primarySlider.mapToItem(primaryInstrument,0,0) : null;
                 const clearPosition=clearDraft ? clearDraft.mapToItem(consolePane,0,0) : null;
                 const footerPosition=footerDivider ? footerDivider.mapToItem(consolePane,0,0) : null;
+                const headerTop=headerSection ? headerSection.mapToItem(consolePane,0,0) : null;
+                const controlsTop=controlsScroll ? controlsScroll.mapToItem(consolePane,0,0) : null;
+                if (!smoke.check(headerSection && headerResourceTitle
+                        && headerCapability && controlsScroll && headerTop && controlsTop
+                        && headerSection.height>=112
+                        && controlsTop.y>=headerTop.y+headerSection.height-1
+                        && headerResourceTitle.visible
+                        && headerCapability.text.indexOf("NOT VERIFIED")>=0
+                        && headerResourceTitle.text.indexOf("CPU")>=0,
+                        "KILL right header is fixed, substantial, and controls begin below it")) return;
                 if (!smoke.check(resourceInfo && resourcePopup && !resourcePopup.visible
                         && headerDivider && Qt.colorEqual(headerDivider.color,"#D16041")
                         && infoPosition && filterPosition
-                        && Math.abs(infoPosition.x+resourceInfo.width-consolePane.width)<2
+                        && infoPosition.x+resourceInfo.width<=consolePane.width+1
+                        && infoPosition.x+resourceInfo.width>=consolePane.width-16
                         && infoPosition.y>=filterPosition.y+cpuFilter.height-1,
                         "resource information control is top-right below filters with red header rule")) return;
                 if (!smoke.check(primaryModes && primaryInstrument && primarySlider

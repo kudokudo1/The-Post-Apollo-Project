@@ -135,6 +135,7 @@ Column {
             }
         });
     }
+    onSubjectChanged: disarm()
     onVisibleChanged: if (!visible) disarm()
     onLockedChanged: if (locked) disarm()
     onPlanTextChanged: disarm()

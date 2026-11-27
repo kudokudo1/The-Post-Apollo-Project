@@ -34,9 +34,32 @@ Scope {
     readonly property string archiveStatus: archive.status
     readonly property bool archiveBusy: archive.busy
     DiagnosticReportArchive { id: archive }
+    // One durable catalog owner across demand-loaded diagnostic views.
+    DiagnosticWorkflowStore { id: workflowStore }
+    readonly property var workflowRows: workflowStore.rows
+    readonly property var workflowFavorites: workflowStore.favorites
+    readonly property string workflowCatalogStatus: workflowStore.status
+    readonly property bool workflowCatalogReady: workflowStore.ready
+    readonly property bool workflowCatalogBusy: workflowStore.busy
+    function loadWorkflowCatalog() {
+        if (busy || archiveBusy || faulted || setActive || workflowStore.busy) return false;
+        return workflowStore.load();
+    }
+    function setWorkflowFavorite(id, value) {
+        if (workshopPresetLocked || !workflowStore.ready) return false;
+        return workflowStore.edit({action:"favorite",id:id,favorite:value});
+    }
+    function runFavoriteWorkflow(id) {
+        if (workshopPresetLocked || !workflowStore.ready) return false;
+        const row=workflowStore.favorites.find(r=>r.id===id);
+        if (!row) return false;
+        if (row.execution==="fixed") return request(row.kind);
+        if (row.execution==="configured") return requestWorkshopCapture(row.plan);
+        return false;
+    }
 
     function loadHistory() {
-        if (busy || setActive) return false;
+        if (busy || setActive || workflowCatalogBusy) return false;
         return archive.invoke({action: "list"});
     }
     function selectLatest(job) {
@@ -155,7 +178,7 @@ Scope {
     // D4a session presets. Persistence is a separate catalog milestone.
     property var workshopPresets: []
     property string workshopPresetFeedback: "SESSION ONLY // NO DISK SAVE"
-    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive
+    readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive || workflowCatalogBusy
     function saveWorkshopPreset(name, subject = "ALL") {
         if (workshopPresetLocked) return false;
         if (typeof name!=="string" || !/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(name) || name.trim()!==name) {
@@ -318,7 +341,7 @@ Scope {
     }
 
     function request(job, configuration) {
-        if (busy || faulted || worker.running || archive.busy || (setActive && !setDispatching)) return false;
+        if (busy || faulted || worker.running || archive.busy || workflowCatalogBusy || (setActive && !setDispatching)) return false;
         const configured = configuration !== undefined;
         const plan = configured
             ? (job === "workflow"

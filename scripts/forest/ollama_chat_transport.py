@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import argparse
 import http.client
+import hashlib
 import json
 import socket
 import sys
 import threading
 import time
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from typing import Any
 
 from ollama_inventory import InventoryFailure, VALID_NAME, _target
@@ -104,22 +106,25 @@ def _strict_json(data: bytes) -> object:
         raise ChatRefusal("INVALID_STREAM_JSON") from exc
 
 
-def stream_chat(
+@dataclass(frozen=True, slots=True)
+class PreparedChatRequest:
+    """Exact B2 request bytes, not a grant. Do not log the body or digest."""
+    model: str
+    host: str
+    port: int
+    body: bytes = field(repr=False)
+    body_sha256: str = field(repr=False)
+
+
+def prepare_chat_request(
     *,
     model: str,
     messages: list[dict[str, str]],
     endpoint: str = "http://127.0.0.1:11434",
     max_predict: int = 256,
     num_ctx: int = 4096,
-    cancel_event: threading.Event | None = None,
-) -> Iterator[dict[str, object]]:
-    """Yields STARTED, DELTA*, COMPLETE. Raises ChatRefusal on any failure.
-
-    COMPLETE is the only signal suitable for later durable journal commit.
-    An optional host-owned, single-operation Event may be set from another
-    thread; never clear or reuse it. Closing a generator is still supported.
-    Cancellation closes only this HTTP exchange, not the Ollama process.
-    """
+) -> PreparedChatRequest:
+    """Validate and serialize without opening a connection or storing a turn."""
     model = _model_name(model)
     messages = _messages(messages)
     max_predict = _number(max_predict, lower=1, upper=MAX_OUTPUT_TOKENS,
@@ -138,6 +143,37 @@ def stream_chat(
         # Default modest context/prediction limits avoid huge cold starts.
         "options": {"num_predict": max_predict, "num_ctx": num_ctx},
     }, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    return PreparedChatRequest(model, host, port, payload,
+                               hashlib.sha256(payload).hexdigest())
+
+
+def stream_chat(
+    *,
+    model: str,
+    messages: list[dict[str, str]],
+    endpoint: str = "http://127.0.0.1:11434",
+    max_predict: int = 256,
+    num_ctx: int = 4096,
+    cancel_event: threading.Event | None = None,
+    expected_request: PreparedChatRequest | None = None,
+) -> Iterator[dict[str, object]]:
+    """Yields STARTED, DELTA*, COMPLETE. Raises ChatRefusal on any failure.
+
+    COMPLETE is the only signal suitable for later durable journal commit.
+    An optional host-owned, single-operation Event may be set from another
+    thread; never clear or reuse it. Closing a generator is still supported.
+    Cancellation closes only this HTTP exchange, not the Ollama process.
+    An optional original prepared request pins exact endpoint and POST bytes
+    before connect. Matching bytes do not establish execution authority.
+    """
+    prepared = prepare_chat_request(model=model, messages=messages,
+                                    endpoint=endpoint, max_predict=max_predict,
+                                    num_ctx=num_ctx)
+    model, host, port, payload = (prepared.model, prepared.host,
+                                  prepared.port, prepared.body)
+    if expected_request is not None:
+        if type(expected_request) is not PreparedChatRequest or expected_request != prepared:
+            raise ChatRefusal("REQUEST_BINDING_MISMATCH")
     if cancel_event is not None and type(cancel_event) is not threading.Event:
         raise ChatRefusal("INVALID_CANCEL_EVENT")
     deadline = time.monotonic() + TOTAL_SECONDS

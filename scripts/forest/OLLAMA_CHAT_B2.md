@@ -84,3 +84,33 @@ attempt. B3 integration is deliberately unchanged pending shared ownership
 agreement. The focused tests exercise pre-dispatch refusal, stalled headers,
 partial-line cancellation, deadline and cancellation between events using
 public disposable loopback fixtures only.
+
+## Real ForestW request binding (source-only)
+
+For the real local P0 path, `prepare_chat_request` uses B2's existing
+validator and exact JSON encoder without I/O. The returned immutable
+request retains resolved loopback host/port, model, exact POST bytes and
+SHA256. Never log the object body or digest; it is not authority. The
+owner may supply `expected_request` to `stream_chat`: any mismatch in
+validated destination or payload refuses before connect. A matching
+request does not authorize a POST, authenticate an installed artifact,
+prove resource capacity or grant output release. Existing B2 callers
+and its CLI retain their previous behavior. No new executable entry,
+QML binding, provider admission, or model invocation is added here.
+
+P0 owner plan: UI1 captures the actual original draft and selected model
+from ForestW SEND, held until an independently admitted host exists.
+Runtime must retain the approved public input and selected settings,
+use the same B2 preparation for original commitment and exact B3/R3
+stream dispatch, and independently fence authority and resource admission
+before the POST. Mind's existing exact-input M2/B3 path uses a disposable
+in-memory journal. The original worker consumes R3 and projects bounded
+same-row replacement snapshots; UI2 renders only the independently
+current original view. STOP uses original R2/R3 control independent of
+blocked B2 I/O; close withdraws output and must not imply provider idle.
+No fixed mock substitution, new journal, tools, protected history,
+model pull, fallback, retry, or shared-service change. H9 A–F, H13 and
+First Light trial checklist still require actual host, installed digest,
+exclusive runner, preventive RAM/CPU/device/time/egress limits, original
+custody and one explicit operator trial authorization; Stage1 hosted
+staging is separate. Actual SEND binding and execution remain HOLD.

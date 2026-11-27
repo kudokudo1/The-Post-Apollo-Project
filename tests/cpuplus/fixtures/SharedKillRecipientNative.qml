@@ -144,6 +144,11 @@ ShellRoot {
         property alias taskMiniHunterMetricHistories: fakeHistory.taskMiniHunterMetricHistories
         property alias taskMiniDisplayRevision: fakeHistory.taskMiniDisplayRevision
         property bool destructiveConfirmOpen: false
+        readonly property bool donorActionBlocked: destructiveConfirmOpen
+        readonly property var safety: QtObject {
+            function dangerReason(row) { return fakeOwner.taskDangerReason(row); }
+            function requiresDangerUnlock(row) { return fakeOwner.taskRequiresDangerUnlock(row); }
+        }
         property var cpuBulkReview: null
         property bool cpuBulkOperation: false
         property string hunterOperationPhase: "idle"
@@ -406,6 +411,15 @@ ShellRoot {
                 info.open=false;
                 if (!smoke.check(!info.visible && !infoButton.selected,
                     "information closes without action")) return;
+                fakeOwner.destructiveConfirmOpen=true;
+                if (!smoke.check(view.legacyActionBlocked
+                    && !view.prepareAction("end")
+                    && !view.canChangeLock(view.currentTask)
+                    && fakeGate.preparations===0,
+                    "shared legacy exclusion refuses competing actions")) return;
+                fakeOwner.destructiveConfirmOpen=false;
+                if (!smoke.check(!view.legacyActionBlocked,
+                    "legacy exclusion releases with owner state")) return;
                 if (!smoke.check(view.toggleLock(view.currentTask,"restart",false)
                     && view.lockMode(view.currentTask,"restart")==="once"
                     && view.lockMode(view.currentTask,"kill")===""

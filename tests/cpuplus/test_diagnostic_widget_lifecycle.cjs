@@ -1,0 +1,48 @@
+const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
+const assert=require("node:assert/strict");
+const ctx=vm.createContext({assert});
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../../services/diagnostics/DiagnosticWidgetLifecycle.js"),"utf8"),ctx);
+function verify(assert,P) {
+    const ids=P.lifecycleIds();
+    assert(ids.length===15&&new Set(ids).size===15,"stable distinct targets");
+    assert(P.validSelection(ids)&&P.validSelection(["git"]),"all and individual");
+    assert(!P.validSelection([])&&!P.validSelection(["git","git"])&&!P.validSelection(["unknown"]),"invalid selections");
+    assert(!P.validSelection(Array(1)),"sparse selection refused");
+    assert(!P.lifecycleStart(["git"],{git:false,extra:true},1000,5000),"snapshot extra refused");
+    assert(!P.lifecycleStart(["git"],{git:1},1000,5000),"nonboolean refused");
+    assert(!P.lifecycleStart(["git"],{git:false},1000,999),"duration bound");
+    const initial={git:false,hospital:true};
+    const run=P.lifecycleStart(["git","hospital"],initial,1000,5000);
+    initial.git=true;
+    assert(run.initial.git===false,"snapshot detached");
+    assert(!P.lifecycleObserve(run,"forest",true,1100)&&run.events.length===0,"unselected ignored");
+    assert(P.lifecycleObserve(run,"git",true,2000),"open");
+    assert(P.lifecycleObserve(run,"git",true,2100)&&run.events.length===1,"duplicate ignored");
+    assert(P.lifecycleObserve(run,"hospital",false,3000),"close initial open");
+    assert(P.lifecycleObserve(run,"git",false,4000),"close");
+    assert(P.lifecycleObserve(run,"git",true,5000),"reopen");
+    const report=P.lifecycleFinish(run,6000,"COMPLETE");
+    assert(report.status==="COMPLETE"&&report.elapsedMs===5000,"exact completion");
+    assert(report.stats[0].openMs===3000&&report.stats[0].opens===2&&report.stats[0].closes===1,"open occupancy");
+    assert(report.stats[1].openMs===2000&&report.stats[1].opens===0&&report.stats[1].closes===1,"initial-open occupancy");
+    assert(report.events.length===4&&report.events[0].atMs===1000,"relative events");
+    report.events[0].open=false;
+    assert(run.events[0].open===true,"detached report");
+    assert(P.lifecycleFinish(run,5500,"CANCELLED").status==="CANCELLED","cancel partial");
+    assert(P.lifecycleFinish(run,5500,"COMPLETE").status==="FAILED","early completion refused");
+    assert(P.lifecycleFinish(run,6001,"COMPLETE").status==="FAILED","late completion refused");
+    assert(P.lifecycleFinish(run,4999,"CANCELLED")===null,"finish before event refused");
+    const backwards=P.lifecycleStart(["git"],{git:false},1000,5000);
+    P.lifecycleObserve(backwards,"git",true,3000);
+    assert(!P.lifecycleObserve(backwards,"git",false,2999)&&P.lifecycleFinish(backwards,6000,"COMPLETE").status==="FAILED","clock rollback");
+    const over=P.lifecycleStart(["git"],{git:false},1000,5000);
+    for(let i=0;i<512;i++)assert(P.lifecycleObserve(over,"git",i%2===0,1000+i),"bounded event "+i);
+    assert(!P.lifecycleObserve(over,"git",true,2000)&&P.lifecycleFinish(over,6000,"COMPLETE").status==="FAILED","overflow fails closed");
+    const late=P.lifecycleStart(["git"],{git:false},1000,5000);
+    assert(!P.lifecycleObserve(late,"git",true,6001)&&late.fault==="CAPTURE DEADLINE EXCEEDED","late event fails");
+    const all=P.lifecycleStart(ids,Object.fromEntries(ids.map(id=>[id,false])),0,1000);
+    assert(P.lifecycleFinish(all,1000,"COMPLETE").stats.length===15,"all quiet windows reported");
+}
+
+vm.runInContext(verify.toString()+"\nverify(assert,{lifecycleIds,validSelection,lifecycleStart,lifecycleObserve,lifecycleFinish});",ctx);
+console.log("universal lifecycle contract PASS");

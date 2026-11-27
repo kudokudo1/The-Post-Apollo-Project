@@ -87,6 +87,10 @@ import "../../components"
                             ];
                             if (taskManagerBody.metricGraphSelectionEnabled) {
                                 const extra = presentationState.taskExtraDetailHistories || {};
+                                const swap = extra.swap || [];
+                                metrics[4] = {id:"swap",label:"SWAP",value:swap.length && taskManagerBody.graphDataAvailable
+                                    ? Number(swap[swap.length-1]).toFixed(1)+" MiB" : "N/A",
+                                    baseAccent:Colors.resourceColor("swap"),critical:false,noFavorite:true};
                                 const io = extra.io || [];
                                 metrics.push({id:"io",label:"I/O",value:io.length && taskManagerBody.graphDataAvailable
                                     ? Number(io[io.length-1]).toFixed(2)+" MiB/s" : "N/A",

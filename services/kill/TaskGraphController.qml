@@ -116,7 +116,7 @@ QtObject {
         presentationState.taskHistoryPid = 0;
         presentationState.taskCpuHistory = [];
         presentationState.taskMemHistory = [];
-        presentationState.taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: []});
+        presentationState.taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: [], swap: []});
         presentationState.taskHunterDetailHistories = ({
             cpu: [], mem: [], io: [], age: [], combined: []
         });
@@ -144,7 +144,7 @@ QtObject {
         }
 
         presentationState.taskHistoryPid = pid;
-        presentationState.taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: []});
+        presentationState.taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: [], swap: []});
 
         const preload =
             Array.isArray(preloadedCpu) && preloadedCpu.length > 0
@@ -226,10 +226,11 @@ QtObject {
         const values = {
             rss: data.rssObserved === true ? data.rssKiB / 1024 : null,
             threads: data.threadCount,
+            swap: typeof data.swapKiB === "number" && Number.isSafeInteger(data.swapKiB) && data.swapKiB >= 0 ? data.swapKiB / 1024 : null,
             io: data.ioRateObserved === true ? data.ioRateBytes / (1024 * 1024) : null,
             age: data.ageObserved === true ? data.ageSeconds / 60 : null
         };
-        for (const key of ["rss", "threads", "io", "age"]) {
+        for (const key of ["rss", "threads", "io", "age", "swap"]) {
             const value = values[key];
             if (typeof value !== "number" || !Number.isFinite(value) || value < 0
                     || (key === "threads" && (!Number.isSafeInteger(value) || value < 1))) {

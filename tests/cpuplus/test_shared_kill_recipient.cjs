@@ -1111,19 +1111,22 @@ test("K7d: observed extra metric samples and no fabricated missing history", () 
     const b=src.indexOf("\n    Process {",a);
     let now=1000;
     const parse=new Function("Date", "let detailProbeGeneration=2,detailProbeActiveGeneration=2,detailProbePid=4321,detailProbeLastTicks=-1,detailProbeLastIoBytes=-1,detailProbeLastMs=0,detailProbeRequest={pid:4321,startTicks:98765,fallbackCpu:11};"+src.slice(a,b)+"\nreturn parseDetailProbe;")({now:()=>now});
-    const first=parse("4321 100 2048 100000 100 4 1000 98765 1000 29");
+    const first=parse("4321 100 2048 100000 100 4 1000 98765 1000 29 65536");
+    assert.equal(first.swapKiB,65536);
     assert.equal(first.threadCount,29);
     assert.equal(first.rssObserved,true);
     assert.equal(first.ioRateObserved,false);
     assert.equal(first.ageObserved,true);
     now=2000;
-    const second=parse("4321 200 3072 100000 100 4 1049576 98765 1001 30");
+    const second=parse("4321 200 3072 100000 100 4 1049576 98765 1001 30 0");
+    assert.equal(second.swapKiB,0);
     assert.equal(second.ioRateObserved,true);
     assert.equal(second.ioRateBytes,1048576);
     now=3000;
     const unavailable=parse("4321 300 - 100000 100 4 - 98765 - -");
     assert.equal(unavailable.rssObserved,false);
     assert.equal(unavailable.threadCount,null);
+    assert.equal(unavailable.swapKiB,null);
     assert.equal(unavailable.ioRateObserved,false);
     assert.equal(unavailable.ageObserved,false);
     now=4000;
@@ -1132,16 +1135,17 @@ test("K7d: observed extra metric samples and no fabricated missing history", () 
     const graph=read("services/kill/TaskGraphController.qml");
     const start=graph.indexOf("    function appendExtraDetailHistories(");
     const end=graph.indexOf("    function applyDetailProbe(",start);
-    const state={taskExtraDetailHistories:{rss:[],threads:[],io:[],age:[]},taskHistoryLimit:3};
+    const state={taskExtraDetailHistories:{rss:[],threads:[],io:[],age:[],swap:[]},taskHistoryLimit:3};
     const append=new Function("presentationState",graph.slice(start,end)+"\nreturn appendExtraDetailHistories;")(state);
     append(first); append(second);
     assert.deepEqual(state.taskExtraDetailHistories.rss,[2,3]);
     assert.deepEqual(state.taskExtraDetailHistories.threads,[29,30]);
+    assert.deepEqual(state.taskExtraDetailHistories.swap,[64,0]);
     assert.deepEqual(state.taskExtraDetailHistories.io,[1]);
     for(let n=0;n<4;n++) append(second);
     assert.equal(state.taskExtraDetailHistories.rss.length,3);
     append(unavailable);
-    assert.deepEqual(state.taskExtraDetailHistories,{rss:[],threads:[],io:[],age:[]});
+    assert.deepEqual(state.taskExtraDetailHistories,{rss:[],threads:[],io:[],age:[],swap:[]});
     assert.match(recipient,/objectName: "cpuPlusDetailGraph-"\+extraMetric.modelData.key/);
     assert.match(recipient,/historyLimit: history.taskHistoryLimit\s*scrollDuration: history.taskGraphScrollDuration/);
     assert.match(read("services/kill/KillStore.qml"),/id: cpuGraph[\s\S]*?extraDetailHistoryEnabled: true/);
@@ -1152,7 +1156,7 @@ test("K7e: metric cards select at most two graphs and preserve fixed quick contr
     const b=recipient.indexOf("\n    readonly property var gate",a);
     assert.ok(a>=0 && b>a);
     const api=new Function("let selectedGraphKeys=['cpu','mem'];"+recipient.slice(a,b)+"\nreturn {toggleMetricGraph,get:()=>selectedGraphKeys};")();
-    for (const [key,want] of [["rss",["mem","rss"]],["threads",["rss","threads"]],["rss",["threads"]],["combined",["combined","score"]],["io",["io"]],["pid",["io"]],["io",[]]]) {
+    for (const [key,want] of [["rss",["mem","rss"]],["threads",["rss","threads"]],["rss",["threads"]],["combined",["combined","score"]],["io",["io"]],["pid",["io"]],["swap",["io","swap"]],["io",["swap"]],["swap",[]]]) {
         api.toggleMetricGraph(key);
         assert.deepEqual(api.get(),want);
     }
@@ -1166,4 +1170,20 @@ test("K7e: metric cards select at most two graphs and preserve fixed quick contr
     assert.match(recipient,/viewportHeight: Math.max\(1,actuatorScroll.height - quickFooter.height - 24\)/);
     assert.doesNotMatch(recipient,/cpuPlusKillActuatorScroll/);
     assert.match(recipient,/contentHeight: height\s*interactive: false/);
+});
+
+test("K7f: swap replaces PID only in recipient cards and identity stays readable",()=>{
+    assert.match(donorView,/metrics\[4\] = \{id:"swap",label:"SWAP"/);
+    assert.match(donorView,/baseAccent:Colors.resourceColor\("swap"\)/);
+    assert.match(recipient,/\{key:"swap", label:"SWAP", unit:" MiB"/);
+    assert.match(recipient,/workspace.reviewInk\("PID ", Colors.magenta\)/);
+    assert.match(recipient,/workspace.reviewInk\(workspace.selectedPid, Colors.white\)/);
+    assert.match(recipient,/objectName: "cpuPlusProcessIdentityMetadata"[\s\S]*?color: Colors.magenta; transparentBorder: true/);
+    const src=read("services/system/ProcessTelemetry.qml");
+    const a=src.indexOf("    function refreshDetailProbe(");
+    const b=src.indexOf("    function parseDetailProbe(",a);
+    const probe=src.slice(a,b);
+    assert.match(probe,/\^VmRSS:/);
+    assert.match(probe,/\^VmSwap:/);
+    assert.equal((probe.match(/\/proc\/\$pid\/status/g)||[]).length,1);
 });

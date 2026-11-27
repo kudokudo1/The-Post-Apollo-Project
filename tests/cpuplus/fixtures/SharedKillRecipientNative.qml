@@ -347,6 +347,9 @@ ShellRoot {
                     && Math.abs(glyph.y+glyph.height/2-identityText.y-identityText.height/2)<1
                     && Qt.colorEqual(glyph.color,"#D16041")
                     && glyph.layer.enabled && name.layer.enabled && metadata.layer.enabled && stateLabel.layer.enabled
+                    && !smoke.find(view,"taskMetricCard-pid")
+                    && smoke.find(view,"taskMetricCard-swap")
+                    && metadata.text.indexOf("PID ")>=0
                     && gutter.x>=8 && gutter.y>=8,
                     "red identity glyph beside centered glowing text and graph halo gutter")) return;
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
@@ -510,7 +513,7 @@ ShellRoot {
                     && fakeHistory.taskCpuHistory[fakeHistory.taskCpuHistory.length-1]!==37,
                     "general snapshot and wrong birth do not feed selected detail")) return;
                 if (!smoke.check(fakeSession.accept({pid:3442,startTicks:967833,
-                    cpuPercent:37,memPercent:7,rssKiB:23456,rssObserved:true,threadCount:29,
+                    cpuPercent:37,memPercent:7,rssKiB:23456,rssObserved:true,threadCount:29,swapKiB:65536,
                     ioRateBytes:1024,ioRateObserved:true,ageSeconds:55,ageObserved:true}),
                     "exact dedicated probe feeds shared history")) return;
                 smoke.previousRevision=initial;
@@ -534,7 +537,7 @@ ShellRoot {
                         "fixed quick controls within non-scrolling viewport")) return;
                 // Select through the actual metric card signal, verify the
                 // extra renderer mounts and that quick controls do not move.
-                for (const [metric,card,expected] of [["rss","rss",23456/1024],["threads","threads",29],["io","io",1024/1048576],["age","uptime",55/60]]) {
+                for (const [metric,card,expected] of [["rss","rss",23456/1024],["threads","threads",29],["io","io",1024/1048576],["age","uptime",55/60],["swap","swap",64]]) {
                     const toggle=smoke.find(view,"taskMetricToggle-"+card);
                     if (!smoke.check(toggle && toggle.enabled,"metric toggle "+card)) return;
                     toggle.clicked(null);
@@ -550,7 +553,8 @@ ShellRoot {
                 if (!smoke.check(!smoke.find(view,"cpuPlusDetailGraph-rss")
                     && !smoke.find(view,"cpuPlusDetailGraph-threads")
                     && !smoke.find(view,"cpuPlusDetailGraph-io")
-                    && !smoke.find(view,"cpuPlusDetailGraph-age"),
+                    && !smoke.find(view,"cpuPlusDetailGraph-age")
+                    && !smoke.find(view,"cpuPlusDetailGraph-swap"),
                     "unselected extra graph renderers released")) return;
                 smoke.previousMiniOffset=mini.graphScrollOffset;
                 smoke.previousCpuOffset=detail.cpuCanvas.graphScrollOffset;

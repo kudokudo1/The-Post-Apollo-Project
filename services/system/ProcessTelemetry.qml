@@ -69,6 +69,8 @@ Scope {
 
     // Read-only process telemetry. Mutation (freeze/limit/terminate/restart)
     // deliberately remains outside this service.
+    // Detail-only channels cannot launch all-process probes.
+    property bool detailOnly: false
     property var rows: []
     property bool snapshotLoading: false
     property string snapshotError: ""
@@ -97,7 +99,7 @@ Scope {
     signal detailProbeRetryRequested()
 
     function refreshSnapshot() {
-        if (snapshotLoading)
+        if (detailOnly || snapshotLoading)
             return;
 
         snapshotLoading = true;
@@ -299,7 +301,7 @@ Scope {
     }
 
     function refreshMiniProbe(request) {
-        if (miniProbeLoading)
+        if (detailOnly || miniProbeLoading)
             return;
 
         const items = Array.isArray(request) ? request : [];
@@ -445,19 +447,19 @@ Scope {
             "-lc",
             "pid=" + String(pid) + "; "
             + "[ -r /proc/$pid/stat ] || exit 0; "
-            + "stat=$(awk '{sub(/^.*[)] /,\"\"); print $12+$13, $20}' /proc/$pid/stat 2>/dev/null) || exit 0; "
-            + "set -- $stat; [ \"$#\" -eq 2 ] || exit 0; ticks=$1; start=$2; "
+            + "stat=$(awk '{sub(/^.*[)] /,\"\"); print $12+$13, $20, $18}' /proc/$pid/stat 2>/dev/null) || exit 0; "
+            + "set -- $stat; [ \"$#\" -eq 3 ] || exit 0; ticks=$1; start=$2; threads=$3; "
             + "rss=$(awk '/^VmRSS:/{print $2; exit}' /proc/$pid/status 2>/dev/null); "
             + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
             + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
             + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
-            + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2} END{print sum+0}' /proc/$pid/io 2>/dev/null); "
+            + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2; n++} END{if(n==2) printf \"%.0f\", sum+0; else print \"-\"}' /proc/$pid/io 2>/dev/null); "
             + "birth=$(awk '{sub(/^.*[)] /,\"\"); print $20}' /proc/$pid/stat 2>/dev/null); "
             + "[ \"$birth\" = \"$start\" ] || exit 0; "
             + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "
-            + "printf '%s %s %s %s %s %s %s %s %s\\n' "
-            + "\"$pid\" \"$ticks\" \"${rss:-0}\" \"${total:-1}\" \"$clk\" \"$cores\" "
-            + "\"${io:-0}\" \"${start:-0}\" \"${uptime:-0}\""
+            + "printf '%s %s %s %s %s %s %s %s %s %s\\n' "
+            + "\"$pid\" \"$ticks\" \"${rss:--}\" \"${total:-1}\" \"$clk\" \"$cores\" "
+            + "\"${io:--}\" \"${start:-0}\" \"${uptime:--}\" \"${threads:--}\""
         ]);
     }
 
@@ -472,12 +474,16 @@ Scope {
 
         const pid = Number(fields[0] || 0);
         const ticks = Number(fields[1] || 0);
-        const rssKiB = Number(fields[2] || 0);
+        const rssObserved = /^\d+$/.test(fields[2]) && Number.isSafeInteger(Number(fields[2]));
+        const rssKiB = rssObserved ? Number(fields[2]) : 0;
         const totalKiB = Math.max(1, Number(fields[3] || 1));
         const tickRate = Math.max(1, Number(fields[4] || 100));
-        const ioBytes = Math.max(0, Number(fields[6] || 0));
+        const ioObserved = /^\d+$/.test(fields[6]) && Number.isSafeInteger(Number(fields[6]));
+        const ioBytes = ioObserved ? Number(fields[6]) : 0;
         const startTicks = Math.max(0, Number(fields[7] || 0));
-        const uptimeSeconds = Math.max(0, Number(fields[8] || 0));
+        const uptimeSeconds = Math.max(0, Number(fields[8]) || 0);
+        const threadCount = /^[1-9]\d*$/.test(fields[9] || "")
+            && Number.isSafeInteger(Number(fields[9])) ? Number(fields[9]) : null;
         const nowMs = Date.now();
         const request = detailProbeRequest || ({});
 
@@ -507,8 +513,11 @@ Scope {
         const memPercent = Math.max(0, (rssKiB / totalKiB) * 100.0);
 
         let ioRateBytes = Math.max(0, Number(request.fallbackIoRate || 0));
+        const ioRateObserved = ioObserved && detailProbePid === pid
+            && detailProbeLastIoBytes >= 0 && ioBytes >= detailProbeLastIoBytes
+            && detailProbeLastMs > 0 && nowMs > detailProbeLastMs;
 
-        if (detailProbePid === pid
+        if (ioObserved && detailProbePid === pid
                 && detailProbeLastIoBytes >= 0
                 && detailProbeLastMs > 0) {
             const ioElapsed =
@@ -524,7 +533,7 @@ Scope {
 
         detailProbePid = pid;
         detailProbeLastTicks = ticks;
-        detailProbeLastIoBytes = ioBytes;
+        detailProbeLastIoBytes = ioObserved ? ioBytes : -1;
         detailProbeLastMs = nowMs;
 
         return {
@@ -533,8 +542,13 @@ Scope {
             cpuPercent: cpuPercent,
             memPercent: memPercent,
             rssKiB: rssKiB,
+            rssObserved: rssObserved,
+            threadCount: threadCount,
             ioRateBytes: ioRateBytes,
-            ageSeconds: ageSeconds
+            ioRateObserved: ioRateObserved,
+            ageSeconds: ageSeconds,
+            ageObserved: /^\d+(\.\d+)?$/.test(fields[8])
+                && uptimeSeconds >= startTicks / tickRate
         };
     }
 

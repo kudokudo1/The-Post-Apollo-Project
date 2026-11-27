@@ -296,9 +296,9 @@ assert.match(workshop,/root.changeStorageCadence\(cadenceRow.field,-1\)/);
 assert.match(workshop,/storagePreview.observations/);
 
 assert.match(workshop,/compactLayout: viewportHeight > 0 && viewportHeight < 480/);
-assert.match(workshop,/instrumentHeight: verticalLayout \? Math.max\(76,Math.min\(112,Math.floor\(viewportHeight\*0.47\)\)\) : compactLayout \? 112 : Math.min\(240,176\+/);
+assert.match(workshop,/instrumentHeight: mediumSystemDials && draft.selected.includes\("storage"\) \? Math.max\(154,Math.min\(184,Math.floor\(viewportHeight\*0.53\)\)\)/);
 assert.match(workshopSlider,/height: root\.vertical \? root\.verticalTravel : \(root\.compact \? 22 : 32\)/);
-assert.match(workshopSlider,/width: root\.vertical \? Math\.min\(parent\.width,32\) : parent\.height\s+height: root\.vertical \? parent\.height : parent\.width/);
+assert.match(workshopSlider,/width: root\.vertical \? Math\.min\(parent\.width,48\) : parent\.height\s+height: root\.vertical \? parent\.height : parent\.width/);
 assert.match(ui,/viewportHeight: root.workshopViewportHeight/);
 console.log("DIAG D3c adaptive full-width layout contracts PASS");
 
@@ -364,7 +364,7 @@ assert.match(ui,/filterTarget: root.workshopFilterTarget/);
 assert.match(read("components/SelectorSlider.qml"),/property bool responsiveHardware: false/);
 assert.match(read("components/SelectorSlider.qml"),/property bool energizedValueFill: false/);
 
-assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialWidth>=92/);
+assert.match(workshop,/storageMechanical: !smallestStorageLayout && storageDialWidth>=\(mediumSystemDials\?76:92\)/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorage-sample-dial"/);
 assert.match(workshop,/objectName: "cpuplusWorkshopStorage-report-dial"/);
 assert.doesNotMatch(workshop,/storageDialCell/);
@@ -747,3 +747,26 @@ assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/resourc
     assert.equal(policy.combineAppControl(jsonl(rows),[{tsMs:1000,mode:"fake"}],[],false),null);
 }
 console.log("CPU++ K7a exclusive donor/recipient comparison PASS");
+
+
+// D10e: SYSTEM-only upright controls, remaining viewport, divider order.
+assert.match(workshop,/verticalLayout: subject==="SYSTEM" && viewportHeight>0/);
+assert.match(workshop,/rackTravel: Math.max\(45,Math.floor\(viewportHeight-\(lowerInstrumentCount>0\?instrumentHeight\+spacing:0\)-34\)\)/);
+assert.ok(ui.indexOf('id: pinnedExecutionHost')<ui.indexOf('objectName: "cpuplusDiagFooterDivider"'));
+assert.ok(ui.indexOf('objectName: "cpuplusDiagFooterDivider"')<ui.indexOf('objectName: "cpuplusDiagBottomControls"'));
+assert.match(parent,/y: workHeader.y\+diagnosticCapacityHeader.y\+diagnosticCapacityHeader.dividerBottom\+3/);
+assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/y: header.y\+resourceDivider.y\+resourceDivider.height\+3/);
+{
+    const size=w=>Math.max(1,Math.min(36,Math.floor((w-Math.max(52,Math.min(145,Math.floor(w*.36)))-16)/5)));
+    for(let w=100;w<=1600;w++){
+        const rail=5*size(w)+12;
+        assert.ok(w-rail-4>=Math.max(52,Math.min(145,Math.floor(w*.36))));
+        assert.ok(size(w)<=36);
+    }
+    assert.ok(size(240)>17 && size(320)>size(240));
+}
+
+assert.match(workshop,/parent: root.calibrationTarget \|\| executionColumn/);
+assert.match(ui,/calibrationTarget: root.workshopCalibrationTarget/);
+assert.match(parent,/workshopCalibrationTarget: root.diagnosticSubject==="ALL" \? null : memoryCalibrationHost/);
+assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/workshopCalibrationTarget: calibrationHost/);

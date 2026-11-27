@@ -53,7 +53,13 @@ ShellRoot {
         const info=findItem(paneItem,"cpuplusResourceDiagnosticsInfo");
         const host=findItem(paneItem,"cpuplusResourceFilterHost");
         const rail=findItem(paneItem,"cpuplusWorkshopFilterRail");
-        if(!band||!block||!target||!divider||!info||!host||!rail) return false;
+        const popup=findItem(paneItem,"cpuplusResourceDiagnosticsInfoPopup");
+        const workshop=findItem(paneItem,"cpuplusDiagnosticWorkshop");
+        const slider=findItem(paneItem,"cpuplusWorkshopDuration-hardware");
+        if(!band||!block||!target||!divider||!info||!host||!rail||!popup||!workshop||!slider) return false;
+        const calibration=findItem(paneItem,"cpuplusWorkshopCalibrationStatus");
+        const calibrationHost=findItem(paneItem,"cpuplusResourceCalibrationHost");
+        if(!calibration||!calibrationHost||calibration.parent!==calibrationHost)return false;
         const pos=item=>item.mapToItem(paneItem,0,0);
         const horizontal = Math.abs(pos(block).x-pos(band).x)<1
             && Math.abs(pos(host).x+host.width-pos(band).x-band.width)<1
@@ -71,7 +77,10 @@ ShellRoot {
             && pos(host).y+host.height<=pos(band).y+band.height+1;
         return target.visible && target.text.length>0 && rail.parent===host
             && pos(info).y+info.height<=pos(divider).y+1
+            && pos(popup).y>=pos(divider).y+divider.height
+            && (paneItem.subject==="SYSTEM" || (!workshop.verticalLayout && slider.rotation===90))
             && pos(divider).y+divider.height<=pos(band).y+1
+            && pos(calibration).y>=pos(band).y+band.height
             && (band.stacked ? stacked : horizontal)
             && Math.abs(rail.height-host.height)<1
             && Math.abs(rail.width-host.width)<1;
@@ -1320,6 +1329,17 @@ ShellRoot {
                 if(!root.check(w && host && host.selectorColumns===5
                     && root.resourceStatusGeometry(resourcePane.item)
                     && w.draft.selected.length===10,"SYSTEM wide rail retains vertical pairs and draft"))return;
+                nativeWindow.width=480;
+                root.phase=670;return;
+            }
+            if(root.phase===670 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const box=root.findItem(resourcePane.item,"cpuplusWorkshopStorageInstrument");
+                const pair=root.findItem(resourcePane.item,"cpuplusWorkshopStorageDialPair");
+                if(!w||!box||!pair)return;
+                if(!root.check(w.verticalLayout && w.mediumSystemDials && w.storageMechanical && pair.visible
+                    && box.y>=0 && box.y+box.height<=box.parent.height+1
+                    && root.resourceStatusGeometry(resourcePane.item),"SYSTEM medium mechanical dials and bounded enclosure"))return;
                 nativeWindow.width=160;
                 root.phase=671;return;
             }
@@ -1332,12 +1352,15 @@ ShellRoot {
                 const execute=root.findItem(resourcePane.item,"cpuplusWorkshopExecute");
                 const nav=root.findItem(resourcePane.item,"cpuplusDiagBottomControls");
                 const slider=root.findItem(w,"cpuplusWorkshopDuration-hardware");
+                const footerDivider=root.findItem(resourcePane.item,"cpuplusDiagFooterDivider");
                 if(!root.check(w&&host&&block&&band&&!band.stacked
                     && block.x+block.width<=host.x && host.x+host.width<=band.width+1
                     && w.draft.selected.length===10 && w.verticalLayout && rack && slider
                     && slider.rotation===0 && !slider.horizontalStepPresentation
                     && String(slider.focusBorderColor)===String(root.findItem(w,"cpuplusWorkshopMemoryInterval").subjectColor)
-                    && execute && nav && execute.mapToItem(resourcePane.item,0,0).y+execute.height<=nav.mapToItem(resourcePane.item,0,0).y
+                    && execute && nav && footerDivider && execute.mapToItem(resourcePane.item,0,0).y+execute.height<=footerDivider.mapToItem(resourcePane.item,0,0).y
+                    && footerDivider.mapToItem(resourcePane.item,0,0).y+footerDivider.height<=nav.mapToItem(resourcePane.item,0,0).y
+                    && Math.abs(slider.height-w.rackTravel)<1
                     && root.findItem(resourcePane.item,"cpuplusResourceMode-DIAG").visible,
                     "SYSTEM compact header, vertical rack and pinned execution"))return;
                 root.resourcePaneActive=false;
@@ -1353,7 +1376,13 @@ ShellRoot {
                 const host=root.findItem(pane.item,"cpuplusDiagnosticFilterHost");
                 const block=root.findItem(pane.item,"cpuplusMemoryDiagnosticStatusBlock");
                 const button=root.findItem(pane.item,"cpuplusWorkshopInstrument-memory");
-                if(!root.check(w.filterKinds.join(",")==="memory" && w.draft.selected.join(",")==="memory"
+                const slider=root.findItem(w,"cpuplusWorkshopDuration-hardware");
+                const popup=root.findItem(pane.item,"cpuplusMemoryDiagnosticsInfoPopup");
+                const info=root.findItem(pane.item,"cpuplusMemoryDiagnosticsInfo");
+                if(!root.check(!w.verticalLayout && slider && slider.rotation===90 && popup && info
+                    && popup.y>=info.mapToItem(pane.item,0,info.height).y
+                    && root.findItem(pane.item,"cpuplusWorkshopCalibrationStatus").parent===root.findItem(pane.item,"cpuplusMemoryCalibrationHost")
+                    && w.filterKinds.join(",")==="memory" && w.draft.selected.join(",")==="memory"
                     && host&&block&&button&&button.width===button.height
                     && Math.abs(block.height-host.height)<=1
                     && !root.findItem(pane.item,"cpuplusWorkshopInstrument-threads")

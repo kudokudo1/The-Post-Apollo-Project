@@ -13,9 +13,12 @@ Column {
     property real viewportHeight: 0
     property Item filterTarget: null
     property Item executionTarget: null
+    property Item calibrationTarget: null
+    readonly property bool mediumSystemDials: subject==="SYSTEM" && width>=340 && verticalLayout && viewportHeight>=210
     readonly property int sliderCount: 1+["threads","memory","census","hostcpu","gpu","netio","swapio","diskio"].filter(k=>draft.selected.includes(k)).length
-    readonly property bool verticalLayout: subject!=="ALL" && viewportHeight>0 && (width<340 || (sliderCount>=3 && viewportHeight < sliderCount*(compactLayout?38:52)+(lowerInstrumentCount>0?176:0)+90))
-    readonly property real rackTravel: Math.max(45,Math.min(150,viewportHeight-(lowerInstrumentCount>0?instrumentHeight:0)-38))
+    readonly property bool verticalLayout: subject==="SYSTEM" && viewportHeight>0 && (width<340 || (sliderCount>=3 && viewportHeight < sliderCount*(compactLayout?38:52)+(lowerInstrumentCount>0?176:0)+90))
+    // Reserve the dial bank and its spacing, then give the rack the remaining viewport.
+    readonly property real rackTravel: Math.max(45,Math.floor(viewportHeight-(lowerInstrumentCount>0?instrumentHeight+spacing:0)-34))
     property string subject: "ALL"
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
@@ -32,20 +35,20 @@ Column {
         return qs && system ? "TARGET // QS + USER" : qs ? "TARGET // QUICKSHELL" : system ? "TARGET // USER" : "NO TARGET";
     }
     readonly property bool compactLayout: viewportHeight > 0 && viewportHeight < 480
-    readonly property int instrumentHeight: verticalLayout ? Math.max(76,Math.min(112,Math.floor(viewportHeight*0.47))) : compactLayout ? 112 : Math.min(240,176+Math.floor(Math.max(0,viewportHeight-540)*0.35))
+    readonly property int instrumentHeight: mediumSystemDials && draft.selected.includes("storage") ? Math.max(154,Math.min(184,Math.floor(viewportHeight*0.53))) : subject==="SYSTEM" && verticalLayout ? (draft.selected.includes("storage") ? 132 : Math.max(76,Math.min(112,Math.floor(viewportHeight*0.47)))) : compactLayout ? 112 : Math.min(240,176+Math.floor(Math.max(0,viewportHeight-540)*0.35))
     readonly property int filterSize: compactLayout ? 24 : 32
     readonly property int filterGap: compactLayout ? 3 : 4
     readonly property int filterWidth: Math.min(filterSize,Math.max(16,Math.floor((width-68-filterCount*filterGap)/Math.max(1,filterCount))))
     readonly property int lowerInstrumentCount: ["threads","storage","stall"].filter(k=>draft.selected.includes(k)).length
     readonly property real lowerInstrumentSpace: Math.max(0,width-4*Math.max(0,lowerInstrumentCount-1))
     readonly property real lowerInstrumentWidth: Math.floor(lowerInstrumentSpace/Math.max(1,lowerInstrumentCount))
-    readonly property real storageWidth: lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(Math.max(288,2*(instrumentHeight-57)+18),Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
+    readonly property real storageWidth: mediumSystemDials && lowerInstrumentCount===3 ? Math.floor(lowerInstrumentSpace*0.54) : lowerInstrumentCount===3 ? (lowerInstrumentSpace>=420 ? Math.min(Math.max(288,2*(instrumentHeight-57)+18),Math.floor(lowerInstrumentSpace-240)) : Math.floor(lowerInstrumentSpace*(compactLayout ? 0.30 : 0.24))) : lowerInstrumentWidth
     readonly property int storageDialWidth: Math.max(0,Math.floor(Math.min(180,(storageWidth-18)/2,instrumentHeight-57)))
     readonly property int storageDialHeight: storageDialWidth+34
     readonly property bool smallestStorageLayout: width<340 && viewportHeight<380
     // A 92px mounted dial gives the face at least 72 actual logical pixels.
     // Below that size use the existing readable digital controls instead.
-    readonly property bool storageMechanical: !smallestStorageLayout && storageDialWidth>=92
+    readonly property bool storageMechanical: !smallestStorageLayout && storageDialWidth>=(mediumSystemDials?76:92)
     readonly property real dialWidth: lowerInstrumentCount===3 ? Math.floor((lowerInstrumentSpace-storageWidth)/2) : lowerInstrumentWidth
     readonly property var draft: CpuPlusDiagnostics.draftForSubject(subject)
     readonly property int storageSample: draft.storageSampleSeconds || 1
@@ -480,7 +483,7 @@ Column {
             objectName: "cpuplusWorkshopStorageInstrument"
             anchors.centerIn: parent
             width: Math.max(0,parent.width-4)
-            height: storageContents.implicitHeight+8
+            height: root.subject==="SYSTEM" && root.verticalLayout ? Math.min(parent.height,storageContents.implicitHeight+8) : storageContents.implicitHeight+8
             color: Colors.black
             border.color: Colors.blue
             clip: true
@@ -489,7 +492,7 @@ Column {
                 objectName: "cpuplusWorkshopStorageContents"
                 anchors.centerIn: parent
                 width: Math.max(0,parent.width-(root.compactLayout ? 4 : 8))
-                spacing: root.compactLayout ? 1 : 3
+                spacing: root.compactLayout || root.verticalLayout ? 1 : 3
                 CpuPlusMemoryReadout {
                     width: parent.width
                     text: root.lowerInstrumentCount===3 ? "STORAGE" : "STORAGE // METADATA"
@@ -517,7 +520,7 @@ Column {
                         Row {
                             id: cadenceRow
                             width: parent.width
-                            height: root.compactLayout ? (root.storageRunning ? 16 : 19) : 26
+                            height: root.compactLayout || root.verticalLayout ? (root.storageRunning ? 16 : 19) : 26
                             spacing: 2
                             readonly property string field: parent.modelData.key
                             readonly property int seconds: field==="sample" ? root.storageSample : root.storageReport
@@ -716,7 +719,7 @@ Column {
                 GohuText {
                     width: parent.width
                     text: "FINAL INCLUDED"
-                    visible: !root.compactLayout && !root.storageMechanical
+                    visible: !root.compactLayout && !root.verticalLayout && !root.storageMechanical
                     color: Colors.white
                     font.pixelSize: 8
                     fontSizeMode: Text.HorizontalFit
@@ -770,6 +773,7 @@ Column {
         }
     }
     Column {
+        id: executionColumn
         objectName: "cpuplusWorkshopPinnedExecution"
         parent: root.executionTarget || root
         width: parent.width
@@ -777,6 +781,8 @@ Column {
     
         CpuPlusMemoryReadout {
             objectName: "cpuplusWorkshopCalibrationStatus"
+            parent: root.calibrationTarget || executionColumn
+            // Legacy standalone workshop keeps its readout in the execution column.
             width: parent.width
             text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
                 : CpuPlusDiagnostics.busy ? "SHARED CAPTURE ACTIVE // "+CpuPlusDiagnostics.kind.toUpperCase()
@@ -787,6 +793,8 @@ Column {
             color: root.recording ? Colors.green : root.ready ? Colors.orange : root.preview.ok ? Colors.omnitrix : Colors.yellow
             font.pixelSize: 10
             height: 14
+            fontSizeMode: Text.HorizontalFit
+            minimumPixelSize: 7
             elide: Text.ElideRight
             wrapMode: Text.NoWrap
         }

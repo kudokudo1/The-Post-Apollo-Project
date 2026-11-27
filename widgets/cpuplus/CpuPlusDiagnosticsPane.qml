@@ -13,9 +13,10 @@ Column {
     property string workshopSubject: "ALL"
     function presetMatchesSubject(plan) { return Calibration.workshopPlanMatchesSubject(plan,workshopSubject); }
     property Item workshopFilterTarget: null
+    property Item workshopCalibrationTarget: null
     readonly property string workshopTargetText: workshopLoader.item ? workshopLoader.item.targetText : ""
     property Item footerTarget: null
-    readonly property real footerHeight: workshopOpen && workshopSubject!=="ALL" ? 100 : 53
+    readonly property real footerHeight: workshopSubject==="ALL" ? 53 : workshopOpen ? (workshopCalibrationTarget ? 88 : 104) : 57
     property real workshopViewportHeight: 0
     spacing: 6
     readonly property string selectedReport: CpuPlusDiagnostics.selectedReport
@@ -271,6 +272,7 @@ Column {
         sourceComponent: CpuPlusDiagnosticWorkshop {
             viewportHeight: root.workshopViewportHeight
             filterTarget: root.workshopFilterTarget
+            calibrationTarget: root.workshopCalibrationTarget
             executionTarget: root.workshopSubject==="ALL" ? null : pinnedExecutionHost
             subject: root.workshopSubject
         }
@@ -960,8 +962,15 @@ Column {
             id: pinnedExecutionHost
             objectName: "cpuplusDiagExecutionHost"
             width: parent.width
-            height: 44
+            height: root.workshopCalibrationTarget ? 28 : 44
             visible: root.workshopOpen && root.workshopSubject!=="ALL"
+        }
+        Rectangle {
+            objectName: "cpuplusDiagFooterDivider"
+            visible: root.workshopSubject!=="ALL"
+            width: parent.width
+            height: 1
+            color: Colors.cyan
         }
         Column {
         objectName: "cpuplusDiagBottomControls"

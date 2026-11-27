@@ -1,13 +1,14 @@
 import QtQuick
 import Quickshell
 
-// One selected-detail stream. CPU++ has priority during donor transition;
-// two views of the same exact live process read the same history.
+// One exact selected-detail stream per session. Store supplies independent
+// consumer sessions during donor comparison.
 Scope {
     id: root
     required property var graph
     required property var state
     required property var rows
+    property bool collectionAllowed: true
     property bool cpuActive: false
     property bool donorActive: false
     property string cpuTarget: ""
@@ -22,7 +23,7 @@ Scope {
                 || !Number.isSafeInteger(birth) || birth<=0 || !comm) return "";
         return JSON.stringify([pid,birth,comm]);
     }
-    readonly property string requestedKey: cpuActive ? cpuTarget : donorActive ? donorTarget : ""
+    readonly property string requestedKey: !collectionAllowed ? "" : cpuActive ? cpuTarget : donorActive ? donorTarget : ""
     readonly property var currentEntry: {
         if (!requestedKey) return null;
         const expected=JSON.parse(requestedKey);

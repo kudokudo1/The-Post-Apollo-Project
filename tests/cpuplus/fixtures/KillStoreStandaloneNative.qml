@@ -43,6 +43,51 @@ ShellRoot {
         state: witnessState
         rows: root.witnessRows
     }
+    QtObject {
+        id: secondWitnessState
+        property int taskHistoryPid: 0
+    }
+    QtObject {
+        id: secondWitnessGraph
+        property int accepted: 0
+        function clearDetailHistory() { secondWitnessState.taskHistoryPid=0; }
+        function miniCpuHistory(entry) { return []; }
+        function resetForSelection(entry, preload, forceReset) { secondWitnessState.taskHistoryPid=entry.pid; }
+        function refreshDetailProbe(entry) {}
+        function applyDetailProbe(sample, entry) { accepted++; }
+    }
+    KillBackend.KillDetailSession {
+        id: secondWitness
+        graph: secondWitnessGraph
+        state: secondWitnessState
+        rows: root.witnessRows
+    }
+    function verifyIndependentDetail() {
+        const a=witnessRows[0], b=witnessRows[1];
+        const store=first.store;
+        if (store.collectionEnabled || store.detailSession === store.cpuDetailSession
+                || store.graphState === store.cpuGraphState
+                || store.graphController === store.cpuGraphController
+                || store.cpuGraphController.sharedMiniController !== store.graphController
+                || !store.cpuDetailTelemetry.detailOnly) return false;
+        store.cpuDetailTelemetry.refreshSnapshot();
+        store.cpuDetailTelemetry.refreshMiniProbe([{pid:4321}]);
+        if (store.cpuDetailTelemetry.snapshotLoading || store.cpuDetailTelemetry.miniProbeLoading)
+            return false;
+        witness.selectDonor(a);
+        witness.donorActive=true;
+        secondWitness.setCpuActive(true);
+        secondWitness.selectCpu(b);
+        if (!witness.matches(a) || !secondWitness.matches(b)
+                || witness.matches(b) || secondWitness.matches(a)) return false;
+        if (secondWitness.accept({pid:a.pid,startTicks:a.startTicks})
+                || !secondWitness.accept({pid:b.pid,startTicks:b.startTicks})
+                || secondWitnessGraph.accepted!==1) return false;
+        secondWitness.collectionAllowed=false;
+        if (secondWitness.activeKey || !witness.matches(a)) return false;
+        secondWitness.setCpuActive(false);
+        return true;
+    }
     function verifySession() {
         const a=witnessRows[0], b=witnessRows[1];
         witness.selectDonor(a);
@@ -204,7 +249,7 @@ ShellRoot {
         const combiCadence=first.store.snapshotInterval===1800 && first.store.miniProbeNeeded;
         first.store.donorFavoritesVisible=false;
         first.store.donorCombiVisible=false;
-        if (!verifyActionGateway() || !verifyControlCustody() || !verifyReportCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
+        if (!verifyActionGateway() || !verifyControlCustody() || !verifyReportCustody() || !verifyIndependentDetail() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
                 || !cpuGraphDemand || !idleGraphDemand || !donorGraphDemand || !censusDidNotAppend
                 || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry

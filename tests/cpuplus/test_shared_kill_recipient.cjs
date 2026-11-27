@@ -75,7 +75,7 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     assert.match(recipient,/modelBlank=true;[\s\S]*?modelBlank=false;/);
     assert.match(recipient,/acceptedButtons: Qt.NoButton[\s\S]*?targets.indexAt/);
     assert.match(recipient,/if \(sameTarget\(row\)\) return true/);
-    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillInstrumentViewport","cpuPlusKillActuatorScroll"])
+    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillInstrumentViewport","cpuPlusQuickControlFooter"])
         assert.ok(recipient.includes(name));
     assert.match(recipient,/function killAllEligibleTasks\(\) \{ return bulkCandidates\("kill-all"\); \}/);
     assert.match(recipient,/collectionSource\.prepareCpuBulkReview\(kind,hunterMetricMode,hunterVisibilityMode\)/);
@@ -98,10 +98,10 @@ test("recipient restores existing owner graph and favorite semantics", () => {
     assert.match(recipient,/details\.cpuCanvas\.requestPaint\(true\)/);
     assert.match(recipient,/details\.combiScoreCanvas\.requestPaint\(true\)/);
     assert.doesNotMatch(recipient,/detailGraph\.appendSelectedTaskHunterHistories/);
-    assert.match(host,/graphSource: KillBackend\.KillStore\.graphState/);
+    assert.match(host,/graphSource: KillBackend\.KillStore\.cpuGraphState/);
     assert.match(recipient,/readonly property var history: graphSource/);
-    assert.match(host,/graphController: KillBackend\.KillStore\.graphController/);
-    assert.match(host,/graphSession: KillBackend\.KillStore\.detailSession/);
+    assert.match(host,/graphController: KillBackend\.KillStore\.cpuGraphController/);
+    assert.match(host,/graphSession: KillBackend\.KillStore\.cpuDetailSession/);
     assert.doesNotMatch(recipient,/appControlWindow\.taskMini(?:CpuHistories|HunterMetricHistories|DisplayRevision)/);
     assert.match(row,/width: 82/);
     assert.match(row,/mini\.combi/);
@@ -188,7 +188,8 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.match(store,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: root.collectionEnabled && root.miniProbeNeeded/);
     assert.match(store,/id: afterAction[\s\S]*?interval: 320/);
     assert.match(store,/^pragma Singleton/m);
-    assert.equal((store.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,2);
+    assert.match(store,/ProcessTelemetry\s*\{\s*id: cpuDetailSampler\s*detailOnly: true/);
     assert.doesNotMatch(owner,/^\s*ProcessTelemetry\s*\{/m);
     assert.match(owner,/readonly property var processTelemetry: KillBackend\.KillStore\.telemetry/);
     assert.match(owner,/readonly property var taskRows: KillBackend\.KillStore\.rows/);
@@ -378,7 +379,7 @@ test("P4h: stable instrument reserves and protected review guidance",()=>{
     assert.match(host,/text: modelData.displayName \|\| modelData.name/);
     assert.match(recipient,/id: instrumentTitle[\s\S]*?text: "KILL \/\/ TASK MANAGER"/);
     assert.match(recipient,/id: instrumentHeaderLine[\s\S]*?height: 2\s+color: Colors.red/);
-    assert.match(recipient,/height: Math.max\(48, lockRail.reservedHeight/);
+    assert.match(recipient,/height: Math.max\(56, lockRail.reservedHeight/);
     assert.match(recipient,/reservedHeight: 3 \* 23 \+ 3 \* spacing \+ 22/);
     assert.doesNotMatch(recipient,/visible: lockRail.protectedTarget/);
     assert.match(recipient,/id: limitLockSlot[\s\S]*?height: 26\s+visible: !!workspace.currentTask/);
@@ -434,7 +435,8 @@ test("P4j: single and captured review live on the right, with bounded body and i
     assert.match(right,/model: reviewPanel.capture \? workspace.bulkReview.targets : \[\]/);
     assert.match(right,/id: capturedCount[\s\S]*?color: Colors.magenta/);
     assert.match(right,/id: capturedLabel[\s\S]*?text: "CAPTURED TARGETS"\s+color: Colors.red/);
-    assert.match(right,/id: reviewCancel[\s\S]*?normalFace: true[\s\S]*?idleForegroundColor: Colors.white[\s\S]*?hoverForegroundColor: Colors.white/);
+    assert.match(right,/id: reviewCancel[\s\S]*?normalFace: true[\s\S]*?idleForegroundColor: Colors.white[\s\S]*?hoverForegroundColor: reviewPanel.reportReady \? Colors.white : Colors.black/);
+    assert.match(right,/id: reviewCancel[\s\S]*?hoverFillColor: reviewPanel.reportReady \? Colors.red : Colors.yellow/);
     assert.match(right,/workspace.gate.confirm\(\)/);
     assert.match(right,/workspace.confirmBulk\(\)/);
     assert.match(right,/workspace.cancelOwned\(\)/);
@@ -464,8 +466,8 @@ test("K2a: service owns donor graph controller and history; views consume the sa
     const owner=read("widgets/AppControlW.qml");
     const store=read("services/kill/KillStore.qml");
     const legacy=read("widgets/appcontrol/TaskGraphController.qml");
-    assert.equal((store.match(/^\s*ProcessPresentationState\s*\{/gm)||[]).length,1);
-    assert.equal((store.match(/^\s*TaskGraphController\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*ProcessPresentationState\s*\{/gm)||[]).length,2);
+    assert.equal((store.match(/^\s*TaskGraphController\s*\{/gm)||[]).length,2);
     assert.match(store,/taskMiniHistoryKeepImmutable: root\.graphVisible/);
     assert.match(owner,/readonly property var processPresentationState: KillBackend\.KillStore\.graphState/);
     assert.match(owner,/readonly property var taskGraphController: KillBackend\.KillStore\.graphController/);
@@ -1074,4 +1076,94 @@ test("K6d: Hunter emits legacy presentation events without retaining a widget", 
     assert.match(owner,/function onLegacyWindowRequested\(operationKind, title, resetChoice, clearTargets\)/);
     assert.match(owner,/function onLegacyReviewRejected\(\)\s*\{\s*appControlWindow\.cancelDestructiveConfirm\(\)/);
     assert.doesNotMatch(controller,/\bhost\b/);
+});
+
+test("K7b: CPU++ process identity, glow clearance and yellow cancellation", () => {
+    const identity=recipient.slice(recipient.indexOf("id: identityGroup"),recipient.indexOf('objectName: "cpuPlusProcessExactIdentity"'));
+    assert.match(identity,/id: identityGlyph[\s\S]*?anchors.verticalCenter: parent.verticalCenter[\s\S]*?color: Colors.red[\s\S]*?layer.effect: DropShadow/);
+    assert.match(identity,/id: identityText[\s\S]*?anchors.verticalCenter: parent.verticalCenter/);
+    assert.match(identity,/objectName: "cpuPlusProcessIdentityName"[\s\S]*?layer.effect: DropShadow/);
+    assert.match(identity,/objectName: "cpuPlusProcessIdentityMetadata"[\s\S]*?layer.effect: DropShadow/);
+    assert.match(recipient,/objectName: "cpuPlusProcessStateLabel"[\s\S]*?anchors.bottom: parent.bottom[\s\S]*?layer.effect: DropShadow/);
+    assert.match(recipient,/objectName: "cpuPlusProcessGlowGutter"[\s\S]*?x: 8\s*y: 8\s*width: Math.max\(0,actuatorScroll.width-30\)/);
+    assert.match(recipient,/contentHeight: height\s*interactive: false/);
+});
+
+test("K7c: independent selected detail channels share one mini publication", () => {
+    const store=read("services/kill/KillStore.qml");
+    const telemetry=read("services/system/ProcessTelemetry.qml");
+    const session=read("services/kill/KillDetailSession.qml");
+    assert.match(store,/id: cpuHistories[\s\S]*?taskMiniCpuHistories: histories\.taskMiniCpuHistories[\s\S]*?taskMiniDisplayRevision: histories\.taskMiniDisplayRevision/);
+    assert.match(store,/id: cpuGraph[\s\S]*?telemetry: cpuDetailSampler[\s\S]*?sharedMiniController: graph/);
+    assert.match(store,/id: cpuSelectedDetail[\s\S]*?state: cpuHistories[\s\S]*?collectionAllowed: root\.collectionEnabled/);
+    assert.match(store,/id: selectedDetail[\s\S]*?collectionAllowed: root\.collectionEnabled/);
+    assert.match(store,/id: cpuDetailSampler\s*detailOnly: true\s*onDetailProbeReady: function\(sample\) \{ cpuSelectedDetail\.accept\(sample\); \}/);
+    assert.match(telemetry,/function refreshSnapshot\(\)\s*\{\s*if \(detailOnly \|\| snapshotLoading\)/);
+    assert.match(telemetry,/function refreshMiniProbe\(request\)\s*\{\s*if \(detailOnly \|\| miniProbeLoading\)/);
+    assert.match(session,/requestedKey: !collectionAllowed \? "" : cpuActive/);
+    assert.equal((store.match(/id: taskManagerRefreshTimer/g)||[]).length,1);
+    assert.equal((store.match(/id: taskMiniDisplayTimer/g)||[]).length,1);
+});
+
+test("K7d: observed extra metric samples and no fabricated missing history", () => {
+    const src=read("services/system/ProcessTelemetry.qml");
+    const a=src.indexOf("    function parseDetailProbe(output) {");
+    const b=src.indexOf("\n    Process {",a);
+    let now=1000;
+    const parse=new Function("Date", "let detailProbeGeneration=2,detailProbeActiveGeneration=2,detailProbePid=4321,detailProbeLastTicks=-1,detailProbeLastIoBytes=-1,detailProbeLastMs=0,detailProbeRequest={pid:4321,startTicks:98765,fallbackCpu:11};"+src.slice(a,b)+"\nreturn parseDetailProbe;")({now:()=>now});
+    const first=parse("4321 100 2048 100000 100 4 1000 98765 1000 29");
+    assert.equal(first.threadCount,29);
+    assert.equal(first.rssObserved,true);
+    assert.equal(first.ioRateObserved,false);
+    assert.equal(first.ageObserved,true);
+    now=2000;
+    const second=parse("4321 200 3072 100000 100 4 1049576 98765 1001 30");
+    assert.equal(second.ioRateObserved,true);
+    assert.equal(second.ioRateBytes,1048576);
+    now=3000;
+    const unavailable=parse("4321 300 - 100000 100 4 - 98765 - -");
+    assert.equal(unavailable.rssObserved,false);
+    assert.equal(unavailable.threadCount,null);
+    assert.equal(unavailable.ioRateObserved,false);
+    assert.equal(unavailable.ageObserved,false);
+    now=4000;
+    assert.equal(parse("4321 400 3072 100000 100 4 1049576 98765 1003 30").ioRateObserved,false);
+    assert.equal(parse("4321 400 3072 100000 100 4 1049576 98764 1003 30"),null);
+    const graph=read("services/kill/TaskGraphController.qml");
+    const start=graph.indexOf("    function appendExtraDetailHistories(");
+    const end=graph.indexOf("    function applyDetailProbe(",start);
+    const state={taskExtraDetailHistories:{rss:[],threads:[],io:[],age:[]},taskHistoryLimit:3};
+    const append=new Function("presentationState",graph.slice(start,end)+"\nreturn appendExtraDetailHistories;")(state);
+    append(first); append(second);
+    assert.deepEqual(state.taskExtraDetailHistories.rss,[2,3]);
+    assert.deepEqual(state.taskExtraDetailHistories.threads,[29,30]);
+    assert.deepEqual(state.taskExtraDetailHistories.io,[1]);
+    for(let n=0;n<4;n++) append(second);
+    assert.equal(state.taskExtraDetailHistories.rss.length,3);
+    append(unavailable);
+    assert.deepEqual(state.taskExtraDetailHistories,{rss:[],threads:[],io:[],age:[]});
+    assert.match(recipient,/objectName: "cpuPlusDetailGraph-"\+extraMetric.modelData.key/);
+    assert.match(recipient,/historyLimit: history.taskHistoryLimit\s*scrollDuration: history.taskGraphScrollDuration/);
+    assert.match(read("services/kill/KillStore.qml"),/id: cpuGraph[\s\S]*?extraDetailHistoryEnabled: true/);
+});
+
+test("K7e: metric cards select at most two graphs and preserve fixed quick controls",()=>{
+    const a=recipient.indexOf("    function toggleMetricGraph(");
+    const b=recipient.indexOf("\n    readonly property var gate",a);
+    assert.ok(a>=0 && b>a);
+    const api=new Function("let selectedGraphKeys=['cpu','mem'];"+recipient.slice(a,b)+"\nreturn {toggleMetricGraph,get:()=>selectedGraphKeys};")();
+    for (const [key,want] of [["rss",["mem","rss"]],["threads",["rss","threads"]],["rss",["threads"]],["combined",["combined","score"]],["io",["io"]],["pid",["io"]],["io",[]]]) {
+        api.toggleMetricGraph(key);
+        assert.deepEqual(api.get(),want);
+    }
+    assert.match(donorView,/property bool metricGraphSelectionEnabled: false/);
+    assert.match(donorView,/onClicked: taskManagerBody.metricGraphRequested\(taskMetricCard.graphKey\)/);
+    assert.match(donorView,/host.toggleTaskMetricFavorite\(/);
+    assert.match(donorView,/Qt.tint\(Colors.black,Qt.rgba\(modelData.baseAccent.r/);
+    assert.match(recipient,/metricGraphSelectionEnabled: true\s*selectedGraphKeys: workspace.selectedGraphKeys/);
+    assert.match(recipient,/\.filter\(m=>workspace.selectedGraphKeys.indexOf\(m.key\)>=0\)/);
+    assert.match(recipient,/id: quickFooter[\s\S]*?anchors.bottom: parent.bottom/);
+    assert.match(recipient,/viewportHeight: Math.max\(1,actuatorScroll.height - quickFooter.height - 24\)/);
+    assert.doesNotMatch(recipient,/cpuPlusKillActuatorScroll/);
+    assert.match(recipient,/contentHeight: height\s*interactive: false/);
 });

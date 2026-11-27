@@ -266,7 +266,7 @@ test("dominant clash lobe grows while losing lobe shrinks",()=>{
     assert.ok(currents.clashSizes(0,1).enemy>=1.8);
 });
 const pixel=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyPixelFire.js"),"utf8")+"\n({fire});");
+    "components/EnergyPixelFire.js"),"utf8")+"\n({fire,velocity,lightMotion,falloff});");
 test("pixel fire waves, emits detached embers and stays static in reduced motion",()=>{
     const a=pixel.fire(42,0,false), b=pixel.fire(42,.75,false);
     assert.ok(a.cells.length>40 && a.cells.length<200);
@@ -433,7 +433,69 @@ test("fire light uses the forward pixel and reflection overlays the material",()
     assert.match(source,/readonly property real flameTipOffset/);
     assert.match(source,/const tip=edge\+root.flameTipOffset/);
     assert.match(source,/Flow.speedSample\(root.speedFraction,next/);
-    assert.ok(source.indexOf("Material.drawAsh")<source.indexOf("const reflected="));
+    assert.ok(source.indexOf("Material.drawAsh")<source.indexOf("fireHalo(tip-h*(.36"));
     assert.match(preview,/light.fire\?source.flameTipOffset/);
     assert.match(field,/ki-blast"\?\.38:fire\?\.36/);
+});
+
+test("flame brightness is integrated into the pixels rather than a foreground orb",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/mix\(fireOrange\[cell.heat\],fireTip\[cell.heat\],k\*heat\)/);
+    assert.doesNotMatch(source,/orb\(h\*\.65,h\*\.62/);
+    assert.doesNotMatch(source,/orb\(h\*1.18,h\*1.10/);
+});
+test("battlefield light follows beam geometry and the winner bleeds into contact",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/const penetration=Math.min/);
+    assert.match(source,/tint\(winner,.60\*dominance\)/);
+    assert.match(preview,/bloom\(start\+left\*\.53,origin.y/);
+    assert.match(preview,/bloom\(split\+right\*\.47,origin.y/);
+    assert.match(preview,/bloom\(split,origin.y,h\*3.2/);
+    assert.doesNotMatch(preview,/const lo=Math.max\(0,\(split-blend\)/);
+});
+
+test("flame turbulence and illumination remain attached and vary continuously",()=>{
+    for(const mode of ["standard","ash-trail","burn-away"]){
+        const shapes=new Set();
+        for(let i=0;i<120;i++){
+            const t=i/30;
+            const f=pixel.fire(34,t,false,mode,.5);
+            shapes.add(JSON.stringify(f.cells));
+            assert.ok(f.cells.length>40 && f.cells.length<=330);
+            assert.ok(f.embers.every(e=>e.x<0));
+            const light=pixel.lightMotion(t,.5,false);
+            assert.ok(Math.abs(light.sway)<=.096);
+            assert.ok(light.drag>=0 && light.drag<=.56);
+            assert.ok(light.pulse>=.81 && light.pulse<=1.19);
+            assert.ok(light.breath>=.86 && light.breath<=1.14);
+            const next=pixel.lightMotion(t+.001,.5,false);
+            assert.ok(Math.abs(next.pulse-light.pulse)<.004);
+        }
+        assert.ok(shapes.size>70);
+        assert.equal(JSON.stringify(pixel.fire(34,0,true,mode,0)),JSON.stringify(pixel.fire(34,120,true,mode,1)));
+    }
+    let slow=0,fast=0;
+    for(let i=0;i<30;i++){
+        slow=pixel.velocity(0,.001,.033,800,34,slow);
+        fast=pixel.velocity(0,.025,.033,800,34,fast);
+    }
+    assert.ok(fast>slow && fast<=1);
+    assert.ok(pixel.lightMotion(1,fast,false).drag>pixel.lightMotion(1,slow,false).drag);
+    assert.ok(pixel.lightMotion(1,fast,false).stretch>pixel.lightMotion(1,slow,false).stretch);
+    assert.ok(pixel.velocity(0,.002,.033,1600,34,0)>pixel.velocity(0,.002,.033,800,34,0));
+    for(let i=0;i<30;i++)fast=pixel.velocity(.4,.4,.033,800,34,fast);
+    assert.ok(fast<.001);
+    assert.equal(pixel.velocity(.8,.4,.033,800,34,0),0);
+    assert.equal(pixel.lightMotion(2,1,true).drag,0);
+    assert.equal(pixel.lightMotion(2,1,true).pulse,1);
+    assert.equal(pixel.falloff(0),1);
+    assert.equal(pixel.falloff(1),0);
+    for(let i=1;i<=100;i++) assert.ok(pixel.falloff(i/100)<=pixel.falloff((i-1)/100));
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/PixelFire.velocity\(root.speedFraction,front/);
+    assert.match(source,/flame.stretch/);
+    assert.match(preview,/source.flameMotion/);
+    assert.match(preview,/flame.drag/);
 });

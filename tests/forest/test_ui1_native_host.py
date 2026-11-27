@@ -270,7 +270,7 @@ def trial(width, height, count):
                     stderr=subprocess.STDOUT, start_new_session=True)
                 if width == 1366:
                     observe_joined_db(qs, scene, qs_log)
-                code = qs.wait(timeout=65)
+                code = qs.wait(timeout=85)
             output = qs_log.read_text(errors="replace")
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
@@ -309,7 +309,7 @@ def trial(width, height, count):
             fl7 = [line.split("FOREST_HOST_FIRST_LIGHT_CHILD_PASS ", 1)[1].strip()
                    for line in output.splitlines()
                    if "FOREST_HOST_FIRST_LIGHT_CHILD_PASS " in line]
-            if fl7 != (["COMMIT", "STOP", "WITHDRAW"] if width >= 770 else []):
+            if fl7 != (["COMMIT", "STOP", "WITHDRAW", "PENDING_STOP"] if width >= 770 else []):
                 raise AssertionError("FIRST_LIGHT_CHILD_TRIALS")
             if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
                     season != ([str(i) for i in range(9)] if width >= 770 else []) or

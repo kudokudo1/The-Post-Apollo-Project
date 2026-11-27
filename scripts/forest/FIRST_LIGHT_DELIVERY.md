@@ -94,3 +94,27 @@ and actual epoch observation; UI2 owns typed bounded snapshot/render
 validation, same-row response and scroll, no draft clear from native false.
 Existing installed SEND remains locked; no R6 relabel or new production
 wire. Native admission/recipient/source/capacity/crash custody unresolved.
+
+
+## FL8 // independent disposable control during a pending step
+
+Existing FL7 commands remain compatible. The same test child owns the
+same FirstLightDelivery on a dedicated single original worker thread.
+Optional {"op":"STEP_BEGIN"} queues one advance and immediately returns
+{"ok":true}; {"op":"STEP_POLL"} returns {"ok":true,"done":false/true}.
+Until the pending step is polled complete, refuse another STEP,
+STEP_BEGIN, SUBMIT, OUTCOME or CLOSE. OBSERVE, TAKE and contextual STOP
+remain available on the control thread, including while B2 blocks on
+response I/O. No additional queue, worker replacement or auto-retry.
+STEP remains synchronous for existing UI test sequences. Do not use
+STEP for an interruptible native action; this is not a native scheduler.
+
+On EOF the disposable child waits for original step completion (B2
+existing finite transport deadline) and closes on its owner thread;
+no inferred cancellation/release, no detached owner replacement.
+Parent still independently fences every view transition and render.
+No actual provider, source/recipient authority or crash-resistant custody.
+Regression uses the actual owner control and B2 loopback fake peer
+with deliberately blocked response, independent original STOP, local
+ABORTED/UNKNOWN_HOLD before peer release, one POST. Socket interruption
+does not establish real provider quiescence or resource settlement.

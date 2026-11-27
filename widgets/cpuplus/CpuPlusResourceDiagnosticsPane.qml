@@ -57,6 +57,7 @@ Item {
             }
         }
         Rectangle {
+            id: resourceDivider
             objectName: "cpuplusResourceDiagnosticsDivider"
             width: parent.width
             height: 1
@@ -77,7 +78,7 @@ Item {
             readonly property int railColumns: general ? 5 : Math.max(1,root.instrumentKinds.length)
             readonly property int railRows: Math.max(1,Math.ceil(root.instrumentKinds.length/railColumns))
             readonly property int railButtonSize: general
-                ? Math.max(1,Math.min(Math.floor((toolSize-3)/2),Math.floor((width*0.60-12)/5)))
+                ? Math.max(1,Math.min(36,Math.floor((width-Math.max(52,Math.min(145,Math.floor(width*0.36)))-16)/5)))
                 : toolSize
             readonly property int railHeight: railRows*railButtonSize+3*(railRows-1)
             readonly property real readoutHeight: general ? lineHeight : (railHeight-2)/3
@@ -145,6 +146,13 @@ Item {
                 y: statusBand.stacked ? statusBlock.height+4 : (parent.height-height)/2
             }
         }
+        Item {
+            id: calibrationHost
+            objectName: "cpuplusResourceCalibrationHost"
+            width: parent.width
+            height: 14
+            visible: diagnostics.workshopOpen
+        }
     }
     Flickable {
         id: scroll
@@ -167,6 +175,7 @@ Item {
             workshopSubject: root.subject
             workshopViewportHeight: scroll.height
             workshopFilterTarget: filterHost
+            workshopCalibrationTarget: calibrationHost
             footerTarget: footerControls
             onNavigationChanged: scroll.contentY=0
         }
@@ -178,7 +187,6 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         spacing: 3
-        Rectangle { width: parent.width; height: 1; color: Colors.cyan }
         Item {
             id: footerControls
             width: parent.width
@@ -190,7 +198,7 @@ Item {
         visible: root.informationOpen && root.visible
         z: 401
         x: 0
-        y: resourceInfoButton.mapToItem(root,0,resourceInfoButton.height).y+3
+        y: header.y+resourceDivider.y+resourceDivider.height+3
         width: root.width
         height: Math.min(Math.max(0,root.height-y),resourceHelpText.implicitHeight+12)
         color: Colors.black

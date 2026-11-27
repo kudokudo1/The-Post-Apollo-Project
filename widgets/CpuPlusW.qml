@@ -3381,9 +3381,9 @@ PanelWindow {
                 && KillBackend.KillStore.collectionEnabled
         visible: active
         sourceComponent: CpuPlusKillWorkspace {
-            graphSource: KillBackend.KillStore.graphState
-            graphController: KillBackend.KillStore.graphController
-            graphSession: KillBackend.KillStore.detailSession
+            graphSource: KillBackend.KillStore.cpuGraphState
+            graphController: KillBackend.KillStore.cpuGraphController
+            graphSession: KillBackend.KillStore.cpuDetailSession
             collectionSource: KillBackend.KillStore
             instrumentWidth: sharedInstrumentPane.width
             targetWidth: targetPane.width

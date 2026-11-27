@@ -118,6 +118,7 @@ ShellRoot {
     }
     KillBackend.TaskGraphController {
         id: fakeGraph
+        extraDetailHistoryEnabled: true
         presentationState: fakeHistory
         hunterPresentation: fakeHunter
         telemetry: fakeTelemetry
@@ -335,6 +336,19 @@ ShellRoot {
                     return;
                 }
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
+                const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");
+                const identityText=smoke.find(view,"cpuPlusProcessIdentityText");
+                const name=smoke.find(view,"cpuPlusProcessIdentityName");
+                const metadata=smoke.find(view,"cpuPlusProcessIdentityMetadata");
+                const stateLabel=smoke.find(view,"cpuPlusProcessStateLabel");
+                const gutter=smoke.find(view,"cpuPlusProcessGlowGutter");
+                if (!smoke.check(glyph && identityText && name && metadata && stateLabel && gutter
+                    && glyph.x+glyph.width<=identityText.x
+                    && Math.abs(glyph.y+glyph.height/2-identityText.y-identityText.height/2)<1
+                    && Qt.colorEqual(glyph.color,"#D16041")
+                    && glyph.layer.enabled && name.layer.enabled && metadata.layer.enabled && stateLabel.layer.enabled
+                    && gutter.x>=8 && gutter.y>=8,
+                    "red identity glyph beside centered glowing text and graph halo gutter")) return;
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
                 const quick=smoke.find(view,"cpuPlusProcessHeaderActions");
@@ -496,7 +510,8 @@ ShellRoot {
                     && fakeHistory.taskCpuHistory[fakeHistory.taskCpuHistory.length-1]!==37,
                     "general snapshot and wrong birth do not feed selected detail")) return;
                 if (!smoke.check(fakeSession.accept({pid:3442,startTicks:967833,
-                    cpuPercent:37,memPercent:7,rssKiB:23456,ioRateBytes:1024,ageSeconds:55}),
+                    cpuPercent:37,memPercent:7,rssKiB:23456,rssObserved:true,threadCount:29,
+                    ioRateBytes:1024,ioRateObserved:true,ageSeconds:55,ageObserved:true}),
                     "exact dedicated probe feeds shared history")) return;
                 smoke.previousRevision=initial;
                 smoke.phase=10;
@@ -510,6 +525,33 @@ ShellRoot {
                 if (!smoke.check(mini && mini.historyValues.length===3 && mini.historyValues[2]===37
                     && mini.graphScrollOffset>0 && detail.cpuCanvas.graphScrollOffset>0,
                     "same-length mini snapshot and main graph both animate after publication")) return;
+                const viewport=smoke.find(view,"cpuPlusKillInstrumentViewport");
+                const footer=smoke.find(view,"cpuPlusQuickControlFooter");
+                const footerY=footer.mapToItem(view,0,0).y;
+                if (!smoke.check(!viewport.interactive && viewport.contentHeight===viewport.height
+                        && footer.visible && detail.limitSlider.visible
+                        && footer.mapToItem(view,0,footer.height).y<=viewport.mapToItem(view,0,viewport.height).y,
+                        "fixed quick controls within non-scrolling viewport")) return;
+                // Select through the actual metric card signal, verify the
+                // extra renderer mounts and that quick controls do not move.
+                for (const [metric,card,expected] of [["rss","rss",23456/1024],["threads","threads",29],["io","io",1024/1048576],["age","uptime",55/60]]) {
+                    const toggle=smoke.find(view,"taskMetricToggle-"+card);
+                    if (!smoke.check(toggle && toggle.enabled,"metric toggle "+card)) return;
+                    toggle.clicked(null);
+                    const extra=smoke.find(view,"cpuPlusDetailGraph-"+metric);
+                    if (!smoke.check(view.selectedGraphKeys.length<=2 && extra
+                        && extra.historyValues.length===1
+                        && Math.abs(extra.historyValues[0]-expected)<0.00001
+                        && extra.historyLimit===132 && extra.scrollDuration===920
+                        && Math.abs(footer.mapToItem(view,0,0).y-footerY)<1,
+                        "selected observed graph "+metric)) return;
+                }
+                view.selectedGraphKeys=["cpu","mem"];
+                if (!smoke.check(!smoke.find(view,"cpuPlusDetailGraph-rss")
+                    && !smoke.find(view,"cpuPlusDetailGraph-threads")
+                    && !smoke.find(view,"cpuPlusDetailGraph-io")
+                    && !smoke.find(view,"cpuPlusDetailGraph-age"),
+                    "unselected extra graph renderers released")) return;
                 smoke.previousMiniOffset=mini.graphScrollOffset;
                 smoke.previousCpuOffset=detail.cpuCanvas.graphScrollOffset;
                 // Test-only long scope injection. The actual hosts retain their
@@ -667,6 +709,7 @@ ShellRoot {
                 if (!smoke.check(panel.visible && panel.parent===right && panel.y===5
                     && detail.visible && confirm.available && cancel.available && cancel.normalFace
                     && Qt.colorEqual(cancel.idleForegroundColor,"#DCF3FA")
+                    && Qt.colorEqual(cancel.hoverFillColor,"#F2BE4E")
                     && Math.abs(panel.height-cancel.mapToItem(panel,0,cancel.height).y-5)<1
                     && smoke.find(view,"cpuPlusKillInstrumentViewport").contentY===smoke.priorInstrumentY
                     && JSON.stringify(smoke.instrumentGeometry(view))===JSON.stringify(smoke.priorReviewGeometry),

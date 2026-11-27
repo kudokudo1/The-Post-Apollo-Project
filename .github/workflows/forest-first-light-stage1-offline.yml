@@ -1,0 +1,24 @@
+name: Forest First Light Stage 1 offline verifier
+on:
+  pull_request:
+    paths:
+      - 'tests/forest/first_light_stage1.py'
+      - 'tests/forest/test_first_light_stage1.py'
+      - '.github/workflows/forest-first-light-stage1-offline.yml'
+  push:
+    paths:
+      - 'tests/forest/first_light_stage1.py'
+      - 'tests/forest/test_first_light_stage1.py'
+      - '.github/workflows/forest-first-light-stage1-offline.yml'
+permissions:
+  contents: read
+jobs:
+  offline-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Synthetic verifier tests only (no artifact acquisition)
+        run: /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 /usr/bin/python3 -I -B tests/forest/test_first_light_stage1.py -v

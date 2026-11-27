@@ -49,7 +49,7 @@ test("reduced motion uses a static activity cue and instant verified completion"
 test("native renderer owns no operation or input; gallery has all four variants", () => {
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
     const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
-    assert.match(source,/const f=root.visualFrame, p=f.fraction, mid=y\+h\/2/);
+    assert.match(source,/const f=root.visualFrame, p=root.displayedFraction, mid=y\+h\/2/);
     assert.match(source,/c.translate\(edge,mid\)/);
     assert.doesNotMatch(source,/\b(?:MouseArea|TapHandler|Process|XMLHttpRequest|onLeftClicked)\b/);
     for(const key of ["omnitrix","tron","ki-blast","flamethrower"]) assert.ok(preview.includes('"'+key+'"'));
@@ -87,4 +87,41 @@ test("four personalities preserve bounded motion, distinct intensity and flash i
     assert.equal(profiles.host("tron",4,1,1,"running",false).fragments,0);
     assert.equal(profiles.host("omnitrix",4,1,1,"running",false).fragments,0);
     assert.ok(profiles.host("flamethrower",4,1,1,"running",false).fragments>0);
+});
+
+const material = vm.runInNewContext(fs.readFileSync(path.join(root,
+    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining});",
+    {Qt:{rgba:(r,g,b,a)=>({r,g,b,a})}});
+test("material experiments preserve standard and partition the chassis", () => {
+    for(const mode of ["standard","ash-trail","burn-away","unknown"]){
+        for(let i=0;i<=100;i++){
+            const g=material.geometry(mode,i/100,200,34);
+            assert.ok(Math.abs(g.burned+g.remaining-200)<1e-9);
+            assert.equal(g.ash,mode==="ash-trail");
+            assert.equal(g.erosion,mode==="burn-away");
+        }
+    }
+    assert.equal(material.geometry("burn-away",1,200,34).remaining,0);
+    assert.equal(material.geometry("ash-trail",1,200,34).burned,200);
+    assert.equal(material.geometry("burn-away",NaN,200,34).remaining,200);
+    assert.equal(material.grain(12,3),material.grain(12,3));
+});
+test("burn-away terminal state draws no remaining structure; ash remains deposited", () => {
+    const calls=[];
+    const gradient={addColorStop(){}};
+    const context=new Proxy({}, {get:(o,k)=>k==="createLinearGradient"
+        ? ()=>gradient : (...a)=>{calls.push([k,...a]);}});
+    material.drawRemaining(context,0,0,200,34,200,false,"orange");
+    assert.equal(calls.length,0);
+    material.drawRemaining(context,0,0,200,34,100,false,"orange");
+    assert.ok(calls.some(c=>c[0]==="fill"));
+    assert.ok(calls.filter(c=>c[0]==="moveTo"||c[0]==="lineTo").every(c=>c[1]>=100));
+    calls.length=0;
+    material.drawAsh(context,0,0,200,34,200,false);
+    assert.ok(calls.some(c=>c[0]==="fillRect"&&c[1]===0&&c[3]===200));
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/property string fireMode: "standard"/);
+    assert.match(source,/root.materialPeak=Math.max\(root.materialPeak,next\)/);
+    assert.ok(preview.includes('fireMode:"ash-trail"')&&preview.includes('fireMode:"burn-away"'));
 });

@@ -3,11 +3,13 @@ on:
   pull_request:
     paths:
       - 'tests/forest/first_light_stage1.py'
+      - 'tests/forest/first_light_stage1_launcher.py'
       - 'tests/forest/test_first_light_stage1.py'
       - '.github/workflows/forest-first-light-stage1-offline.yml'
   push:
     paths:
       - 'tests/forest/first_light_stage1.py'
+      - 'tests/forest/first_light_stage1_launcher.py'
       - 'tests/forest/test_first_light_stage1.py'
       - '.github/workflows/forest-first-light-stage1-offline.yml'
 permissions:
@@ -20,5 +22,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+      - name: Actual fixed launcher offline witness (no artifact acquisition)
+        run: |
+          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 \
+            /usr/bin/timeout --signal=TERM --kill-after=10s 20s \
+            /usr/bin/python3 -I -B tests/forest/first_light_stage1_launcher.py --offline-witness </dev/null
       - name: Synthetic verifier tests only (no artifact acquisition)
         run: /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 /usr/bin/python3 -I -B tests/forest/test_first_light_stage1.py -v

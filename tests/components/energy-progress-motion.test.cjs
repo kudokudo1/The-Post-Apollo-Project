@@ -170,7 +170,7 @@ test("Omnitrix has an expanding success pulse and non-fire heads are enlarged", 
     assert.match(preview,/createRadialGradient\(origin.x,origin.y/);
 });
 
-test("Ki Blast enemy heat grows through defeat and extinguishes after impact", () => {
+test("Ki Blast enemy heat grows through defeat and persists after impact", () => {
     const running=frame("running","measured",.68,4,0,false,"ki-blast");
     assert.ok(running.enemyHeat>0 && running.enemyHeat<.25);
     assert.equal(running.enemyOpacity,1);
@@ -187,18 +187,21 @@ test("Ki Blast enemy heat grows through defeat and extinguishes after impact", (
     assert.equal(hit.enemyHeat,1);
     assert.equal(hit.enemyOpacity,1);
     const fade=frame("failure","measured",0,.96,.68,false,"ki-blast");
-    assert.ok(fade.enemyOpacity>0 && fade.enemyOpacity<1);
+    assert.equal(fade.enemyOpacity,1);
     const end=frame("failure","measured",0,1.08,.68,false,"ki-blast");
-    assert.equal(end.enemyOpacity,0);
-    assert.equal(end.clash,false);
+    assert.equal(end.enemyOpacity,1);
+    assert.equal(end.clash,true);
+    assert.equal(end.enemyFraction,1);
     const reduced=frame("failure","measured",0,0,.68,true,"ki-blast");
-    assert.equal(reduced.enemyOpacity,0);
+    assert.equal(reduced.enemyOpacity,1);
+    assert.equal(reduced.enemyFraction,1);
+    assert.equal(frame("idle","measured",0,0,.68,false,"ki-blast").enemyOpacity,0);
     for(const name of ["tron","omnitrix","flamethrower"])
         assert.equal(frame("failure","measured",0,.5,.68,false,name).enemyHeat,0);
 });
 
 const currents=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head});");
+    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes});");
 test("full-lane currents advance in opposite directions, with faster TRON", () => {
     const w=900,h=40;
     const left=currents.flow("ki-blast","standard","player",w,h,0,false);
@@ -223,9 +226,9 @@ test("fire wake distribution distinguishes live fire from cooled material", () =
     const b=currents.flow("flamethrower","burn-away","player",w,h,2,false);
     const standard=currents.flow("flamethrower","standard","player",w,h,2,false);
     assert.equal(JSON.stringify(a),JSON.stringify(b));
-    assert.ok(a.length>0 && a.every(r=>r.wake && r.x>=w-h*2.8-1e-9));
+    assert.ok(a.length>0 && a.every(r=>r.wake && r.x>=w-h*4.4-1e-9));
     assert.ok(standard.filter(r=>r.wake).length>standard.filter(r=>!r.wake).length);
-    assert.ok(standard.some(r=>!r.wake && r.x<w-h*2.8));
+    assert.ok(standard.some(r=>!r.wake && r.x<w-h*4.4));
     for(const variant of ["tron","ki-blast","flamethrower"]){
         assert.equal(currents.flow(variant,"standard","player",0,h,2,false).length,0);
         for(const r of currents.flow(variant,"standard","player",w,h,2,false)){
@@ -237,8 +240,9 @@ test("TRON and Omnitrix core covers chamber height; clash lobes have separate co
     for(const variant of ["tron","omnitrix"]){
         for(const h of [12,24,42,80]){
             const g=currents.head(variant,h,1,800);
-            assert.ok(g.ry*g.solid>=h/2);
-            assert.ok(g.rx>=h);
+            assert.ok(g.ry>=h*.60 && g.ry<h*.80);
+            assert.ok(g.solid<.55 && g.rx<h);
+            assert.ok(g.rx>=h*.70);
         }
     }
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
@@ -248,4 +252,26 @@ test("TRON and Omnitrix core covers chamber height; clash lobes have separate co
     assert.match(source,/c.rect\(edge,0,width-edge,height\)/);
     assert.match(source,/f.enemyHeat/);
     assert.match(source,/Flow.flow/);
+});
+
+test("dominant clash lobe grows while losing lobe shrinks",()=>{
+    const a=currents.clashSizes(.2,.8), b=currents.clashSizes(.8,.15);
+    assert.ok(a.enemy>a.player && b.player>b.enemy);
+    assert.ok(a.enemy>b.enemy && a.player<b.player);
+    assert.ok(currents.clashSizes(0,1).enemy>=1.8);
+});
+const pixel=vm.runInNewContext(fs.readFileSync(path.join(root,
+    "components/EnergyPixelFire.js"),"utf8")+"\n({fire});");
+test("pixel fire waves, emits detached embers and stays static in reduced motion",()=>{
+    const a=pixel.fire(42,0,false), b=pixel.fire(42,.75,false);
+    assert.ok(a.cells.length>40 && a.cells.length<200);
+    assert.ok(a.embers.length===12 && a.embers.some(e=>e.y<-8));
+    assert.ok(JSON.stringify(a.cells)!==JSON.stringify(b.cells));
+    assert.ok(JSON.stringify(a.embers)!==JSON.stringify(b.embers));
+    assert.equal(JSON.stringify(pixel.fire(42,0,true)),JSON.stringify(pixel.fire(42,99,true)));
+    for(const cell of a.cells) assert.ok(Number.isInteger(cell.x)&&Number.isInteger(cell.y)&&cell.heat>=0&&cell.heat<=3);
+    for(const ember of a.embers) assert.ok(ember.alpha>=0&&ember.alpha<=1);
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/PixelFire.fire/);
+    assert.match(source,/c.globalAlpha=\.35/);
 });

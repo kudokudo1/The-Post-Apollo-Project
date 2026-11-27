@@ -565,6 +565,9 @@ ShellRoot {
                 if (!smoke.check(memorySlider && memorySet && memoryRestore && memoryApply
                         && !memoryRestore.available && !memoryApply.available && !consolePane.hasDraft,
                         "memory editor opens without limit or restore draft")) return;
+                if (!smoke.check(!memorySlider.adjustable && !view.stageResourceMemory(42),
+                        "protected memory target stays locked")) return;
+                fakeOwner.protectTargets=false;
                 memorySlider.valueRequested(42);
                 if (!smoke.check(view.stagedLimitPercent===42 && memoryApply.available
                         && consolePane.reviewLines[0].indexOf("42%")>=0
@@ -576,6 +579,7 @@ ShellRoot {
                 clearDraft.leftClicked(null);
                 if (!smoke.check(view.stagedLimitPercent===-1 && !memoryApply.available,
                         "clear removes shared draft without owner dispatch")) return;
+                fakeOwner.protectTargets=true;
                 cpuFilter.leftClicked(null);
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");

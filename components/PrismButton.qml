@@ -183,7 +183,7 @@ ActionButton {
     property bool openArtworkPrepared: false
     Loader {
         id: openArtworkLoader
-        anchors.fill: parent
+        anchors.centerIn: parent
         active: root.selected || root.openArtworkPrepared
         opacity: root.selected ? 1 : 0
         onLoaded: root.openArtworkPrepared = true
@@ -194,7 +194,6 @@ ActionButton {
                 readonly property real logicalWidth: Math.max(0,root.width+2*root.glowPadding)
                 readonly property real logicalHeight: Math.max(0,root.height+2*root.glowPadding)
                 readonly property real sampleScale: Math.min(2,root.rasterLimit/Math.max(1,logicalWidth,logicalHeight))
-                anchors.centerIn: parent
                 width: Math.max(1,Math.min(root.rasterLimit,Math.ceil(logicalWidth*sampleScale)))
                 height: Math.max(1,Math.min(root.rasterLimit,Math.ceil(logicalHeight*sampleScale)))
                 transform: Scale {
@@ -218,6 +217,7 @@ ActionButton {
                     function onOpenPaletteChanged() { openRaster.requestPaint() }
                 }
                 property real lastPaintDurationMs: -1
+                property int paintCount: 0
                 onPaint: {
                     const started=Date.now()
                     const c=getContext("2d")
@@ -229,6 +229,7 @@ ActionButton {
                     Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
                                   1,root.openPalette,root.spectralGlowStrength)
                     lastPaintDurationMs=Date.now()-started
+                    paintCount++
                 }
             }
         }

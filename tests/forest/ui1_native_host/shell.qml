@@ -241,6 +241,19 @@ ShellRoot {
         const button = find(parts.model, "forestModelForm-BIG");
         check(button && button.formTarget() !== "", "direct form available");
         if (failed) return false;
+        // Resolve the actual mounted store through its existing Connections
+        // resource. No production test API or replacement preference store.
+        let store = null;
+        for (let i = 0; i < button.resources.length; ++i) {
+            const resource = button.resources[i];
+            const target = resource ? resource.target : null;
+            if (target && target.status !== undefined && target.busy !== undefined
+                    && target.committed !== undefined)
+                store = target;
+        }
+        check(store && store.status === "READY" && store.committed !== null,
+            "direct form mounted store ready");
+        if (failed) return false;
         const original = forest.selectedTreeIndex;
         const originalEquipment = forest.selectedTreeEquipment;
         const before = JSON.stringify(originalEquipment);
@@ -258,6 +271,31 @@ ShellRoot {
         check(!button.commitFormGesture() && JSON.stringify(forest.selectedTreeEquipment) === before,
             "direct form equal-value external revision refused");
         button.beginFormGesture();
+        forest.modelPopupOpen = false;
+        forest.modelPopupOpen = true;
+        check(!button.commitFormGesture() && JSON.stringify(forest.selectedTreeEquipment) === before,
+            "direct form popup visibility ABA refused");
+        // Simulate transitions on the actual mounted store, without starting
+        // a Process, saving a file, or claiming an actual storage receipt.
+        button.beginFormGesture();
+        store.status = "SAVING";
+        check(store.busy && button.formTarget() === "" && button.gestureTicket === null,
+            "direct form busy invalidates original press");
+        button.beginFormGesture();
+        check(button.gestureTicket === null, "direct form busy press refused");
+        store.status = "READY";
+        check(!button.commitFormGesture(), "direct form busy ABA refused");
+        button.beginFormGesture();
+        const originalReceipt = store.committed;
+        store.committed = Object.assign({}, originalReceipt, {revision: originalReceipt.revision + 1});
+        check(!button.commitFormGesture() && JSON.stringify(forest.selectedTreeEquipment) === before,
+            "direct form same-equipment committed revision refused");
+        store.committed = originalReceipt;
+        button.beginFormGesture();
+        const cancelled = button.gestureTicket;
+        button.cancelFormGesture(cancelled);
+        check(!button.commitFormGesture(), "direct form cancelled press refused");
+        button.beginFormGesture();
         const fresh = button.gestureTicket;
         button.cancelFormGesture(old);
         check(fresh !== null && button.gestureTicket === fresh,
@@ -267,7 +305,10 @@ ShellRoot {
         forest.selectedTreeEquipment = originalEquipment;
         check(JSON.stringify(forest.selectedTreeEquipment) === before,
             "direct form restores disposable local baseline");
-        if (!failed) console.info("FOREST_HOST_DIRECT_FORM_GESTURE_PASS");
+        if (!failed) {
+            console.info("FOREST_HOST_DIRECT_FORM_GESTURE_PASS");
+            console.info("FOREST_HOST_DIRECT_FORM_MATRIX_PASS " + (compact ? "COMPACT" : "FULL"));
+        }
         return !failed;
     }
     function capture() {
@@ -1528,6 +1569,11 @@ ShellRoot {
                     ? forest.frameWidth < 930 && forest.frameHeight < 610
                     : forest.frameWidth === 930 && forest.frameHeight === 610, "default/clamped stage");
                 witness.check(parts.preview.interactive, "normal viewport ineligible");
+                if (witness.compact) {
+                    forest.modelPopupOpen = true;
+                    if (!witness.directFormGestureWitness()) return;
+                    forest.modelPopupOpen = false;
+                }
                 parts.input.text = "unsubmitted local draft";
                 parts.preview.leftClicked(null);
                 break;

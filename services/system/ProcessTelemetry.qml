@@ -454,10 +454,10 @@ Scope {
             "-lc",
             "pid=" + String(pid) + "; "
             + "[ -r /proc/$pid/stat ] || exit 0; "
-            + "stat=$(awk '{sub(/^.*[)] /,\"\"); print $12+$13, $20, $18}' /proc/$pid/stat 2>/dev/null) || exit 0; "
-            + "set -- $stat; [ \"$#\" -eq 3 ] || exit 0; ticks=$1; start=$2; threads=$3; "
-            + "status=$(awk 'BEGIN{rss=\"-\"; swap=\"-\"} /^VmRSS:/{rss=$2} /^VmSwap:/{swap=$2} END{print rss,swap}' /proc/$pid/status 2>/dev/null); "
-            + "set -- $status; rss=$1; swap=$2; "
+            + "stat=$(awk '{sub(/^.*[)] /,\"\"); print $12+$13, $20, $18, $17}' /proc/$pid/stat 2>/dev/null) || exit 0; "
+            + "set -- $stat; [ \"$#\" -eq 4 ] || exit 0; ticks=$1; start=$2; threads=$3; nice=$4; "
+            + "status=$(awk 'BEGIN{rss=\"-\"; swap=\"-\"; mask=\"-\"} /^VmRSS:/{rss=$2} /^VmSwap:/{swap=$2} /^Cpus_allowed_list:/{mask=$2} END{print rss,swap,mask}' /proc/$pid/status 2>/dev/null); "
+            + "set -- $status; rss=$1; swap=$2; mask=$3; "
             + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
             + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
             + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
@@ -465,9 +465,9 @@ Scope {
             + "birth=$(awk '{sub(/^.*[)] /,\"\"); print $20}' /proc/$pid/stat 2>/dev/null); "
             + "[ \"$birth\" = \"$start\" ] || exit 0; "
             + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "
-            + "printf '%s %s %s %s %s %s %s %s %s %s %s\\n' "
+            + "printf '%s %s %s %s %s %s %s %s %s %s %s %s %s\\n' "
             + "\"$pid\" \"$ticks\" \"${rss:--}\" \"${total:-1}\" \"$clk\" \"$cores\" "
-            + "\"${io:--}\" \"${start:-0}\" \"${uptime:--}\" \"${threads:--}\" \"${swap:--}\""
+            + "\"${io:--}\" \"${start:-0}\" \"${uptime:--}\" \"${threads:--}\" \"${swap:--}\" \"${nice:--}\" \"${mask:--}\""
         ]);
     }
 
@@ -494,6 +494,10 @@ Scope {
         const uptimeSeconds = Math.max(0, Number(fields[8]) || 0);
         const threadCount = /^[1-9]\d*$/.test(fields[9] || "")
             && Number.isSafeInteger(Number(fields[9])) ? Number(fields[9]) : null;
+        const niceValue = /^-?\d+$/.test(fields[11] || "") && Number(fields[11])>=-20
+            && Number(fields[11])<=19 ? Number(fields[11]) : null;
+        const cpuMask = typeof fields[12] === "string" && fields[12].length<=4096
+            && /^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$/.test(fields[12]) ? fields[12] : "";
         const nowMs = Date.now();
         const request = detailProbeRequest || ({});
 
@@ -555,6 +559,8 @@ Scope {
             rssObserved: rssObserved,
             swapKiB: swapKiB,
             threadCount: threadCount,
+            niceValue: niceValue,
+            cpuMask: cpuMask,
             ioRateBytes: ioRateBytes,
             ioRateObserved: ioRateObserved,
             ageSeconds: ageSeconds,

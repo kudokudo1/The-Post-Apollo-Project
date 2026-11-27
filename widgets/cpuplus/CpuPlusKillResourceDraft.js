@@ -4,7 +4,7 @@ function cards() {
         {key:"cpu",title:"CPU",scope:"PRIORITY / LEADER THREAD; QUOTA / GROUP",controls:[
             {key:"quota",title:"QUOTA DRAFT",min:10,max:100,step:5,unit:"% OF ONE CPU",initial:75},
             {key:"nice",title:"PRIORITY / NICE",min:-20,max:19,step:1,unit:"NICE",initial:0}
-        ],note:"AFFINITY // CPU CORE SET NOT ENUMERATED"},
+        ],note:"AFFINITY // CURRENT LEADER MASK ONLY; EXPANSION UNVERIFIED"},
         {key:"memory",title:"MEMORY",scope:"RLIMIT_AS / VIRTUAL ADDRESS SPACE",controls:[
             {key:"virtual",title:"ADDRESS SPACE",min:128,max:8192,step:128,unit:"MiB",initial:2048}
         ],note:"NOT AN RSS OR PHYSICAL RAM CAP"},
@@ -77,7 +77,7 @@ function stageValue(previous,key,field,value) {
     return result;
 }
 function mode(previous,key) {
-    return previous[key]?previous[key].mode:"hold";
+    return previous[key]?previous[key].mode:(key==="cpu"?"manual":"hold");
 }
 function value(previous,key,field) {
     var spec=find(key);
@@ -88,6 +88,45 @@ function value(previous,key,field) {
             ?selected[field]:spec.controls[i].initial;
     }
     return null;
+}
+// Parse Linux Cpus_allowed_list, never derive CPU IDs from a count.
+function cpuIds(mask) {
+    if(typeof mask!=="string"||!mask||mask.length>4096) return [];
+    var result=[];
+    var parts=mask.split(",");
+    for(var i=0;i<parts.length;i++) {
+        if(!/^\d+(?:-\d+)?$/.test(parts[i])) return [];
+        var bounds=parts[i].split("-"),lo=Number(bounds[0]),hi=Number(bounds[bounds.length-1]);
+        if(!Number.isSafeInteger(lo)||!Number.isSafeInteger(hi)||lo<0||hi<lo||hi>1048575||hi-lo>4095) return [];
+        for(var cpu=lo;cpu<=hi;cpu++) {
+            if(result.length>=4096||result.indexOf(cpu)>=0) return [];
+            result.push(cpu);
+        }
+    }
+    return result.sort((a,b)=>a-b);
+}
+function stageAffinity(previous,allowed,selected) {
+    if(!Array.isArray(allowed)||!Array.isArray(selected)||!selected.length
+        ||selected.some(x=>!Number.isSafeInteger(x)||allowed.indexOf(x)<0)
+        ||new Set(selected).size!==selected.length) return previous;
+    var result=Object.assign({},previous);
+    var entry=previous.cpu||{mode:"manual",values:{}};
+    result.cpu={mode:"manual",values:Object.assign({},entry.values,{affinity:selected.slice().sort((a,b)=>a-b)})};
+    return result;
+}
+function affinitySelection(previous,allowed) {
+    var entry=previous.cpu,selected=entry&&entry.values&&entry.values.affinity;
+    return Array.isArray(selected)&&selected.length&&selected.every(x=>allowed.indexOf(x)>=0)
+        ?selected.slice():allowed.slice();
+}
+function dropAffinity(previous) {
+    if(!hasValue(previous,"cpu","affinity")) return previous;
+    var result=Object.assign({},previous),entry=previous.cpu;
+    var values=Object.assign({},entry.values);
+    delete values.affinity;
+    if(!Object.keys(values).length&&entry.mode==="manual") delete result.cpu;
+    else result.cpu={mode:entry.mode,values:values};
+    return result;
 }
 function summary(previous) {
     var lines=[];
@@ -105,6 +144,7 @@ function summary(previous) {
                 if(spec.key==="cpu"&&!hasValue(previous,spec.key,c.key)) continue;
                 fields.push(c.title+" "+value(previous,spec.key,c.key)+" "+c.unit);
             }
+            if(spec.key==="cpu"&&hasValue(previous,"cpu","affinity")) fields.push("AFFINITY "+entry.values.affinity.join(","));
             description+=" // "+(fields.length?fields.join(" · "):"NO CPU VALUES SELECTED");
         }
         if(entry.mode==="auto") description+=" // POLICY NOT DEFINED";

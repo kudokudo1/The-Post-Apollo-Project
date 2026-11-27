@@ -11,6 +11,38 @@ Item {
     objectName: "cpuPlusKillResourceConsole"
     required property var target
     property bool selectionReady: false
+    property var resourceEvidence: null
+    readonly property var exactEvidence: resourceEvidence && resourceEvidence.key===targetIdentity ? resourceEvidence : null
+    readonly property var allowedCpuIds: Draft.cpuIds(exactEvidence ? exactEvidence.cpuMask : "")
+    readonly property string allowedCpuKey: allowedCpuIds.join(",")
+    readonly property var selectedCpuIds: Draft.affinitySelection(staged,allowedCpuIds)
+    // A changed effective mask invalidates the old selection; never silently
+    // carry a narrowing request to a different kernel mask.
+    onAllowedCpuKeyChanged: {
+        staged = Draft.dropAffinity(staged);
+        reviewing = false;
+    }
+    function priorityValue() {
+        if (Draft.hasValue(staged,"cpu","nice")) return Draft.value(staged,"cpu","nice");
+        const v=exactEvidence ? exactEvidence.niceValue : null;
+        return Number.isInteger(v)&&v>=-20&&v<=19 ? v : 0;
+    }
+    function priorityObserved() {
+        const v=exactEvidence ? exactEvidence.niceValue : null;
+        return Number.isInteger(v)&&v>=-20&&v<=19;
+    }
+    function setAffinity(ids) {
+        if (!selectionReady || selectedKey!=="cpu" || modeFor("cpu")!=="manual") return;
+        staged = Draft.stageAffinity(staged,allowedCpuIds,ids);
+        reviewing = false;
+    }
+    function toggleAffinity(cpu) {
+        const next=selectedCpuIds.slice();
+        const i=next.indexOf(cpu);
+        if(i>=0) { if(next.length===1) return; next.splice(i,1); }
+        else next.push(cpu);
+        setAffinity(next);
+    }
     readonly property string targetIdentity: Draft.identity(target)
     readonly property var categories: Draft.cards()
     property var staged: ({})
@@ -61,8 +93,7 @@ Item {
     }
     function priorityPresetSelected(nice) {
         return modeFor("cpu") === "manual"
-            && Draft.hasValue(staged,"cpu","nice")
-            && valueFor("cpu","nice") === nice;
+            && priorityValue() === nice;
     }
     function accentFor(key) {
         if (key === "cpu") return Colors.orange;
@@ -404,10 +435,8 @@ Item {
                                                 valueStep: 1
                                                 valueDecimals: 0
                                                 snapContinuousToStep: true
-                                                currentValue: root.valueFor("cpu","nice")
-                                                readoutText: Draft.hasValue(root.staged,"cpu","nice")
-                                                    ? (previewNumericValue>0?"+":"")+Math.round(previewNumericValue)
-                                                    : "DRAFT"
+                                                currentValue: root.priorityValue()
+                                                readoutText: (previewNumericValue>0?"+":"")+Math.round(previewNumericValue)
                                                 options: ["-20","-10","0","+10","+19"]
                                                 displayOptions: options
                                                 numericReferenceValues: [-20,-10,0,10,19]
@@ -451,7 +480,8 @@ Item {
                                             }
                                             GohuText {
                                                 width: parent.width
-                                                text: "PRESETS // DRAFT"
+                                                text: Draft.hasValue(root.staged,"cpu","nice") ? "PRIORITY // DRAFT"
+                                                    : root.priorityObserved() ? "PRIORITY // OBSERVED" : "NORMAL // PREVIEW"
                                                 color: Colors.white
                                                 font.pixelSize: 9
                                                 elide: Text.ElideRight
@@ -502,8 +532,7 @@ Item {
                                             objectName: "cpuPlusDraftInput-" + resourcePanel.key + "-" + field.modelData.key
                                             width: 92
                                             height: 26
-                                            text: field.priorityField && !Draft.hasValue(root.staged,"cpu","nice")
-                                                ? "" : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            text: field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
                                             placeholderText: field.priorityField ? "UNSET" : ""
                                             color: Colors.white
                                             font.pixelSize: 11
@@ -523,9 +552,78 @@ Item {
                                                 if (acceptableInput)
                                                     root.stageNumber(resourcePanel.key,field.modelData.key,Number(text));
                                                 else
-                                                    text = String(root.valueFor(resourcePanel.key,field.modelData.key));
+                                                    text = String(field.priorityField ? root.priorityValue() : root.valueFor(resourcePanel.key,field.modelData.key));
                                             }
                                         }
+                                    }
+                                }
+                            }
+                            Column {
+                                objectName: "cpuPlusAffinityControls"
+                                visible: resourcePanel.key==="cpu"
+                                width: parent.width
+                                spacing: 4
+                                GohuText {
+                                    width: parent.width
+                                    text: "AFFINITY // LEADER THREAD"
+                                    color: Colors.orange
+                                    font.pixelSize: 11
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: root.allowedCpuIds.length ? root.selectedCpuIds.length+"/"+root.allowedCpuIds.length+" CURRENTLY ALLOWED CPUs"
+                                        : "CPU MASK NOT OBSERVED"
+                                    color: Colors.white
+                                    font.pixelSize: 9
+                                    wrapMode: Text.Wrap
+                                }
+                                Grid {
+                                    id: affinityButtons
+                                    width: parent.width
+                                    columns: Math.max(1,Math.floor(width/48))
+                                    rowSpacing: 3
+                                    columnSpacing: 3
+                                    Repeater {
+                                        model: resourcePanel.key==="cpu" ? root.allowedCpuIds : []
+                                        delegate: ActionButton {
+                                            required property int modelData
+                                            objectName: "cpuPlusAffinityCpu-"+modelData
+                                            width: Math.max(1,(affinityButtons.width-(affinityButtons.columns-1)*affinityButtons.columnSpacing)/affinityButtons.columns)
+                                            height: 26
+                                            label: String(modelData)
+                                            normalFace: true
+                                            accentColor: Colors.orange
+                                            selected: root.selectedCpuIds.indexOf(modelData)>=0
+                                            available: root.selectionReady && root.modeFor("cpu")==="manual"
+                                            onLeftClicked: root.toggleAffinity(modelData)
+                                        }
+                                    }
+                                }
+                                Row {
+                                    width: parent.width
+                                    spacing: 4
+                                    ActionButton {
+                                        objectName: "cpuPlusAffinityAll"
+                                        width: (parent.width-parent.spacing)/2
+                                        height: 28
+                                        label: "ALL ALLOWED"
+                                        labelPixelSize: 9
+                                        labelMinimumPixelSize: 7
+                                        normalFace: true
+                                        accentColor: Colors.orange
+                                        available: root.selectionReady && root.allowedCpuIds.length>0 && root.modeFor("cpu")==="manual"
+                                        onLeftClicked: root.setAffinity(root.allowedCpuIds)
+                                    }
+                                    ActionButton {
+                                        objectName: "cpuPlusAffinityOne"
+                                        width: (parent.width-parent.spacing)/2
+                                        height: 28
+                                        label: "ONE CPU"
+                                        labelPixelSize: 9
+                                        normalFace: true
+                                        accentColor: Colors.orange
+                                        available: root.selectionReady && root.allowedCpuIds.length>0 && root.modeFor("cpu")==="manual"
+                                        onLeftClicked: root.setAffinity(root.selectedCpuIds.slice(0,1))
                                     }
                                 }
                             }

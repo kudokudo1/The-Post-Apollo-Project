@@ -1437,3 +1437,17 @@ test("P6: process snapshot stat probe uses one awk while retaining CPU and birth
         fs.rmSync(dir,{recursive:true,force:true});
     }
 });
+
+test("K8e2a detail sample preserves nice and sparse mask with identity guard",()=>{
+    const src=fs.readFileSync(path.resolve(__dirname,"../../services/system/ProcessTelemetry.qml"),"utf8");
+    const a=src.indexOf("    function parseDetailProbe(output) {");
+    const b=src.indexOf("\n    Process {",a);
+    const parse=new Function("Date","let detailProbeGeneration=2,detailProbeActiveGeneration=2,detailProbePid=4321,detailProbeLastTicks=-1,detailProbeLastIoBytes=-1,detailProbeLastMs=0,detailProbeRequest={pid:4321,startTicks:98765,fallbackCpu:11};"+src.slice(a,b)+"\nreturn parseDetailProbe;")({now:()=>1000});
+    const sample=parse("4321 100 2048 100000 100 4 1000 98765 1000 3 0 -5 0,2,8-9");
+    assert.equal(sample.niceValue,-5);
+    assert.equal(sample.cpuMask,"0,2,8-9");
+    const unknown=parse("4321 100 2048 100000 100 4 1000 98765 1000 3 0 - -");
+    assert.equal(unknown.niceValue,null);
+    assert.equal(unknown.cpuMask,"");
+    assert.equal(parse("4321 100 2048 100000 100 4 1000 98766 1000 3 0 0 0"),null);
+});

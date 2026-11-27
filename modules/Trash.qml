@@ -3218,8 +3218,7 @@ PanelWindow {
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 30, 360)
                 spacing: 14
-                visible: trashLauncher.burnUiStage !== "result"
-                         && trashLauncher.burnUiStage !== "error"
+                visible: !researchBurnFace.receiptReady
 
                 GohuText {
                     width: parent.width
@@ -3316,12 +3315,8 @@ PanelWindow {
                             }
                         }
 
-                        // Keep the regular ActionButton chassis opaque black
-                        // in idle, hover, pressed AND fully-armed states.
-                        // Progress lives in its rich content slot so it draws
-                        // above the black button fill, not behind an opaque
-                        // overlay. White and clipped black labels ensure that
-                        // text stays readable while orange crosses each glyph.
+                        // Same confirmation control through both visual stages.
+                        // Existing input and backend authorization remain here.
                         ActionButton {
                             id: confirmManagedResearchBurn
                             anchors.fill: parent
@@ -3335,9 +3330,9 @@ PanelWindow {
                             selectedFillColor: Colors.black
                             keyboardSelectedFillColor: Colors.black
 
-                            idleBorderWidth: 2
-                            hoverBorderWidth: 2
-                            pressedBorderWidth: 2
+                            idleBorderWidth: researchBurnFace.operationVisible ? 0 : 2
+                            hoverBorderWidth: researchBurnFace.operationVisible ? 0 : 2
+                            pressedBorderWidth: researchBurnFace.operationVisible ? 0 : 2
                             idleBorderColor: Colors.red
                             hoverBorderColor: Colors.red
                             pressedBorderColor: Colors.red
@@ -3363,21 +3358,18 @@ PanelWindow {
                                               === trashLauncher.researchRevision)
                             onLeftClicked: trashLauncher.advanceResearchBurn()
 
-                            Item {
+                            EnergyProgressBurnSequence {
                                 id: researchBurnFace
                                 anchors.fill: parent
+                                anchors.margins: 2
                                 clip: true
-                                // Keep the full orange fill at 100% after
-                                // arming completes. Only the second click
-                                // transitions to the magenta feedback stage.
-                                readonly property bool loading:
-                                    trashLauncher.researchBurnClickArmed
-                                    && trashLauncher.burnUiStage === ""
-                                readonly property string displayedLabel:
-                                    trashLauncher.burnUiStage === "clicked"
+                                armed: trashLauncher.researchBurnClickArmed
+                                armReady: trashLauncher.researchBurnLoadComplete
+                                armProgress: trashLauncher.researchBurnLoadProgress
+                                operationStage: trashLauncher.burnUiStage
+                                verified: trashLauncher.burnReceiptVerified
+                                idleCaption: trashLauncher.burnUiStage === "clicked"
                                     ? "CONFIRMING..."
-                                    : trashLauncher.burnUiStage === "working"
-                                    ? "BURNING..."
                                     : !trashLauncher.researchBurnPointerRelocated
                                     ? "MOVE HERE TO ARM"
                                     : !trashLauncher.researchBurnClickArmed
@@ -3385,64 +3377,6 @@ PanelWindow {
                                     : !trashLauncher.researchBurnLoadComplete
                                     ? "LOADING SAFETY..."
                                     : "CLICK AGAIN // BURN"
-
-                                // Fill the entire button during loading AND
-                                // hold orange when armed, with the centered
-                                // text black through the clipped label layer.
-                                // The second click switches to magenta feedback.
-                                Rectangle {
-                                    id: researchBurnLoadFill
-                                    x: 2
-                                    y: 2
-                                    width: Math.max(0, parent.width - 4)
-                                           * trashLauncher.researchBurnLoadProgress
-                                    height: Math.max(0, parent.height - 4)
-                                    color: Colors.orange
-                                    radius: 0
-                                    visible: researchBurnFace.loading
-                                }
-
-                                GohuText {
-                                    id: researchBurnLabelWhite
-                                    visible: trashLauncher.burnUiStage !== "working"
-                                    anchors.centerIn: parent
-                                    width: Math.max(0, parent.width - 12)
-                                    height: parent.height
-                                    font.pixelSize: 10
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                    color: Colors.white
-                                    text: researchBurnFace.displayedLabel
-                                }
-
-                                // Black text is revealed over exactly the
-                                // portion where the orange fill has passed.
-                                // The white label stays visible elsewhere.
-                                Item {
-                                    id: researchBurnLabelClip
-                                    x: researchBurnLoadFill.x
-                                    y: researchBurnLoadFill.y
-                                    width: researchBurnLoadFill.width
-                                    height: researchBurnLoadFill.height
-                                    clip: true
-                                    visible: researchBurnFace.loading
-
-                                    GohuText {
-                                        x: researchBurnLabelWhite.x
-                                           - researchBurnLabelClip.x
-                                        y: researchBurnLabelWhite.y
-                                           - researchBurnLabelClip.y
-                                        width: researchBurnLabelWhite.width
-                                        height: researchBurnLabelWhite.height
-                                        font.pixelSize: 10
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        elide: Text.ElideRight
-                                        color: Colors.black
-                                        text: researchBurnFace.displayedLabel
-                                    }
-                                }
                             }
                         }
                     }
@@ -3463,37 +3397,13 @@ PanelWindow {
                     width: parent.width
                     font.pixelSize: 10
                     color: Colors.green
-                    text: "CANCEL RETURNS TO BURN // NO DELETION"
+                    text: trashLauncher.burnUiStage === ""
+                        ? "CANCEL RETURNS TO BURN // NO DELETION"
+                        : trashLauncher.burnUiStage === "working" || trashLauncher.burnUiStage === "clicked"
+                        ? "CONFIRMED // WAIT FOR BACKEND"
+                        : "RESULT RECORDED // FINISHING DISPLAY"
                     wrapMode: Text.WordWrap
                 }
-            }
-
-            // One persistent visual instance moves from the actual working
-            // button to the receipt. No phase or animation can authorize IO.
-            // The safety arm, second click, magenta acknowledgement and
-            // backend receipt retain their original independent owners.
-            EnergyProgressFace {
-                id: burnOperationFace
-                parent: trashLauncher.burnUiStage === "result"
-                        || trashLauncher.burnUiStage === "error"
-                        ? burnReceiptProgressSlot : researchBurnFace
-                anchors.fill: parent
-                anchors.margins: 2
-                z: 3
-                variant: "flamethrower"
-                fireMode: "burn-away"
-                energyColor: Colors.orange
-                chassisColor: Colors.red
-                progressMode: "indeterminate"
-                phase: trashLauncher.burnUiStage === "working" ? "running"
-                    : trashLauncher.burnUiStage === "result" && trashLauncher.burnReceiptVerified
-                        ? "success"
-                    : trashLauncher.burnUiStage === "result" || trashLauncher.burnUiStage === "error"
-                        ? "failure" : "idle"
-                visible: phase !== "idle"
-                caption: phase === "running" ? "BURNING..."
-                    : phase === "success" ? "BURN VERIFIED"
-                    : "PARTIAL // UNVERIFIED"
             }
 
             // Stays here until DONE. Every listed name came from the actual
@@ -3503,8 +3413,7 @@ PanelWindow {
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 30, 370)
                 spacing: 10
-                visible: trashLauncher.burnUiStage === "result"
-                         || trashLauncher.burnUiStage === "error"
+                visible: researchBurnFace.receiptReady
 
                 GohuText {
                     width: parent.width
@@ -3519,11 +3428,10 @@ PanelWindow {
                           ? "BURN // VERIFIED RESULT"
                           : "BURN // PARTIAL OR UNVERIFIED"
                 }
-                Item {
-                    id: burnReceiptProgressSlot
+                Rectangle {
                     width: parent.width
-                    height: 43
-                    clip: true
+                    height: 2
+                    color: Colors.orange
                 }
                 GohuText {
                     width: parent.width
@@ -3545,7 +3453,7 @@ PanelWindow {
 
                 Item {
                     width: parent.width
-                    height: Math.max(85, Math.min(169, trashMenu.height - 286))
+                    height: Math.max(85, Math.min(210, trashMenu.height - 245))
                     ListView {
                         id: burnReceiptList
                         anchors.fill: parent

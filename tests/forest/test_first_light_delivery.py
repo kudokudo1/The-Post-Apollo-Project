@@ -3,6 +3,7 @@ import sys
 import json
 import subprocess
 from unittest.mock import patch
+from http.server import ThreadingHTTPServer
 import threading
 import unittest
 from pathlib import Path
@@ -178,6 +179,77 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(replies[9]["snapshot"]["local_outcome"], "ABORTED_LOCAL")
         self.assertEqual(replies[9]["snapshot"]["text"], "")
         self.assertEqual(replies[10]["local_outcome"], "ABORTED_LOCAL")
+
+    def test_independent_control_stops_actual_blocked_b2_read(self):
+        from first_light_delivery_child import OwnerWorker, Control, ControlRefusal
+        from test_ollama_chat_transport import FakeOllama
+        from ollama_chat_transport import stream_chat
+
+        blocked = threading.Event()
+        release = threading.Event()
+        observed = []
+
+        class Peer(FakeOllama):
+            def do_POST(self):
+                size = int(self.headers["Content-Length"])
+                observed.append(json.loads(self.rfile.read(size)))
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/x-ndjson")
+                    self.end_headers()
+                    self.wfile.write(packet("partial"))
+                    self.wfile.flush()
+                    blocked.set()
+                    release.wait(8)
+                    self.wfile.write(packet(" later", done=True))
+                    self.wfile.flush()
+                except OSError:
+                    pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Peer)
+        peer_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        peer_thread.start()
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+
+        def transport(**kw):
+            kw["endpoint"] = endpoint
+            yield from stream_chat(**kw)
+
+        owner = OwnerWorker(transport)
+        control = Control(owner)
+        try:
+            control.command({"op": "OBSERVE", "epoch": 1, "visible": True})
+            control.command({"op": "SUBMIT", "epoch": 1, "prompt": PROMPT})
+            for _ in range(4):
+                control.command({"op": "STEP"})
+            self.assertTrue(blocked.wait(2))
+            partial = control.command({"op": "TAKE", "epoch": 1})["snapshot"]
+            self.assertEqual(partial["text"], "partial")
+            control.command({"op": "STEP_BEGIN"})
+            self.assertFalse(control.command({"op": "STEP_POLL"})["done"])
+            for op in ("STEP", "STEP_BEGIN", "OUTCOME", "CLOSE"):
+                with self.assertRaises(ControlRefusal):
+                    control.command({"op": op})
+            self.assertEqual(control.command({"op": "STOP", "epoch": 1})["ack"],
+                             "STOP_LATCHED")
+            # Peer has not completed/released its response. Cancellation
+            # must interrupt B2 independently of the blocked owner read.
+            owner.pending.result(timeout=3)
+            self.assertFalse(release.is_set())
+            self.assertTrue(control.command({"op": "STEP_POLL"})["done"])
+            final = control.command({"op": "TAKE", "epoch": 1})["snapshot"]
+            self.assertEqual((final["status"], final["local_outcome"], final["text"]),
+                             ("UNKNOWN_HOLD", "ABORTED_LOCAL", ""))
+            self.assertEqual(len(observed), 1)
+            self.assertFalse(final["native_admitted"])
+            self.assertEqual(control.command({"op": "CLOSE"})["local_outcome"],
+                             "ABORTED_LOCAL")
+        finally:
+            release.set()
+            owner.dispose()
+            server.shutdown()
+            server.server_close()
+            peer_thread.join(timeout=2)
 
     def test_wrong_prompt_is_unknown_not_admission_or_retry(self):
         calls = []

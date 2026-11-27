@@ -1223,7 +1223,8 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("onLeftClicked: root.modelPopupOpen = !root.modelPopupOpen", view)
         self.assertIn("onModelPopupOpenChanged:", view)
         self.assertIn("if (modelPopupOpen)", view)
-        self.assertIn("if (!localInventory.scanning && !modelResidency.scanning)", view)
+        # Explicit operator popup scanning remains gated off in visual-only fixtures.
+        self.assertIn("if (!fixtureOnly && !localInventory.scanning && !modelResidency.scanning)", view)
         self.assertIn("root.refreshLocalModelEvidence();", view)
         self.assertNotIn("onMenuOpenChanged: localInventory.scanModels()", view)
         self.assertIn("id: closeModelPopupButton", view)

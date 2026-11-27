@@ -8,6 +8,7 @@ ShellRoot {
     id: witness
     property bool failed: false
     property real glowDuration: -1
+    property int openPaintCount: -1
     function descendant(item, wanted) {
         if (!item) return null;
         if (item.objectName === wanted) return item;
@@ -112,25 +113,56 @@ ShellRoot {
     }
     Timer {
         id: selectionCheck
-        interval: 150
+        interval: 450
         repeat: false
         onTriggered: {
             const glow=witness.descendant(prism,"prismGlowArtwork");
+            const openArt=witness.descendant(prism,"prismOpenArtwork");
             if (!glow || !prism.selected || prism.activeBorderWidth!==1
-                    || glow.opacity<0.7 || glow.lastPaintDurationMs!==witness.glowDuration) {
-                console.error("PRISM_NATIVE_FAIL selected border/glow or unexpected repaint");
+                    || glow.opacity!==0 || glow.lastPaintDurationMs!==witness.glowDuration
+                    || !Qt.colorEqual(prism.fillColor, Ui.Colors.yellow)
+                    || !Qt.colorEqual(prism.activeBorderColor, Ui.Colors.magenta)
+                    || !openArt || openArt.lastPaintDurationMs<0
+                    || !prism.openArtworkPrepared) {
+                console.error("PRISM_NATIVE_FAIL selected palette or cached artwork");
                 Qt.quit(); return;
             }
-            console.info("PRISM_NATIVE_SELECTED_GLOW",glow.opacity,glow.lastPaintDurationMs);
+            console.info("PRISM_NATIVE_OPEN_PALETTE",prism.fillColor,prism.activeBorderColor,openArt.lastPaintDurationMs);
+            witness.openPaintCount=openArt.paintCount;
             prism.grabToImage(function(result) {
                 console.info("PRISM_NATIVE_COMPOSITE",result.saveToFile("/tmp/prism-render-composite.png"));
                 spectrumWitness.grabToImage(function(spectrumResult) {
                     if (!spectrumResult.saveToFile("/tmp/prism-render-spectrum.png"))
                         console.error("PRISM_NATIVE_FAIL spectrum snapshot");
-                    console.info("PRISM_NATIVE_DONE");
-                    Qt.quit();
+                    prism.selected=false;
+                    closedCheck.start();
                 });
             });
+        }
+    }
+    Timer {
+        id: closedCheck
+        interval: 150
+        onTriggered: {
+            if (!Qt.colorEqual(prism.fillColor, Ui.Colors.black)
+                    || !Qt.colorEqual(prism.activeBorderColor, Ui.Colors.white)
+                    || !witness.descendant(prism,"prismOpenArtwork")) {
+                console.error("PRISM_NATIVE_FAIL closed palette or lost cache");
+                Qt.quit(); return;
+            }
+            prism.selected=true;
+            reopenedCheck.start();
+        }
+    }
+    Timer {
+        id: reopenedCheck
+        interval: 150
+        onTriggered: {
+            const openArt=witness.descendant(prism,"prismOpenArtwork");
+            if (!openArt || openArt.paintCount!==witness.openPaintCount)
+                console.error("PRISM_NATIVE_FAIL open state repaint");
+            console.info("PRISM_NATIVE_DONE");
+            Qt.quit();
         }
     }
     Timer {

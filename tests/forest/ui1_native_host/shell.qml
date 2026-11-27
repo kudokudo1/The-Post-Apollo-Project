@@ -162,6 +162,57 @@ ShellRoot {
             "unified rail accessibility properties");
         inspect(rail);
     }
+    // S5 preparation: exercise actual disconnected Tree preferences only.
+    // No fabricated room, addressee, membership or provider operation.
+    function treePreferenceIsolation() {
+        const a = parts, original = forest.selectedTreeIndex;
+        const draft = a.input.text;
+        const before = forest.selectedTreeReasoningSteps.slice();
+        const equipment = JSON.stringify(forest.selectedTreeEquipment);
+        const modelOpen = forest.modelPopupOpen;
+        const railOpen = forest.reasoningRailExpanded;
+        check(!modelOpen && !railOpen && !forest.chatHostTrusted,
+            "S5 disconnected preference baseline");
+        if (failed) return false;
+        a.input.text = "local draft: Tree browsing must not submit";
+        forest.selectedTreeIndex = 0;
+        const first = (before[0] + 1) % 4;
+        forest.chooseTreeReasoningStep(first);
+        check(forest.selectedReasoningStep === first
+            && forest.selectedTreeReasoningSteps.slice(1).join(",") === before.slice(1).join(","),
+            "S5 local CHERRY reasoning isolation");
+        geometry(false);
+        forest.selectedTreeIndex = 1;
+        check(forest.selectedReasoningStep === before[1]
+            && forest.selectedEquipment === forest.selectedTreeEquipment[1],
+            "S5 MAPLE browse preference target");
+        const second = (before[1] + 2) % 4;
+        forest.chooseTreeReasoningStep(second);
+        check(forest.selectedTreeReasoningSteps[0] === first
+            && forest.selectedReasoningStep === second
+            && forest.selectedTreeReasoningSteps.slice(2).join(",") === before.slice(2).join(","),
+            "S5 local MAPLE reasoning isolation");
+        geometry(false);
+        check(!forest.chooseModelForm("BIG") && !forest.clearLocalModel("small")
+            && JSON.stringify(forest.selectedTreeEquipment) === equipment,
+            "S5 hidden equipment controls refuse");
+        forest.selectedTreeIndex = 0;
+        check(forest.selectedReasoningStep === first
+            && forest.selectedEquipment === forest.selectedTreeEquipment[0],
+            "S5 original Tree preference retained");
+        geometry(false);
+        check(a.input.text === "local draft: Tree browsing must not submit"
+            && !a.send.enabledAction && !a.voice.backendReady
+            && forest.activeChatSessions.length === 0
+            && !a.loader.active && a.loader.item === null,
+            "S5 draft, disconnected send and preview isolation");
+        // Restore in-memory preferences; never call SAVE or open a model popup.
+        forest.selectedTreeReasoningSteps = before;
+        forest.selectedTreeIndex = original;
+        a.input.text = draft;
+        geometry(false);
+        return !failed;
+    }
     function capture() {
         const names = {
             chat: "forestChatPane", heading: "forestChatHeading",
@@ -985,6 +1036,8 @@ ShellRoot {
                 witness.seasonRows=[];
                 console.info("FOREST_HOST_UNIFIED_RAIL_PASS " + parts.chatRail.width);
                 console.info("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS");
+                if (!witness.treePreferenceIsolation()) return;
+                console.info("FOREST_HOST_TREE_PREFERENCE_ISOLATION_PASS " + parts.chatRail.width);
                 if (witness.small) {
                     witness.check(!parts.preview.interactive, "small viewport eligible");
                     parts.preview.leftClicked(null); // direct signal, not a physical pointer event

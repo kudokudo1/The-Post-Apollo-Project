@@ -1187,3 +1187,49 @@ test("K7f: swap replaces PID only in recipient cards and identity stays readable
     assert.match(probe,/\^VmSwap:/);
     assert.equal((probe.match(/\/proc\/\$pid\/status/g)||[]).length,1);
 });
+
+test("K8b1: gateway dispatch binds signals to a pidfd and checks actual results", () => {
+    const source=read("services/system/ProcessControl.qml");
+    const begin=source.indexOf("    function identitySignalCommand(");
+    const end=source.indexOf("\n    }",begin);
+    assert.ok(begin>=0 && end>begin);
+    const make=new Function("normalizedSignal",source.slice(begin,end+6)+"\nreturn identitySignalCommand;")(s=>["-STOP","-CONT","-TERM"].includes(s)?s:"");
+    assert.deepEqual(make(1,123,"test","-TERM"),[]);
+    assert.deepEqual(make(123,0,"test","-TERM"),[]);
+    assert.deepEqual(make(123,456,"test","-KILL"),[]);
+    const command=make(123,456,"test","-TERM");
+    assert.match(command[2],/os\.pidfd_open/);
+    assert.match(command[2],/signal\.pidfd_send_signal/);
+    assert.doesNotMatch(command[2],/os\.kill\(/);
+    assert.match(gate,/controlOwner\.identitySignalCommand\(req\.pid,req\.startTicks,req\.name,sig\)/);
+    assert.match(gate,/signalDispatchActive = true;[\s\S]*?signalDispatch\.exec\(command\)/);
+    assert.doesNotMatch(gate,/controlOwner\.sendSignal\(/);
+    assert.match(gate,/exitCode === 0 && exitStatus === 0/);
+    const harness=[
+        "import subprocess, sys, time",
+        "script=sys.argv[1]",
+        "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'])",
+        "def state():",
+        "    with open(f'/proc/{p.pid}/stat') as f: raw=f.read()",
+        "    end=raw.rfind(')'); fields=raw[end+2:].split()",
+        "    return raw[raw.index('(')+1:end],fields",
+        "def invoke(name,birth,sig):",
+        "    return subprocess.run([sys.executable,'-c',script,str(p.pid),birth,name,sig],timeout=5).returncode",
+        "def wait_state(stopped):",
+        "    for _ in range(100):",
+        "        if (state()[1][0]=='T')==stopped: return",
+        "        time.sleep(.02)",
+        "    raise AssertionError('state did not change')",
+        "try:",
+        "    name,fields=state(); born=fields[19]",
+        "    assert invoke(name,str(int(born)+1),'-TERM')!=0 and p.poll() is None",
+        "    assert invoke(name+'-wrong',born,'-STOP')!=0; wait_state(False)",
+        "    assert invoke(name,born,'-STOP')==0; wait_state(True)",
+        "    assert invoke(name,born,'-CONT')==0; wait_state(False)",
+        "    assert invoke(name,born,'-TERM')==0; assert p.wait(timeout=5)==-15",
+        "finally:",
+        "    if p.poll() is None: p.kill(); p.wait(timeout=5)"
+    ].join("\n");
+    const result=require("node:child_process").spawnSync("/usr/bin/python3",["-c",harness,command[2]],{encoding:"utf8",timeout:20000});
+    assert.equal(result.status,0,result.stderr || String(result.error || ""));
+});

@@ -41,11 +41,37 @@ test("K8d QML is a contained presentation, no process mutator or helper",()=>{
     assert.match(parent,/id: resourceBay[\s\S]*?CpuPlusKillResourceConsole \{/);
     assert.match(parent,/visible: !reviewPanel.visible/);
     assert.match(ui,/onTargetIdentityChanged:\s*root.clearDraft\(\)/);
-    assert.match(ui,/CpuPlusDiagnosticSlider \{/);
+    assert.match(ui,/CpuPlusDiagnosticSlider \\{/);
+    assert.match(ui,/id: resourceFilters/);
+    assert.match(ui,/model: root.categories/);
+    assert.match(ui,/objectName: "cpuPlusResourceFilter-"/);
+    assert.match(ui,/id: resourcePanel/);
+    assert.match(ui,/readonly property var spec: root.selectedResource/);
+    assert.match(ui,/anchors.top: resourceFilters.bottom/);
+    assert.doesNotMatch(ui,/id: resourceCard/);
+    assert.doesNotMatch(ui,/model: root.categories\\s*\\n\\s*delegate: Rectangle/);
+    assert.match(ui,/onLeftClicked: root.selectResource\\(modelData.key\\)/);
     assert.match(ui,/label: "REVIEW"/);
     assert.match(ui,/label: "CLEAR DRAFT"/);
     assert.match(ui,/APPLY LOCKED/);
     assert.match(ui,/onValueRequested: function\(value\)/);
     for(const forbidden of ["Quickshell.execDetached","Process {","setLimitMiB(","setLimitPercent(","signalDispatch.exec(","prlimit(","onLeftClicked: workspace.gate.confirm"])
         assert.equal(ui.includes(forbidden),false,"forbidden actuator "+forbidden);
+});
+
+test("K8d2 top filters select one editor while retaining drafts",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    for (const name of ["CPU","MEM","SWAP","DISK","THR","GPU","NET"])
+        assert.match(ui,new RegExp('\\\"'+name+'\\\"'));
+    assert.match(ui,/property string selectedKey: "cpu"/);
+    assert.match(ui,/selected: root.selectedKey === modelData.key/);
+    assert.match(ui,/function selectResource\\(key\\)/);
+    assert.match(ui,/reviewing = false;[\\s\\S]*?bodyScroll.contentY = 0/);
+    assert.match(ui,/model: resourcePanel.spec.controls/);
+    assert.match(ui,/model: \\["off","manual","auto","hold"\\]/);
+    assert.match(ui,/visible: root.modeFor\\(resourcePanel.key\\) === "manual"/);
+    const updated=draft.stageValue({}, "cpu", "nice", 8);
+    assert.equal(draft.value(updated,"cpu","nice"),8);
+    assert.equal(draft.value(updated,"memory","virtual"),2048);
+    assert.equal(draft.summary(updated).length,1);
 });

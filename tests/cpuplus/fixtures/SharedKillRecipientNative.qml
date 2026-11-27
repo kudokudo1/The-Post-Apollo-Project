@@ -5,6 +5,7 @@ import Quickshell
 import "widgets/cpuplus"
 import "services/system"
 import "services/kill" as KillBackend
+import qs.services.favorites
 
 ShellRoot {
     id: smoke
@@ -142,7 +143,6 @@ ShellRoot {
         property alias taskMiniCpuHistories: fakeHistory.taskMiniCpuHistories
         property alias taskMiniHunterMetricHistories: fakeHistory.taskMiniHunterMetricHistories
         property alias taskMiniDisplayRevision: fakeHistory.taskMiniDisplayRevision
-        property var favoriteStore: QtObject { property var favoriteKeys: [] }
         property bool destructiveConfirmOpen: false
         property var cpuBulkReview: null
         property bool cpuBulkOperation: false
@@ -213,7 +213,6 @@ ShellRoot {
             else return fakeGate.toggleOneShotUnlock(pid,birth,name);
             return true;
         }
-        function taskFavoriteKey(row) { return "task|"+row.comm; }
         function taskSimplePurpose(row) { return "Synthetic purpose"; }
         function monitorResultIcon(row) { return "(╭ರ_•́)"; }
         property bool menuOpen: false
@@ -222,8 +221,6 @@ ShellRoot {
         property int refreshes: 0
         readonly property var rows: taskRows
         function refreshSnapshot() { refreshes++; }
-        function isTaskMetricFavorite(entry,metricId) { return false; }
-        function toggleTaskMetricFavorite(entry,metricId) { }
     }
 
     Window {
@@ -424,10 +421,27 @@ ShellRoot {
                     && master.mode==="once"
                     && view.toggleLock(view.currentTask,"",true)
                     && master.mode==="sticky", "three real owner lock states")) return;
+                // Exercise the real singleton in the fixture's disposable XDG directory.
+                FavoritesService.toggleFavoriteKey("app|fixture-sentinel");
                 view.toggleTaskFavorite(view.currentTask);
                 if (!smoke.check(view.isTaskFavorite(view.currentTask)
-                    && fakeOwner.favoriteStore.favoriteKeys[0]==="task|synthetic-worker",
-                    "shared favorite identity")) return;
+                    && FavoritesStore.favoriteKeys[0]==="task|synthetic-worker"
+                    && FavoritesService.isFavoriteKey("app|fixture-sentinel"),
+                    "shared favorite identity and unrelated key preservation")) return;
+                detail.host.toggleTaskMetricFavorite(view.currentTask,"cpu");
+                if (!smoke.check(detail.host.isTaskMetricFavorite(view.currentTask,"cpu")
+                    && FavoritesStore.favoriteTaskMetricKeys[0]==="taskmetric|synthetic-worker|cpu",
+                    "shared metric favorite identity")) return;
+                detail.host.toggleTaskMetricFavorite(view.currentTask,"cpu");
+                if (!smoke.check(!detail.host.isTaskMetricFavorite(view.currentTask,"cpu")
+                    && FavoritesStore.favoriteTaskMetricKeys.length===0,
+                    "metric favorite removal")) return;
+                view.toggleTaskFavorite(view.currentTask);
+                if (!smoke.check(!view.isTaskFavorite(view.currentTask)
+                    && FavoritesStore.favoriteKeys.length===1
+                    && FavoritesService.isFavoriteKey("app|fixture-sentinel"),
+                    "process favorite removal preserves other membership")) return;
+                FavoritesService.toggleFavoriteKey("app|fixture-sentinel");
                 info.open=true;
                 const initial=detail.cpuCanvas.graphRevision;
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];

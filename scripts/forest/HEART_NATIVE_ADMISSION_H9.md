@@ -521,3 +521,117 @@ with H11/R7 and independent evidence feasibility. Otherwise retain
 existing zero-demand refusal. Exact Runtime, Spirit and Nurse source
 review and CI before operator documentation integration; all native,
 protected and production gates remain HOLD.
+
+
+## FL3/H14-E // Exact First Light qualification packet (candidate only)
+
+Nurse #2161 comment 7217350418, Heart 7216904378 and 7217388245.
+Runtime #3031 integrated at af43b151, host blob 7bc811c8; current
+baseline cc7b6fe6. FL4 #3037 retains the same B2 settings. This is
+the Heart-owned concrete evidence plan for that one existing host,
+not a second runner, issuer, new resource policy or native grant.
+
+### Frozen candidate versus evidence still required
+
+| Item | Candidate reference | Independent evidence required |
+| --- | --- | --- |
+| Host | H14-C separate fresh hosted Ubuntu 24.04 x64 VM, no operator-host fallback | Actual authorized runner/boot and isolation owner, ancestor limits, capacity and available observer; no runner selected yet |
+| Model | granite3.3:2b, manifest SHA-256 `07bd1f170855240f9e162bf54ea494a8bc1c73d8cbd1365d7fccbeb7d2504947` | Raw manifest bytes hashed, config and every referenced layer verified by exact digest/size, immutable staged path and actual loaded artifact/runner association |
+| Runtime | Ollama v0.32.14, linux-amd64.tar.zst SHA-256 `c620917a71e146ab3a7f893084f066069c4c65d144ef8379a91c3cbe8b27de8f` | Actual independently sourced release archive bytes and extracted executable/runner/library hashes, immutable image and provider lifetime; no acquisition here |
+| Placement | CPU-only candidate, no accelerator access | Effective inherited device exclusion, no retained or transferred device descriptors, alternate service/offload or attributable device charge; H15/H15b compatibility unresolved |
+| Request | Fixed public Reply with READY., 2048 context, 32 output, provider-default effort, one POST | Exact actual B2 bytes and model/template/tokenizer, effective settings and rendered token count, no private input, retry or fallback |
+| Egress | One original local provider at literal 127.0.0.1:11434 inside isolated scope | Spirit independently establishes source, recipient, no external route/credentials/FDs, no replacement provider or cloud forwarding |
+
+The published IBM example and Ollama catalog are candidate references,
+not verified registry manifest bytes or local installation attestation:
+https://community.ibm.com/community/user/blogs/anuj-bahuguna/2025/05/06/deploying-granite-ollama-openshift
+and https://ollama.com/library/granite3.3:2b. Missing config or layer
+bytes, unknown source, or any mismatch refuses. No auto-pull. Separate
+approval is required for any actual artifact acquisition or execution.
+
+The exact current B2 compact JSON request is 142 UTF-8 bytes with
+SHA-256 `e4faea266b440742199c9e97803de2a19d656f1c9a7dd18ab733f2eaf7ca75af`.
+The H1 settings fingerprint is separately SHA-256
+`bab19bea7d3b9e79940663ddbd3d524281d4eee44bca2afcf9a9f65be9134576`.
+These are offline reference computations, not permission, currentness,
+or evidence that a POST occurred. Compare actual serialized bytes at
+the effect boundary; do not treat equality with a hardcoded constant
+as source authentication. The provider template adds system/role
+framing; count all rendered tokens including output allowance. Do not
+insert a new user/control message to satisfy an assumed thinking mode.
+
+### Ordered qualification and resource custody
+
+1. **Before any native creation:** operator selects exact host, artifact,
+   runtime, allowed fixed public workload and containment experiment.
+   Independently verify staging, disk including extraction/scratch,
+   fresh host and ancestor capacity, pressure, finite preventive
+   ceilings and a conservative applicable RAM/CPU demand and margin.
+   The existing proposed 6 GiB cap, two CPU equivalents, zero swap and
+   10 GiB host available floor are containment bounds, not demand.
+   Published 1.55 GB artifact and hypothetical 160 MiB FP16 KV payload
+   at 2048 tokens are not sufficient for an upper bound. Include
+   runtime allocation, cold/warm state, buffers and overhead. If an
+   independent demand bound is unavailable, ordinary admission stays
+   HOLD; only a separately approved containment-limited qualification
+   experiment may be considered under H14-B/C. No trial as its own
+   admission preflight.
+2. **After separately authorized isolated creation, before effect:**
+   Runtime pins original provider/runner, boot, scope/ancestry and
+   effective controls; Spirit verifies original isolation and egress.
+   Keep independently observed real monotonic clock domain, not FL3
+   logical journal tick. Refuse any unproved accelerator applicability
+   or prior/unknown attributable charge. Do not silently set zero or
+   dummy positive VRAM values. H1/H2 remain unchanged until the
+   H15 representation and original accounting compatibility are agreed.
+3. **Original reservation and claim:** existing B3 creates the actual
+   attempt ID; PREPARED/REQUESTED cannot supply it. After preventive
+   preflight and reservation, before POST, bind actual original
+   context/turn/operation/attempt, exact artifact/settings/request
+   and resource evidence to one serialized original claim. Existing
+   H2 reference is disposable, not durable custody. Runtime must
+   preserve independently recoverable original custody across loss
+   of the in-memory journal; no substitute H2 instance, replay, or
+   release inferred from a local abort. Recheck actual source/claim
+   and preventive controls at actual send; no new provider transport.
+4. **Execution and terminal:** retain original pinned resource scope,
+   continuous preventive controls and bounded observations through
+   startup, send, original terminal, quiescence and later accounting.
+   Capture only permitted fixed aggregate evidence. Separate local
+   journal outcome, transport outcome, original provider terminal,
+   independent quiescence, retained residency/charges and settlement.
+   Do not dispose original scope before final accounting. Missing
+   observation, mismatch, timeout or unknown holds original custody.
+
+### Lifetime profile reconciliation (proposal, not implementation)
+
+H14-D is a NO-MODEL profile: 60s original lifetime, <=1s sample
+duration/gap, <=121 samples. Leave these limits and evaluator unchanged.
+B2's 120s transport timer starts before connect, not provider startup,
+and does not cover post-transport quiescence. A model-specific full
+lifetime profile must be separately reviewed with Runtime/Spirit;
+H14-C's 180s total is a candidate ceiling, not a validated budget.
+Use one independently monotonic original launch deadline; before POST
+require enough remaining time for the actual bounded transport interval
+and reserved terminal/accounting window. If not, refuse before send.
+The model profile needs a separately justified finite sample count
+and observation interval covering the entire original lifetime;
+do not simply increase H14-D MAX_NS or reuse 121 samples as proof.
+A timeout must stop further progression and preserve UNKNOWN_HOLD
+if original terminal/accounting is unavailable, not release resources.
+No profile selected, no implementation or dispatch authorization.
+
+### Exit criteria and remaining work
+
+Runtime can continue FL4 and owner-side delivery development now.
+Heart requires the selected actual host/source and independently
+supported demand/exclusion evidence before qualifying a native claim.
+Runtime and Spirit must agree actual bounded full-lifetime profile,
+original effect custody and evidence producer; H15 CPU-only semantics
+remain a separate scoped implementation decision. Mind verifies exact
+eligible user input and distinct provider-rendered token accounting;
+UI integration remains independent of resource release. Nurse reviews
+the exact completed seams. Actual trial and later user-text scope
+remain distinct operator decisions. No preliminary approval round
+for existing ordinary development; no change to H1/H2, H14-D, B2,
+H15, model files, workflow, native/protected/production authority.

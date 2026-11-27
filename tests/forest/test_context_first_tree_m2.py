@@ -62,7 +62,7 @@ class ContextTests(unittest.TestCase):
             self.db.rollback()
 
     def test_first_light_exact_unicode_without_write_or_normalization(self):
-        prompt = " Public café\\n "
+        prompt = " Public café" + chr(10) + " "
         self.db.execute("UPDATE forest_turns SET body=? WHERE turn_id=?",
                         (prompt, self.ref.user_turn_id))
         self.db.commit()
@@ -88,7 +88,7 @@ class ContextTests(unittest.TestCase):
 
         self.db.set_authorizer(authorizer)
         try:
-            for prompt in (None, "", "é" * 2049, "x\\x00y"):
+            for prompt in (None, "", "é" * 2049, "x" + chr(0) + "y"):
                 with self.subTest(prompt_type=type(prompt)), self.assertRaisesRegex(
                         ContextRefusal, "FIRST_LIGHT_INPUT_REFUSED"):
                     self.read_first_light(prompt)

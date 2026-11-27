@@ -1630,9 +1630,14 @@ assert 'os.kill(pid,' not in process_control
 for token in (
     'pidToken.indexOf(":")',
     'startTicks: Number.isSafeInteger(startTicks)',
-    'stat_pair=$(sed',
+    'ticks=${stat_pair%% *}',
+    'start=${stat_pair#* }',
+    'print ($12+$13)',
+    '$20',
 ):
     assert token in telemetry, f"AppControl birth token missing {token}"
+assert ('stat_pair=$(sed' in telemetry or 'stat_pair=$(awk' in telemetry), \
+    "AppControl must collect process birth ticks from /proc/PID/stat"
 for token in (
     'property var processActionGate: null',
     'processActionGate: hub.processActionGate',

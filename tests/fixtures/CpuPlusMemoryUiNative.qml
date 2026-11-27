@@ -331,7 +331,12 @@ ShellRoot {
                         if (!top || !bottom || !refresh || !controls) return;
                         if (!smoke.check(top.visible && bottom.visible && (smoke.phase===3 ? controls.parent===smoke.find(pane,"cpuplusAutoSectionFooter") : controls.parent===bottom)
                             && scroll.y>=top.y+top.height && scroll.y+scroll.height<=footer.y+1
-                            && scroll.height>0,"fixed work rails and positive middle viewport")) return;
+                            && scroll.height>0,"fixed work rails and positive middle viewport"
+                            +" phase="+smoke.phase+" top="+top.visible+" bottom="+bottom.visible
+                            +" controlsParent="+(controls.parent===bottom?"footer":controls.parent===smoke.find(pane,"cpuplusAutoSectionFooter")?"auto":"other")
+                            +" scrollY="+scroll.y+" topBottom="+(top.y+top.height)
+                            +" scrollBottom="+(scroll.y+scroll.height)+" footerY="+footer.y
+                            +" scrollHeight="+scroll.height)) return;
                         const y=controls.mapToItem(pane,0,0).y;
                         const topY=refresh.mapToItem(pane,0,0).y;
                         scroll.contentY=Math.max(0,scroll.contentHeight-scroll.height);

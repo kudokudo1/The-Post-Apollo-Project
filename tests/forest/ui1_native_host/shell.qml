@@ -241,6 +241,21 @@ ShellRoot {
         check(a.loader.width === a.pane.width && a.loader.height === a.pane.height, "loader bounds");
         check(a.loader.active === active && a.loader.visible === active, "loader state");
         check(a.empty.visible !== active, "placeholder state");
+        // The disconnected pane cannot establish an empty session list.
+        // At compact widths B0 status remains visible independently of the rail.
+        const inventoryState = a.chatRail.inventoryStatus;
+        const inventoryLabel = "OLLAMA INVENTORY // " + (
+            inventoryState === "REACHABLE" ? "READY"
+            : inventoryState === "CHECKING" ? "SCANNING"
+            : inventoryState === "NOT_CHECKED" ? "NOT SCANNED" : "UNAVAILABLE");
+        check(directTextCount(a.empty, "CHAT HOST OFFLINE") === 1
+            && directTextCount(a.empty, inventoryLabel) === 1
+            && directTextCount(a.empty, "LOCAL DRAFT ONLY // SEND LOCKED") === 1
+            && directTextCount(a.empty, "NO ACTIVE SESSION") === 0,
+            "First Light honest disconnected pane");
+        const labels = a.empty.children.filter(x => typeof x.text === "string");
+        check(labels.length === 3 && labels.every(x => x.textFormat === Text.PlainText),
+            "First Light plain status labels");
         check(!forest.chatHostTrusted && !forest.voiceHostTrusted
             && forest.activeChatSessions.length === 0 && !a.send.enabledAction
             && !a.voice.backendReady, "host or action unexpectedly unlocked");

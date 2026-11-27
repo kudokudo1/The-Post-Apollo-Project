@@ -1042,7 +1042,8 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("root.refreshLocalModelEvidence();", view)
         self.assertIn("id: scanAllButton", view)
         self.assertIn("SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED", view)
-        self.assertIn("B1 / B2 / B3 READY AS CONTRACTS", view)
+        self.assertIn("LOCAL DRAFT ONLY // SEND LOCKED", view)
+        self.assertNotIn("B1 / B2 / B3 READY AS CONTRACTS", view)
         self.assertIn("running: false", adapter)
         self.assertIn('Quickshell.shellPath("scripts/forest/ollama_inventory.py")', adapter)
         self.assertIn('"list-models"', adapter)
@@ -1058,7 +1059,10 @@ class ForestLauncherContract(unittest.TestCase):
         self.assertIn("id: sendGate", view)
         self.assertIn("id: promptRow", view)
         self.assertIn('visible: root.frameHeight >= 540', view)
-        self.assertIn('MODEL LIST READY // CHAT HOST NOT CONNECTED', view)
+        for status in ("READY", "SCANNING", "NOT SCANNED", "UNAVAILABLE"):
+            self.assertIn("OLLAMA INVENTORY // " + status, view)
+        self.assertNotIn("MODEL LIST READY // CHAT HOST NOT CONNECTED", view)
+        self.assertNotIn("OLLAMA / HERMES ADAPTER NOT CONNECTED", view)
         self.assertIn('SEND LOCKED // HOST NOT CONNECTED', view)
         self.assertIn('Accessible.name: "Scan local Ollama models, read-only"', view)
         self.assertIn('Accessible.name: "Open Forest model selector"', view)
@@ -1339,9 +1343,12 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
             "publicPreviewGate.dismissPreview()",
             "PublicPreview.PublicConversationFixture {}",
             "visible: !publicPreviewLoader.visible",
-            '"NO ACTIVE SESSION"',
+            '"CHAT HOST OFFLINE"',
+            '"CHAT COVERAGE UNKNOWN"',
+            '"LOCAL DRAFT ONLY // SEND LOCKED"',
         ):
             self.assertIn(contract, pane)
+        self.assertNotIn('"NO ACTIVE SESSION"', pane)
         self.assertIn("available: publicPreviewGate.eligible", toggle)
         self.assertIn("interactive: publicPreviewGate.eligible", toggle)
         self.assertIn("onLeftClicked: publicPreviewGate.togglePreview()", toggle)

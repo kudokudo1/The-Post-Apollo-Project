@@ -6,6 +6,8 @@ on:
       - 'scripts/forest/turn_bridge_b3.py'
       - 'scripts/forest/first_light_trial_host.py'
       - 'scripts/forest/first_light_delivery.py'
+      - 'scripts/forest/real_local_runtime_stdio.py'
+      - 'tests/forest/test_real_local_runtime_stdio.py'
       - 'tests/forest/test_first_light_delivery.py'
       - 'tests/forest/first_light_delivery_child.py'
       - 'scripts/forest/FIRST_LIGHT_DELIVERY.md'
@@ -19,6 +21,8 @@ on:
       - 'scripts/forest/turn_bridge_b3.py'
       - 'scripts/forest/first_light_trial_host.py'
       - 'scripts/forest/first_light_delivery.py'
+      - 'scripts/forest/real_local_runtime_stdio.py'
+      - 'tests/forest/test_real_local_runtime_stdio.py'
       - 'tests/forest/test_first_light_delivery.py'
       - 'tests/forest/first_light_delivery_child.py'
       - 'scripts/forest/FIRST_LIGHT_DELIVERY.md'
@@ -39,5 +43,7 @@ jobs:
         run: python3 -m unittest discover -s tests/forest -p 'test_first_light_trial_host.py' -v
       - name: Test First Light owner delivery
         run: python3 -m unittest discover -s tests/forest -p 'test_first_light_delivery.py' -v
+      - name: Actual held Runtime stdio process
+        run: python3 -m unittest discover -s tests/forest -p 'test_real_local_runtime_stdio.py' -v
       - name: Check Python syntax
-        run: python3 -m py_compile scripts/forest/turn_bridge_b3.py tests/forest/test_turn_bridge_b3.py scripts/forest/first_light_trial_host.py tests/forest/test_first_light_trial_host.py scripts/forest/first_light_delivery.py tests/forest/test_first_light_delivery.py tests/forest/first_light_delivery_child.py
+        run: python3 -m py_compile scripts/forest/turn_bridge_b3.py tests/forest/test_turn_bridge_b3.py scripts/forest/first_light_trial_host.py tests/forest/test_first_light_trial_host.py scripts/forest/first_light_delivery.py tests/forest/test_first_light_delivery.py tests/forest/first_light_delivery_child.py scripts/forest/real_local_runtime_stdio.py tests/forest/test_real_local_runtime_stdio.py

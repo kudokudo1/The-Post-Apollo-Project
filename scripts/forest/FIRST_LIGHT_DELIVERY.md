@@ -171,3 +171,34 @@ enforce byte bounds before decode and never derive admission from token
 or snapshot. No IPC/process launcher or host containment in this change.
 No inference, fake reply, new persistent store or grant. Tests use actual
 held host and a separate mocked translation-only control case.
+
+
+### Real owner child stdio (P0)
+
+`scripts/forest/real_local_runtime_stdio.py` is the actual
+RealLocalRequestBridge in a separate Python child, no fake HTTP peer.
+Fixed interpreter and script, no argv configuration or default endpoint.
+Current child cannot dispatch: no native authority/endpoint supplied.
+Parent owns exact process and exit, not a shared service. No auto-start.
+
+One ASCII JSON line per request: {seq,op,data}, contiguous seq 1..256.
+Reply {seq,result}. Exact keys, no duplicate/prototype keys, depth <=4
+before JSON, no nonfinite/fraction numbers, 32768 input and 100000 output
+bytes including LF, 512000 total, 180s absolute child lifetime, 5s partial
+frame/write. User Unicode encoded as JSON escapes; validated exact UTF8
+4096 prompt and 256 model byte bounds. No raw stderr, no replay after bad
+frame. Request names OBSERVE(epoch or null), SUBMIT_BEGIN(epoch,model,
+prompt), SUBMIT_POLL(), ATTACH(correlation), TAKE(correlation),
+STOP(correlation), WITHDRAW(correlation), STEP_BEGIN(), STEP_POLL(),
+CLOSE(). BEGIN returns PENDING, POLL returns PENDING or original result;
+no queued second operation. ATTACH only after actual UI acceptance;
+STEP only after attachment, control STOP/TAKE remain independent of
+an outstanding STEP. CLOSE requires no pending action. EOF/malformed/
+uncertain loss is not a clean close. Parent must independently enforce
+preallocation limits, deadline, process identity and reaping; current
+child is not a provider isolation mechanism. UI1 should bind this
+asynchronously in existing composer, keep draft until accepted and
+canonicalize the original token object; no blocking QML wait. Future
+admitted path still needs provider scope and original authority, bounded
+native snapshots, full lifetime cleanup, and real STOP qualification.
+No real inference, shared service changes, or workstation execution.

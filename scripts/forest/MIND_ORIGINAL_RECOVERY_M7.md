@@ -291,3 +291,155 @@ Spirit, Runtime, Heart and Nurse; UI compatibility when a presentation
 contract is proposed. No new schema, API, store, authority, test fixture,
 model call, protected data access, host execution or destructive action.
 Native/protected/production HOLD; operator integration separate.
+
+
+## M7k-a // Recipient-specific room context transition (design only)
+
+S5 operator clarification #2161 7215166665/7215453268, UI2 #2999,
+Nurse #7215502409, Runtime #7215535828, Mind #7215552948 and
+Spirit S5 candidate #3001. Standing ordinary development direction
+#7204485179/#7204663398. This is a Mind-owned context transition
+proposal, not a participant registry, new authority or storage choice.
+
+### Existing contracts that cannot be silently widened
+
+| Source at main 916ebb03 | Existing invariant and group-room gap |
+| --- | --- |
+| B1 session_journal_v0.py d1533f15 | Unique ordinal and revision within owner/Tree session, role/provider/model but no authenticated participant author, audience, or original multi-agent trigger. |
+| M2 context_first_tree_m2.py 1085bc56 | SessionContextRef refuses Clone; select_history requires latest user, contiguous newest-first global suffix with exact length, reports omitted global prefix, emits role/content only. |
+| M4 history_public_fixture_m4.py a97f0533 | HistoryPageRef uses global after ordinal/revision; max ordinal and limit+1 calculate complete; rows must be contiguous; public R6 aliases are fixed five-row disposable scope only. |
+| B2 ollama_chat_transport.py db572336 | _messages accepts only role/content, user/assistant roles, last role user; 16 messages, 4096 UTF-8 bytes each and 16384 total. No peer-author field or system persona. |
+| M7e test_mind_final_composition_m7e.py 0519ad9e | Single TaskContext/session/user-turn pin and selected version source/purpose/recipient; includes global omitted count and full selected rows in fixture workload commitment; nonempty reference RELEASE_HOLD. |
+
+Removing the contiguity check, changing a peer's author role to user,
+or allowing non-user final messages in the current transport would
+not establish group context. Preserve existing M2/M4/B2/R6 and M7e
+fixture semantics. A protected actual source and reviewed versioned
+adapter are prerequisites for any new executable path.
+
+### Two projections, one original journal
+
+Runtime retains canonical immutable message order and authenticated
+original author/trigger, including messages with restricted audience.
+No second conversation journal, per-recipient duplicate history store
+or historic author inference from the present membership. Mind needs
+an independently qualified per-recipient input projection, not the
+whole room followed by local filtering. UI history paging and model
+input selection may have different purposes, recipients and permitted
+field sets. Neither authorizes the other.
+
+Separate logically (not proposed wire fields):
+- Original room and message identity, authentic author/incarnation,
+  exact committed message/version and permitted attachment references.
+- Exact recipient, TaskContext/response job, original trigger and causal
+  root, current room/member/audience policy and a source-qualified
+  immutable input cut. Independent source coverage determines whether
+  the required trigger and relevant allowed inputs are available.
+- Ordered authorized entries and their provenance, not necessarily
+  contiguous in the canonical room. The source checks audience before
+  enumeration/body retrieval. A permitted excerpt is not proof of full
+  visibility, and membership does not qualify pre-join history.
+- Display page cursor scoped to recipient/view/snapshot and allowed
+  field set, separately from original global ordinal/revision and from
+  a model input commitment. Cursor semantics, alias lifetime and actual
+  source implementation remain Runtime/Spirit/Connections decisions.
+
+Prefer an opaque recipient-bound continuation for evaluation rather
+than a global ordinal offset exposed to a partial audience. Define
+completion only relative to an independently established eligible
+projection; unknown relevant coverage is not a complete/empty result.
+Never reveal excluded identities, ordinals, gaps, total counts, hidden
+append activity, unavailable attachment existence or unqualified
+unread counts through cursors, errors, revision changes or timing claims.
+Do not manufacture renumbered durable messages, weaken the existing
+M4 complete proof, or claim an opaque cursor alone solves disclosure.
+
+### Per-original-response context construction
+
+1. Runtime/Spirit qualify the original trigger (user or authorized
+   participant), intended recipient, member/task incarnation, room and
+   participation bounds, current audience, exact source and provider
+   recipient before the first eligible metadata/body access. A mention,
+   observer status, proposal or shared room alone opens no model input.
+2. Pin an immutable source-qualified input cut for that response.
+   Distinguish canonical append head, recipient-visible eligible cut and
+   independent policy/revocation observations. An intervening append
+   can affect eligibility or leave the cut unchanged; the actual owner
+   must establish which. Do not silently replace the trigger, add a new
+   message, assume stale cut is valid, or require a new provider effect
+   solely because an unrelated hidden append changed a global counter.
+3. Select only within the bounded eligible projection. Preserve exact
+   author attribution and original order in retained messages. The
+   trigger and independently required constraints must fit or HOLD;
+   never substitute a different trigger or silently omit mandatory
+   context. Relevant partial/unknown coverage cannot become an empty
+   selection. Bound raw rows, bytes, references and assembly work before
+   expansion; legacy B2 limits are compatibility ceilings, not a new
+   room budget, tokenizer guarantee or a chosen truncation policy.
+4. Resolve each participant's own independently eligible durable
+   Leaves, decision references, Task Hot/Warm state and attachments.
+   Reuse existing M7 version/use/policy/recipient and revocation
+   boundaries; do not share mutable cache entries between members or
+   treat a room transcript, observer reception or approved proposal
+   as durable absorption. Same-Tree sharing still needs scoped use.
+5. Future adapter must explicitly qualify a provider-supported mapping
+   of operator instructions, recipient's own prior replies, other
+   participants' messages, addressed trigger and reference data.
+   Peer content remains attributed reference/dialogue, not fabricated
+   operator instructions or the recipient's own historical response.
+   No string prefix is proof of instruction isolation; user/system
+   roles and prompt injection require actual reviewed mapping. If the
+   adapter cannot preserve required semantics, refuse the operation.
+   Do not choose a new role format or modify B2 in this proposal.
+6. Bind actual qualified message/attachment versions, original author,
+   source/cut, exact recipient, selected Leaf versions and effective
+   provider settings to the original workload. Existing M7e digest
+   stays unchanged for its fixture; future versioned workload/adapter
+   commitments must cover actual serialized bytes separately. Heart
+   qualifies resource capacity and Runtime/Spirit recheck currentness
+   at actual dispatch. Permission loss invalidates affected derived
+   eligibility and new release, not original append or effect outcome.
+
+### Decision continuity and revision boundary
+
+A memory of an operator decision can be a versioned knowledge
+reference when separately authorized, with exact original source and
+permitted revision, rationale, scope, rejected alternatives and
+uncertainty. Preserve distinction among proposal, approved design,
+authorized assignment, original effect and final operator acceptance.
+A recipient may use a remembered approval to identify the exact
+original grant for independent verification; neither a Leaf, summary,
+quoted instruction nor peer's claim authorizes a write. An exact
+design approval is not automatically implementation authority.
+
+Superseding a decision does not rewrite its source history or transfer
+an outstanding original assignment. If delegation, current scope,
+effect identity or grant evidence is unknown, hold the affected action;
+a historical decision can remain eligible for authorized historical use
+without qualifying present execution. Clarification of M7j-a: a lost
+commit acknowledgement cannot establish either an unchanged or advanced
+authoritative generation; reconcile the original outcome before any
+new conflicting effect or published clock claim.
+
+### Future acceptance (not test or executable evidence)
+
+| Case | Required result |
+| --- | --- |
+| Visible messages separated by hidden originals | Preserve eligible order; no raw ordinal gap/count or global completion leak. |
+| New member with unknown historic access | No automatic backfill, no false empty, independently qualify requested history. |
+| Participant triggers another participant | Preserve actual author and trigger; no fabricated latest-user turn. |
+| Hidden or unrelated append during an admitted response | Actual source decides cut validity; no guessed refresh or global activity disclosure. |
+| Required trigger/constraint absent, oversized or unknown | HOLD affected response, no substitution or silent truncation. |
+| Same room, two recipients with distinct Leaf/audience scope | Independently selected inputs and payloads; no copied private working set. |
+| UI-authorized page but provider disclosure denied | No provider assembly/release from display eligibility. |
+| Observer receives eligible room message | No automatic response, memory promotion or private context transfer. |
+| Remembered approval, changed design or delegated recipient | Verify exact original current grant; summary is not authority. |
+| Revoke/leave or uncertain prior send | Refuse affected new use/release; preserve original journal and settlement. |
+
+Next: Runtime/Spirit/Connections qualify actual ordered recipient
+projection, source cut and permission fence; Runtime/Heart establish
+provider adapter feasibility; UI owners align independent display
+paging and completion. Review this completed proposal with those
+owners and Nurse. No new schema, store, cursor generator, test
+surrogate, authority, adapter, protected source, model or host action.
+Native/protected/production HOLD; operator integration separate.

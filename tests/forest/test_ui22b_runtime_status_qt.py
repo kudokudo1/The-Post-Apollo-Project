@@ -201,6 +201,53 @@ class ReactiveStatusTests(unittest.TestCase):
         self.label("GENERATING")
         self.assertEqual(len(self.units), 3)
 
+    def test_actual_child_stop_and_typed_abort_reactive_label(self):
+        # Reuse the R6d disposable child driver: it checks the original
+        # SQLite ABORTED row and absence of an assistant reply independently.
+        data = json.loads(subprocess.check_output(
+            [sys.executable, "-B", str(HERE / "ui2_r6d_child_fixture.py")],
+            text=True, timeout=90))
+        self.call("openView")
+        self.call("setCurrent", data["c"])
+        self.call("openLifetime", data["c"])
+        self.label("", "ATTACHED")
+        for unit in data["unitsC"]:
+            self.call("receiveUnit", unit)
+        self.label("GENERATING")
+        for unit in data["stop"]:
+            self.call("receiveUnit", unit)
+        self.label("STOP REQUESTED // OUTCOME PENDING")
+        self.assertEqual(self.view.property("localOutcome"), "")
+        self.assertEqual(data["abortCode"], "ABORTED_LOCAL")
+        self.assertEqual(len(data["abort"]), 1)
+        result = dict(ref=data["c"], code=data["abortCode"],
+                      finalSequence=data["abort"][-1]["sequence"])
+        self.call("recordLocalAbort", dict(result, ref=data["b"]))
+        self.assertFalse(self.view.property("abortAccepted"))
+        self.label("STOP REQUESTED // OUTCOME PENDING")
+        for unit in data["abort"]:
+            self.call("receiveUnit", unit)
+        self.label("UNKNOWN HOLD // NO AUTOMATIC RETRY")
+        self.assertEqual(self.view.property("localOutcome"), "")
+        self.call("recordLocalAbort", result)
+        self.assertTrue(self.view.property("abortAccepted"))
+        self.label("LOCAL ABORT RECORDED // DELIVERY UNCONFIRMED")
+        self.assertEqual(self.view.property("localOutcome"), "ABORTED_LOCAL")
+        self.assertEqual(self.view.property("historyLabel"), "HISTORY SNAPSHOT COMPLETE")
+        self.assertEqual(self.view.property("historyCount"), 2)
+        normal = self.view.property("labelHeight")
+        self.assertTrue(self.view.setProperty("width", 120))
+        APP.processEvents()
+        self.assertGreaterEqual(self.view.property("labelHeight"), normal)
+        self.call("closeView")
+        self.label("", "CLOSED")
+        self.assertEqual(self.view.property("localOutcome"), "")
+        self.call("openView")
+        self.call("recordLocalAbort", result)
+        self.assertFalse(self.view.property("abortAccepted"))
+        self.label("", "CLOSED")
+        self.assertEqual(self.view.property("historyCount"), 2)
+
     def test_compact_label_wrap_and_collapse(self):
         self.attach()
         d = self.delivery()

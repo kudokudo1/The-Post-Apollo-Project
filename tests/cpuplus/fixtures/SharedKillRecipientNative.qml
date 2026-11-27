@@ -338,7 +338,7 @@ ShellRoot {
                 }
                 // K8d: the right surface is an identity-bound draft, never
                 // an alternate Linux executor or a second confirmation gate.
-                const consolePane=smoke.find(view,"cpuPlusKillResourceConsole");
+                const consolePane=smoke.find(view,"cpuPlusKillResourceConsoleSurface");
                 const cpuCard=smoke.find(view,"cpuPlusResourceCard-cpu");
                 const applyLocked=smoke.find(view,"cpuPlusResourceApplyLocked");
                 const detailState = "console=" + (!!consolePane)

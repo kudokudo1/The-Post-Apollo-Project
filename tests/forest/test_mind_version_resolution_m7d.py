@@ -1017,9 +1017,9 @@ class RefinementPreviewTests(unittest.TestCase):
 
     def test_exact_preview_preserves_original_and_never_reads_or_assembles(self):
         from unittest.mock import patch
-        with patch(__name__ + ".resolve") as resolver, \\
-                patch(__name__ + ".assemble_hot_context") as assembler, \\
-                patch.object(FixtureOwner, "body") as body, \\
+        with patch(__name__ + ".resolve") as resolver, \
+                patch(__name__ + ".assemble_hot_context") as assembler, \
+                patch.object(FixtureOwner, "body") as body, \
                 patch.object(FixtureOwner, "metadata") as metadata:
             result = self.preview()
             self.assertEqual(result.status, "PROPOSED")

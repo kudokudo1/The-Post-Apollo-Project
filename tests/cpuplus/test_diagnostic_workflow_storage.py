@@ -79,6 +79,24 @@ class CatalogStorageTests(unittest.TestCase):
             self.save(bad,doc)
         self.assertEqual(self.load()["document"],doc)
 
+    def test_target_metadata_preserved_and_invalid_scope_refused(self):
+        legacy=document()
+        self.save(legacy)
+        selected=copy.deepcopy(legacy)
+        selected["rows"][0]["targetId"]="quickshell"
+        self.assertEqual(self.save(selected,legacy)["status"],"SAVED")
+        self.assertEqual(self.load()["document"],selected)
+        for target in ("automatic","host-cpu","process-instance","unknown",123):
+            bad=copy.deepcopy(selected)
+            bad["rows"][0]["targetId"]=target
+            with self.assertRaises(ValueError):
+                self.save(bad,selected)
+        bad=copy.deepcopy(selected)
+        bad["rows"][1]["targetId"]="appcontrol"
+        with self.assertRaises(ValueError):
+            self.save(bad,selected)
+        self.assertEqual(self.load()["document"],selected)
+
     def test_corrupt_and_duplicate_keys(self):
         doc=document()
         self.save(doc)

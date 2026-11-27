@@ -998,6 +998,38 @@ ShellRoot {
                 if(!root.check(workshop.selectTarget("automatic") && workshop.targetCompatibility.ok
                     && !CpuPlusDiagnostics.busy,"automatic restores valid calibration without mutation"))return;
                 console.log("CPU_Q4_TARGET_SELECTOR_PASS");
+                if(!root.check(workshop.selectTarget("apollo-loop"),"select actual event loop target"))return;
+                workshop.edit("selected",["stall"]);
+                if(!root.check(workshop.targetCompatibility.ok && !CpuPlusDiagnostics.requestWorkshopCapture(workshop.plan,"quickshell")
+                    && !CpuPlusDiagnostics.busy,"owner refuses mismatched target"))return;
+                if(!root.check(workshop.openSaveEditor(),"explicit target can save"))return;
+                root.phase=328;return;
+            }
+            if(root.phase===328 && pane.item){
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                root.findItem(workshop,"cpuplusWorkshopSaveName").text="EVENT LOOP TARGET";
+                if(!root.check(workshop.confirmSave(),"save explicit target"))return;
+                root.phase=329;return;
+            }
+            if(root.phase===329 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const row=CpuPlusDiagnostics.workshopPresets.find(r=>r.name==="EVENT LOOP TARGET");
+                if(!root.check(row && row.targetId==="apollo-loop" && !workshop.saveEditorOpen
+                    && !CpuPlusDiagnostics.queueWorkshop(row.name) && CpuPlusDiagnostics.loadWorkflowCatalog(),
+                    "explicit target saved; queue refuses metadata loss"))return;
+                root.phase=330;return;
+            }
+            if(root.phase===330 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(workshop.selectTarget("automatic") && CpuPlusDiagnostics.loadWorkshopPreset("EVENT LOOP TARGET")
+                    && CpuPlusDiagnostics.targetForSubject("ALL")==="apollo-loop" && !CpuPlusDiagnostics.busy,
+                    "disk reload and preset restore explicit target"))return;
+                if(!root.check(workshop.selectTarget("automatic"),"restore automatic"))return;
+                // Restore the original storage cadence for the existing set regression.
+                if(!root.check(CpuPlusDiagnostics.loadWorkshopPreset("CONTROLS SAVE"),"restore original calibration"))return;
+                console.log("CPU_Q4_TARGET_CUSTODY_PASS");
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);

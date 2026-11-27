@@ -2,6 +2,7 @@ import QtQuick
 import qs.services.diagnostics
 import "../../services/diagnostics/DiagnosticComparison.js" as Compare
 import "../../services/diagnostics/DiagnosticCalibration.js" as Calibration
+import "../../services/diagnostics/DiagnosticTargetRegistry.js" as Targets
 import "../../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as Policy
 import "../../components"
 
@@ -436,7 +437,7 @@ Column {
                 }
                 GohuText {
                     width: parent.width
-                    text: modelData.execution==="configured"?modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / "):"SPECIALIZED // "+modelData.kind.toUpperCase()
+                    text: modelData.execution==="configured"?modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / ")+(modelData.targetId?" // "+Targets.findDiagnosticTarget(modelData.targetId).label.toUpperCase():""):"SPECIALIZED // "+modelData.kind.toUpperCase()
                     color: Colors.cyan
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
@@ -465,7 +466,7 @@ Column {
                         normalFace: true
                         accentColor: Colors.cyan
                         objectName: "cpuplusDiagnosticQueuePreset-"+modelData.name
-                        available: !CpuPlusDiagnostics.workshopPresetLocked && modelData.execution==="configured"
+                        available: !CpuPlusDiagnostics.workshopPresetLocked && modelData.execution==="configured" && !modelData.targetId
                         onLeftClicked: CpuPlusDiagnostics.queueWorkshop(modelData.name)
                     }
                     ActionButton {

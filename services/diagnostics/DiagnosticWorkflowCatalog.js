@@ -27,7 +27,10 @@ function validatedCatalog(input, defaults, calibration) {
             const exec=Object.getOwnPropertyDescriptor(row,"execution");
             if(!exec||!Object.prototype.hasOwnProperty.call(exec,"value"))return null;
             const fixed=exec.value==="fixed";
-            if(!exactFields(row,["id","name","favorite","execution",fixed?"kind":"plan"])||
+            const explicit=!fixed&&Object.prototype.hasOwnProperty.call(row,"targetId");
+            const fields=["id","name","favorite","execution",fixed?"kind":"plan"];
+            if(explicit)fields.push("targetId");
+            if(!exactFields(row,fields)||
                 (!fixed&&row.execution!=="configured")||typeof row.id!=="string"||
                 !validCatalogName(row.name)||typeof row.favorite!=="boolean")return null;
             const seed=defaults.find(d=>d.id===row.id);
@@ -44,7 +47,14 @@ function validatedCatalog(input, defaults, calibration) {
                 if(seed&&seed.execution!=="configured")return null;
                 const draft=calibration.workshopDraftFromPlan(row.plan);
                 if(!draft)return null;
-                rows.push(Object.assign(core,{plan:calibration.workshopPlanFromDraft(draft)}));
+                const plan=calibration.workshopPlanFromDraft(draft);
+                if(explicit){
+                    if(typeof row.targetId!=="string"||row.targetId==="automatic"||
+                        typeof calibration.targetCompatible!=="function"||
+                        !calibration.targetCompatible(row.targetId,plan))return null;
+                    core.targetId=row.targetId;
+                }
+                rows.push(Object.assign(core,{plan:plan}));
             }
         }
         return {schema:catalogSchema,nextId:input.nextId,rows:rows};
@@ -59,10 +69,14 @@ function editCatalog(input,edit,defaults,calibration) {
     const kind=Object.getOwnPropertyDescriptor(edit,"action");
     if(!kind||!Object.prototype.hasOwnProperty.call(kind,"value"))return null;
     if(kind.value==="create"){
-        if(!exactFields(edit,["action","name","plan","favorite"])||
+        const explicit=Object.prototype.hasOwnProperty.call(edit,"targetId");
+        const fields=["action","name","plan","favorite"];
+        if(explicit)fields.push("targetId");
+        if(!exactFields(edit,fields)||
             doc.rows.length>=catalogLimit||doc.nextId>=Number.MAX_SAFE_INTEGER)return null;
         doc.rows.push({id:"user-"+doc.nextId++,name:edit.name,plan:edit.plan,
             favorite:edit.favorite,execution:"configured"});
+        if(explicit)doc.rows[doc.rows.length-1].targetId=edit.targetId;
     }else{
         const action=kind.value;
         const keys=action==="favorite"?["action","id","favorite"]:
@@ -81,7 +95,7 @@ function editCatalog(input,edit,defaults,calibration) {
     return validatedCatalog(doc,defaults,calibration);
 }
 function queueProjection(row,calibration) {
-    if(!row||row.execution!=="configured"||!validCatalogName(row.name))return null;
+    if(!row||row.execution!=="configured"||row.targetId!==undefined||!validCatalogName(row.name))return null;
     const draft=calibration.workshopDraftFromPlan(row.plan);
     return draft?{name:row.name,plan:calibration.workshopPlanFromDraft(draft)}:null;
 }

@@ -22,6 +22,15 @@ ORDER = ("threads", "memory", "census", "storage", "stall",
          "hostcpu", "gpu", "diskio", "swapio", "netio")
 
 
+# Only stable configured scopes; no process identity or executable metadata.
+TARGET_KINDS = {
+    "host-cpu": {"hostcpu"}, "host-gpu": {"gpu"}, "host-disk": {"diskio"},
+    "host-swap": {"swapio"}, "host-network": {"netio"},
+    "user-processes": {"census"}, "quickshell": {"threads", "memory"},
+    "apollo-loop": {"stall"}, "apollo-files": {"storage"},
+}
+
+
 def integer(value, low, high):
     return type(value) is int and low <= value <= high
 
@@ -84,7 +93,11 @@ def validate(document):
         if type(row) is not dict or row.get("execution") not in ("fixed","configured"):
             raise ValueError("row shape")
         fixed = row["execution"] == "fixed"
-        if set(row) != {"id","name","favorite","execution", "kind" if fixed else "plan"}:
+        fields = {"id","name","favorite","execution", "kind" if fixed else "plan"}
+        explicit = not fixed and "targetId" in row
+        if explicit:
+            fields.add("targetId")
+        if set(row) != fields:
             raise ValueError("row fields")
         ident, name = row["id"], row["name"]
         if (type(ident) is not str or type(name) is not str or not NAME.fullmatch(name)
@@ -105,6 +118,11 @@ def validate(document):
             if seed in ("inventory","appcontrol"):
                 raise ValueError("fixed identity")
             validate_plan(row["plan"])
+            if explicit:
+                target = row["targetId"]
+                if (type(target) is not str or target not in TARGET_KINDS
+                        or any(c["kind"] not in TARGET_KINDS[target] for c in row["plan"]["instruments"])):
+                    raise ValueError("target scope")
     if len(encode(document)) > MAX_FILE:
         raise ValueError("catalog size")
     return document

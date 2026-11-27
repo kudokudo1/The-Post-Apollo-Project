@@ -48,7 +48,7 @@ assert.match(owner,/if \(workshopPresetLocked \|\| !workflowStore.ready\) return
 assert.match(owner,/const row=workflowStore.favorites.find\(r=>r.id===id\)/);
 assert.match(owner,/if \(!row\) return false/);
 assert.match(owner,/if \(row.execution==="fixed"\) return request\(row.kind\)/);
-assert.match(owner,/if \(row.execution==="configured"\) return requestWorkshopCapture\(row.plan\)/);
+assert.match(owner,/if \(row.execution==="configured"\) return requestWorkshopCapture\(row.plan,row.targetId\|\|"automatic"\)/);
 assert.match(ui,/reportText.copy\(\)/);
 assert.match(parent,/active: root.page === "DIAG"\s+visible: active\s+sourceComponent: CpuPlusDiagnosticsPane/);
 assert.doesNotMatch(ui,/Process\s*\{|Timer\s*\{/);
@@ -218,7 +218,7 @@ assert.equal(policy.combineAppControl(jsonl(acRows.map((row,i)=>i===1?{...row,pi
 assert.match(ui,/CpuPlusDiagnostics\.workflowFavorites/);
 assert.match(ui,/CpuPlusDiagnostics\.runFavoriteWorkflow\(modelData.id\)/);
 assert.match(owner,/row.execution==="fixed"\) return request\(row.kind\)/);
-assert.match(owner,/row.execution==="configured"\) return requestWorkshopCapture\(row.plan\)/);
+assert.match(owner,/row.execution==="configured"\) return requestWorkshopCapture\(row.plan,row.targetId\|\|"automatic"\)/);
 assert.match(owner,/DiagnosticWorkflowStore\s*\{\s*id: workflowStore\b/);
 assert.match(owner,/readonly property var workshopPresets: workflowStore.rows/);
 assert.match(owner,/onCompleted: function\(outcome\)/);
@@ -287,7 +287,7 @@ assert.match(workshopSlider,/property color fillColor: Colors.omnitrix/);
 assert.match(workshop,/SelectorDial\s*\{/);
 assert.match(workshop,/markerColor: Colors.orange/);
 assert.match(workshop,/Colors.resourceColor\(modelData.subject\)/);
-assert.match(workshop,/if \(ready\) \{[\s\S]*?requestWorkshopCapture\(frozen\)/);
+assert.match(workshop,/if \(ready\) \{[\s\S]*?requestWorkshopCapture\(frozen,selectedTargetId\)/);
 assert.match(workshop,/onPlanTextChanged: \{ disarm\(\); closeSaveEditor\(\);/);
 assert.match(workshop,/running: root.visible && root.recording && !CpuPlusDiagnostics.cancelled/);
 assert.match(executionFace,/phase === "COMPLETE" \? Colors.omnitrix/);
@@ -735,6 +735,9 @@ assert.match(workshop,/if \(locked \|\| calibrating \|\| !preview.ok \|\| saveEd
 assert.match(workshop,/Targets.targetPlanCompatibility\(selectedTargetId,plan/);
 assert.match(workshop,/Targets.searchDiagnosticTargets\(targetSearch.text,targetPicker.category\)/);
 assert.match(workshop,/row.route==="configured"/);
+assert.match(owner,/if \(!targetCompatibility\(targetId,plan\).ok\) return false/);
+assert.match(workshop,/saveTargetId!==selectedTargetId/);
+assert.match(owner,/if\(p && p.targetId\)/);
 assert.match(ui,/id: pinnedExecutionHost/);
 assert.match(parent,/memoryDiagnosticInfo\.hovered/);
 assert.match(parent,/objectName: "cpuplusMemoryDiagnosticsInfoPopup"/);

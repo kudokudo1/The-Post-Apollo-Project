@@ -25,7 +25,7 @@ Column {
     property string subject: "ALL"
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
-    property string selectedTargetId: "automatic"
+    readonly property string selectedTargetId: CpuPlusDiagnostics.targetForSubject(subject)
     readonly property var selectedTarget: Targets.findDiagnosticTarget(selectedTargetId)
     readonly property var targetCompatibility: Targets.targetPlanCompatibility(selectedTargetId,plan,{
         workshopDraftFromPlan: p=>Calibration.workshopDraftFromPlan(p),
@@ -39,7 +39,7 @@ Column {
     function selectTarget(id) {
         if(locked || saveEditorOpen || !targetCanSelect(Targets.findDiagnosticTarget(id))) return false;
         disarm();
-        selectedTargetId=id;
+        if(!CpuPlusDiagnostics.setTargetForSubject(subject,id))return false;
         targetPicker.close();
         return true;
     }
@@ -94,6 +94,7 @@ Column {
         : Calibration.previewWorkflow(plan)
     property bool saveEditorOpen: false
     property string savePlanText: ""
+    property string saveTargetId: ""
     property string pendingSaveName: ""
     property string saveNotice: ""
     property string preparedText: ""
@@ -106,10 +107,11 @@ Column {
         && CpuPlusDiagnostics.captureId === CpuPlusDiagnostics.workshopRunId
         && CpuPlusDiagnostics.workshopRunId !== ""
         && CpuPlusDiagnostics.workshopRunPlan === planText
+        && CpuPlusDiagnostics.workshopRunTarget === selectedTargetId
     readonly property var terminal: {
         const row=CpuPlusDiagnostics.reports[CpuPlusDiagnostics.workshopRunKind];
         return row && row.id===CpuPlusDiagnostics.workshopRunId
-            && CpuPlusDiagnostics.workshopRunPlan===planText ? row : null;
+            && CpuPlusDiagnostics.workshopRunPlan===planText && CpuPlusDiagnostics.workshopRunTarget===selectedTargetId ? row : null;
     }
     property double displayNow: 0
     readonly property real elapsedFraction: recording
@@ -164,21 +166,23 @@ Column {
     function closeSaveEditor() {
         saveEditorOpen=false;
         savePlanText="";
+        saveTargetId="";
         pendingSaveName="";
         if(workflowName) workflowName.text="";
     }
     function openSaveEditor() {
-        if (locked || calibrating || !preview.ok || saveEditorOpen || selectedTargetId!=="automatic") return false;
+        if (locked || calibrating || !preview.ok || saveEditorOpen || !targetCompatibility.ok) return false;
         disarm();
         saveNotice="";
         savePlanText=planText;
+        saveTargetId=selectedTargetId;
         saveEditorOpen=true;
         if (!CpuPlusDiagnostics.workflowCatalogReady)
             CpuPlusDiagnostics.loadWorkflowCatalog();
         return true;
     }
     function confirmSave() {
-        if (!saveEditorOpen || locked || calibrating || !preview.ok || savePlanText!==planText || selectedTargetId!=="automatic") return false;
+        if (!saveEditorOpen || locked || calibrating || !preview.ok || savePlanText!==planText || saveTargetId!==selectedTargetId || !targetCompatibility.ok) return false;
         if (!CpuPlusDiagnostics.workflowCatalogReady) {
             saveNotice="";
             return CpuPlusDiagnostics.loadWorkflowCatalog();
@@ -198,6 +202,7 @@ Column {
             if (!wasEdit || !root.pendingSaveName) return;
             const row=confirmedDocument && confirmedDocument.rows.find(r=>r.name===root.pendingSaveName);
             if (outcome==="READY" && row && row.execution==="configured"
+                    && (row.targetId||"automatic")===root.saveTargetId
                     && Receipt.sameValue(row.plan,JSON.parse(root.savePlanText))) {
                 root.closeSaveEditor();
                 root.saveNotice="SAVED // LOCAL WORKFLOW LIBRARY";
@@ -215,7 +220,7 @@ Column {
         if (ready) {
             const frozen=JSON.parse(preparedText);
             disarm();
-            if (CpuPlusDiagnostics.requestWorkshopCapture(frozen)) displayNow=Date.now();
+            if (CpuPlusDiagnostics.requestWorkshopCapture(frozen,selectedTargetId)) displayNow=Date.now();
             return;
         }
         disarm();
@@ -233,8 +238,8 @@ Column {
             }
         });
     }
-    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; selectedTargetId="automatic"; if(targetPicker) targetPicker.close(); }
-    onSelectedTargetIdChanged: disarm()
+    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); }
+    onSelectedTargetIdChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
     onVisibleChanged: if (!visible) { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); }
     onLockedChanged: if (locked) disarm()
     onPlanTextChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
@@ -869,7 +874,7 @@ Column {
                 : root.saveEditorOpen ? (root.saveNotice || CpuPlusDiagnostics.workshopPresetFeedback)
                 : !root.targetCompatibility.ok && root.preview.ok ? root.targetCompatibility.reason
                 : root.ready ? "SECOND CLICK STARTS CAPTURE"
-                : root.selectedTargetId!=="automatic" ? "TARGET SELECTED // SAVE SUPPORT PENDING"
+                : root.selectedTargetId!=="automatic" ? "TARGET VALID // "+root.selectedTarget.label.toUpperCase()
                 : root.saveNotice || (root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
                 : root.preview.reason)
             // Multi-instrument previews have a separate aggregate observation field.
@@ -893,7 +898,7 @@ Column {
                 label: "SAVE"
                 normalFace: true
                 accentColor: Colors.magenta
-                available: !root.locked && !root.calibrating && root.preview.ok && root.selectedTargetId==="automatic"
+                available: !root.locked && !root.calibrating && root.preview.ok && root.targetCompatibility.ok
                 onLeftClicked: root.openSaveEditor()
             }
             ActionButton {

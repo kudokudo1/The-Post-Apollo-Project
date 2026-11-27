@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "CpuPlusDiagnosticsPolicy.js" as Policy
 import "DiagnosticCalibration.js" as Calibration
+import "DiagnosticTargetRegistry.js" as Targets
 
 // Session owner, independent of the demand-loaded CPU++ pane.
 // No process or timer runs until an explicit button request.
@@ -67,7 +68,7 @@ Scope {
         const row=workflowStore.favorites.find(r=>r.id===id);
         if (!row) return false;
         if (row.execution==="fixed") return request(row.kind);
-        if (row.execution==="configured") return requestWorkshopCapture(row.plan);
+        if (row.execution==="configured") return requestWorkshopCapture(row.plan,row.targetId||"automatic");
         return false;
     }
 
@@ -171,6 +172,23 @@ Scope {
         hostCpuIntervalMs:1000, gpuIntervalMs:1000, diskIoIntervalMs:1000, storageCadenceExplicit:true, storageSampleSeconds:1, storageReportSeconds:10})
     property var swapWorkshopDraft: ({durationSeconds:10, selected:["swapio"], swapIoIntervalMs:1000})
     property var netWorkshopDraft: ({durationSeconds:10, selected:["netio"], netIoIntervalMs:1000})
+    property var workshopTargets: ({})
+    function targetForSubject(subject) {
+        return workshopTargets[subject] || "automatic";
+    }
+    function targetCompatibility(id,plan) {
+        return Targets.targetPlanCompatibility(id,plan,{
+            workshopDraftFromPlan:p=>Calibration.workshopDraftFromPlan(p),
+            previewCalibration:c=>Calibration.previewCalibration(c)});
+    }
+    function setTargetForSubject(subject,id) {
+        if(workshopPresetLocked)return false;
+        const t=Targets.findDiagnosticTarget(id);
+        const kinds=Calibration.workshopSubjectKinds(subject);
+        if(!t||t.route!=="configured"||!t.available||!t.kinds.some(k=>kinds.includes(k)))return false;
+        workshopTargets=Object.assign({},workshopTargets,{[subject]:id});
+        return true;
+    }
     function draftForSubject(subject) {
         return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft
             : subject==="STORAGE" ? storageWorkshopDraft : subject==="SWAP" ? swapWorkshopDraft : subject==="NETWORK" ? netWorkshopDraft : subject==="MEMORY" ? memoryWorkshopDraft : workshopDraft;
@@ -209,16 +227,21 @@ Scope {
             workshopPresetFeedback="INVALID CALIBRATION";
             return false;
         }
-        return editWorkflowCatalog({action:"create",name:name,plan:plan,favorite:false});
+        const target=targetForSubject(subject);
+        if(!targetCompatibility(target,plan).ok){workshopPresetFeedback="TARGET INCOMPATIBLE";return false;}
+        const change={action:"create",name:name,plan:plan,favorite:false};
+        if(target!=="automatic")change.targetId=target;
+        return editWorkflowCatalog(change);
     }
     function loadWorkshopPreset(name, subject = "ALL") {
         if (workshopPresetLocked || !workflowStore.ready) return false;
         const p=workshopPresets.find(row=>row.name===name);
         const next=p && p.execution==="configured" && Calibration.workshopDraftFromPlan(p.plan);
         if (!next) {workshopPresetFeedback="PRESET UNAVAILABLE";return false;}
-        if (!Calibration.workshopPlanMatchesSubject(p.plan,subject) || !setDraftForSubject(subject,next)) {
+        if (!Calibration.workshopPlanMatchesSubject(p.plan,subject) || !targetCompatibility(p.targetId||"automatic",p.plan).ok || !setDraftForSubject(subject,next)) {
             workshopPresetFeedback="WORKFLOW OUTSIDE SUBJECT"; return false;
         }
+        if(!setTargetForSubject(subject,p.targetId||"automatic"))return false;
         workshopPresetFeedback="LOADED // PREPARE REQUIRED";
         return true;
     }
@@ -244,6 +267,7 @@ Scope {
         if (workshopPresetLocked || !workflowStore.ready) return false;
         const p=workshopPresets.find(x=>x.name===name);
         // Queue custody remains detached calibration snapshots, not catalog IDs.
+        if(p && p.targetId){setFeedback="EXPLICIT TARGET // QUEUE NOT SUPPORTED";return false;}
         const next=p && p.execution==="configured" &&
             Calibration.validatedWorkshopSet(workshopQueue.concat([{name:p.name,plan:p.plan}]));
         if(!next){setFeedback="LIMIT // 4 STEPS / 240s";return false;}
@@ -328,10 +352,12 @@ Scope {
     property string workshopRunId: ""
     property string workshopRunKind: ""
     property string workshopRunPlan: ""
+    property string workshopRunTarget: "automatic"
     property double workshopStartedMs: 0
     property int workshopDurationSeconds: 0
 
-    function requestWorkshopCapture(plan) {
+    function requestWorkshopCapture(plan,targetId="automatic") {
+        if (!targetCompatibility(targetId,plan).ok) return false;
         if (!plan || !Array.isArray(plan.instruments) || plan.instruments.length < 1) return false;
         const single = plan.instruments.length === 1;
         const job = single ? plan.instruments[0].kind : "workflow";
@@ -341,6 +367,7 @@ Scope {
         workshopRunId = captureId;
         workshopRunKind = job;
         workshopRunPlan = frozen;
+        workshopRunTarget = targetId;
         workshopStartedMs = Date.now();
         workshopDurationSeconds = plan.durationSeconds;
         return true;

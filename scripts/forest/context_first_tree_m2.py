@@ -49,6 +49,19 @@ class SessionContextRef:
         _integer(self.expected_revision)
 
 
+def _validate_history_metadata(turn_id, ordinal, role, provider, model, recorded_at_ms):
+    _key(turn_id)
+    _integer(ordinal, 1)
+    _integer(recorded_at_ms, 1)
+    if type(role) is not str or role not in ("user", "assistant"):
+        raise ContextRefusal("INVALID_HISTORY")
+    if role == "assistant":
+        _key(provider)
+        _key(model)
+    elif provider != "" or model != "":
+        raise ContextRefusal("INVALID_HISTORY")
+
+
 @dataclass(frozen=True, slots=True)
 class HistoryTurn:
     turn_id: str
@@ -60,16 +73,8 @@ class HistoryTurn:
     recorded_at_ms: int
 
     def __post_init__(self):
-        _key(self.turn_id)
-        _integer(self.ordinal, 1)
-        _integer(self.recorded_at_ms, 1)
-        if type(self.role) is not str or self.role not in ("user", "assistant"):
-            raise ContextRefusal("INVALID_HISTORY")
-        if self.role == "assistant":
-            _key(self.provider)
-            _key(self.model)
-        elif self.provider != "" or self.model != "":
-            raise ContextRefusal("INVALID_HISTORY")
+        _validate_history_metadata(self.turn_id, self.ordinal, self.role,
+                                   self.provider, self.model, self.recorded_at_ms)
         if type(self.content) is not str or not self.content or "\x00" in self.content:
             raise ContextRefusal("INVALID_HISTORY")
         try:
@@ -194,11 +199,29 @@ def snapshot_in_transaction(journal, requested, *, current, capability_plan=None
         _integer(latest[1], 1)
         if latest[1] > current.expected_revision:
             raise ContextRefusal("INVALID_HISTORY_REVISION")
+        # Validate the bounded suffix before materializing message content.
+        # The latest trigger check alone cannot detect an older gap or
+        # malformed metadata inside this same snapshot.
+        metadata = db.execute(
+            "SELECT turn_id,ordinal,role,provider_key,model_key,recorded_at_ms "
+            "FROM forest_turns WHERE session_id=? ORDER BY ordinal DESC LIMIT ?",
+            (current.session_id, MAX_HISTORY),
+        ).fetchall()
+        if (len(metadata) != min(latest[1], MAX_HISTORY)
+                or metadata[0][:3] != latest
+                or len({r[0] for r in metadata}) != len(metadata)
+                or any(type(r[1]) is not int or r[1] != latest[1] - i
+                       for i, r in enumerate(metadata))):
+            raise ContextRefusal("INVALID_HISTORY_ORDER")
+        for row in metadata:
+            _validate_history_metadata(*row)
         rows = db.execute(
             "SELECT turn_id,ordinal,role,body,provider_key,model_key,recorded_at_ms "
             "FROM forest_turns WHERE session_id=? ORDER BY ordinal DESC LIMIT ?",
             (current.session_id, MAX_HISTORY),
         ).fetchall()
+        if [r[:3] + r[4:] for r in rows] != metadata:
+            raise ContextRefusal("INVALID_HISTORY_ORDER")
         return select_history(current, tuple(HistoryTurn(*r) for r in rows),
                               capability_plan=capability_plan)
     except sqlite3.Error as exc:

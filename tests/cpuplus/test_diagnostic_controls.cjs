@@ -102,7 +102,10 @@ assert.equal(policy.summarize("storage",jsonl([{...storageSample,rows:[{...stora
 assert.equal(policy.argumentsFor("storage",p=>"/local/"+p),null);
 assert.deepEqual(JSON.parse(JSON.stringify(policy.argumentsFor("storage",p=>"/local/"+p,"/data"))).slice(-6),
     ["--data-dir","/data","--shell-dir","/local/.","--duration","30"]);
-assert.match(ui,/STORAGE OBSERVE \/\/ 30s/);
+// Storage's fixed adapter remains reachable through the durable QUICK
+// favorites owner; the retired hard-coded button label is not a contract.
+assert.match(owner,/if \(row.execution==="fixed"\) return request\(row.kind\)/);
+assert.match(ui,/modelData.name\+\(modelData.execution==="configured"/);
 assert.match(read("scripts/cpuplus_diagnostic_archive.py"),/KINDS = \{[^}]*"storage"/);
 const comparePolicy=vm.createContext({});
 vm.runInContext(read("services/diagnostics/DiagnosticComparison.js"),comparePolicy);

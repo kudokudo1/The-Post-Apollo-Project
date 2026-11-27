@@ -12,6 +12,7 @@ Item {
     property real chassisClearance: 10
     property bool showChassis: true
     property bool showScrews: true
+    property color screwColor: "#40899b"
     property bool showGlow: true
     property bool showValue: true
     property bool showSetValue: true
@@ -78,6 +79,7 @@ Item {
         clearance: root.chassisClearance
         chassisStyle: root.chassisStyle
         showScrews: root.showScrews
+        screwColor: root.screwColor
         structuralColor: root.structuralColor
     }
 

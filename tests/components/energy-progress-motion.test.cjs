@@ -794,3 +794,67 @@ test("opt-in burn away consumes ash without restoring erased structure",()=>{
     assert.match(face,/property bool remainingAsh: false/);
     assert.match(face,/material.erosion && root.remainingAsh && p===0/);
 });
+
+test("GitW synchronization buttons retain per-control colors and child-owned activity",()=>{
+    const git=fs.readFileSync(path.join(root,"widgets/GitW.qml"),"utf8");
+    const service=fs.readFileSync(path.join(root,"services/git/GitService.qml"),"utf8");
+    const action=git.slice(git.indexOf("component GitPrimaryAction:"),git.indexOf("component ActionButton: Rectangle"));
+    assert.match(action,/property color actionAccentColor: Colors.cyan/);
+    assert.match(action,/redAccent \? Colors.red[\s\S]*?orangeAccent \? Colors.orange[\s\S]*?blueAccent \? Colors.blue : actionAccentColor/);
+    assert.match(action,/energyColor: gitAction.semanticAccent/);
+    assert.match(action,/chassisColor: gitAction.semanticAccent/);
+    assert.match(action,/activityMotionEnabled: !gitAction.operationQuiet/);
+    assert.match(action,/operationClock - gitService.actionLastActivityAt >= 7000/);
+    assert.match(action,/gitService.pendingProcessAction === operationKey/);
+    assert.match(action,/pendingProcessAction === "track-checkout"/);
+    assert.match(action,/gitService.actionExitCode === 0[\s\S]*?\? "success" : "failure"/);
+    for (const [name,token] of [["FETCH","fetch"],["PULL","pull"],["PUSH","push"]]) {
+        assert.match(git,new RegExp('operationKey: "'+token+'"'));
+        assert.match(git,new RegExp('gitService.runSyncAction\\("'+token+'"\\)'));
+    }
+    assert.match(git,/operationKey: gitService.repoIsLocal \? "pull" : "clone"/);
+    assert.match(git,/actionAccentColor: Colors.magenta/);
+    assert.match(service,/property double actionLastActivityAt: 0/);
+    assert.match(service,/onActionBusyChanged: if \(actionBusy\) actionLastActivityAt = Date.now\(\)/);
+    assert.match(service,/onActionStageChanged: if \(actionBusy\) actionLastActivityAt = Date.now\(\)/);
+    assert.match(service,/function consumeActionLine\(line\)[\s\S]*?noteActionActivity\(\)/);
+    assert.match(service,/gitService.noteActionActivity\(\)/);
+    assert.match(service,/Only warn\. Never mark failed or unlock while Git may run/);
+});
+test("GitHub PR controls keep their established accent hues and mutation authority",()=>{
+    const pr=fs.readFileSync(path.join(root,"widgets/GitHubPullRequestControlView.qml"),"utf8");
+    const list=fs.readFileSync(path.join(root,"widgets/GitHubWorkItemsView.qml"),"utf8");
+    const action=pr.slice(pr.indexOf("component ActionButton: Rectangle"),pr.indexOf("component InputField: Rectangle"));
+    assert.match(action,/property color accent: Colors.cyan/);
+    assert.match(action,/energyColor: button.accent/);
+    assert.match(action,/chassisColor: button.accent/);
+    assert.match(action,/activityMotionEnabled: !button.quietOperation/);
+    assert.match(action,/visualClock - lastPhaseEvidenceAt >= 8000/);
+    assert.match(action,/id: progressSlow[\s\S]*?to: 0.9[\s\S]*?duration: 3600/);
+    assert.match(action,/id: progressFinish[\s\S]*?to: 1.0[\s\S]*?duration: 260/);
+    assert.match(action,/root.completedLifecycleAction === actionToken[\s\S]*?root.completedLifecycleSuccess/);
+    assert.match(action,/root.completedLifecycleAction === actionToken\) \{[\s\S]*?visualPhase = "failure"/);
+    assert.match(action,/visualPhase = "idle";[\s\S]*?progressReset.stop\(\)/);
+    assert.match(pr,/actionToken: "review-approve"[\s\S]*?accent: Colors.green/);
+    assert.match(pr,/actionToken: "merge-" \+ modelData[\s\S]*?accent: Colors.red/);
+    assert.match(pr,/actionToken: "update-branch"[\s\S]*?accent: Colors.orange/);
+    assert.match(pr,/actionToken: "close-reopen"[\s\S]*?accent: Colors.red/);
+    assert.match(pr,/onTriggered: root.startLifecycleAction\("review-approve"/);
+    assert.match(pr,/root.lifecycleService.mergePullRequest\(/);
+    assert.match(pr,/function armOrRun\(token, callback\)/);
+    assert.doesNotMatch(action,/id: progressFill|color: Colors.green|color: Colors.red/);
+    assert.match(list,/accent: root.isPulls \? Colors.yellow : Colors.blue/);
+    assert.match(list,/energyColor: button.accent/);
+    assert.match(list,/chassisColor: button.accent/);
+    assert.match(list,/progressBusy: root.isPulls && root.busy/);
+    assert.match(list,/onTriggered: root.refresh\(\)/);
+});
+test("EnergyProgress can stop and resume its visual clock without a fake result",()=>{
+    const face=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(face,/property bool activityMotionEnabled: true/);
+    assert.match(face,/visible && !reducedMotion && activityMotionEnabled/);
+    assert.match(face,/onActivityMotionEnabledChanged: if \(initialized\)/);
+    assert.match(face,/startedAt = Date.now\(\) - elapsed \* 1000/);
+    assert.match(face,/!root.activityMotionEnabled \? 0/);
+    assert.match(face,/!activityMotionEnabled \|\| phase !== "running"/);
+});

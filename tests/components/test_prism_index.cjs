@@ -140,3 +140,56 @@ test("placement index includes exactly the currently installed Prism context",()
     assert.equal(context.registered()[0].name,"POST APOLLO");
     assert.doesNotMatch(widget,/\b(?:serviceAvailable|healthReady|isLive|scanRunning)\s*:/);
 });
+
+test("Prism starts with standard SYNTAGMA and ATLAS top navigation",()=>{
+    assert.match(widget,/property string helpPage: "syntagma"/);
+    assert.match(widget,/\{ id: "syntagma", label: "SYNTAGMA" \},\s*\{ id: "atlas", label: "ATLAS" \}/);
+    const nav=widget.slice(widget.indexOf("id: prismMainModes"),widget.indexOf("id: prismBody"));
+    assert.match(nav,/ModeButton\s*\{/);
+    assert.match(nav,/model: root\.helpModes/);
+    assert.match(nav,/selected: !root\.indexOpen && root\.helpPage === modelData\.id/);
+    assert.match(nav,/onTriggered: root\.selectHelpPage\(modelData\.id\)/);
+    assert.match(widget,/helpPage = page;\s*indexOpen = false;/);
+    assert.match(widget,/PrismHelpContent\s*\{/);
+    const help=file("widgets/PrismHelpContent.qml");
+    assert.match(help,/help\.page === "syntagma"/);
+    assert.match(help,/help\.page === "atlas"/);
+    assert.match(help,/NO DEFINITIONS YET/);
+    assert.match(help,/help\.atlasZones\.slice\(0, 3\)/);
+    assert.match(help,/help\.atlasZones\.slice\(3, 6\)/);
+    assert.doesNotMatch(help,/\b(?:Process|FileView|PanelWindow|MouseArea|Timer)\s*\{/);
+});
+test("Atlas maps mounted shell groups in their actual order, not Prism installation status",()=>{
+    const atlas=vm.createContext({});
+    vm.runInContext(file("services/prism/PrismAtlas.js").replace(/^\s*\.pragma library\s*/,""),atlas);
+    const zones=atlas.mapZones();
+    assert.deepEqual(Array.from(zones,z=>z.id),["top-left","top-center","top-right","bottom-left","bottom-center","bottom-right"]);
+    const bounds=[
+        ["// ===== LEFT MODULES","// ===== CENTER MODULE"],
+        ["// ===== CENTER MODULE","// ===== RIGHT MODULES"],
+        ["// ===== RIGHT MODULES","// ===== BOTTOM-CENTER SYSTEM TRAY"],
+        ["// ===== BOTTOM UTILITIES","// ===== POWER"],
+        ["// ===== BOTTOM-CENTER SYSTEM TRAY","// ===== BOTTOM UTILITIES"],
+        ["// ===== POWER",null]
+    ];
+    const seen=new Set();
+    for(let i=0;i<zones.length;i++){
+        const [start,end]=bounds[i];
+        const from=shell.indexOf(start),to=end?shell.indexOf(end):shell.length;
+        assert.ok(from>=0&&to>from,zones[i].id);
+        const group=shell.slice(from,to);
+        let last=-1;
+        for(const entry of zones[i].entries){
+            const pos=group.search(new RegExp("\\b"+entry.mount+"\\s*\\{"));
+            assert.ok(pos>last,entry.mount+" is mounted in source order");
+            assert.ok(!seen.has(entry.mount),entry.mount+" is unique");
+            seen.add(entry.mount);
+            last=pos;
+        }
+    }
+    assert.equal(seen.size,23);
+    const copy=atlas.mapZones();
+    copy[0].entries[0].name="EDIT";
+    assert.equal(atlas.mapZones()[0].entries[0].name,"APP CONTROL");
+    assert.equal(context.registered().length,1,"Atlas does not fabricate Prism registrations");
+});

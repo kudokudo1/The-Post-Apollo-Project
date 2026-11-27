@@ -378,7 +378,7 @@ test("P4h: stable instrument reserves and protected review guidance",()=>{
     assert.match(host,/text: modelData.displayName \|\| modelData.name/);
     assert.match(recipient,/id: instrumentTitle[\s\S]*?text: "KILL \/\/ TASK MANAGER"/);
     assert.match(recipient,/id: instrumentHeaderLine[\s\S]*?height: 2\s+color: Colors.red/);
-    assert.match(recipient,/height: Math.max\(48, lockRail.reservedHeight/);
+    assert.match(recipient,/height: Math.max\(56, lockRail.reservedHeight/);
     assert.match(recipient,/reservedHeight: 3 \* 23 \+ 3 \* spacing \+ 22/);
     assert.doesNotMatch(recipient,/visible: lockRail.protectedTarget/);
     assert.match(recipient,/id: limitLockSlot[\s\S]*?height: 26\s+visible: !!workspace.currentTask/);
@@ -434,7 +434,8 @@ test("P4j: single and captured review live on the right, with bounded body and i
     assert.match(right,/model: reviewPanel.capture \? workspace.bulkReview.targets : \[\]/);
     assert.match(right,/id: capturedCount[\s\S]*?color: Colors.magenta/);
     assert.match(right,/id: capturedLabel[\s\S]*?text: "CAPTURED TARGETS"\s+color: Colors.red/);
-    assert.match(right,/id: reviewCancel[\s\S]*?normalFace: true[\s\S]*?idleForegroundColor: Colors.white[\s\S]*?hoverForegroundColor: Colors.white/);
+    assert.match(right,/id: reviewCancel[\s\S]*?normalFace: true[\s\S]*?idleForegroundColor: Colors.white[\s\S]*?hoverForegroundColor: reviewPanel.reportReady \? Colors.white : Colors.black/);
+    assert.match(right,/id: reviewCancel[\s\S]*?hoverFillColor: reviewPanel.reportReady \? Colors.red : Colors.yellow/);
     assert.match(right,/workspace.gate.confirm\(\)/);
     assert.match(right,/workspace.confirmBulk\(\)/);
     assert.match(right,/workspace.cancelOwned\(\)/);
@@ -1074,4 +1075,15 @@ test("K6d: Hunter emits legacy presentation events without retaining a widget", 
     assert.match(owner,/function onLegacyWindowRequested\(operationKind, title, resetChoice, clearTargets\)/);
     assert.match(owner,/function onLegacyReviewRejected\(\)\s*\{\s*appControlWindow\.cancelDestructiveConfirm\(\)/);
     assert.doesNotMatch(controller,/\bhost\b/);
+});
+
+test("K7b: CPU++ process identity, glow clearance and yellow cancellation", () => {
+    const identity=recipient.slice(recipient.indexOf("id: identityGroup"),recipient.indexOf('objectName: "cpuPlusProcessExactIdentity"'));
+    assert.match(identity,/id: identityGlyph[\s\S]*?anchors.verticalCenter: parent.verticalCenter[\s\S]*?color: Colors.red[\s\S]*?layer.effect: DropShadow/);
+    assert.match(identity,/id: identityText[\s\S]*?anchors.verticalCenter: parent.verticalCenter/);
+    assert.match(identity,/objectName: "cpuPlusProcessIdentityName"[\s\S]*?layer.effect: DropShadow/);
+    assert.match(identity,/objectName: "cpuPlusProcessIdentityMetadata"[\s\S]*?layer.effect: DropShadow/);
+    assert.match(recipient,/objectName: "cpuPlusProcessStateLabel"[\s\S]*?anchors.bottom: parent.bottom[\s\S]*?layer.effect: DropShadow/);
+    assert.match(recipient,/objectName: "cpuPlusProcessGlowGutter"[\s\S]*?x: 8\s*y: 8\s*width: Math.max\(0,actuatorScroll.width-30\)/);
+    assert.match(recipient,/contentHeight: actuatorBody.implicitHeight \+ 20/);
 });

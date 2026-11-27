@@ -687,25 +687,63 @@ Item {
                     anchors.margins: 8
                     anchors.rightMargin: 38
                     spacing: 4
-                    GohuText {
+                    Row {
+                        id: identityGroup
+                        objectName: "cpuPlusProcessIdentityGroup"
                         width: parent.width
-                        text: workspace.currentTask
-                            ? workspace.taskGlyph(workspace.currentTask)+"  "+String(workspace.currentTask.comm)
-                            : ""
-                        textFormat: Text.PlainText
-                        font.pixelSize: 16
-                        color: Colors.orange
-                        elide: Text.ElideRight
-                    }
-                    GohuText {
-                        width: parent.width
-                        text: workspace.currentTask
-                            ? "PID "+workspace.selectedPid+" • "+String(workspace.currentTask.user || "?")
-                              +" • "+String(workspace.currentTask.state || "?") : ""
-                        textFormat: Text.PlainText
-                        font.pixelSize: 12
-                        color: Colors.white
-                        elide: Text.ElideRight
+                        height: Math.max(identityGlyph.implicitHeight, identityText.implicitHeight)
+                        spacing: 8
+                        GohuText {
+                            id: identityGlyph
+                            objectName: "cpuPlusProcessIdentityGlyph"
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: workspace.currentTask ? workspace.taskGlyph(workspace.currentTask) : ""
+                            textFormat: Text.PlainText
+                            font.pixelSize: 20
+                            color: Colors.red
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 6; samples: 7; opacity: 0.75
+                                color: Colors.red; transparentBorder: true
+                            }
+                        }
+                        Column {
+                            id: identityText
+                            objectName: "cpuPlusProcessIdentityText"
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(0, parent.width - identityGlyph.width - parent.spacing)
+                            spacing: 4
+                            GohuText {
+                                objectName: "cpuPlusProcessIdentityName"
+                                width: parent.width
+                                text: workspace.currentTask ? String(workspace.currentTask.comm) : ""
+                                textFormat: Text.PlainText
+                                font.pixelSize: 16
+                                color: Colors.orange
+                                elide: Text.ElideRight
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 6; samples: 7; opacity: 0.70
+                                    color: Colors.orange; transparentBorder: true
+                                }
+                            }
+                            GohuText {
+                                objectName: "cpuPlusProcessIdentityMetadata"
+                                width: parent.width
+                                text: workspace.currentTask
+                                    ? "PID "+workspace.selectedPid+" • "+String(workspace.currentTask.user || "?")
+                                      +" • "+String(workspace.currentTask.state || "?") : ""
+                                textFormat: Text.PlainText
+                                font.pixelSize: 12
+                                color: Colors.white
+                                elide: Text.ElideRight
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 5; samples: 7; opacity: 0.55
+                                    color: Colors.cyan; transparentBorder: true
+                                }
+                            }
+                        }
                     }
                     GohuText {
                         width: parent.width
@@ -750,18 +788,25 @@ Item {
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
                 // Reserve the full lock rail even when no individual locks are visible.
-                height: Math.max(48, lockRail.reservedHeight + 7 + 32 - processIdentity.height - 4)
+                height: Math.max(56, lockRail.reservedHeight + 7 + 32 - processIdentity.height - 4)
                 visible: !!workspace.currentTask
                 GohuText {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
                     anchors.right: headerLocks.left
                     anchors.rightMargin: 4
-                    anchors.verticalCenter: headerLocks.verticalCenter
+                    objectName: "cpuPlusProcessStateLabel"
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 7
                     elide: Text.ElideRight
                     text: "PROCESS STATE"
                     color: Colors.red
                     font.pixelSize: 13
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 6; samples: 7; opacity: 0.72
+                        color: Colors.red; transparentBorder: true
+                    }
                 }
                 Row {
                     id: headerLocks
@@ -864,10 +909,14 @@ Item {
                 anchors.margins: 8
                 clip: true
                 contentWidth: width
-                contentHeight: actuatorBody.implicitHeight + 12
+                contentHeight: actuatorBody.implicitHeight + 20
                 Column {
                 id: actuatorBody
-                width: Math.max(0,actuatorScroll.width-14)
+                objectName: "cpuPlusProcessGlowGutter"
+                // Keep shadows inside the clipped viewport on all four edges.
+                x: 8
+                y: 8
+                width: Math.max(0,actuatorScroll.width-30)
                 spacing: 6
                 GohuText {
                     id: emptyTarget
@@ -1560,9 +1609,9 @@ Item {
                             accentColor: Colors.red
                             acceptedButtons: Qt.LeftButton
                             idleForegroundColor: Colors.white
-                            hoverForegroundColor: Colors.white
+                            hoverForegroundColor: reviewPanel.reportReady ? Colors.white : Colors.black
                             pressedForegroundColor: Colors.white
-                            hoverFillColor: Colors.red
+                            hoverFillColor: reviewPanel.reportReady ? Colors.red : Colors.yellow
                             pressedFillColor: Colors.dark
                             idleBorderColor: Colors.red
                             hoverBorderColor: Colors.red

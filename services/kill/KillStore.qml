@@ -143,6 +143,34 @@ Scope {
         return true;
     }
 
+    // Preserve the donor's existing eligibility rules and current snapshot.
+    function taskEligibleForKillAll(entry) {
+        if (!entry || !entry._taskRecord || Number(entry.pid || 0) <= 1)
+            return false;
+
+        const currentUser = String(Quickshell.env("USER") || "").trim();
+        const taskUser = String(entry.user || "").trim();
+
+        if (currentUser.length > 0
+                && taskUser.length > 0
+                && taskUser !== currentUser)
+            return false;
+
+        if (String(entry.state || "").indexOf("Z") !== -1)
+            return false;
+
+        return !safety.protectedFromKillAll(entry);
+    }
+
+    function killAllEligibleTasks() {
+        const eligible = [];
+        for (let i = 0; i < rows.length; i++) {
+            if (taskEligibleForKillAll(rows[i]))
+                eligible.push(rows[i]);
+        }
+        return eligible;
+    }
+
     function snapshotCadence(cpu, resource, kill, taskFavorites, combi,
                              preload, target, favorites) {
         if (cpu) return 600;

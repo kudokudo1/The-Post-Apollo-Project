@@ -55,7 +55,18 @@ ShellRoot {
     }
     HunterOperationController {
         id: controller
-        host: fakeHost
+        legacyPresentationAvailable: true
+        onLegacyMessagePublished: function(value) {
+            fakeHost.destructiveConfirmMessage=value;
+        }
+        onLegacyWindowRequested: function(operationKind, title, resetChoice, clearTargets) {
+            if (clearTargets) fakeHost.destructiveConfirmTargetPids=[];
+            fakeHost.destructiveConfirmKind=operationKind;
+            if (resetChoice) fakeHost.destructiveConfirmChoice=0;
+            if (title) fakeHost.destructiveConfirmTitle=title;
+            fakeHost.destructiveConfirmOpen=true;
+        }
+        onLegacyReviewRejected: fakeHost.cancelDestructiveConfirm()
         policyOwner: policy
         favoriteStoreObject: favorites
         executor: engine
@@ -80,7 +91,12 @@ ShellRoot {
         controller.start("kill-hogs",[captured[0],captured[0]]);
         if (!check(fakeHost.cancelled && engine.calls.length===0,"duplicate capture refused")) return;
         controller.start("kill-hogs",captured);
-        if (!check(engine.calls.length===1 && engine.running,"one target dispatched")) return;
+        if (!check(engine.calls.length===1 && engine.running
+                   && fakeHost.destructiveConfirmOpen
+                   && fakeHost.destructiveConfirmKind==="kill-hogs"
+                   && fakeHost.destructiveConfirmTitle.indexOf("HUNTING HOGS")>=0
+                   && fakeHost.destructiveConfirmMessage.indexOf("HUNTING HOGS")>=0,
+                   "one target dispatched and legacy presentation events applied")) return;
         favorites.favoriteKeys=["task|beta"];
         policy.rows=[first,second,{pid:3012,startTicks:31,comm:"gamma",identity:"gamma"},fourth];
         engine.exit(true);
@@ -91,7 +107,10 @@ ShellRoot {
                        && controller.results[2].status==="gone","live favorite and birth changes withheld")) return;
             engine.exit(true);
             Qt.callLater(function() {
-                if (!check(controller.phase==="report" && controller.results.length===4,"one result per capture")) return;
+                if (!check(controller.phase==="report" && controller.results.length===4
+                           && fakeHost.destructiveConfirmTitle.indexOf("HOG HUNT COMPLETE")>=0
+                           && fakeHost.destructiveConfirmMessage.indexOf("HOGS HUNT REPORT")>=0,
+                           "one result per capture and legacy report published")) return;
                 favorites.favoriteKeys=[];
                 policy.rows=[first,second,third,fourth];
                 controller.start("kill-mice",controller.targetsFromRows(policy.rows));
@@ -121,7 +140,12 @@ ShellRoot {
                     if (!check(controller.phase==="report" && controller.results.length===1
                                && engine.calls.length===priorCalls+1,"Kill All reports reviewed set only")) return;
                     const before=engine.calls.length;
-                    controller.host=null;
+                    controller.legacyPresentationAvailable=false;
+                    fakeHost.destructiveConfirmOpen=false;
+                    const legacyMessage=fakeHost.destructiveConfirmMessage;
+                    controller.start("kill-all",[captured[0]],false);
+                    if (!check(engine.calls.length===before && !fakeHost.destructiveConfirmOpen,
+                               "legacy admission requires presentation availability")) return;
                     policy.collectionEnabled=false;
                     controller.start("kill-all",[captured[0]],true);
                     if (!check(engine.calls.length===before,"unavailable policy refused")) return;
@@ -132,7 +156,9 @@ ShellRoot {
                     policy.collectionEnabled=false;
                     engine.exit(true);
                     Qt.callLater(function() {
-                        if (!check(controller.phase==="report" && controller.results.length===1,
+                        if (!check(controller.phase==="report" && controller.results.length===1
+                                   && !fakeHost.destructiveConfirmOpen
+                                   && fakeHost.destructiveConfirmMessage===legacyMessage,
                                    "recipient report without legacy host")) return;
                         console.log("HUNTER_SERIAL_PASS");
                         Qt.quit();

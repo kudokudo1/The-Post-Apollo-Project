@@ -205,6 +205,65 @@ def snapshot_in_transaction(journal, requested, *, current, capability_plan=None
         raise ContextRefusal("STORAGE_REFUSED") from exc
 
 
+def first_light_snapshot_in_transaction(journal, requested, *, current,
+                                        approved_prompt):
+    """Exact one-input M2 guard for a host-owned disposable trial journal.
+
+    Runtime must independently own and qualify the fresh journal, original
+    prompt and current reference, call inside its reservation writer
+    transaction, and use this returned snapshot (never fall back to history).
+    No opening, authority, provider call, cleanup or erasure proof here.
+    """
+    if (type(requested) is not SessionContextRef
+            or type(current) is not SessionContextRef
+            or requested != current):
+        raise ContextRefusal("CONTEXT_CHANGED")
+    db = _journal(journal)
+    if not db.in_transaction:
+        raise ContextRefusal("TRANSACTION_REQUIRED")
+    try:
+        expected = _messages([{"role": "user", "content": approved_prompt}])
+    except ChatRefusal as exc:
+        raise ContextRefusal("FIRST_LIGHT_INPUT_REFUSED") from exc
+    if current.expected_revision != 1 or current.context.origin != "INTERACTIVE":
+        raise ContextRefusal("FIRST_LIGHT_SCOPE_REFUSED")
+    try:
+        row = db.execute(
+            "SELECT state,revision FROM forest_sessions "
+            "WHERE owner_key=? AND tree_key=? AND session_id=?",
+            (current.context.principal_key, current.context.tree_key,
+             current.session_id),
+        ).fetchone()
+        if row is None or tuple(row) != ("OPEN", 1):
+            raise ContextRefusal("FIRST_LIGHT_SCOPE_REFUSED")
+        # This checks the shape of an already independently owned disposable
+        # journal, not an arbitrary/personal database. No titles or bodies.
+        if db.execute(
+                "SELECT 1 FROM forest_sessions WHERE session_id<>? LIMIT 1",
+                (current.session_id,)).fetchone() is not None:
+            raise ContextRefusal("FIRST_LIGHT_JOURNAL_NOT_SINGLE")
+        rows = db.execute(
+            "SELECT turn_id,ordinal,role FROM forest_turns "
+            "WHERE session_id=? LIMIT 2", (current.session_id,),
+        ).fetchall()
+        if (len(rows) != 1
+                or tuple(rows[0]) != (current.user_turn_id, 1, "user")):
+            raise ContextRefusal("FIRST_LIGHT_TRIGGER_REFUSED")
+        if db.execute(
+                "SELECT 1 FROM forest_turns WHERE session_id<>? LIMIT 1",
+                (current.session_id,)).fetchone() is not None:
+            raise ContextRefusal("FIRST_LIGHT_JOURNAL_NOT_SINGLE")
+    except sqlite3.Error as exc:
+        raise ContextRefusal("STORAGE_REFUSED") from exc
+    # Reuse M2's full validation and selection in the SAME transaction.
+    snapshot = snapshot_in_transaction(journal, requested, current=current)
+    if (snapshot.omitted_prefix_count != 0
+            or snapshot.capability_plan is not None
+            or snapshot.transport_messages() != expected):
+        raise ContextRefusal("FIRST_LIGHT_INPUT_MISMATCH")
+    return snapshot
+
+
 @dataclass(frozen=True, slots=True)
 class WorkshopContextRef:
     """M5 host-owned fixture selection reference, not an activation grant.

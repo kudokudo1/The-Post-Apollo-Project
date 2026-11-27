@@ -527,3 +527,144 @@ a protected writer or roster. No new API, schema, data migration,
 registry, opener, issuer, test, UI, provider or native operation
 in R7h. Exact source review/CI at handoff; operator integration
 separate. Native/protected/production HOLD.
+
+
+## R7i // Multi-author room ordering and directed response custody (design)
+
+Operator S5 clarification #2161 7215166665/7215453268, integrated UI2
+#2999, Nurse 7215502409; Runtime 7215535828, UI1 7215538179,
+Spirit 7215553666 (candidate #3001), UI2 7215555784,
+Mind 7215556125, Heart 7215569936. Preserve R7h persistent member,
+original history, execution succession and unknown-effect custody.
+The earlier one-prospective-writer recommendation was not a decision:
+a room may have multiple independently authorized authors across
+Trees/Clones. Message append serialization is not sole-speaker
+assignment, response admission, or ownership of external effects.
+No actual A/B transaction topology or policy defaults selected.
+
+### Existing implementation and gap
+
+Main 916ebb03: B1 d1533f15 lines 23-45 stores one owner/Tree per
+session and ordered turns with role/provider/model, no authenticated
+member author or audience; lines 186-213 serialize append at exact
+revision, lines 215-229 read bodies by owner/session. B3 c5dbbc29
+lines 40-58 restrict one attempt per (session,user_turn) and one
+RESERVED per session; lines 157-195 select latest user and bounded
+history; lines 303-325 require unchanged revision and original user
+still last at commit. Thus merely removing one-live index cannot
+support a second reply to the same trigger. M2 1085bc56 refuses Clone
+and selects one Tree's contiguous suffix at exact revision; filtering
+after fetching private bodies or exposing ordinal gaps is not a
+qualified room history. R3 291dbaa4 keeps OperationRef in memory, one
+generator and STOP. H1 62dc22ec also refuses Clone/background.
+B2 transport carries user/assistant roles, not stable author identity.
+Retain all existing refusal boundaries; current local transaction
+and fixture evidence do not establish real room or audience custody.
+
+### Distinct logical records (not a schema)
+
+| Record | Required invariant |
+| --- | --- |
+| Room / durable conversation | Stable room/chat identity independent of selected Tree, current participants and execution. Old B1 Tree/owner remain original provenance, not universal room ownership. |
+| Membership / policy | Stable authenticated member and Tree, independently current join/leave incarnation, room ceiling and member-specific revision. Membership is not history, resource or execution access. |
+| Message | Immutable original ID, author, order, causal reference and exact content/version; separately permitted audience and attachments. A label/model name is not authorship. |
+| Address / intent | Deliberate qualified target(s) and original request, independent of readers. Mention, quotation, proposal, assignment and verified implementation authorization differ. |
+| Response job | Original room/trigger, intended member, purpose and bounded causal root; independent job identity, current policy, input and claim. Multiple jobs may cite one trigger. |
+| External effect / assignment | Exact original operator grant, approved revision, delegation, receiving owner/Task, actual target/action, claim and terminal outcome; separate from reply and delivery. |
+
+The room's mode is a ceiling; member mode and suggestion preference
+restrict it. The S5 Maple/Cedar/DOC1/DOC2 table is illustrative, not a
+roster or default. No implicit response from observation, mere mention,
+quote or proposal. A one-shot invitation to an observer remains an
+open policy choice; no silent mode override. Proposal-only contribution
+still requires permitted input and actual model/resource admission.
+Cross-Tree audience is separately qualified; never broadcast private
+Leaves, Task state, transcripts or tools through shared membership.
+
+### Response admission, append and original recovery
+
+1. Resolve original message/intent and independently authorized
+   recipients before protected enumeration. Freeze exact member,
+   membership and policy revisions and permitted trigger; establish
+   bounded root, per-member/room/host work budgets and causal limits.
+   Names or free-text @ tokens alone cannot create jobs. Replayed
+   addressing or relay must resolve the same original job, not mint a
+   new attempt. Each distinct eligible response has independent
+   identity even when the same user message triggered it.
+2. Evaluate serialized response admission per room first as a
+   conservative candidate, not a selected global scheduler or sole
+   speaker. A queue entry is not execution authority. Revalidate
+   membership, intent, current policy, input eligibility and actual
+   Heart claim before assembling/dispatching each job. Nonconflicting
+   independently authorized background assignments may continue under
+   separate claims. Host-wide capacity and causal/cadence ceilings are
+   independent of room queue; no implicit fan-out or recursion.
+3. Pin exact eligible input snapshot and provider recipient before
+   actual send; keep the causal trigger distinct from the latest
+   message. The snapshot and append-head revision are distinct
+   concepts, not permission to ignore drift. If another message
+   arrives, resolve actual currentness rules: hold invalidated input,
+   never silently rebase a prepared request or replay an inference.
+   Parallel computation remains a later candidate needing qualified
+   snapshot semantics and independent claims, not approved here.
+4. At the actual durable writer, serialize message append and compare
+   exact original job, current qualified author/membership, permitted
+   input and append precondition. Record immutable message, order and
+   local original job settlement atomically or preserve unknown
+   original custody. Duplicate completion must reconcile original
+   outcome rather than insert another message. Local append, delivery
+   to each recipient and external tool effect are different outcomes.
+   No message or hidden ordinal/count is published without current
+   independently qualified audience. Lost receipt is not success,
+   rollback, external cancellation or permission to retry.
+5. A task handoff uses independently verified original operator grant,
+   exact approved revision, delegation eligibility, current receiving
+   role/Task, workspace/action/target, scope and budget. Standing
+   authorization may cover a bounded handoff without repeated consent;
+   the sender's statement or a summary does not grant execution.
+   Conflicting actual effects serialize at their actual target owner,
+   not merely at the room ledger. Nonconflicting effects still need
+   independent permission/claim and original custody. A posted result
+   needs its own outcome and recipient evidence.
+6. Leave, rebind, mode changes, STOP and revocation deny affected new
+   admission/delivery and clear stale presentation where required;
+   preserve outstanding original effects and accounting until exact
+   settlement. No implicit retarget, history rewrite, grant transfer,
+   cancellation of unrelated work or resource release. A newly joined
+   member's earlier-message visibility requires independent policy;
+   no automatic history backfill or inferred completeness.
+
+UI1/UI2 own the actual layout, explicit room/target, draft and mode
+controls, and authorized status. Keep addressees distinct from readers
+and effect owner; no invented queued/speaking status or hidden counts.
+Mind owns eligible recipient-specific history/Leaf/approval context;
+Spirit/Connections own authority, audience, revocation and source
+custody; Heart owns actual capacity, claim and terminal accounting.
+Runtime owns original ordering and recovery, not an additional issuer.
+
+### Future negative acceptance matrix
+
+| Case | Required result |
+| --- | --- |
+| Two eligible authors respond to one user trigger | Distinct original jobs, each at most one committed message; durable order, not duplicate rejection solely due to common trigger. |
+| Duplicate job delivery or completion after lost acknowledgement | Reconcile exact original outcome; no new provider send or second message. |
+| New append after original input preparation | Requalify applicable snapshot/currentness; no implicit refresh/rebase, replay or guessed success. |
+| Quoted/negated mention, proposal or observer without permitted invitation | No inferred addressed job, model admission or tool effect. |
+| Duplicate display names or stale addressed member | Refuse ambiguous/stale target; never choose first match or replacement. |
+| Join/leave/mode/revoke during queue or response | No affected new admission or delivery; retain original outstanding effect, no automatic release. |
+| Partial recipient history or attachment eligibility | No body enumeration outside scope, hidden gap/count or implied full history; no automatic backfill. |
+| Cross-Tree room | Separate authorized projections; no private Task/Leaf broadcast or inherited capability. |
+| Accepted design without implementation grant, or widened relay | No tool effect; require independently qualified exact delegated scope. |
+| Covered delegated assignment, same target conflict | Separate original claim; actual target custodian serializes conflicting effects. |
+| Independent eligible targets | Separate capacity, permission and original effect claims; no room-wide sole-author lock. |
+| Causal loop, budget exhausted, STOP or unknown terminal | Hold affected admission; no automatic response/dispatch or inferred settlement. |
+
+Open: authentic room/member/author source and join/history policy;
+room versus member preference lifetime; actual durable job allocation,
+deduplication, append preconditions and ordering; causal/budget limits
+and scheduler scope; original operation/target/receipt custody;
+approved A/B transaction domain, opener, migration/legacy writers
+and recovery. Candidate evaluation only. No new schema, queue, API,
+registry, test, issuer, permission, UI, model/tool invocation or native
+operation in this slice. Exact completed-source owner/Nurse review
+and existing CI; operator integration separate. Production HOLD.

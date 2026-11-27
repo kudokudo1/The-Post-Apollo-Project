@@ -75,3 +75,14 @@ function lifecycleFinish(run,now,outcome) {
     return {schema:lifecycleSchema,status:outcome,elapsedMs,targets:run.ids.slice(),
         events:run.events.map(e=>({id:e.id,open:e.open,atMs:e.atMs})),stats};
 }
+
+// The cutoff is the requested observation window, not the timer callback.
+// Record actual callback delay; refuse a delayed or backwards clock witness.
+function lifecycleFinishObserved(run,now) {
+    if(!run||!validTime(now)||now<run.deadlineMs||now<run.lastMs)return null;
+    const delay=now-run.deadlineMs;
+    if(delay>250)return {schema:lifecycleSchema,status:"FAILED",reason:"COMPLETION CALLBACK LATE",completionDelayMs:delay};
+    const report=lifecycleFinish(run,run.deadlineMs,"COMPLETE");
+    if(report)report.completionDelayMs=delay;
+    return report;
+}

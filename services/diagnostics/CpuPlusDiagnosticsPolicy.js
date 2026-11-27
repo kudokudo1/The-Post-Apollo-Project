@@ -293,7 +293,7 @@ function appControlMetrics(text) {
                 || !Array.isArray(d.modes) || !d.modes.length || d.modes.length > 128
                 || !Array.isArray(d.openings) || d.openings.length > 140
                 || d.modes.some((m,i)=>!m || !stamp(m.tsMs)
-                    || ["closed","app","kill","other","unavailable"].indexOf(m.mode)<0
+                    || ["closed","app","kill","cpu-kill","mixed","other","unavailable"].indexOf(m.mode)<0
                     || (i>0 && m.tsMs<d.modes[i-1].tsMs))
                 || d.modes[0].tsMs > d.startMs
                 || d.samples.some((s,i)=>!s || !stamp(s.tsMs) || !stamp(s.intervalMs)
@@ -342,7 +342,7 @@ function appControlMetrics(text) {
                 "app-position-view","resource-reconcile","event-loop-gap"]);
             if (!Array.isArray(d.work) || d.work.length>256
                     || d.work.some((o,i)=>!o || moreStages.indexOf(o.stage)<0
-                        || ["closed","app","kill","other","unavailable"].indexOf(o.mode)<0
+                        || ["closed","app","kill","cpu-kill","mixed","other","unavailable"].indexOf(o.mode)<0
                         || !stamp(o.tsMs) || !numeric(o.elapsedMs)
                         || (i>0 && o.tsMs<d.work[i-1].tsMs))) return null;
             for (const o of d.work) {
@@ -359,7 +359,7 @@ function appControlMetrics(text) {
                 total:ms?rows.reduce((n,s)=>n+s.total*s.intervalMs,0)/ms:null,
                 main:ms?rows.reduce((n,s)=>n+s.main*s.intervalMs,0)/ms:null};
         };
-        const buckets={app:[],kill:[]};
+        const buckets={app:[],kill:[], "cpu-kill":[]};
         for (const s of d.samples) {
             const from=s.tsMs-s.intervalMs;
             if (from<d.startMs) continue;
@@ -369,7 +369,7 @@ function appControlMetrics(text) {
             buckets[previous.mode].push(s);
         }
         return {pid:d.pid,durationMs:d.endMs-d.startMs,all:weighted(d.samples),
-            app:weighted(buckets.app),kill:weighted(buckets.kill),
+            app:weighted(buckets.app),kill:weighted(buckets.kill),cpuKill:weighted(buckets["cpu-kill"]),
             selection:selection,killWork:killWork,work:observedWork,
             openings:totals.length,openingMean:totals.length?totals.reduce((a,b)=>a+b,0)/totals.length:null,
             openingMax:totals.length?Math.max(...totals):null};
@@ -396,12 +396,12 @@ function summarize(kind, text) {
             const d=appControlMetrics(text);
             if (!d) return null;
             const line=(name,x)=>name+" // "+(x.count?x.total.toFixed(1)+"% total / "+x.main.toFixed(1)+"% main ("+x.count+" samples)":"N/A");
-            return "PID // "+d.pid+"\n"+line("MIXED / WHOLE CAPTURE",d.all)+"\n"+line("APP",d.app)+"\n"+line("KILL",d.kill)
+            return "PID // "+d.pid+"\n"+line("MIXED / WHOLE CAPTURE",d.all)+"\n"+line("APP",d.app)+"\n"+line("KILL",d.kill)+"\n"+line("CPU++ KILL",d.cpuKill)
                 +"\nOPENINGS // "+d.openings+(d.openings?" / mean "+d.openingMean.toFixed(1)+" ms / max "+d.openingMax+" ms":" / N/A")
                 +Object.keys(d.selection).filter(k=>d.selection[k].length).map(k=>"\n"+k.toUpperCase()+" // mean "+(d.selection[k].reduce((a,b)=>a+b,0)/d.selection[k].length).toFixed(1)+" ms").join("")
                 +Object.keys(d.killWork).sort((a,b)=>d.killWork[b].totalMs-d.killWork[a].totalMs).map(k=>"\nKILL "+k.toUpperCase()+" // "+d.killWork[k].count+" calls / "+d.killWork[k].totalMs+" ms summed / "+d.killWork[k].maxMs+" ms max").join("")
                 +Object.keys(d.work).sort((a,b)=>d.work[b].maxMs-d.work[a].maxMs).map(k=>"\n"+k.toUpperCase()+" // "+d.work[k].count+" calls / "+d.work[k].totalMs+" ms summed / "+d.work[k].maxMs+" ms max").join("")
-                +"\nStable-mode CPU intervals only; whole capture includes closed/other. Work mode is observed at completion, not necessarily throughout the call. Event-loop gaps may overlap measured work; do not add them as CPU time. Stage timings are synchronous wall time, not CPU attribution or first paint. 100% = one core.";
+                +"\nStable-mode CPU intervals only; KILL is AppControl, CPU++ KILL is the recipient. Both-open and transition intervals are excluded from those buckets. Whole capture includes closed/other/mixed. Work mode is observed at completion, not necessarily throughout the call. Event-loop gaps may overlap measured work; do not add them as CPU time. Stage timings are synchronous wall time, not CPU attribution or first paint. 100% = one core.";
         }
         if (kind === "inventory") {
             const data = JSON.parse(text);

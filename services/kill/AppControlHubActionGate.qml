@@ -188,10 +188,16 @@ Scope {
             signalDispatch.exec(command);
             return;
         }
-        // Restart and address-space limit retain existing paths.
         if (req.action === "restart") {
-            if (!controlOwner.restart(req.pid)) { finishRequest("REQUEST REJECTED"); return; }
-        } else if (req.action === "limit") {
+            const command = controlOwner.identityRestartCommand(req.pid,req.startTicks,req.name);
+            if (!command.length) { finishRequest("REQUEST REJECTED"); return; }
+            safetyOwner.relockDangerAction(row,kind);
+            signalDispatchActive = true;
+            feedback = "RESTART // WAITING FOR ORIGINAL EXIT";
+            signalDispatch.exec(command);
+            return;
+        }
+        if (req.action === "limit") {
             presentationOwner.setLimitPercent(req.percent,row);
         }
         safetyOwner.relockDangerAction(row,kind);
@@ -211,6 +217,24 @@ Scope {
         if (!signalDispatchActive) return;
         signalDispatchActive = false;
         const req = pending;
+        if (req && req.action === "restart") {
+            if (exitStatus !== 0)
+                finishRequest("RESTART OUTCOME UNKNOWN // VERIFY OWNER STATE");
+            else if (exitCode === 0)
+                finishRequest("RESTART // ORIGINAL EXIT OBSERVED // LAUNCH ACCEPTED");
+            else if (exitCode === 2)
+                finishRequest("RESTART CAPTURE REFUSED // NO SIGNAL");
+            else if (exitCode === 3)
+                finishRequest("RESTART TIMEOUT // NO REPLACEMENT LAUNCHED");
+            else if (exitCode === 4)
+                finishRequest("ORIGINAL EXITED // REPLACEMENT LAUNCH FAILED");
+            else if (exitCode === 5)
+                finishRequest("RESTART SIGNAL REFUSED // NO REPLACEMENT LAUNCHED");
+            else
+                finishRequest("RESTART OUTCOME UNKNOWN // VERIFY OWNER STATE");
+            refreshOwner.restart();
+            return;
+        }
         if (req && exitCode === 0 && exitStatus === 0) {
             const row = exactRow(req.pid,req.startTicks,req.name);
             if (row && (req.action === "freeze" || req.action === "resume"))

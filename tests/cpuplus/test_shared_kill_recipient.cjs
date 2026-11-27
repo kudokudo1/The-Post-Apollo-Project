@@ -367,7 +367,7 @@ test("P4g: restart lock is checked and consumed at all existing authorization se
     assert.match(gate,/actionLockKind\(pending.action\)/);
     assert.match(gate,/const key = actionLockKind\(action\)/);
     assert.match(controller,/function requestRestart\([\s\S]*?dangerActionUnlocked\(target, "restart"\)/);
-    assert.match(global,/function executeTaskRestart\([\s\S]*?taskDangerActionUnlocked\(entry, "restart"\)[\s\S]*?relockTaskDangerAction\(entry, "restart"\)/);
+    assert.match(global,/function executeTaskRestart\([\s\S]*?taskDangerActionUnlocked\(entry, "restart"\)[\s\S]*?gate\.prepare\(Number\(pid\), Number\(expectedStartTicks\), expectedName, "restart", 0\)[\s\S]*?gate\.confirm\(\)/);
     assert.match(app,/cancelKind.indexOf\("restart"\) !== -1 \? "restart"/);
     assert.match(recipient,/id: lockRail[\s\S]*?id: killLockSlot[\s\S]*?id: restartLockSlot[\s\S]*?id: freezeLockSlot[\s\S]*?id: lockHelpButton/);
     assert.match(recipient,/restartLockTarget: restartLockSlot/);
@@ -1277,4 +1277,68 @@ test("K8b2: donor confirmations carry exact birth and reuse the individual gatew
     assert.notEqual(key(row),key({...row,startTicks:457}));
     assert.equal(key({...row,startTicks:0}),"");
     assert.match(presentation,/gate\.prepare\(Number\(target\.pid\), Number\(target\.startTicks\),\s*String\(target\.comm \|\| ""\), "resume", 0\)/);
+});
+
+test("K8b3: restart observes original exit and refuses duplicate replacement on timeout", () => {
+    const source=read("services/system/ProcessControl.qml");
+    const begin=source.indexOf("    function identityRestartCommand(");
+    const end=source.indexOf("\n    }",begin);
+    assert.ok(begin>=0 && end>begin);
+    const make=new Function(source.slice(begin,end+6)+"\nreturn identityRestartCommand;")();
+    assert.deepEqual(make(1,123,"test"),[]);
+    assert.deepEqual(make(123,0,"test"),[]);
+    const command=make(123,456,"test");
+    assert.match(command[2],/os\.pidfd_open/);
+    assert.match(command[2],/signal\.pidfd_send_signal/);
+    assert.match(command[2],/poll\.poll\(5000\)[\s\S]*?subprocess\.Popen/);
+    assert.doesNotMatch(command[2],/os\.kill\(|SIGKILL/);
+    assert.match(gate,/controlOwner\.identityRestartCommand\(req\.pid,req\.startTicks,req\.name\)/);
+    assert.match(gate,/RESTART TIMEOUT \/\/ NO REPLACEMENT LAUNCHED/);
+    const legacy=read("widgets/appcontrol/GlobalTaskActionController.qml");
+    assert.doesNotMatch(legacy,/processControlObject\.restart\(/);
+    const harness=[
+        "import os, pathlib, signal, subprocess, sys, tempfile, time",
+        "script=sys.argv[1]",
+        "child='''import pathlib,signal,sys,time",
+        "d=pathlib.Path(sys.argv[1]); mode=sys.argv[2]",
+        "ready=d/'ready'; exited=d/'exited'; replacement=d/'replacement'",
+        "if ready.exists():",
+        "    replacement.write_text('after' if exited.exists() else 'early')",
+        "    sys.exit(0)",
+        "def term(*args):",
+        "    if mode=='ignore': return",
+        "    time.sleep(.7); exited.write_text('yes'); sys.exit(0)",
+        "signal.signal(signal.SIGTERM,term)",
+        "ready.write_text('yes')",
+        "while True: time.sleep(.1)",
+        "'''",
+        "def wait_file(path):",
+        "    for _ in range(150):",
+        "        if path.exists(): return",
+        "        time.sleep(.02)",
+        "    raise AssertionError('missing '+str(path))",
+        "def exercise(mode):",
+        "    with tempfile.TemporaryDirectory() as tmp:",
+        "        d=pathlib.Path(tmp)",
+        "        p=subprocess.Popen([sys.executable,'-c',child,tmp,mode])",
+        "        try:",
+        "            wait_file(d/'ready')",
+        "            raw=pathlib.Path(f'/proc/{p.pid}/stat').read_text(); end=raw.rfind(')')",
+        "            name=raw[raw.index('(')+1:end]; born=raw[end+2:].split()[19]",
+        "            def run(b,n): return subprocess.run([sys.executable,'-c',script,str(p.pid),b,n],timeout=12).returncode",
+        "            assert run(str(int(born)+1),name)==2 and p.poll() is None",
+        "            assert run(born,name+'-wrong')==2 and p.poll() is None",
+        "            assert not (d/'replacement').exists()",
+        "            code=run(born,name)",
+        "            if mode=='ignore':",
+        "                assert code==3 and p.poll() is None and not (d/'replacement').exists()",
+        "            else:",
+        "                assert code==0 and p.wait(timeout=5)==0",
+        "                wait_file(d/'replacement'); assert (d/'replacement').read_text()=='after'",
+        "        finally:",
+        "            if p.poll() is None: p.kill(); p.wait(timeout=5)",
+        "exercise('exit'); exercise('ignore')"
+    ].join("\n");
+    const result=require("node:child_process").spawnSync("/usr/bin/python3",["-c",harness,command[2]],{encoding:"utf8",timeout:30000});
+    assert.equal(result.status,0,result.stderr || String(result.error || ""));
 });

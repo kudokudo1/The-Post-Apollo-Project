@@ -140,16 +140,22 @@ QtObject {
     function executeTaskRestart(pid, expectedName, expectedStartTicks) {
         const entry = taskEntryForCapturedIdentity(pid, expectedName, expectedStartTicks);
 
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
+        const gate = host.hubProcessActionGate;
+        if (!entry || !gate)
+            return false;
 
         if (host.taskRequiresDangerUnlock(entry)
                 && !host.taskDangerActionUnlocked(entry, "restart"))
-            return;
+            return false;
 
-        processControlObject.restart(entry.pid);
-        relockTaskDangerAction(entry, "restart");
-        refreshTimer.restart();
+        if (!gate.prepare(Number(pid), Number(expectedStartTicks), expectedName, "restart", 0))
+            return false;
+        const captured = gate.pending;
+        if (gate.confirm())
+            return true;
+        if (!gate.busy && gate.pending === captured)
+            gate.cancel();
+        return false;
     }
 
 

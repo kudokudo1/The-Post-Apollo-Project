@@ -731,7 +731,10 @@ assert.match(owner,/workflowCatalogCompleted\(outcome,wasEdit,workflowStore.docu
 assert.match(workshop,/onWorkflowCatalogCompleted\(outcome,wasEdit,confirmedDocument\)/);
 assert.match(workshop,/if \(!wasEdit \|\| !root.pendingSaveName\) return/);
 assert.match(workshop,/Receipt.sameValue\(row.plan,JSON.parse\(root.savePlanText\)\)/);
-assert.match(workshop,/if \(locked \|\| calibrating \|\| !preview.ok \|\| saveEditorOpen\) return/);
+assert.match(workshop,/if \(locked \|\| calibrating \|\| !preview.ok \|\| saveEditorOpen \|\| !targetCompatibility.ok \|\| targetPicker.visible\) return/);
+assert.match(workshop,/Targets.targetPlanCompatibility\(selectedTargetId,plan/);
+assert.match(workshop,/Targets.searchDiagnosticTargets\(targetSearch.text,targetPicker.category\)/);
+assert.match(workshop,/row.route==="configured"/);
 assert.match(ui,/id: pinnedExecutionHost/);
 assert.match(parent,/memoryDiagnosticInfo\.hovered/);
 assert.match(parent,/objectName: "cpuplusMemoryDiagnosticsInfoPopup"/);

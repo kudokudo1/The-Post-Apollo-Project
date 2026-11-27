@@ -982,6 +982,22 @@ ShellRoot {
                 if(!root.check(!workshop.saveEditorOpen && !CpuPlusDiagnostics.workflowCatalogBusy
                     && !CpuPlusDiagnostics.busy,"cancel save does not write or capture"))return;
                 console.log("CPU_Q3_DIRECT_SAVE_PASS");
+                const target=root.findItem(workshop,"cpuplusWorkshopTarget");
+                if(!root.check(target&&target.available,"target button available"))return;
+                target.leftClicked(null);
+                root.phase=327;return;
+            }
+            if(root.phase===327 && pane.item){
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(workshop.targetPickerOpen && !workshop.selectTarget("process-instance")
+                    && !workshop.selectTarget("appcontrol") && workshop.selectTarget("quickshell")
+                    && !workshop.targetCompatibility.ok && !workshop.targetAllowsInstrument("storage")
+                    && !workshop.ready && !workshop.openSaveEditor(),"target selection, incompatible plan and locked targets"))return;
+                workshop.activate();
+                if(!root.check(!workshop.ready && !CpuPlusDiagnostics.busy,"incompatible target cannot prepare"))return;
+                if(!root.check(workshop.selectTarget("automatic") && workshop.targetCompatibility.ok
+                    && !CpuPlusDiagnostics.busy,"automatic restores valid calibration without mutation"))return;
+                console.log("CPU_Q4_TARGET_SELECTOR_PASS");
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);

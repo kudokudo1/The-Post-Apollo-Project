@@ -41,11 +41,36 @@ test("K8d QML is a contained presentation, no process mutator or helper",()=>{
     assert.match(parent,/id: resourceBay[\s\S]*?CpuPlusKillResourceConsole \{/);
     assert.match(parent,/visible: !reviewPanel.visible/);
     assert.match(ui,/onTargetIdentityChanged:\s*root.clearDraft\(\)/);
-    assert.match(ui,/CpuPlusDiagnosticSlider \{/);
+    assert.ok(ui.includes("CpuPlusDiagnosticSlider {"));
+    assert.ok(ui.includes("id: resourceFilters"));
+    assert.ok(ui.includes("model: root.categories"));
+    assert.ok(ui.includes('objectName: "cpuPlusResourceFilter-"'));
+    assert.ok(ui.includes("id: resourcePanel"));
+    assert.ok(ui.includes("readonly property var spec: root.selectedResource"));
+    assert.ok(ui.includes("anchors.top: resourceFilters.bottom"));
+    assert.ok(!ui.includes("id: resourceCard"));
+    assert.ok(ui.includes("onLeftClicked: root.selectResource(modelData.key)"));
     assert.match(ui,/label: "REVIEW"/);
     assert.match(ui,/label: "CLEAR DRAFT"/);
     assert.match(ui,/APPLY LOCKED/);
     assert.match(ui,/onValueRequested: function\(value\)/);
     for(const forbidden of ["Quickshell.execDetached","Process {","setLimitMiB(","setLimitPercent(","signalDispatch.exec(","prlimit(","onLeftClicked: workspace.gate.confirm"])
         assert.equal(ui.includes(forbidden),false,"forbidden actuator "+forbidden);
+});
+
+test("K8d2 top filters select one editor while retaining drafts",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    for (const name of ["CPU","MEM","SWAP","DISK","THR","GPU","NET"])
+        assert.ok(ui.includes(':"'+name+'"') || ui.includes(':"'+name+'",'));
+    assert.ok(ui.includes('property string selectedKey: "cpu"'));
+    assert.ok(ui.includes("selected: root.selectedKey === modelData.key"));
+    assert.ok(ui.includes("function selectResource(key)"));
+    assert.ok(ui.includes("bodyScroll.contentY = 0"));
+    assert.ok(ui.includes("model: resourcePanel.spec.controls"));
+    assert.ok(ui.includes('model: ["off","manual","auto","hold"]'));
+    assert.ok(ui.includes('visible: root.modeFor(resourcePanel.key) === "manual"'));
+    const updated=draft.stageValue({}, "cpu", "nice", 8);
+    assert.equal(draft.value(updated,"cpu","nice"),8);
+    assert.equal(draft.value(updated,"memory","virtual"),2048);
+    assert.equal(draft.summary(updated).length,1);
 });

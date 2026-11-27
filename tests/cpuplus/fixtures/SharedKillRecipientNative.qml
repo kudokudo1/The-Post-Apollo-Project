@@ -339,30 +339,72 @@ ShellRoot {
                 // K8d: the right surface is an identity-bound draft, never
                 // an alternate Linux executor or a second confirmation gate.
                 const consolePane=smoke.find(view,"cpuPlusKillResourceConsoleSurface");
-                const cpuCard=smoke.find(view,"cpuPlusResourceCard-cpu");
+                const cpuFilter=smoke.find(view,"cpuPlusResourceFilter-cpu");
+                const memoryFilter=smoke.find(view,"cpuPlusResourceFilter-memory");
+                const netFilter=smoke.find(view,"cpuPlusResourceFilter-network");
+                const selectedPanel=smoke.find(view,"cpuPlusResourceSelectedPanel");
                 const applyLocked=smoke.find(view,"cpuPlusResourceApplyLocked");
                 const detailState = "console=" + (!!consolePane)
                     + " ready=" + (consolePane ? consolePane.selectionReady : "missing")
                     + " identity=" + (consolePane ? consolePane.targetIdentity : "missing")
-                    + " card=" + (!!cpuCard)
-                    + " expanded=" + (cpuCard ? cpuCard.expanded : "missing")
+                    + " cpuFilter=" + (!!cpuFilter)
+                    + " cpuSelected=" + (cpuFilter ? cpuFilter.selected : "missing")
+                    + " memoryFilter=" + (!!memoryFilter)
+                    + " networkFilter=" + (!!netFilter)
+                    + " selectedPanel=" + (selectedPanel ? selectedPanel.key : "missing")
                     + " apply=" + (!!applyLocked)
                     + " available=" + (applyLocked ? applyLocked.available : "missing")
                     + " draft=" + (consolePane ? consolePane.reviewLines.length : "missing")
                     + " prep=" + fakeGate.preparations + " confirm=" + fakeGate.confirmations;
                 if (!smoke.check(consolePane && consolePane.selectionReady
                         && consolePane.targetIdentity.length>0
-                        && cpuCard && cpuCard.expanded
+                        && cpuFilter && cpuFilter.selected && memoryFilter && netFilter
+                        && selectedPanel && selectedPanel.key==="cpu"
                         && applyLocked && !applyLocked.available
                         && consolePane.reviewLines.length===0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "resource console mounts draft-only beside existing KILL controls; " + detailState)) return;
+                // All seven filter buttons must fit simultaneously in the top bar.
+                const filterButtons=["cpu","memory","swap","disk","threads","gpu","network"]
+                    .map(function(key) { return smoke.find(view,"cpuPlusResourceFilter-"+key); });
+                let lastEdge=-1;
+                let oneRow=true;
+                let selectedCount=0;
+                let filterY=0;
+                if (filterButtons.every(function(button) { return !!button; })) {
+                    filterY=filterButtons[0].mapToItem(consolePane,0,0).y;
+                    for (const button of filterButtons) {
+                        const pos=button.mapToItem(consolePane,0,0);
+                        if (!button.visible || pos.x<0 || pos.x<lastEdge-0.5
+                                || pos.x+button.width>consolePane.width+0.5
+                                || Math.abs(pos.y-filterY)>0.5 || button.width<30)
+                            oneRow=false;
+                        lastEdge=pos.x+button.width;
+                        if (button.selected) selectedCount++;
+                    }
+                } else oneRow=false;
+                if (!smoke.check(oneRow && selectedCount===1
+                        && filterButtons.every(function(button) { return !!button; }),
+                        "seven resource filters remain on one visible non-overlapping row")) return;
                 consolePane.stageMode("cpu","manual");
                 consolePane.stageNumber("cpu","nice",9);
                 if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "draft input never dispatches a process action")) return;
+                // Fire the actual filter button signal, not the root helper,
+                // to verify the same handler a pointer press reaches.
+                netFilter.leftClicked(null);
+                if (!smoke.check(consolePane.selectedKey==="network"
+                        && !cpuFilter.selected && netFilter.selected
+                        && selectedPanel.key==="network"
+                        && consolePane.reviewLines.length===1
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "top resource filters swap one editor without clearing the draft")) return;
+                cpuFilter.leftClicked(null);
+                if (!smoke.check(selectedPanel.key==="cpu" && cpuFilter.selected
+                        && consolePane.reviewLines[0].indexOf("NICE 9")>=0,
+                        "CPU draft survives category navigation")) return;
                 consolePane.reviewing=true;
                 consolePane.clearDraft();
                 if (!smoke.check(!consolePane.hasDraft && !consolePane.reviewing,

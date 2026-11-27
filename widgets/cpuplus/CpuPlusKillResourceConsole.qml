@@ -13,7 +13,21 @@ Item {
     readonly property string targetIdentity: Draft.identity(target)
     readonly property var categories: Draft.cards()
     property var staged: ({})
-    property string expandedKey: "cpu"
+    // One resource selector controls one below-panel editor, matching other
+    // Post-Apollo filter bars. Switching views does not change staged values.
+    property string selectedKey: "cpu"
+    readonly property var selectedResource: Draft.find(selectedKey)
+    function selectResource(key) {
+        if (!Draft.find(key)) return false;
+        selectedKey = key;
+        reviewing = false;
+        bodyScroll.contentY = 0;
+        return true;
+    }
+    function filterLabel(key) {
+        return ({cpu:"CPU",memory:"MEM",swap:"SWAP",disk:"DISK",
+            threads:"THR",gpu:"GPU",network:"NET"})[key] || key.toUpperCase();
+    }
     property bool reviewing: false
     readonly property var reviewLines: Draft.summary(staged)
     readonly property bool hasDraft: reviewLines.length > 0
@@ -71,11 +85,43 @@ Item {
         Rectangle { width: parent.width; height: 1; color: Colors.orange }
     }
 
+    // All resource categories remain visible in a single filter row.
+    Row {
+        id: resourceFilters
+        objectName: "cpuPlusResourceCategoryFilters"
+        anchors.top: heading.bottom
+        anchors.topMargin: 6
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 30
+        spacing: 2
+        Repeater {
+            model: root.categories
+            delegate: ActionButton {
+                required property var modelData
+                objectName: "cpuPlusResourceFilter-" + modelData.key
+                readonly property color filterInk: root.accentFor(modelData.key)
+                width: Math.max(1,(resourceFilters.width
+                    - resourceFilters.spacing * (root.categories.length-1))
+                    / root.categories.length)
+                height: resourceFilters.height
+                label: root.filterLabel(modelData.key)
+                labelPixelSize: 9
+                labelMinimumPixelSize: 7
+                contentPadding: 1
+                normalFace: true
+                selected: root.selectedKey === modelData.key
+                accentColor: filterInk
+                onLeftClicked: root.selectResource(modelData.key)
+            }
+        }
+    }
+
     Flickable {
         id: bodyScroll
         objectName: "cpuPlusResourceConsoleScroll"
-        anchors.top: heading.bottom
-        anchors.topMargin: 5
+        anchors.top: resourceFilters.bottom
+        anchors.topMargin: 6
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: footer.top
@@ -92,7 +138,6 @@ Item {
             y: 3
             width: Math.max(0,bodyScroll.width-16)
             spacing: 6
-
             Rectangle {
                 objectName: "cpuPlusResourceDraftReview"
                 width: parent.width
@@ -134,48 +179,41 @@ Item {
                 }
             }
 
-            Repeater {
-                model: root.categories
-                delegate: Rectangle {
-                    id: resourceCard
-                    required property var modelData
-                    readonly property string key: modelData.key
-                    readonly property color ink: root.accentFor(key)
-                    readonly property bool expanded: root.expandedKey === key
-                    objectName: "cpuPlusResourceCard-" + key
-                    width: cardStack.width
-                    height: cardContent.implicitHeight + 10
-                    color: Colors.black
-                    border.width: 1
-                    border.color: ink
 
-                    Column {
-                        id: cardContent
-                        x: 5; y: 5
-                        width: Math.max(0,parent.width-10)
-                        spacing: 5
-                        ActionButton {
-                            objectName: "cpuPlusResourceCardToggle-" + resourceCard.key
-                            width: parent.width
-                            height: 30
-                            label: resourceCard.modelData.title
-                                + (resourceCard.expanded ? "  [-]" : "  [+]")
-                            labelPixelSize: 11
-                            normalFace: true
-                            selected: resourceCard.expanded
-                            accentColor: resourceCard.ink
-                            onLeftClicked: {
-                                root.expandedKey = resourceCard.expanded ? "" : resourceCard.key;
-                            }
-                        }
+            // Exactly one editor is instantiated below the filter row.
+            Rectangle {
+                id: resourcePanel
+                objectName: "cpuPlusResourceSelectedPanel"
+                readonly property var spec: root.selectedResource
+                readonly property string key: root.selectedKey
+                readonly property color ink: root.accentFor(key)
+                width: cardStack.width
+                height: detailContent.implicitHeight + 10
+                color: Colors.black
+                border.width: 1
+                border.color: ink
+
+                Column {
+                    id: detailContent
+                    x: 5
+                    y: 5
+                    width: Math.max(0,parent.width-10)
+                    spacing: 5
+                    GohuText {
+                        width: parent.width
+                        text: resourcePanel.spec.title + " // CONTROLS"
+                        color: resourcePanel.ink
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
                         Column {
                             width: parent.width
-                            visible: resourceCard.expanded
+                            visible: true
                             spacing: 5
                             GohuText {
                                 width: parent.width
-                                text: resourceCard.modelData.scope
-                                color: resourceCard.ink
+                                text: resourcePanel.spec.scope
+                                color: resourcePanel.ink
                                 font.pixelSize: 9
                                 wrapMode: Text.Wrap
                             }
@@ -189,8 +227,8 @@ Item {
                             Row {
                                 id: modeRow
                                 width: parent.width
-                                height: resourceCard.modelData.controls.length ? 26 : 0
-                                visible: resourceCard.modelData.controls.length > 0
+                                height: resourcePanel.spec.controls.length ? 26 : 0
+                                visible: resourcePanel.spec.controls.length > 0
                                 spacing: 3
                                 Repeater {
                                     model: ["off","manual","auto","hold"]
@@ -199,24 +237,24 @@ Item {
                                         width: Math.max(1,(modeRow.width-9)/4)
                                         height: 26
                                         normalFace: true
-                                        accentColor: resourceCard.ink
+                                        accentColor: resourcePanel.ink
                                         label: modelData.toUpperCase()
                                         labelPixelSize: 9
                                         contentPadding: 1
-                                        selected: root.modeFor(resourceCard.key) === modelData
+                                        selected: root.modeFor(resourcePanel.key) === modelData
                                         available: root.selectionReady
-                                        onLeftClicked: root.stageMode(resourceCard.key,modelData)
+                                        onLeftClicked: root.stageMode(resourcePanel.key,modelData)
                                     }
                                 }
                             }
                             GohuText {
                                 width: parent.width
-                                visible: resourceCard.modelData.controls.length > 0
-                                text: root.modeFor(resourceCard.key) === "auto"
+                                visible: resourcePanel.spec.controls.length > 0
+                                text: root.modeFor(resourcePanel.key) === "auto"
                                     ? "AUTO // POLICY NOT CONFIGURED; DRAFT ONLY"
-                                    : root.modeFor(resourceCard.key) === "off"
+                                    : root.modeFor(resourcePanel.key) === "off"
                                     ? "OFF // DRAFT CHOICE; NO LIMIT RELEASED"
-                                    : root.modeFor(resourceCard.key) === "hold"
+                                    : root.modeFor(resourcePanel.key) === "hold"
                                     ? "HOLD // NO CHANGES REQUESTED"
                                     : "MANUAL // VALUES BELOW ARE STAGED ONLY"
                                 color: Colors.white
@@ -224,31 +262,31 @@ Item {
                                 wrapMode: Text.Wrap
                             }
                             Repeater {
-                                model: resourceCard.modelData.controls
+                                model: resourcePanel.spec.controls
                                 delegate: Column {
                                     id: field
                                     required property var modelData
                                     width: modeRow.width
                                     spacing: 2
-                                    visible: root.modeFor(resourceCard.key) === "manual"
+                                    visible: root.modeFor(resourcePanel.key) === "manual"
                                     CpuPlusDiagnosticSlider {
-                                        objectName: "cpuPlusDraftSlider-" + resourceCard.key + "-" + field.modelData.key
+                                        objectName: "cpuPlusDraftSlider-" + resourcePanel.key + "-" + field.modelData.key
                                         width: field.width
                                         height: 52
                                         compact: true
                                         title: field.modelData.title
                                         shortTitle: title
-                                        readout: String(root.valueFor(resourceCard.key,field.modelData.key))
+                                        readout: String(root.valueFor(resourcePanel.key,field.modelData.key))
                                             + " " + field.modelData.unit
                                         minimumValue: field.modelData.min
                                         maximumValue: field.modelData.max
                                         valueStep: field.modelData.step
-                                        currentValue: root.valueFor(resourceCard.key,field.modelData.key)
-                                        subjectColor: resourceCard.ink
-                                        fillColor: resourceCard.ink
+                                        currentValue: root.valueFor(resourcePanel.key,field.modelData.key)
+                                        subjectColor: resourcePanel.ink
+                                        fillColor: resourcePanel.ink
                                         adjustable: root.selectionReady
                                         onValueRequested: function(value) {
-                                            root.stageNumber(resourceCard.key,field.modelData.key,Number(value));
+                                            root.stageNumber(resourcePanel.key,field.modelData.key,Number(value));
                                         }
                                     }
                                     Row {
@@ -264,10 +302,10 @@ Item {
                                             font.pixelSize: 9
                                         }
                                         TextField {
-                                            objectName: "cpuPlusDraftInput-" + resourceCard.key + "-" + field.modelData.key
+                                            objectName: "cpuPlusDraftInput-" + resourcePanel.key + "-" + field.modelData.key
                                             width: 92
                                             height: 26
-                                            text: String(root.valueFor(resourceCard.key,field.modelData.key))
+                                            text: String(root.valueFor(resourcePanel.key,field.modelData.key))
                                             color: Colors.white
                                             font.pixelSize: 11
                                             horizontalAlignment: TextInput.AlignHCenter
@@ -280,13 +318,13 @@ Item {
                                             background: Rectangle {
                                                 color: Colors.black
                                                 border.width: 1
-                                                border.color: resourceCard.ink
+                                                border.color: resourcePanel.ink
                                             }
                                             onEditingFinished: {
                                                 if (acceptableInput)
-                                                    root.stageNumber(resourceCard.key,field.modelData.key,Number(text));
+                                                    root.stageNumber(resourcePanel.key,field.modelData.key,Number(text));
                                                 else
-                                                    text = String(root.valueFor(resourceCard.key,field.modelData.key));
+                                                    text = String(root.valueFor(resourcePanel.key,field.modelData.key));
                                             }
                                         }
                                     }
@@ -294,21 +332,20 @@ Item {
                             }
                             GohuText {
                                 width: parent.width
-                                text: resourceCard.modelData.note
+                                text: resourcePanel.spec.note
                                 color: Colors.orange
                                 wrapMode: Text.Wrap
                                 font.pixelSize: 9
                             }
                             GohuText {
                                 width: parent.width
-                                visible: resourceCard.modelData.controls.length === 0
+                                visible: resourcePanel.spec.controls.length === 0
                                 text: "OBSERVATION ONLY // NO PROCESS ACTUATOR"
                                 color: Colors.white
                                 wrapMode: Text.Wrap
                                 font.pixelSize: 10
                             }
                         }
-                    }
                 }
             }
         }

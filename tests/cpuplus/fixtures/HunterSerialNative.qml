@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell
-import "widgets/appcontrol"
+import "services/kill"
 
 ShellRoot {
     id: root

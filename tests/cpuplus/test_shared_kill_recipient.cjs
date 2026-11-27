@@ -656,15 +656,25 @@ test("K3c.2a: shared bulk review is immutable and consumed only by exact referen
     assert.equal(api.current(),null);
 });
 
-test("K3c.2b-1: one service-owned Hunter executor retains donor admission and result routing", () => {
+test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results without donor relays", () => {
     const store=read("services/kill/KillStore.qml");
     const owner=read("widgets/AppControlW.qml");
+    const controller=read("services/kill/HunterOperationController.qml");
     assert.equal((store.match(/^\s*HunterExecutor\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*HunterOperationController\s*\{/gm)||[]).length,1);
     assert.match(store,/readonly property var hunterExecutor: hunterExecution/);
-    assert.doesNotMatch(owner,/^\s*HunterExecutor\s*\{/m);
+    assert.match(store,/readonly property var hunterOperation: hunterController/);
+    assert.doesNotMatch(owner,/^\s*(HunterExecutor|HunterOperationController)\s*\{/m);
     assert.match(owner,/readonly property var hunterExecutor: KillBackend\.KillStore\.hunterExecutor/);
-    assert.match(owner,/HunterOperationController\s*\{\s*id: hunterOperationController[\s\S]*?executor: hunterExecutor/);
-    assert.match(owner,/Connections\s*\{\s*target: appControlWindow\.hunterExecutor\s*function onResultReady\(result\)\s*\{\s*appControlWindow\.applyHunterOperationResult\(result\)/);
-    assert.match(owner,/function onFinished\(\)\s*\{\s*appControlWindow\.finishHunterOperation\(\)/);
-    assert.match(owner,/function onErrorRaised\(message\)\s*\{\s*console\.log\("AppControl: HUNTER"/);
+    assert.match(owner,/readonly property var hunterOperationController: KillBackend\.KillStore\.hunterOperation/);
+    assert.match(store,/HunterOperationController\s*\{\s*id: hunterController[\s\S]*?executor: hunterExecution/);
+    assert.match(store,/onResultReady: function\(result\) \{ hunterController\.applyResult\(result\); \}/);
+    assert.match(store,/onFinished: hunterController\.finish\(\)/);
+    assert.match(store,/onErrorRaised: function\(message\)/);
+    assert.match(owner,/property: "donorHunterHost"\s*value: appControlWindow/);
+    assert.match(owner,/property: "donorHunterFavorites"\s*value: appControlWindow\.favoriteStore/);
+    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!host \|\| !favoriteStoreObject\) return;/);
+    assert.match(controller,/if \(!host \|\| !favoriteStoreObject\) \{ stopRemaining\(\); return; \}/);
+    assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
+    assert.doesNotMatch(owner,/property alias hunterOperation/);
 });

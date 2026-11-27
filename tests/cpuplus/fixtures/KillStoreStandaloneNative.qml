@@ -83,6 +83,10 @@ ShellRoot {
         const reused={pid:4321,startTicks:98766,comm:"sway",user:"synthetic"};
         const unknown={pid:4321,startTicks:0,comm:"sway",user:"synthetic"};
         const safety=first.store.safety;
+        // With no donor policy installed, even a syntactically valid synthetic
+        // capture must not start a hunt or arm the executor.
+        first.store.hunterOperation.start("kill-all", [{
+            pid:4321,startTicks:98765,name:"sway",identity:"synthetic"}],true);
         if (safety !== second.store.safety
                 || first.store.control !== second.store.control
                 || first.store.limits !== second.store.limits
@@ -90,6 +94,10 @@ ShellRoot {
                 || first.store.hunterExecutor.running
                 || first.store.hunterExecutor.expectedTarget !== null
                 || first.store.hunterExecutor.completionVerified
+                || first.store.hunterOperation !== second.store.hunterOperation
+                || first.store.hunterOperation.phase !== "idle"
+                || first.store.hunterOperation.host !== null
+                || first.store.hunterOperation.favoriteStoreObject !== null
                 || !safety.requiresDangerUnlock(old)
                 || first.store.limits.applyLoading
                 || first.store.limits.activeRequest !== null

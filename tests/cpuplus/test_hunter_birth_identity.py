@@ -9,7 +9,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 EXECUTOR = (ROOT / "services/system/HunterExecutor.qml").read_text()
-CONTROLLER = (ROOT / "widgets/appcontrol/HunterOperationController.qml").read_text()
+CONTROLLER = (ROOT / "services/kill/HunterOperationController.qml").read_text()
 SCRIPT = json.loads(re.search(
     r'function script\(\)\s*\{\s*return ("(?:\\.|[^"\\])*");', EXECUTOR
 ).group(1))

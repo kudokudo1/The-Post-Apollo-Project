@@ -454,6 +454,31 @@ ShellRoot {
                     && FavoritesService.isFavoriteKey("app|fixture-sentinel"),
                     "process favorite removal preserves other membership")) return;
                 FavoritesService.toggleFavoriteKey("app|fixture-sentinel");
+                // Exercise each real controller signal independently. The
+                // donor's selective repaint is the authority, not the old CPU++ path.
+                const revisions = () => [detail.cpuCanvas.graphRevision,
+                    detail.memCanvas.graphRevision, detail.combiScoreCanvas.graphRevision];
+                const delta = before => JSON.stringify(revisions().map((n,i)=>n-before[i]));
+                let before = revisions();
+                fakeGraph.repaintCpuMem(false);
+                if (!smoke.check(delta(before)==="[1,1,0]",
+                    "donor parity: CPU/MEM repaint excludes COMBI")) return;
+                before = revisions();
+                fakeGraph.repaintCpu(false);
+                if (!smoke.check(delta(before)==="[1,0,0]",
+                    "donor parity: CPU-only repaint")) return;
+                before = revisions();
+                fakeGraph.repaintAll(false);
+                if (!smoke.check(delta(before)==="[1,1,1]",
+                    "donor parity: full repaint")) return;
+                before = revisions();
+                fakeGraph.prepareCpuMemAppend();
+                if (!smoke.check(delta(before)==="[1,1,0]",
+                    "donor parity: CPU/MEM append preparation")) return;
+                before = revisions();
+                fakeGraph.prepareCombiAppend();
+                if (!smoke.check(delta(before)==="[0,0,1]",
+                    "donor parity: COMBI append preparation")) return;
                 info.open=true;
                 const initial=detail.cpuCanvas.graphRevision;
                 fakeOwner.taskRows=[Object.assign({},fakeOwner.taskRows[0],{cpu:24,cpuInstant:37,mem:7})];

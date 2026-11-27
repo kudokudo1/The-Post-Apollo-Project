@@ -24,7 +24,7 @@ Scope {
     function selectComparison(side, reportId) {
         if (archiveBusy || archiveStatus !== "READY") return false;
         const row = archiveRows.find(item => item.id === reportId);
-        if (!row || row.status !== "COMPLETE" || ["workflow","stall"].includes(row.kind)) return false;
+        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu"].includes(row.kind)) return false;
         if (side === "before") compareBeforeId = row.id;
         else if (side === "after") compareAfterId = row.id;
         else return false;

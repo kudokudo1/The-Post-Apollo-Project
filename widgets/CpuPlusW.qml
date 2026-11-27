@@ -3375,6 +3375,7 @@ PanelWindow {
             graphSource: KillBackend.KillStore.graphState
             graphController: KillBackend.KillStore.graphController
             graphSession: KillBackend.KillStore.detailSession
+            collectionSource: KillBackend.KillStore
             instrumentWidth: sharedInstrumentPane.width
             targetWidth: targetPane.width
             appControlWindow: cpuPlusWindow.appControlWindow

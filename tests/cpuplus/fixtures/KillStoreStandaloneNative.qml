@@ -89,8 +89,20 @@ ShellRoot {
         first.store.graphController.updateMiniCpuHistories(next);
         first.store.graphController.updateMiniHunterMetricHistories(next);
         first.graphState.taskMiniDisplayRevision += 1;
-        if (!verifySession()
-                || first.store !== second.store
+        // Real singleton remains disarmed throughout this synthetic test.
+        first.store.cpuVisible=true;
+        const cpuCadence=first.store.snapshotInterval===600 && first.store.miniProbeNeeded;
+        first.store.cpuVisible=false;
+        first.store.donorResourceVisible=true;
+        const resourceCadence=first.store.snapshotInterval===900 && !first.store.miniProbeNeeded;
+        first.store.donorResourceVisible=false;
+        first.store.donorFavoritesVisible=true;
+        first.store.donorCombiVisible=true;
+        const combiCadence=first.store.snapshotInterval===1800 && first.store.miniProbeNeeded;
+        first.store.donorFavoritesVisible=false;
+        first.store.donorCombiVisible=false;
+        if (!verifySession() || !cpuCadence || !resourceCadence || !combiCadence
+                || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry
                 || first.graphState !== second.graphState
                 || first.store.graphController !== second.store.graphController

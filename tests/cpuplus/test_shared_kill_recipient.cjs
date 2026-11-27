@@ -23,8 +23,10 @@ test("CPU++ PROCESS mounts the existing Kill detail only while active", () => {
 });
 
 test("recipient uses live owner rows and never historical diagnostic census", () => {
-    assert.match(recipient, /appControlWindow\.taskRows/);
-    assert.match(recipient, /appControlWindow\.refreshTaskManager\(\)/);
+    assert.match(recipient, /collectionSource\.rows/);
+    assert.match(recipient, /collectionSource\.refreshSnapshot\(\)/);
+    assert.match(host,/collectionSource: KillBackend\.KillStore/);
+    assert.doesNotMatch(recipient,/appControlWindow\.(taskRows|refreshTaskManager)/);
     assert.match(recipient, /row\._taskRecord === true/);
     assert.match(recipient, /Number\(row\.startTicks\) === selectedStartTicks/);
     assert.match(recipient, /String\(row\.comm \|\| ""\) === selectedComm/);
@@ -129,10 +131,14 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.match(shell,/AppControlW\s*\{[\s\S]*?cpuPlusProcessVisible:\s*cpuPlusWindow\.menuOpen\s*&& cpuPlusWindow\.selectedModeIndex === 1/);
     assert.match(owner,/property bool cpuPlusProcessVisible: false/);
     assert.match(owner,/property: "graphVisible"\s*value: appControlWindow\.menuOpen\s*\|\| appControlWindow\.cpuPlusProcessVisible/);
-    assert.match(owner,/function taskMiniProbeNeeded\(\) \{\s*return cpuPlusProcessVisible\s*\|\| \(menuOpen/);
-    assert.match(owner,/id: taskManagerRefreshTimer[\s\S]*?interval:\s*appControlWindow\.cpuPlusProcessVisible\s*\? 600/);
-    assert.match(owner,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: appControlWindow\.taskMiniProbeNeeded\(\)/);
+    assert.match(owner,/function taskMiniProbeNeeded\(\) \{\s*return KillBackend\.KillStore\.miniProbeNeeded/);
+    assert.match(shell,/property: "cpuVisible"\s*value: cpuPlusWindow\.menuOpen && cpuPlusWindow\.selectedModeIndex === 1/);
+    assert.match(shell,/KillBackend\.KillStore\.collectionEnabled = true/);
+    assert.doesNotMatch(owner,/id: taskManagerRefreshTimer|id: taskMiniDisplayTimer|id: taskRefreshAfterKillTimer/);
     const store=read("services/kill/KillStore.qml");
+    assert.match(store,/id: taskManagerRefreshTimer[\s\S]*?interval: root.snapshotInterval[\s\S]*?running: root.collectionEnabled/);
+    assert.match(store,/id: taskMiniDisplayTimer[\s\S]*?interval: 1200[\s\S]*?running: root.collectionEnabled && root.miniProbeNeeded/);
+    assert.match(store,/id: afterAction[\s\S]*?interval: 320/);
     assert.match(store,/^pragma Singleton/m);
     assert.equal((store.match(/^\s*ProcessTelemetry\s*\{/gm)||[]).length,1);
     assert.doesNotMatch(owner,/^\s*ProcessTelemetry\s*\{/m);
@@ -460,4 +466,26 @@ test("detail parser refuses wrong birth and generation before advancing counters
     p.stale();
     assert.equal(p.parseDetailProbe("4321 200 2048 100000 100 4 2000 98765 1001"),null);
     assert.deepEqual(p.counters(),[100,1000,1000]);
+});
+
+test("K2c preserves all snapshot cadence priorities and mini request data", () => {
+    const source=read("services/kill/KillStore.qml");
+    const extract=(name,next)=>source.slice(source.indexOf("    function "+name+"("),source.indexOf("    function "+next+"("));
+    const cadence=new Function(extract("snapshotCadence","refreshSnapshot")+"\nreturn snapshotCadence;")();
+    const mini=new Function(extract("miniRequestForRows","refreshMiniProbe")+"\nreturn miniRequestForRows;")();
+    for(const [args,want] of [
+        [[true,true,true,true,true,0,48,true],600],
+        [[false,true,true,true,true,0,48,true],900],
+        [[false,false,true,false,true,0,48,true],600],
+        [[false,false,false,true,true,0,48,true],600],
+        [[false,false,false,false,true,0,48,true],1800],
+        [[false,false,false,false,false,47,48,true],700],
+        [[false,false,false,false,false,48,48,true],1400],
+        [[false,false,false,false,false,48,48,false],3200]
+    ]) assert.equal(cadence(...args),want);
+    assert.deepEqual(mini([null,{pid:1},{pid:4321,comm:"synthetic",cpu:5,cpuInstant:31},
+        {pid:4322,name:"fallback",cpu:4}]),[
+        {pid:4321,comm:"synthetic",fallbackCpu:31},{pid:4322,comm:"fallback",fallbackCpu:4}]);
+    assert.match(source,/property bool collectionEnabled: false/);
+    assert.match(source,/if \(collectionEnabled\) sampler.refreshSnapshot\(\)/);
 });

@@ -14,6 +14,7 @@ import "widgets/notifications"
 
 import "services/weather"
 import "services/system"
+import "services/kill" as KillBackend
 import "services/audio" as AudioOwner
 import qs.services.hub
 import qs.services.location
@@ -33,6 +34,12 @@ import Qt5Compat.GraphicalEffects
 
 PanelWindow {
     id: shellRoot
+
+    Binding {
+        target: KillBackend.KillStore
+        property: "cpuVisible"
+        value: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 1
+    }
 
     // Keep the idle diagnostic session referenced by the root, not a transient pane.
     readonly property var diagnosticSessionOwner: CpuPlusDiagnostics
@@ -60,6 +67,8 @@ PanelWindow {
     // explicit process restart instead of in-process hot reload.
     Component.onCompleted: {
         Quickshell.watchFiles = false;
+        // Preserve one warm collector, now independent of widget visibility.
+        KillBackend.KillStore.collectionEnabled = true;
     }
 
     // User-Sway hotkeys: the system-owned bootstrap performs an isolated,

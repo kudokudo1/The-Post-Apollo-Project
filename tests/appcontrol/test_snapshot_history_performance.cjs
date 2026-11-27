@@ -450,8 +450,9 @@ test('mini graph scroll moves one trace layer, not every rectangle', () => {
     assert.match(trace, /root\.graphPoints.length - 1/);
     // The polling, history and destructive-action owners remain outside this
     // presentation change. Never reduce safety refreshes to improve rendering.
-    assert.match(app, /\? 600\s*:\s*appControlWindow.menuOpen/);
-    assert.match(app, /id: taskMiniDisplayTimer[\s\S]*?interval: 1200/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    assert.match(store, /if \(cpu\) return 600;/);
+    assert.match(store, /id: taskMiniDisplayTimer[\s\S]*?interval: 1200/);
 });
 
 test('explicit Kill ranking snapshots score once per eligible task and retains legacy order', () => {
@@ -679,7 +680,7 @@ test('opening substages and runtime KILL work remain opt-in and keep existing op
     assert.match(app,/return diagnosticCaptureActive && menuOpen && selectedModeIndex === killModeIndex/);
     assert.match(app,/if \(!startMs \|\| !killDiagnosticActive\(\)\)\s*return/);
     assert.match(app,/traceKillWork\("snapshot-selection", selectionStart\)/);
-    const mini=app.slice(app.indexOf('    function applyTaskMiniProbeRows('),app.indexOf('    Timer {',app.indexOf('    function applyTaskMiniProbeRows(')));
+    const mini=app.slice(app.indexOf('    function applyTaskMiniProbeRows('),app.indexOf('    // All collection scheduling',app.indexOf('    function applyTaskMiniProbeRows(')));
     assert.match(mini,/updateTaskMiniCpuHistories\(samples\);[\s\S]*?traceKillWork\("mini-cpu-history"[\s\S]*?updateTaskMiniHunterMetricHistories\(samples\);[\s\S]*?traceKillWork\("mini-hunter-history"[\s\S]*?taskMiniDisplayRevision \+= 1;[\s\S]*?traceKillWork\("mini-history-revisions"/);
 });
 

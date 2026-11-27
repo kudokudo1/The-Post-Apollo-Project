@@ -865,6 +865,48 @@ PanelWindow {
     readonly property var hunterPresentation: KillBackend.KillStore.hunterPresentation
     readonly property var taskGraphController: KillBackend.KillStore.graphController
     readonly property var killDetailSession: KillBackend.KillStore.detailSession
+    readonly property var taskRefreshAfterKillTimer: KillBackend.KillStore.refreshAfterActionTimer
+    // Temporary demand adapter for modes that still reside in AppControl.
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorResourceVisible"
+        value: appControlWindow.menuOpen
+            && (appControlWindow.selectedResultIsApplication()
+                || appControlWindow.selectedResultIsWindow()
+                || appControlWindow.selectedResultIsTab())
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorKillVisible"
+        value: appControlWindow.menuOpen
+            && appControlWindow.selectedModeIndex === appControlWindow.killModeIndex
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorFavoritesVisible"
+        value: appControlWindow.menuOpen
+            && appControlWindow.selectedModeIndex === appControlWindow.favoritesModeIndex
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorFavoriteTasksVisible"
+        value: appControlWindow.menuOpen
+            && appControlWindow.selectedModeIndex === appControlWindow.favoritesModeIndex
+            && appControlWindow.favoritesScopeMode === appControlWindow.favoritesScopeFavorites
+            && appControlWindow.hasTaskFavorites()
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorCombiVisible"
+        value: appControlWindow.menuOpen
+            && appControlWindow.selectedModeIndex === appControlWindow.favoritesModeIndex
+            && appControlWindow.favoritesScopeMode === appControlWindow.favoritesScopeCombi
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "hasTaskFavorites"
+        value: appControlWindow.hasTaskFavorites()
+    }
     Binding {
         target: appControlWindow.killDetailSession
         property: "donorActive"
@@ -1694,7 +1736,7 @@ PanelWindow {
     // The single selected-detail timer and sample acceptance live in KillStore.
 
     function refreshTaskManager() {
-        processTelemetry.refreshSnapshot();
+        KillBackend.KillStore.refreshSnapshot();
     }
 
 
@@ -2596,39 +2638,7 @@ PanelWindow {
     }
 
     function taskMiniProbeNeeded() {
-        return cpuPlusProcessVisible
-               || (menuOpen
-                   && (selectedModeIndex === killModeIndex
-                       || selectedModeIndex === favoritesModeIndex));
-    }
-
-
-
-    function refreshTaskMiniProbe() {
-        if (!taskMiniProbeNeeded() || taskMiniProbeLoading)
-            return;
-
-        const request = [];
-
-        for (let i = 0; i < taskRows.length; i++) {
-            const entry = taskRows[i];
-            const pid = Number(entry && entry.pid || 0);
-
-            if (pid <= 1)
-                continue;
-
-            request.push({
-                pid: pid,
-                comm: String(entry.comm || entry.name || entry.label || "PROCESS"),
-                fallbackCpu: Number(
-                    entry.cpuInstant !== undefined
-                    ? entry.cpuInstant
-                    : entry.cpu || 0
-                )
-            });
-        }
-
-        processTelemetry.refreshMiniProbe(request);
+        return KillBackend.KillStore.miniProbeNeeded;
     }
 
     function applyTaskMiniProbeRows(rows) {
@@ -2649,67 +2659,7 @@ PanelWindow {
         }
     }
 
-    Timer {
-        id: taskManagerRefreshTimer
-
-        // Preload a complete 48-sample mini-graph window even while AppControl
-        // is closed. After warm-up, use a gentler hidden cadence; entering KILL
-        // or task FAVORITES immediately returns to the normal live cadence.
-        interval:
-            appControlWindow.cpuPlusProcessVisible
-            ? 600
-            : appControlWindow.menuOpen
-            && (appControlWindow.selectedResultIsApplication()
-                || appControlWindow.selectedResultIsWindow()
-                || appControlWindow.selectedResultIsTab())
-            ? 900
-            : appControlWindow.menuOpen
-              && appControlWindow.selectedModeIndex === appControlWindow.killModeIndex
-            ? 600
-            : appControlWindow.menuOpen
-              && appControlWindow.selectedModeIndex === appControlWindow.favoritesModeIndex
-              && appControlWindow.favoritesScopeMode === appControlWindow.favoritesScopeFavorites
-              && appControlWindow.hasTaskFavorites()
-            ? 600
-            : appControlWindow.menuOpen
-              && appControlWindow.selectedModeIndex === appControlWindow.favoritesModeIndex
-              && appControlWindow.favoritesScopeMode === appControlWindow.favoritesScopeCombi
-            ? 1800
-            : appControlWindow.taskMiniPreloadSnapshots
-              < appControlWindow.taskMiniPreloadTarget
-            ? 700
-            : appControlWindow.hasTaskFavorites()
-            ? 1400
-            : 3200
-
-        repeat: true
-        running: true
-        triggeredOnStart: true
-
-        onTriggered: appControlWindow.refreshTaskManager()
-    }
-
-    Timer {
-        id: taskMiniDisplayTimer
-
-        // v31: mini graphs remain slightly slower than the detail graph so they
-        // retain a useful short-term comparison without feeling disconnected.
-        interval: 1200
-        repeat: true
-        running: appControlWindow.taskMiniProbeNeeded()
-        triggeredOnStart: true
-
-        onTriggered: appControlWindow.refreshTaskMiniProbe()
-    }
-
-    Timer {
-        id: taskRefreshAfterKillTimer
-
-        interval: 320
-        repeat: false
-
-        onTriggered: appControlWindow.refreshTaskManager()
-    }
+    // All collection scheduling and delayed action refresh now live in KillStore.
 
     // Exact visible spacing between app rows and their neighboring edges.
     property int appSelectorRowGap: 6

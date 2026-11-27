@@ -335,6 +335,18 @@ ShellRoot {
                     return;
                 }
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
+                const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");
+                const identityText=smoke.find(view,"cpuPlusProcessIdentityText");
+                const name=smoke.find(view,"cpuPlusProcessIdentityName");
+                const metadata=smoke.find(view,"cpuPlusProcessIdentityMetadata");
+                const stateLabel=smoke.find(view,"cpuPlusProcessStateLabel");
+                const gutter=smoke.find(view,"cpuPlusProcessGlowGutter");
+                if (!smoke.check(glyph && identityText && name && metadata && stateLabel && gutter
+                    && glyph.x+glyph.width<=identityText.x
+                    && Math.abs(glyph.y+glyph.height/2-identityText.y-identityText.height/2)<1
+                    && glyph.layer.enabled && name.layer.enabled && metadata.layer.enabled && stateLabel.layer.enabled
+                    && gutter.x>=8 && gutter.y>=8,
+                    "red identity glyph beside centered glowing text and graph halo gutter")) return;
                 const master=smoke.find(view,"cpuPlusProcessMasterLock");
                 const actionTarget=smoke.find(view,"cpuPlusSharedActionTarget");
                 const quick=smoke.find(view,"cpuPlusProcessHeaderActions");
@@ -667,6 +679,7 @@ ShellRoot {
                 if (!smoke.check(panel.visible && panel.parent===right && panel.y===5
                     && detail.visible && confirm.available && cancel.available && cancel.normalFace
                     && Qt.colorEqual(cancel.idleForegroundColor,"#DCF3FA")
+                    && Qt.colorEqual(cancel.hoverFillColor,Colors.yellow)
                     && Math.abs(panel.height-cancel.mapToItem(panel,0,cancel.height).y-5)<1
                     && smoke.find(view,"cpuPlusKillInstrumentViewport").contentY===smoke.priorInstrumentY
                     && JSON.stringify(smoke.instrumentGeometry(view))===JSON.stringify(smoke.priorReviewGeometry),

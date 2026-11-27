@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'components/PrismButton.qml'
+      - 'components/PrismBorderGlow.qml'
       - 'components/PrismArtwork.js'
       - 'tests/components/prism_native/**'
       - '.github/workflows/prism-native-render.yml'
@@ -38,18 +39,18 @@ jobs:
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
-          trap 'rm -rf "$work"; rm -f /tmp/prism-render-composite.png /tmp/prism-render-idle.png' EXIT
+          trap 'rm -rf "$work"; rm -f /tmp/prism-render-composite.png /tmp/prism-render-idle.png /tmp/prism-render-spectrum.png' EXIT
           export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/run"
           mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
           scene="$work/config/prism"
           mkdir -p "$scene/components"
           cp tests/components/prism_native/shell.qml "$scene/shell.qml"
-          for name in ActionButton PrismButton PrismArtwork Colors VisualLanguage GohuText SafeDropShadow; do
+          for name in ActionButton PrismButton PrismBorderGlow PrismArtwork Colors VisualLanguage GohuText SafeDropShadow; do
             if [ "$name" = PrismArtwork ]; then ext=js; else ext=qml; fi
             cp "components/$name.$ext" "$scene/components/$name.$ext"
           done
-          grep -E '^(singleton Colors|singleton VisualLanguage|ActionButton|PrismButton|GohuText|SafeDropShadow) ' components/qmldir > "$scene/components/qmldir"
+          grep -E '^(singleton Colors|singleton VisualLanguage|ActionButton|PrismButton|PrismBorderGlow|GohuText|SafeDropShadow) ' components/qmldir > "$scene/components/qmldir"
           timeout --signal=TERM --kill-after=3s 18s quickshell --path "$scene/shell.qml" --no-color --log-rules "$QT_LOGGING_RULES" 2>&1 | tee "$work/output"
           grep -q PRISM_NATIVE_DONE "$work/output"
           if grep -q PRISM_NATIVE_FAIL "$work/output"; then exit 1; fi
@@ -71,4 +72,17 @@ jobs:
                     f"state_changed_pixels={differences}",flush=True)
               if colorful<40 or differences<25:
                   raise SystemExit("Prism glow failed to brighten in the actual native composite")
+          with Image.open("/tmp/prism-render-spectrum.png") as original:
+              im=original.convert("RGB")
+              # Sample 3px outside the edge at each corner, rather than
+              # the white edge itself. A monochrome halo must fail.
+              corners=[im.getpixel((9,9)),im.getpixel((140,9)),
+                       im.getpixel((9,190)),im.getpixel((140,190))]
+              tl,tr,bl,br=corners
+              print("PRISM_NATIVE_SPECTRUM_CORNERS",corners,flush=True)
+              if not (tl[1]>tl[0]+8 and tl[2]>tl[0]+8 and
+                      tr[0]>tr[1]+8 and tr[2]>tr[1]+8 and
+                      bl[0]>bl[1]+8 and bl[1]>bl[2]+8 and
+                      br[1]>br[0]+8 and br[2]>br[0]+8):
+                  raise SystemExit("Prism rectangular halo missing or spectral corner orientation wrong")
           PY

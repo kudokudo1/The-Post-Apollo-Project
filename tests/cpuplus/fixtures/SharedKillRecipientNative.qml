@@ -525,13 +525,33 @@ ShellRoot {
                 if (!smoke.check(mini && mini.historyValues.length===3 && mini.historyValues[2]===37
                     && mini.graphScrollOffset>0 && detail.cpuCanvas.graphScrollOffset>0,
                     "same-length mini snapshot and main graph both animate after publication")) return;
-                for (const [metric,expected] of [["rss",23456/1024],["threads",29],["io",1024/1048576],["age",55/60]]) {
+                const viewport=smoke.find(view,"cpuPlusKillInstrumentViewport");
+                const footer=smoke.find(view,"cpuPlusQuickControlFooter");
+                const footerY=footer.mapToItem(view,0,0).y;
+                if (!smoke.check(!viewport.interactive && viewport.contentHeight===viewport.height
+                        && footer.visible && detail.limitSlider.visible
+                        && footer.mapToItem(view,0,footer.height).y<=viewport.mapToItem(view,0,viewport.height).y,
+                        "fixed quick controls within non-scrolling viewport")) return;
+                // Select through the actual metric card signal, verify the
+                // extra renderer mounts and that quick controls do not move.
+                for (const [metric,card,expected] of [["rss","rss",23456/1024],["threads","threads",29],["io","io",1024/1048576],["age","uptime",55/60]]) {
+                    const toggle=smoke.find(view,"taskMetricToggle-"+card);
+                    if (!smoke.check(toggle && toggle.enabled,"metric toggle "+card)) return;
+                    toggle.clicked(null);
                     const extra=smoke.find(view,"cpuPlusDetailGraph-"+metric);
-                    if (!smoke.check(extra && extra.historyValues.length===1
+                    if (!smoke.check(view.selectedGraphKeys.length<=2 && extra
+                        && extra.historyValues.length===1
                         && Math.abs(extra.historyValues[0]-expected)<0.00001
-                        && extra.historyLimit===132 && extra.scrollDuration===920,
-                        "extra observed graph "+metric)) return;
+                        && extra.historyLimit===132 && extra.scrollDuration===920
+                        && Math.abs(footer.mapToItem(view,0,0).y-footerY)<1,
+                        "selected observed graph "+metric)) return;
                 }
+                view.selectedGraphKeys=["cpu","mem"];
+                if (!smoke.check(!smoke.find(view,"cpuPlusDetailGraph-rss")
+                    && !smoke.find(view,"cpuPlusDetailGraph-threads")
+                    && !smoke.find(view,"cpuPlusDetailGraph-io")
+                    && !smoke.find(view,"cpuPlusDetailGraph-age"),
+                    "unselected extra graph renderers released")) return;
                 smoke.previousMiniOffset=mini.graphScrollOffset;
                 smoke.previousCpuOffset=detail.cpuCanvas.graphScrollOffset;
                 // Test-only long scope injection. The actual hosts retain their

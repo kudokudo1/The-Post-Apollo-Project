@@ -167,19 +167,30 @@ def history_public_fixture_in_transaction(journal, requested, *, current):
         _integer(last)
         if last > requested.revision or requested.after > last:
             raise ContextRefusal("INVALID_CURSOR")
-        rows = db.execute(
-            "SELECT turn_id,ordinal,role,body,provider_key,model_key,recorded_at_ms "
-            "FROM forest_turns WHERE session_id=? AND ordinal>? "
+        # Validate the page and its lookahead using ordinals only. The
+        # extra row proves continuity but its body is not part of this page.
+        ordinals = db.execute(
+            "SELECT ordinal FROM forest_turns WHERE session_id=? AND ordinal>? "
             "ORDER BY ordinal LIMIT ?",
             (requested.session_id, requested.after, requested.limit + 1),
         ).fetchall()
+        if (len(ordinals) != min(last - requested.after, requested.limit + 1)
+                or any(r[0] != requested.after + i + 1
+                       for i, r in enumerate(ordinals))):
+            raise ContextRefusal("INVALID_HISTORY_ORDER")
+        selected = ordinals[:requested.limit]
+        rows = []
+        if selected:
+            rows = db.execute(
+                "SELECT turn_id,ordinal,role,body,provider_key,model_key,recorded_at_ms "
+                "FROM forest_turns WHERE session_id=? AND ordinal>? "
+                "ORDER BY ordinal LIMIT ?",
+                (requested.session_id, requested.after, len(selected)),
+            ).fetchall()
+        if [r[1] for r in rows] != [r[0] for r in selected]:
+            raise ContextRefusal("INVALID_HISTORY_ORDER")
     except sqlite3.Error as exc:
         raise ContextRefusal("STORAGE_REFUSED") from exc
-
-    if len(rows) != min(last - requested.after, requested.limit + 1):
-        raise ContextRefusal("INVALID_HISTORY_ORDER")
-    if any(r[1] != requested.after + i + 1 for i, r in enumerate(rows)):
-        raise ContextRefusal("INVALID_HISTORY_ORDER")
     frame = _envelope(requested.view, HISTORY_SCHEMA)
     frame.update(sessionId=requested.session_id, revision=requested.revision,
                  messages=[], complete=False)

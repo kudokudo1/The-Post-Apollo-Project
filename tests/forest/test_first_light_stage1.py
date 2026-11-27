@@ -26,6 +26,9 @@ def tar_bytes(items):
                 info.type = tarfile.SYMTYPE
                 info.linkname = data
                 archive.addfile(info)
+            elif kind == "dir":
+                info.type = tarfile.DIRTYPE
+                archive.addfile(info)
             else:
                 info.type = tarfile.FIFOTYPE
                 archive.addfile(info)
@@ -36,6 +39,16 @@ class Stage1Tests(unittest.TestCase):
     def test_fixed_sources_and_exact_redirect_paths(self):
         digest = "sha256:" + "a"*64
         stage.target(stage.RELEASE, "archive")
+        cdn = ("https://release-assets.githubusercontent.com/github-production-release-asset/"
+               "658928958/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+               "?sig=fixture&response-content-disposition=attachment%3B%20filename%3D"
+               "ollama-linux-amd64.tar.zst")
+        stage.target(cdn, "archive", redirected=True)
+        for wrong in (cdn.replace("658928958", "123"),
+                      cdn.replace("ollama-linux-amd64.tar.zst", "other.tar.zst"),
+                      cdn.replace("sig=fixture&", "")):
+            with self.assertRaises(stage.Hold):
+                stage.target(wrong, "archive", redirected=True)
         stage.target(stage.REGISTRY+"manifests/2b", "manifest")
         stage.target(stage.REGISTRY+"blobs/"+digest, "blob", digest)
         stage.target("https://"+stage.R2+"/ollama/docker/registry/v2/blobs/sha256/aa/"
@@ -70,16 +83,12 @@ class Stage1Tests(unittest.TestCase):
                     stage.parse_manifest(data)
 
     def test_safe_regular_hash_and_unmaterialized_link(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            records, links, total = stage.unpack(tar_bytes([
-                ("./bin/ollama", "file", b"not executable"),
-                ("lib/alias", "link", "../bin/ollama")]), root, time.monotonic()+5)
-            self.assertEqual(total, 14)
-            self.assertEqual(records["bin/ollama"][1], hashlib.sha256(b"not executable").hexdigest())
-            self.assertEqual(links, {"lib/alias": "bin/ollama"})
-            self.assertFalse((root/"lib/alias").exists())
-            self.assertFalse((root/"bin/ollama").stat().st_mode & 0o111)
+        records, links, total = stage.unpack(tar_bytes([
+            ("./bin/ollama", "file", b"not executable"),
+            ("lib/alias", "link", "../bin/ollama")]), time.monotonic()+5)
+        self.assertEqual(total, 14)
+        self.assertEqual(records["bin/ollama"][1], hashlib.sha256(b"not executable").hexdigest())
+        self.assertEqual(links, {"lib/alias": "bin/ollama"})
 
     def test_unsafe_archive_refuses(self):
         cases = [
@@ -90,11 +99,22 @@ class Stage1Tests(unittest.TestCase):
             [("bin/ollama", "file", b"x"), ("link", "link", "missing")],
             [("bin/ollama", "file", b"x"), ("bin/ollama", "file", b"y")],
             [("bin", "link", "other"), ("bin/ollama", "file", b"x")],
+            [("bin", "dir", ""), ("./bin/", "dir", ""),
+             ("bin/ollama", "file", b"x")],
         ]
         for items in cases:
-            with tempfile.TemporaryDirectory() as tmp:
-                with self.assertRaises(stage.Hold):
-                    stage.unpack(tar_bytes(items), Path(tmp), time.monotonic()+5)
+            with self.assertRaises(stage.Hold):
+                stage.unpack(tar_bytes(items), time.monotonic()+5)
+
+    def test_complete_physical_tar_tail_including_buffered_nonzero(self):
+        good = tar_bytes([("bin/ollama", "file", b"x")]).getvalue()
+        self.assertEqual(stage.unpack(io.BytesIO(good), time.monotonic()+5)[2], 1)
+        bad = bytearray(good)
+        bad[4096] = 1
+        for raw in (bytes(bad), good[:1024], good[:1536], good[:2047],
+                    good[:2048] + good):
+            with self.subTest(length=len(raw)), self.assertRaises(stage.Hold):
+                stage.unpack(io.BytesIO(raw), time.monotonic()+5)
 
     def test_unqualified_environment_stops_before_acquisition(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {}, clear=True):

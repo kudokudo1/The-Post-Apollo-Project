@@ -141,6 +141,34 @@ ShellRoot {
             && gate.feedback==="CANCELLED // NO ACTION";
     }
 
+    // Synthetic completed reports only; collection and executor stay disabled.
+    function verifyReportCustody() {
+        const op=first.store.hunterOperation;
+        if (first.store.collectionEnabled || op.phase!=="idle"
+                || first.store.hunterExecutor.running) return false;
+        for (const cpu of [true,false]) {
+            op.recipientOwned=cpu;
+            op.kind="kill-all";
+            op.targets=[{pid:4321}];
+            op.results=[{status:"gone"}];
+            op.completed=1;
+            op.total=1;
+            op.phase="report";
+            const wrong=cpu ? first.store.acknowledgeDonorBulkReport()
+                            : first.store.acknowledgeCpuBulkReport();
+            if (wrong || op.phase!=="report" || op.results.length!==1
+                    || op.total!==1 || !first.store.actionGate.bulkBlocked) return false;
+            const correct=cpu ? second.store.acknowledgeCpuBulkReport()
+                              : second.store.acknowledgeDonorBulkReport();
+            if (!correct || op.phase!=="idle" || op.kind!==""
+                    || op.targets.length || op.results.length || op.completed || op.total
+                    || first.store.actionGate.bulkBlocked) return false;
+            if (first.store.acknowledgeCpuBulkReport()
+                    || first.store.acknowledgeDonorBulkReport()) return false;
+        }
+        return !first.store.hunterExecutor.running;
+    }
+
     function verifyStore() {
         const sample = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 31, rss: 2048, mem: 3, elapsed: "00:05"}];
@@ -176,7 +204,7 @@ ShellRoot {
         const combiCadence=first.store.snapshotInterval===1800 && first.store.miniProbeNeeded;
         first.store.donorFavoritesVisible=false;
         first.store.donorCombiVisible=false;
-        if (!verifyActionGateway() || !verifyControlCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
+        if (!verifyActionGateway() || !verifyControlCustody() || !verifyReportCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
                 || !cpuGraphDemand || !idleGraphDemand || !donorGraphDemand || !censusDidNotAppend
                 || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry

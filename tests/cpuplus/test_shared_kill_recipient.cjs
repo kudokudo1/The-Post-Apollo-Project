@@ -1012,3 +1012,29 @@ test("K6a: independent history visibility and favorite warm demand", () => {
     favoriteStore.favoriteTaskMetricKeys=["taskmetric|worker|cpu"];
     assert.equal(demand(identity,favoriteStore,{favoriteStore}),true);
 });
+
+test("K6c: only the initiating consumer can acknowledge its completed Hunter report", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const a=store.indexOf("    function acknowledgeCpuBulkReport(");
+    const b=store.indexOf("    // One immutable recipient review.",a);
+    const op={phase:"idle",recipientOwned:false};
+    const api=new Function("hunterOperation",store.slice(a,b)+"\nreturn {acknowledgeCpuBulkReport,acknowledgeDonorBulkReport};")(op);
+    for(const cpu of [true,false]) {
+        const correct=cpu?api.acknowledgeCpuBulkReport:api.acknowledgeDonorBulkReport;
+        const wrong=cpu?api.acknowledgeDonorBulkReport:api.acknowledgeCpuBulkReport;
+        for(const phase of ["idle","running","report"]) {
+            Object.assign(op,{phase,recipientOwned:cpu,kind:"kill-all",targets:[1],results:[2],completed:1,total:1});
+            assert.equal(wrong(),false);
+            assert.equal(op.phase,phase);
+            assert.deepEqual(op.results,[2]);
+            assert.equal(correct(),phase==="report");
+            assert.equal(op.phase,phase==="report"?"idle":phase);
+            assert.deepEqual(op.results,phase==="report"?[]:[2]);
+            if(phase==="report") assert.equal(correct(),false);
+        }
+    }
+    const dismiss=owner.slice(owner.indexOf("    function dismissHunterOperationWindow("),owner.indexOf("    function cancelDestructiveConfirm("));
+    assert.match(dismiss,/KillBackend\.KillStore\.acknowledgeDonorBulkReport\(\)/);
+    assert.doesNotMatch(dismiss,/hunterOperationController\.(?:phase|kind|targets|results|completed|total)\s*=/);
+});

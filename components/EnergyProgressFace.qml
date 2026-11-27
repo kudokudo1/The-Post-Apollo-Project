@@ -1,12 +1,18 @@
 import QtQuick
 import "EnergyProgressMotion.js" as Motion
 import "EnergyVariantProfile.js" as Profiles
+import "EnergyFireMaterial.js" as Material
 
 // Opt-in presentation only. No input handling or service calls.
 // The owner supplies phase and, for measured/timed modes, actual progress.
 Item {
     id: root
     property string variant: "omnitrix" // omnitrix | tron | ki-blast | flamethrower
+    // Experimental presentation only; existing hosts default to standard.
+    property string fireMode: "standard" // standard | ash-trail | burn-away
+    readonly property bool materialExperiment: variant === "flamethrower"
+        && (fireMode === "ash-trail" || fireMode === "burn-away")
+    property real materialPeak: 0
     property string phase: "idle" // idle | queued | running | ready | success | failure
     property string progressMode: "indeterminate" // indeterminate | measured | timed
     property real progress: 0
@@ -18,7 +24,8 @@ Item {
     property color chassisColor: phase === "failure" ? Colors.red : energyColor
     property color foregroundColor: Colors.white
     readonly property var personality: Profiles.profile(variant)
-    readonly property real displayedFraction: visualFrame.fraction
+    readonly property real displayedFraction: materialExperiment && progressMode === "indeterminate"
+        ? Math.max(materialPeak, visualFrame.fraction) : visualFrame.fraction
     readonly property real headCenterY: height / 2
     readonly property bool animationActive: visible && !reducedMotion
         && (phase === "running" || (phase === "success" && elapsed < .84))
@@ -34,9 +41,10 @@ Item {
     function beginPhase() {
         // Capture the last rendered fraction, never a guessed success.
         finishFrom = lastFraction;
+        if (phase === "running" || phase === "idle" || phase === "queued") materialPeak = 0;
         elapsed = 0;
         startedAt = Date.now();
-        lastFraction = visualFrame.fraction;
+        lastFraction = displayedFraction;
         surface.requestPaint();
     }
     property real lastFraction: 0
@@ -63,14 +71,24 @@ Item {
     onEnergyColorChanged: if (initialized) surface.requestPaint()
     onChassisColorChanged: if (initialized) surface.requestPaint()
     onVariantChanged: if (initialized) surface.requestPaint()
+    onFireModeChanged: {
+        materialPeak = 0;
+        if (initialized) surface.requestPaint();
+    }
     Timer {
         interval: 33
         repeat: true
         running: root.animationActive
         onTriggered: {
             root.elapsed = Math.max(0, (Date.now()-root.startedAt)/1000);
-            if (root.phase === "running") root.lastFraction = Motion.frame(root.phase,
-                root.progressMode, root.progress, root.elapsed, root.finishFrom, root.reducedMotion).fraction;
+            if (root.phase === "running") {
+                const next=Motion.frame(root.phase, root.progressMode, root.progress,
+                    root.elapsed, root.finishFrom, root.reducedMotion).fraction;
+                if (root.materialExperiment && root.progressMode === "indeterminate")
+                    root.materialPeak=Math.max(root.materialPeak,next);
+                root.lastFraction=root.materialExperiment && root.progressMode === "indeterminate"
+                    ? root.materialPeak : next;
+            }
         }
     }
 
@@ -97,7 +115,7 @@ Item {
                 c.clearRect(0,0,width,height);
                 const x=spill, y=spill, w=Math.max(0,root.width), h=Math.max(0,root.height);
                 if (w<4 || h<4) return;
-                const f=root.visualFrame, p=f.fraction, mid=y+h/2;
+                const f=root.visualFrame, p=root.displayedFraction, mid=y+h/2;
                 const ink=root.phase==="failure" ? Colors.red : root.energyColor;
                 const hot=root.variant==="flamethrower";
                 const ki=root.variant==="ki-blast";
@@ -109,6 +127,15 @@ Item {
                     return Qt.rgba(a.r+(b.r-a.r)*k,a.g+(b.g-a.g)*k,
                         a.b+(b.b-a.b)*k,1);
                 }
+                const material=Material.geometry(root.materialExperiment ? root.fireMode : "standard",
+                    p,w-2,h-2);
+                const inner=w-2, edge=x+1+inner*p;
+                // In Burn Away, the traversed chassis is gone, not covered
+                // by a differently colored progress fill.
+                if (material.erosion && p>0) {
+                    Material.drawRemaining(c,x+1,y+1,inner,h-2,edge,
+                        f.headVisible,root.chassisColor);
+                } else {
                 // Low-cost perimeter: three nested outlines, no full-face shadow.
                 for (let i=3;i>=1;i--) {
                     c.strokeStyle=tint(root.chassisColor,Math.min(.35,(.035+f.intensity*.025)*(4-i)*root.personality.brightness));
@@ -120,8 +147,10 @@ Item {
                 c.strokeStyle=root.chassisColor;
                 c.lineWidth=1;
                 c.strokeRect(x+.5,y+.5,w-1,h-1);
-                const inner=w-2, edge=x+1+inner*p;
-                if (p>0) {
+                }
+                if (material.ash && p>0) {
+                    Material.drawAsh(c,x+1,y+1,inner,h-2,edge,f.headVisible);
+                } else if (!material.erosion && p>0) {
                     const g=c.createLinearGradient(0,y+1,0,y+h-1);
                     g.addColorStop(0,ink);
                     g.addColorStop(.18,mix(Colors.dark,ink,tron?.22:.42));

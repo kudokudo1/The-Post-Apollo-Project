@@ -10,6 +10,8 @@ on:
       - 'components/PrismButton.qml'
       - 'components/PrismArtwork.js'
       - 'tests/components/test_prism_dock.cjs'
+      - 'tests/components/test_prism_index.cjs'
+      - 'services/prism/PrismIndex.js'
       - 'tests/components/test_prism_artwork.cjs'
       - '.github/workflows/prism-dock-contract.yml'
   push:
@@ -21,6 +23,8 @@ on:
       - 'components/PrismButton.qml'
       - 'components/PrismArtwork.js'
       - 'tests/components/test_prism_dock.cjs'
+      - 'tests/components/test_prism_index.cjs'
+      - 'services/prism/PrismIndex.js'
       - 'tests/components/test_prism_artwork.cjs'
       - '.github/workflows/prism-dock-contract.yml'
 
@@ -35,4 +39,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify Prism geometry and isolated dock placement
-        run: node --test tests/components/test_prism_artwork.cjs tests/components/test_prism_dock.cjs
+        run: node --test tests/components/test_prism_artwork.cjs tests/components/test_prism_dock.cjs tests/components/test_prism_index.cjs

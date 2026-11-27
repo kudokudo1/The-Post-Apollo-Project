@@ -662,6 +662,35 @@ ShellRoot {
                 clearDraft.leftClicked(null);
                 if (!smoke.check(!consolePane.hasDraft && consolePane.swapDraft.kind==="preview",
                         "clear swap draft restores preview only")) return;
+                const threadFilter=smoke.find(view,"cpuPlusResourceFilter-threads");
+                threadFilter.leftClicked(null);
+                const taskMinus=smoke.find(view,"cpuPlusTaskMinus");
+                const taskPlus=smoke.find(view,"cpuPlusTaskPlus");
+                const taskInput=smoke.find(view,"cpuPlusTaskExactInput");
+                const taskMax=smoke.find(view,"cpuPlusTaskChoice-uncapped");
+                const taskRestore=smoke.find(view,"cpuPlusTaskChoice-restore");
+                if (!smoke.check(taskMinus && taskPlus && taskInput && taskMax && taskRestore
+                        && taskMinus.available && taskPlus.available && !taskRestore.available
+                        && !consolePane.hasDraft && consolePane.taskDraft.kind==="preview",
+                        "task budget opens ready, no default draft")) return;
+                taskMinus.leftClicked(null);
+                if (!smoke.check(consolePane.taskDraft.count===63
+                        && consolePane.reviewLines[0].includes("TASK COUNT 63 TASKS"),
+                        "minus stages one fewer task")) return;
+                taskPlus.leftClicked(null);
+                if (!smoke.check(consolePane.taskDraft.count===64,"plus stages one more task")) return;
+                consolePane.stageTasks("budget",1);
+                if (!smoke.check(!taskMinus.available,"minimum blocks decrement")) return;
+                consolePane.stageTasks("budget",512);
+                if (!smoke.check(!taskPlus.available,"maximum blocks increment")) return;
+                taskMax.leftClicked(null);
+                if (!smoke.check(taskMax.selected && consolePane.taskDraft.kind==="uncapped"
+                        && consolePane.reviewLines[0].includes("pids.max=max")
+                        && !applyLocked.available && fakeGate.preparations===1 && fakeGate.confirmations===0,
+                        "no cap separate from numeric task budget; no dispatch")) return;
+                clearDraft.leftClicked(null);
+                if (!smoke.check(!consolePane.hasDraft && consolePane.taskDraft.kind==="preview",
+                        "clear task draft returns to preview")) return;
                 fakeOwner.protectTargets=true;
                 cpuFilter.leftClicked(null);
                 const header=smoke.find(view,"cpuPlusProcessIdentity");

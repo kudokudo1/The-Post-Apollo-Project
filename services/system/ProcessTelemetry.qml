@@ -69,6 +69,8 @@ Scope {
 
     // Read-only process telemetry. Mutation (freeze/limit/terminate/restart)
     // deliberately remains outside this service.
+    // Detail-only channels cannot launch all-process probes.
+    property bool detailOnly: false
     property var rows: []
     property bool snapshotLoading: false
     property string snapshotError: ""
@@ -97,7 +99,7 @@ Scope {
     signal detailProbeRetryRequested()
 
     function refreshSnapshot() {
-        if (snapshotLoading)
+        if (detailOnly || snapshotLoading)
             return;
 
         snapshotLoading = true;
@@ -299,7 +301,7 @@ Scope {
     }
 
     function refreshMiniProbe(request) {
-        if (miniProbeLoading)
+        if (detailOnly || miniProbeLoading)
             return;
 
         const items = Array.isArray(request) ? request : [];

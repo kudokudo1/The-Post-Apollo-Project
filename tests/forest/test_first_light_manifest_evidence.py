@@ -76,6 +76,32 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(classify(obj)["original_refusal"], "MODEL_BYTE_LIMIT")
         self.assertFalse(classify(obj)["aggregate_within_cap"])
 
+    def test_nonfinite_json_refuses_before_strict_parser(self):
+        for token in (b"NaN", b"Infinity", b"-Infinity", b"1e999", b"-1E999"):
+            for raw in (b'{"schemaVersion":2,"config":{"size":' + token + b'},"layers":[{}]}',
+                        b'{"schemaVersion":2,"config":{},"layers":[{"name":[{"nested":'
+                        + token + b'}]}]}'):
+                with self.subTest(token=token, raw=raw):
+                    with patch.object(stage, "MANIFEST_SHA", hashlib.sha256(raw).hexdigest()), \
+                         patch.object(stage, "parse_manifest", side_effect=AssertionError("parsed")):
+                        with self.assertRaisesRegex(stage.Hold, "^MANIFEST_JSON$"):
+                            evidence.classify(raw)
+
+    def test_finite_float_does_not_relax_descriptor_policy(self):
+        obj = fixture()
+        obj["layers"][0]["size"] = 16.0
+        report = classify(obj)
+        self.assertEqual(report["original_refusal"], "BLOB_SIZE")
+        self.assertEqual(report["descriptors"][1]["size_kind"], "NONINTEGER")
+        self.assertIsNone(report["bounded_size_sum"])
+        self.assertFalse(report["aggregate_within_cap"])
+        obj = fixture()
+        obj["layers"][0]["name"] = 1e308
+        report = classify(obj)
+        self.assertEqual(report["original_refusal"], "BLOB_DESCRIPTOR_KEYS")
+        self.assertEqual(report["descriptors"][1]["name_kind"], "NONSTRING")
+        self.assertNotIn("1e+308", json.dumps(report))
+
     def test_shape_duplicate_json_and_metadata_bounds(self):
         obj = fixture()
         obj["layers"] *= 17

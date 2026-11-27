@@ -84,7 +84,7 @@ def validate(duration, interval):
 
 
 def capture(duration, interval, drm=Path("/sys/class/drm"),
-            devices_root=Path("/sys/devices")):
+            devices_root=Path("/sys/devices"), workflow_clock=False):
     validate(duration, interval)
     pinned = discover(drm, devices_root)
     start = time.monotonic_ns()
@@ -114,7 +114,9 @@ def capture(duration, interval, drm=Path("/sys/class/drm"),
     if not has_data:
         raise ValueError("no supported GPU measurements")
     rows.append({"schema": SCHEMA, "event": "complete", "samples": len(rows),
-                 "observedMs": previous, "calibration": {"kind": "gpu",
+                 "observedMs": previous,
+            **({"startedMonotonicMs": start // 1000000,
+                "monotonicMs": start // 1000000 + previous} if workflow_clock else {}), "calibration": {"kind": "gpu",
                  "durationSeconds": duration, "intervalMs": interval*1000}})
     output = "\n".join(json.dumps(r, ensure_ascii=True, allow_nan=False,
                                   separators=(",", ":")) for r in rows) + "\n"
@@ -128,9 +130,10 @@ def main():
     parser.add_argument("--workshop", action="store_true", required=True)
     parser.add_argument("--duration", type=int, required=True)
     parser.add_argument("--interval", type=int, required=True)
+    parser.add_argument("--workflow-clock", action="store_true")
     args = parser.parse_args()
     try:
-        sys.stdout.write(capture(args.duration, args.interval))
+        sys.stdout.write(capture(args.duration, args.interval, workflow_clock=args.workflow_clock))
     except (OSError, ValueError, RuntimeError) as exc:
         print("GPU capture unavailable: " + str(exc), file=sys.stderr)
         return 1

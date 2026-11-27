@@ -15,6 +15,8 @@ Item {
     property var recoverySession: null
     // Only the DIAG instrument scope changes; capacity and policy stay shared.
     property string diagnosticSubject: "MEMORY"
+    property bool diagnosticInfoOpen: false
+    onDiagnosticSubjectChanged: diagnosticInfoOpen=false
     property var sample: null
     property var lastGoodSample: null
     readonly property var displaySample: lastGoodSample
@@ -337,6 +339,7 @@ Item {
             capSection = 0;
         }
         detailsInfoOpen=false;
+        diagnosticInfoOpen=false;
         CpuPlusDiagnostics.memoryMenuIndex = index;
         scroll.contentY = 0;
     }
@@ -490,6 +493,35 @@ Item {
         spacing: 5
         visible: root.page !== "CAP"
         height: visible ? implicitHeight : 0
+        Row {
+            width: parent.width
+            visible: root.page==="DIAG" && root.diagnosticSubject!=="ALL"
+            spacing: 4
+            GohuText {
+                width: Math.max(0,parent.width-28)
+                height: 24
+                verticalAlignment: Text.AlignVCenter
+                text: root.diagnosticSubject+" // OBSERVATION"
+                color: Colors.resourceColor(root.diagnosticSubject)
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+            InformationButton {
+                objectName: "cpuplusMemoryDiagnosticsInfo"
+                selected: root.diagnosticInfoOpen
+                onLeftClicked: root.diagnosticInfoOpen=!root.diagnosticInfoOpen
+            }
+        }
+        GohuText {
+            width: parent.width
+            visible: root.page==="DIAG" && root.diagnosticSubject!=="ALL" && root.diagnosticInfoOpen
+            text: root.diagnosticSubject==="SWAP"
+                ? "Read-only swap movement, memory pressure and zram allocation. Capacity and policy controls are separate."
+                : "Read-only Quickshell memory capture: resident, proportional and private memory; swap and host RAM context. Capacity and policy controls are separate."
+            color: Colors.white
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+        }
         LiveCapacityHeader {
             objectName: "cpuplusSharedCapacityHeader"
             width: parent.width

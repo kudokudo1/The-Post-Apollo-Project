@@ -34,6 +34,47 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError): w.decode('{"a":1,"a":2}')
         with self.assertRaises(ValueError): w.decode('{"a":NaN}')
 
+    def test_all_ten_plan_and_hardware_clock_receipts(self):
+        plan={"durationSeconds":10,"instruments":[
+            {"kind":"threads","intervalMs":1000,"topCount":4},
+            {"kind":"memory","intervalMs":10000},
+            {"kind":"census","intervalMs":10000},{"kind":"storage"},
+            {"kind":"stall","thresholdMs":350},
+            *({"kind":kind,"intervalMs":1000} for kind in w.HARDWARE)]}
+        configs=w.validate(plan)
+        self.assertEqual(tuple(c["kind"] for c in configs),w.ORDER)
+        commands=w.commands(configs,Path("/data"),ROOT/"scripts",{"pid":123,"startTicks":456})
+        for config in configs[5:]:
+            kind=config["kind"]
+            self.assertEqual(commands[kind][-1],"--workflow-clock")
+            rows=[{"schema":w.HARDWARE_SCHEMAS[kind],"event":kind,"sequence":i,
+                   "elapsedMs":i*1000,"intervalMs":1000} for i in range(1,11)]
+            terminal={"schema":w.HARDWARE_SCHEMAS[kind],"event":"complete","samples":10,
+                      "observedMs":10000,"startedMonotonicMs":1000,"monotonicMs":11000,
+                      "calibration":config}
+            encode=lambda values: ("\n".join(json.dumps(r) for r in values)+"\n").encode("ascii")
+            self.assertEqual(w.receipt(config,encode(rows+[terminal]),None)[1:],(1000,11000))
+            for bad in (dict(terminal,monotonicMs=11001),dict(terminal,samples=9),dict(terminal,startedMonotonicMs=None)):
+                with self.assertRaises(ValueError): w.receipt(config,encode(rows+[bad]),None)
+        with self.assertRaises(ValueError): w.validate(dict(plan,durationSeconds=30))
+
+    def test_ten_parallel_children_and_cleanup(self):
+        # Ten actual child processes, disposable barrier, no host observers.
+        with tempfile.TemporaryDirectory() as folder:
+            script="""import pathlib,sys,time
+root=pathlib.Path(sys.argv[1]); (root/sys.argv[2]).touch()
+until=time.monotonic()+5
+while len(list(root.iterdir()))!=10:
+    if time.monotonic()>until: sys.exit(4)
+    time.sleep(.01)
+print(sys.argv[2])
+"""
+            commands={kind:[sys.executable,"-c",script,folder,kind] for kind in w.ORDER}
+            _,_,reason,result=w.collect_children(commands,1,lambda:False)
+            self.assertEqual(reason,"")
+            self.assertEqual(len(result),10)
+            self.assertTrue(all(row["exitCode"]==0 for row in result.values()))
+
     def test_parallel_and_cleanup(self):
         # Both children must arrive at the barrier before either can exit.
         # Sequential execution would fail this test without relying on speed.

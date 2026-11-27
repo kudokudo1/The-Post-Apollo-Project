@@ -1279,23 +1279,49 @@ ShellRoot {
                     && !w.ready && !CpuPlusDiagnostics.busy
                     && JSON.stringify(w.draft)===root.generalDraftWitness,
                     "SYSTEM all ten instruments, two rows, status geometry and existing general draft"))return;
-                w.toggle("gpu");
-                if(!root.check(w.draft.selected.join(",")==="gpu","SYSTEM GPU is exclusive"))return;
-                w.toggle("memory");
-                if(!root.check(w.draft.selected.join(",")==="memory","SYSTEM core selection removes standalone GPU"))return;
-                w.toggle("threads");
-                if(!root.check(w.draft.selected.includes("memory")&&w.draft.selected.includes("threads"),"SYSTEM retains qualified core combinations"))return;
-                w.toggle("netio");
-                if(!root.check(w.draft.selected.join(",")==="netio"&&!w.ready&&!CpuPlusDiagnostics.busy,"SYSTEM network remains standalone"))return;
+                const paired=[["threads","stall"],["hostcpu","diskio"],["memory","storage"],["census","gpu"],["netio","swapio"]];
+                if(!root.check(paired.every(pair=>{
+                    const a=root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-"+pair[0]);
+                    const b=root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-"+pair[1]);
+                    const p=a.mapToItem(host,0,0),q=b.mapToItem(host,0,0);
+                    return Math.abs(p.x-q.x)<1 && q.y>p.y;
+                }),"SYSTEM vertical instrument pairs"))return;
+                for(const k of kinds)if(!w.draft.selected.includes(k))w.toggle(k);
+                w.edit("durationSeconds",10);
+                w.edit("threadIntervalMs",1000);
+                w.edit("memoryIntervalMs",10000);
+                w.edit("censusIntervalMs",10000);
+                w.edit("topCount",4);
+                w.edit("stallThresholdMs",350);
+                w.edit("storageCadenceExplicit",true);
+                w.edit("storageSampleSeconds",1);
+                w.edit("storageReportSeconds",10);
+                for(const key of ["hostCpuIntervalMs","gpuIntervalMs","diskIoIntervalMs","swapIoIntervalMs","netIoIntervalMs"])w.edit(key,1000);
+                if(!root.check(w.draft.selected.length===10&&w.preview.ok&&!w.ready&&!CpuPlusDiagnostics.busy,
+                    "SYSTEM all ten independently selected and calibrated"))return;
+                const cpu=root.findItem(w,"cpuplusWorkshopHostCpuInterval"),gpu=root.findItem(w,"cpuplusWorkshopGpuInterval");
+                if(!root.check(cpu&&gpu&&cpu.visible&&gpu.visible,"independent host and GPU controls simultaneously visible"))return;
                 nativeWindow.width=720;
                 root.phase=67;return;
             }
             if(root.phase===67 && resourcePane.item){
                 const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
                 const host=root.findItem(resourcePane.item,"cpuplusResourceFilterHost");
-                if(!root.check(w && host && host.selectorColumns===10
+                if(!root.check(w && host && host.selectorColumns===5
                     && root.resourceStatusGeometry(resourcePane.item)
-                    && w.draft.selected.join(",")==="netio","SYSTEM wide rail retains all instruments and draft"))return;
+                    && w.draft.selected.length===10,"SYSTEM wide rail retains vertical pairs and draft"))return;
+                nativeWindow.width=160;
+                root.phase=671;return;
+            }
+            if(root.phase===671 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const host=root.findItem(resourcePane.item,"cpuplusResourceFilterHost");
+                const block=root.findItem(resourcePane.item,"cpuplusResourceStatusBlock");
+                const band=root.findItem(resourcePane.item,"cpuplusResourceStatusBand");
+                if(!root.check(w&&host&&block&&band&&band.stacked
+                    && host.y>=block.y+block.height+4 && host.x>=0
+                    && host.x+host.width<=band.width+1 && w.draft.selected.length===10,
+                    "SYSTEM narrow stacked header cannot overlap status text"))return;
                 root.resourcePaneActive=false;
                 root.memorySubject="MEMORY";
                 nativeWindow.width=320;
@@ -1314,7 +1340,8 @@ ShellRoot {
                     && Math.abs(block.height-host.height)<=1
                     && !root.findItem(pane.item,"cpuplusWorkshopInstrument-threads")
                     && !root.findItem(pane.item,"cpuplusWorkshopInstrument-netio")
-                    && CpuPlusDiagnostics.workshopDraft.selected.join(",")==="netio"
+                    && CpuPlusDiagnostics.workshopDraft.selected.length===10
+                    && root.findItem(pane.item,"cpuplusMemoryDiagnosticsInfo").visible
                     && !w.ready&&!CpuPlusDiagnostics.busy,
                     "MEMORY focus, unchanged status geometry and independent general draft"))return;
                 console.log("CPU_D10B_SYSTEM_MEMORY_NATIVE_PASS");

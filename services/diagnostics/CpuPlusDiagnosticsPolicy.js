@@ -552,13 +552,14 @@ function workflowEvidence(text, expected) {
         if (!d || d.schema!=="post-apollo-diagnostic-workflow-transport-v1"
                 || !["COLLECTED","NOT VERIFIED","CANCELLED"].includes(d.status)
                 || !int(d.durationSeconds,1,120) || !Array.isArray(d.instruments)
-                || d.instruments.length<2 || d.instruments.length>5
+                || d.instruments.length<2 || d.instruments.length>10
                 || !int(d.startedMonotonicMs,0,Number.MAX_SAFE_INTEGER)
                 || !int(d.finishedMonotonicMs,d.startedMonotonicMs,Number.MAX_SAFE_INTEGER)
                 || d.finishedMonotonicMs-d.startedMonotonicMs>145000) return null;
         if (expected && (expected.durationSeconds!==d.durationSeconds
                 || expected.instruments.length!==d.instruments.length)) return null;
-        const order=["threads","memory","census","storage","stall"], seen=[], summaries=[];
+        const hardware=["hostcpu","gpu","diskio","swapio","netio"];
+        const order=["threads","memory","census","storage","stall",...hardware], seen=[], summaries=[];
         let first=0,last=Number.MAX_SAFE_INTEGER, complete=0;
         const pin=d.pinnedQuickshell;
         for (let i=0;i<d.instruments.length;i++) {
@@ -582,6 +583,7 @@ function workflowEvidence(text, expected) {
                         || !int(c.topCount,1,12) || n>30 || n*(c.topCount+1)>150)) return null;
                 if (kind==="memory" && (c.intervalMs<5000 || c.intervalMs%1000 || n>12)) return null;
                 if (kind==="census" && (c.durationSeconds>60 || c.intervalMs%1000 || n>3)) return null;
+                if (hardware.includes(kind) && (c.durationSeconds>30 || c.intervalMs<1000 || c.intervalMs>5000 || c.intervalMs%1000 || n>12)) return null;
             }
             seen.push(kind);
             if (!int(item.payloadBytes,0,65536) || !Array.isArray(item.records)
@@ -620,6 +622,24 @@ function workflowEvidence(text, expected) {
                 continue;
             }
             const rows=item.records, end=rows[rows.length-1];
+            if (hardware.includes(kind)) {
+                if (!end || end.startedMonotonicMs!==item.firstMonotonicMs
+                        || end.monotonicMs!==item.lastMonotonicMs
+                        || !int(end.observedMs,c.durationSeconds*1000,45000)
+                        || end.monotonicMs-end.startedMonotonicMs!==end.observedMs) return null;
+                // Standalone validators retain their exact legacy schema.
+                // The two workflow-only clock fields were checked above.
+                const terminal=Object.assign({},end);
+                delete terminal.startedMonotonicMs;
+                delete terminal.monotonicMs;
+                const raw=rows.slice(0,-1).concat([terminal]).map(row=>JSON.stringify(row)).join("\n")+"\n";
+                if (raw.length>65536 || !configuredEvidence(kind,raw,c) || !summarize(kind,raw)) return null;
+                summaries.push(kind.toUpperCase()+" // VERIFIED");
+                complete++;
+                first=Math.max(first,item.firstMonotonicMs);
+                last=Math.min(last,item.lastMonotonicMs);
+                continue;
+            }
             if (!end || end.monotonicMs!==item.lastMonotonicMs
                     || Math.abs(item.lastMonotonicMs-item.firstMonotonicMs-end.observedMs)>2
                     || (kind==="memory" || kind==="threads" ? rows[0].monotonicMs : end.startedMonotonicMs)!==item.firstMonotonicMs

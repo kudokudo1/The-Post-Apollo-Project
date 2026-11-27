@@ -16,6 +16,7 @@ Column {
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
     readonly property string targetText: {
+        if (subject==="SYSTEM" && draft.selected.length>1) return "TARGET // "+draft.selected.length+" INSTRUMENTS";
         if (draft.selected.includes("netio")) return "TARGET // ALL VISIBLE INTERFACES";
         if (draft.selected.includes("swapio")) return "TARGET // HOST SWAP";
         if (draft.selected.includes("diskio")) return "TARGET // WHOLE BLOCK DEVICES";
@@ -115,11 +116,10 @@ Column {
     }
     function toggle(kind) {
         if (locked || !filterKinds.includes(kind)) return;
-        // The five core collectors may run in one qualified workflow. New
-        // resource captures are standalone; mixed sequential sets are allowed.
+        // SYSTEM permits every instrument to be selected independently.
         const standalone=["hostcpu","gpu","diskio","swapio","netio"];
-        if (standalone.includes(kind)) { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
-        const selected=draft.selected.filter(k=>!standalone.includes(k));
+        if (subject!=="SYSTEM" && standalone.includes(kind)) { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
+        const selected=subject==="SYSTEM" ? draft.selected.slice() : draft.selected.filter(k=>!standalone.includes(k));
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
         edit("selected",selected);
@@ -178,7 +178,11 @@ Column {
                 {kind:"swapio",symbol:"⇅",subject:"SWAP"},
                 {kind:"diskio",symbol:"▥",subject:"STORAGE"},
                 {kind:"storage",symbol:"",subject:"STORAGE"},
-                {kind:"stall",symbol:"⚡",subject:"UPTIME"}].filter(row=>root.filterKinds.includes(row.kind))
+                {kind:"stall",symbol:"⚡",subject:"UPTIME"}].filter(row=>root.filterKinds.includes(row.kind)).sort((a,b)=>{
+                if(root.subject!=="SYSTEM")return 0;
+                const order=["threads","hostcpu","memory","census","netio","stall","diskio","storage","gpu","swapio"];
+                return order.indexOf(a.kind)-order.indexOf(b.kind);
+            })
             ActionButton {
                 id: instrumentFilter
                 required property var modelData
@@ -272,19 +276,34 @@ Column {
         onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
     }
     CpuPlusDiagnosticSlider {
-        objectName: root.subject==="GPU" ? "cpuplusWorkshopGpuInterval" : "cpuplusWorkshopHostCpuInterval"
+        objectName: "cpuplusWorkshopHostCpuInterval"
         width: parent.width
         compact: root.compactLayout
-        subjectColor: root.subject==="GPU" ? Colors.omnitrix : Colors.orange
+        subjectColor: Colors.orange
         fillColor: subjectColor
-        visible: root.draft.selected.includes("hostcpu") || root.draft.selected.includes("gpu")
-        title: root.subject==="GPU" ? "GPU SAMPLE INTERVAL" : "HOST SAMPLE INTERVAL"
+        visible: root.draft.selected.includes("hostcpu")
+        title: "HOST SAMPLE INTERVAL"
         readout: currentValue+" SEC"
         minimumValue: 1
         maximumValue: 5
-        currentValue: root.subject==="GPU" ? (root.draft.gpuIntervalMs||1000)/1000 : (root.draft.hostCpuIntervalMs||1000)/1000
+        currentValue: (root.draft.hostCpuIntervalMs||1000)/1000
         adjustable: !root.locked
-        onValueRequested: value=>root.edit(root.subject==="GPU"?"gpuIntervalMs":"hostCpuIntervalMs",value*1000)
+        onValueRequested: value=>root.edit("hostCpuIntervalMs",value*1000)
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopGpuInterval"
+        width: parent.width
+        compact: root.compactLayout
+        subjectColor: Colors.omnitrix
+        fillColor: subjectColor
+        visible: root.draft.selected.includes("gpu")
+        title: "GPU SAMPLE INTERVAL"
+        readout: currentValue+" SEC"
+        minimumValue: 1
+        maximumValue: 5
+        currentValue: (root.draft.gpuIntervalMs||1000)/1000
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("gpuIntervalMs",value*1000)
     }
     CpuPlusDiagnosticSlider {
         objectName: "cpuplusWorkshopNetIoInterval"
@@ -357,9 +376,17 @@ Column {
     }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("hostcpu") || root.draft.selected.includes("gpu")
-        text: root.subject==="GPU" ? "BUSY / VRAM / TEMP1 · ALL DRM DEVICES · 12 SAMPLES MAX" : "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
-        color: root.subject==="GPU" ? Colors.omnitrix : Colors.orange
+        visible: root.draft.selected.includes("hostcpu")
+        text: "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
+        color: Colors.orange
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
+    }
+    GohuText {
+        width: parent.width
+        visible: root.draft.selected.includes("gpu")
+        text: "BUSY / VRAM / TEMP1 · ALL DRM DEVICES · 12 SAMPLES MAX"
+        color: Colors.omnitrix
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }

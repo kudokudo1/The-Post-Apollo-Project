@@ -78,7 +78,7 @@ def validate(duration, interval):
         raise ValueError("CPU observation budget")
 
 
-def capture(duration, interval):
+def capture(duration, interval, workflow_clock=False):
     validate(duration, interval)
     before = parse_stat(bounded_text(Path("/proc/stat"), MAX_STAT))
     ids = sorted(k for k in before if k >= 0)
@@ -118,6 +118,8 @@ def capture(duration, interval):
             break
     append({"schema": SCHEMA, "event": "complete", "samples": count,
             "observedMs": previous_ms,
+            **({"startedMonotonicMs": start // 1000000,
+                "monotonicMs": start // 1000000 + previous_ms} if workflow_clock else {}),
             "calibration": {"kind": "hostcpu", "durationSeconds": duration,
                             "intervalMs": interval * 1000}})
     # Publish only a complete bounded capture. Cancellation cannot produce a
@@ -130,9 +132,10 @@ def main():
     parser.add_argument("--workshop", action="store_true", required=True)
     parser.add_argument("--duration", required=True, type=int)
     parser.add_argument("--interval", required=True, type=int)
+    parser.add_argument("--workflow-clock", action="store_true")
     args = parser.parse_args()
     try:
-        sys.stdout.write(capture(args.duration, args.interval))
+        sys.stdout.write(capture(args.duration, args.interval, workflow_clock=args.workflow_clock))
     except (OSError, ValueError) as exc:
         print("CPU capture unavailable: " + str(exc), file=sys.stderr)
         return 1

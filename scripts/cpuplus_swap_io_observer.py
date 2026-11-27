@@ -171,7 +171,7 @@ def validate(duration, interval, page_size):
         raise ValueError("unsupported system page size")
 
 
-def capture(duration, interval, proc=Path("/proc"), block=Path("/sys/block"), page_size=None):
+def capture(duration, interval, proc=Path("/proc"), block=Path("/sys/block"), page_size=None, workflow_clock=False):
     page_size = os.sysconf("SC_PAGE_SIZE") if page_size is None else page_size
     validate(duration, interval, page_size)
     pinned, memory, previous, pressure, _ = snapshot(proc, block)
@@ -209,7 +209,9 @@ def capture(duration, interval, proc=Path("/proc"), block=Path("/sys/block"), pa
         if scheduled == duration:
             break
     append({"schema": SCHEMA, "event": "complete", "samples": len(lines),
-            "observedMs": elapsed_previous, "pageSize": page_size,
+            "observedMs": elapsed_previous,
+            **({"startedMonotonicMs": start // 1000000,
+                "monotonicMs": start // 1000000 + elapsed_previous} if workflow_clock else {}), "pageSize": page_size,
             "calibration": {"kind": "swapio", "durationSeconds": duration, "intervalMs": interval*1000}})
     return "\n".join(lines) + "\n"
 
@@ -219,9 +221,10 @@ def main():
     parser.add_argument("--workshop", required=True, action="store_true")
     parser.add_argument("--duration", required=True, type=int)
     parser.add_argument("--interval", required=True, type=int)
+    parser.add_argument("--workflow-clock", action="store_true")
     args = parser.parse_args()
     try:
-        sys.stdout.write(capture(args.duration, args.interval))
+        sys.stdout.write(capture(args.duration, args.interval, workflow_clock=args.workflow_clock))
     except (OSError, ValueError, RuntimeError) as exc:
         print("Swap capture unavailable: " + str(exc), file=sys.stderr)
         return 1

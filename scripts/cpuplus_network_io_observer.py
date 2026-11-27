@@ -122,7 +122,7 @@ def validate(duration, interval):
 
 
 def capture(duration, interval, procdev=Path("/proc/net/dev"),
-            net=Path("/sys/class/net"), devices_root=Path("/sys/devices")):
+            net=Path("/sys/class/net"), devices_root=Path("/sys/devices"), workflow_clock=False):
     validate(duration, interval)
     devices_root = devices_root.resolve(strict=True)
     pinned, before, _ = snapshot(procdev, net, devices_root)
@@ -159,7 +159,9 @@ def capture(duration, interval, procdev=Path("/proc/net/dev"),
         if scheduled == duration:
             break
     append({"schema": SCHEMA, "event": "complete", "samples": len(lines),
-            "observedMs": previous, "calibration": {"kind": "netio",
+            "observedMs": previous,
+            **({"startedMonotonicMs": start // 1000000,
+                "monotonicMs": start // 1000000 + previous} if workflow_clock else {}), "calibration": {"kind": "netio",
                 "durationSeconds": duration, "intervalMs": interval * 1000}})
     return "\n".join(lines) + "\n"
 
@@ -169,9 +171,10 @@ def main():
     parser.add_argument("--workshop", required=True, action="store_true")
     parser.add_argument("--duration", required=True, type=int)
     parser.add_argument("--interval", required=True, type=int)
+    parser.add_argument("--workflow-clock", action="store_true")
     args = parser.parse_args()
     try:
-        sys.stdout.write(capture(args.duration, args.interval))
+        sys.stdout.write(capture(args.duration, args.interval, workflow_clock=args.workflow_clock))
     except (OSError, ValueError, RuntimeError) as exc:
         print("Network capture unavailable: " + str(exc), file=sys.stderr)
         return 1

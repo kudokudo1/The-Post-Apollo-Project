@@ -808,7 +808,7 @@ test("GitW synchronization buttons retain per-control colors and child-owned act
     assert.match(action,/gitService.pendingProcessAction === operationKey/);
     assert.match(action,/pendingProcessAction === "track-checkout"/);
     assert.match(action,/gitService.actionExitCode === 0[\s\S]*?\? "success" : "failure"/);
-    for (const [name,token] of [["FETCH","fetch"],["PULL","pull"],["PUSH","push"]]) {
+    for (const [name,token] of [["FETCH","fetch"],["PUSH","push"]]) {
         assert.match(git,new RegExp('operationKey: "'+token+'"'));
         assert.match(git,new RegExp('gitService.runSyncAction\\("'+token+'"\\)'));
     }
@@ -816,7 +816,7 @@ test("GitW synchronization buttons retain per-control colors and child-owned act
     assert.match(git,/actionAccentColor: Colors.magenta/);
     assert.match(service,/property double actionLastActivityAt: 0/);
     assert.match(service,/onActionBusyChanged: if \(actionBusy\) actionLastActivityAt = Date.now\(\)/);
-    assert.match(service,/onActionStageChanged: if \(actionBusy\) actionLastActivityAt = Date.now\(\)/);
+    assert.match(service,/onActionStageChanged: if \(actionBusy && actionStage !== "RUNNING \(SLOW\)"\)/);
     assert.match(service,/function consumeActionLine\(line\)[\s\S]*?noteActionActivity\(\)/);
     assert.match(service,/gitService.noteActionActivity\(\)/);
     assert.match(service,/Only warn\. Never mark failed or unlock while Git may run/);

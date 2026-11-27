@@ -38,6 +38,9 @@ Rectangle {
     // The host provides upright external reference labels/readout. All existing
     // vertical INDEX/VALUE/STEP/RANGE consumers retain their defaults.
     property bool horizontalStepPresentation: false
+    property bool compactVerticalStep: false
+    property color focusBorderColor: Colors.cyan
+    readonly property bool externalStepReadout: horizontalStep || (stepMode && compactVerticalStep)
     readonly property bool horizontalStep: stepMode && horizontalStepPresentation
     // F2 VALUE is opt-in. Existing INDEX users retain the exact default.
     property string selectorProfile: "index" // "index" | "value" | "step" | "range"
@@ -414,7 +417,7 @@ Rectangle {
             topMargin: 13
         }
 
-        visible: !slider.horizontalStep
+        visible: !slider.externalStepReadout
         rotation: -90
         transformOrigin: Item.Center
         text: slider.sideLabel
@@ -432,8 +435,8 @@ Rectangle {
             bottom: parent.bottom
             left: parent.left
             right: parent.right
-            topMargin: slider.horizontalStep ? 8 : 38
-            bottomMargin: slider.horizontalStep ? 8 : 26
+            topMargin: slider.externalStepReadout ? 8 : 38
+            bottomMargin: slider.externalStepReadout ? 8 : 26
             leftMargin: 4
             rightMargin: 4
         }
@@ -502,7 +505,7 @@ Rectangle {
                 }
 
                 GohuText {
-                    visible: !slider.horizontalStep
+                    visible: !slider.externalStepReadout
                     x: 10
                     anchors.verticalCenter: parent.verticalCenter
                     text: slider.valueText(parent.tickValue)
@@ -1110,11 +1113,11 @@ Rectangle {
         color: "transparent"
         radius: slider.radius
         border.width: 2
-        border.color: Colors.cyan
+        border.color: slider.focusBorderColor
     }
 
     GohuText {
-        visible: !slider.rangeMode && !slider.horizontalStep
+        visible: !slider.rangeMode && !slider.externalStepReadout
             && (slider.numericMode || slider.showIndexReadout)
         anchors {
             horizontalCenter: parent.horizontalCenter

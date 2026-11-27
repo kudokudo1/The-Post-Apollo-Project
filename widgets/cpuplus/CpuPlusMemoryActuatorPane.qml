@@ -15,8 +15,7 @@ Item {
     property var recoverySession: null
     // Only the DIAG instrument scope changes; capacity and policy stay shared.
     property string diagnosticSubject: "MEMORY"
-    property bool diagnosticInfoOpen: false
-    onDiagnosticSubjectChanged: diagnosticInfoOpen=false
+    readonly property bool diagnosticInfoOpen: memoryDiagnosticInfo.hovered && root.page==="DIAG"
     property var sample: null
     property var lastGoodSample: null
     readonly property var displaySample: lastGoodSample
@@ -339,7 +338,6 @@ Item {
             capSection = 0;
         }
         detailsInfoOpen=false;
-        diagnosticInfoOpen=false;
         CpuPlusDiagnostics.memoryMenuIndex = index;
         scroll.contentY = 0;
     }
@@ -507,20 +505,10 @@ Item {
                 elide: Text.ElideRight
             }
             InformationButton {
+                id: memoryDiagnosticInfo
                 objectName: "cpuplusMemoryDiagnosticsInfo"
                 selected: root.diagnosticInfoOpen
-                onLeftClicked: root.diagnosticInfoOpen=!root.diagnosticInfoOpen
             }
-        }
-        GohuText {
-            width: parent.width
-            visible: root.page==="DIAG" && root.diagnosticSubject!=="ALL" && root.diagnosticInfoOpen
-            text: root.diagnosticSubject==="SWAP"
-                ? "Read-only swap movement, memory pressure and zram allocation. Capacity and policy controls are separate."
-                : "Read-only Quickshell memory capture: resident, proportional and private memory; swap and host RAM context. Capacity and policy controls are separate."
-            color: Colors.white
-            font.pixelSize: 10
-            wrapMode: Text.WordWrap
         }
         LiveCapacityHeader {
             objectName: "cpuplusSharedCapacityHeader"
@@ -1632,4 +1620,28 @@ Item {
         }
     }
     NeonScrollBar { flickable: scroll; visible: root.visible && scroll.visible && scrollable && scroll.interactive && !root.scanDiagnosticsOpen }
+    Rectangle {
+        objectName: "cpuplusMemoryDiagnosticsInfoPopup"
+        visible: root.diagnosticInfoOpen && root.visible && root.diagnosticSubject!=="ALL"
+        z: 401
+        x: 5
+        y: memoryDiagnosticInfo.mapToItem(root,0,memoryDiagnosticInfo.height).y+3
+        width: Math.max(0,root.width-10)
+        height: Math.min(Math.max(0,root.height-y),memoryHelpText.implicitHeight+12)
+        color: Colors.black
+        border.color: Colors.yellow
+        clip: true
+        GohuText {
+            id: memoryHelpText
+            width: Math.max(0,parent.width-12)
+            x: 6
+            y: 6
+            text: root.diagnosticSubject==="SWAP"
+                ? "Read-only swap movement, memory pressure and zram allocation. Capacity and policy controls are separate."
+                : "Read-only Quickshell memory capture: resident, proportional and private memory; swap and host RAM context. Capacity and policy controls are separate."
+            color: Colors.white
+            font.pixelSize: 10
+            wrapMode: Text.WordWrap
+        }
+    }
 }

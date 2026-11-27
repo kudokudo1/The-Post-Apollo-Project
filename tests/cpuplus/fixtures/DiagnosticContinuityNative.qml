@@ -819,7 +819,7 @@ ShellRoot {
                 const controls=root.findItem(pane.item,"cpuplusDiagnosticWorkspace-WORK");
                 const workflows=root.findItem(pane.item,"cpuplusDiagnosticWorkspace-PRESETS");
                 if (!root.check(rail && context && footer && modes && controls && workflows && rail.visible
-                    && footer.parent===root.findItem(pane.item,"cpuplusWorkFooter")
+                    && footer.parent.parent===root.findItem(pane.item,"cpuplusWorkFooter")
                     && footer.height===53 && context.height===25 && rail.height===25
                     && context.y+context.height+3===rail.y && modes.y===0 && controls.selected,
                     "fixed two-row footer with context above workspace // "+JSON.stringify({footer:footer?footer.height:null,context:context?{y:context.y,h:context.height}:null,rail:rail?{y:rail.y,h:rail.height,v:rail.visible}:null,modes:modes?modes.y:null,selected:controls?controls.selected:null,parent:footer?footer.parent.objectName:null}))) return;
@@ -1328,10 +1328,18 @@ ShellRoot {
                 const host=root.findItem(resourcePane.item,"cpuplusResourceFilterHost");
                 const block=root.findItem(resourcePane.item,"cpuplusResourceStatusBlock");
                 const band=root.findItem(resourcePane.item,"cpuplusResourceStatusBand");
-                if(!root.check(w&&host&&block&&band&&band.stacked
-                    && host.y>=block.y+block.height+4 && host.x>=0
-                    && host.x+host.width<=band.width+1 && w.draft.selected.length===10,
-                    "SYSTEM narrow stacked header cannot overlap status text"))return;
+                const rack=root.findItem(w,"cpuplusWorkshopSliderRack");
+                const execute=root.findItem(resourcePane.item,"cpuplusWorkshopExecute");
+                const nav=root.findItem(resourcePane.item,"cpuplusDiagBottomControls");
+                const slider=root.findItem(w,"cpuplusWorkshopDuration-hardware");
+                if(!root.check(w&&host&&block&&band&&!band.stacked
+                    && block.x+block.width<=host.x && host.x+host.width<=band.width+1
+                    && w.draft.selected.length===10 && w.verticalLayout && rack && slider
+                    && slider.rotation===0 && !slider.horizontalStepPresentation
+                    && String(slider.focusBorderColor)===String(root.findItem(w,"cpuplusWorkshopMemoryInterval").subjectColor)
+                    && execute && nav && execute.mapToItem(resourcePane.item,0,0).y+execute.height<=nav.mapToItem(resourcePane.item,0,0).y
+                    && root.findItem(resourcePane.item,"cpuplusResourceMode-DIAG").visible,
+                    "SYSTEM compact header, vertical rack and pinned execution"))return;
                 root.resourcePaneActive=false;
                 root.memorySubject="MEMORY";
                 nativeWindow.width=320;

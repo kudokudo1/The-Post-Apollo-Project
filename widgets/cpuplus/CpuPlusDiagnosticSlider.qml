@@ -14,13 +14,20 @@ Column {
     property color fillColor: Colors.omnitrix
     property bool adjustable: true
     property bool compact: false
+    property bool vertical: false
+    property string shortTitle: title
+    property real verticalTravel: 96
     // Cool white hardware with a restrained semantic tint, not saturated ink.
     readonly property color hardwareFace: Qt.rgba(0.72+subjectColor.r*0.28,0.72+subjectColor.g*0.28,0.72+subjectColor.b*0.28,1)
     signal valueRequested(real value)
     spacing: compact ? 0 : 2
     CpuPlusMemoryReadout {
         width: parent.width
-        text: root.title + " // " + root.readout
+        text: root.vertical ? root.shortTitle : root.title + " // " + root.readout
+        horizontalAlignment: root.vertical ? Text.AlignHCenter : Text.AlignLeft
+        fontSizeMode: Text.HorizontalFit
+        minimumPixelSize: 7
+        height: root.vertical ? 15 : implicitHeight
         color: root.subjectColor
         font.pixelSize: 12
         semanticGlowColor: root.fillColor
@@ -28,14 +35,16 @@ Column {
     }
     Item {
         width: parent.width
-        height: root.compact ? 22 : 32
+        height: root.vertical ? root.verticalTravel : (root.compact ? 22 : 32)
         SelectorSlider {
             objectName: root.objectName + "-hardware"
             anchors.centerIn: parent
-            width: parent.height
-            height: parent.width
-            rotation: 90
-            horizontalStepPresentation: true
+            width: root.vertical ? Math.min(parent.width,32) : parent.height
+            height: root.vertical ? parent.height : parent.width
+            rotation: root.vertical ? 0 : 90
+            horizontalStepPresentation: !root.vertical
+            compactVerticalStep: root.vertical
+            focusBorderColor: Colors.magenta
             selectorProfile: "step"
             minimumValue: root.minimumValue
             maximumValue: root.maximumValue
@@ -56,5 +65,18 @@ Column {
             activityGlowColor: root.fillColor
             onValueRequested: value => root.valueRequested(value)
         }
+    }
+    CpuPlusMemoryReadout {
+        visible: root.vertical
+        width: parent.width
+        height: 15
+        text: root.readout.replace(" SEC","s").replace(" MS","ms")
+        color: root.subjectColor
+        semanticGlowColor: root.fillColor
+        font.pixelSize: 10
+        fontSizeMode: Text.HorizontalFit
+        minimumPixelSize: 7
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
     }
 }

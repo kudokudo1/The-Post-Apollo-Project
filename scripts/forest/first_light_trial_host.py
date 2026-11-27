@@ -95,7 +95,8 @@ class FirstLightTrialHost:
             self._operation = OperationRef(ref, "first-light-" + nonce)
             self._resolve_context()
             bridge = ForestTurnBridge(journal, clock_ms=self._tick,
-                                      streamer=self._exact_stream)
+                                      streamer=self._exact_stream,
+                                      first_light_prompt=PROMPT)
             self._runtime = RuntimeExchange(
                 bridge, self._operation,
                 resolve_current_context=self._resolve_context,
@@ -123,8 +124,9 @@ class FirstLightTrialHost:
         return ref
 
     def _exact_stream(self, **options):
-        # B3 has selected M2's exact bounded input in its reservation
-        # transaction. Refuse drift before the transport can do any work.
+        # B3 now uses Mind's canonical exact-input helper inside the
+        # reservation transaction. This separate check binds the actual
+        # transport parameters to the original fixed public trial.
         if (set(options) != {"model", "messages", "endpoint", "num_ctx",
                              "max_predict", "cancel_event"}
                 or options["model"] != MODEL or options["endpoint"] != ENDPOINT

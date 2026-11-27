@@ -66,8 +66,13 @@ Item {
             surface.requestPaint();
         }
     }
-    onProgressChanged: if (initialized && phase === "running")
-        lastFraction = Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion).fraction
+    onProgressChanged: if (initialized && phase === "running") {
+        const next=Motion.frame(phase, progressMode, progress, elapsed, finishFrom, reducedMotion).fraction;
+        if (materialExperiment && progressMode === "indeterminate") {
+            materialPeak=Math.max(materialPeak,next);
+            lastFraction=materialPeak;
+        } else lastFraction=next;
+    }
     onEnergyColorChanged: if (initialized) surface.requestPaint()
     onChassisColorChanged: if (initialized) surface.requestPaint()
     onVariantChanged: if (initialized) surface.requestPaint()

@@ -125,3 +125,47 @@ test("burn-away terminal state draws no remaining structure; ash remains deposit
     assert.match(source,/root.materialPeak=Math.max\(root.materialPeak,next\)/);
     assert.ok(preview.includes('fireMode:"ash-trail"')&&preview.includes('fireMode:"burn-away"'));
 });
+
+test("TRON advances monotonically without inventing completion", () => {
+    let previous=0;
+    for(let t=0;t<120;t+=.013) {
+        const f=frame("running","indeterminate",0,t,0,false,"tron");
+        assert.ok(f.fraction>=previous && f.fraction<=.96);
+        assert.equal(f.clash,false);
+        previous=f.fraction;
+    }
+    assert.equal(frame("running","measured",.43,12,0,false,"tron").fraction,.43);
+});
+test("Ki Blast clash remains complementary and defeat retreats to zero", () => {
+    for(let t=0;t<60;t+=.013) {
+        const f=frame("running","indeterminate",0,t,0,false,"ki-blast");
+        assert.ok(f.clash && f.fraction>=.43 && f.fraction<1);
+        assert.ok(Math.abs(f.enemyFraction+f.fraction-1)<1e-12);
+    }
+    let prev=.73;
+    for(let t=0;t<.84;t+=.005) {
+        const f=frame("failure","indeterminate",0,t,.73,false,"ki-blast");
+        assert.ok(f.fraction<=prev+1e-12);
+        assert.ok(Math.abs(f.enemyFraction+f.fraction-1)<1e-12);
+        prev=f.fraction;
+    }
+    assert.equal(frame("failure","indeterminate",0,1,.73,false,"ki-blast").fraction,0);
+    assert.equal(frame("failure","indeterminate",0,0,.73,true,"ki-blast").fraction,0);
+    assert.equal(frame("success","indeterminate",0,.42,.73,false,"ki-blast").enemyFraction,0);
+    assert.equal(frame("running","measured",.42,4,0,false,"ki-blast").fraction,.42);
+    assert.equal(frame("failure","measured",0,1,.73,false,"flamethrower").fraction,.73);
+});
+test("Omnitrix has an expanding success pulse and non-fire heads are enlarged", () => {
+    let prev=0;
+    for(let t=.42;t<.82;t+=.005){
+        const f=profiles.host("omnitrix",t,1,1,"success",false);
+        assert.ok(f.flashSpread>=prev && f.flashSpread<=1);
+        prev=f.flashSpread;
+    }
+    for(const name of ["omnitrix","tron","ki-blast"]) assert.ok(profiles.profile(name).headConsume>1);
+    assert.equal(profiles.profile("flamethrower").headConsume,1);
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(preview,/source.mapToItem\(flashOverlay/);
+    assert.match(preview,/field.flashColor/);
+    assert.match(preview,/createRadialGradient\(origin.x,origin.y/);
+});

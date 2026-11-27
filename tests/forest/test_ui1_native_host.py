@@ -202,6 +202,19 @@ def trial(width, height, count):
                      "capability_registry_b6r2.py", "runtime_stop_control_r2.py", "local_terminal_outbox_b4f.py"):
             shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
+        shutil.copy2(ROOT / "tests/forest/ui1_native_host/FirstLightProcess.qml",
+                     scene / "FirstLightProcess.qml")
+        (scene / "privateFirstLight").mkdir(mode=0o700)
+        for name in ("first_light_delivery.py", "first_light_trial_host.py"):
+            shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
+        for name in ("first_light_delivery_child.py", "test_ollama_chat_transport.py"):
+            shutil.copyfile(ROOT / "tests/forest" / name, scene / "runtime" / name)
+        for name in ("first_light_delivery.py", "first_light_trial_host.py",
+                     "first_light_delivery_child.py", "test_ollama_chat_transport.py"):
+            source = ROOT / ("tests/forest" if name in ("first_light_delivery_child.py",
+                            "test_ollama_chat_transport.py") else "scripts/forest") / name
+            if source.read_bytes() != (scene / "runtime" / name).read_bytes():
+                raise AssertionError("FIRST_LIGHT_CHILD_SOURCE_MISMATCH")
         # A finite, pre-captured public witness from actual owner delivery.
         # No command receiver, provider connection, or native admission.
         capture = capture_first_light() if width >= 770 else {}
@@ -257,7 +270,7 @@ def trial(width, height, count):
                     stderr=subprocess.STDOUT, start_new_session=True)
                 if width == 1366:
                     observe_joined_db(qs, scene, qs_log)
-                code = qs.wait(timeout=35)
+                code = qs.wait(timeout=65)
             output = qs_log.read_text(errors="replace")
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
@@ -293,6 +306,11 @@ def trial(width, height, count):
                    if "FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS " in line]
             if fl5 != ([str(i) for i in range(11)] if width >= 770 else []):
                 raise AssertionError("FIRST_LIGHT_CAPTURE_PHASES")
+            fl7 = [line.split("FOREST_HOST_FIRST_LIGHT_CHILD_PASS ", 1)[1].strip()
+                   for line in output.splitlines()
+                   if "FOREST_HOST_FIRST_LIGHT_CHILD_PASS " in line]
+            if fl7 != (["COMMIT", "STOP", "WITHDRAW"] if width >= 770 else []):
+                raise AssertionError("FIRST_LIGHT_CHILD_TRIALS")
             if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
                     season != ([str(i) for i in range(9)] if width >= 770 else []) or
                     output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

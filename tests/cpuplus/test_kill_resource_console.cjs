@@ -79,7 +79,7 @@ test("K8d3 places modes beside the primary instrument and actions above divider"
     const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
     // The mode cluster must be a child of the FIRST instrument row; the
     // selected editor is frameless rather than another boxed filter card.
-    assert.match(ui,/Item \\{\\s*id: resourcePanel/);
+    assert.match(ui,/Item \{\s*id: resourcePanel/);
     assert.ok(!ui.includes("id: modeRow"));
     assert.ok(ui.includes("id: instrumentRow"));
     assert.ok(ui.includes("id: modeCluster"));
@@ -90,8 +90,8 @@ test("K8d3 places modes beside the primary instrument and actions above divider"
     assert.ok(instrument < slider && slider < modes && modes < number);
     assert.match(ui,/visible: field.index === 0/);
     assert.match(ui,/columns: 2/);
-    assert.match(ui,/model: \\["off","manual","auto","hold"\\]/);
-    assert.match(ui,/adjustable: root.selectionReady && root.modeFor\\(resourcePanel.key\\) === "manual"/);
+    assert.match(ui,/model: \["off","manual","auto","hold"\]/);
+    assert.match(ui,/adjustable: root.selectionReady && root.modeFor\(resourcePanel.key\) === "manual"/);
     assert.ok(ui.includes('objectName: "cpuPlusResourceWorkspaceActions"'));
     const actions=ui.indexOf('objectName: "cpuPlusResourceWorkspaceActions"');
     const divider=ui.indexOf('objectName: "cpuPlusResourceFooterDivider"');
@@ -103,15 +103,15 @@ test("K8d3 places modes beside the primary instrument and actions above divider"
     assert.match(ui.slice(review,divider),/accentColor: Colors.yellow/);
     assert.match(ui.slice(apply),/accentColor: Colors.green/);
     assert.match(ui.slice(apply),/available: false/);
-    assert.match(ui,/objectName: "cpuPlusResourceFooterDivider"[\\s\\S]*?color: Colors.red/);
-    assert.match(ui,/text: "RESOURCE CONTROL \\/\\/ DRAFT"[\\s\\S]*?color: Colors.orange[\\s\\S]*?color: Colors.red/);
+    assert.match(ui,/objectName: "cpuPlusResourceFooterDivider"[\s\S]*?color: Colors.red/);
+    assert.match(ui,/text: "RESOURCE CONTROL \/\/ DRAFT"[\s\S]*?color: Colors.orange[\s\S]*?color: Colors.red/);
 });
 
 test("K8d3 has a functional right-aligned information button directly below filters",()=>{
     const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
-    assert.match(ui,/import "\\.\\.\\/appcontrol"/);
-    assert.match(ui,/id: resourceInfoStrip[\\s\\S]*?anchors.top: resourceFilters.bottom/);
-    assert.match(ui,/id: resourceInformationButton[\\s\\S]*?anchors.right: parent.right/);
+    assert.match(ui,/import "\.\.\/appcontrol"/);
+    assert.match(ui,/id: resourceInfoStrip[\s\S]*?anchors.top: resourceFilters.bottom/);
+    assert.match(ui,/id: resourceInformationButton[\s\S]*?anchors.right: parent.right/);
     assert.match(ui,/objectName: "cpuPlusResourceInformationButton"/);
     assert.match(ui,/onLeftClicked: root.informationOpen = !root.informationOpen/);
     assert.match(ui,/objectName: "cpuPlusResourceInformationPopup"/);

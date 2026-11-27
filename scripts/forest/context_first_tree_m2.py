@@ -178,6 +178,22 @@ def snapshot_in_transaction(journal, requested, *, current, capability_plan=None
             raise ContextRefusal("SESSION_NOT_OPEN")
         if row[1] != current.expected_revision:
             raise ContextRefusal("STALE_REVISION")
+        # Resolve the original trigger using metadata before fetching any
+        # body. This remains the one-Tree fixture path, not a room audience
+        # check or authenticated permission. Both reads share the caller's
+        # transaction; select_history still checks the full bounded suffix.
+        latest = db.execute(
+            "SELECT turn_id,ordinal,role FROM forest_turns "
+            "WHERE session_id=? ORDER BY ordinal DESC LIMIT 1",
+            (current.session_id,),
+        ).fetchone()
+        if latest is None:
+            raise ContextRefusal("INVALID_HISTORY")
+        if latest[2] != "user" or latest[0] != current.user_turn_id:
+            raise ContextRefusal("LATEST_USER_MISMATCH")
+        _integer(latest[1], 1)
+        if latest[1] > current.expected_revision:
+            raise ContextRefusal("INVALID_HISTORY_REVISION")
         rows = db.execute(
             "SELECT turn_id,ordinal,role,body,provider_key,model_key,recorded_at_ms "
             "FROM forest_turns WHERE session_id=? ORDER BY ordinal DESC LIMIT ?",

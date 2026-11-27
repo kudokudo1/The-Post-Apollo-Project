@@ -108,6 +108,67 @@ class ContextTests(unittest.TestCase):
         with self.assertRaisesRegex(ContextRefusal, "LATEST_USER_MISMATCH"):
             self.read()
 
+    def test_wrong_trigger_refused_before_body_query(self):
+        # SQLite authorizer denies statement preparation if body is read.
+        # No provider invocation or protected source is involved.
+        body_attempts = []
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and table == "forest_turns" and column == "body":
+                body_attempts.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            wrong = replace(self.ref, user_turn_id="wrong")
+            with self.assertRaisesRegex(ContextRefusal, "LATEST_USER_MISMATCH"):
+                self.read(requested=wrong, current=wrong)
+            self.assertEqual(body_attempts, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_assistant_trigger_refused_before_body_query(self):
+        self.append("assistant", "Public answer")
+        body_attempts = []
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and table == "forest_turns" and column == "body":
+                body_attempts.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "LATEST_USER_MISMATCH"):
+                self.read()
+            self.assertEqual(body_attempts, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_empty_or_inconsistent_trigger_refused_before_body_query(self):
+        # Disposable malformed journal fixtures; never modify a real store.
+        self.db.execute("UPDATE forest_turns SET ordinal=2 WHERE session_id=?", (self.sid,))
+        self.db.commit()
+        body_attempts = []
+        def authorizer(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and table == "forest_turns" and column == "body":
+                body_attempts.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        self.db.set_authorizer(authorizer)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "INVALID_HISTORY_REVISION"):
+                self.read()
+            empty = self.journal.create_session(
+                self.context.principal_key, self.context.tree_key,
+                "Empty fixture", now_ms=9)
+            ref = SessionContextRef(self.context, empty["session_id"], 0, "missing")
+            with self.assertRaisesRegex(ContextRefusal, "INVALID_HISTORY"):
+                self.read(requested=ref, current=ref)
+            self.assertEqual(body_attempts, [])
+        finally:
+            self.db.set_authorizer(None)
+
     def test_transaction_required(self):
         with self.assertRaisesRegex(ContextRefusal, "TRANSACTION_REQUIRED"):
             snapshot_in_transaction(self.journal, self.ref, current=self.ref)

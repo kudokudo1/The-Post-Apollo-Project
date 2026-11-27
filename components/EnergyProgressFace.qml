@@ -30,6 +30,9 @@ Item {
         reducedMotion || !visible || phase !== "running")
     readonly property real displayedFraction: materialExperiment && progressMode === "indeterminate"
         ? Math.max(materialPeak, visualFrame.fraction) : visualFrame.fraction
+    readonly property var track: Flow.trackGeometry(width,height,displayedFraction)
+    readonly property real fillGap: track.gap
+    readonly property real headCenterX: track.front
     readonly property real headCenterY: height / 2
     readonly property bool animationActive: visible && !reducedMotion
         && (phase === "running" || (phase === "success" && elapsed < .84)
@@ -135,7 +138,7 @@ Item {
             if(root.variant==="flamethrower") {
                 const front=root.displayedFraction;
                 root.flameSpeed=PixelFire.velocity(root.speedFraction,front,
-                    root.elapsed-root.speedTime,root.width-2,root.height,root.flameSpeed);
+                    root.elapsed-root.speedTime,root.track.width,root.height,root.flameSpeed);
                 root.speedFraction=front;
                 root.speedTime=root.elapsed;
                 surface.requestPaint();
@@ -167,6 +170,8 @@ Item {
                 const x=spill, y=spill, w=Math.max(0,root.width), h=Math.max(0,root.height);
                 if (w<4 || h<4) return;
                 const f=root.visualFrame, p=root.displayedFraction, mid=y+h/2;
+                const inset=root.track.inset, fx=x+inset, fy=y+inset;
+                const inner=root.track.width, fillHeight=root.track.height, edge=x+root.headCenterX;
                 const ink=root.phase==="failure" && root.variant!=="ki-blast" ? Colors.red : root.energyColor;
                 // Flat baseline: no radial gradients, external spill, or head.
                 if(root.variant==="default") {
@@ -176,12 +181,12 @@ Item {
                     c.lineWidth=1;
                     c.strokeRect(x+.5,y+.5,w-1,h-1);
                     if(p>0) {
-                        const fill=c.createLinearGradient(0,y+1,0,y+h-1);
+                        const fill=c.createLinearGradient(0,fy,0,fy+fillHeight);
                         fill.addColorStop(0,Qt.rgba(ink.r*.70,ink.g*.70,ink.b*.70,1));
                         fill.addColorStop(.5,Qt.rgba(ink.r*.38,ink.g*.38,ink.b*.38,1));
                         fill.addColorStop(1,Qt.rgba(ink.r*.60,ink.g*.60,ink.b*.60,1));
                         c.fillStyle=fill;
-                        c.fillRect(x+1,y+1,(w-2)*p,h-2);
+                        c.fillRect(fx,fy,inner*p,fillHeight);
                     }
                     return;
                 }
@@ -196,8 +201,7 @@ Item {
                         a.b+(b.b-a.b)*k,1);
                 }
                 const material=Material.geometry(root.materialExperiment ? root.fireMode : "standard",
-                    p,w-2,h-2);
-                const inner=w-2, edge=x+1+inner*p;
+                    p,inner,fillHeight);
                 // Emitted light, behind the opaque track. Cooled material remains dark.
                 const flame=root.flameMotion;
                 function radiate(start,span,color,amount) {
@@ -234,7 +238,7 @@ Item {
                         c.fillRect(side<0?-1:0,-1,1,2); c.restore();
                     }
                 }
-                if(f.headVisible && !material.experimental) radiate(x+1,inner*p,ink,ki?.47:hot?.34:tron?.25:.38);
+                if(f.headVisible && !material.experimental) radiate(fx,inner*p,ink,ki?.47:hot?.34:tron?.25:.38);
                 // Shared flame-attached optical field: smooth orange falloff
                 // and a short velocity-dependent backward stretch.
                 function fireHalo(cx,cy,rx,ry,amount) {
@@ -260,8 +264,8 @@ Item {
                 // In Burn Away, the traversed chassis is gone, not covered
                 // by a differently colored progress fill.
                 if (material.erosion && p>0) {
-                    Material.drawRemaining(c,x+1,y+1,inner,h-2,edge,
-                        f.headVisible,root.chassisColor);
+                    if(p<1) Material.drawRemaining(c,x+.5,y+.5,w-1,h-1,edge,
+                        f.headVisible,root.chassisColor,inset-.5);
                 } else {
                 // Low-cost perimeter: three nested outlines, no full-face shadow.
                 for (let i=3;i>=1;i--) {
@@ -276,19 +280,19 @@ Item {
                 c.strokeRect(x+.5,y+.5,w-1,h-1);
                 }
                 if (material.ash && p>0) {
-                    Material.drawAsh(c,x+1,y+1,inner,h-2,edge,f.headVisible);
+                    Material.drawAsh(c,fx,fy,inner,fillHeight,edge,f.headVisible);
                 } else if (!material.erosion && p>0) {
-                    const g=c.createLinearGradient(0,y+1,0,y+h-1);
+                    const g=c.createLinearGradient(0,fy,0,fy+fillHeight);
                     g.addColorStop(0,ink);
                     g.addColorStop(.18,mix(Colors.dark,ink,tron?.22:.42));
                     g.addColorStop(.50,mix(Colors.dark,ink,ki?.92:hot?.72:omni?.80:.43));
                     g.addColorStop(.82,mix(Colors.dark,ink,tron?.22:.42));
                     g.addColorStop(1,ink);
                     c.fillStyle=g;
-                    c.fillRect(x+1,y+1,inner*p,h-2);
+                    c.fillRect(fx,fy,inner*p,fillHeight);
                     c.fillStyle=tint(Colors.white,.075);
-                    for (let yy=y+4;yy<y+h-2;yy+=4)
-                        c.fillRect(x+1,yy,inner*p,1);
+                    for (let yy=fy+3;yy<fy+fillHeight-1;yy+=4)
+                        c.fillRect(fx,yy,inner*p,1);
                 }
                 // Two contiguous beams share a single collision plane.
                 // The opposing blast occupies the right side until pushed off
@@ -303,7 +307,7 @@ Item {
                     const hotWhite=Qt.rgba(1,.94,.74,1);
                     c.save();
                     c.globalAlpha=f.enemyOpacity;
-                    const g=c.createLinearGradient(0,y+1,0,y+h-1);
+                    const g=c.createLinearGradient(0,fy,0,fy+fillHeight);
                     g.addColorStop(0,mix(cyan,red,heat));
                     g.addColorStop(.18,mix(cool,crimson,heat));
                     g.addColorStop(.38,mix(warm,red,heat));
@@ -311,27 +315,27 @@ Item {
                     g.addColorStop(.62,mix(warm,red,heat));
                     g.addColorStop(.82,mix(cool,crimson,heat));
                     g.addColorStop(1,mix(cyan,red,heat));
-                    c.fillStyle=g; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
+                    c.fillStyle=g; c.fillRect(edge,fy,inner*f.enemyFraction,fillHeight);
                     // Red pressure concentrates at the advancing collision
                     // front first, then progressively consumes the enemy core.
-                    const rush=c.createLinearGradient(edge,mid,x+w-1,mid);
+                    const rush=c.createLinearGradient(edge,mid,fx+inner,mid);
                     rush.addColorStop(0,tint(red,.18+.48*heat));
                     rush.addColorStop(.35,tint(red,.06+.22*heat));
                     rush.addColorStop(1,tint(red,0));
-                    c.fillStyle=rush; c.fillRect(edge,y+1,inner*f.enemyFraction,h-2);
+                    c.fillStyle=rush; c.fillRect(edge,fy,inner*f.enemyFraction,fillHeight);
                     c.restore();
                 }
                 // Paint the current over the material but under the head.
                 // Reduced motion retains a stationary, legible pattern.
                 function current(start,span,side,color,alpha) {
                     if(span<1 || alpha<=0) return;
-                    const rows=Flow.flow(root.variant,root.fireMode,side,span,h-2,
+                    const rows=Flow.flow(root.variant,root.fireMode,side,span,fillHeight,
                         root.elapsed,root.reducedMotion,root.speedLevel);
                     c.save();
-                    c.beginPath(); c.rect(start,y+1,span,h-2); c.clip();
+                    c.beginPath(); c.rect(start,fy,span,fillHeight); c.clip();
                     for(const line of rows) {
                         const left=start+line.x, right=left+line.length;
-                        const yy=y+1+line.y;
+                        const yy=fy+line.y;
                         const g=c.createLinearGradient(left,yy,right,yy);
                         const a=line.alpha*alpha;
                         g.addColorStop(0,tint(color,side==="enemy"?a:0));
@@ -343,7 +347,7 @@ Item {
                     }
                     c.restore();
                 }
-                if(f.headVisible && p>0) current(x+1,inner*p,"player",
+                if(f.headVisible && p>0) current(fx,inner*p,"player",
                     hot?Colors.yellow:ink,1);
                 if(ki && f.clash && f.enemyFraction>0) {
                     const enemyInk=mix(Colors.white,Qt.rgba(1,.10,.16,1),f.enemyHeat);
@@ -380,17 +384,17 @@ Item {
                     const pixel=root.flamePixels;
                     // Heat penetrates the material ahead of the flame.
                     // Keep the already eroded/ashed region unchanged.
-                    const contactWidth=Math.min(w-1-(edge-x),h*1.85+root.flameTipOffset);
+                    const contactWidth=Math.min(fx+inner-edge,h*1.85+root.flameTipOffset);
                     if(contactWidth>0) {
-                        c.save(); c.beginPath(); c.rect(edge,y+1,contactWidth,h-2); c.clip();
+                        c.save(); c.beginPath(); c.rect(edge,fy,contactWidth,fillHeight); c.clip();
                         const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
                         heated.addColorStop(0,tint(Colors.yellow,.94));
                         heated.addColorStop(.23,tint(Colors.orange,.77));
                         heated.addColorStop(.64,tint(Colors.red,.36));
                         heated.addColorStop(1,tint(Colors.red,0));
-                        c.fillStyle=heated; c.fillRect(edge,y+1,contactWidth,h-2);
+                        c.fillStyle=heated; c.fillRect(edge,fy,contactWidth,fillHeight);
                         for(let i=0;i<6;i++){
-                            const yy=y+2+i*(h-4)/5;
+                            const yy=fy+1+i*Math.max(0,fillHeight-2)/5;
                             c.fillStyle=tint(Colors.yellow,.25);
                             c.fillRect(edge,yy,contactWidth*(.22+.28*(i%3)),1);
                         }
@@ -532,7 +536,7 @@ Item {
                             g.addColorStop(.4,tint(winner,.30*dominance));
                             g.addColorStop(1,tint(winner,0));
                             c.fillStyle=g;
-                            c.fillRect(Math.min(edge,end),y+1,penetration,h-2);
+                            c.fillRect(Math.min(edge,end),fy,penetration,fillHeight);
                         }
                     }
                     if(playerWins) {

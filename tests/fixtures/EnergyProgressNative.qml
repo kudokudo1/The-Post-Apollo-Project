@@ -23,6 +23,7 @@ ShellRoot {
         property string mockSavePhase: "idle"
         property real mockSaveProgress: 0
         property double pulseStarted: 0
+        property real pausedAt: 0
         function require(ok, message) {
             if (!ok) {
                 failed = true;
@@ -191,7 +192,31 @@ ShellRoot {
                         if(!lab.require(mockBurn.receiptReady && mockBurn.burnPhase==="success"
                             && mockBurn.burnFraction===1 && mockReceiptSlot.visible
                             && !mockWorkSlot.visible,"verified receipt after full repair")) return;
-                        console.log("ENERGY_NATIVE_PASS seven treatments; timed save; two-stage burn and delayed receipt");
+                        quiet.reducedMotion=false;
+                        quiet.progressMode="measured"; quiet.progress=.4;
+                        quiet.phase="running"; quiet.activityMotionEnabled=true;
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===36) {
+                        if(Date.now()-lab.pulseStarted<400) return;
+                        if(!lab.require(quiet.animationActive && quiet.displayedFraction===.4,
+                            "operation visual starts with exact progress")) return;
+                        quiet.activityMotionEnabled=false;
+                        lab.pausedAt=quiet.elapsed;
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===37) {
+                        if(Date.now()-lab.pulseStarted<500) return;
+                        if(!lab.require(!quiet.animationActive && quiet.displayedFraction===.4
+                            && Math.abs(quiet.elapsed-lab.pausedAt)<.001,
+                            "quiet operation freezes motion without changing progress")) return;
+                        quiet.activityMotionEnabled=true;
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===38) {
+                        if(Date.now()-lab.pulseStarted<400) return;
+                        if(!lab.require(quiet.animationActive && quiet.displayedFraction===.4
+                            && quiet.elapsed>lab.pausedAt && quiet.elapsed<lab.pausedAt+1,
+                            "fresh activity resumes without a clock jump")) return;
+                        quiet.phase="idle";
+                        console.log("ENERGY_NATIVE_PASS seven treatments; timed save; two-stage burn; evidence-clock pause");
                         Qt.quit(); return;
                     }
                     lab.stage++; return;

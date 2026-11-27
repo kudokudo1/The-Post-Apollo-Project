@@ -138,6 +138,35 @@ Item {
         property bool enabledAction: true
         property bool primaryBlue: false
         property color accent: primaryBlue ? Colors.blue : Colors.cyan
+        property bool progressBusy: false
+        property string progressPhase: "idle"
+        property double progressClock: 0
+        property double progressStartedAt: 0
+        readonly property bool progressQuiet: progressBusy
+            && progressClock - progressStartedAt >= 8000
+        onProgressBusyChanged: {
+            if (progressBusy) {
+                progressPhase = "running";
+                progressStartedAt = Date.now();
+                progressClock = progressStartedAt;
+                progressResultHold.stop();
+            } else if (progressPhase === "running") {
+                progressPhase = root.lastError ? "failure" : "success";
+                progressResultHold.restart();
+            }
+        }
+        Timer {
+            interval: 400
+            repeat: true
+            running: button.progressBusy && button.visible
+            onTriggered: button.progressClock = Date.now()
+        }
+        Timer {
+            id: progressResultHold
+            interval: 1300
+            repeat: false
+            onTriggered: button.progressPhase = "idle"
+        }
         property int keyboardListIndex: -1
 
         readonly property bool keyboardSelected:
@@ -185,6 +214,31 @@ Item {
             : mouse.containsMouse
             ? Colors.orange
             : accent
+
+        EnergyProgressFace {
+            anchors.fill: parent
+            anchors.margins: 1
+            z: 0
+            clip: true
+            visible: button.progressPhase !== "idle"
+            variant: "default"
+            energyColor: button.accent
+            chassisColor: button.accent
+            phase: button.progressPhase
+            progressMode: "indeterminate"
+            activityMotionEnabled: !button.progressQuiet
+        }
+
+        GohuText {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 3
+            font.pixelSize: 6
+            color: button.accent
+            text: "NO RESPONSE"
+            visible: button.progressQuiet
+            z: 2
+        }
 
         GohuText {
             id: buttonLabel
@@ -533,6 +587,7 @@ Item {
                 height: parent.height
                 accent: root.isPulls ? Colors.yellow : Colors.blue
                 label: root.busy ? "..." : "REFRESH"
+                progressBusy: root.isPulls && root.busy
                 primaryBlue: true
                 enabledAction: !root.busy && !!root.gitService.repoRemoteSlug
                 onTriggered: root.refresh()

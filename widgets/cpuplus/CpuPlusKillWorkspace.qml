@@ -8,7 +8,7 @@ import "../../services/system"
 import "../../services/kill" as KillBackend
 
 // CPU++ owns navigation and presentation. KillStore owns live telemetry and
-// mini histories; AppControl temporarily owns the birth-time-verified action gate. No second poller,
+// mini histories and the birth-time-verified action gate. No second poller,
 // kill/prlimit backend, detached command, or historical-census actuation.
 Item {
     id: workspace
@@ -22,8 +22,7 @@ Item {
     readonly property var detailGraph: graphController
     property bool active: true
 
-    readonly property var gate: appControlWindow
-        ? appControlWindow.hubProcessActionGate : null
+    readonly property var gate: collectionSource ? collectionSource.actionGate : null
     readonly property var taskRows: collectionSource
         && Array.isArray(collectionSource.rows)
         ? collectionSource.rows : []

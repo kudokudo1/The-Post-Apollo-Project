@@ -1587,18 +1587,19 @@ assert 'ApolloHubMediaExplore {' in tile
 # Phase 2C: all inline process mutations are issued by the AppControl-owner
 # gateway only after a fresh process birth check and local Hub confirmation.
 owner_blob = (ROOT / "widgets/AppControlW.qml").read_text(encoding="utf-8")
-owner_gate = (ROOT / "widgets/appcontrol/AppControlHubActionGate.qml").read_text(encoding="utf-8")
+owner_gate = (ROOT / "services/kill/AppControlHubActionGate.qml").read_text(encoding="utf-8")
+kill_store = (ROOT / "services/kill/KillStore.qml").read_text(encoding="utf-8")
 telemetry = (ROOT / "services/system/ProcessTelemetry.qml").read_text(encoding="utf-8")
 for token in (
     'AppControlHubActionGate {',
-    'property alias hubProcessActionGate: appControlHubGate',
-    'ownerRows: appControlWindow.taskRows',
-    'safetyOwner: taskSafety',
-    'presentationOwner: processPresentationController',
-    'controlOwner: processControl',
-    'limitsOwner: processLimits',
+    'ownerRows: root.rows',
+    'safetyOwner: root.safety',
+    'presentationOwner: root.presentation',
+    'controlOwner: root.control',
+    'limitsOwner: root.limits',
 ):
-    assert token in owner_blob, f"AppControl owner API missing {token}"
+    assert token in kill_store, f"KILL service owner API missing {token}"
+assert 'readonly property var hubProcessActionGate: KillBackend.KillStore.actionGate' in owner_blob
 for token in (
     'function exactRow(pid, startTicks, name)',
     'function toggleOneShotUnlock(pid, startTicks, name)',

@@ -39,6 +39,32 @@ Scope {
     readonly property var control: controlBackend
     readonly property var limits: limitBackend
 
+    // Shared individual action authority. Only the transitional legacy
+    // confirmation UI selects donorTask and contributes its bulk exclusion.
+    property var donorTask: null
+    property bool donorActionBlocked: false
+    readonly property var presentation: actionPresentation
+    readonly property var actionGate: guardedActions
+    ProcessPresentationController {
+        id: actionPresentation
+        safetyService: root.safety
+        limitsService: root.limits
+        controlService: root.control
+        currentTask: root.donorTask
+        taskRows: root.rows
+        onRefreshRequested: afterAction.restart()
+    }
+    AppControlHubActionGate {
+        id: guardedActions
+        ownerRows: root.rows
+        safetyOwner: root.safety
+        presentationOwner: root.presentation
+        controlOwner: root.control
+        limitsOwner: root.limits
+        refreshOwner: root.refreshAfterActionTimer
+        bulkBlocked: root.donorActionBlocked
+    }
+
     TaskSafety { id: safetyState }
     ProcessControl { id: controlBackend }
     ProcessLimits {

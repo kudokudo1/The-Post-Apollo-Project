@@ -60,7 +60,7 @@ PanelWindow {
     property string savedSystemWatchSourceId: ""
     property string savedSystemWatchBoxId: ""
     // Owner-owned typed action surface for Hub RUNNING. No service clones.
-    property alias hubProcessActionGate: appControlHubGate
+    readonly property var hubProcessActionGate: KillBackend.KillStore.actionGate
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
 
@@ -1017,16 +1017,23 @@ PanelWindow {
     readonly property var processControl: KillBackend.KillStore.control
     readonly property var processLimits: KillBackend.KillStore.limits
 
-    ProcessPresentationController {
-        id: processPresentationController
+    readonly property var processPresentationController: KillBackend.KillStore.presentation
 
-        safetyService: taskSafety
-        limitsService: processLimits
-        controlService: processControl
-        currentTask: appControlWindow.selectedTask()
-        taskRows: appControlWindow.taskRows
-
-        onConfirmationRequested: function(
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorTask"
+        value: appControlWindow.selectedTask()
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorActionBlocked"
+        value: appControlWindow.cpuBulkReview !== null
+            || appControlWindow.hunterOperationPhase !== "idle"
+            || appControlWindow.destructiveConfirmOpen
+    }
+    Connections {
+        target: appControlWindow.processPresentationController
+        function onConfirmationRequested(
             kind,
             title,
             message,
@@ -1045,8 +1052,6 @@ PanelWindow {
             appControlWindow.destructiveConfirmTargetName =
                 String(targetName || "");
         }
-
-        onRefreshRequested: taskRefreshAfterKillTimer.restart()
     }
 
     GlobalTaskActionController {
@@ -1057,19 +1062,6 @@ PanelWindow {
         processControllerObject: processPresentationController
         processLimitsObject: processLimits
         refreshTimer: taskRefreshAfterKillTimer
-    }
-
-    AppControlHubActionGate {
-        id: appControlHubGate
-        ownerRows: appControlWindow.taskRows
-        safetyOwner: taskSafety
-        presentationOwner: processPresentationController
-        controlOwner: processControl
-        limitsOwner: processLimits
-        refreshOwner: taskRefreshAfterKillTimer
-        bulkBlocked: appControlWindow.cpuBulkReview !== null
-            || appControlWindow.hunterOperationPhase !== "idle"
-            || appControlWindow.destructiveConfirmOpen
     }
 
     HunterOperationController {
@@ -1344,7 +1336,7 @@ PanelWindow {
     // excluded there even while a row is manually unlocked.
     // Optimistic STOP/CONT state makes the FREEZE button react immediately;
     // the live task snapshot remains the authority after this short window.
-    property alias taskFrozenOptimistic: processPresentationController.frozenOptimistic
+    readonly property var taskFrozenOptimistic: processPresentationController.frozenOptimistic
 
     // HUNTER operation state lives in a cold-path controller. Keep aliases
     // here so the rest of AppControl and its overlay retain the same contract.

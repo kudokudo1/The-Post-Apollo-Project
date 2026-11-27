@@ -8,7 +8,7 @@ const read = p => fs.readFileSync(path.resolve(__dirname, "../..", p), "utf8");
 const recipient = read("widgets/cpuplus/CpuPlusKillWorkspace.qml");
 const host = read("widgets/CpuPlusW.qml");
 const donorView = read("widgets/appcontrol/TaskManagerView.qml");
-const gate = read("widgets/appcontrol/AppControlHubActionGate.qml");
+const gate = read("services/kill/AppControlHubActionGate.qml");
 
 test("CPU++ PROCESS mounts the existing Kill detail only while active", () => {
     assert.match(host, /id: sharedKillWorkspaceLoader/);
@@ -37,7 +37,8 @@ test("recipient uses live owner rows and never historical diagnostic census", ()
 });
 
 test("all mutation requests use shared action gateway and explicit confirmation", () => {
-    assert.match(recipient, /appControlWindow\.hubProcessActionGate/);
+    assert.match(recipient, /collectionSource\.actionGate/);
+    assert.doesNotMatch(recipient, /appControlWindow\.hubProcessActionGate/);
     assert.match(recipient, /gate\.exactRow\(selectedPid, selectedStartTicks, selectedComm\)/);
     assert.match(recipient, /gate\.prepare\(/);
     assert.match(recipient, /workspace\.gate\.confirm\(\)/);
@@ -550,8 +551,25 @@ test("K3a: one shared runtime safety, mutation primitive and limit queue", () =>
     assert.match(owner,/readonly property var processControl: KillBackend\.KillStore\.control/);
     assert.match(owner,/readonly property var processLimits: KillBackend\.KillStore\.limits/);
     assert.match(store,/ProcessLimits \{\s*id: limitBackend\s*onRefreshRequested: afterAction.restart\(\)/);
-    assert.match(owner,/safetyOwner: taskSafety/);
-    assert.match(owner,/controlOwner: processControl/);
-    assert.match(owner,/limitsOwner: processLimits/);
-    assert.match(owner,/bulkBlocked: appControlWindow.cpuBulkReview !== null/);
+    assert.match(store,/safetyOwner: root\.safety/);
+    assert.match(store,/controlOwner: root\.control/);
+    assert.match(store,/limitsOwner: root\.limits/);
+    assert.match(store,/bulkBlocked: root\.donorActionBlocked/);
+    assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow.cpuBulkReview !== null/);
+});
+
+test("K3b: independent guarded gateway and presentation share service custody", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    assert.equal((store.match(/^\s*AppControlHubActionGate\s*\{/gm)||[]).length,1);
+    assert.equal((store.match(/^\s*ProcessPresentationController\s*\{/gm)||[]).length,1);
+    assert.doesNotMatch(owner,/^\s*(AppControlHubActionGate|ProcessPresentationController)\s*\{/m);
+    assert.match(owner,/readonly property var hubProcessActionGate: KillBackend\.KillStore\.actionGate/);
+    assert.match(owner,/readonly property var processPresentationController: KillBackend\.KillStore\.presentation/);
+    assert.match(store,/ownerRows: root\.rows/);
+    assert.match(store,/presentationOwner: root\.presentation/);
+    assert.match(store,/refreshOwner: root\.refreshAfterActionTimer/);
+    assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow.cpuBulkReview !== null\s*\|\| appControlWindow.hunterOperationPhase !== "idle"\s*\|\| appControlWindow.destructiveConfirmOpen/);
+    assert.match(owner,/function onConfirmationRequested\([\s\S]*?appControlWindow.openDestructiveConfirm\(/);
+    assert.match(read("widgets/appcontrol/AppControlHubActionGate.qml"),/KillBackend\.AppControlHubActionGate \{\}/);
 });

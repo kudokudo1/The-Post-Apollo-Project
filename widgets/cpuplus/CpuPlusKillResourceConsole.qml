@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import "../../components"
+import "../appcontrol"
 import "CpuPlusKillResourceDraft.js" as Draft
 
 // K8d // CPU++-owned presentation only. No process action backend.
@@ -28,6 +29,8 @@ Item {
         return ({cpu:"CPU",memory:"MEM",swap:"SWAP",disk:"DISK",
             threads:"THR",gpu:"GPU",network:"NET"})[key] || key.toUpperCase();
     }
+    property bool informationOpen: false
+    onSelectedKeyChanged: informationOpen = false
     property bool reviewing: false
     readonly property var reviewLines: Draft.summary(staged)
     readonly property bool hasDraft: reviewLines.length > 0
@@ -82,7 +85,7 @@ Item {
             color: root.selectionReady ? Colors.white : Colors.yellow
             elide: Text.ElideRight
         }
-        Rectangle { width: parent.width; height: 1; color: Colors.orange }
+        Rectangle { width: parent.width; height: 1; color: Colors.red }
     }
 
     // All resource categories remain visible in a single filter row.
@@ -117,11 +120,75 @@ Item {
         }
     }
 
+    // The standard Post-Apollo information control stays in the top-right
+    // immediately beneath the category row, never in the left control area.
+    Item {
+        id: resourceInfoStrip
+        objectName: "cpuPlusResourceInformationStrip"
+        anchors.top: resourceFilters.bottom
+        anchors.topMargin: 3
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 24
+        z: 10
+        ProcessInformationButton {
+            id: resourceInformationButton
+            objectName: "cpuPlusResourceInformationButton"
+            anchors.right: parent.right
+            anchors.top: parent.top
+            selected: root.informationOpen
+            onLeftClicked: root.informationOpen = !root.informationOpen
+        }
+        Rectangle {
+            id: resourceInformationPopup
+            objectName: "cpuPlusResourceInformationPopup"
+            anchors.right: parent.right
+            anchors.top: resourceInformationButton.bottom
+            anchors.topMargin: 3
+            width: Math.min(320, Math.max(0,root.width - 6))
+            height: informationContent.implicitHeight + 12
+            color: Colors.black
+            border.width: 1
+            border.color: Colors.yellow
+            visible: root.informationOpen
+            z: 11
+            Column {
+                id: informationContent
+                x: 6
+                y: 6
+                width: Math.max(0,parent.width-12)
+                spacing: 4
+                GohuText {
+                    width: parent.width
+                    text: root.selectedResource.title + " // RESOURCE INFORMATION"
+                    color: root.accentFor(root.selectedKey)
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 11
+                }
+                GohuText {
+                    width: parent.width
+                    text: root.selectedResource.scope + "\\n" + root.selectedResource.note
+                    color: Colors.white
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 10
+                }
+                GohuText {
+                    width: parent.width
+                    text: "OFF / MANUAL / AUTO / HOLD ARE DRAFTS ONLY. "
+                        + "APPLY REMAINS LOCKED UNTIL THE RESOURCE BACKEND IS VERIFIED."
+                    color: Colors.yellow
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 10
+                }
+            }
+        }
+    }
+
     Flickable {
         id: bodyScroll
         objectName: "cpuPlusResourceConsoleScroll"
-        anchors.top: resourceFilters.bottom
-        anchors.topMargin: 6
+        anchors.top: resourceInfoStrip.bottom
+        anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: footer.top
@@ -180,24 +247,22 @@ Item {
             }
 
 
-            // Exactly one editor is instantiated below the filter row.
-            Rectangle {
+            // The selected editor has no enclosing card/frame; modes and
+            // instruments share the same open control surface.
+            Item {
                 id: resourcePanel
                 objectName: "cpuPlusResourceSelectedPanel"
                 readonly property var spec: root.selectedResource
                 readonly property string key: root.selectedKey
                 readonly property color ink: root.accentFor(key)
                 width: cardStack.width
-                height: detailContent.implicitHeight + 10
-                color: Colors.black
-                border.width: 1
-                border.color: ink
+                height: detailContent.implicitHeight + 4
 
                 Column {
                     id: detailContent
-                    x: 5
-                    y: 5
-                    width: Math.max(0,parent.width-10)
+                    x: 2
+                    y: 2
+                    width: Math.max(0,parent.width-4)
                     spacing: 5
                     GohuText {
                         width: parent.width
@@ -224,29 +289,6 @@ Item {
                                 font.pixelSize: 9
                                 wrapMode: Text.Wrap
                             }
-                            Row {
-                                id: modeRow
-                                width: parent.width
-                                height: resourcePanel.spec.controls.length ? 26 : 0
-                                visible: resourcePanel.spec.controls.length > 0
-                                spacing: 3
-                                Repeater {
-                                    model: ["off","manual","auto","hold"]
-                                    delegate: ActionButton {
-                                        required property string modelData
-                                        width: Math.max(1,(modeRow.width-9)/4)
-                                        height: 26
-                                        normalFace: true
-                                        accentColor: resourcePanel.ink
-                                        label: modelData.toUpperCase()
-                                        labelPixelSize: 9
-                                        contentPadding: 1
-                                        selected: root.modeFor(resourcePanel.key) === modelData
-                                        available: root.selectionReady
-                                        onLeftClicked: root.stageMode(resourcePanel.key,modelData)
-                                    }
-                                }
-                            }
                             GohuText {
                                 width: parent.width
                                 visible: resourcePanel.spec.controls.length > 0
@@ -261,37 +303,75 @@ Item {
                                 font.pixelSize: 9
                                 wrapMode: Text.Wrap
                             }
+                            // The operating-mode buttons live beside the FIRST
+                            // slider, sharing its footprint instead of another
+                            // menu row. A future dial occupies the same left slot.
                             Repeater {
                                 model: resourcePanel.spec.controls
                                 delegate: Column {
                                     id: field
                                     required property var modelData
-                                    width: modeRow.width
-                                    spacing: 2
-                                    visible: root.modeFor(resourcePanel.key) === "manual"
-                                    CpuPlusDiagnosticSlider {
-                                        objectName: "cpuPlusDraftSlider-" + resourcePanel.key + "-" + field.modelData.key
+                                    required property int index
+                                    width: detailContent.width
+                                    spacing: 3
+                                    Row {
+                                        id: instrumentRow
+                                        objectName: "cpuPlusResourceInstrumentRow-" + resourcePanel.key + "-" + field.modelData.key
                                         width: field.width
-                                        height: 52
-                                        compact: true
-                                        title: field.modelData.title
-                                        shortTitle: title
-                                        readout: String(root.valueFor(resourcePanel.key,field.modelData.key))
-                                            + " " + field.modelData.unit
-                                        minimumValue: field.modelData.min
-                                        maximumValue: field.modelData.max
-                                        valueStep: field.modelData.step
-                                        currentValue: root.valueFor(resourcePanel.key,field.modelData.key)
-                                        subjectColor: resourcePanel.ink
-                                        fillColor: resourcePanel.ink
-                                        adjustable: root.selectionReady
-                                        onValueRequested: function(value) {
-                                            root.stageNumber(resourcePanel.key,field.modelData.key,Number(value));
+                                        height: 58
+                                        spacing: 4
+                                        CpuPlusDiagnosticSlider {
+                                            objectName: "cpuPlusDraftSlider-" + resourcePanel.key + "-" + field.modelData.key
+                                            width: Math.max(75,instrumentRow.width - modeCluster.width - instrumentRow.spacing)
+                                            height: 54
+                                            compact: true
+                                            title: field.modelData.title
+                                            shortTitle: title
+                                            readout: String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                                + " " + field.modelData.unit
+                                            minimumValue: field.modelData.min
+                                            maximumValue: field.modelData.max
+                                            valueStep: field.modelData.step
+                                            currentValue: root.valueFor(resourcePanel.key,field.modelData.key)
+                                            subjectColor: resourcePanel.ink
+                                            fillColor: resourcePanel.ink
+                                            adjustable: root.selectionReady && root.modeFor(resourcePanel.key) === "manual"
+                                            onValueRequested: function(value) {
+                                                root.stageNumber(resourcePanel.key,field.modelData.key,Number(value));
+                                            }
+                                        }
+                                        Grid {
+                                            id: modeCluster
+                                            objectName: "cpuPlusResourceInlineModes"
+                                            visible: field.index === 0
+                                            width: visible ? Math.max(112,Math.min(142,instrumentRow.width * 0.45)) : 0
+                                            columns: 2
+                                            rowSpacing: 3
+                                            columnSpacing: 3
+                                            Repeater {
+                                                model: ["off","manual","auto","hold"]
+                                                delegate: ActionButton {
+                                                    required property string modelData
+                                                    objectName: "cpuPlusResourceMode-" + modelData
+                                                    width: Math.max(1,(modeCluster.width - modeCluster.columnSpacing)/2)
+                                                    height: 26
+                                                    normalFace: true
+                                                    accentColor: resourcePanel.ink
+                                                    label: modelData.toUpperCase()
+                                                    labelPixelSize: 9
+                                                    labelMinimumPixelSize: 7
+                                                    contentPadding: 1
+                                                    selected: root.modeFor(resourcePanel.key) === modelData
+                                                    available: root.selectionReady
+                                                    onLeftClicked: root.stageMode(resourcePanel.key,modelData)
+                                                }
+                                            }
                                         }
                                     }
                                     Row {
                                         width: parent.width
-                                        height: 27
+                                        height: visible ? 27 : 0
+                                        visible: root.modeFor(resourcePanel.key) === "manual"
                                         spacing: 4
                                         GohuText {
                                             width: Math.max(1,parent.width-100)
@@ -345,6 +425,53 @@ Item {
                                 wrapMode: Text.Wrap
                                 font.pixelSize: 10
                             }
+                            GohuText {
+                                objectName: "cpuPlusResourceDraftStatus"
+                                width: parent.width
+                                text: root.selectionReady
+                                    ? root.hasDraft ? "DRAFT CHANGES // " + root.reviewLines.length + " CATEGORIES"
+                                        : "NO RESOURCE CHANGES STAGED"
+                                    : "DRAFT INPUT LOCKED // VERIFY TARGET"
+                                color: root.hasDraft ? Colors.yellow : Colors.white
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            // Actions act on this resource workspace, not the
+                            // operating mode; they belong ABOVE the footer rule.
+                            Row {
+                                id: resourceActions
+                                objectName: "cpuPlusResourceWorkspaceActions"
+                                width: parent.width
+                                height: 30
+                                spacing: 5
+                                ActionButton {
+                                    objectName: "cpuPlusResourceClearDraft"
+                                    width: Math.max(1,(parent.width-parent.spacing)/2)
+                                    height: 30
+                                    label: "CLEAR DRAFT"
+                                    labelPixelSize: 10
+                                    normalFace: true
+                                    accentColor: Colors.red
+                                    available: root.selectionReady && root.hasDraft
+                                    onLeftClicked: root.clearDraft()
+                                }
+                                ActionButton {
+                                    objectName: "cpuPlusResourceReviewDraft"
+                                    width: Math.max(1,(parent.width-parent.spacing)/2)
+                                    height: 30
+                                    label: "REVIEW"
+                                    labelPixelSize: 10
+                                    selected: root.reviewing
+                                    normalFace: true
+                                    accentColor: Colors.yellow
+                                    available: root.selectionReady && root.hasDraft
+                                    onLeftClicked: {
+                                        root.reviewing = !root.reviewing;
+                                        if (root.reviewing) bodyScroll.contentY = 0;
+                                    }
+                                }
+                            }
+
                         }
                 }
             }
@@ -368,6 +495,8 @@ Item {
         wheelEnabled: false
     }
 
+    // Only final actuation occupies the lower footer. It remains deliberately
+    // unavailable until native capability and authorization are established.
     Column {
         id: footer
         objectName: "cpuPlusResourceConsoleFooter"
@@ -375,47 +504,11 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         spacing: 4
-        Rectangle { width: parent.width; height: 1; color: Colors.orange }
-        GohuText {
+        Rectangle {
+            objectName: "cpuPlusResourceFooterDivider"
             width: parent.width
-            text: root.selectionReady
-                ? root.hasDraft ? "DRAFT CHANGES // " + root.reviewLines.length + " CATEGORIES"
-                    : "NO RESOURCE CHANGES STAGED"
-                : "DRAFT INPUT LOCKED // VERIFY TARGET"
-            color: root.hasDraft ? Colors.yellow : Colors.white
-            font.pixelSize: 10
-            elide: Text.ElideRight
-        }
-        Row {
-            width: parent.width
-            height: 30
-            spacing: 5
-            ActionButton {
-                objectName: "cpuPlusResourceClearDraft"
-                width: Math.max(1,(parent.width-parent.spacing)/2)
-                height: 30
-                label: "CLEAR DRAFT"
-                labelPixelSize: 10
-                normalFace: true
-                accentColor: Colors.yellow
-                available: root.selectionReady && root.hasDraft
-                onLeftClicked: root.clearDraft()
-            }
-            ActionButton {
-                objectName: "cpuPlusResourceReviewDraft"
-                width: Math.max(1,(parent.width-parent.spacing)/2)
-                height: 30
-                label: "REVIEW"
-                labelPixelSize: 10
-                selected: root.reviewing
-                normalFace: true
-                accentColor: Colors.cyan
-                available: root.selectionReady && root.hasDraft
-                onLeftClicked: {
-                    root.reviewing = !root.reviewing;
-                    if (root.reviewing) bodyScroll.contentY = 0;
-                }
-            }
+            height: 1
+            color: Colors.red
         }
         ActionButton {
             objectName: "cpuPlusResourceApplyLocked"
@@ -424,15 +517,8 @@ Item {
             label: "APPLY LOCKED // UNVERIFIED"
             labelPixelSize: 10
             normalFace: true
-            accentColor: Colors.orange
+            accentColor: Colors.green
             available: false
-        }
-        GohuText {
-            width: parent.width
-            text: "RESTORE // EXISTING VERIFIED MEMORY CONTROL ONLY"
-            color: Colors.white
-            font.pixelSize: 9
-            elide: Text.ElideRight
         }
     }
 }

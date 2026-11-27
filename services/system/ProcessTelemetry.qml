@@ -449,7 +449,8 @@ Scope {
             + "[ -r /proc/$pid/stat ] || exit 0; "
             + "stat=$(awk '{sub(/^.*[)] /,\"\"); print $12+$13, $20, $18}' /proc/$pid/stat 2>/dev/null) || exit 0; "
             + "set -- $stat; [ \"$#\" -eq 3 ] || exit 0; ticks=$1; start=$2; threads=$3; "
-            + "rss=$(awk '/^VmRSS:/{print $2; exit}' /proc/$pid/status 2>/dev/null); "
+            + "status=$(awk 'BEGIN{rss=\"-\"; swap=\"-\"} /^VmRSS:/{rss=$2} /^VmSwap:/{swap=$2} END{print rss,swap}' /proc/$pid/status 2>/dev/null); "
+            + "set -- $status; rss=$1; swap=$2; "
             + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
             + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
             + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
@@ -457,9 +458,9 @@ Scope {
             + "birth=$(awk '{sub(/^.*[)] /,\"\"); print $20}' /proc/$pid/stat 2>/dev/null); "
             + "[ \"$birth\" = \"$start\" ] || exit 0; "
             + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "
-            + "printf '%s %s %s %s %s %s %s %s %s %s\\n' "
+            + "printf '%s %s %s %s %s %s %s %s %s %s %s\\n' "
             + "\"$pid\" \"$ticks\" \"${rss:--}\" \"${total:-1}\" \"$clk\" \"$cores\" "
-            + "\"${io:--}\" \"${start:-0}\" \"${uptime:--}\" \"${threads:--}\""
+            + "\"${io:--}\" \"${start:-0}\" \"${uptime:--}\" \"${threads:--}\" \"${swap:--}\""
         ]);
     }
 
@@ -476,6 +477,8 @@ Scope {
         const ticks = Number(fields[1] || 0);
         const rssObserved = /^\d+$/.test(fields[2]) && Number.isSafeInteger(Number(fields[2]));
         const rssKiB = rssObserved ? Number(fields[2]) : 0;
+        const swapKiB = /^\d+$/.test(fields[10] || "")
+            && Number.isSafeInteger(Number(fields[10])) ? Number(fields[10]) : null;
         const totalKiB = Math.max(1, Number(fields[3] || 1));
         const tickRate = Math.max(1, Number(fields[4] || 100));
         const ioObserved = /^\d+$/.test(fields[6]) && Number.isSafeInteger(Number(fields[6]));
@@ -543,6 +546,7 @@ Scope {
             memPercent: memPercent,
             rssKiB: rssKiB,
             rssObserved: rssObserved,
+            swapKiB: swapKiB,
             threadCount: threadCount,
             ioRateBytes: ioRateBytes,
             ioRateObserved: ioRateObserved,

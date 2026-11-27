@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "TasksChassisPolicy.js" as TasksChassisPolicy
+import "../services/prism/PrismIndex.js" as PrismIndex
 import "../components"
 
 // PRISM // One reusable widget chassis, no separate dictionary data yet.
@@ -12,6 +13,12 @@ PanelWindow {
     objectName: "prismWindow"
     property bool menuOpen: false
     property string chassisLevel: "compact"
+    // The owning shell binds this to the actual Prism dock border color.
+    property color prismBorderColor: Colors.white
+    property bool indexOpen: false
+    // Source-backed registered placements. Not a service scan or heartbeat.
+    readonly property var registeredLocations: PrismIndex.registered()
+    onMenuOpenChanged: if (!menuOpen) indexOpen = false
     // The shell binds this to trashWindow.fullHeightReserve. This fallback
     // keeps standalone previews safe before the parent supplies a Trash owner.
     property int fullHeightReserve: 165
@@ -96,62 +103,135 @@ PanelWindow {
 
         fillColor: Colors.black
         fillOpacity: 0.95
-        borderColor: Colors.cyan
+        borderColor: root.prismBorderColor
         borderWidth: 1
         radius: 0
         glowVisible: root.menuOpen
-        glowColor: Colors.cyan
+        glowColor: root.prismBorderColor
 
         Rectangle {
             id: prismHeader
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: 56
+            // Two rows preserve legibility at TASKS' narrow portrait sizes.
+            // The upper row is the title and close; the lower row is the
+            // ordinary controls family and a source label, NOT a live poll.
+            height: 84
             color: "transparent"
 
             GohuText {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
-                anchors.right: collapsePrismButton.left
+                anchors.right: closePrismButton.left
                 anchors.rightMargin: 8
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenter: closePrismButton.verticalCenter
                 text: "PRISM // POST APOLLO"
                 font.pixelSize: 17
                 font.bold: true
-                color: Colors.magenta
+                color: root.prismBorderColor
                 elide: Text.ElideRight
             }
 
-            ResizeButton {
-                id: collapsePrismButton
-                anchors.right: expandPrismButton.left
-                anchors.rightMargin: 4
-                anchors.verticalCenter: parent.verticalCenter
-                direction: "down"
-                available: root.chassisLevel !== "compact"
-                onResizeRequested: function(delta) {
-                    if (delta === -1) root.collapseChassis();
-                }
-            }
-            ResizeButton {
-                id: expandPrismButton
-                anchors.right: closePrismButton.left
-                anchors.rightMargin: 7
-                anchors.verticalCenter: parent.verticalCenter
-                direction: "up"
-                available: root.chassisLevel !== "large"
-                onResizeRequested: function(delta) {
-                    if (delta === 1) root.expandChassis();
-                }
-            }
             CloseButton {
                 id: closePrismButton
                 anchors.right: parent.right
                 anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 5
                 Accessible.name: "Close Prism widget"
                 onCloseRequested: root.menuOpen = false
+            }
+
+            Row {
+                id: prismToolbar
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.top: parent.top
+                anchors.topMargin: 45
+                height: 28
+                spacing: 5
+
+                ResizeButton {
+                    id: collapsePrismButton
+                    width: 28
+                    direction: "down"
+                    available: root.chassisLevel !== "compact"
+                    onResizeRequested: function(delta) {
+                        if (delta === -1) root.collapseChassis();
+                    }
+                }
+                ResizeButton {
+                    id: expandPrismButton
+                    width: 28
+                    direction: "up"
+                    available: root.chassisLevel !== "large"
+                    onResizeRequested: function(delta) {
+                        if (delta === 1) root.expandChassis();
+                    }
+                }
+
+                Item {
+                    width: Math.max(0, prismToolbar.width
+                        - collapsePrismButton.width - expandPrismButton.width
+                        - prismSourceIndicator.width - prismReloadButton.width
+                        - prismIndexButton.width - prismToolbar.spacing * 5)
+                    height: 1
+                }
+
+                // "Live indicator" location, but no fabricated liveness:
+                // this is only a static semantic-source identification badge.
+                Rectangle {
+                    id: prismSourceIndicator
+                    objectName: "prismSourceIndicator"
+                    width: Math.max(0, Math.min(126, prismToolbar.width
+                        - 28 - 28 - 30 - 38 - prismToolbar.spacing * 4))
+                    height: 27
+                    radius: 0
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: root.prismBorderColor
+
+                    GohuText {
+                        anchors.fill: parent
+                        anchors.leftMargin: 3
+                        anchors.rightMargin: 3
+                        text: "COLOR // SYNTAGMA"
+                        color: root.prismBorderColor
+                        font.pixelSize: 9
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+                }
+
+                // The standard ReloadButton stays visible but unavailable.
+                // No reload action or fabricated service is wired yet.
+                ReloadButton {
+                    id: prismReloadButton
+                    objectName: "prismReloadButton"
+                    width: 30
+                    height: 28
+                    available: false
+                    unavailableOpacity: 0.80
+                    semanticColor: Colors.yellow
+                    hoverSurfaceColor: Colors.orange
+                    Accessible.name: "Reload Prism index not yet available"
+                }
+
+                // The diagnostic control opens the real placement index.
+                // Selection follows the displayed index, not a fake scan.
+                DiagnosticsDockButton {
+                    id: prismIndexButton
+                    objectName: "prismIndexButton"
+                    width: 38
+                    height: 28
+                    diagnosticsOpen: root.indexOpen
+                    Accessible.description: "Registered Prism locations index"
+                    onToggleRequested: root.indexOpen = !root.indexOpen
+                }
             }
         }
 
@@ -163,7 +243,7 @@ PanelWindow {
             anchors.right: parent.right
             anchors.rightMargin: 12
             height: 2
-            color: Colors.cyan
+            color: root.prismBorderColor
         }
 
         Item {
@@ -174,6 +254,7 @@ PanelWindow {
             anchors.bottom: parent.bottom
 
             Column {
+                visible: !root.indexOpen
                 anchors.centerIn: parent
                 width: Math.max(0, parent.width - 28)
                 spacing: 12
@@ -182,7 +263,7 @@ PanelWindow {
                     width: parent.width
                     text: "VISUAL LANGUAGE // DICTIONARY"
                     font.pixelSize: 13
-                    color: Colors.white
+                    color: root.prismBorderColor
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                 }
@@ -198,11 +279,101 @@ PanelWindow {
                     width: parent.width
                     text: "POST APOLLO // CONTEXTUAL HELP"
                     font.pixelSize: 11
-                    color: Colors.cyan
+                    color: root.prismBorderColor
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                 }
             }
+
+            // First dossier/index: exactly those Prism placements registered
+            // in source, with no invented readiness or definitions. Future
+            // modules append a verified entry in the common registry.
+            Flickable {
+                id: prismIndex
+                objectName: "prismPlacementIndex"
+                visible: root.indexOpen
+                anchors.fill: parent
+                anchors.margins: 14
+                clip: true
+                contentWidth: width
+                contentHeight: indexColumn.implicitHeight
+                flickableDirection: Flickable.VerticalFlick
+
+                Column {
+                    id: indexColumn
+                    width: prismIndex.width
+                    spacing: 12
+
+                    GohuText {
+                        width: parent.width
+                        text: "PRISM // PLACEMENT INDEX"
+                        color: root.prismBorderColor
+                        font.pixelSize: 15
+                        font.bold: true
+                        elide: Text.ElideRight
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: root.registeredLocations.length + " REGISTERED LOCATIONS"
+                        color: Colors.orange
+                        font.pixelSize: 11
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: root.prismBorderColor
+                    }
+
+                    Repeater {
+                        model: root.registeredLocations
+                        delegate: Rectangle {
+                            width: indexColumn.width
+                            height: 88
+                            radius: 0
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: root.prismBorderColor
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 6
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.name
+                                    color: root.prismBorderColor
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.location
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.definitions + " DEFINITIONS // " + modelData.source
+                                    color: Colors.orange
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: "INDEX OF INSTALLED PRISM ENTRY POINTS // NOT A SERVICE CHECK"
+                        wrapMode: Text.WordWrap
+                        color: root.prismBorderColor
+                        font.pixelSize: 10
+                        opacity: 0.7
+                    }
+                }
+            }
+
         }
     }
 }

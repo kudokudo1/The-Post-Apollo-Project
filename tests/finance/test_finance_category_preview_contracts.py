@@ -42,11 +42,20 @@ for expected in (
 ):
     assert expected in plan, expected
 
+# M7 extended the read-only group descriptor with observed visibility.
+# Keep group ID provenance and fail-closed identity validation intact.
+group_record = read.split('groupRows.push({', 1)[1].split('});', 1)[0]
 for expected in (
-    'groupRows.push({id:group.id,name:group.name})',
+    'id:group.id,name:group.name,',
+    'hidden:observedBoolean(group.hidden)',
+    'isIncome:observedBoolean(group.is_income)',
+):
+    assert expected in group_record, expected
+for expected in (
     'groupId: group.id',
     'categoryGroups: groupRows',
     'unexpected-category-group-identity',
+    'if (group.is_income) continue;',
 ):
     assert expected in read, expected
 

@@ -72,8 +72,23 @@ Item {
                     || JSON.stringify(value)!==raw || typeof value.ok!=="boolean") {
                 fail("INVALID_REPLY"); return;
             }
+            if (closing) {
+                // A pending FL8 step explicitly refuses CLOSE. Only that
+                // exact reply permits continued original control; never
+                // treat an unknown/malformed close result as safe.
+                const keys=Object.keys(value).sort().join(",");
+                if (keys==="error,ok" && value.ok===false
+                        && value.error==="COMMAND_REFUSED") {
+                    closing=false;
+                    closeReply=false;
+                } else if (keys==="local_outcome,ok" && value.ok===true
+                        && ["COMMITTED_LOCAL","ABORTED_LOCAL","UNKNOWN_HOLD"].indexOf(value.local_outcome)>=0) {
+                    closeReply=true;
+                } else {
+                    fail("INVALID_CLOSE_REPLY"); return;
+                }
+            }
             reply=value; pending=false;
-            if (closing) closeReply=value.ok===true;
         } catch (_) { fail("INVALID_REPLY"); }
     }
 

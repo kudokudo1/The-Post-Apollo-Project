@@ -1197,8 +1197,9 @@ ShellRoot {
                 || !Number.isSafeInteger(s.sequence) || s.sequence<=fl7Sequence
                 || s.status!==status || s.text!==text || s.local_outcome!==local
                 || s.provisional!==provisional || s.native_admitted!==false) return false;
+        if (!fl7Render(s,render)) return false;
         fl7Sequence=s.sequence;
-        return fl7Render(s,render);
+        return true;
     }
     function fl7Render(s, render) {
         // Same gate for immediate and already-dequeued delayed snapshots.
@@ -1212,6 +1213,30 @@ ShellRoot {
             item.messages=[{direction:"outgoing",body:FirstLight.capture.prompt}];
         else if (render==="HOLD")
             fl7Late=s; // intentionally delayed past Tree withdrawal in case 3
+        return true;
+    }
+    function fl7RejectInvalidSnapshots() {
+        if (!fl7Current()) return false;
+        const item=fl7OriginalView, e=fl7OriginalEpoch, seq=fl7Sequence;
+        const messages=item.messages, body=item._streamingTailBody;
+        const active=item._streamingTailActive, draft=parts.input.text;
+        const make=(epoch,sequence)=>({ok:true,epoch:epoch,snapshot:{
+            sequence:sequence,status:"GENERATING",text:"READY",
+            local_outcome:"UNKNOWN_HOLD",provisional:true,native_admitted:false}});
+        const wrongEpoch=make(e+1,seq+1);
+        const duplicate=make(e,seq), older=make(e,seq-1);
+        const wrongType=make(e,seq+1); wrongType.snapshot.provisional="true";
+        const extra=make(e,seq+1); extra.snapshot.unexpected=true;
+        const authority=make(e,seq+1); authority.snapshot.native_admitted=true;
+        const oversized=make(e,seq+1); oversized.snapshot.text="x".repeat(16001);
+        const missing=make(e,seq+1); delete missing.snapshot.local_outcome;
+        const malformed=[wrongEpoch,duplicate,older,wrongType,extra,authority,oversized,missing];
+        for (const reply of malformed) {
+            if (fl7Snapshot(reply,"GENERATING","READY","UNKNOWN_HOLD",true,"GROW")
+                    || fl7Sequence!==seq || item.messages!==messages
+                    || item._streamingTailBody!==body || item._streamingTailActive!==active
+                    || parts.input.text!==draft) return false;
+        }
         return true;
     }
     function fl7Stable(body, captureTail) {
@@ -1242,6 +1267,7 @@ ShellRoot {
         for (let n=0;n<4;n++) cmd({op:"STEP"},okay);
         take("GENERATING","RE","UNKNOWN_HOLD",true,"BASE");
         local(()=>fl7Stable("RE",true));
+        local(()=>fl7RejectInvalidSnapshots());
         if (fl7Case===0) {
             cmd({op:"STEP"},okay); cmd({op:"STEP"},okay);
             take("LOCAL_COMMITTED","READY","COMMITTED_LOCAL",false,"GROW");
@@ -1303,7 +1329,8 @@ ShellRoot {
             cmd({op:"STEP_BEGIN"},refused);
             cmd({op:"OUTCOME"},refused);
             cmd({op:"STOP",epoch:e},eq({ok:true,ack:"STOP_LATCHED"}));
-            cmd({op:"CLOSE"},refused);
+            cmd({op:"CLOSE"},r=>refused(r) && fl7Parent.running
+                && !fl7Parent.closing && !fl7Parent.closeReply && !fl7Parent.pending);
             plan.push({cmd:{op:"STEP_POLL"},poll:true,
                 verify:eq({ok:true,done:true})});
             cmd({op:"TAKE",epoch:e},r=>{

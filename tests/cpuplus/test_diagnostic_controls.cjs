@@ -38,7 +38,17 @@ assert.match(owner,/if \(!busy \|\| !received \|\| !exited\) return/);
 assert.match(owner,/worker\.exec\(args\)/);
 assert.match(owner,/maximumReport: 65536/);
 assert.doesNotMatch(owner,/Component.onCompleted|repeat:\s*true|running:\s*true|pkexec|sudo/);
-assert.match(ui,/onLeftClicked:\s*\{\s*if \(CpuPlusDiagnostics.request\(modelData.kind\)\)/);
+// QUICK now dispatches only durable favorites through the existing bounded
+// fixed/configured capture entrypoints; the old per-kind button was retired.
+assert.match(ui,/model: !CpuPlusDiagnostics.workflowCatalogReady \? \[\] :/);
+assert.match(ui,/CpuPlusDiagnostics.workflowFavorites/);
+assert.match(ui,/CpuPlusDiagnostics.runFavoriteWorkflow\(modelData.id\)/);
+assert.match(ui,/CpuPlusDiagnostics.setWorkflowFavorite\(modelData.id,!modelData.favorite\)/);
+assert.match(owner,/if \(workshopPresetLocked \|\| !workflowStore.ready\) return false/);
+assert.match(owner,/const row=workflowStore.favorites.find\(r=>r.id===id\)/);
+assert.match(owner,/if \(!row\) return false/);
+assert.match(owner,/if \(row.execution==="fixed"\) return request\(row.kind\)/);
+assert.match(owner,/if \(row.execution==="configured"\) return requestWorkshopCapture\(row.plan\)/);
 assert.match(ui,/reportText.copy\(\)/);
 assert.match(parent,/active: root.page === "DIAG"\s+visible: active\s+sourceComponent: CpuPlusDiagnosticsPane/);
 assert.doesNotMatch(ui,/Process\s*\{|Timer\s*\{/);

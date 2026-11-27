@@ -204,8 +204,11 @@ Item {
         color: Colors.black
         border.color: Colors.yellow
         clip: true
-        GohuText {
+        CpuPlusMemoryReadout {
             id: resourceHelpText
+            objectName: "cpuplusResourceHelpText"
+            helpSubject: root.subject
+            semanticGlowColor: root.subjectColor===Colors.white ? Colors.cyan : root.subjectColor
             width: Math.max(0,parent.width-12)
             x: 6
             y: 6

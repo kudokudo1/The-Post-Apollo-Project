@@ -8,6 +8,8 @@ on:
       - "widgets/cpuplus/CpuPlusDiagnosticSlider.qml"
       - "widgets/cpuplus/CpuPlusDiagnosticExecutionButton.qml"
       - "widgets/cpuplus/CpuPlusMemoryActuatorPane.qml"
+      - "widgets/cpuplus/CpuPlusMemoryReadout.qml"
+      - "widgets/cpuplus/CpuPlusMemoryReadout.js"
       - "widgets/cpuplus/CpuPlusProcessPane.qml"
       - "widgets/cpuplus/CpuPlusProcessPresentation.js"
       - "widgets/cpuplus/CpuPlusProfilePane.qml"

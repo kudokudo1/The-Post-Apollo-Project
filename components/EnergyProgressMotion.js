@@ -11,7 +11,7 @@ function frame(phase, mode, progress, seconds, finishFrom, reduced, variant) {
     const t = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
     let p = 0;
     const running = phase === "running";
-    const ki=variant==="ki-blast", tron=variant==="tron";
+    const ki=variant==="ki-blast", tron=variant==="tron", flat=variant==="default";
     const defeated=ki && phase==="failure";
     const exact = mode === "measured" || mode === "timed";
     if (running && exact) {
@@ -19,6 +19,9 @@ function frame(phase, mode, progress, seconds, finishFrom, reduced, variant) {
     } else if (running && reduced) {
         // A stationary, explicitly indeterminate activity cue.
         p = ki ? .5 : .35;
+    } else if (running && flat) {
+        // Quiet monotonic activity cue; never completes without a result.
+        p=.96*(1-Math.exp(-t/3.0));
     } else if (running && tron) {
         // Monotonic acceleration, then an asymptotic approach to the finish.
         p=.96*(1-Math.exp(-Math.pow(t/3.0,1.65)));
@@ -41,8 +44,8 @@ function frame(phase, mode, progress, seconds, finishFrom, reduced, variant) {
     else if (defeated) p = reduced ? 0 : clamp(finishFrom,0,1)*(1-smooth(t/.72));
     else if (phase === "failure") p = clamp(finishFrom, 0, 1);
     const strength = smooth((p-.38)/.60);
-    const pulse = running && !reduced ? Math.sin(t*13)*.09+Math.sin(t*24)*.06 : 0;
-    const impact = phase === "success" && !reduced
+    const pulse = running && !reduced && !flat ? Math.sin(t*13)*.09+Math.sin(t*24)*.06 : 0;
+    const impact = phase === "success" && !reduced && !flat
         ? smooth((t-.42)/.08)*(1-smooth((t-.50)/.34)) : 0;
     const clash=ki && (running || (phase==="success" && p<1)
         || defeated);
@@ -60,9 +63,9 @@ function frame(phase, mode, progress, seconds, finishFrom, reduced, variant) {
         defeat: defeated && !reduced ? (1-smooth(t/1.08)) : 0,
         power: 1+strength*.85+pulse*(1+strength)+impact*.65,
         brightness: 1+strength*1.15+impact*.7,
-        dx: running && !reduced ? (Math.sin(t*39)+.4*Math.sin(t*19))*(.35+strength*.85) : 0,
-        dy: running && !reduced ? Math.sin(t*31)*(.1+strength*.35) : 0,
-        headVisible: running || (phase === "success" && !reduced && t<.84) || (defeated && !reduced && t<.72),
+        dx: running && !reduced && !flat ? (Math.sin(t*39)+.4*Math.sin(t*19))*(.35+strength*.85) : 0,
+        dy: running && !reduced && !flat ? Math.sin(t*31)*(.1+strength*.35) : 0,
+        headVisible: !flat && (running || (phase === "success" && !reduced && t<.84) || (defeated && !reduced && t<.72)),
         impact: impact
     };
 }

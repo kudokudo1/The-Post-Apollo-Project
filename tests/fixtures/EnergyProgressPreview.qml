@@ -7,7 +7,7 @@ ShellRoot {
     Window {
         id: lab
         width: 620
-        height: 710
+        height: 804
         visible: true
         color: Colors.dark
         title: "Post-Apollo // Energy Progress Laboratory"
@@ -226,7 +226,7 @@ ShellRoot {
                 onItemRemoved: function(index, item) {
                     field.sources = field.sources.filter(source => source !== item.pressureSource);
                 }
-                model: [{name:"OMNITRIX",key:"omnitrix"},{name:"TRON",key:"tron"},
+                model: [{name:"OMNITRIX",key:"omnitrix"},{name:"DEFAULT",key:"default"},{name:"TRON",key:"tron"},
                     {name:"KI BLAST",key:"ki-blast"},{name:"FLAMETHROWER",key:"flamethrower"},
                     {name:"FLAMETHROWER // ASH TRAIL",key:"flamethrower",fireMode:"ash-trail"},
                     {name:"FLAMETHROWER // BURN AWAY",key:"flamethrower",fireMode:"burn-away"}]
@@ -284,6 +284,7 @@ ShellRoot {
                         idleBorderColor: card.fireMode==="burn-away" ? "transparent" : accentColor
                         hoverBorderColor: card.fireMode==="burn-away" ? "transparent" : Colors.orange
                         pressedBorderColor: card.fireMode==="burn-away" ? "transparent" : Colors.magenta
+                        perimeterGlowEnabled: card.modelData.key==="default" ? false : (normalFace || (washSafePerimeter && softGlowEnabled))
                         contentGlowEnabled: false
                         softGlowEnabled: false
                         wideGlowEnabled: false

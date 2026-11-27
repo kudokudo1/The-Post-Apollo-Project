@@ -25,7 +25,7 @@ QtObject {
         let fragmentStyle = "";
         if (enabled && !reducedMotion) {
             for (const source of sources) {
-                if (!source || !source.visible || source.reducedMotion) continue;
+                if (!source || !source.visible || source.reducedMotion || source.variant==="default") continue;
                 const f = source.visualFrame;
                 if(source.variant==="ki-blast" && f.clash) {
                     const p=source.displayedFraction;

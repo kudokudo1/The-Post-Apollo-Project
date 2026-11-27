@@ -1,6 +1,7 @@
 // Visual profiles only. These never change operation progress or authority.
 function profile(variant) {
     switch (variant) {
+    case "default": return {x:0,y:0,brightness:1,head:0,headConsume:0,fragments:0,flash:0,style:"flat"};
     case "omnitrix": return {x:.10,y:.05,brightness:1.65,head:1.28,headConsume:1.35,fragments:0,flash:.72,style:"contained"};
     case "tron": return {x:.06,y:.025,brightness:1.0,head:1.10,headConsume:1.35,fragments:0,flash:0,style:"speed"};
     case "flamethrower": return {x:.95,y:.90,brightness:1.05,head:1.0,headConsume:1,fragments:.8,flash:0,style:"fire"};
@@ -14,7 +15,7 @@ function host(variant, time, level, strength, phase, reduced, fireMode) {
     const t=Number.isFinite(time)?Math.max(0,time):0;
     const drive=variant==="flamethrower" && phase==="running"
         ? fireDrive(fireMode,t,level) : level;
-    const power=reduced?0:clamp(drive*strength);
+    const power=reduced || variant==="default"?0:clamp(drive*strength);
     // Directional road buzz and slow lateral drift, rather than quake harmonics.
     const x=p.style==="speed" ? 1.9*Math.sin(t*11)+1.1*Math.sin(t*46)
         : 2.3*Math.sin(t*27)+.7*Math.sin(t*13);

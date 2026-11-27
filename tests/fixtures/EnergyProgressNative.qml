@@ -7,7 +7,7 @@ ShellRoot {
     Window {
         id: lab
         width: 480
-        height: 410
+        height: 480
         visible: true
         color: Colors.dark
         property int stage: 0
@@ -46,6 +46,14 @@ ShellRoot {
                 }
             }
             EnergyProgressFace {
+                id: quiet
+                width: parent.width; height: 36
+                variant: "default"
+                progressMode: "measured"
+                caption: "DEFAULT"
+                Component.onCompleted: field.sources=field.sources.concat([quiet])
+            }
+            EnergyProgressFace {
                 id: ash
                 width: parent.width; height: 36
                 variant: "flamethrower"; fireMode: "ash-trail"
@@ -77,6 +85,33 @@ ShellRoot {
                     if (elapsed>4800 && !lab.require(field.pressure>.5,
                             "overdrive host pressure")) return;
                 }
+                if (lab.stage>=17) {
+                    if (!lab.require(field.pressure===0 && field.offsetX===0 && field.offsetY===0
+                        && field.localLights.length===0 && field.completionFlash===0,
+                        "default emits no host effects")) return;
+                    if(lab.stage===17) {
+                        quiet.phase="running"; quiet.progress=.63;
+                    } else if(lab.stage===18) {
+                        if(!lab.require(quiet.displayedFraction===.63 && !quiet.visualFrame.headVisible,
+                            "default measured fill without head")) return;
+                        quiet.phase="failure";
+                    } else if(lab.stage===19) {
+                        if(!lab.require(quiet.displayedFraction===.63 && !quiet.animationActive,
+                            "default failure retains extent")) return;
+                        quiet.phase="running"; quiet.progress=.8; quiet.phase="success";
+                        lab.pulseStarted=Date.now();
+                    } else if(lab.stage===20) {
+                        if(Date.now()-lab.pulseStarted<1000) return;
+                        if(!lab.require(quiet.displayedFraction===1 && !quiet.animationActive,
+                            "default success settles")) return;
+                        quiet.phase="idle";
+                    } else if(lab.stage===21) {
+                        if(!lab.require(quiet.displayedFraction===0,"default resets")) return;
+                        console.log("ENERGY_NATIVE_PASS all seven treatments; host pulse; pixel fire; persistent defeat; quiet default lifecycle");
+                        Qt.quit(); return;
+                    }
+                    lab.stage++; return;
+                }
                 if (lab.stage>=14) {
                     const ki=faces.itemAt(2);
                     if (lab.stage===14) {
@@ -98,8 +133,7 @@ ShellRoot {
                                 "native defeat drained and stopped")) return;
                         ki.phase="idle";
                         if (!lab.require(ki.visualFrame.enemyOpacity===0,"explicit reset clears winner")) return;
-                        console.log("ENERGY_NATIVE_PASS variants; host pulse; pixel fire materials; persistent red defeat and reset");
-                        Qt.quit(); return;
+                        lab.stage=17; return;
                     }
                     lab.stage++;
                     return;

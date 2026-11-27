@@ -499,3 +499,33 @@ test("flame turbulence and illumination remain attached and vary continuously",(
     assert.match(preview,/source.flameMotion/);
     assert.match(preview,/flame.drag/);
 });
+
+test("DEFAULT is monotonic, bounded, and does not emit energy effects",()=>{
+    let prev=0;
+    for(let i=0;i<1000;i++){
+        const t=i*.05;
+        const f=frame("running","indeterminate",0,t,0,false,"default");
+        assert.ok(f.fraction>=prev && f.fraction<=.96);
+        assert.equal(f.headVisible,false);
+        assert.equal(f.dx,0); assert.equal(f.dy,0); assert.equal(f.clash,false);
+        prev=f.fraction;
+        const host=profiles.host("default",t,1,1,"running",false);
+        assert.equal(host.power,0); assert.equal(host.dx,0); assert.equal(host.dy,0);
+        assert.equal(host.fragments,0); assert.equal(host.flash,0);
+    }
+    for(const mode of ["measured","timed"]) assert.equal(frame("running",mode,.63,3,0,false,"default").fraction,.63);
+    assert.equal(frame("failure","measured",0,3,.63,false,"default").fraction,.63);
+    assert.equal(frame("success","measured",0,.42,.63,false,"default").fraction,1);
+    assert.equal(frame("success","measured",0,.52,.63,false,"default").impact,0);
+    assert.equal(frame("idle","measured",0,0,0,false,"default").fraction,0);
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const field=fs.readFileSync(path.join(root,"components/EnergyPressureField.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/root.variant==="default" \? 0 : Math.max/);
+    const start=source.indexOf('if(root.variant==="default") {');
+    const end=source.indexOf('const hot=',start);
+    assert.ok(start>=0 && end>start);
+    assert.doesNotMatch(source.slice(start,end),/createRadialGradient|shadowBlur|orb\(/);
+    assert.match(field,/source.variant==="default"\) continue/);
+    assert.match(preview,/name:"DEFAULT",key:"default"/);
+});

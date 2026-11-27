@@ -75,6 +75,16 @@ ShellRoot {
                 if (!lab.require(faces.count===4,"variant count")) return;
                 if (!lab.require(Math.abs(field.offsetX)<=3.000001 && Math.abs(field.offsetY)<=2.000001,
                         "bounded aggregate widget pressure")) return;
+                if (lab.stage===0 || lab.stage===3) {
+                    const all=[quiet,ash,erosion];
+                    for(let i=0;i<faces.count;i++) all.push(faces.itemAt(i));
+                    for(const f of all) {
+                        if (!lab.require(Math.abs(f.fillGap-3*f.height/34)<.00001,
+                                "height-scaled fill gap "+f.variant)) return;
+                        if (!lab.require(Math.abs(f.headCenterX-(f.track.inset+f.track.width*f.displayedFraction))<.00001,
+                                "inset head center "+f.variant)) return;
+                    }
+                }
                 if (lab.stage===0 || lab.stage===3 || (lab.stage>=4 && lab.stage<=6)) {
                     if (!lab.require(field.pressure===0 && field.offsetX===0 && field.offsetY===0,
                             "idle, hidden or reduced host pressure "+lab.stage)) return;

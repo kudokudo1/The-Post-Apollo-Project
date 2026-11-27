@@ -39,7 +39,10 @@ def scene_text(mounted):
     function confirmCapture() {
         const r=recorder.report;
         if(!r || r.status!=="COMPLETE" || !r.resource || r.resource.status!=="COMPLETE" ||
-            !r.resource.evidence || r.events.length===0 || r.eventLoop.ticks===0)return false;
+            !r.resource.evidence || r.events.length===0 || r.eventLoop.ticks===0){
+            console.error("CPU_Q6_TERMINAL "+JSON.stringify(r?{status:r.status,reason:r.reason||"",resourceStatus:r.resource?r.resource.status:"MISSING",resourceReason:r.resource?(r.resource.reason||""):"",ticks:r.eventLoop?r.eventLoop.ticks:0,events:r.events?r.events.length:0}:null));
+            return false;
+        }
         console.log("CPU_Q6_IDENTITY "+JSON.stringify({pid:r.resource.evidence.pid,startTicks:r.resource.evidence.startTicks,
             samples:r.resource.evidence.samples.length,overlapMs:r.resource.evidence.overlapMs,
             ticks:r.eventLoop.ticks,events:r.events.length}));
@@ -167,6 +170,50 @@ def run_scene(folder,mounted):
     scripts=scene/"scripts";scripts.mkdir()
     for name in (SCRIPT,"syntagma_quickshell_thread_sampler.py"):
         shutil.copy2(ROOT/"scripts"/name,scripts/name)
+    # Test-only diagnostic wrapper, executing the unchanged observer in the
+    # same Python process (no extra parent, no permission or identity bypass).
+    # Preserve its exact stdout, stderr and exit status. Keep the capture in
+    # this private temporary scene, and print only bounded structural evidence.
+    actual=scripts/"actual_memory_observer.py"
+    (scripts/SCRIPT).rename(actual)
+    (scripts/SCRIPT).write_text(r"""
+import contextlib,json,os,runpy,sys
+from pathlib import Path
+from syntagma_quickshell_thread_sampler import launching_quickshell,parse_stat_line
+base=Path(__file__).parent
+diag={"parent":os.getppid(),"parentComm":None,"launcher":None,"smaps":"NOT CHECKED"}
+try:
+    diag["parentComm"]=(Path("/proc")/str(os.getppid())/"comm").read_text().strip()
+    diag["launcher"]=launching_quickshell()
+    if diag["launcher"]:
+        p=Path("/proc")/str(diag["launcher"])
+        diag["launcherStart"]=parse_stat_line((p/"stat").read_text())["start"]
+        try:
+            with (p/"smaps_rollup").open() as handle:
+                diag["smapsFields"]=[line.partition(":")[0] for line in handle if line.partition(":")[0] in
+                    ("Rss","Pss","Pss_Anon","Pss_File","Pss_Shmem","Private_Clean","Private_Dirty","Swap","SwapPss")]
+            diag["smaps"]="READABLE"
+        except OSError as e:
+            diag["smaps"]="ERRNO_"+str(e.errno)
+except (OSError,ValueError,IndexError) as e:
+    diag["preflightError"]=type(e).__name__
+(base/"observer-preflight.json").write_text(json.dumps(diag))
+class Tee:
+    def __init__(self,stream,copy):
+        self.stream,self.copy=stream,copy
+    def write(self,data):
+        self.copy.write(data);self.copy.flush()
+        return self.stream.write(data)
+    def flush(self):
+        self.copy.flush();self.stream.flush()
+with (base/"observer-stdout.jsonl").open("w") as out,(base/"observer-stderr.txt").open("w") as err:
+    with contextlib.redirect_stdout(Tee(sys.stdout,out)),contextlib.redirect_stderr(Tee(sys.stderr,err)):
+        try:
+            runpy.run_path(str(base/"actual_memory_observer.py"),run_name="__main__")
+        except SystemExit as e:
+            (base/"observer-exit.txt").write_text(str(e.code))
+            raise
+""")
     (scene/"smoke.qml").write_text(scene_text(mounted))
     env=os.environ.copy()
     for key in ("HOME","XDG_CACHE_HOME","XDG_CONFIG_HOME","XDG_STATE_HOME","XDG_DATA_HOME","XDG_RUNTIME_DIR"):
@@ -246,6 +293,21 @@ def run_scene(folder,mounted):
                     observedWorkerPeakPssKiB=max((v["peakPssKiB"] for v in observed_pids.values()),default=0))
     except BaseException:
         print("\n".join(logs[-80:]))
+        preflight=scripts/"observer-preflight.json"
+        if preflight.exists():
+            print("CPU_Q6_PREFLIGHT",preflight.read_text()[:2048])
+        output=scripts/"observer-stdout.jsonl"
+        if output.exists():
+            for line in output.read_text()[:65536].splitlines()[:14]:
+                try:
+                    row=json.loads(line)
+                    print("CPU_Q6_OBSERVER_ROW",json.dumps({k:row.get(k) for k in ("event","pid","startTicks","tsMs","monotonicMs","cpuTicks","cpuPct","sampleIntervalMs","samples","observedMs","reason","calibration")}))
+                except ValueError:
+                    print("CPU_Q6_OBSERVER_ROW invalid JSON")
+        for name in ("observer-exit.txt","observer-stderr.txt"):
+            candidate=scripts/name
+            if candidate.exists():
+                print("CPU_Q6_OBSERVER",name,candidate.read_text()[:512])
         raise
     finally:
         if proc.poll() is None:

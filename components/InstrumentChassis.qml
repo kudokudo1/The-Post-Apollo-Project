@@ -10,6 +10,10 @@ Item {
     property color structuralColor: Colors.cyan
     // Approved cyan gunmetal. The finish is independent of the dial accent.
     property color screwColor: "#40899b"
+    // Semantic finishes blend 75% toward the selected hue from gunmetal.
+    // Set 1.0 for an exact legacy/custom metal tone.
+    property real screwColorStrength: 0.75
+    readonly property real boundedScrewColorStrength: Number.isFinite(screwColorStrength) ? Math.max(0,Math.min(1,screwColorStrength)) : 0.75
     readonly property real screwShadow: 0.75
     readonly property real screwDirectLight: 0.20
     readonly property real screwReflectedLight: 0.10
@@ -18,9 +22,10 @@ Item {
     // Map the approved palette to a caller-selected metal color. Alpha is
     // deliberately ignored: these are opaque metal surfaces, not glow.
     function screwTone(r,g,b) {
-        return Qt.rgba(Math.min(1,screwColor.r*r/64),
-                       Math.min(1,screwColor.g*g/137),
-                       Math.min(1,screwColor.b*b/155),1);
+        const t=boundedScrewColorStrength;
+        return Qt.rgba(Math.min(1,((64/255)*(1-t)+screwColor.r*t)*r/64),
+                       Math.min(1,((137/255)*(1-t)+screwColor.g*t)*g/137),
+                       Math.min(1,((155/255)*(1-t)+screwColor.b*t)*b/155),1);
     }
     function screwLightingAngle(x,y) {
         return Math.atan2(height/2-y,width/2-x)-Math.PI/4;
@@ -53,6 +58,7 @@ Item {
             function onShowScrewsChanged() { plate.requestPaint() }
             function onStructuralColorChanged() { plate.requestPaint() }
             function onScrewColorChanged() { plate.requestPaint() }
+            function onScrewColorStrengthChanged() { plate.requestPaint() }
             function onScrewDiameterChanged() { plate.requestPaint() }
             function onScrewInsetChanged() { plate.requestPaint() }
             function onScrewsFitChanged() { plate.requestPaint() }

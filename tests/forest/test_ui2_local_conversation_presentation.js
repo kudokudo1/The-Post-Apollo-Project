@@ -125,4 +125,49 @@ check("cheap length guard rejects giant ASCII input and response",()=>{
     assert.equal(c.receive(1,snap(1,"GENERATING","x".repeat(100000),"UNKNOWN_HOLD",true,true)),false);
     assert.equal(c.state().status,"UNKNOWN_HOLD");
 });
+check("observable presentation status distinguishes preparation, provisional, STOP, commit",()=>{
+    const {c,feed}=start();
+    assert.equal(c.state().displayLabel,"REQUEST ACCEPTED");
+    assert.equal(c.receive(1,snap(1,"PREPARED")),true);
+    assert.equal(c.state().displayLabel,"REQUEST PREPARED");
+    assert.equal(c.receive(1,snap(2,"LOCAL_RESERVED")),true);
+    assert.equal(c.state().displayLabel,"LOCAL TURN RESERVED");
+    assert.equal(c.receive(1,snap(3,"GENERATING","RE","UNKNOWN_HOLD",true,true)),true);
+    assert.equal(c.state().displayLabel,"GENERATING // PROVISIONAL");
+    assert.equal(c.state().provisional,true);
+    assert.equal(c.requestStop(1),true);
+    assert.equal(c.state().displayLabel,"STOP REQUESTED // OUTCOME PENDING");
+    assert.equal(c.state().provisional,true);
+    assert.equal(c.receive(1,snap(4,"LOCAL_COMMITTED","READY","COMMITTED_LOCAL",false,true)),true);
+    assert.equal(c.state().displayLabel,"RESPONSE COMPLETE // LOCAL");
+    assert.equal(c.state().localOutcome,"COMMITTED_LOCAL");
+    assert.equal(c.state().provisional,false);
+    assert.equal(feed.tail,"READY");
+});
+check("terminal label preserves actual local outcome without claiming provider state",()=>{
+    const cases=[["ABORTED_LOCAL","LOCAL TURN ABORTED // PROVIDER STATE UNKNOWN"],
+        ["COMMITTED_LOCAL","LOCAL TURN COMMITTED // RESPONSE UNAVAILABLE"],
+        ["UNKNOWN_HOLD","OUTCOME UNKNOWN // NO AUTOMATIC RETRY"]];
+    for(const [outcome,label] of cases){
+        const {c,feed}=start();
+        c.receive(1,snap(1,"GENERATING","RE","UNKNOWN_HOLD",true,true));
+        c.requestStop(1);
+        assert.equal(c.receive(1,snap(2,"UNKNOWN_HOLD","",outcome,false,true)),true);
+        assert.equal(c.state().displayLabel,label);
+        assert.equal(c.state().localOutcome,outcome);
+        assert.equal(c.state().provisional,false);
+        assert.equal(feed.tail,"");
+        c.observe(2);
+        assert.equal(c.state().displayLabel,"VIEW WITHDRAWN");
+        assert.equal(c.state().localOutcome,"UNKNOWN_HOLD");
+        assert.equal(c.state().nativeAdmitted,false);
+    }
+});
+check("malformed committed packet cannot manufacture a local outcome label",()=>{
+    const {c,feed}=start();
+    assert.equal(c.receive(1,snap(1,"LOCAL_COMMITTED","READY","COMMITTED_LOCAL",false,false)),false);
+    assert.equal(c.state().displayLabel,"OUTCOME UNKNOWN // NO AUTOMATIC RETRY");
+    assert.equal(c.state().localOutcome,"UNKNOWN_HOLD");
+    assert.equal(feed.tail,"");
+});
 console.log("UI2_REAL_PRESENTATION_PASS",n);

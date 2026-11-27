@@ -6,6 +6,7 @@
 function createPresentation(feed) {
     let observed = null, epoch = null, scope = "", used = false;
     let prompt = "", text = "", sequence = 0, status = "IDLE";
+    let localOutcome = "UNKNOWN_HOLD";
     let admitted = false, terminal = false, baseline = "", stopFrozen = false;
     const ranks = {PREPARED:1, LOCAL_RESERVED:2, GENERATING:3,
         STOP_REQUESTED:4, LOCAL_COMMITTED:5, UNKNOWN_HOLD:5};
@@ -39,6 +40,7 @@ function createPresentation(feed) {
     function retire() {
         clearRows(); terminal = true; status = "WITHDRAWN";
         prompt = ""; text = ""; baseline = "";
+        localOutcome = "UNKNOWN_HOLD"; admitted = false;
     }
     function observe(v) {
         const next = validEpoch(v) ? v : null;
@@ -63,6 +65,7 @@ function createPresentation(feed) {
             feed.messages = [outgoing()];
         }
         text = ""; baseline = ""; terminal = true; status = "UNKNOWN_HOLD";
+        localOutcome = "UNKNOWN_HOLD";
         return false;
     }
     function validSnapshot(s) {
@@ -114,6 +117,7 @@ function createPresentation(feed) {
         if (s.status === "UNKNOWN_HOLD") {
             hold();
             sequence = s.sequence; admitted = s.native_admitted;
+            localOutcome = s.local_outcome;
             return true;
         }
         if (s.status === "STOP_REQUESTED") stopFrozen = true;
@@ -130,6 +134,7 @@ function createPresentation(feed) {
         }
         if (show) text = s.text;
         sequence = s.sequence; status = s.status;
+        localOutcome = s.local_outcome;
         admitted = s.native_admitted;
         terminal = status === "LOCAL_COMMITTED";
         return true;
@@ -138,9 +143,32 @@ function createPresentation(feed) {
         if (v !== epoch || epoch === null) return false;
         retire(); observed = null; return true;
     }
+    function displayLabel() {
+        // Labels describe only observed presentation, never provider idle,
+        // durable protected storage, or permission for another request.
+        switch (status) {
+        case "IDLE": return "NO RESPONSE YET";
+        case "SUBMITTED": return "REQUEST ACCEPTED";
+        case "PREPARED": return "REQUEST PREPARED";
+        case "LOCAL_RESERVED": return "LOCAL TURN RESERVED";
+        case "GENERATING": return "GENERATING // PROVISIONAL";
+        case "STOP_REQUESTED": return "STOP REQUESTED // OUTCOME PENDING";
+        case "LOCAL_COMMITTED": return "RESPONSE COMPLETE // LOCAL";
+        case "WITHDRAWN": return "VIEW WITHDRAWN";
+        case "UNKNOWN_HOLD":
+            if (localOutcome === "ABORTED_LOCAL")
+                return "LOCAL TURN ABORTED // PROVIDER STATE UNKNOWN";
+            if (localOutcome === "COMMITTED_LOCAL")
+                return "LOCAL TURN COMMITTED // RESPONSE UNAVAILABLE";
+            return "OUTCOME UNKNOWN // NO AUTOMATIC RETRY";
+        default: return "OUTCOME UNKNOWN // NO AUTOMATIC RETRY";
+        }
+    }
     function state() {
         return {status:status,sequence:sequence,terminal:terminal,
-            nativeAdmitted:admitted};
+            nativeAdmitted:admitted,localOutcome:localOutcome,
+            provisional:!!text && status !== "LOCAL_COMMITTED",
+            displayLabel:displayLabel()};
     }
     return {observe,attach,receive,requestStop,withdraw,state};
 }

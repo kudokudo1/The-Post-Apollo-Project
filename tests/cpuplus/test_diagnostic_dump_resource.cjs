@@ -21,6 +21,14 @@ function verify(assert,R,P) {
     assert(result.overlapMs===4900&&result.firstOffsetMs===100&&result.lastOffsetMs===5100);
     assert(result.samples[0].withinWindow&&!result.samples[1].withinWindow&&!result.samples[1].intervalWithinWindow);
     assert(result.samples[0].cpuPct===null&&result.samples[1].cpuPct===10);
+    const host={MemTotal:100000,MemAvailable:80000,MemFree:30000,AnonPages:10000,Cached:3000,
+        Shmem:100,SReclaimable:100,SUnreclaim:100,SwapTotal:10000,SwapFree:9000};
+    const context={beforeKiB:host,afterKiB:{...host,MemAvailable:79000},spanMs:0.4};
+    const realShape=[{...a,hostObservation:context,privateResidentKiB:30,pssPlusSwapPssKiB:80},
+        {...b,hostObservation:context,privateResidentKiB:30,pssPlusSwapPssKiB:80},end];
+    assert(P.summarize("memory",encode(realShape)).includes("HOST CONTEXT // 2/2 paired samples"));
+    assert(parse(realShape)?.pid===123);
+    assert(P.summarize("memory",encode([{...a,hostObservation:{beforeKiB:null,afterKiB:null,spanMs:0}},b,end])).includes("UNAVAILABLE"));
     assert(!parse([a,{...b,pid:124},end]));
     assert(!parse([a,{...b,startTicks:999},end]));
     assert(!parse([a,{...b,tsMs:b.tsMs+1000},end]));

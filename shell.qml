@@ -391,6 +391,15 @@ PanelWindow {
             // Do not transfer arbitrary saved IDs or create another window.
             return timewWindow.openFavoriteView(view);
         }
+        // KILL favorites retain their historical owner key, but their
+        // inspection destination is the independent CPU++ KILL workspace.
+        if (owner==="appcontrol" && view==="KILL") {
+            if (!KillBackend.KillStore.collectionEnabled) return false;
+            cpuPlusWindow.selectMode(1);
+            if (!cpuPlusWindow.menuOpen) cpuPlusWindow.open();
+            shellRoot.requestControlKeyboard("cpu","favorites-owner");
+            return true;
+        }
         if(owner==="appcontrol") {
             const modes={
                 "FAVORITES":appControlWindow.favoritesModeIndex,
@@ -398,7 +407,6 @@ PanelWindow {
                 "FILES":appControlWindow.filesModeIndex,
                 "RUN":appControlWindow.runModeIndex,
                 "WINDOWS":appControlWindow.windowsModeIndex,
-                "KILL":appControlWindow.killModeIndex,
                 "THERMAL":appControlWindow.thermalModeIndex,
                 "SYSTEM":appControlWindow.systemModeIndex
             };
@@ -1316,7 +1324,8 @@ PanelWindow {
                 onFavoriteOwnerNavigationRequested: function(owner,view) {
                     // Only after the destination opens does CPU++ withdraw.
                     // Invalid plans keep the user's current Favorites view.
-                    if(shellRoot.openApolloFavoriteOwner(owner,view))
+                    if(shellRoot.openApolloFavoriteOwner(owner,view)
+                            && !(owner==="appcontrol" && view==="KILL"))
                         cpuPlusWindow.close();
                 }
                 onFavoriteExactNavigationRequested: function(owner,route) {

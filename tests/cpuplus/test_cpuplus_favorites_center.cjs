@@ -1475,7 +1475,7 @@ test("U7a OPEN OWNER uses shell's existing windows and never forwards selected I
   assert.match(cpu,/cpuPlusWindow\.favoriteOwnerNavigationRequested\(owner,view\)/);
   assert.match(shell,/function openApolloFavoriteOwner\(owner,view\)/);
   assert.match(shell,/onFavoriteOwnerNavigationRequested: function\(owner,view\)/);
-  assert.match(shell,/if\(shellRoot\.openApolloFavoriteOwner\(owner,view\)\)\s*cpuPlusWindow\.close\(\)/);
+  assert.match(shell,/if\(shellRoot\.openApolloFavoriteOwner\(owner,view\)\s*&& !\(owner==="appcontrol" && view==="KILL"\)\)\s*cpuPlusWindow\.close\(\)/);
   const route=shell.slice(shell.indexOf("function openApolloFavoriteOwner("),
                           shell.indexOf("function swapControlKeyboardOwner()"));
   assert.match(route,/appControlWindow\.switchMode\(modes\[view\],false\)/);
@@ -2482,4 +2482,34 @@ test("CPU++ rounded scrollbar cap is opt-in and star migration remains a separat
   const runtime=read("tests/components/test_neon_scrollbar_qt_runtime.py");
   assert.match(runtime,/bounded rounded thumb/);
   assert.match(runtime,/legacy proportional thumb is opt-out/);
+});
+
+test("K6e: KILL owner navigation stays within CPU++ and retains legacy favorite keys",()=>{
+  const shell=read("shell.qml");
+  const a=shell.indexOf("    function openApolloFavoriteOwner(");
+  const b=shell.indexOf("    function swapControlKeyboardOwner()",a);
+  assert.ok(a>=0 && b>a);
+  const calls=[];
+  const cpu={menuOpen:true,selectMode:n=>calls.push(["cpu-mode",n]),
+    open:()=>{calls.push(["cpu-open"]);cpu.menuOpen=true;}};
+  const store={collectionEnabled:true};
+  const app={menuOpen:false,appsModeIndex:2,switchMode:(...v)=>calls.push(["app-mode",...v])};
+  const route=new Function("KillBackend","cpuPlusWindow","appControlWindow","shellRoot",
+    shell.slice(a,b)+"\nreturn openApolloFavoriteOwner;")({KillStore:store},cpu,app,
+      {requestControlKeyboard:(...v)=>calls.push(["focus",...v])});
+  assert.equal(route("appcontrol","KILL"),true);
+  assert.deepEqual(calls,[["cpu-mode",1],["focus","cpu","favorites-owner"]]);
+  assert.equal(app.menuOpen,false);
+  calls.length=0; cpu.menuOpen=false;
+  assert.equal(route("appcontrol","KILL"),true);
+  assert.deepEqual(calls,[["cpu-mode",1],["cpu-open"],["focus","cpu","favorites-owner"]]);
+  calls.length=0; store.collectionEnabled=false;
+  assert.equal(route("appcontrol","KILL"),false);
+  assert.deepEqual(calls,[]);
+  assert.equal(route("appcontrol","INVALID"),false);
+  assert.deepEqual(calls,[]);
+  assert.equal(route("appcontrol","APPS"),true);
+  assert.deepEqual(calls,[["app-mode",2,false],["focus","appcontrol","favorites-owner"]]);
+  assert.doesNotMatch(shell.slice(a,b),/"KILL":appControlWindow\.killModeIndex/);
+  assert.match(shell,/onFavoriteOwnerNavigationRequested: function\(owner,view\)[\s\S]*?&& !\(owner==="appcontrol" && view==="KILL"\)/);
 });

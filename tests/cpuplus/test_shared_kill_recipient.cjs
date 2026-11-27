@@ -951,3 +951,24 @@ test("K5a: Hub process projection and guarded action route use KillStore directl
     assert.equal(result.snapshot.loading,true);
     assert.equal(projected,1);
 });
+
+test("K5c: process classification and exclusion use shared safety and store state", () => {
+    assert.match(recipient,/readonly property var safety: collectionSource \? collectionSource\.safety : null/);
+    assert.match(recipient,/readonly property bool legacyActionBlocked: !collectionSource\s*\|\| collectionSource\.donorActionBlocked !== false/);
+    assert.match(recipient,/hasBulkReview \|\| bulkOperation \|\| legacyActionBlocked/);
+    assert.match(recipient,/!legacyActionBlocked && isProtected\(row\)/);
+    assert.doesNotMatch(recipient,/appControlWindow\.(?:taskDangerReason|taskRequiresDangerUnlock|destructiveConfirmOpen|monitorResultIcon|resultDisplayName)/);
+    const start=recipient.indexOf("    function protectedProcessRisk(");
+    const end=recipient.indexOf("    function hunterMetricAccent(",start);
+    assert.ok(start>=0 && end>start);
+    const safety={dangerReason:row=>row.comm==="sway"?"SESSION-CRITICAL":"",
+        requiresDangerUnlock:row=>row.comm==="sway"};
+    const make=new Function("safety","gate",recipient.slice(start,end)+"\nreturn {protectedProcessRisk,isProtected};");
+    const api=make(safety,{});
+    assert.equal(api.isProtected({comm:"sway"}),true);
+    assert.equal(api.isProtected({comm:"worker"}),false);
+    assert.equal(api.isProtected(null),true);
+    assert.equal(make(null,{}).isProtected({comm:"worker"}),true);
+    assert.equal(make(safety,null).isProtected({comm:"worker"}),true);
+    assert.ok(api.protectedProcessRisk({comm:"sway"}).endsWith("SESSION-CRITICAL"));
+});

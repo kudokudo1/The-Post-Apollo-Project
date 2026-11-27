@@ -25,6 +25,9 @@ Item {
     property bool active: true
 
     readonly property var gate: collectionSource ? collectionSource.actionGate : null
+    readonly property var safety: collectionSource ? collectionSource.safety : null
+    readonly property bool legacyActionBlocked: !collectionSource
+        || collectionSource.donorActionBlocked !== false
     readonly property var taskRows: collectionSource
         && Array.isArray(collectionSource.rows)
         ? collectionSource.rows : []
@@ -106,19 +109,16 @@ Item {
     }
 
     function protectedProcessRisk(row) {
-        const reason = row && appControlWindow && appControlWindow.taskDangerReason
-            ? String(appControlWindow.taskDangerReason(row) || "") : "";
+        const reason = row && safety
+            ? String(safety.dangerReason(row) || "") : "";
         return "Changing a critical process can freeze the desktop, interrupt essential services, end your session or force a reboot. Unsaved work may be lost."
             + (reason ? "\n" + reason : "");
     }
     function isProtected(row) {
         // Read-only classification, identical to donor filter. Avoid a full
         // exact-row search for every row; mutations still require gate.exactRow.
-        if (!row || !appControlWindow || !gate) return true;
-        if (appControlWindow.taskRequiresDangerUnlock)
-            return appControlWindow.taskRequiresDangerUnlock(row);
-        return gate.isProtected(Number(row.pid),Number(row.startTicks),
-                                String(row.comm || ""));
+        if (!row || !safety || !gate) return true;
+        return safety.requiresDangerUnlock(row);
     }
     function hunterMetricAccent() { return hunterGraph.metricAccent(); }
     function hunterActive(row) {
@@ -212,8 +212,7 @@ Item {
     function setHunterMetricMode(mode) { changeView("metric",mode); }
     function setHunterVisibilityMode(mode) { changeView("visibility",mode); }
     function taskGlyph(row) {
-        return appControlWindow && appControlWindow.monitorResultIcon
-            ? appControlWindow.monitorResultIcon(row) : "(╭ర_•́)";
+        return row && row._taskRecord ? "(╭ర_•́)" : "";
     }
     function taskRowMetric(row) {
         if (!row) return "NO METRIC";
@@ -254,9 +253,7 @@ Item {
     readonly property int miniHistoryLimit: history.taskMiniHistoryLimit
     readonly property int miniScrollDuration: history.taskMiniGraphScrollDuration
     function taskDisplayName(row) {
-        return appControlWindow && appControlWindow.resultDisplayName
-            ? appControlWindow.resultDisplayName(row, appControlWindow.killModeIndex)
-            : String(row.comm || row.name || "PROCESS")
+        return row ? String(row.comm || row.name || "PROCESS") : "";
     }
     function miniHistory(row,key) {
         if (key==="normal")
@@ -391,7 +388,7 @@ Item {
     function prepareAction(action, percent) {
         const row = currentTask;
         if (!active || !exactTargetAvailable || !gate || locallyPending
-                || hasBulkReview || bulkOperation || appControlWindow.destructiveConfirmOpen)
+                || hasBulkReview || bulkOperation || legacyActionBlocked)
             return false;
         const ok = gate.prepare(
             Number(row.pid), Number(row.startTicks), String(row.comm),
@@ -418,7 +415,7 @@ Item {
         return active && exactTargetAvailable && sameTarget(row)
             && !!gate && !gate.pending && !gate.busy && !gate.bulkBlocked
             && !hasBulkReview && !bulkOperation
-            && !appControlWindow.destructiveConfirmOpen && isProtected(row);
+            && !legacyActionBlocked && isProtected(row);
     }
     function toggleLock(row,action,sticky) {
         if (!canChangeLock(row) || !collectionSource) return false;
@@ -849,7 +846,7 @@ Item {
                 available: !!workspace.currentTask && !workspace.locallyPending
                     && !workspace.hasBulkReview && !workspace.bulkOperation
                     && !!workspace.gate && !workspace.gate.pending && !workspace.gate.busy
-                    && !workspace.appControlWindow.destructiveConfirmOpen && !cpuProcessInformation.open
+                    && !workspace.legacyActionBlocked && !cpuProcessInformation.open
             }
             }
             Flickable {

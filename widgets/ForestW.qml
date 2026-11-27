@@ -1462,6 +1462,7 @@ PanelWindow {
                 // those buttons available when the compact panel hides the rail.
                 SelectorSlider {
                     id: modelFormSlider
+                    objectName: "forestModelFormSlider"
                     anchors.right: parent.right
                     anchors.rightMargin: 7
                     anchors.top: modelEquipmentPanel.bottom
@@ -1489,11 +1490,33 @@ PanelWindow {
                     handleGlowColor: root.activeTree.spiritualIdleGlowColor
                     activityGlowColor: root.activeTree.iconIdleGlowColor
                     enabledSlider: root.menuOpen && root.modelPopupOpen && visible
+                        && root.visible && !preferenceStore.busy
                     Accessible.name: "Forest model form, Big, Auto or Small"
                     Accessible.description: "Local model selection only. Auto routing is not connected."
                     onVisibleChanged: {
                         if (!visible)
                             cancelIndexPreview();
+                    }
+                    // Existing preview-release cancellation seam. Observe
+                    // withdrawal immediately even if the same index returns.
+                    // Do not cancel on our own synchronous equipment echo;
+                    // same-index external equipment replacement still needs
+                    // the coordinated gesture-origin / owner revision seam.
+                    onEnabledSliderChanged: {
+                        if (!enabledSlider)
+                            cancelIndexPreview();
+                    }
+                    Connections {
+                        target: root
+                        function onSelectedTreeIndexChanged() { modelFormSlider.cancelIndexPreview(); }
+                        function onMenuOpenChanged() { modelFormSlider.cancelIndexPreview(); }
+                        function onModelPopupOpenChanged() { modelFormSlider.cancelIndexPreview(); }
+                        function onVisibleChanged() { modelFormSlider.cancelIndexPreview(); }
+                    }
+                    Connections {
+                        target: preferenceStore
+                        function onBusyChanged() { modelFormSlider.cancelIndexPreview(); }
+                        function onCommittedChanged() { modelFormSlider.cancelIndexPreview(); }
                     }
                     onIndexRequested: function(index) {
                         if (enabledSlider && Number.isInteger(index) && index >= 0 && index < 3)

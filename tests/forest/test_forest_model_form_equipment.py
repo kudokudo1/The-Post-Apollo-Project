@@ -53,6 +53,12 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         self.assertIn("enabledSlider: root.menuOpen && root.modelPopupOpen && visible", rail)
         self.assertIn("if (!visible)", rail)
         self.assertIn("cancelIndexPreview();", rail)
+        self.assertIn("&& root.visible && !preferenceStore.busy", rail)
+        self.assertIn("onEnabledSliderChanged:", rail)
+        for transition in ("onSelectedTreeIndexChanged()", "onMenuOpenChanged()",
+                           "onModelPopupOpenChanged()", "onVisibleChanged()",
+                           "onBusyChanged()", "onCommittedChanged()"):
+            self.assertIn(transition + " { modelFormSlider.cancelIndexPreview(); }", rail)
         self.assertIn("root.modelPopupOpen && modelPopup.width >= 320", rail)
         self.assertIn("&& modelPopup.height >= 320", rail)
         self.assertEqual(view.count("anchors.rightMargin: modelFormSlider.visible ? 53 : 7"), 2)

@@ -944,6 +944,40 @@ ShellRoot {
                     "footer geometry preserved after loading a preset and remount"))return;
                 console.log("CPU_D4A_NATIVE_PASS");
                 console.log("CPU_D4B_FIXED_FOOTER_PASS");
+                const save=root.findItem(workshop,"cpuplusWorkshopSave");
+                if(!root.check(save&&save.available,"direct Controls SAVE visible"))return;
+                save.leftClicked(null);
+                root.phase=324;return;
+            }
+            if(root.phase===324 && pane.item){
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const field=root.findItem(workshop,"cpuplusWorkshopSaveName");
+                const confirm=root.findItem(workshop,"cpuplusWorkshopConfirmSave");
+                if(!root.check(workshop.saveEditorOpen && field.visible && !workshop.ready
+                    && !CpuPlusDiagnostics.busy,"save editor opens without preparing or running"))return;
+                field.text="CONTROLS SAVE";
+                confirm.leftClicked(null);
+                if(!root.check(CpuPlusDiagnostics.workflowCatalogBusy && !CpuPlusDiagnostics.busy,
+                    "direct save only starts storage"))return;
+                root.phase=325;return;
+            }
+            if(root.phase===325 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                const row=CpuPlusDiagnostics.workshopPresets.find(r=>r.name==="CONTROLS SAVE");
+                if(!root.check(row && JSON.stringify(row.plan)===workshop.planText
+                    && !row.favorite && !workshop.saveEditorOpen && !workshop.ready
+                    && !CpuPlusDiagnostics.busy && workshop.saveNotice.startsWith("SAVED //"),
+                    "direct save receipt, exact plan, no execution or prepared authority"))return;
+                root.findItem(workshop,"cpuplusWorkshopSave").leftClicked(null);
+                root.phase=326;return;
+            }
+            if(root.phase===326 && pane.item){
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                root.findItem(workshop,"cpuplusWorkshopCancelSave").leftClicked(null);
+                if(!root.check(!workshop.saveEditorOpen && !CpuPlusDiagnostics.workflowCatalogBusy
+                    && !CpuPlusDiagnostics.busy,"cancel save does not write or capture"))return;
+                console.log("CPU_Q3_DIRECT_SAVE_PASS");
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);

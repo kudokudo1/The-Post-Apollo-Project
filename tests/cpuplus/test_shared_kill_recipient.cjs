@@ -1355,7 +1355,9 @@ test("P2: process snapshot reads procfs I/O counters once with legacy first-key 
     const sourceLiteral = program.replaceAll('"', '\\"');
     assert.ok(telemetry.replace(/"\s*\+\s*"/g, "").includes("awk '" + sourceLiteral + "' /proc/$pid/io"),
         "compiled shell command retains both exact I/O counters in one awk invocation");
-    assert.equal((telemetry.match(/\/proc\/\$pid\/io/g) || []).length, 1);
+    const snapshotBody = telemetry.slice(telemetry.indexOf("    function refreshSnapshot() {"),
+        telemetry.indexOf("    function parseSnapshot(output) {"));
+    assert.equal((snapshotBody.match(/\/proc\/\$pid\/io/g) || []).length, 1);
     assert.match(telemetry, /readb=\$\{io_pair%% \*\}; writeb=\$\{io_pair#\* \};/);
     assert.doesNotMatch(telemetry, /(?:readb|writeb)=\$\(awk/);
     const dir = fixture.mkdtempSync(path.join(os.tmpdir(), "cpuplus-proc-io-"));

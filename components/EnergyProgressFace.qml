@@ -3,6 +3,7 @@ import "EnergyProgressMotion.js" as Motion
 import "EnergyVariantProfile.js" as Profiles
 import "EnergyFireMaterial.js" as Material
 import "EnergyBeamFlow.js" as Flow
+import "EnergyPixelFire.js" as PixelFire
 
 // Opt-in presentation only. No input handling or service calls.
 // The owner supplies phase and, for measured/timed modes, actual progress.
@@ -112,7 +113,7 @@ Item {
             id: surface
             objectName: "energyProgressCanvas"
             anchors.fill: parent
-            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?.65:1.35))
+            readonly property real spill: Math.max(10, root.height * (root.variant==="flamethrower"?1.05:root.variant==="ki-blast"?1.65:.85))
             anchors.margins: -spill
             renderTarget: Canvas.Image
             onWidthChanged: requestPaint()
@@ -242,6 +243,23 @@ Item {
                     c.beginPath(); c.arc(0,0,1,0,2*Math.PI); c.fill();
                     c.restore();
                 }
+                // Crisp, animated pixel-fire underneath a translucent
+                // optical glow. Detached embers rise from the moving front.
+                if(hot && p>0) {
+                    const pixel=PixelFire.fire(h,root.elapsed,root.reducedMotion);
+                    const palette=["#D34A18","#F48B1B","#FFD05A","#FFF3B0"];
+                    const u=pixel.unit;
+                    for(const cell of pixel.cells) {
+                        c.fillStyle=palette[cell.heat];
+                        c.fillRect(Math.round(edge)+cell.x*u,Math.round(mid)+cell.y*u,u,u);
+                    }
+                    for(const ember of pixel.embers) {
+                        c.save(); c.globalAlpha=ember.alpha;
+                        c.fillStyle=palette[ember.heat];
+                        c.fillRect(Math.round(edge)+ember.x*u,Math.round(mid)+ember.y*u,u,u);
+                        c.restore();
+                    }
+                }
                 // Consuming fire: asymmetric curved tongues curl
                 // around the advancing ember, not down the entire beam.
                 // Soft flame lobes can spill beyond the beam vertically;
@@ -251,6 +269,7 @@ Item {
                     const length=Math.min(h*1.5,inner*p);
                     const reach=h*(.78+.12*f.intensity);
                     c.save();
+                    c.globalAlpha=.35;
                     // Constrain the fire to the terminal region, while
                     // letting it consume the full height of the beam tip.
                     c.beginPath();
@@ -290,16 +309,20 @@ Item {
                 const enlarged=Flow.head(root.variant,h,f.power,w);
                 const rx=enlarged?enlarged.rx:Math.min(h*.78*scale*root.personality.headConsume,w*.48);
                 const ry=enlarged?enlarged.ry:Math.min(h*(hot?.66:.84),h*(hot?.47:.58)*(1+(scale-1)*.22));
-                if (ki && f.clash) {
+                if (ki && (f.clash || (root.phase==="success" && f.headVisible))) {
                     // Two compressed, independently colored lobes. A hard
                     // shared plane separates their flat contact faces; only
                     // the narrow white seam crosses the plane.
                     const red=Qt.rgba(1,.10,.16,1);
                     const enemyInk=mix(Qt.rgba(.65,1,1,1),red,f.enemyHeat);
                     const enemyCore=mix(Qt.rgba(1,.94,.74,1),red,f.enemyHeat*.82);
-                    const lobe=Math.min(h*1.05,w*.25);
-                    const tall=h*(.80+.15*f.intensity);
+                    const sizes=Flow.clashSizes(p,f.enemyHeat);
+                    const baseLobe=Math.min(h*.92,w*.22);
+                    const baseTall=h*.72;
                     function compressed(side,color,core,alpha) {
+                        const dominance=side<0?sizes.player:sizes.enemy;
+                        const lobe=baseLobe*dominance;
+                        const tall=baseTall*dominance;
                         if(alpha<=0 || lobe<=0) return;
                         c.save(); c.globalAlpha=alpha;
                         c.beginPath();
@@ -316,6 +339,7 @@ Item {
                     compressed(-1,ink,Qt.rgba(.70,.91,1,1),Math.min(1,p*12));
                     compressed(1,enemyInk,enemyCore,Math.min(1,f.enemyFraction*12)*f.enemyOpacity);
                     if(p>0 && f.enemyFraction>0) {
+                        const tall=baseTall*Math.min(sizes.player,sizes.enemy);
                         const seam=c.createLinearGradient(edge,mid-tall,edge,mid+tall);
                         seam.addColorStop(0,tint(Colors.white,0));
                         seam.addColorStop(.20,tint(Colors.white,.55));
@@ -338,11 +362,17 @@ Item {
                         c.fillStyle=g;
                         c.fillRect(edge-tail,mid-h*.16,tail,h*.32);
                     }
-                    orb(rx*1.45,ry*1.32,[[0,tint(ink,.9)],
-                        [.55,tint(ink,.44)],[1,tint(ink,0)]]);
-                    orb(rx,ry,[[0,Colors.white],[.26,Colors.white],
-                        [.48,mix(ink,Colors.white,.45)],[enlarged.solid,ink],
-                        [.82,tint(ink,.88)],[1,tint(ink,0)]]);
+                    orb(rx*1.55,ry*1.42,[[0,tint(ink,.68)],
+                        [.48,tint(ink,.32)],[.78,tint(ink,.09)],[1,tint(ink,0)]]);
+                    orb(rx,ry,[[0,Colors.white],[.16,Colors.white],
+                        [enlarged.solid,mix(ink,Colors.white,.32)],
+                        [.68,tint(ink,.58)],[1,tint(ink,0)]]);
+                } else if(hot) {
+                    // Preserve the pixel silhouette. The existing plasma is
+                    // now a soft, low-opacity light layer, not a solid ball.
+                    orb(rx*1.25,ry*1.22,[[0,tint(Colors.white,.45)],
+                        [.27,tint(Colors.yellow,.32)],[.55,tint(ink,.16)],
+                        [1,tint(ink,0)]]);
                 } else {
                     orb(rx*1.6,Math.min(h*(hot?.91:1.12),ry*1.55),[
                         [0,tint(ink,Math.min(.98,.35*bright))],

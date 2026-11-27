@@ -142,3 +142,22 @@ This is local lifecycle enforcement, not a Python sandbox or process
 isolation. The owner must explicitly close/exhaust the iterator; abandoned
 host/object finalization and process death are not independently recoverable
 effect custody. No native permission, release inference or safe retry.
+
+
+## FL9 // exact original persisted response readback
+
+Mind #2161 7220919005 identified that local_outcome originally checked
+metadata linkage, not independently persisted response bytes. After
+original worker exhaustion, retain only the bounded exact UTF-8 terminal
+comparison value in the disposable host; verify exact attempt/session/
+turn metadata first, then compare the actual bounded assistant-row BLOB
+bytes to the original COMMITTED text. On missing, altered, invalid or
+oversized body, local evidence remains UNKNOWN_HOLD; the existing FL5
+projection cannot promote provisional content. No extra writer, history
+access, new wire field, provider call, retry or native admission. On
+ABORTED_LOCAL or metadata mismatch, do not select a body. The comparison
+value is dropped at local close; no erasure or durable custody claim.
+Existing test-only public fake B2 transport; actual Unicode exact match
+and same-metadata body alteration tests. This is a disposable local
+witness, not independent native recipient/provider settlement or a Stage
+1 staging dependency.

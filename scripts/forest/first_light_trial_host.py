@@ -13,7 +13,7 @@ import uuid
 
 from context_first_tree_m2 import SessionContextRef
 from runtime_events_r3 import OperationRef, RuntimeExchange
-from session_journal_v0 import ForestSessionJournal, bootstrap_synthetic
+from session_journal_v0 import ForestSessionJournal, MAX_BODY, bootstrap_synthetic
 from shared_context_b6r1 import TaskContext
 from turn_bridge_b3 import ForestTurnBridge, bootstrap_attempts_synthetic
 
@@ -112,6 +112,7 @@ class FirstLightTrialHost:
         self._active_stream = None
         self._closed = False
         self._local = "UNKNOWN_HOLD"
+        self._committed_bytes = None
         self._clock = 0
 
     @property
@@ -213,6 +214,13 @@ class FirstLightTrialHost:
                 self._attempt = frame.attempt_id
                 event = frame.payload["event"]
                 if event == "COMMITTED":
+                    body = frame.payload.get("text")
+                    if type(body) is not str:
+                        raise FirstLightRefusal("TERMINAL_BODY_INVALID")
+                    encoded = body.encode("utf-8")
+                    if not 0 < len(encoded) <= MAX_BODY:
+                        raise FirstLightRefusal("TERMINAL_BODY_INVALID")
+                    self._committed_bytes = encoded
                     self._phase = "LOCAL_COMMITTED"
                 elif event == "UNKNOWN_HOLD":
                     self._phase = "UNKNOWN_HOLD"
@@ -255,7 +263,23 @@ class FirstLightTrialHost:
                 and session == [(ref.session_id, OWNER, TREE, "OPEN", 2)]
                 and turns == [user, (row[1], ref.session_id, 2, "assistant",
                                      "ollama", MODEL)]):
-            return "COMMITTED_LOCAL"
+            # Only after exact original metadata linkage and worker
+            # retirement: independently compare bounded persisted bytes.
+            # Do not return/read a body from a foreign or aborted row.
+            expected = self._committed_bytes
+            if expected is None:
+                return "UNKNOWN_HOLD"
+            body = self._db.execute(
+                "SELECT CASE WHEN typeof(body)='text' "
+                "AND length(CAST(body AS BLOB)) BETWEEN 1 AND ? "
+                "THEN CAST(body AS BLOB) ELSE NULL END "
+                "FROM forest_turns WHERE turn_id=? AND session_id=? "
+                "AND ordinal=2 AND role='assistant' "
+                "AND provider_key='ollama' AND model_key=?",
+                (MAX_BODY, row[1], ref.session_id, MODEL),
+            ).fetchone()
+            if body == (expected,):
+                return "COMMITTED_LOCAL"
         return "UNKNOWN_HOLD"
 
     def close(self):
@@ -269,5 +293,6 @@ class FirstLightTrialHost:
         if self._db is not None:
             self._db.close()
             self._db = None
+        self._committed_bytes = None
         self._closed = True
         return self._local

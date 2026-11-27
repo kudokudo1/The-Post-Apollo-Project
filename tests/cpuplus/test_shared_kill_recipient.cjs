@@ -716,11 +716,13 @@ test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results wi
     assert.match(store,/onResultReady: function\(result\) \{ hunterController\.applyResult\(result\); \}/);
     assert.match(store,/onFinished: hunterController\.finish\(\)/);
     assert.match(store,/onErrorRaised: function\(message\)/);
-    assert.match(owner,/property: "donorHunterHost"\s*value: appControlWindow/);
+    assert.match(owner,/property: "donorHunterPresentationAvailable"\s*value: true/);
+    assert.match(store,/legacyPresentationAvailable: root\.donorHunterPresentationAvailable/);
+    assert.doesNotMatch(controller,/\bhost\b/);
     assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
     assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
     assert.doesNotMatch(owner,/property: "donorHunterFavorites"/);
-    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!policyReady \|\| \(cpuRecipient !== true && !host\)\) return;/);
+    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!policyReady \|\| \(cpuRecipient !== true && !legacyPresentationAvailable\)\) return;/);
     assert.match(controller,/if \(!policyReady\) \{ stopRemaining\(\); return; \}/);
     assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
     assert.doesNotMatch(owner,/property alias hunterOperation/);
@@ -1037,4 +1039,39 @@ test("K6c: only the initiating consumer can acknowledge its completed Hunter rep
     const dismiss=owner.slice(owner.indexOf("    function dismissHunterOperationWindow("),owner.indexOf("    function cancelDestructiveConfirm("));
     assert.match(dismiss,/KillBackend\.KillStore\.acknowledgeDonorBulkReport\(\)/);
     assert.doesNotMatch(dismiss,/hunterOperationController\.(?:phase|kind|targets|results|completed|total)\s*=/);
+});
+
+test("K6d: Hunter emits legacy presentation events without retaining a widget", () => {
+    const controller=read("services/kill/HunterOperationController.qml");
+    const owner=read("widgets/AppControlW.qml");
+    const a=controller.indexOf("    function refreshMessage(");
+    const b=controller.indexOf("    function record(",a);
+    const events=[];
+    const api=new Function("events",
+        "let legacyPresentationAvailable=false,recipientOwned=false,phase='idle',kind='',message='',completed=0,total=0,results=[],targets=[],pendingTargets=[],cursor=0,activeTarget=null,activeResult=null,activeProtocolError=false,policyReady=true;"+
+        "function operationLabel(){return 'ALL';} function operationStatusLine(){return 'synthetic';}"+
+        "function legacyMessagePublished(v){events.push(['message',v]);} function legacyWindowRequested(...v){events.push(['window',...v]);} function legacyReviewRejected(){events.push(['rejected']);} function dispatchNext(){events.push(['dispatch']);}"+
+        controller.slice(a,b)+
+        "\nreturn {start,showWindow,refreshMessage,available:v=>legacyPresentationAvailable=v,reset:()=>phase='idle'};")(events);
+    const target={pid:4321,startTicks:98765,name:"synthetic",identity:"synthetic"};
+    api.start("kill-all",[target],false);
+    assert.deepEqual(events,[]);
+    api.available(true);
+    api.start("kill-all",[target],false);
+    assert.equal(events[0][0],"window");
+    assert.deepEqual(events[0].slice(-2),[true,true]);
+    assert.equal(events[1][0],"message");
+    assert.deepEqual(events[2],["dispatch"]);
+    assert.equal(api.showWindow(),true);
+    assert.deepEqual(events[3],["window","kill-all","",true,false]);
+    api.reset(); events.length=0;
+    api.start("kill-all",[{...target,startTicks:0}],false);
+    assert.deepEqual(events,[["rejected"]]);
+    events.length=0; api.available(false);
+    api.start("kill-all",[target],true);
+    assert.deepEqual(events,[["dispatch"]]);
+    assert.equal(api.showWindow(),false);
+    assert.match(owner,/function onLegacyWindowRequested\(operationKind, title, resetChoice, clearTargets\)/);
+    assert.match(owner,/function onLegacyReviewRejected\(\)\s*\{\s*appControlWindow\.cancelDestructiveConfirm\(\)/);
+    assert.doesNotMatch(controller,/\bhost\b/);
 });

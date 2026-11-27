@@ -4,7 +4,12 @@ import "../favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
 QtObject {
     id: hunterOperationController
 
-    required property var host // legacy presentation only
+    property bool legacyPresentationAvailable: false
+    // Transitional presentation events; the execution controller never writes
+    // properties on a widget or retains its object reference.
+    signal legacyMessagePublished(string value)
+    signal legacyWindowRequested(string operationKind, string title, bool resetChoice, bool clearTargets)
+    signal legacyReviewRejected()
     required property var policyOwner
     readonly property bool policyReady: !!policyOwner && policyOwner.collectionEnabled === true
         && Array.isArray(policyOwner.rows) && !!favoriteStoreObject && !!favoriteStoreObject.favoriteKeys
@@ -118,22 +123,20 @@ QtObject {
         }
 
         message = lines.join("\n");
-        if (!recipientOwned && host) host.destructiveConfirmMessage = message;
+        if (!recipientOwned && legacyPresentationAvailable) legacyMessagePublished(message);
     }
 
     function showWindow() {
-        if (!host || recipientOwned || (phase !== "running" && phase !== "report"))
+        if (!legacyPresentationAvailable || recipientOwned || (phase !== "running" && phase !== "report"))
             return false;
 
-        host.destructiveConfirmKind = kind;
-        host.destructiveConfirmChoice = 0;
-        host.destructiveConfirmOpen = true;
+        legacyWindowRequested(kind, "", true, false);
         refreshMessage();
         return true;
     }
 
     function start(operationKind, operationTargets, cpuRecipient) {
-        if (!policyReady || (cpuRecipient !== true && !host)) return;
+        if (!policyReady || (cpuRecipient !== true && !legacyPresentationAvailable)) return;
         if (phase === "running") {
             showWindow();
             return;
@@ -153,7 +156,7 @@ QtObject {
                     || typeof target.name !== "string" || !target.name
                     || typeof target.identity !== "string" || !target.identity
                     || seen.has(target.pid)) {
-                if (host && cpuRecipient !== true) host.cancelDestructiveConfirm();
+                if (legacyPresentationAvailable && cpuRecipient !== true) legacyReviewRejected();
                 return;
             }
             seen.add(target.pid);
@@ -177,15 +180,12 @@ QtObject {
         pendingTargets = [];
 
         if (!recipientOwned) {
-            host.destructiveConfirmTargetPids = [];
-            host.destructiveConfirmKind = kind;
-            host.destructiveConfirmChoice = 0;
-            host.destructiveConfirmTitle =
+            const title =
                 kind === "kill-all" ? "⚠︎ KILL ALL • CHECKING CAPTURES… ⚠︎"
                 : kind === "kill-mice"
                 ? "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  HUNTING MICE…  ⚠︎"
                 : "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  HUNTING HOGS…  ⚠︎";
-            host.destructiveConfirmOpen = true;
+            legacyWindowRequested(kind, title, true, true);
         }
         refreshMessage();
 
@@ -290,14 +290,13 @@ QtObject {
         if (phase !== "running" || activeTarget)
             return;
         phase = "report";
-        if (!recipientOwned && host) {
-            host.destructiveConfirmTitle =
+        if (!recipientOwned && legacyPresentationAvailable) {
+            const title =
                 kind === "kill-all" ? "⚠︎ KILL ALL • REPORT ⚠︎"
                 : kind === "kill-mice"
                 ? "⚠︎ (-_•)デ╾━  (ᐢ××ᐢ)౨  MICE HUNT COMPLETE  ⚠︎"
                 : "⚠︎ (-_•)デ╾━  ₍˄×⚇×˄₎  HOG HUNT COMPLETE  ⚠︎";
-            host.destructiveConfirmKind = kind;
-            host.destructiveConfirmOpen = true;
+            legacyWindowRequested(kind, title, false, false);
         }
         refreshMessage();
         refreshTimer.restart();

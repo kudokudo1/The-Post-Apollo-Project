@@ -46,6 +46,8 @@ ShellRoot {
     property int fl7Sequence: 0
     property var fl7Tail: null
     property var fl7Late: null
+    property bool fl8FinalObserved: false
+    property int fl8Polls: 0
     property var seasonRows: []
     property bool catalogDismissed: false
     property var originalPreviewComponent: null
@@ -1173,6 +1175,7 @@ ShellRoot {
         fl7Epoch=0; fl7OriginalEpoch=0; fl7View=null; fl7ObservedVisible=false;
         fl7OriginalView=null; fl7Withdrawn=false;
         fl7Sequence=0; fl7Tail=null; fl7Late=null; fl7Stage=0; fl7Index=0;
+        fl8FinalObserved=false; fl8Polls=0;
         fl7Active=true;
         parts.loader.sourceComponent=firstLightCaptureType;
         forest.selectedTreeIndex=0;
@@ -1195,7 +1198,11 @@ ShellRoot {
                 || s.status!==status || s.text!==text || s.local_outcome!==local
                 || s.provisional!==provisional || s.native_admitted!==false) return false;
         fl7Sequence=s.sequence;
-        if (!fl7Current()) return false; // independent observation at render
+        return fl7Render(s,render);
+    }
+    function fl7Render(s, render) {
+        // Same gate for immediate and already-dequeued delayed snapshots.
+        if (!fl7Current()) return false;
         const item=fl7OriginalView;
         if (render==="BASE")
             firstLightBaseline(item,s,"fl7-"+String(fl7Case));
@@ -1254,7 +1261,7 @@ ShellRoot {
             });
             cmd({op:"OUTCOME"},eq({ok:true,status:"UNKNOWN_HOLD",local_outcome:"ABORTED_LOCAL"}));
             cmd({op:"CLOSE"},eq({ok:true,local_outcome:"ABORTED_LOCAL"}));
-        } else {
+        } else if (fl7Case===2) {
             cmd({op:"STEP"},okay);
             take("GENERATING","READY","UNKNOWN_HOLD",true,"HOLD");
             local(()=>{
@@ -1273,9 +1280,11 @@ ShellRoot {
             local(()=>{
                 observeFL7();
                 const item=parts.loader.item;
-                // Delayed TAKE cannot render in replacement even if same Tree.
+                // Actually attempt the same render gate with the previously
+                // validated, dequeued old snapshot; absence alone is not proof.
                 return fl7Withdrawn && fl7Epoch===e+2 && fl7View===item
-                    && item && !fl7Current() && item.messages.length===0;
+                    && item && fl7Late!==null && !fl7Render(fl7Late,"GROW")
+                    && item.messages.length===0 && !item._streamingTailActive;
             });
             cmd({op:"OBSERVE",epoch:e+2,visible:true},eq({ok:true,epoch:e+2}));
             cmd({op:"TAKE",epoch:e+2},eq({ok:true,epoch:e+2,snapshot:null}));
@@ -1284,6 +1293,43 @@ ShellRoot {
             cmd({op:"OUTCOME"},eq({ok:true,status:"LOCAL_COMMITTED",local_outcome:"COMMITTED_LOCAL"}));
             cmd({op:"TAKE",epoch:e+2},eq({ok:true,epoch:e+2,snapshot:null}));
             cmd({op:"CLOSE"},eq({ok:true,local_outcome:"COMMITTED_LOCAL"}));
+        } else {
+            // FL8: one outstanding step, independent control before poll.
+            // The CLI peer emits both deltas immediately; the worker may
+            // finish the step before STOP arrives. This proves the pending
+            // control boundary, not an independently blocked socket read.
+            const refused=eq({ok:false,error:"COMMAND_REFUSED"});
+            cmd({op:"STEP_BEGIN"},okay);
+            cmd({op:"STEP_BEGIN"},refused);
+            cmd({op:"OUTCOME"},refused);
+            cmd({op:"STOP",epoch:e},eq({ok:true,ack:"STOP_LATCHED"}));
+            cmd({op:"CLOSE"},refused);
+            plan.push({cmd:{op:"STEP_POLL"},poll:true,
+                verify:eq({ok:true,done:true})});
+            cmd({op:"TAKE",epoch:e},r=>{
+                const s=r&&r.snapshot;
+                if (!s) return false;
+                if (s.status==="UNKNOWN_HOLD") {
+                    const ok=fl7Snapshot(r,"UNKNOWN_HOLD","","ABORTED_LOCAL",false,"DISCARD");
+                    fl8FinalObserved=ok;
+                    return ok;
+                }
+                if (s.text!=="RE" && s.text!=="READY") return false;
+                return fl7Snapshot(r,"STOP_REQUESTED",s.text,"UNKNOWN_HOLD",true,"");
+            });
+            // If the outstanding advance emitted the second delta before
+            // STOP, only the next original advance observes terminal abort.
+            plan.push({cmd:{op:"STEP"},verify:okay,when:()=>!fl8FinalObserved});
+            plan.push({cmd:{op:"TAKE",epoch:e},when:()=>!fl8FinalObserved,
+                verify:r=>fl7Snapshot(r,"UNKNOWN_HOLD","","ABORTED_LOCAL",false,"DISCARD")});
+            local(()=>{
+                if (!fl7Current()) return false;
+                const item=fl7OriginalView, list=find(item,"conversationMessages");
+                return list && list.count===1 && !item._streamingTailActive
+                    && parts.input.text===prompt && !parts.send.enabledAction;
+            });
+            cmd({op:"OUTCOME"},eq({ok:true,status:"UNKNOWN_HOLD",local_outcome:"ABORTED_LOCAL"}));
+            cmd({op:"CLOSE"},eq({ok:true,local_outcome:"ABORTED_LOCAL"}));
         }
         return plan;
     }
@@ -1318,21 +1364,27 @@ ShellRoot {
             if (!p.finished) return;
             check(!p.running && !p.pending && p.cleanExit,"FL7 child not cleanly reaped");
             if (failed) return;
-            console.info("FOREST_HOST_FIRST_LIGHT_CHILD_PASS "+["COMMIT","STOP","WITHDRAW"][fl7Case]);
+            console.info("FOREST_HOST_FIRST_LIGHT_CHILD_PASS "+["COMMIT","STOP","WITHDRAW","PENDING_STOP"][fl7Case]);
             fl7Active=false; fl7Tail=null; fl7Late=null; fl7OriginalView=null; fl7View=null;
             fl7Plan=[]; fl7Parent=null; p.destroy();
             forest.menuOpen=false;
             parts.loader.sourceComponent=firstLightOriginalComponent;
             fl7Timer.stop();
-            if (++fl7Case<3) fl7Next.restart(); else finish();
+            if (++fl7Case<4) fl7Next.restart(); else finish();
             return;
         }
         const action=fl7Plan[fl7Index];
-        if (action.local) {
+        if (action.when && !action.when()) {
+            fl7Index++;
+        } else if (action.local) {
             check(action.local(),"FL7 local action "+fl7Index);
             fl7Index++;
         } else if (p.reply!==null) {
             const reply=p.consume();
+            if (action.poll && fl7Equal(reply,{ok:true,done:false})) {
+                check(++fl8Polls<=12,"FL8 original pending step deadline");
+                return; // poll only, never repeat an advance or STOP
+            }
             check(action.verify(reply),"FL7 reply "+fl7Index);
             fl7Index++;
         } else if (!p.pending && p.ready) {

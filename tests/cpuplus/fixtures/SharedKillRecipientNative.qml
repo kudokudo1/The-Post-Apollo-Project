@@ -542,6 +542,17 @@ ShellRoot {
                         && consolePane.reviewLines.length===1
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "top resource filters swap one editor without clearing the draft")) return;
+                const inspect=smoke.find(view,"cpuPlusResourceInspect");
+                const observation=smoke.find(view,"cpuPlusResourceObservation");
+                if (!smoke.check(inspect && inspect.visible && inspect.available && observation
+                        && observation.text.includes("NETWORK NAMESPACE COUNTERS // NOT INSPECTED")
+                        && !consolePane.inspectionBusy && !applyLocked.available,
+                        "network inspection is explicit, read-only, and never auto-dispatched")) return;
+                const gpuFilter=smoke.find(view,"cpuPlusResourceFilter-gpu");
+                gpuFilter.leftClicked(null);
+                if (!smoke.check(observation.text.includes("DRM FDINFO // NOT INSPECTED")
+                        && !consolePane.inspectionBusy && !applyLocked.available,
+                        "GPU inspection uses distinct DRM evidence and locked actuation")) return;
                 cpuFilter.leftClicked(null);
                 if (!smoke.check(selectedPanel.key==="cpu" && cpuFilter.selected
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0,

@@ -11,6 +11,14 @@ Item {
     objectName: "cpuPlusKillResourceConsole"
     required property var target
     property bool selectionReady: false
+    property var inspectionResult: null
+    property string inspectionStatus: "NOT INSPECTED"
+    property bool inspectionBusy: false
+    signal inspectionRequested()
+    readonly property var exactInspection: inspectionResult && inspectionResult.key===targetIdentity ? inspectionResult : null
+    function observationLabel(value) {
+        return (value || "not_inspected").replace(/_/g," ").toUpperCase();
+    }
     // Projection of the existing left-side draft and shared limit owner.
     property int memoryDraftPercent: -1
     property real memoryMinimumMiB: 0
@@ -1260,6 +1268,63 @@ Item {
                                         available: root.selectionReady && root.allowedCpuIds.length>0 && root.modeFor("cpu")==="manual"
                                         onLeftClicked: root.setAffinity(root.selectedCpuIds.slice(0,1))
                                     }
+                                }
+                            }
+                            Column {
+                                objectName: "cpuPlusReadOnlyResourceInspection"
+                                width: parent.width
+                                spacing: 5
+                                visible: resourcePanel.key==="gpu" || resourcePanel.key==="network"
+                                GohuText {
+                                    width: parent.width
+                                    text: resourcePanel.key==="gpu" ? "GPU // PROCESS DRM EVIDENCE" : "NETWORK // NAMESPACE EVIDENCE"
+                                    color: resourcePanel.ink
+                                    font.pixelSize: 11
+                                    wrapMode: Text.Wrap
+                                }
+                                ActionButton {
+                                    objectName: "cpuPlusResourceInspect"
+                                    width: parent.width
+                                    height: 32
+                                    label: root.inspectionBusy ? "INSPECTING" : "INSPECT"
+                                    normalFace: true
+                                    accentColor: resourcePanel.ink
+                                    available: root.selectionReady && !root.inspectionBusy
+                                    onLeftClicked: if (available) root.inspectionRequested()
+                                }
+                                GohuText {
+                                    objectName: "cpuPlusResourceInspectionState"
+                                    width: parent.width
+                                    text: root.inspectionStatus
+                                    color: Colors.white
+                                    font.pixelSize: 10
+                                    wrapMode: Text.Wrap
+                                }
+                                GohuText {
+                                    objectName: "cpuPlusResourceObservation"
+                                    width: parent.width
+                                    text: resourcePanel.key==="gpu"
+                                        ? "DRM FDINFO // "+root.observationLabel(root.exactInspection ? root.exactInspection.gpu : null)
+                                        : "NETWORK NAMESPACE COUNTERS // "+root.observationLabel(root.exactInspection ? root.exactInspection.network : null)
+                                    color: resourcePanel.ink
+                                    font.pixelSize: 10
+                                    wrapMode: Text.Wrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: resourcePanel.key==="gpu"
+                                        ? "BOUNDED DRM SCAN. NOT OBSERVED DOES NOT MEAN NO GPU USE. GPU UTILIZATION / VRAM LIMIT NOT VERIFIED."
+                                        : "NAMESPACE COUNTERS ARE NOT PER-PROCESS TRAFFIC. NO VERIFIED PER-PROCESS RATE OR BANDWIDTH LIMIT."
+                                    color: Colors.white
+                                    font.pixelSize: 9
+                                    wrapMode: Text.Wrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "ACTUATION // NOT VERIFIED"
+                                    color: Colors.yellow
+                                    font.pixelSize: 10
+                                    wrapMode: Text.Wrap
                                 }
                             }
                             GohuText {

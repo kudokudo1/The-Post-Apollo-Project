@@ -1502,6 +1502,11 @@ Item {
 
             // K8d draft-only resource console. The existing owner-owned review
             // overlays it on demand; no additional process collector is mounted.
+            KillBackend.KillResourceEvidence {
+                id: resourceInspection
+                targetKey: resourceConsole.targetIdentity
+                eligible: resourceConsole.selectionReady
+            }
             CpuPlusKillResourceConsole {
                 id: resourceConsole
                 objectName: "cpuPlusKillResourceConsoleSurface"
@@ -1509,6 +1514,10 @@ Item {
                 anchors.margins: 6
                 target: workspace.currentTask
                 resourceEvidence: workspace.graphSession.resourceEvidence
+                inspectionResult: resourceInspection.result
+                inspectionStatus: resourceInspection.status
+                inspectionBusy: resourceInspection.busy
+                onInspectionRequested: resourceInspection.inspect()
                 memoryDraftPercent: workspace.stagedLimitPercent
                 memoryMinimumMiB: processView.presentation && workspace.currentTask
                     ? processView.limitMinimumMiB(workspace.currentTask) : 0

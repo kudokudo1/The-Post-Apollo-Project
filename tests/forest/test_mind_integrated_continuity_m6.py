@@ -7,6 +7,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import threading
+from http.server import ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "forest"))
@@ -186,6 +188,112 @@ process.stdout.write(JSON.stringify(snapshots));
             "status":status, "sourceAuthenticated":False,
             "permissionGranted":False, "productionAuthority":False,
             "modelExecutionPermitted":False, "safeActions":[]})
+
+    def first_light_http(self, *, lines):
+        # Reuse the existing B2 disposable HTTP peer; do not substitute the
+        # B3 streamer or contact an installed Ollama daemon. Independent
+        # subclass state prevents reuse of another transport test's input.
+        from test_ollama_chat_transport import FakeOllama
+
+        class Peer(FakeOllama):
+            pass
+
+        Peer.lines = lines
+        Peer.observed = []
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Peer)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        def close():
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.addCleanup(close)
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+        return Peer, endpoint
+
+    def first_light_runtime(self, operation_id, endpoint):
+        # Actual default B2 transport, exact M2 reference and existing R3
+        # operation/STOP lifetime, only the disposable HTTP peer is fake.
+        bridge = ForestTurnBridge(self.journal, clock_ms=self.tick)
+        op = OperationRef(self.ref, operation_id)
+        runtime = RuntimeExchange(bridge, op,
+            resolve_current_context=self.resolve_fixture_context,
+            model="fixture-model", max_predict=32, num_ctx=2048,
+            endpoint=endpoint)
+        return op, runtime
+
+    def test_first_light_exact_single_prompt_through_actual_http_transport(self):
+        from test_ollama_chat_transport import packet
+        prompt = "Public first light: café."
+        self.append_user(prompt)
+        peer, endpoint = self.first_light_http(lines=[
+            packet("Public ", message={"role": "assistant", "content": "Public ",
+                                      "thinking": "Fixture trace not for display"}),
+            packet("reply", done=True),
+        ])
+        op, runtime = self.first_light_runtime("first-light-commit", endpoint)
+        gen = runtime.run()
+        self.addCleanup(gen.close)
+        for name in ("REQUESTED", "RESERVED", "STARTED"):
+            self.assertEqual(next(gen).payload["event"], name)
+        delta = next(gen)
+        self.assertEqual(delta.operation, op)
+        self.assertEqual(dict(delta.payload),
+                         {"event": "DELTA", "text": "Public ", "provisional": True})
+        self.assertEqual(peer.observed, [("POST", "/api/chat", {
+            "model": "fixture-model", "messages": [{"role": "user", "content": prompt}],
+            "stream": True, "options": {"num_predict": 32, "num_ctx": 2048},
+        })])
+        self.assertEqual([m["body"] for m in self.display(self.history())["messages"]],
+                         [prompt])
+        terminal = list(gen)[-1]
+        self.assertEqual(terminal.operation, op)
+        self.assertEqual(terminal.attempt_id, delta.attempt_id)
+        self.assertEqual(terminal.payload["event"], "COMMITTED")
+        self.assertEqual(terminal.payload["text"], "Public reply")
+        self.rev += 1
+        self.assertEqual([m["body"] for m in self.display(self.history())["messages"]],
+                         [prompt, "Public reply"])
+        self.assertEqual(self.db.execute(
+            "SELECT status,reply_turn_id FROM forest_attempts_b3 WHERE attempt_id=?",
+            (terminal.attempt_id,)).fetchone(),
+            ("COMMITTED", terminal.payload["turn_id"]))
+        self.assertEqual(len(peer.observed), 1)
+
+    def test_first_light_stop_does_not_persist_partial_or_replay_http(self):
+        from test_ollama_chat_transport import packet
+        prompt = "Public first light STOP fixture."
+        self.append_user(prompt)
+        peer, endpoint = self.first_light_http(lines=[
+            packet("Provisional public text"), packet(" not committed", done=True),
+        ])
+        op, runtime = self.first_light_runtime("first-light-stop", endpoint)
+        gen = runtime.run()
+        self.addCleanup(gen.close)
+        for name in ("REQUESTED", "RESERVED", "STARTED"):
+            self.assertEqual(next(gen).payload["event"], name)
+        delta = next(gen)
+        self.assertEqual(delta.payload["event"], "DELTA")
+        self.assertEqual(delta.operation, op)
+        self.assertEqual(runtime.request_stop(op, delta.attempt_id), "STOP_LATCHED")
+        self.assertEqual(self.db.execute(
+            "SELECT status FROM forest_attempts_b3 WHERE attempt_id=?",
+            (delta.attempt_id,)).fetchone(), ("RESERVED",))
+        end = list(gen)[-1]
+        self.assertEqual(end.attempt_id, delta.attempt_id)
+        self.assertEqual(dict(end.payload), {"event": "UNKNOWN_HOLD"})
+        self.assertEqual(self.db.execute(
+            "SELECT status,reply_turn_id FROM forest_attempts_b3 WHERE attempt_id=?",
+            (delta.attempt_id,)).fetchone(), ("ABORTED", None))
+        self.assertEqual([m["body"] for m in self.display(self.history())["messages"]],
+                         [prompt])
+        with self.assertRaisesRegex(RuntimeEventRefusal, "OPERATION_ALREADY_USED"):
+            list(runtime.run())
+        _, second = self.first_light_runtime("first-light-no-replay", endpoint)
+        self.assertEqual(list(second.run())[-1].payload["event"], "UNKNOWN_HOLD")
+        self.assertEqual(len(peer.observed), 1)
 
     def test_r4a_status_and_committed_history_after_restart(self):
         self.append_user("Public first question")

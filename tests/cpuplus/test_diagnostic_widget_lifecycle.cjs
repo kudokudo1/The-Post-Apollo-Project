@@ -92,3 +92,22 @@ vm.runInContext(`
     assert(git.count===2&&git.totalMs===30&&git.maxMs===20);
     git.count=99;assert(timed.timings.find(x=>x.id==="git").count===2);
 `,ctx);
+
+vm.runInContext(`
+    const loopRun=lifecycleStart(["git"],{git:false},1000,1000);
+    assert(lifecycleLoopTick(loopRun,100,1100));
+    assert(lifecycleLoopTick(loopRun,400,1500));
+    assert(!lifecycleLoopTick(loopRun,100,1500));
+    const loopReport=lifecycleFinish(loopRun,2000,"COMPLETE");
+    assert(loopReport.eventLoop.ticks===2&&loopReport.eventLoop.gapCount===1&&loopReport.eventLoop.gaps[0].fromMs===100);
+    const verified={status:"COMPLETE",evidence:{scope:"launching-quickshell"}};
+    assert(lifecycleCombined(loopReport,verified,true,false).status==="COMPLETE");
+    assert(lifecycleCombined(loopReport,{status:"NOT VERIFIED"},true,false).status==="PARTIAL");
+    assert(lifecycleCombined(loopReport,verified,true,true).status==="CANCELLED");
+    assert(lifecycleCombined({status:"FAILED"},verified,true,false).status==="FAILED");
+    assert(lifecycleCombined(loopReport,null,false,false).status==="COMPLETE");
+    assert(lifecycleCombined({...loopReport,eventLoop:{ticks:0}},verified,true,false).status==="PARTIAL");
+`,ctx);
+assert(shell.includes("resourceCapture: universalResources"));
+assert(shell.includes("universalLifecycle.loopTick(elapsed,now)"));
+assert(adapter.includes("readonly property bool active: observing || awaitingResource"));

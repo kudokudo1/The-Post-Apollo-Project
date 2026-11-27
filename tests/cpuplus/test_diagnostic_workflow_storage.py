@@ -97,6 +97,32 @@ class CatalogStorageTests(unittest.TestCase):
             self.save(bad,selected)
         self.assertEqual(self.load()["document"],selected)
 
+    def test_dump_roundtrip_and_strict_scope(self):
+        legacy=document()
+        self.save(legacy)
+        doc=copy.deepcopy(legacy)
+        doc["nextId"]=3
+        doc["rows"].append(dict(id="user-2",name="Post Apollo dump",favorite=True,execution="dump",
+                               plan=dict(durationSeconds=30,targets=["git","hospital","media"])))
+        self.assertEqual(self.save(doc,legacy)["status"],"SAVED")
+        self.assertEqual(self.load()["document"],doc)
+        for targets in ([],["git","git"],["unknown"],[1],[None],["git",{}]):
+            bad=copy.deepcopy(doc)
+            bad["rows"][-1]["plan"]["targets"]=targets
+            with self.assertRaises(ValueError):
+                self.save(bad,doc)
+        for duration in (1,121,"30",True):
+            bad=copy.deepcopy(doc)
+            bad["rows"][-1]["plan"]["durationSeconds"]=duration
+            with self.assertRaises(ValueError):
+                self.save(bad,doc)
+        for field,value in (("targetId","git"),("id","default-memory"),("argv",["/bin/sh"])):
+            bad=copy.deepcopy(doc)
+            bad["rows"][-1][field]=value
+            with self.assertRaises(ValueError):
+                self.save(bad,doc)
+        self.assertEqual(self.load()["document"],doc)
+
     def test_corrupt_and_duplicate_keys(self):
         doc=document()
         self.save(doc)

@@ -77,3 +77,87 @@ Next: separately review workload-specific residency-aware requirements;
 do not subtract generic resident bytes from available RAM or import
 historical CPU-only calibration. Mind owns context selection, Runtime
 owns actual execution. See issue #2161 comments 7160677299 and 7160733041.
+
+
+## H17 // Reasoning selection versus actual provider behavior (design)
+
+Operator standing ordinary development #2161 7204485179 / 7204663398.
+H16a #2970 and H16b #2973 integrated; H16c #2985 is an independent
+reference candidate, not a live adapter. This section does not require
+its unmerged code or change any existing executable path.
+
+### Recovered concrete source gap
+
+Frozen original Forest 28895aafdddb07cf402f1e75574eea1ee79a516d,
+bristlecone/reasoning/router.py 8174ccb0 computed prompt-shape signals
+and selected Light/Normal/Deep. Its historical score used character
+thresholds 800/2000, line threshold 20, question threshold 3, code
+fences and up to three complexity-marker groups. Score >=3 selected
+Deep; a small simple turn or eligible quick marker selected Light;
+otherwise Normal. This is historical deterministic usefulness logic,
+not token counting, permission, actual model effort or resource demand.
+Do not run the old text extractor on protected content or accept
+unbounded caller-provided markers/counts. Actual input eligibility and
+bounded work remain independently required.
+
+Original runtime/adapters/hermes.py f535c6a0 lines 1821–1877 mapped
+Light/Normal/Deep to low/medium/high in model_options.reasoning_effort.
+That is the historical Hermes payload request, not proof of model
+support or applied effort, and not an Ollama API mapping.
+
+Current Post-Apollo source at 0e9de42c:
+- I2 e8a9a5d1 recognizes the feature label reasoning; this describes a
+  reference capability, not a provider-specific supported option set.
+- H1 62dc22ec retains canonical reasoning in the P1 request and original
+  binding; its existing settings digest covers endpoint/model/num_ctx/
+  max_predict only.
+- B2 db572336 explicitly emits options.num_predict and options.num_ctx
+  with no think or reasoning setting. The transport contract 010a5e12
+  explicitly excludes thinking options.
+- Therefore selecting Deep rather than Light in the reference does not
+  establish a different actual request or different provider behavior.
+  Do not claim connected reasoning controls from H16 or current H1.
+
+### Next actual adapter boundary
+
+Heart owns canonical requested effort, exact model-binding compatibility
+and demand calibration. Runtime owns adapter option negotiation,
+serialization, exact request dispatch and original effect identity.
+Spirit owns control-source authority and recipient disclosure. Mind owns
+eligible input and the actual payload boundary. No live option expansion
+is authorized by this document.
+
+Before a provider-specific effort can become executable:
+1. Establish exact installed model/artifact, provider/runtime version
+   and capability/option semantics from an independently qualified
+   source. A reasoning feature label, generic model family, user
+   preference or historical Hermes mapping is insufficient.
+2. Distinguish requested canonical effort, the concrete supported
+   option/value, and independently observable actual behavior. An
+   unsupported or unknown mapping refuses the requested operation; do
+   not silently downgrade, substitute another model, or assume omitted
+   options enforce a provider default. A provider with only a binary
+   control cannot be advertised as having three verified levels without
+   an explicit supported policy and honest presentation.
+3. Bind the exact effective request, adapter/version, options and model
+   identity to the original input/operation and current eligibility.
+   The existing H1 settings digest must remain unchanged for its old
+   B2 subset; a reviewed versioned extension is needed for new settings,
+   never an unbound side option added after original admission.
+4. Calibrate the selected configuration and actual workload separately.
+   Reasoning mode, output budget, context limit, generated tokens, peak
+   RAM/VRAM, retained allocations and latency are not interchangeable.
+   Do not infer demand from the historical routing score or setting.
+5. Preserve original effect, lease reservation and terminal/accounting
+   boundaries. A rejected option, transport failure or unknown effect
+   is not permission to retry with a different effort or consume a
+   temporary lease. Release still requires original H2/H11 evidence.
+
+Review the actual Runtime adapter contract and source feasibility before
+selecting a wire field or implementing provider negotiation. Reuse the
+existing dispatch and model-binding ownership; no second provider
+registry, settings writer, governor or synthetic authority.
+
+No new code, classifier, model calls, storage, native observation or
+changes to H1 digest, I2 feature grammar, B2 transport or protected
+permissions in this slice. Native/protected/production HOLD.

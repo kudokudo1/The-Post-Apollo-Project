@@ -1513,13 +1513,14 @@ assert 'mediaSnapshot: tile.mediaSnapshot' in tile
 
 
 # Phase 2B1: running processes are a bounded, read-only projection of the
-# EXISTING AppControl sampler. No second process sampler or direct signals.
+# EXISTING KillStore sampler. No second process sampler or direct signals.
 for token in (
     'import "services/hub/ApolloHubProcessesPolicy.js" as HubProcessesPolicy',
     'HubProcessesPolicy.snapshot(',
-    'appControlWindow.taskRows,',
-    'appControlWindow.taskSnapshotLoading,',
-    'appControlWindow.taskSnapshotError)',
+    'processSnapshot: KillBackend.KillStore.collectionEnabled',
+    'KillBackend.KillStore.rows,',
+    'KillBackend.KillStore.telemetry.snapshotLoading,',
+    'KillBackend.KillStore.telemetry.snapshotError)',
 ):
     assert token in shell, f"Owner process snapshot missing {token}"
 for token in (
@@ -1584,7 +1585,7 @@ for sensitive in ('args:', 'user:', 'cmdline:', 'environment:', 'commandLine:'):
 assert 'ApolloHubMediaExplore {' in tile
 
 
-# Phase 2C: all inline process mutations are issued by the AppControl-owner
+# Phase 2C: all inline process mutations are issued by the KillStore-owner
 # gateway only after a fresh process birth check and local Hub confirmation.
 owner_blob = (ROOT / "widgets/AppControlW.qml").read_text(encoding="utf-8")
 owner_gate = (ROOT / "services/kill/AppControlHubActionGate.qml").read_text(encoding="utf-8")
@@ -1630,8 +1631,10 @@ for token in (
     '&& !processInputFocused',
 ):
     assert token in window, f"Hub action/focus link missing {token}"
-assert 'processActionGate: appControlWindow' in shell
-assert 'appControlWindow.hubProcessActionGate : null' in shell
+assert 'processActionGate: KillBackend.KillStore.collectionEnabled' in shell
+assert '? KillBackend.KillStore.actionGate : null' in shell
+assert 'processActionGate: appControlWindow' not in shell
+assert 'processSnapshot: appControlWindow' not in shell
 assert 'processActionGate: tile.processActionGate' in tile
 assert 'processActionGate: appsExplore.processActionGate' in apps_explore
 assert 'signal inputFocusChanged(bool focused)' in process_explore

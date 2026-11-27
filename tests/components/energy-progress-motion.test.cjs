@@ -90,7 +90,7 @@ test("four personalities preserve bounded motion, distinct intensity and flash i
 });
 
 const material = vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining});",
+    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining,heatBed});",
     {Qt:{rgba:(r,g,b,a)=>({r,g,b,a})}});
 test("material experiments preserve standard and partition the chassis", () => {
     for(const mode of ["standard","ash-trail","burn-away","unknown"]){
@@ -400,7 +400,7 @@ test("local light is shared and bounded; fire light follows the pixel silhouette
     assert.match(source,/Math.max\(\.\.\.flamePixels.cells.map/);
     assert.match(source,/edge\+root.flameTipOffset/);
     assert.match(source,/const halo=c.createRadialGradient/);
-    assert.match(source,/heated.addColorStop\(0,tint\(Colors.yellow,.94\)\)/);
+    assert.match(source,/heated.addColorStop\(0,tint\(Colors.yellow,.94\*bed.pulse\)\)/);
 });
 
 test("TRON streak density follows sampled forward advance, not time or completion",()=>{
@@ -500,7 +500,7 @@ test("flame turbulence and illumination remain attached and vary continuously",(
     assert.match(preview,/flame.drag/);
 });
 
-test("DEFAULT is monotonic, bounded, and does not emit energy effects",()=>{
+test("DEFAULT is monotonic, bounded, and does not emit host energy effects",()=>{
     let prev=0;
     for(let i=0;i<1000;i++){
         const t=i*.05;
@@ -571,4 +571,22 @@ test("surviving burn-away material is inset and does not restore erased structur
     assert.equal(fill[4],26);
     assert.ok(calls.some(c=>c[0]==="clip"));
     assert.ok(calls.some(c=>c[0]==="stroke"));
+});
+
+test("reactive heat bed moves while stalled, stretches with speed and respects reduced motion",()=>{
+    const a=material.heatBed(0,0,false), b=material.heatBed(.43,0,false);
+    assert.ok(JSON.stringify(a.rows)!==JSON.stringify(b.rows));
+    assert.ok(material.heatBed(.43,1,false).reach>b.reach);
+    assert.equal(JSON.stringify(material.heatBed(0,0,true)),JSON.stringify(material.heatBed(80,1,true)));
+    for(let i=0;i<250;i++){
+        const h=material.heatBed(i/30,(i%11)/10,false);
+        assert.ok(h.pulse>=.63&&h.pulse<=1.001&&h.reach>=.75&&h.reach<=1.19);
+        assert.equal(h.rows.length,7);
+        for(const r of h.rows) assert.ok(r.y>0&&r.y<1&&r.reach>0&&r.shift+r.reach<1&&r.alpha<=.40);
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/Material.heatBed\(root.elapsed,root.flameSpeed,root.reducedMotion\)/);
+    assert.match(source,/if\(!material.erosion && inner\*p>0\)/);
+    assert.match(source,/const active=c.createLinearGradient\(edge-span,mid,edge,mid\)/);
+    assert.match(source,/c.fillRect\(edge-cap,fy,cap,fillHeight\)/);
 });

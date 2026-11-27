@@ -40,7 +40,7 @@ class FirstLightDelivery:
     """
 
     def __init__(self, *, test_transport):
-        self._owner_thread = threading.get_ident()
+        self._owner_thread = threading.current_thread()
         self._host = FirstLightTrialHost(test_transport=test_transport)
         self._lock = threading.Lock()
         self._observed = None
@@ -62,7 +62,7 @@ class FirstLightDelivery:
         self._terminal = False
 
     def _worker(self):
-        if (threading.get_ident() != self._owner_thread or self._closed
+        if (threading.current_thread() is not self._owner_thread or self._closed
                 or self._busy):
             raise DeliveryRefusal("OWNER_ACTION_UNAVAILABLE")
 

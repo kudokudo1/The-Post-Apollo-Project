@@ -33,6 +33,20 @@ function createTargetLatch() {
         return active;
     }
 
+    // Immediate press/drag requests must be checked BEFORE each synchronous
+    // owner mutation, not merely at release. This is correlation only.
+    // A mismatch retires this gesture; a stale ticket cannot retire another.
+    // Host must observe all target, external revision and visibility changes.
+    function checkCurrent(ticket, current) {
+        if (active === null || ticket !== active)
+            return false;
+        if (!valid(current) || current !== observed) {
+            active = null;
+            return false;
+        }
+        return true;
+    }
+
     function finish(ticket, current) {
         // A delayed release from an old gesture must not clear a new one.
         if (active === null || ticket !== active)
@@ -53,5 +67,5 @@ function createTargetLatch() {
         active = null;
     }
 
-    return {observe, begin, finish, cancel, clear};
+    return {observe, begin, checkCurrent, finish, cancel, clear};
 }

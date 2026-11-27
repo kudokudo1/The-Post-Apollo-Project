@@ -201,7 +201,7 @@ test("Ki Blast enemy heat grows through defeat and persists after impact", () =>
 });
 
 const currents=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact,airFlow});");
+    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact,airFlow,speedSample});");
 test("full-lane currents advance in opposite directions, with faster TRON", () => {
     const w=900,h=40;
     const left=currents.flow("ki-blast","standard","player",w,h,0,false);
@@ -397,8 +397,43 @@ test("local light is shared and bounded; fire light follows the pixel silhouette
     assert.match(field,/localLights.sort\(.*\).slice\(0,8\)/);
     assert.match(preview,/id: localRadiance\s+anchors.fill: parent\s+z: 11/);
     assert.match(preview,/source.mapToItem\(localRadiance/);
-    assert.match(source,/Math.min\(\.\.\.pixel.cells.map/);
-    assert.match(source,/edge\+offset/);
+    assert.match(source,/Math.max\(\.\.\.flamePixels.cells.map/);
+    assert.match(source,/edge\+root.flameTipOffset/);
     assert.match(source,/const halo=c.createRadialGradient/);
     assert.match(source,/heated.addColorStop\(0,tint\(Colors.yellow,.94\)\)/);
+});
+
+test("TRON streak density follows sampled forward advance, not time or completion",()=>{
+    let speed=0,p=0;
+    assert.equal(currents.airFlow(800,40,0,false,speed).length,0);
+    for(let i=0;i<25;i++) {
+        const next=p+.002;
+        speed=currents.speedSample(p,next,.04,speed);p=next;
+    }
+    const slow=speed;
+    const slowAir=currents.airFlow(800,40,1,false,slow).length;
+    for(let i=0;i<25;i++) {
+        const next=p+.012;
+        speed=currents.speedSample(p,next,.04,speed);p=next;
+    }
+    const fast=speed;
+    assert.ok(slow>0 && fast>slow && fast<=1);
+    assert.ok(currents.airFlow(800,40,2,false,fast).length>slowAir);
+    assert.ok(currents.flow("tron","standard","player",800,40,2,false,fast).length>
+        currents.flow("tron","standard","player",800,40,2,false,slow).length);
+    for(let i=0;i<40;i++) speed=currents.speedSample(p,p,.04,speed);
+    assert.ok(speed<.001);
+    assert.equal(currents.airFlow(800,40,3,false,speed).length,0);
+    assert.equal(currents.speedSample(.8,.2,.1,0),0);
+});
+test("fire light uses the forward pixel and reflection overlays the material",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    const field=fs.readFileSync(path.join(root,"components/EnergyPressureField.qml"),"utf8");
+    assert.match(source,/readonly property real flameTipOffset/);
+    assert.match(source,/const tip=edge\+root.flameTipOffset/);
+    assert.match(source,/Flow.speedSample\(root.speedFraction,next/);
+    assert.ok(source.indexOf("Material.drawAsh")<source.indexOf("const reflected="));
+    assert.match(preview,/light.fire\?source.flameTipOffset/);
+    assert.match(field,/ki-blast"\?\.38:fire\?\.36/);
 });

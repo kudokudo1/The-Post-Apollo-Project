@@ -17,13 +17,19 @@ import subprocess
 import sys
 import tarfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 GIB = 1024**3
 ARCHIVE_SIZE = 1421191399
 ARCHIVE_SHA = "c620917a71e146ab3a7f893084f066069c4c65d144ef8379a91c3cbe8b27de8f"
 MANIFEST_SHA = "07bd1f170855240f9e162bf54ea494a8bc1c73d8cbd1365d7fccbeb7d2504947"
 RELEASE = "https://github.com/ollama/ollama/releases/download/v0.32.14/ollama-linux-amd64.tar.zst"
+RELEASE_REPO_ID = 658928958
+RELEASE_ASSET_ID = 517039292
+RELEASE_FILENAME = "ollama-linux-amd64.tar.zst"
+RELEASE_CDN_PATH = re.compile(
+    r"/github-production-release-asset/658928958/"
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z", re.ASCII)
 REGISTRY = "https://registry.ollama.ai/v2/library/granite3.3/"
 R2 = "dd20bb891979d25aebc8bec07b2b3bbc.r2.cloudflarestorage.com"
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z", re.ASCII)
@@ -92,9 +98,18 @@ def target(url, kind, digest=None, redirected=False):
                     REGISTRY + "blobs/" + digest)
         require(url == expected, "SOURCE_REFUSED")
     elif kind == "archive":
+        # Public release metadata independently identifies repo, asset ID,
+        # filename, size and digest. CDN storage UUID is not the API asset ID.
+        # This narrows the CDN namespace and verifies the signed filename;
+        # the initial exact release URL and final bytes remain essential.
+        query = parse_qs(p.query, strict_parsing=True, max_num_fields=32)
         require(p.hostname == "release-assets.githubusercontent.com"
-                and p.path.startswith("/github-production-release-asset/")
-                and bool(p.query), "REDIRECT_REFUSED")
+                and RELEASE_CDN_PATH.fullmatch(p.path)
+                and query.get("response-content-disposition") in (
+                    ["attachment; filename=" + RELEASE_FILENAME],
+                    ['attachment; filename="' + RELEASE_FILENAME + '"'])
+                and len(query.get("sig", [])) == 1
+                and bool(query["sig"][0]), "REDIRECT_REFUSED")
     elif kind == "blob":
         require(type(digest) is str and DIGEST.fullmatch(digest), "BLOB_DESCRIPTOR")
         hexval = digest[7:]
@@ -185,42 +200,53 @@ def link_target(name, link):
     return "/".join(stack)
 
 
-class LimitedReader:
-    def __init__(self, source, deadline):
-        self.source, self.deadline, self.count = source, deadline, 0
+def validate_tar_tail(source, end, size, deadline):
+    # tarfile may buffer or silently stop on invalid headers. The physical
+    # seekable decompressed bytes, not its buffered stream, prove the tail.
+    require(type(end) is int and end >= 0 and end % 512 == 0
+            and size % 512 == 0 and size - end >= 1024, "ARCHIVE_TERMINATOR")
+    source.seek(end)
+    remaining_bytes = size - end
+    require(remaining_bytes <= CHUNK, "ARCHIVE_TRAILING")
+    while remaining_bytes:
+        remaining(deadline)
+        block = source.read(min(CHUNK, remaining_bytes))
+        require(bool(block) and not any(block), "ARCHIVE_TRAILING")
+        remaining_bytes -= len(block)
 
-    def read(self, n):
-        remaining(self.deadline)
-        require(type(n) is int and 0 <= n <= CHUNK, "ARCHIVE_READ")
-        result = self.source.read(min(n, EXTRACT_LIMIT + CHUNK - self.count))
-        self.count += len(result)
-        require(self.count < EXTRACT_LIMIT + CHUNK, "ARCHIVE_STREAM_LIMIT")
-        return result
 
+def unpack(source, deadline):
+    """Hash data-only tar members in a bounded, seekable spool.
 
-def unpack(source, root, deadline):
-    """Stream tar as data: no tar.extract, chmod executable, links or devices."""
-    records, dirs, links = {}, {""}, {}
+    No materialized files, symlinks, executables, devices or duplicate
+    extraction disk allocation. Full decompressed tail checked by offset.
+    """
+    records, dirs, links, names = {}, {""}, {}, set()
     count = total = 0
-    reader = LimitedReader(source, deadline)
-    with tarfile.open(fileobj=reader, mode="r|") as archive:
+    source.seek(0, os.SEEK_END)
+    size = source.tell()
+    require(0 < size <= EXTRACT_LIMIT, "ARCHIVE_STREAM_LIMIT")
+    source.seek(0)
+    with tarfile.open(fileobj=source, mode="r:") as archive:
         for member in archive:
             remaining(deadline)
             count += 1
             require(count <= MAX_MEMBERS, "ARCHIVE_MEMBER_LIMIT")
             name = member_path(member.name)
+            require(name not in names, "ARCHIVE_DUPLICATE")
+            names.add(name)
             require(not member.sparse and not any(k.startswith("GNU.sparse")
                     for k in member.pax_headers), "ARCHIVE_SPARSE")
+            require(0 <= member.offset < member.offset_data <= size
+                    and 0 <= member.size <= size - member.offset_data,
+                    "ARCHIVE_TRUNCATED")
             if not name:
-                require(member.isdir(), "ARCHIVE_PATH")
+                require(member.isdir() and member.size == 0, "ARCHIVE_PATH")
                 continue
-            require(name not in records and name not in links, "ARCHIVE_DUPLICATE")
             parents = [str(p) for p in PurePosixPath(name).parents if str(p) != "."]
             require(not any(p in records or p in links for p in parents), "ARCHIVE_PARENT")
-            dest = root / name
             if member.isdir():
                 require(member.size == 0, "ARCHIVE_DIRECTORY")
-                dest.mkdir(parents=True, exist_ok=True, mode=0o700)
                 dirs.add(name)
                 dirs.update(parents)
                 continue
@@ -229,26 +255,22 @@ def unpack(source, root, deadline):
             if member.issym():
                 require(member.size == 0, "ARCHIVE_LINK")
                 links[name] = link_target(name, member.linkname)
-                continue  # record, do not materialize even safe symlinks
+                continue
             require(member.isfile() and 0 <= member.size <= EXTRACT_LIMIT - total,
                     "ARCHIVE_MEMBER_TYPE_OR_SIZE")
-            require(shutil.disk_usage(root).free >= member.size + DISK_RESERVE,
-                    "DISK_RESERVE")
-            dest.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             h = hashlib.sha256()
-            with archive.extractfile(member) as data, dest.open("xb") as out:
+            with archive.extractfile(member) as data:
                 left = member.size
                 while left:
                     remaining(deadline)
                     block = data.read(min(CHUNK, left))
                     require(bool(block), "ARCHIVE_TRUNCATED")
-                    out.write(block)
                     h.update(block)
                     left -= len(block)
             total += member.size
             records[name] = (member.size, h.hexdigest())
-    # A link may refer to a later regular file or directory; reject cycles,
-    # dangling paths and aliases through undeclared parent links. Never create.
+        end = archive.offset
+    validate_tar_tail(source, end, size, deadline)
     for name, dest in links.items():
         seen = {name}
         while dest in links:
@@ -261,28 +283,30 @@ def unpack(source, root, deadline):
 
 
 def extract_archive(path, root, deadline):
-    root.mkdir(mode=0o700)
-    # Only the runner-provided decompressor is executed, not archive files.
+    # One bounded spool replaces materialized extraction, within existing
+    # 6GiB disk budget. Never execute, chmod or create archive members.
     require(Path("/usr/bin/zstd").is_file(), "DECOMPRESSOR_MISSING")
+    spool = root / "runtime.tar"
     with subprocess.Popen(["/usr/bin/zstd", "-dc", "--", str(path)],
                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                           stderr=subprocess.DEVNULL, close_fds=True) as proc:
         try:
-            result = unpack(proc.stdout, root, deadline)
-            # Consume bounded trailing tar padding; verify zstd exit.
-            # tar stream already stops at end marker; any remaining bytes
-            # must be zero padding and bounded (no concatenated archive).
-            trailing = 0
-            while True:
-                remaining(deadline)
-                block = proc.stdout.read(CHUNK)
-                if not block:
-                    break
-                trailing += len(block)
-                require(trailing <= CHUNK and not any(block), "ARCHIVE_TRAILING")
+            count = 0
+            with spool.open("xb") as out:
+                while True:
+                    remaining(deadline)
+                    block = proc.stdout.read(min(CHUNK, EXTRACT_LIMIT - count + 1))
+                    if not block:
+                        break
+                    count += len(block)
+                    require(count <= EXTRACT_LIMIT, "ARCHIVE_STREAM_LIMIT")
+                    require(shutil.disk_usage(root).free >= len(block) + DISK_RESERVE,
+                            "DISK_RESERVE")
+                    out.write(block)
             require(proc.wait(timeout=min(15, remaining(deadline))) == 0,
                     "DECOMPRESSOR_FAILED")
-            return result
+            with spool.open("rb") as source:
+                return unpack(source, deadline)
         finally:
             if proc.poll() is None:
                 proc.kill()
@@ -369,14 +393,14 @@ def run(root):
               deadline, size=size, sha=digest[7:], digest=digest)
     runtime = root / "ollama.tar.zst"
     fetch(RELEASE, "archive", runtime, deadline, size=ARCHIVE_SIZE, sha=ARCHIVE_SHA)
-    records, links, extracted = extract_archive(runtime, root / "runtime", deadline)
+    records, links, extracted = extract_archive(runtime, root, deadline)
     inventory = json.dumps({"regular": records, "links": links}, sort_keys=True,
                            separators=(",", ":")).encode("ascii")
     # Derive exact member hashes and aggregate inventory digest; there are
     # no independent per-member reference pins other than archive digest.
     evidence.update({"stage": "STAGED_PUBLIC_ONLY", "manifest_sha256": MANIFEST_SHA,
                      "archive_sha256": ARCHIVE_SHA, "blob_count": len(blobs),
-                     "blob_bytes": sum(blobs.values()), "extracted_bytes": extracted,
+                     "blob_bytes": sum(blobs.values()), "hashed_member_bytes": extracted,
                      "regular_count": len(records), "link_count": len(links),
                      "runtime_inventory_sha256": digest_bytes(inventory),
                      "ollama_binary_sha256": records["bin/ollama"][1],

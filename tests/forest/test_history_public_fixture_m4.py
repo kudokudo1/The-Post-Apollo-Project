@@ -82,6 +82,56 @@ class HistoryTests(unittest.TestCase):
                           for r in p["messages"]], [1,2,3,4,5])
         self.assertTrue(third["complete"])
 
+    def test_lookahead_body_not_read_until_its_page(self):
+        self.add("user", "Public first")
+        self.add("assistant", "Public next")
+        # Synthetic corruption: SQLite cannot decode this text as UTF-8.
+        self.db.execute("UPDATE forest_turns SET body=CAST(X'FF' AS TEXT) "
+                        "WHERE session_id=? AND ordinal=2", (self.sid,))
+        self.db.commit()
+        first = self.read(self.page(limit=1))
+        self.assertEqual([r["text"] for r in first["messages"]], ["Public first"])
+        self.assertFalse(first["complete"])
+        with self.assertRaisesRegex(ContextRefusal, "STORAGE_REFUSED"):
+            self.read(self.page(after=1, limit=1))
+
+    def test_lookahead_gap_refused_before_body_read(self):
+        for text in ("Public first", "Public second", "Public third"):
+            self.add("user", text)
+        self.db.execute("DELETE FROM forest_turns WHERE session_id=? AND ordinal=2",
+                        (self.sid,))
+        self.db.commit()
+        denied = []
+        def auth(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                denied.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(auth)
+        try:
+            with self.assertRaisesRegex(ContextRefusal, "INVALID_HISTORY_ORDER"):
+                self.read(self.page(limit=1))
+            self.assertEqual(denied, [])
+        finally:
+            self.db.set_authorizer(None)
+
+    def test_empty_page_does_not_query_body(self):
+        self.add("user", "Public first")
+        denied = []
+        def auth(action, table, column, *_):
+            if action == sqlite3.SQLITE_READ and column in ("body", "title"):
+                denied.append(column)
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+        self.db.set_authorizer(auth)
+        try:
+            page = self.read(self.page(after=1))
+            self.assertEqual(page["messages"], [])
+            self.assertTrue(page["complete"])
+            self.assertEqual(denied, [])
+        finally:
+            self.db.set_authorizer(None)
+
     def test_frame_cap_preserves_full_rows(self):
         for _ in range(6):
             self.add("user", "é" * 8000)

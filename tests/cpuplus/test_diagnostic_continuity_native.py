@@ -154,8 +154,15 @@ for entry in [start,row,row,row,row,end]: print(json.dumps(entry))
     real_scripts = config / "real-capture" / "scripts"
     real_scripts.mkdir(parents=True)
     for name in ("cpuplus_diagnostic_workflow.py", "cpuplus_storage_observer.py",
-                 "syntagma_quickshell_thread_sampler.py", "cpuplus_stall_clock_witness.py"):
+                 "syntagma_quickshell_thread_sampler.py", "cpuplus_stall_clock_witness.py",
+                 "cpuplus_diagnostic_workflow_catalog.py", "cpuplus_diagnostic_archive.py"):
         shutil.copy2(ROOT / "scripts" / name, real_scripts / name)
+    (scripts / "cpuplus_diagnostic_workflow_catalog.py").write_text("""import os,sys
+from pathlib import Path
+target=Path(__file__).resolve().parents[1]/"real-capture"/"scripts"/"cpuplus_diagnostic_workflow_catalog.py"
+assert len(sys.argv)==1
+os.execv(sys.executable,[sys.executable,"-E","-s","-B",str(target)])
+""")
     # Standalone Storage uses the real observer and real sampler import, not
     # the synthetic thread fixture in scripts/. Keep disposable path arguments.
     (scripts / "cpuplus_storage_observer.py").write_text("""import os,sys

@@ -31,3 +31,7 @@ Next: validate receipts and mount the observer in existing Memory/SWAP
 DIAG without replacing CAP/POL/PROC/AUTO/PROF or duplicating the layout.
 Preserve existing shared session, archive, notifications and workflow
 sets. Dedicated native and desktop verification required.
+
+## D9a-b integration
+
+SYSTEM → SWAP (including a SWAP row under ALL) → DIAG → CONTROLS uses the existing Memory actuator pane, capacity banner, PSI/status/target band and pinned footer. A single yellow swap selector has the height of the left status stack. MEMORY retains its original five selectors; SWAP gets a separate scoped draft and standalone capture. CAP/POL/PROC/AUTO/PROF and management authority are unchanged. Shared owner, exact calibration receipt, report/notification/archive, sequential workflow sets; REPORT → SWAP. No new polling. Native disposable fixture and negative receipt tests added. Dedicated comparison, workstation measurements and desktop acceptance deferred.

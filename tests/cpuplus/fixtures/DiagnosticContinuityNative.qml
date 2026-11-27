@@ -12,6 +12,7 @@ ShellRoot {
     property int ticks: 0
     property bool done: false
     property bool paneActive: true
+    property string memorySubject: "ALL"
     property bool resourcePaneActive: false
     property string resourceSubject: "CPU"
     property string cpuDraftWitness: ""
@@ -152,7 +153,7 @@ ShellRoot {
             id: pane
             anchors.fill: parent
             active: root.paneActive
-            sourceComponent: CpuPlusMemoryActuatorPane {}
+            sourceComponent: CpuPlusMemoryActuatorPane { diagnosticSubject: root.memorySubject }
         }
         Loader {
             id: resourcePane
@@ -172,7 +173,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 600) {
+            if (++root.ticks > 640) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -1173,6 +1174,53 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "disk remount retains scoped calibration, not readiness"))return;
                 console.log("CPU_D8C_DISK_NATIVE_PASS");
+                root.resourcePaneActive=false;
+                root.memorySubject="SWAP";
+                root.paneActive=true;
+                root.phase=58;return;
+            }
+            if(root.phase===58 && pane.item){
+                pane.item.selectMenu(4);
+                const w=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if(!w || w.subject!=="SWAP")return;
+                const host=root.findItem(pane.item,"cpuplusDiagnosticFilterHost");
+                const block=root.findItem(pane.item,"cpuplusMemoryDiagnosticStatusBlock");
+                const button=root.findItem(pane.item,"cpuplusWorkshopInstrument-swapio");
+                if(!root.check(w.draft.selected.join(",")==="swapio" && w.preview.ok && !w.ready
+                    && host && block && button && button.width===button.height
+                    && Math.abs(block.height-host.height)<=1
+                    && Math.abs(host.x+host.width-host.parent.width)<=1
+                    && !root.findItem(pane.item,"cpuplusWorkshopInstrument-threads")
+                    && !CpuPlusDiagnostics.busy,"SWAP uses existing DIAG band, separate draft and square selector"))return;
+                w.edit("durationSeconds",1);
+                w.edit("swapIoIntervalMs",1000);
+                w.activate();root.phase=59;return;
+            }
+            if(root.phase===59 && pane.item){
+                const w=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"swap PREPARE does not launch"))return;
+                w.activate();
+                if(!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="swapio","swap explicit START"))return;
+                root.paneActive=false;root.phase=60;return;
+            }
+            if(root.phase===60){
+                if(CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const report=CpuPlusDiagnostics.reports.swapio;
+                if(!root.check(report && report.status==="COMPLETE" && report.summary.includes("SWAP IN / OUT")
+                    && report.summary.includes("zram0")
+                    && CpuPlusDiagnostics.archiveRows.some(r=>r.id===report.id&&r.kind==="swapio"),
+                    "real swap reader receipt and archive across unload // "+CpuPlusDiagnostics.feedback))return;
+                root.paneActive=true;root.phase=61;return;
+            }
+            if(root.phase===61 && pane.item){
+                pane.item.selectMenu(4);
+                const w=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if(!w)return;
+                if(!root.check(w.subject==="SWAP" && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.draft.durationSeconds===1 && w.draft.selected.join(",")==="swapio"
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "swap remount retains scope but not readiness"))return;
+                console.log("CPU_D9A_SWAP_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

@@ -568,3 +568,45 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.match(workshop,/cpuplusWorkshopDiskIoInterval/);
     assert.match(workshop,/TARGET \/\/ WHOLE BLOCK DEVICES/);
 }
+
+
+// D9a-b: independent SWAP calibration, fixed reader, bounded evidence.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const call=expr=>vm.runInContext(expr,c);
+    const cfg={kind:"swapio",durationSeconds:2,intervalMs:1000};
+    const plan={durationSeconds:2,instruments:[{kind:"swapio",intervalMs:1000}]};
+    const expr=JSON.stringify(plan);
+    assert.equal(call('JSON.stringify(workshopSubjectKinds("SWAP"))'),'["swapio"]');
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"SWAP")'),true);
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"ALL")'),false);
+    assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+expr+')))'),expr);
+    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"swapio",intervalMs:1000},{kind:"memory",intervalMs:5000}]}).ok'),false);
+    const launch=JSON.parse(call('JSON.stringify(observerLaunchPlan('+JSON.stringify(cfg)+',p=>"/local/"+p))'));
+    assert.deepEqual(launch.args.slice(-6),["/local/scripts/cpuplus_swap_io_observer.py","--workshop","--duration","2","--interval","1"]);
+    assert.equal(args("swapio"),null);
+    const a={schema:"post-apollo-swap-io-v1",event:"swapio",sequence:1,elapsedMs:1000,intervalMs:1000,memoryKiB:[16384,2048,8192,4096],swapBytes:[1048576,2097152],pressure:[2.5,.1,10000,1000],zram:[["zram0",4194304,1048576,1572864]]};
+    const b={...a,sequence:2,elapsedMs:2000,pressure:null,zram:[["zram0",null,null,null]]};
+    const end={schema:a.schema,event:"complete",samples:2,observedMs:2000,pageSize:4096,calibration:cfg};
+    const valid=jsonl([a,b,end]);
+    assert.match(policy.summarize("swapio",valid),/SWAP IN \/ OUT \/\/ 2\.00 \/ 4\.00 MiB total/);
+    assert.match(policy.summarize("swapio",valid),/10\.0 \/ 1\.0 ms over 1000 ms observed/);
+    assert.match(policy.summarize("swapio",valid),/zram0 \/\/ N\/A/);
+    assert.ok(policy.configuredEvidence("swapio",valid,cfg));
+    assert.equal(policy.configuredEvidence("swapio",valid,{...cfg,durationSeconds:3}),null);
+    const idle={...a,swapBytes:[0,0],pressure:null,zram:[],memoryKiB:[16384,2048,0,0]};
+    assert.ok(policy.summarize("swapio",jsonl([idle,{...idle,sequence:2,elapsedMs:2000},end])));
+    for(const bad of [
+        [a,b],
+        [a,{...b,zram:[["zram1",null,null,null]]},end],
+        [{...a,swapBytes:[1,0]},b,end],
+        [{...a,memoryKiB:[16384,20000,8192,4096]},b,end],
+        [{...a,zram:[["zram0",null,1,null]]},b,end],
+        [{...a,pressure:[101,0,0,0]},b,end],
+        [a,b,{...end,pageSize:3000}],
+        [a,{...b,elapsedMs:1999},end]
+    ])assert.equal(policy.summarize("swapio",jsonl(bad)),null);
+    assert.match(workshop,/cpuplusWorkshopSwapIoInterval/);
+    assert.match(parent,/workshopSubject: root\.diagnosticSubject/);
+}

@@ -3175,6 +3175,7 @@ PanelWindow {
             visible: active
             sourceComponent: CpuPlusMemoryActuatorPane {
                 recoverySession: cpuPlusWindow.memoryRecoverySession
+                diagnosticSubject: cpuPlusWindow.systemSubMode === "SWAP" || (cpuPlusWindow.systemSubMode === "ALL" && String((cpuPlusWindow.selectedMonitorEntry() || {}).category || "").toUpperCase() === "SWAP") ? "SWAP" : "ALL"
                 headerRefreshAvailable: true
             }
         }

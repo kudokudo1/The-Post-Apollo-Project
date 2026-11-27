@@ -97,6 +97,11 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             archive.validate_rows([record(1),record(1)])
 
+    def test_swap_io_kind(self):
+        row = dict(record(1), kind="swapio")
+        self.save(row)
+        self.assertEqual(self.read()["rows"], [row])
+
     def test_disk_io_kind(self):
         row = dict(record(1), kind="diskio")
         self.save(row)

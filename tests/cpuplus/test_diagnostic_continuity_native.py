@@ -94,6 +94,24 @@ assert sys.argv[1:]==["--workshop","--duration","1","--interval","1"]
 base=Path(__file__).resolve().parents[2]/"disk-fixture"
 sys.stdout.write(capture(1,1,base/"block",base/"devices"))
 """)
+    # Real swap observer against disposable procfs/sysfs, fixed argv.
+    shutil.copy2(ROOT / "scripts/cpuplus_swap_io_observer.py", scripts / "swap_reader_fixture.py")
+    swap_proc = base / "swap-fixture" / "proc"
+    swap_block = base / "swap-fixture" / "block"
+    (swap_proc / "pressure").mkdir(parents=True)
+    (swap_block / "zram0").mkdir(parents=True)
+    (swap_proc / "swaps").write_text("Filename Type Size Used Priority\n/dev/zram0 partition 8192 4096 100\n")
+    (swap_proc / "meminfo").write_text("MemTotal: 16384 kB\nMemAvailable: 2048 kB\nSwapTotal: 8192 kB\nSwapFree: 4096 kB\n")
+    (swap_proc / "vmstat").write_text("pswpin 100\npswpout 200\n")
+    (swap_proc / "pressure/memory").write_text("some avg10=2.50 avg60=1.00 avg300=0.00 total=100000\nfull avg10=0.10 avg60=0.00 avg300=0.00 total=20000\n")
+    (swap_block / "zram0/mm_stat").write_text("4194304 1048576 1572864 0 0 0 0 0\n")
+    (scripts / "cpuplus_swap_io_observer.py").write_text("""import sys
+from pathlib import Path
+from swap_reader_fixture import capture
+assert sys.argv[1:]==["--workshop","--duration","1","--interval","1"]
+base=Path(__file__).resolve().parents[2]/"swap-fixture"
+sys.stdout.write(capture(1,1,base/"proc",base/"block",4096))
+""")
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')
@@ -167,7 +185,7 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                WAYLAND_DISPLAY="", DISPLAY="")
     result = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=80, check=False)
+                            stderr=subprocess.STDOUT, timeout=85, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_D9A_SWAP_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

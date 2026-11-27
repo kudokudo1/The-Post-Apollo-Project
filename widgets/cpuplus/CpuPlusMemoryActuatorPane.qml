@@ -13,6 +13,8 @@ Item {
     id: root
     // Borrowed session: this view does not own its lifecycle or launch paths.
     property var recoverySession: null
+    // Only the DIAG instrument scope changes; capacity and policy stay shared.
+    property string diagnosticSubject: "ALL"
     property var sample: null
     property var lastGoodSample: null
     readonly property var displaySample: lastGoodSample
@@ -505,8 +507,10 @@ Item {
             width: parent.width
             visible: root.page === "DIAG"
             spacing: 4
-            readonly property int toolSize: Math.max(16,Math.min(36,Math.floor((width*0.57-12)/5)))
+            readonly property int toolSize: root.diagnosticSubject==="SWAP" ? Math.ceil(diagnosticStatusBlock.implicitHeight) : Math.max(16,Math.min(36,Math.floor((width*0.57-12)/5)))
             Column {
+                id: diagnosticStatusBlock
+                objectName: "cpuplusMemoryDiagnosticStatusBlock"
                 width: Math.max(0,parent.width-(diagnosticFilterHost.visible ? diagnosticFilterHost.width+parent.spacing : 0))
                 spacing: 1
                 anchors.verticalCenter: parent.verticalCenter
@@ -543,7 +547,7 @@ Item {
                 id: diagnosticFilterHost
                 objectName: "cpuplusDiagnosticFilterHost"
                 visible: root.page === "DIAG" && !!diagnosticPaneLoader.item && diagnosticPaneLoader.item.workshopOpen
-                width: visible ? 5*diagnosticHeaderBand.toolSize+12 : 0
+                width: visible ? (root.diagnosticSubject==="SWAP" ? diagnosticHeaderBand.toolSize : 5*diagnosticHeaderBand.toolSize+12) : 0
                 height: visible ? diagnosticHeaderBand.toolSize : 0
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -799,6 +803,7 @@ Item {
                     headerTarget: workHeader
                     footerTarget: workFooter
                     workshopViewportHeight: scroll.height
+                    workshopSubject: root.diagnosticSubject
                     workshopFilterTarget: diagnosticFilterHost
                     onNavigationChanged: scroll.contentY=0
                 }

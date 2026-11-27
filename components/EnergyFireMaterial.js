@@ -86,3 +86,19 @@ function drawRemaining(c,x,y,w,h,edge,hot,border,inset) {
         }
     }
 }
+
+// A small living contact bed, not a second flame sprite. Coordinates
+// are normalized to the remaining material, so no erased shell reappears.
+function heatBed(time,speed,reduced) {
+    const t=reduced?0:Math.max(0,Number.isFinite(time)?time:0);
+    const v=reduced?0:Math.max(0,Math.min(1,Number.isFinite(speed)?speed:0));
+    const rows=[];
+    for(let i=0;i<7;i++) {
+        const wave=Math.sin(t*(9.2+i*.67)+i*2.17);
+        const q=Math.sin(t*(5.4+i*.31)-i*1.37);
+        rows.push({y:(i+.5)/7, reach:.24+.22*(wave*.5+.5)+.26*v,
+            alpha:.20+.20*(q*.5+.5), shift:.08*(wave*.5+.5)});
+    }
+    return {pulse:.82+.11*Math.sin(t*8.9)+.07*Math.sin(t*15.1),
+        reach:.86+.22*v+.10*Math.sin(t*6.8), rows:rows};
+}

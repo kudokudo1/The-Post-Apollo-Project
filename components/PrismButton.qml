@@ -86,7 +86,6 @@ ActionButton {
         Component.onCompleted: requestPaint()
         Connections {
             target: root
-            function onActiveBorderWidthChanged() { raster.requestPaint() }
             function onSpectralGlowStrengthChanged() { raster.requestPaint() }
             function onPrismPaletteChanged() { raster.requestPaint() }
         }
@@ -98,7 +97,17 @@ ActionButton {
                 return
             }
             Artwork.paint(c,width,height,root.width,root.height,root.glowPadding,
-                          root.activeBorderWidth,root.prismPalette,root.spectralGlowStrength)
+                          1,root.prismPalette,root.spectralGlowStrength)
         }
+    }
+
+    // Native state emphasis is composited above the artwork. Changing hover,
+    // press or selection does not regenerate the expensive raster.
+    Rectangle {
+        anchors.fill: parent
+        color: "transparent"
+        border.color: root.activeBorderColor
+        border.width: root.activeBorderWidth
+        radius: 0
     }
 }

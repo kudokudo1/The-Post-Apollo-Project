@@ -36,10 +36,12 @@ on:
       - 'tests/forest/test_ui23b_history_controller.js'
       - 'tests/forest/ui2_m4_public_fixture.py'
       - '.github/workflows/forest-mind-m4-history.yml'
-  # Re-run the existing continuity suite on integrated First Light changes.
+  # Re-run the existing continuity suite on integrated history and First Light changes.
   push:
     branches: [main]
     paths:
+      - 'scripts/forest/history_public_fixture_m4.py'
+      - 'tests/forest/test_history_public_fixture_m4.py'
       - 'scripts/forest/first_light_trial_host.py'
       - 'scripts/forest/first_light_delivery.py'
       - 'scripts/forest/turn_bridge_b3.py'

@@ -1,10 +1,10 @@
 // Visual profiles only. These never change operation progress or authority.
 function profile(variant) {
     switch (variant) {
-    case "omnitrix": return {x:.10,y:.05,brightness:1.45,head:1.10,fragments:0,flash:.72,style:"contained"};
-    case "tron": return {x:.45,y:.18,brightness:1.0,head:.75,fragments:0,flash:0,style:"speed"};
-    case "flamethrower": return {x:.95,y:.90,brightness:1.05,head:1.0,fragments:.8,flash:0,style:"fire"};
-    default: return {x:1,y:1,brightness:1,head:1,fragments:1,flash:0,style:"struggle"};
+    case "omnitrix": return {x:.10,y:.05,brightness:1.65,head:1.28,headConsume:1.35,fragments:0,flash:.72,style:"contained"};
+    case "tron": return {x:.30,y:.10,brightness:1.0,head:1.10,headConsume:1.35,fragments:0,flash:0,style:"speed"};
+    case "flamethrower": return {x:.95,y:.90,brightness:1.05,head:1.0,headConsume:1,fragments:.8,flash:0,style:"fire"};
+    default: return {x:1,y:1,brightness:1,head:1.15,headConsume:1.42,fragments:1,flash:0,style:"struggle"};
     }
 }
 function clamp(x) { return Math.max(0,Math.min(1,Number.isFinite(x)?x:0)); }
@@ -22,6 +22,6 @@ function host(variant, time, level, strength, phase, reduced) {
     const flash=phase==="success" && !reduced
         ? p.flash*smooth((t-.42)/.10)*(1-smooth((t-.52)/.30)) : 0;
     return {power:power,dx:power===0?0:power*x*p.x,dy:power===0?0:power*y*p.y,
-        flash:flash,fragments:power*p.fragments,style:p.style,
+        flash:flash,flashSpread:clamp((t-.42)/.32),fragments:power*p.fragments,style:p.style,
         score:power*Math.max(p.x,p.y)};
 }

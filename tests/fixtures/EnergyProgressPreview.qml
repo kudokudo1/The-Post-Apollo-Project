@@ -132,7 +132,7 @@ ShellRoot {
                     property real fraction: 0
                     property bool exact: false
                     function start() {
-                        if (phase === "running") return;
+                        if (phase === "running" || energyFace.animationActive) return;
                         duration=lab.responseMs;
                         exact=lab.measured;
                         fraction=0;
@@ -178,7 +178,7 @@ ShellRoot {
                         wideGlowEnabled: false
                         // The lab panel itself moves by a bounded offset.
                         available: true
-                        interactive: card.phase !== "running"
+                        interactive: card.phase !== "running" && !energyFace.animationActive
                         onLeftClicked: card.start()
                         EnergyProgressFace {
                             id: energyFace
@@ -216,14 +216,40 @@ ShellRoot {
             }
         }
         }
-        // Single soft pulse confined to the laboratory widget, not the
-        // desktop or other monitors. No input handler; reduced motion opts out.
-        Rectangle {
+        // The flash is born at the Omnitrix head, then spreads through
+        // this widget only. Map the nested source into overlay coordinates.
+        Canvas {
+            id: flashOverlay
             anchors.fill: parent
             z: 20
-            color: "#D8FFEA"
-            opacity: field.completionFlash
-            visible: opacity > 0
+            visible: field.completionFlash>0 && field.flashSource!==null
+            renderTarget: Canvas.Image
+            onVisibleChanged: if (visible) requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            Connections {
+                target: field
+                function onCompletionFlashChanged() { flashOverlay.requestPaint(); }
+                function onFlashSpreadChanged() { flashOverlay.requestPaint(); }
+                function onFlashSourceChanged() { flashOverlay.requestPaint(); }
+            }
+            onPaint: {
+                const c=getContext("2d");
+                c.reset(); c.clearRect(0,0,width,height);
+                const source=field.flashSource;
+                if (!source || field.completionFlash<=0 || width<=0 || height<=0) return;
+                const origin=source.mapToItem(flashOverlay,
+                    source.width*source.displayedFraction,source.height/2);
+                const radius=Math.max(1,Math.hypot(Math.max(origin.x,width-origin.x),
+                    Math.max(origin.y,height-origin.y))*(.10+1.25*field.flashSpread));
+                const ink=field.flashColor, alpha=field.completionFlash;
+                const g=c.createRadialGradient(origin.x,origin.y,0,origin.x,origin.y,radius);
+                g.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,alpha));
+                g.addColorStop(.48,Qt.rgba(ink.r,ink.g,ink.b,alpha*.76));
+                g.addColorStop(.78,Qt.rgba(ink.r,ink.g,ink.b,alpha*.42));
+                g.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,0));
+                c.fillStyle=g; c.fillRect(0,0,width,height);
+            }
         }
     }
 }

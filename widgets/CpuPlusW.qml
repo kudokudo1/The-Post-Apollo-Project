@@ -3166,16 +3166,11 @@ PanelWindow {
             anchors.topMargin: 20
             anchors.bottomMargin: 10
             active: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 3
-                    && (cpuPlusWindow.systemSubMode === "MEMORY"
-                        || cpuPlusWindow.systemSubMode === "SWAP"
-                        || (cpuPlusWindow.systemSubMode === "ALL"
-                            && ["MEMORY", "SWAP"].indexOf(String(
-                                (cpuPlusWindow.selectedMonitorEntry() || {}).category || ""
-                            ).toUpperCase()) >= 0))
+                    && ["MEMORY","SWAP"].includes(cpuPlusWindow.systemSubMode)
             visible: active
             sourceComponent: CpuPlusMemoryActuatorPane {
                 recoverySession: cpuPlusWindow.memoryRecoverySession
-                diagnosticSubject: cpuPlusWindow.systemSubMode === "SWAP" || (cpuPlusWindow.systemSubMode === "ALL" && String((cpuPlusWindow.selectedMonitorEntry() || {}).category || "").toUpperCase() === "SWAP") ? "SWAP" : "ALL"
+                diagnosticSubject: cpuPlusWindow.systemSubMode === "SWAP" ? "SWAP" : "MEMORY"
                 headerRefreshAvailable: true
             }
         }
@@ -3185,10 +3180,9 @@ PanelWindow {
             objectName: "cpuplusResourceDiagnosticsLoader"
             anchors.fill: memoryActuatorLoader
             readonly property string resourceSubject: cpuPlusWindow.systemSubMode === "ALL"
-                ? String((cpuPlusWindow.selectedMonitorEntry() || {}).category || "").toUpperCase()
-                : cpuPlusWindow.systemSubMode
+                ? "SYSTEM" : cpuPlusWindow.systemSubMode
             active: cpuPlusWindow.menuOpen && cpuPlusWindow.selectedModeIndex === 3
-                    && ["CPU","GPU","STORAGE","NETWORK"].includes(resourceSubject)
+                    && ["SYSTEM","CPU","GPU","STORAGE","NETWORK"].includes(resourceSubject)
             visible: active
             sourceComponent: CpuPlusResourceDiagnosticsPane { subject: cpuResourceDiagnosticsLoader.resourceSubject }
         }

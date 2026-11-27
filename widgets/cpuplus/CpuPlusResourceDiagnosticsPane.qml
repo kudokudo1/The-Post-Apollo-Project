@@ -41,7 +41,7 @@ Item {
         GohuText {
             width: parent.width
             visible: root.informationOpen
-            text: root.subject==="CPU"
+            text: root.subject==="SYSTEM" ? "General diagnostic workshop: all ten instruments, shared reports and workflow sets. Core instruments can be combined; newer hardware observers run individually or in sequential sets. Selecting a resource row does not change this workshop." : root.subject==="CPU"
                 ? "Read-only host CPU capture, same-user process census and Quickshell threads. Host busy is 0–100% of aggregate capacity; process CPU can exceed 100%. Driver frequency and kernel PSI may be unavailable. Host capture runs alone; the report archive and sequential workflow queue are shared."
                 : root.subject==="GPU" ? "All hardware DRM cards are observed independently, regardless of the selected SYSTEM row. Busy, VRAM and uniquely associated hwmon temp1 depend on driver support. No process attribution, stress test or clock changes. Reports and workflow queue are shared."
                 : root.subject==="NETWORK" ? "Read-only RX/TX bytes, packets, errors and drops per visible interface, including virtual and loopback. No aggregate across stacked interfaces, no test traffic, endpoint inspection or latency measurement. Reports and workflow queue are shared."
@@ -68,6 +68,11 @@ Item {
             readonly property int lineHeight: Math.max(7,Math.min(11,
                 Math.floor((Math.min(36,Math.floor((width*0.57-3*Math.max(0,root.instrumentKinds.length-1))/Math.max(1,root.instrumentKinds.length)))-2)/3)))
             readonly property int toolSize: 3*lineHeight+2
+            readonly property int railColumns: root.subject==="SYSTEM" ? (width*0.57>=267?10:5) : Math.max(1,root.instrumentKinds.length)
+            readonly property int railRows: Math.max(1,Math.ceil(root.instrumentKinds.length/railColumns))
+            readonly property int railButtonSize: root.subject==="SYSTEM" ? Math.max(12,Math.min(35,Math.floor((width*0.57-3*(railColumns-1))/railColumns))) : toolSize
+            readonly property int railHeight: railRows*railButtonSize+3*(railRows-1)
+            readonly property real readoutHeight: (railHeight-2)/3
             Column {
                 id: statusBlock
                 objectName: "cpuplusResourceStatusBlock"
@@ -76,7 +81,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    height: statusBand.lineHeight
+                    height: statusBand.readoutHeight
                     text: CpuPlusDiagnostics.feedback
                     color: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted ? Colors.orange : Colors.cyan
                     font.pixelSize: 11
@@ -87,8 +92,8 @@ Item {
                 }
                 CpuPlusMemoryReadout {
                     width: parent.width
-                    height: statusBand.lineHeight
-                    text: root.subject==="CPU" ? "PSI // HOST CAPTURE ONLY" : "PSI // NOT MEASURED"
+                    height: statusBand.readoutHeight
+                    text: root.subject==="SYSTEM" ? "PSI // CPU / SWAP CAPTURES" : root.subject==="CPU" ? "PSI // HOST CAPTURE ONLY" : "PSI // NOT MEASURED"
                     color: Colors.yellow
                     font.pixelSize: 10
                     fontSizeMode: Text.Fit
@@ -99,7 +104,7 @@ Item {
                 CpuPlusMemoryReadout {
                     objectName: "cpuplusResourceTargetReadout"
                     width: parent.width
-                    height: statusBand.lineHeight
+                    height: statusBand.readoutHeight
                     visible: filterHost.visible
                     text: diagnostics.workshopTargetText
                     color: Colors.purple
@@ -114,8 +119,10 @@ Item {
                 id: filterHost
                 objectName: "cpuplusResourceFilterHost"
                 visible: diagnostics.workshopOpen
-                width: visible?root.instrumentKinds.length*statusBand.toolSize+3*Math.max(0,root.instrumentKinds.length-1):0
-                height: visible?statusBand.toolSize:0
+                readonly property int selectorColumns: statusBand.railColumns
+                readonly property int selectorButtonSize: statusBand.railButtonSize
+                width: visible?selectorColumns*selectorButtonSize+3*Math.max(0,selectorColumns-1):0
+                height: visible?statusBand.railHeight:0
                 anchors.verticalCenter: parent.verticalCenter
             }
         }

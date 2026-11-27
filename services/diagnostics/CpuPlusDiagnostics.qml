@@ -119,7 +119,9 @@ Scope {
     // Session-owned draft, not authorization. No persistence or auto-start.
     property var workshopDraft: ({durationSeconds:30, selected:["threads","memory"],
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
+        hostCpuIntervalMs:1000, gpuIntervalMs:1000, diskIoIntervalMs:1000, swapIoIntervalMs:1000, netIoIntervalMs:1000,
         storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
+    property var memoryWorkshopDraft: ({durationSeconds:30, selected:["memory"], memoryIntervalMs:10000})
     // CPU has independent session calibration; switching SYSTEM targets never
     // overwrites the general workshop or starts a capture.
     property var cpuWorkshopDraft: ({durationSeconds:30, selected:["census"], hostCpuIntervalMs:1000,
@@ -135,17 +137,18 @@ Scope {
     property var netWorkshopDraft: ({durationSeconds:10, selected:["netio"], netIoIntervalMs:1000})
     function draftForSubject(subject) {
         return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft
-            : subject==="STORAGE" ? storageWorkshopDraft : subject==="SWAP" ? swapWorkshopDraft : subject==="NETWORK" ? netWorkshopDraft : workshopDraft;
+            : subject==="STORAGE" ? storageWorkshopDraft : subject==="SWAP" ? swapWorkshopDraft : subject==="NETWORK" ? netWorkshopDraft : subject==="MEMORY" ? memoryWorkshopDraft : workshopDraft;
     }
     function setDraftForSubject(subject, draft) {
         if (workshopPresetLocked || !draft || !Array.isArray(draft.selected)
-                || !["CPU","GPU","STORAGE","SWAP","NETWORK","ALL"].includes(subject)
+                || !["CPU","GPU","STORAGE","SWAP","NETWORK","MEMORY","SYSTEM","ALL"].includes(subject)
                 || !draft.selected.every(k=>Calibration.workshopSubjectKinds(subject).includes(k))) return false;
         if (subject==="CPU") cpuWorkshopDraft=draft;
         else if (subject==="GPU") gpuWorkshopDraft=draft;
         else if (subject==="STORAGE") storageWorkshopDraft=draft;
         else if (subject==="SWAP") swapWorkshopDraft=draft;
         else if (subject==="NETWORK") netWorkshopDraft=draft;
+        else if (subject==="MEMORY") memoryWorkshopDraft=draft;
         else workshopDraft=draft;
         return true;
     }
@@ -376,8 +379,10 @@ Scope {
         if (!reportFor(job, reportId)) return false;
         selectedReport = job;
         selectedArchiveId = reports[job] && reports[job].id === reportId ? "" : reportId;
-        memoryMenuIndex = 4;
-        if (openReport) pendingReportView = true;
+        if (openReport) {
+            memoryMenuIndex = 4;
+            pendingReportView = true;
+        }
         return true;
     }
 

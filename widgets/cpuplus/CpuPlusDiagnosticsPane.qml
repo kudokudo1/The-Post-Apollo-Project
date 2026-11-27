@@ -231,7 +231,7 @@ Column {
                 {kind: "census", label: "PROCESS CENSUS // 30s"},
                 {kind: "storage", label: "STORAGE OBSERVE // 30s"},
                 {kind: "appcontrol", label: "APPCONTROL // TEST 30s"}
-            ].filter(row=>root.workshopSubject==="ALL" || Calibration.workshopSubjectKinds(root.workshopSubject).includes(row.kind))
+            ].filter(row=>["ALL","SYSTEM"].includes(root.workshopSubject) || Calibration.workshopSubjectKinds(root.workshopSubject).includes(row.kind))
             delegate: ActionButton {
                 required property var modelData
                 width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
@@ -299,7 +299,7 @@ Column {
         GohuText {
             width: parent.width
             visible: presets.mixerPage==="LIBRARY"
-            text: "SAVE "+(root.workshopSubject==="ALL"?"CURRENT":root.workshopSubject)+" CALIBRATION // SHARED QUEUE"
+            text: "SAVE "+(["ALL","SYSTEM"].includes(root.workshopSubject)?"CURRENT":root.workshopSubject)+" CALIBRATION // SHARED QUEUE"
             color: Colors.cyan
             font.pixelSize: 10
             wrapMode: Text.Wrap
@@ -572,7 +572,7 @@ Column {
     GohuText {
         width: parent.width
         visible: root.viewMode === "QUICK"
-        text: root.workshopSubject==="NETWORK" ? "NETWORK capture uses CONTROLS with explicit PREPARE and START. Observe interface counters; no generated traffic, internet latency test or endpoint inspection. QUICK provides cancellation while a shared capture is active." : root.workshopSubject==="SWAP" ? "SWAP capture uses CONTROLS with explicit PREPARE and START. VM swap traffic is not physical disk throughput. PSI is host memory pressure; ZRAM allocated bytes consume RAM. QUICK provides cancellation while a shared capture is active." : root.workshopSubject==="STORAGE" ? "STORAGE OBSERVE // fixed 30-second metadata capture. Use CONTROLS to configure sample/report cadence with PREPARE and START. For physical disk throughput select DISK I/O in CONTROLS; metadata alone does not measure it." : root.workshopSubject==="GPU" ? "GPU captures use CONTROLS with explicit PREPARE and START. QUICK provides cancellation while a shared capture is active." : "Close this menu and reproduce the issue, then return here. APPCONTROL TEST: open AppControl, spend time in APP and KILL, then close it; no process actions needed. CPU sampling runs outside Quickshell; opening markers run inside it. CANCEL stops early without a verified comparison. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
+        text: root.workshopSubject==="MEMORY" ? "MEMORY OBSERVE // Quickshell resident and proportional memory, private memory, swap and host RAM context. Use CONTROLS for calibrated capture. Capacity and policy controls remain separate." : root.workshopSubject==="SYSTEM" ? "SYSTEM DIAG // all instruments available in CONTROLS. Core instruments can run together; host CPU, GPU, disk, swap and network captures run individually or in sequential sets. QUICK offers original fixed captures." : root.workshopSubject==="NETWORK" ? "NETWORK capture uses CONTROLS with explicit PREPARE and START. Observe interface counters; no generated traffic, internet latency test or endpoint inspection. QUICK provides cancellation while a shared capture is active." : root.workshopSubject==="SWAP" ? "SWAP capture uses CONTROLS with explicit PREPARE and START. VM swap traffic is not physical disk throughput. PSI is host memory pressure; ZRAM allocated bytes consume RAM. QUICK provides cancellation while a shared capture is active." : root.workshopSubject==="STORAGE" ? "STORAGE OBSERVE // fixed 30-second metadata capture. Use CONTROLS to configure sample/report cadence with PREPARE and START. For physical disk throughput select DISK I/O in CONTROLS; metadata alone does not measure it." : root.workshopSubject==="GPU" ? "GPU captures use CONTROLS with explicit PREPARE and START. QUICK provides cancellation while a shared capture is active." : "Close this menu and reproduce the issue, then return here. APPCONTROL TEST: open AppControl, spend time in APP and KILL, then close it; no process actions needed. CPU sampling runs outside Quickshell; opening markers run inside it. CANCEL stops early without a verified comparison. Memory/thread targets are the newest same-user Quickshell; verify the reported PID. Source scan is not a live census. Process census reads same-user CPU, RSS and storage I/O; Storage observe checks fixed file metadata only; not writer identity, SQL activity or bytes written. GPU is not measured."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

@@ -173,7 +173,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 680) {
+            if (++root.ticks > 710) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -1262,6 +1262,62 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "Network remount retains draft without cross-scope authority"))return;
                 console.log("CPU_D10A_NETWORK_NATIVE_PASS");
+                nativeWindow.width=320;
+                nativeWindow.height=620;
+                root.resourceSubject="SYSTEM";
+                root.phase=66;return;
+            }
+            if(root.phase===66 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const host=root.findItem(resourcePane.item,"cpuplusResourceFilterHost");
+                if(!w||w.subject!=="SYSTEM"||!host)return;
+                const kinds=["threads","memory","census","storage","stall","hostcpu","gpu","diskio","swapio","netio"];
+                const buttons=kinds.map(k=>root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-"+k));
+                if(!root.check(buttons.every(b=>b&&b.visible&&b.width===b.height)
+                    && host.selectorColumns===5 && root.resourceStatusGeometry(resourcePane.item)
+                    && buttons.every(b=>{const p=b.mapToItem(host,0,0);return p.x>=0&&p.y>=0&&p.x+b.width<=host.width+1&&p.y+b.height<=host.height+1;})
+                    && !w.ready && !CpuPlusDiagnostics.busy
+                    && JSON.stringify(w.draft)===root.generalDraftWitness,
+                    "SYSTEM all ten instruments, two rows, status geometry and existing general draft"))return;
+                w.toggle("gpu");
+                if(!root.check(w.draft.selected.join(",")==="gpu","SYSTEM GPU is exclusive"))return;
+                w.toggle("memory");
+                if(!root.check(w.draft.selected.join(",")==="memory","SYSTEM core selection removes standalone GPU"))return;
+                w.toggle("threads");
+                if(!root.check(w.draft.selected.includes("memory")&&w.draft.selected.includes("threads"),"SYSTEM retains qualified core combinations"))return;
+                w.toggle("netio");
+                if(!root.check(w.draft.selected.join(",")==="netio"&&!w.ready&&!CpuPlusDiagnostics.busy,"SYSTEM network remains standalone"))return;
+                nativeWindow.width=720;
+                root.phase=67;return;
+            }
+            if(root.phase===67 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const host=root.findItem(resourcePane.item,"cpuplusResourceFilterHost");
+                if(!root.check(w && host && host.selectorColumns===10
+                    && root.resourceStatusGeometry(resourcePane.item)
+                    && w.draft.selected.join(",")==="netio","SYSTEM wide rail retains all instruments and draft"))return;
+                root.resourcePaneActive=false;
+                root.memorySubject="MEMORY";
+                nativeWindow.width=320;
+                root.paneActive=true;
+                root.phase=68;return;
+            }
+            if(root.phase===68 && pane.item){
+                pane.item.selectMenu(4);
+                const w=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
+                if(!w||w.subject!=="MEMORY")return;
+                const host=root.findItem(pane.item,"cpuplusDiagnosticFilterHost");
+                const block=root.findItem(pane.item,"cpuplusMemoryDiagnosticStatusBlock");
+                const button=root.findItem(pane.item,"cpuplusWorkshopInstrument-memory");
+                if(!root.check(w.filterKinds.join(",")==="memory" && w.draft.selected.join(",")==="memory"
+                    && host&&block&&button&&button.width===button.height
+                    && Math.abs(block.height-host.height)<=1
+                    && !root.findItem(pane.item,"cpuplusWorkshopInstrument-threads")
+                    && !root.findItem(pane.item,"cpuplusWorkshopInstrument-netio")
+                    && CpuPlusDiagnostics.workshopDraft.selected.join(",")==="netio"
+                    && !w.ready&&!CpuPlusDiagnostics.busy,
+                    "MEMORY focus, unchanged status geometry and independent general draft"))return;
+                console.log("CPU_D10B_SYSTEM_MEMORY_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

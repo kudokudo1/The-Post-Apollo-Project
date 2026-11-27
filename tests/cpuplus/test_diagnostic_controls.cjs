@@ -512,7 +512,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+JSON.stringify(p)+')))'),JSON.stringify(p));
     assert.match(owner,/property var storageWorkshopDraft:/);
     assert.match(owner,/else if \(subject==="STORAGE"\) storageWorkshopDraft=draft;/);
-    assert.match(read("widgets/CpuPlusW.qml"),/\["CPU","GPU","STORAGE","NETWORK"\]\.includes\(resourceSubject\)/);
+    assert.match(read("widgets/CpuPlusW.qml"),/\["SYSTEM","CPU","GPU","STORAGE","NETWORK"\]\.includes\(resourceSubject\)/);
     assert.match(workshop,/TARGET \/\/ 18 KNOWN FILES/);
     assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/does not measure physical disk throughput/);
 }
@@ -524,7 +524,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.match(resource,/readonly property int toolSize: 3\*lineHeight\+2/);
     assert.match(resource,/objectName: "cpuplusResourceStatusBlock"/);
     assert.match(resource,/objectName: "cpuplusResourceTargetReadout"/);
-    assert.match(resource,/height: visible\?statusBand\.toolSize:0/);
+    assert.match(resource,/height: visible\?statusBand\.railHeight:0/);
     assert.match(resource,/headerTarget: header/);
     assert.match(resource,/workshopFilterTarget: filterHost/);
     assert.match(resource,/PSI \/\/ HOST CAPTURE ONLY/);
@@ -647,5 +647,32 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
         [a,b,{...end,extra:true}]
     ])assert.equal(policy.summarize("netio",jsonl(bad)),null);
     assert.match(workshop,/cpuplusWorkshopNetIoInterval/);
-    assert.match(read("widgets/CpuPlusW.qml"),/\["CPU","GPU","STORAGE","NETWORK"\]\.includes\(resourceSubject\)/);
+    assert.match(read("widgets/CpuPlusW.qml"),/\["SYSTEM","CPU","GPU","STORAGE","NETWORK"\]\.includes\(resourceSubject\)/);
+}
+
+
+// D10b: ALL is a stable general workspace; MEMORY is a focused instrument.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const call=expr=>vm.runInContext(expr,c);
+    assert.equal(call('JSON.stringify(workshopSubjectKinds("SYSTEM"))'),'["threads","memory","census","storage","stall","hostcpu","gpu","diskio","swapio","netio"]');
+    assert.equal(call('JSON.stringify(workshopSubjectKinds("MEMORY"))'),'["memory"]');
+    for(const kind of ["hostcpu","gpu","diskio","swapio","netio"]){
+        const plan={durationSeconds:2,instruments:[{kind,intervalMs:1000}]};
+        assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(plan)+',"SYSTEM")'),true);
+        assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(plan)+',"MEMORY")'),false);
+    }
+    const memory={durationSeconds:10,instruments:[{kind:"memory",intervalMs:5000}]};
+    assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(memory)+',"MEMORY")'),true);
+    const w=read("widgets/CpuPlusW.qml");
+    assert.match(w,/readonly property string resourceSubject: cpuPlusWindow\.systemSubMode === "ALL"\s*\? "SYSTEM" : cpuPlusWindow\.systemSubMode/);
+    assert.match(w,/\["MEMORY","SWAP"\]\.includes\(cpuPlusWindow\.systemSubMode\)/);
+    assert.match(w,/diagnosticSubject: cpuPlusWindow\.systemSubMode === "SWAP" \? "SWAP" : "MEMORY"/);
+    assert.match(owner,/property var memoryWorkshopDraft:/);
+    assert.match(workshop,/const standalone=\["hostcpu","gpu","diskio","swapio","netio"\]/);
+    assert.match(workshop,/draft\.selected\.filter\(k=>!standalone\.includes\(k\)\)/);
+    assert.match(workshop,/root\.filterTarget\.selectorColumns/);
+    assert.match(parent,/property string diagnosticSubject: "MEMORY"/);
+    assert.match(ui,/\["ALL","SYSTEM"\]\.includes\(root\.workshopSubject\)/);
 }

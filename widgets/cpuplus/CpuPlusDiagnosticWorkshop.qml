@@ -115,9 +115,11 @@ Column {
     }
     function toggle(kind) {
         if (locked || !filterKinds.includes(kind)) return;
-        // Host capture is standalone in D6b; mixed sequential sets remain supported.
-        if (kind==="hostcpu" || kind==="gpu" || kind==="diskio" || kind==="swapio" || kind==="netio") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
-        const selected=draft.selected.filter(k=>k!=="hostcpu"&&k!=="diskio");
+        // The five core collectors may run in one qualified workflow. New
+        // resource captures are standalone; mixed sequential sets are allowed.
+        const standalone=["hostcpu","gpu","diskio","swapio","netio"];
+        if (standalone.includes(kind)) { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
+        const selected=draft.selected.filter(k=>!standalone.includes(k));
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
         edit("selected",selected);
@@ -158,11 +160,12 @@ Column {
     }
 
 
-    Row {
+    Grid {
         objectName: "cpuplusWorkshopFilterRail"
         parent: root.filterTarget || root
         width: parent.width
         height: root.filterTarget ? parent.height : root.filterSize
+        columns: root.filterTarget && root.subject==="SYSTEM" ? root.filterTarget.selectorColumns : Math.max(1,root.filterCount+(root.filterTarget?0:1))
         spacing: root.filterTarget ? 3 : root.filterGap
         visible: root.visible
         Repeater {
@@ -180,11 +183,11 @@ Column {
                 id: instrumentFilter
                 required property var modelData
                 objectName: "cpuplusWorkshopInstrument-"+modelData.kind
-                width: root.filterTarget ? parent.height : root.filterWidth
-                height: root.filterTarget ? parent.height : root.filterSize
+                width: root.filterTarget && root.subject==="SYSTEM" ? root.filterTarget.selectorButtonSize : root.filterTarget ? parent.height : root.filterWidth
+                height: root.filterTarget ? width : root.filterSize
                 accentColor: Colors.resourceColor(modelData.subject)
                 label: modelData.symbol
-                labelPixelSize: Math.max(16,Math.round(width*0.72))
+                labelPixelSize: Math.max(root.subject==="SYSTEM"?9:16,Math.round(width*0.72))
                 labelElide: Text.ElideNone
                 contentPadding: 0
                 selected: root.draft.selected.includes(modelData.kind)

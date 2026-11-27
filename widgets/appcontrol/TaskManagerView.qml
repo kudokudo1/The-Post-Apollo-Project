@@ -27,10 +27,17 @@ import "../../components"
     property Item restartLockTarget: null
     property Item freezeLockTarget: null
     readonly property bool headerActions: quickActionTarget !== null
+    property bool metricGraphSelectionEnabled: false
+    property var selectedGraphKeys: ["cpu", "mem"]
+    signal metricGraphRequested(string key)
+    function graphSelected(key) { return selectedGraphKeys.indexOf(key) >= 0; }
     property real viewportHeight: 0
     readonly property bool compact: viewportHeight > 0
-    readonly property int graphCount: taskCpuGraph.hunterMetricView && !taskCpuGraph.combiView ? 1 : 2
-    readonly property real graphHeight: compact
+    readonly property int graphCount: metricGraphSelectionEnabled ? selectedGraphKeys.length : taskCpuGraph.hunterMetricView && !taskCpuGraph.combiView ? 1 : 2
+    readonly property real graphHeight: metricGraphSelectionEnabled
+        ? Math.max(0, Math.min(180, Math.floor((viewportHeight - taskMetricGrid.implicitHeight
+            - spacing * (graphCount + 1) - 4) / Math.max(1,graphCount))))
+        : compact
         ? Math.max(48, Math.min(112, Math.floor((viewportHeight - taskMetricGrid.implicitHeight
             - (actionTarget ? 0 : actionColumn.implicitHeight + spacing)
             - spacing * graphCount - 12) / graphCount)))
@@ -61,7 +68,7 @@ import "../../components"
                     id: taskMetricGrid
 
                     width: parent.width
-                    columns: 3
+                    columns: taskManagerBody.metricGraphSelectionEnabled ? 4 : 3
                     columnSpacing: 6
                     rowSpacing: 6
 
@@ -70,7 +77,7 @@ import "../../components"
                             const task = taskManagerBody.currentTask;
                             if (!task) return [];
 
-                            return [
+                            const metrics = [
                                 { id: "cpu", label: "CPU", value: Number(task.cpu || 0).toFixed(1) + "%", baseAccent: Colors.resourceColor("cpu"), critical: processController.metricIsCritical(task, "cpu") },
                                 { id: "mem", label: "MEM", value: Number(task.mem || 0).toFixed(1) + "%", baseAccent: Colors.resourceColor("mem"), critical: processController.metricIsCritical(task, "mem") },
                                 { id: "rss", label: "RSS", value: processController.formatMemory(task.rss), baseAccent: Colors.resourceColor("rss"), critical: processController.metricIsCritical(task, "rss") },
@@ -78,6 +85,16 @@ import "../../components"
                                 { id: "pid", label: "PID", value: String(task.pid || "?"), baseAccent: Colors.resourceColor("pid"), critical: false },
                                 { id: "uptime", label: "UPTIME", value: String(task.elapsed || "?"), baseAccent: Colors.resourceColor("uptime"), critical: false }
                             ];
+                            if (taskManagerBody.metricGraphSelectionEnabled) {
+                                const extra = presentationState.taskExtraDetailHistories || {};
+                                const io = extra.io || [];
+                                metrics.push({id:"io",label:"I/O",value:io.length && taskManagerBody.graphDataAvailable
+                                    ? Number(io[io.length-1]).toFixed(2)+" MiB/s" : "N/A",
+                                    baseAccent:Colors.cyan,critical:false,noFavorite:true});
+                                metrics.push({id:"combined",label:"COMBI",value:"HISTORY",
+                                    baseAccent:Colors.yellow,critical:false,noFavorite:true});
+                            }
+                            return metrics;
                         }
 
                         Rectangle {
@@ -88,6 +105,10 @@ import "../../components"
                                 modelData.critical ? Colors.red : modelData.baseAccent
                             readonly property color glowColor:
                                 accent === Colors.white ? Colors.cyan : accent
+                            objectName: "taskMetricCard-"+modelData.id
+                            readonly property string graphKey: modelData.id === "uptime" ? "age" : modelData.id
+                            readonly property bool graphSelectable: taskManagerBody.metricGraphSelectionEnabled && modelData.id !== "pid"
+                            readonly property bool graphSelected: graphSelectable && taskManagerBody.graphSelected(graphKey)
                             readonly property bool favorite:
                                 host.isTaskMetricFavorite(
                                     taskManagerBody.currentTask,
@@ -96,7 +117,9 @@ import "../../components"
 
                             Layout.fillWidth: true
                             Layout.preferredHeight: taskManagerBody.compact ? 44 : 58
-                            color: Colors.black
+                            color: graphSelectable && (graphSelected || metricGraphMouse.containsMouse)
+                                ? Qt.tint(Colors.black,Qt.rgba(modelData.baseAccent.r,modelData.baseAccent.g,modelData.baseAccent.b,
+                                    graphSelected ? 0.24 : 0.13)) : Colors.black
                             border.width: 1
                             border.color: accent
 
@@ -105,7 +128,7 @@ import "../../components"
                                 anchors.margins: -4
                                 spread: 3
                                 z: -1
-                                opacity: modelData.critical ? 0.58 : 0.28
+                                opacity: taskMetricCard.graphSelected ? 0.58 : modelData.critical ? 0.58 : 0.28
                                 color: taskMetricCard.glowColor
                             }
 
@@ -132,7 +155,7 @@ import "../../components"
                                 GohuText {
                                     width: parent.width - 16
                                     text: modelData.value
-                                    font.pixelSize: 16
+                                    font.pixelSize: taskManagerBody.metricGraphSelectionEnabled ? 13 : 16
                                     color: taskMetricCard.accent
                                     elide: Text.ElideRight
                                     layer.enabled: true
@@ -146,7 +169,28 @@ import "../../components"
                                 }
                             }
 
+                            MouseArea {
+                                id: metricGraphMouse
+                                objectName: "taskMetricToggle-"+modelData.id
+                                anchors.fill: parent
+                                enabled: taskMetricCard.graphSelectable
+                                hoverEnabled: enabled
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                acceptedButtons: Qt.LeftButton
+                                onClicked: taskManagerBody.metricGraphRequested(taskMetricCard.graphKey)
+                            }
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 2
+                                height: 2
+                                visible: taskMetricCard.graphSelectable
+                                color: taskMetricCard.modelData.baseAccent
+                                opacity: taskMetricCard.graphSelected ? 1 : 0.22
+                            }
                             Item {
+                                visible: !modelData.noFavorite
                                 anchors.right: parent.right
                                 anchors.top: parent.top
                                 anchors.rightMargin: 2
@@ -188,12 +232,14 @@ import "../../components"
 
                 Item {
                     id: taskCpuGraph
+                    visible: !taskManagerBody.metricGraphSelectionEnabled
+                        || taskManagerBody.graphSelected("cpu") || taskManagerBody.graphSelected("combined")
 
                     width: parent.width
                     height: taskManagerBody.graphHeight
 
                     readonly property bool hunterMetricView:
-                        host.hunterMetricView
+                        taskManagerBody.metricGraphSelectionEnabled ? taskManagerBody.graphSelected("combined") : host.hunterMetricView
                     readonly property bool combiView:
                         hunterMetricView
                         && hunterGraph.metricMode
@@ -206,7 +252,7 @@ import "../../components"
                         const miniRevision = presentationState.taskMiniHistoryRevision;
                         const detailRevision =
                             presentationState.taskHunterDetailHistoryRevision;
-                        if (!taskManagerBody.graphDataAvailable) return [];
+                        if (!taskManagerBody.graphDataAvailable || (taskManagerBody.metricGraphSelectionEnabled && !taskCpuGraph.visible)) return [];
                         if (hunterMetricView)
                             return hunterGraph.detailHistory();
                         return presentationState.taskCpuHistory;
@@ -693,6 +739,7 @@ import "../../components"
                     id: taskCombiScoreGraph
 
                     visible: taskCpuGraph.combiView
+                        && (!taskManagerBody.metricGraphSelectionEnabled || taskManagerBody.graphSelected("score"))
                     width: parent.width
                     height: visible ? taskManagerBody.graphHeight : 0
 
@@ -923,7 +970,7 @@ import "../../components"
                 Item {
                     id: taskMemGraph
 
-                    visible: !taskCpuGraph.hunterMetricView
+                    visible: taskManagerBody.metricGraphSelectionEnabled ? taskManagerBody.graphSelected("mem") : !taskCpuGraph.hunterMetricView
 
                     width: parent.width
                     height: taskManagerBody.graphHeight
@@ -1041,7 +1088,7 @@ import "../../components"
                         readonly property var graphPoints: {
                             const revision = graphRevision;
                             return graphGeometry.linePoints(
-                                taskManagerBody.graphDataAvailable ? presentationState.taskMemHistory : [],
+                                taskManagerBody.graphDataAvailable && (!taskManagerBody.metricGraphSelectionEnabled || taskMemGraph.visible) ? presentationState.taskMemHistory : [],
                                 width,
                                 height,
                                 0.35,

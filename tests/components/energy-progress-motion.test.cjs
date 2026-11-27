@@ -57,10 +57,10 @@ test("native renderer owns no operation or input; gallery has all four variants"
 });
 
 const profiles = vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyVariantProfile.js"), "utf8") + "\n({profile,host});");
+    "components/EnergyVariantProfile.js"), "utf8") + "\n({profile,host,barMotion,fireDrive});");
 
 test("four personalities preserve bounded motion, distinct intensity and flash isolation", () => {
-    const names=["ki-blast","flamethrower","tron","omnitrix"];
+    const names=["ki-blast","flamethrower","omnitrix","tron"];
     const max=names.map(name=>{
         let dx=0,dy=0;
         for(let t=0;t<30;t+=.007) {
@@ -201,7 +201,7 @@ test("Ki Blast enemy heat grows through defeat and persists after impact", () =>
 });
 
 const currents=vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes});");
+    "components/EnergyBeamFlow.js"),"utf8")+"\n({flow,head,clashSizes,contact});");
 test("full-lane currents advance in opposite directions, with faster TRON", () => {
     const w=900,h=40;
     const left=currents.flow("ki-blast","standard","player",w,h,0,false);
@@ -216,7 +216,9 @@ test("full-lane currents advance in opposite directions, with faster TRON", () =
     assert.ok(tronNext[0].x-tron[0].x>2*(next[0].x-left[0].x));
     assert.ok(tron.filter(r=>!r.wake).some(r=>r.x<w*.15));
     assert.ok(tron.filter(r=>!r.wake).some(r=>r.x>w*.8));
-    assert.ok(tron.some(r=>r.wake && r.length>h*2));
+    assert.ok(tron.some(r=>r.wake && r.length>h));
+    assert.ok(tron.filter(r=>r.wake).every(r=>r.x>=w-h*4.2-1e-9));
+    assert.ok(tron.filter(r=>!r.wake).every(r=>r.alpha<=.24));
     assert.equal(JSON.stringify(currents.flow("tron","standard","player",w,h,0,true)),
         JSON.stringify(currents.flow("tron","standard","player",w,h,900,true)));
 });
@@ -274,4 +276,42 @@ test("pixel fire waves, emits detached embers and stays static in reduced motion
     const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
     assert.match(source,/PixelFire.fire/);
     assert.match(source,/c.globalAlpha=\.35/);
+});
+
+test("TRON local vibration is distinct from host and fire ignition has three strengths",()=>{
+    const modes=["standard","ash-trail","burn-away"];
+    const initial=modes.map(mode=>profiles.host("flamethrower",0,.12,1,"running",false,mode).power);
+    assert.ok(initial[0]>=.85 && initial[0]>initial[1] && initial[1]>initial[2] && initial[2]>=.35);
+    for(const mode of modes) {
+        let prev=0;
+        for(let i=0;i<=300;i++){
+            const p=profiles.fireDrive(mode,i/100,.12);
+            assert.ok(p>=prev && p<=1);prev=p;
+        }
+        assert.equal(prev,1);
+        assert.equal(profiles.host("flamethrower",1,.12,1,"running",true,mode).power,0);
+    }
+    let local=0,host=0;
+    for(let i=0;i<1000;i++){
+        const t=i/100;
+        local=Math.max(local,Math.abs(profiles.barMotion("tron",t,1,false).dx));
+        host=Math.max(host,Math.abs(profiles.host("tron",t,1,1,"running",false).dx));
+    }
+    assert.ok(local>.9 && host<.19 && local>host*5);
+    assert.equal(profiles.barMotion("tron",4,1,true).dx,0);
+});
+test("clash contact flattens only a shared cap and the winning sphere regains its curve",()=>{
+    for(let i=0;i<=100;i++){
+        const p=i/100, q=currents.contact(p,.15,42,800);
+        for(const l of [q.left,q.right]){
+            const chord=l.ry*Math.sqrt(Math.max(0,1-(l.offset/l.rx)**2));
+            assert.ok(Math.abs(chord-q.chord)<1e-8);
+            assert.ok(l.offset>0&&l.offset<l.rx);
+        }
+    }
+    const q=currents.contact(.9,.15,42,800);
+    assert.ok(q.left.offset/q.left.rx>.95);
+    assert.ok(q.left.offset/q.left.rx>q.right.offset/q.right.rx);
+    const r=currents.contact(.1,.8,42,800);
+    assert.ok(r.right.offset/r.right.rx>.95);
 });

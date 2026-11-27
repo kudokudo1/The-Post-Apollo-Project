@@ -372,7 +372,9 @@ function hostMemorySummary(rows) {
     const signed=value=>(value>0?"+":"")+mib(value);
     let summary="\nHOST CONTEXT // "+available.length+"/"+rows.length+" paired samples";
     if (!available.length) return summary+" // UNAVAILABLE";
-    const samples=available.flatMap(pair=>[pair.beforeKiB,pair.afterKiB]);
+    // Keep host-context formatting compatible with the native QML JS engine.
+    const samples=[];
+    for(const pair of available){samples.push(pair.beforeKiB);samples.push(pair.afterKiB);}
     const minimum=Math.min(...samples.map(value=>value.MemAvailable));
     const span=Math.max(...available.map(pair=>pair.spanMs));
     summary+="\nHOST AVAILABLE MIN (OBSERVED) // "+mib(minimum)+" MiB";

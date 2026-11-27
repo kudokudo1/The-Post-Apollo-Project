@@ -1,0 +1,29 @@
+name: CPU++ universal native overhead
+on:
+  pull_request:
+    paths:
+      - "services/diagnostics/DiagnosticWidgetLifecycle*"
+      - "services/diagnostics/DiagnosticDumpResource*"
+      - "services/diagnostics/CpuPlusDiagnosticsPolicy.js"
+      - "scripts/cpuplus_quickshell_memory_observer.py"
+      - "scripts/syntagma_quickshell_thread_sampler.py"
+      - "tests/cpuplus/test_diagnostic_dump_overhead_native.py"
+      - ".github/workflows/cpuplus-universal-overhead.yml"
+permissions:
+  contents: read
+jobs:
+  disposable-real-proc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: debian:unstable-slim
+    steps:
+      - name: Install native Quickshell and Qt runtime
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates python3 coreutils quickshell=0.3.2-1 qt6-qpa-plugins qml6-module-qtquick qml6-module-qtqml
+      - uses: actions/checkout@v4
+      - name: Measure disposable baseline, idle, active and post-capture shell
+        env:
+          POST_APOLLO_MEMORY_UI_SMOKE: CI_DISPOSABLE_ONLY
+        run: python3 -B tests/cpuplus/test_diagnostic_dump_overhead_native.py

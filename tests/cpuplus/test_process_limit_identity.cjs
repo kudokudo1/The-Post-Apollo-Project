@@ -11,63 +11,98 @@ function fn(name) {
     return source.slice(a,b+6);
 }
 const row={pid:123,startTicks:456,comm:"test",vsz:1000};
-const api=new Function("let softLimitPids={},applyError='';\n"+["identityKey","limitBytesFor","hasSoftLimit","validatedReply","consumeApply","applyCommand"].map(fn).join("\n")+"\nreturn {identityKey,limitBytesFor,hasSoftLimit,validatedReply,consumeApply,applyCommand,state:()=>({softLimitPids,applyError})};")();
-test("exact identity and correlated readback",()=>{
-    const key=api.identityKey(row);
+function makeApi() {
+    return new Function("let softLimitPids={},limitOwnership={},applyError='';\n"+["identityKey","limitStateFor","limitBytesFor","hasSoftLimit","validLimitToken","validatedReply","consumeApply","applyCommand"].map(fn).join("\n")+"\nreturn {identityKey,limitStateFor,limitBytesFor,hasSoftLimit,validatedReply,consumeApply,applyCommand,state:()=>({softLimitPids,limitOwnership,applyError})};")();
+}
+test("exact identity, original baseline and correlated release",()=>{
+    const api=makeApi(),key=api.identityKey(row);
     assert.notEqual(key,api.identityKey({...row,startTicks:457}));
     assert.notEqual(key,api.identityKey({...row,comm:"other"}));
     assert.equal(api.identityKey({...row,startTicks:0}),"");
     assert.equal(api.identityKey({...row,pid:1}),"");
-    const request={serial:1,pid:123,startTicks:456,name:"test",key,capBytes:1024};
-    const reply={serial:1,pid:123,startTicks:456,name:"test",requested:1024,ok:true,soft:1024};
-    assert.equal(api.validatedReply(request,JSON.stringify({...reply,startTicks:457}),"",0,0,false),null);
-    assert.equal(api.validatedReply(request,JSON.stringify({...reply,serial:2}),"",0,0,false),null);
-    assert.equal(api.validatedReply(request,JSON.stringify(reply),"",1,0,false),null);
-    assert.equal(api.validatedReply(request,JSON.stringify(reply),"",0,0,true),null);
-    api.consumeApply(request,api.validatedReply(request,JSON.stringify(reply),"",0,0,false));
+    const request={serial:1,pid:123,startTicks:456,name:"test",key,capBytes:1024,ownership:null};
+    const reply={serial:1,pid:123,startTicks:456,name:"test",requested:1024,ok:true,mode:"managed",observedSoft:"1024",originalSoft:"2048",hard:"4096"};
+    const validate=(req,data,code=0,timeout=false)=>api.validatedReply(req,JSON.stringify(data),"",code,0,timeout);
+    assert.equal(validate(request,{...reply,startTicks:457}),null);
+    assert.equal(validate(request,{...reply,serial:2}),null);
+    assert.equal(validate(request,reply,1),null);
+    assert.equal(validate(request,reply,0,true),null);
+    api.consumeApply(request,validate(request,reply));
     assert.equal(api.limitBytesFor(row),1024);
+    assert.equal(api.limitStateFor(row),"managed");
     assert.equal(api.hasSoftLimit({...row,startTicks:457}),false);
     assert.equal(api.limitBytesFor({...row,startTicks:457}),0);
-    api.consumeApply(request,{ok:false,attempted:false,error:"permission"});
-    assert.equal(api.limitBytesFor(row),1024);
+    const owned=api.state().limitOwnership[key];
+    const second={...request,serial:2,capBytes:1536,ownership:owned};
+    const changed={...reply,serial:2,requested:1536,observedSoft:"1536"};
+    assert.equal(validate(second,{...changed,originalSoft:"1024"}),null);
+    api.consumeApply(second,validate(second,changed));
+    assert.equal(api.state().limitOwnership[key].originalSoft,"2048");
+    api.consumeApply(second,{ok:false,attempted:false,conflict:false,error:"permission"});
+    assert.equal(api.limitBytesFor(row),1536);
+    const release={...second,serial:3,capBytes:0,ownership:api.state().limitOwnership[key]};
+    const restored={...reply,serial:3,requested:0,mode:"released",observedSoft:"2048"};
+    assert.equal(validate(release,{...restored,observedSoft:"4096"}),null);
+    api.consumeApply(release,validate(release,restored));
+    assert.equal(api.limitStateFor(row),"unmanaged");
+    assert.equal(api.hasSoftLimit(row),false);
     api.consumeApply(request,null);
-    assert.equal(api.hasSoftLimit(row),false);
+    assert.equal(api.limitStateFor(row),"unknown");
     assert.match(api.state().applyError,/OUTCOME UNKNOWN/);
-    api.consumeApply(request,{ok:true,soft:0});
-    assert.equal(api.hasSoftLimit(row),true);
-    api.consumeApply(request,{ok:true,soft:-1});
-    assert.equal(api.hasSoftLimit(row),false);
 });
-test("bounded queue preserves accepted capture",()=>{
-    const q=new Function("let queuedRequest=null,requestSerial=0,applyError='';let calls=0;\n"+["identityKey","setLimitMiB"].map(fn).join("\n")+"\nfunction minimumMiB(){return 128} function maximumMiB(){return 8192} function startQueuedApply(){calls++} return {setLimitMiB,state:()=>({queuedRequest,calls,applyError})};")();
+test("external change quarantines ownership and bounded queue preserves capture",()=>{
+    const api=makeApi(),key=api.identityKey(row);
+    const owned={originalSoft:"2048",hard:"4096",appliedSoft:"1024",uncertain:false};
+    const request={serial:2,pid:123,startTicks:456,name:"test",key,capBytes:0,ownership:owned};
+    api.consumeApply(request,{ok:false,attempted:false,conflict:true,error:"external"});
+    assert.equal(api.limitStateFor(row),"unknown");
+    assert.equal(api.state().limitOwnership[key].originalSoft,"2048");
+    const q=new Function("let queuedRequest=null,requestSerial=0,applyError='',limitOwnership={};let calls=0;\n"+["identityKey","limitStateFor","setLimitMiB"].map(fn).join("\n")+"\nfunction minimumMiB(){return 128} function maximumMiB(){return 8192} function startQueuedApply(){calls++} return {setLimitMiB,state:()=>({queuedRequest,calls,applyError,limitOwnership})};")();
     assert.equal(q.setLimitMiB({...row,startTicks:0},256),false);
     assert.equal(q.setLimitMiB(row,256),true);
     assert.equal(q.setLimitMiB({...row,startTicks:457},512),false);
     assert.equal(q.state().queuedRequest.startTicks,456);
     assert.equal(q.state().queuedRequest.capBytes,256*1024*1024);
     assert.equal(q.state().calls,1);
+    q.state().limitOwnership[key]={uncertain:true};
+    assert.equal(q.setLimitMiB(row,256),false);
+    assert.match(q.state().applyError,/OWNERSHIP UNKNOWN/);
     assert.match(source,/!helperExited \|\| !stdoutDone \|\| !stderrDone/);
     assert.match(source,/validatedReply\(request, helperOutput, helperErrors/);
 });
-test("actual helper refuses stale identity and verifies RLIMIT_AS on disposable child",()=>{
-    const script=api.applyCommand({})[2];
+test("actual helper restores original soft limit and refuses external drift",()=>{
+    const script=makeApi().applyCommand({})[2];
     const harness=[
-        "import json,os,pathlib,resource,subprocess,sys",
+        "import json,pathlib,resource,subprocess,sys",
         "script=sys.argv[1]",
         "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'])",
         "try:",
         "    raw=pathlib.Path(f'/proc/{p.pid}/stat').read_text(); end=raw.rfind(')')",
         "    name=raw[raw.index('(')+1:end]; born=int(raw[end+2:].split()[19])",
-        "    original=resource.prlimit(p.pid,resource.RLIMIT_AS)",
-        "    req=dict(serial=1,pid=p.pid,startTicks=born,name=name,capBytes=512*1024*1024)",
+        "    MiB=1024*1024; hard=resource.prlimit(p.pid,resource.RLIMIT_AS)[1]",
+        "    assert hard==resource.RLIM_INFINITY or hard>=768*MiB",
+        "    resource.prlimit(p.pid,resource.RLIMIT_AS,(768*MiB,hard))",
+        "    req=dict(serial=1,pid=p.pid,startTicks=born,name=name,capBytes=512*MiB,ownership=None)",
         "    def apply(**changes):",
         "        return json.loads(subprocess.check_output([sys.executable,'-c',script,json.dumps(dict(req,**changes))],timeout=5))",
+        "    def record(reply): return dict(originalSoft=reply['originalSoft'],hard=reply['hard'],appliedSoft=reply['observedSoft'],uncertain=False)",
         "    bad=apply(startTicks=born+1); assert not bad['ok'] and not bad['attempted']",
         "    bad=apply(name=name+'-wrong'); assert not bad['ok'] and not bad['attempted']",
-        "    assert resource.prlimit(p.pid,resource.RLIMIT_AS)==original",
-        "    good=apply(); assert good['ok'] and good['serial']==1 and good['startTicks']==born",
-        "    assert resource.prlimit(p.pid,resource.RLIMIT_AS)[0]==good['soft']",
-        "    assert resource.prlimit(p.pid,resource.RLIMIT_AS)[1]==original[1]",
+        "    noop=apply(capBytes=0); assert noop['ok'] and noop['mode']=='noop'",
+        "    assert resource.prlimit(p.pid,resource.RLIMIT_AS)==(768*MiB,hard)",
+        "    first=apply(); assert first['ok'] and first['originalSoft']==str(768*MiB)",
+        "    second=apply(serial=2,capBytes=640*MiB,ownership=record(first)); assert second['ok'] and second['originalSoft']==str(768*MiB)",
+        "    restored=apply(serial=3,capBytes=0,ownership=record(second)); assert restored['ok'] and restored['mode']=='released'",
+        "    assert resource.prlimit(p.pid,resource.RLIMIT_AS)==(768*MiB,hard)",
+        "    first=apply(); assert first['ok']",
+        "    resource.prlimit(p.pid,resource.RLIMIT_AS,(600*MiB,hard))",
+        "    conflict=apply(capBytes=0,ownership=record(first)); assert not conflict['ok'] and conflict['conflict'] and not conflict['attempted']",
+        "    assert resource.prlimit(p.pid,resource.RLIMIT_AS)==(600*MiB,hard)",
+        "    if hard==resource.RLIM_INFINITY:",
+        "        resource.prlimit(p.pid,resource.RLIMIT_AS,(hard,hard))",
+        "        first=apply(); assert first['ok'] and first['originalSoft']=='-1'",
+        "        restored=apply(capBytes=0,ownership=record(first)); assert restored['ok'] and restored['observedSoft']=='-1'",
+        "        assert resource.prlimit(p.pid,resource.RLIMIT_AS)==(hard,hard)",
         "finally:",
         "    p.terminate(); p.wait(timeout=5)"
     ].join("\n");

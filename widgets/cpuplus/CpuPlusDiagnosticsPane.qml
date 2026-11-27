@@ -283,13 +283,13 @@ Column {
                         width: Math.max(0,(captureGrid.width-captureGrid.spacing)/2)
                         height: 26
                         label: (root.manageQuickFavorites ? (modelData.favorite ? "★ " : "☆ ") : "")+
-                            modelData.name+(modelData.execution==="configured"?" // "+modelData.plan.durationSeconds+"s":
+                            modelData.name+(modelData.execution==="dump"?" // "+modelData.plan.durationSeconds+"s / "+modelData.plan.targets.length+"W":modelData.execution==="configured"?" // "+modelData.plan.durationSeconds+"s":
                                 modelData.kind==="appcontrol"?" // 30s":"")
                         labelPixelSize: 10
                         labelFontSizeMode: Text.HorizontalFit
                         labelMinimumPixelSize: 8
                         contentPadding: 2
-                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        available: !CpuPlusDiagnostics.workshopPresetLocked && (root.manageQuickFavorites || modelData.execution!=="dump" || CpuPlusDiagnostics.lifecycleAvailable)
                         onLeftClicked: {
                             if(root.manageQuickFavorites)
                                 CpuPlusDiagnostics.setWorkflowFavorite(modelData.id,!modelData.favorite);
@@ -439,7 +439,7 @@ Column {
                 spacing: 2
                 GohuText {
                     width: parent.width
-                    text: modelData.name+" // "+(modelData.execution==="configured"?modelData.plan.durationSeconds+"s":modelData.kind==="appcontrol"?"30s":"STATIC")
+                    text: modelData.name+" // "+(["configured","dump"].includes(modelData.execution)?modelData.plan.durationSeconds+"s":modelData.kind==="appcontrol"?"30s":"STATIC")
                     color: Colors.white
                     font.pixelSize: 11
                     textFormat: Text.PlainText
@@ -447,7 +447,7 @@ Column {
                 }
                 GohuText {
                     width: parent.width
-                    text: modelData.execution==="configured"?modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / ")+(modelData.targetId?" // "+Targets.findDiagnosticTarget(modelData.targetId).label.toUpperCase():""):"SPECIALIZED // "+modelData.kind.toUpperCase()
+                    text: modelData.execution==="dump"?"POST-APOLLO DUMP // "+modelData.plan.targets.length+" WIDGETS":modelData.execution==="configured"?modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / ")+(modelData.targetId?" // "+Targets.findDiagnosticTarget(modelData.targetId).label.toUpperCase():""):"SPECIALIZED // "+modelData.kind.toUpperCase()
                     color: Colors.cyan
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
@@ -462,8 +462,15 @@ Column {
                         label: "LOAD"
                         normalFace: true
                         accentColor: Colors.cyan
-                        available: !CpuPlusDiagnostics.workshopPresetLocked && modelData.execution==="configured" && root.presetMatchesSubject(modelData.plan)
+                        available: !CpuPlusDiagnostics.workshopPresetLocked && (modelData.execution==="dump"?CpuPlusDiagnostics.lifecycleAvailable:modelData.execution==="configured" && root.presetMatchesSubject(modelData.plan))
                         onLeftClicked: {
+                            if(modelData.execution==="dump") {
+                                if(CpuPlusDiagnostics.loadLifecyclePreset(modelData.id)) {
+                                    presets.deleteName=""; root.selectView("WORK");
+                                    Qt.callLater(()=>{if(workshopLoader.item && root.viewMode==="WORK")workshopLoader.item.openLifecycleDump();});
+                                }
+                                return;
+                            }
                             if (CpuPlusDiagnostics.loadWorkshopPreset(modelData.name,root.workshopSubject)) {
                                 presets.deleteName=""; root.selectView("WORK");
                             }

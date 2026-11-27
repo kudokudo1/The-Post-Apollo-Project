@@ -144,6 +144,13 @@ Item {
         staged=Draft.stageIoPriority(staged,"best_effort",level);
         reviewing=false;
     }
+    readonly property var swapDraft: Draft.swapChoice(staged)
+    function stageSwap(kind,mib) {
+        if (!selectionReady || selectedKey!=="swap") return;
+        staged=Draft.stageSwap(staged,kind,mib);
+        reviewing=false;
+    }
+    function swapPreviewMiB() { return swapDraft.kind==="uncapped" ? 1024 : swapDraft.mib; }
     function accentFor(key) {
         if (key === "cpu") return Colors.orange;
         if (key === "memory") return Colors.magenta;
@@ -416,7 +423,7 @@ Item {
                         spacing: 5
                             GohuText {
                                 width: parent.width
-                                visible: resourcePanel.key!=="memory" && resourcePanel.spec.controls.length > 0
+                                visible: resourcePanel.key!=="memory" && resourcePanel.key!=="swap" && resourcePanel.spec.controls.length > 0
                                 text: root.modeFor(resourcePanel.key) === "auto"
                                     ? "AUTO // POLICY NOT CONFIGURED; DRAFT ONLY"
                                     : root.modeFor(resourcePanel.key) === "off"
@@ -432,7 +439,7 @@ Item {
                             // slider, sharing its footprint instead of another
                             // menu row. A future dial occupies the same left slot.
                             Repeater {
-                                model: resourcePanel.key==="memory" ? [] : resourcePanel.spec.controls
+                                model: resourcePanel.key==="memory" || resourcePanel.key==="swap" ? [] : resourcePanel.spec.controls
                                 delegate: Column {
                                     id: field
                                     required property var modelData
@@ -701,6 +708,139 @@ Item {
                                     wrapMode: Text.Wrap
                                     font.pixelSize: 9
                                     visible: Draft.summary(root.staged).length>0
+                                }
+                            }
+                            Loader {
+                                objectName: "cpuPlusSwapBudgetSlot"
+                                width: parent.width
+                                active: resourcePanel.key==="swap"
+                                visible: active
+                                height: active && item ? item.implicitHeight : 0
+                                sourceComponent: Column {
+                                    spacing: 5
+                                    GohuText {
+                                        width: parent.width
+                                        text: "CGROUP SWAP LIMIT // DRAFT ONLY"
+                                        color: Colors.yellow
+                                        font.pixelSize: 11
+                                        wrapMode: Text.Wrap
+                                    }
+                                    Row {
+                                        id: swapRow
+                                        width: parent.width
+                                        height: 62
+                                        spacing: 5
+                                        CpuPlusDiagnosticSlider {
+                                            objectName: "cpuPlusSwapBudgetSlider"
+                                            width: Math.max(1,swapRow.width-swapButtons.width-swapRow.spacing)
+                                            height: 58
+                                            compact: true
+                                            title: "SWAP BUDGET"
+                                            shortTitle: title
+                                            minimumValue: 0
+                                            maximumValue: 8192
+                                            valueStep: 128
+                                            currentValue: root.swapPreviewMiB()
+                                            readout: root.swapDraft.kind==="uncapped" ? "NO CAP" : String(currentValue)+" MiB"
+                                            subjectColor: Colors.yellow
+                                            fillColor: Colors.yellow
+                                            adjustable: root.selectionReady
+                                            onValueRequested: function(value) {
+                                                root.stageSwap("budget",Math.round(value));
+                                            }
+                                        }
+                                        Grid {
+                                            id: swapButtons
+                                            width: Math.min(162,Math.max(112,swapRow.width*0.49))
+                                            columns: 2
+                                            columnSpacing: 3
+                                            rowSpacing: 3
+                                            Repeater {
+                                                model: [{key:"budget",label:"SET BUDGET"},{key:"zero",label:"NO SWAP"},
+                                                    {key:"uncapped",label:"NO CAP"},{key:"restore",label:"RESTORE"}]
+                                                delegate: ActionButton {
+                                                    required property var modelData
+                                                    objectName: "cpuPlusSwapChoice-"+modelData.key
+                                                    width: Math.max(1,(swapButtons.width-swapButtons.columnSpacing)/2)
+                                                    height: 28
+                                                    label: modelData.label
+                                                    labelPixelSize: 9
+                                                    labelMinimumPixelSize: 7
+                                                    normalFace: true
+                                                    accentColor: Colors.yellow
+                                                    available: root.selectionReady && modelData.key!=="restore"
+                                                    selected: modelData.key==="uncapped" ? root.swapDraft.kind==="uncapped"
+                                                        : modelData.key==="zero" ? root.swapDraft.kind==="budget" && root.swapDraft.mib===0
+                                                        : modelData.key==="budget" && root.swapDraft.kind==="budget" && root.swapDraft.mib>0
+                                                    onLeftClicked: {
+                                                        if (!available) return;
+                                                        if (modelData.key==="zero") root.stageSwap("budget",0);
+                                                        else if (modelData.key==="uncapped") root.stageSwap("uncapped",0);
+                                                        else if (modelData.key==="budget") root.stageSwap("budget",Math.max(1,root.swapPreviewMiB()));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Row {
+                                        width: parent.width
+                                        height: 28
+                                        spacing: 5
+                                        GohuText {
+                                            width: Math.max(1,parent.width-101)
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "EXACT MiB // ENTER"
+                                            color: Colors.white
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                        }
+                                        TextField {
+                                            id: swapExact
+                                            objectName: "cpuPlusSwapExactInput"
+                                            width: 96
+                                            height: 28
+                                            enabled: root.selectionReady
+                                            color: Colors.white
+                                            font.pixelSize: 11
+                                            horizontalAlignment: TextInput.AlignHCenter
+                                            selectByMouse: true
+                                            placeholderText: "MiB"
+                                            validator: IntValidator { bottom: 0; top: 8192 }
+                                            property string editIdentity: ""
+                                            onActiveFocusChanged: if (activeFocus) editIdentity=root.targetIdentity
+                                            Binding {
+                                                target: swapExact
+                                                property: "text"
+                                                value: root.swapDraft.kind==="uncapped" ? "" : String(root.swapPreviewMiB())
+                                                when: !swapExact.activeFocus
+                                            }
+                                            background: Rectangle {
+                                                color: Colors.black
+                                                border.width: 1
+                                                border.color: Colors.yellow
+                                            }
+                                            onAccepted: {
+                                                if (acceptableInput && editIdentity===root.targetIdentity && text.length>0)
+                                                    root.stageSwap("budget",Number(text));
+                                            }
+                                        }
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        text: root.swapDraft.kind==="preview" ? "1024 MiB // PREVIEW, NOT OBSERVED"
+                                            : root.swapDraft.kind==="uncapped" ? "DRAFT // NO CAP (max)"
+                                            : "DRAFT // "+root.swapDraft.mib+" MiB"
+                                        color: Colors.white
+                                        wrapMode: Text.Wrap
+                                        font.pixelSize: 10
+                                    }
+                                    GohuText {
+                                        width: parent.width
+                                        text: "0 DOES NOT PURGE EXISTING SWAP. NO CAP IS NOT RESTORE. RESTORE LOCKED // ORIGINAL NOT CAPTURED."
+                                        color: Colors.yellow
+                                        wrapMode: Text.Wrap
+                                        font.pixelSize: 9
+                                    }
                                 }
                             }
                             Loader {

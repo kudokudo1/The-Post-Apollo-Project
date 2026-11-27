@@ -1325,7 +1325,8 @@ if(!s.complete||!s.accepted||s.status!=="UNAVAILABLE"
         self.assertIn("{ width: 930, height: 99999 }", policy)
         self.assertIn("{ width: 99999, height: 99999 }", policy)
         self.assertIn("visible: root.frameHeight >= 540", view)
-        self.assertIn("text: root.frameHeight < 540", view)
+        self.assertIn('text: root.fixtureOnly ? "DRAFT NOT SENT // SAMPLE THEN TEST"', view)
+        self.assertIn(": root.frameHeight < 540", view)
         self.assertIn("gitWidth", policy)
         self.assertIn("gitHeight", policy)
 

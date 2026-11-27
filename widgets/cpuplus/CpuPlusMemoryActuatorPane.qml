@@ -1642,8 +1642,11 @@ Item {
         color: Colors.black
         border.color: Colors.yellow
         clip: true
-        GohuText {
+        CpuPlusMemoryReadout {
             id: memoryHelpText
+            objectName: "cpuplusMemoryHelpText"
+            helpSubject: root.diagnosticSubject
+            semanticGlowColor: Colors.resourceColor(root.diagnosticSubject)
             width: Math.max(0,parent.width-12)
             x: 6
             y: 6

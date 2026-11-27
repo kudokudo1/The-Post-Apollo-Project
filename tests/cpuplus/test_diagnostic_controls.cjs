@@ -770,3 +770,38 @@ assert.match(workshop,/parent: root.calibrationTarget \|\| executionColumn/);
 assert.match(ui,/calibrationTarget: root.workshopCalibrationTarget/);
 assert.match(parent,/workshopCalibrationTarget: root.diagnosticSubject==="ALL" \? null : memoryCalibrationHost/);
 assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/workshopCalibrationTarget: calibrationHost/);
+
+
+// D10g diagnostic help semantics, context and escaping.
+{
+    const help=vm.createContext({});
+    vm.runInContext(read("widgets/cpuplus/CpuPlusMemoryReadout.js"),help);
+    const pairs=(s,scope)=>JSON.parse(JSON.stringify(help.helpTokens(s,scope))).filter(x=>x.ink!=="white").map(x=>[x.text,x.ink]);
+    assert.deepEqual(pairs("CPU, host kernel, Host Apollo, RAM and workflow.","SYSTEM"),[
+        ["CPU","orange"],["host kernel","omnitrix"],["Host Apollo","orange"],["RAM","magenta"],["workflow","yellow"]]);
+    assert.deepEqual(pairs("RX/TX bytes, packets, traffic, errors, drops, latency.","NETWORK"),[
+        ["RX","cyan"],["TX","cyan"],["bytes","cyan"],["packets","cyan"],["traffic","yellow"],["errors","red"],["drops","red"],["latency","yellow"]]);
+    assert.deepEqual(pairs("DRM cards: Busy, VRAM, hwmon temp1, driver.","GPU"),[
+        ["DRM","omnitrix"],["Busy","omnitrix"],["VRAM","omnitrix"],["hwmon","omnitrix"],["temp1","omnitrix"],["driver","omnitrix"]]);
+    assert.deepEqual(pairs("Host busy, CPU frequency and kernel PSI.","CPU"),[
+        ["busy","orange"],["CPU","orange"],["frequency","orange"],["kernel","omnitrix"],["PSI","yellow"]]);
+    assert.deepEqual(pairs("memory pressure and swap; host RAM.","SWAP"),[
+        ["memory pressure","yellow"],["swap","yellow"],["host RAM","magenta"]]);
+    assert.deepEqual(pairs("disk I/O, files, metadata, bytes","STORAGE"),[
+        ["disk I/O","blue"],["files","blue"],["metadata","blue"],["bytes","blue"]]);
+    assert.deepEqual(pairs("CPUsuffix, pretraffic, workflows, crashes","SYSTEM"),[["workflows","yellow"],["crashes","red"]]);
+    const phrase="CPU <b> & packets / errors";
+    assert.equal(JSON.parse(JSON.stringify(help.helpTokens(phrase,"NETWORK"))).map(x=>x.text).join(""),phrase);
+    const rich=help.formatHelp(phrase,"NETWORK",{white:"#ffffff",orange:"#ff9900",cyan:"#00ffff",red:"#ff0000"});
+    assert.ok(rich.includes("&lt;b&gt; &amp;")&&!rich.includes("<b>"));
+    assert.match(rich,/<font color="#ff9900">CPU<\/font>/);
+    assert.match(rich,/<font color="#00ffff">packets<\/font>/);
+    assert.match(rich,/<font color="#ff0000">errors<\/font>/);
+    const face=read("widgets/cpuplus/CpuPlusMemoryReadout.qml");
+    assert.match(face,/root.helpSubject!=="" \? Readout.formatHelp/);
+    assert.match(face,/safeSource: root.visible \? face : null/);
+    assert.match(face,/root.helpSubject!=="" \? 0.65 : 0.95/);
+    assert.match(parent,/helpSubject: root.diagnosticSubject/);
+    assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/helpSubject: root.subject/);
+    console.log("D10g context-sensitive help palette PASS");
+}

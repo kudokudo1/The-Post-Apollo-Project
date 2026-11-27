@@ -144,8 +144,10 @@ test("PROCESS visibility increases only the existing owner sampling cadence", ()
     assert.doesNotMatch(owner,/^\s*ProcessTelemetry\s*\{/m);
     assert.match(owner,/readonly property var processTelemetry: KillBackend\.KillStore\.telemetry/);
     assert.match(owner,/readonly property var taskRows: KillBackend\.KillStore\.rows/);
-    assert.match(owner,/Connections\s*\{\s*target: appControlWindow\.processTelemetry/);
-    assert.match(owner,/KillBackend\.KillStore\.publishSnapshot\(snapshotRows\)/);
+    assert.match(owner,/Connections\s*\{\s*target: KillBackend\.KillStore/);
+    assert.match(store,/onSnapshotReady: function\(rows\) \{ root.publishSnapshot\(rows\); \}/);
+    assert.match(store,/onMiniProbeReady: function\(rows\) \{ root.publishMiniSamples\(rows\); \}/);
+    assert.doesNotMatch(owner,/KillBackend\.KillStore\.publishSnapshot\(|function applyTaskMiniProbeRows\(/);
     assert.match(read("services/kill/qmldir"),/singleton KillStore 1\.0 KillStore\.qml/);
     assert.doesNotMatch(recipient,/^\s*(Timer|ProcessTelemetry)\s*\{/m);
     assert.doesNotMatch(recipient,/appendCurrentHistory|lastDetailSampleMs/);
@@ -488,4 +490,46 @@ test("K2c preserves all snapshot cadence priorities and mini request data", () =
         {pid:4321,comm:"synthetic",fallbackCpu:31},{pid:4322,comm:"fallback",fallbackCpu:4}]);
     assert.match(source,/property bool collectionEnabled: false/);
     assert.match(source,/if \(collectionEnabled\) sampler.refreshSnapshot\(\)/);
+});
+
+test("K2d: sampler publishes without donor and retains ordering and immutable revision semantics", () => {
+    const source=read("services/kill/KillStore.qml");
+    const start=source.indexOf("    function publishSnapshot(");
+    const end=source.indexOf("\n    ProcessTelemetry {",start);
+    assert.ok(start>=0 && end>start);
+    const state={taskMiniHistoryRevision:0,taskMiniDisplayRevision:0,taskMiniPreloadSnapshots:0,taskMiniPreloadTarget:2};
+    const sampler={rows:[]}, events=[];
+    const graph={updateMiniCpuHistories:rows=>events.push("cpu"),updateMiniHunterMetricHistories:rows=>events.push("hunter")};
+    const make=new Function("histories","sampler","graph","events",`
+        let snapshotTraceEnabled=true, snapshotTraceSequence=0, miniTraceEnabled=true, miniProbeNeeded=false;
+        const snapshotStarted=rows=>events.push("start");
+        const snapshotOrdering=rows=>events.push("order");
+        const snapshotStage=(stage,seq,start,count)=>events.push(stage);
+        const snapshotPublished=(rows,seq)=>events.push("published");
+        const miniStage=(stage,start)=>events.push(stage);
+        `+source.slice(start,end)+`
+        return {publishSnapshot,publishMiniSamples,dedicated:()=>miniProbeNeeded=true};
+    `);
+    const owner=make(state,sampler,graph,events);
+    const rows=[{pid:4321}];
+    owner.publishSnapshot(rows);
+    assert.deepEqual(events,["start","cpu","cpu-history","hunter","hunter-history","history-revisions","order","task-order","task-rows","published"]);
+    assert.equal(sampler.rows,rows);
+    assert.equal(state.taskMiniDisplayRevision,1);
+    owner.dedicated();
+    events.length=0;
+    owner.publishSnapshot([{pid:4322}]);
+    assert.deepEqual(events,["start","order","task-order","task-rows","published"]);
+    assert.equal(state.taskMiniDisplayRevision,1);
+    assert.equal(state.taskMiniPreloadSnapshots,2);
+    owner.publishMiniSamples([]);
+    assert.equal(state.taskMiniDisplayRevision,1);
+    events.length=0;
+    owner.publishMiniSamples(rows);
+    assert.deepEqual(events,["cpu","mini-cpu-history","hunter","mini-hunter-history","mini-history-revisions"]);
+    assert.equal(state.taskMiniDisplayRevision,2);
+    assert.equal(sampler.rows[0].pid,4322);
+    owner.publishSnapshot(null);
+    assert.equal(state.taskMiniPreloadSnapshots,2);
+    assert.deepEqual(sampler.rows,[]);
 });

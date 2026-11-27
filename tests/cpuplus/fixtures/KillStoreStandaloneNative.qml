@@ -79,16 +79,12 @@ ShellRoot {
         const sample = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 31, rss: 2048, mem: 3, elapsed: "00:05"}];
         first.store.graphVisible = true;
-        first.store.publishSnapshot(sample);
-        first.store.graphController.updateMiniCpuHistories(sample);
-        first.store.graphController.updateMiniHunterMetricHistories(sample);
-        first.graphState.taskMiniDisplayRevision += 1;
+        // Exercise the real signal route with no donor attached, no probe.
+        first.store.telemetry.snapshotReady(sample);
         const next = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 52, rss: 3072, mem: 4, elapsed: "00:06"}];
         const previous = second.graphState.taskMiniCpuHistories["pid:4321"];
-        first.store.graphController.updateMiniCpuHistories(next);
-        first.store.graphController.updateMiniHunterMetricHistories(next);
-        first.graphState.taskMiniDisplayRevision += 1;
+        first.store.telemetry.miniProbeReady(next);
         // Real singleton remains disarmed throughout this synthetic test.
         first.store.cpuVisible=true;
         const cpuCadence=first.store.snapshotInterval===600 && first.store.miniProbeNeeded;
@@ -111,6 +107,8 @@ ShellRoot {
                 || second.graphState.taskMiniCpuHistories["pid:4321"][1] !== 52
                 || second.graphState.taskMiniHunterMetricHistories["mem:pid:4321"][1] !== 3
                 || second.graphState.taskMiniDisplayRevision !== 2
+                || second.graphState.taskMiniHistoryRevision !== 2
+                || second.graphState.taskMiniPreloadSnapshots !== 1
                 || first.rows.length !== 1 || second.rows.length !== 1
                 || first.rows[0].startTicks !== second.rows[0].startTicks
                 || first.store.telemetry.snapshotLoading

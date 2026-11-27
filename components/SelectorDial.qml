@@ -15,6 +15,7 @@ Item {
     property string chassisStyle: "square"
     property real chassisClearance: 10
     property bool showChassisScrews: true
+    property color screwColor: "#40899b"
     readonly property real mountingClearance: showInstrumentChassis ? Math.max(0,Math.min(40,chassisClearance)) : 0
     // Legacy knob artwork keeps its original coordinate/input mapping; the
     // mount and labels are sized in the actual allocated logical pixels.
@@ -615,6 +616,7 @@ Item {
             clearance: dialRoot.mountingClearance
             chassisStyle: dialRoot.chassisStyle
             showScrews: dialRoot.showChassisScrews
+            screwColor: dialRoot.screwColor
         }
     }
 
@@ -1082,6 +1084,7 @@ Item {
                 chassisClearance: dialRoot.chassisClearance
                 showChassis: dialRoot.showInstrumentChassis
                 showScrews: dialRoot.showChassisScrews
+                screwColor: dialRoot.screwColor
                 accentColor: dialRoot.accentColor
                 fraction: dialRoot.stopwatchVisualFraction
                 rotationDegrees: dialRoot.stopwatchActive ? 360*boundedFraction : dialRoot.visualAngle+90

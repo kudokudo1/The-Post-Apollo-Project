@@ -334,6 +334,7 @@ Rectangle {
         property bool selectedAction: false
         property string actionToken: ""
         property string queueActionToken: ""
+        objectName: queueActionToken
         readonly property bool queueCompletionMatches: queueActionToken.length > 0
             && root.completedQueueAction === queueActionToken
         property real loadingProgress: 0.0
@@ -1547,6 +1548,7 @@ Rectangle {
             // together instead of adding a full-height list below fixed rows.
             ListView {
                 id: syntagmaPane3
+                objectName: "queueViewport"
                 anchors.fill: parent
                 clip: true
                 spacing: 4

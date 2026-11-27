@@ -14,7 +14,7 @@ function cards() {
         {key:"disk",title:"DISK I/O",scope:"I/O PRIORITY / THREAD; BANDWIDTH / GROUP",controls:[
             {key:"read",title:"READ DRAFT",min:1,max:512,step:1,unit:"MiB/s",initial:64},
             {key:"write",title:"WRITE DRAFT",min:1,max:512,step:1,unit:"MiB/s",initial:64}
-        ],note:"NO VERIFIED DEVICE OR CONTROLLER"},
+        ],note:"BLOCK DEVICE / CGROUP UNVERIFIED; NO CAP IS NOT RESTORE"},
         {key:"threads",title:"THREADS",scope:"CGROUP / TASK COUNT",controls:[
             {key:"tasks",title:"TASK COUNT",min:1,max:512,step:1,unit:"TASKS",initial:64}
         ],note:"SHARED CGROUP, NOT A PER-PID THREAD CAP"},
@@ -62,6 +62,10 @@ function stageMode(previous,key,mode) {
 function stageValue(previous,key,field,value) {
     if(key==="swap"&&field==="budget") return stageSwap(previous,"budget",value);
     if(key==="cpu"&&field==="quota") return stageQuota(previous,"budget",value,100);
+    if(key==="disk"&&(field==="read"||field==="write")) {
+        if(typeof value!=="number"||!isFinite(value)) return previous;
+        return stageBandwidth(previous,field,"budget",Math.max(1,Math.min(512,Math.round(value))));
+    }
     var spec=find(key);
     if(!spec) return previous;
     var control=null;
@@ -183,6 +187,28 @@ function stageQuota(previous,kind,percent,maximum) {
     result.cpu={mode:"manual",values:values};
     return result;
 }
+// Each direction has its own finite value or explicit max token.
+// No device is chosen until block-device and group scope are qualified.
+function bandwidthChoice(previous,direction) {
+    if(direction!=="read"&&direction!=="write") return null;
+    var entry=previous.disk, values=entry&&entry.values;
+    if(values&&values[direction+"Kind"]==="uncapped") return {kind:"uncapped"};
+    if(values&&Number.isSafeInteger(values[direction])) return {kind:"budget",mib:values[direction]};
+    return {kind:"preview",mib:64};
+}
+function stageBandwidth(previous,direction,kind,mib) {
+    if(direction!=="read"&&direction!=="write") return previous;
+    if(kind!=="budget"&&kind!=="uncapped") return previous;
+    if(kind==="budget"&&(!Number.isSafeInteger(mib)||mib<1||mib>512)) return previous;
+    var result=Object.assign({},previous);
+    var entry=previous.disk||{mode:"manual",values:{}};
+    var values=Object.assign({},entry.values);
+    values[direction+"Kind"]=kind;
+    if(kind==="budget") values[direction]=mib;
+    else delete values[direction];
+    result.disk={mode:"manual",values:values};
+    return result;
+}
 function summary(previous) {
     var lines=[];
     var rows=cards();
@@ -201,6 +227,10 @@ function summary(previous) {
             }
             if(spec.key==="cpu"&&quotaChoice(previous).kind==="uncapped") fields.push("CPU QUOTA NO CAP // cpu.max=max");
             if(spec.key==="cpu"&&hasValue(previous,"cpu","affinity")) fields.push("AFFINITY "+entry.values.affinity.join(","));
+            if(spec.key==="disk") {
+                if(bandwidthChoice(previous,"read").kind==="uncapped") fields.push("READ NO CAP // rbps=max");
+                if(bandwidthChoice(previous,"write").kind==="uncapped") fields.push("WRITE NO CAP // wbps=max");
+            }
             if(spec.key==="disk"&&hasValue(previous,"disk","ioPriority")) {
                 var p=entry.values.ioPriority;
                 fields.push(p.kind==="idle"?"I/O PRIORITY IDLE":"I/O PRIORITY BEST EFFORT "+p.level);

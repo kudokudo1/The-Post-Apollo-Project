@@ -35,7 +35,16 @@ Scope {
     readonly property bool archiveBusy: archive.busy
     DiagnosticReportArchive { id: archive }
     // One durable catalog owner across demand-loaded diagnostic views.
-    DiagnosticWorkflowStore { id: workflowStore }
+    DiagnosticWorkflowStore {
+        id: workflowStore
+        onCompleted: function(outcome) {
+            owner.workshopPresetFeedback = outcome==="READY" ?
+                (owner.pendingCatalogEdit ? "SAVED // LOCAL WORKFLOW LIBRARY" : "READY // LOCAL WORKFLOW LIBRARY") :
+                outcome==="CONFLICT" ? "CONFLICT // RELOAD REQUIRED" : "NOT CONFIRMED // RELOAD REQUIRED";
+            owner.pendingCatalogEdit=false;
+        }
+    }
+    property bool pendingCatalogEdit: false
     readonly property var workflowRows: workflowStore.rows
     readonly property var workflowFavorites: workflowStore.favorites
     readonly property string workflowCatalogStatus: workflowStore.status
@@ -47,7 +56,7 @@ Scope {
     }
     function setWorkflowFavorite(id, value) {
         if (workshopPresetLocked || !workflowStore.ready) return false;
-        return workflowStore.edit({action:"favorite",id:id,favorite:value});
+        return editWorkflowCatalog({action:"favorite",id:id,favorite:value});
     }
     function runFavoriteWorkflow(id) {
         if (workshopPresetLocked || !workflowStore.ready) return false;
@@ -175,28 +184,33 @@ Scope {
         else workshopDraft=draft;
         return true;
     }
-    // D4a session presets. Persistence is a separate catalog milestone.
-    property var workshopPresets: []
-    property string workshopPresetFeedback: "SESSION ONLY // NO DISK SAVE"
+    // Library and QUICK are projections of the same confirmed catalog.
+    readonly property var workshopPresets: workflowStore.rows
+    property string workshopPresetFeedback: "NOT LOADED // LOCAL WORKFLOW LIBRARY"
     readonly property bool workshopPresetLocked: busy || archiveBusy || faulted || setActive || workflowCatalogBusy
-    function saveWorkshopPreset(name, subject = "ALL") {
-        if (workshopPresetLocked) return false;
-        if (typeof name!=="string" || !/^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(name) || name.trim()!==name) {
-            workshopPresetFeedback="NAME // 1–32 LETTERS, NUMBERS, SPACE, _ OR -"; return false;
+    function editWorkflowCatalog(change) {
+        if (workshopPresetLocked || !workflowStore.ready) return false;
+        if (!workflowStore.edit(change)) {
+            workshopPresetFeedback="INVALID EDIT // CHECK NAME OR CALIBRATION";
+            return false;
         }
-        if (workshopPresets.length>=12 || workshopPresets.some(p=>p.name.toLowerCase()===name.toLowerCase())) {
-            workshopPresetFeedback="NAME EXISTS OR SESSION LIMIT 12"; return false;
-        }
-        const plan=Calibration.workshopPlanFromDraft(draftForSubject(subject));
-        if (!Calibration.workshopPlanMatchesSubject(plan,subject)) {workshopPresetFeedback="INVALID CALIBRATION";return false;}
-        workshopPresets=workshopPresets.concat([{name:name,plan:JSON.parse(JSON.stringify(plan))}]);
-        workshopPresetFeedback="SAVED FOR THIS SESSION";
+        pendingCatalogEdit=true;
+        workshopPresetFeedback="SAVING // WAIT FOR CONFIRMATION";
         return true;
     }
+    function saveWorkshopPreset(name, subject = "ALL") {
+        if (workshopPresetLocked || !workflowStore.ready) return false;
+        const plan=Calibration.workshopPlanFromDraft(draftForSubject(subject));
+        if (!Calibration.workshopPlanMatchesSubject(plan,subject)) {
+            workshopPresetFeedback="INVALID CALIBRATION";
+            return false;
+        }
+        return editWorkflowCatalog({action:"create",name:name,plan:plan,favorite:false});
+    }
     function loadWorkshopPreset(name, subject = "ALL") {
-        if (workshopPresetLocked) return false;
+        if (workshopPresetLocked || !workflowStore.ready) return false;
         const p=workshopPresets.find(row=>row.name===name);
-        const next=p && Calibration.workshopDraftFromPlan(p.plan);
+        const next=p && p.execution==="configured" && Calibration.workshopDraftFromPlan(p.plan);
         if (!next) {workshopPresetFeedback="PRESET UNAVAILABLE";return false;}
         if (!Calibration.workshopPlanMatchesSubject(p.plan,subject) || !setDraftForSubject(subject,next)) {
             workshopPresetFeedback="WORKFLOW OUTSIDE SUBJECT"; return false;
@@ -205,10 +219,9 @@ Scope {
         return true;
     }
     function removeWorkshopPreset(name) {
-        if (workshopPresetLocked || !workshopPresets.some(row=>row.name===name)) return false;
-        workshopPresets=workshopPresets.filter(row=>row.name!==name);
-        workshopPresetFeedback="REMOVED FROM SESSION";
-        return true;
+        if (workshopPresetLocked || !workflowStore.ready) return false;
+        const row=workshopPresets.find(r=>r.name===name);
+        return !!row && editWorkflowCatalog({action:"remove",id:row.id});
     }
     // Session-only mixer. The owner, not the view, owns an explicit ordered run.
     property var workshopQueue: []
@@ -224,9 +237,11 @@ Scope {
     property string setCurrentKind: ""
     readonly property var queuePreview: Calibration.validatedWorkshopSet(workshopQueue)
     function queueWorkshop(name) {
-        if (workshopPresetLocked) return false;
+        if (workshopPresetLocked || !workflowStore.ready) return false;
         const p=workshopPresets.find(x=>x.name===name);
-        const next=p && Calibration.validatedWorkshopSet(workshopQueue.concat([p]));
+        // Queue custody remains detached calibration snapshots, not catalog IDs.
+        const next=p && p.execution==="configured" &&
+            Calibration.validatedWorkshopSet(workshopQueue.concat([{name:p.name,plan:p.plan}]));
         if(!next){setFeedback="LIMIT // 4 STEPS / 240s";return false;}
         workshopQueue=next.items;setFeedback="QUEUED // "+name;return true;
     }

@@ -43,7 +43,7 @@ Column {
         showComparison=mode==="COMPARE";
         viewMode=mode;
         manageQuickFavorites=false;
-        if (mode==="QUICK" && CpuPlusDiagnostics.workflowCatalogStatus==="NOT LOADED")
+        if (["QUICK","PRESETS"].includes(mode) && CpuPlusDiagnostics.workflowCatalogStatus==="NOT LOADED")
             CpuPlusDiagnostics.loadWorkflowCatalog();
         if (showHistory && !CpuPlusDiagnostics.busy && !CpuPlusDiagnostics.archiveBusy)
             CpuPlusDiagnostics.loadHistory();
@@ -331,17 +331,25 @@ Column {
         property string deleteName: ""
         property string mixerPage: "LIBRARY"
         property string armedQueue: ""
+        property string pendingSaveName: ""
         onVisibleChanged: if (!visible) {deleteName="";armedQueue="";}
         onMixerPageChanged: {deleteName="";armedQueue="";root.navigationChanged();}
         Connections {
             target: CpuPlusDiagnostics
             function onWorkshopQueueChanged() {presets.armedQueue="";}
             function onWorkshopPresetLockedChanged() {if(CpuPlusDiagnostics.workshopPresetLocked)presets.armedQueue="";}
+            function onWorkflowCatalogBusyChanged() {
+                if(CpuPlusDiagnostics.workflowCatalogBusy || !presets.pendingSaveName)return;
+                if(CpuPlusDiagnostics.workflowCatalogReady &&
+                    CpuPlusDiagnostics.workshopPresets.some(r=>r.name===presets.pendingSaveName) &&
+                    presetName.text===presets.pendingSaveName) presetName.text="";
+                presets.pendingSaveName="";
+            }
         }
         GohuText {
             width: parent.width
             visible: presets.mixerPage==="LIBRARY"
-            text: "ALL WORKFLOWS // SESSION"
+            text: "ALL WORKFLOWS // LOCAL LIBRARY"
             color: Colors.magenta
             font.pixelSize: 12
         }
@@ -372,7 +380,7 @@ Column {
                     font.pixelSize: 11
                     verticalAlignment: TextInput.AlignVCenter
                     selectByMouse: true
-                    enabled: !CpuPlusDiagnostics.workshopPresetLocked
+                    enabled: !CpuPlusDiagnostics.workshopPresetLocked && CpuPlusDiagnostics.workflowCatalogReady
                 }
                 GohuText {
                     anchors.centerIn: parent
@@ -389,8 +397,9 @@ Column {
                 label: "SAVE"
                 normalFace: true
                 accentColor: Colors.omnitrix
-                available: !CpuPlusDiagnostics.workshopPresetLocked && presetName.text.length>0
-                onLeftClicked: if (CpuPlusDiagnostics.saveWorkshopPreset(presetName.text,root.workshopSubject)) presetName.text=""
+                available: !CpuPlusDiagnostics.workshopPresetLocked && CpuPlusDiagnostics.workflowCatalogReady && presetName.text.length>0
+                onLeftClicked: if (CpuPlusDiagnostics.saveWorkshopPreset(presetName.text,root.workshopSubject))
+                    presets.pendingSaveName=presetName.text
             }
         }
         GohuText {
@@ -401,15 +410,25 @@ Column {
             font.pixelSize: 10
             wrapMode: Text.Wrap
         }
+        ActionButton {
+            visible: presets.mixerPage==="LIBRARY"
+            width: parent.width
+            height: 26
+            label: "RELOAD // "+CpuPlusDiagnostics.workflowCatalogStatus
+            normalFace: true
+            accentColor: Colors.cyan
+            available: !CpuPlusDiagnostics.workshopPresetLocked
+            onLeftClicked: CpuPlusDiagnostics.loadWorkflowCatalog()
+        }
         Repeater {
-            model: presets.mixerPage==="LIBRARY" ? CpuPlusDiagnostics.workshopPresets : []
+            model: presets.mixerPage==="LIBRARY" && CpuPlusDiagnostics.workflowCatalogReady ? CpuPlusDiagnostics.workshopPresets : []
             delegate: Column {
                 required property var modelData
                 width: presets.width
                 spacing: 2
                 GohuText {
                     width: parent.width
-                    text: modelData.name+" // "+modelData.plan.durationSeconds+"s"
+                    text: modelData.name+" // "+(modelData.execution==="configured"?modelData.plan.durationSeconds+"s":modelData.kind==="appcontrol"?"30s":"STATIC")
                     color: Colors.white
                     font.pixelSize: 11
                     textFormat: Text.PlainText
@@ -417,7 +436,7 @@ Column {
                 }
                 GohuText {
                     width: parent.width
-                    text: modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / ")
+                    text: modelData.execution==="configured"?modelData.plan.instruments.map(c=>c.kind.toUpperCase()).join(" / "):"SPECIALIZED // "+modelData.kind.toUpperCase()
                     color: Colors.cyan
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
@@ -426,13 +445,13 @@ Column {
                     width: parent.width
                     spacing: 4
                     ActionButton {
-                        width: Math.floor((parent.width-8)/3)
+                        width: Math.floor((parent.width-12)/4)
                         height: 26
                         objectName: "cpuplusDiagnosticLoadPreset-"+modelData.name
                         label: "LOAD"
                         normalFace: true
                         accentColor: Colors.cyan
-                        available: !CpuPlusDiagnostics.workshopPresetLocked && root.presetMatchesSubject(modelData.plan)
+                        available: !CpuPlusDiagnostics.workshopPresetLocked && modelData.execution==="configured" && root.presetMatchesSubject(modelData.plan)
                         onLeftClicked: {
                             if (CpuPlusDiagnostics.loadWorkshopPreset(modelData.name,root.workshopSubject)) {
                                 presets.deleteName=""; root.selectView("WORK");
@@ -440,17 +459,27 @@ Column {
                         }
                     }
                     ActionButton {
-                        width: Math.floor((parent.width-8)/3)
+                        width: Math.floor((parent.width-12)/4)
                         height: 26
                         label: "+ QUEUE"
                         normalFace: true
                         accentColor: Colors.cyan
                         objectName: "cpuplusDiagnosticQueuePreset-"+modelData.name
-                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        available: !CpuPlusDiagnostics.workshopPresetLocked && modelData.execution==="configured"
                         onLeftClicked: CpuPlusDiagnostics.queueWorkshop(modelData.name)
                     }
                     ActionButton {
-                        width: Math.floor((parent.width-8)/3)
+                        objectName: "cpuplusDiagnosticFavorite-"+modelData.id
+                        width: Math.floor((parent.width-12)/4)
+                        height: 26
+                        label: modelData.favorite?"★":"☆"
+                        normalFace: true
+                        accentColor: Colors.magenta
+                        available: !CpuPlusDiagnostics.workshopPresetLocked
+                        onLeftClicked: CpuPlusDiagnostics.setWorkflowFavorite(modelData.id,!modelData.favorite)
+                    }
+                    ActionButton {
+                        width: Math.floor((parent.width-12)/4)
                         height: 26
                         label: presets.deleteName===modelData.name ? "CONFIRM" : "REMOVE"
                         normalFace: true
@@ -621,7 +650,7 @@ Column {
     GohuText {
         width: parent.width
         visible: root.viewMode === "QUICK"
-        text: "QUICK // favorite saved configurations. MANAGE toggles favorites; RELOAD reads the local catalog. AppControl test observes the launching shell and menu modes for 30s; close this menu to reproduce the issue. Memory/thread tests currently select same-user Quickshell. CANCEL stops early. Custom session workflows remain in WORKFLOWS pending library migration."
+        text: "QUICK // favorite saved configurations. MANAGE toggles favorites; RELOAD reads the local catalog. AppControl test observes the launching shell and menu modes for 30s; close this menu to reproduce the issue. Memory/thread tests currently select same-user Quickshell. CANCEL stops early. Save and favorite custom workflows in WORKFLOWS."
         color: Colors.white
         font.pixelSize: 10
         wrapMode: Text.WordWrap

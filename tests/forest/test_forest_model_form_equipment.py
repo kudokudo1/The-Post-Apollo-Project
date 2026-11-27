@@ -64,15 +64,20 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         self.assertNotIn("selectedTreeReasoningSteps", rail)
         self.assertNotIn("scanResidency(", rail)
         self.assertNotIn("scanModels(", rail)
-        # Horizontal STEP is opt-in. Forest's INDEX rail must retain the
-        # original vertical ruler insets and usable thumb travel.
+        # External STEP readouts are opt-in, horizontal or compact vertical.
+        # Both require stepMode, so Forest's INDEX rail retains its original
+        # ruler insets, regardless of the shared STEP presentation options.
         self.assertIn('selectorProfile: "index"', rail)
         self.assertNotIn("horizontalStepPresentation: true", rail)
+        self.assertNotIn("compactVerticalStep: true", rail)
         self.assertIn("property bool horizontalStepPresentation: false", slider)
+        self.assertIn("property bool compactVerticalStep: false", slider)
+        self.assertIn('readonly property bool stepMode: selectorProfile === "step"', slider)
         self.assertIn("readonly property bool horizontalStep: stepMode && horizontalStepPresentation", slider)
+        self.assertIn("readonly property bool externalStepReadout: horizontalStep || (stepMode && compactVerticalStep)", slider)
         scale = slider.split("id: scaleArea", 1)[1].split("Repeater {", 1)[0]
-        self.assertIn("topMargin: slider.horizontalStep ? 8 : 38", scale)
-        self.assertIn("bottomMargin: slider.horizontalStep ? 8 : 26", scale)
+        self.assertIn("topMargin: slider.externalStepReadout ? 8 : 38", scale)
+        self.assertIn("bottomMargin: slider.externalStepReadout ? 8 : 26", scale)
         # Responsive hardware is opt-in (#2944). The model-form INDEX
         # consumer retains the original thumb geometry and travel.
         self.assertNotIn("responsiveHardware: true", rail)

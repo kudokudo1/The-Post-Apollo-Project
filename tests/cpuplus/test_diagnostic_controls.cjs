@@ -505,7 +505,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
     const p={durationSeconds:4,instruments:[{kind:"storage",sampleSeconds:2,reportSeconds:4}]};
     const call=expr=>vm.runInContext(expr,c);
-    assert.equal(call('JSON.stringify(workshopSubjectKinds("STORAGE"))'),'["storage"]');
+    assert.equal(call('JSON.stringify(workshopSubjectKinds("STORAGE"))'),'["storage","diskio"]');
     assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(p)+',"STORAGE")'),true);
     assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(p)+',"GPU")'),false);
     assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(p)+',"CPU")'),false);
@@ -528,4 +528,43 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.match(resource,/headerTarget: header/);
     assert.match(resource,/workshopFilterTarget: filterHost/);
     assert.match(resource,/PSI \/\/ HOST CAPTURE ONLY/);
+}
+
+
+// D8c-b: exact disk calibration, stable whole-device identity, bounded evidence.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const call=expr=>vm.runInContext(expr,c);
+    const cfg={kind:"diskio",durationSeconds:2,intervalMs:1000};
+    const plan={durationSeconds:2,instruments:[{kind:"diskio",intervalMs:1000}]};
+    const expr=JSON.stringify(plan);
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"STORAGE")'),true);
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"ALL")'),false);
+    assert.equal(call('workshopPlanMatchesSubject('+expr+',"GPU")'),false);
+    assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+expr+')))'),expr);
+    assert.equal(call('previewWorkflow({durationSeconds:2,instruments:[{kind:"diskio",intervalMs:1000},{kind:"storage"}]}).ok'),false);
+    const launch=JSON.parse(call('JSON.stringify(observerLaunchPlan('+JSON.stringify(cfg)+',p=>"/local/"+p))'));
+    assert.deepEqual(launch.args.slice(-6),["/local/scripts/cpuplus_disk_io_observer.py","--workshop","--duration","2","--interval","1"]);
+    assert.equal(args("diskio"),null);
+    const a={schema:"post-apollo-disk-io-v1",event:"diskio",sequence:1,elapsedMs:1000,intervalMs:1000,devices:[["sda",8,0,42,2,1048576,4,3,2097152,6,7,10,1]]};
+    const b={...a,sequence:2,elapsedMs:2000};
+    const end={schema:a.schema,event:"complete",samples:2,observedMs:2000,calibration:cfg};
+    const valid=jsonl([a,b,end]);
+    assert.match(policy.summarize("diskio",valid),/1\.00 \/ 2\.00 MiB\/s/);
+    assert.ok(policy.configuredEvidence("diskio",valid,cfg));
+    assert.equal(policy.configuredEvidence("diskio",valid,{...cfg,durationSeconds:3}),null);
+    const idle={...a,devices:[["sda",8,0,42,0,0,0,0,0,0,0,0,0]]};
+    assert.ok(policy.summarize("diskio",jsonl([idle,{...idle,sequence:2,elapsedMs:2000},end])));
+    for(const bad of [
+        [a,b],
+        [a,{...b,devices:[["sda",8,0,43,...b.devices[0].slice(4)]]},end],
+        [{...a,devices:[["sda",8,0,42,2,1,4,3,2097152,6,7,10,1]]},b,end],
+        [{...a,devices:[["sda",8,0,42,-1,1048576,4,3,2097152,6,7,10,1]]},b,end],
+        [{...a,devices:[a.devices[0],["sdb",8,0,43,...a.devices[0].slice(4)]]},b,end],
+        [a,{...b,elapsedMs:1999},end],
+        [a,b,{...end,extra:true}]
+    ])assert.equal(policy.summarize("diskio",jsonl(bad)),null);
+    assert.match(workshop,/cpuplusWorkshopDiskIoInterval/);
+    assert.match(workshop,/TARGET \/\/ WHOLE BLOCK DEVICES/);
 }

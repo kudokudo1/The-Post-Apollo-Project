@@ -24,7 +24,7 @@ Scope {
     function selectComparison(side, reportId) {
         if (archiveBusy || archiveStatus !== "READY") return false;
         const row = archiveRows.find(item => item.id === reportId);
-        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu"].includes(row.kind)) return false;
+        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu","diskio"].includes(row.kind)) return false;
         if (side === "before") compareBeforeId = row.id;
         else if (side === "after") compareAfterId = row.id;
         else return false;
@@ -130,7 +130,7 @@ Scope {
         hostCpuIntervalMs:1000, storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
     property var storageWorkshopDraft: ({durationSeconds:30, selected:["storage"],
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
-        hostCpuIntervalMs:1000, gpuIntervalMs:1000, storageCadenceExplicit:true, storageSampleSeconds:1, storageReportSeconds:10})
+        hostCpuIntervalMs:1000, gpuIntervalMs:1000, diskIoIntervalMs:1000, storageCadenceExplicit:true, storageSampleSeconds:1, storageReportSeconds:10})
     function draftForSubject(subject) {
         return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft
             : subject==="STORAGE" ? storageWorkshopDraft : workshopDraft;

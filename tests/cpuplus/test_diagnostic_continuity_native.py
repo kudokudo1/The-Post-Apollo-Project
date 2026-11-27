@@ -74,6 +74,26 @@ assert sys.argv[1:]==["--workshop","--duration","2","--interval","1"]
 base=Path(__file__).resolve().parents[2]/"gpu-fixture"
 sys.stdout.write(capture(2,1,base/"drm",base/"devices"))
 """)
+    # Real disk observer, disposable whole-device sysfs and exact argv.
+    shutil.copy2(ROOT / "scripts/cpuplus_disk_io_observer.py", scripts / "disk_reader_fixture.py")
+    block = base / "disk-fixture" / "block"
+    disk_devices = base / "disk-fixture" / "devices"
+    block.mkdir(parents=True)
+    disk_parent = disk_devices / "pci0" / "sda"
+    disk = disk_parent / "block" / "sda"
+    disk.mkdir(parents=True)
+    (disk / "device").symlink_to(disk_parent)
+    (disk / "dev").write_text("8:0")
+    (disk / "diskseq").write_text("42")
+    (disk / "stat").write_text("10 1 20 30 40 2 50 60 0 70 80")
+    (block / "sda").symlink_to(disk)
+    (scripts / "cpuplus_disk_io_observer.py").write_text("""import sys
+from pathlib import Path
+from disk_reader_fixture import capture
+assert sys.argv[1:]==["--workshop","--duration","1","--interval","1"]
+base=Path(__file__).resolve().parents[2]/"disk-fixture"
+sys.stdout.write(capture(1,1,base/"block",base/"devices"))
+""")
     (scripts / "cpuplus_qml_workload_inventory.py").write_text(
         'import json,time\ntime.sleep(3)\nprint(json.dumps({"schema":"post-apollo-qml-workload-inventory-v1",'
         '"trackedQml":826,"scannedQml":826,"skipped":[],"totals":{"Timer":426,"Process":415,"Repeater":743}}))\n')
@@ -147,7 +167,7 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                WAYLAND_DISPLAY="", DISPLAY="")
     result = subprocess.run(["qs", "-p", str(config / "smoke.qml"), "--no-color"],
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=75, check=False)
+                            stderr=subprocess.STDOUT, timeout=80, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

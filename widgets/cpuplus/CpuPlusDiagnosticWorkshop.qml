@@ -16,6 +16,7 @@ Column {
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
     readonly property string targetText: {
+        if (draft.selected.includes("diskio")) return "TARGET // WHOLE BLOCK DEVICES";
         if (draft.selected.includes("gpu")) return "TARGET // ALL DRM DEVICES";
         if (draft.selected.includes("hostcpu")) return "TARGET // HOST CPU";
         if (subject==="STORAGE" && draft.selected.includes("storage")) return "TARGET // 18 KNOWN FILES";
@@ -113,8 +114,8 @@ Column {
     function toggle(kind) {
         if (locked || !filterKinds.includes(kind)) return;
         // Host capture is standalone in D6b; mixed sequential sets remain supported.
-        if (kind==="hostcpu" || kind==="gpu") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
-        const selected=draft.selected.filter(k=>k!=="hostcpu");
+        if (kind==="hostcpu" || kind==="gpu" || kind==="diskio") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
+        const selected=draft.selected.filter(k=>k!=="hostcpu"&&k!=="diskio");
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
         edit("selected",selected);
@@ -168,6 +169,7 @@ Column {
                 {kind:"census",symbol:"",subject:"CPU"},
                 {kind:"hostcpu",symbol:"▥",subject:"CPU"},
                 {kind:"gpu",symbol:"󰢮",subject:"GPU"},
+                {kind:"diskio",symbol:"▥",subject:"STORAGE"},
                 {kind:"storage",symbol:"",subject:"STORAGE"},
                 {kind:"stall",symbol:"⚡",subject:"UPTIME"}].filter(row=>root.filterKinds.includes(row.kind))
             ActionButton {
@@ -276,6 +278,29 @@ Column {
         currentValue: root.subject==="GPU" ? (root.draft.gpuIntervalMs||1000)/1000 : (root.draft.hostCpuIntervalMs||1000)/1000
         adjustable: !root.locked
         onValueRequested: value=>root.edit(root.subject==="GPU"?"gpuIntervalMs":"hostCpuIntervalMs",value*1000)
+    }
+    CpuPlusDiagnosticSlider {
+        objectName: "cpuplusWorkshopDiskIoInterval"
+        width: parent.width
+        compact: root.compactLayout
+        subjectColor: Colors.resourceColor("STORAGE")
+        fillColor: subjectColor
+        visible: root.draft.selected.includes("diskio")
+        title: "DISK I/O SAMPLE INTERVAL"
+        readout: currentValue+" SEC"
+        minimumValue: 1
+        maximumValue: 5
+        currentValue: (root.draft.diskIoIntervalMs||1000)/1000
+        adjustable: !root.locked
+        onValueRequested: value=>root.edit("diskIoIntervalMs",value*1000)
+    }
+    GohuText {
+        width: parent.width
+        visible: root.draft.selected.includes("diskio")
+        text: "READ / WRITE / IOPS / IO TIME · WHOLE DEVICES · 12 INTERVALS MAX"
+        color: Colors.resourceColor("STORAGE")
+        font.pixelSize: 10
+        wrapMode: Text.WordWrap
     }
     GohuText {
         width: parent.width

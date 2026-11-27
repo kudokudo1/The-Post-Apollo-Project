@@ -172,7 +172,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 560) {
+            if (++root.ticks > 600) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -1131,6 +1131,48 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "storage navigation retains cadence without changing other drafts"))return;
                 console.log("CPU_D8A_STORAGE_NATIVE_PASS");
+                const disk=root.findItem(resourcePane.item,"cpuplusWorkshopInstrument-diskio");
+                if(!root.check(disk && disk.available && root.resourceStatusGeometry(resourcePane.item),"disk selector shares status band"))return;
+                disk.leftClicked(null);
+                w.edit("durationSeconds",1);
+                w.edit("diskIoIntervalMs",1000);
+                root.phase=54;return;
+            }
+            if(root.phase===54 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                const slider=root.findItem(w,"cpuplusWorkshopDiskIoInterval");
+                if(!root.check(w && slider && slider.visible && w.preview.ok
+                    && w.draft.selected.join(",")==="diskio" && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.targetText==="TARGET // WHOLE BLOCK DEVICES"
+                    && !root.findItem(w,"cpuplusWorkshopStorageInstrument").visible,
+                    "standalone disk instrument shares Storage without metadata overlap"))return;
+                w.activate();root.phase=55;return;
+            }
+            if(root.phase===55 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"disk PREPARE does not launch"))return;
+                w.activate();
+                if(!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="diskio","disk explicit START"))return;
+                root.resourcePaneActive=false;root.phase=56;return;
+            }
+            if(root.phase===56){
+                if(CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const report=CpuPlusDiagnostics.reports.diskio;
+                if(!root.check(report && report.status==="COMPLETE" && report.summary.includes("DISK I/O //")
+                    && report.summary.includes("sda [8:0]")
+                    && CpuPlusDiagnostics.archiveRows.some(r=>r.id===report.id&&r.kind==="diskio"),
+                    "real disk reader receipt and archive across unload // "+CpuPlusDiagnostics.feedback))return;
+                root.resourcePaneActive=true;root.phase=57;return;
+            }
+            if(root.phase===57 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.draft.selected.join(",")==="diskio" && w.draft.diskIoIntervalMs===1000
+                    && JSON.stringify(CpuPlusDiagnostics.gpuWorkshopDraft)===root.gpuDraftWitness
+                    && JSON.stringify(CpuPlusDiagnostics.cpuWorkshopDraft)===root.cpuDraftWitness
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "disk remount retains scoped calibration, not readiness"))return;
+                console.log("CPU_D8C_DISK_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

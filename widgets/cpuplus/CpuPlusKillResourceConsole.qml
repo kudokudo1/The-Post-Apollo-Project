@@ -598,11 +598,18 @@ Item {
                                             font.pixelSize: 9
                                         }
                                         TextField {
+                                            id: exactField
                                             objectName: "cpuPlusDraftInput-" + resourcePanel.key + "-" + field.modelData.key
                                             width: 92
                                             height: 26
-                                            text: field.quotaField ? (root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent()))
-                                                : field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            text: field.quotaField ? "" : field.priorityField ? String(root.priorityValue()) : String(root.valueFor(resourcePanel.key,field.modelData.key))
+                                            Binding {
+                                                target: exactField
+                                                property: "text"
+                                                value: root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent())
+                                                when: field.quotaField && !exactField.activeFocus
+                                                restoreMode: Binding.RestoreNone
+                                            }
                                             property string editIdentity: ""
                                             onActiveFocusChanged: if (activeFocus) editIdentity=root.targetIdentity
                                             placeholderText: field.priorityField ? "UNSET" : ""
@@ -626,10 +633,7 @@ Item {
                                                     root.stageQuota("budget",Number(text));
                                             }
                                             onEditingFinished: {
-                                                if (field.quotaField) {
-                                                    text = root.quotaDraft.kind==="uncapped" ? "" : String(root.quotaPreviewPercent());
-                                                    return;
-                                                }
+                                                if (field.quotaField) return;
                                                 if (acceptableInput)
                                                     root.stageNumber(resourcePanel.key,field.modelData.key,Number(text));
                                                 else
@@ -674,8 +678,8 @@ Item {
                                         text: (root.quotaDraft.kind==="preview" ? "PREVIEW // NOT OBSERVED"
                                             : root.quotaDraft.kind==="uncapped" ? "DRAFT // NO LOCAL CAP"
                                             : "DRAFT // "+(root.quotaDraft.percent/100).toFixed(2)+" CPU EQUIVALENT")
-                                            + "\\n"+(root.allowedCpuIds.length ? "RANGE REFERENCE // "+root.allowedCpuIds.length+" OBSERVED LEADER CPUs" : "RANGE REFERENCE // ONE CPU")
-                                            + "\\nGROUP CAPACITY UNVERIFIED // RESTORE LOCKED"
+                                            + "\n"+(root.allowedCpuIds.length ? "RANGE REFERENCE // "+root.allowedCpuIds.length+" OBSERVED LEADER CPUs" : "RANGE REFERENCE // ONE CPU")
+                                            + "\nGROUP CAPACITY UNVERIFIED // RESTORE LOCKED"
                                         color: Colors.white
                                         font.pixelSize: 9
                                         wrapMode: Text.Wrap

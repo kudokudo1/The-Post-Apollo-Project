@@ -17,10 +17,11 @@ function createLocalRequestOwner() {
     }
     function validHost(h) {
         return !!h && typeof h.submit === "function" &&
-            typeof h.stop === "function" && typeof h.withdraw === "function";
+            typeof h.stop === "function" && typeof h.withdraw === "function"
+            && typeof h.observe === "function" && typeof h.attach === "function";
     }
     function validPresentation(p) {
-        return !!p && ["observe","attach","receive","withdraw","state"].every(k => typeof p[k] === "function");
+        return !!p && ["observe","attach","receive","requestStop","withdraw","state"].every(k => typeof p[k] === "function");
     }
     function retireRecord(record) {
         // Clear the original before calling out: synchronous callbacks
@@ -37,6 +38,9 @@ function createLocalRequestOwner() {
             try { old.presentation.observe(null); } catch (_) {}
         }
         if (original) retireRecord(original);
+        if (old) {
+            try { old.host.observe(null); } catch (_) {}
+        }
     }
     function observe(host, epoch, model, presentation) {
         if (current && current.host === host && current.epoch === epoch
@@ -48,8 +52,10 @@ function createLocalRequestOwner() {
             return false;
         lastEpoch = epoch;
         current = {host,epoch,model,presentation,used:false};
-        try { presentation.observe(epoch); }
-        catch (_) { withdraw(); return false; }
+        try {
+            if (host.observe(epoch) !== true) { withdraw(); return false; }
+            presentation.observe(epoch);
+        } catch (_) { withdraw(); return false; }
         if (!current || current.epoch !== epoch) return false;
         status = "READY";
         return true;
@@ -73,7 +79,7 @@ function createLocalRequestOwner() {
         }
         pending = false;
         if (result === null) {
-            if (current === view) { view.used = false; status = "READY"; }
+            if (current === view) status = "REFUSED";
             return false;
         }
         // Runtime currently returns these explicit non-acceptance states.
@@ -101,6 +107,17 @@ function createLocalRequestOwner() {
             retireRecord(original);
             return false;
         }
+        // Runtime may release its mailbox only after the original feed
+        // has successfully attached. No early output from an unbound view.
+        let acknowledged = false;
+        try { acknowledged = view.host.attach(original.correlation) === true; } catch (_) {}
+        if (current !== view || active !== original) return false;
+        if (!acknowledged) {
+            active = null;
+            status = "UNKNOWN_HOLD";
+            retireRecord(original);
+            return false;
+        }
         status = "ACCEPTED";
         return true;
     }
@@ -110,6 +127,15 @@ function createLocalRequestOwner() {
             return false;
         original.stopRequested = true;
         status = "STOP_REQUESTED";
+        // Freeze the display before the control call, including a
+        // synchronous callback or uncertain STOP result.
+        let frozen = false;
+        try { frozen = original.presentation.requestStop(original.epoch) === true; } catch (_) {}
+        if (!frozen) {
+            // Withdraw presentation, but still ask the original host to stop.
+            try { original.presentation.withdraw(original.epoch); } catch (_) {}
+        }
+        if (active !== original) return false;
         try { return original.host.stop(original.correlation) === true; }
         catch (_) { if (active === original) status = "UNKNOWN_HOLD"; return false; }
     }

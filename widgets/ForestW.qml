@@ -5,6 +5,8 @@ import "../components"
 import "forest/ui2" as PublicPreview
 import "forest/ui2/InteractionTargetLatch.js" as GestureLatch
 import "ForestChassisPolicy.js" as ForestSizing
+import "ForestLocalRequestOwner.js" as LocalRequest
+import "forest/ui2/LocalConversationPresentation.js" as LocalPresentation
 import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
 import "../services/forest/ForestInventoryPolicy.js" as InventoryPolicy
@@ -41,6 +43,100 @@ PanelWindow {
         if (publicPreviewGate)
             publicPreviewGate.dismissPreview();
     }
+    // Independently owned, nonblocking GUI adapter. Normal shell supplies
+    // none until Runtime's actual admitted IPC adapter is available.
+    // Its ready flag is transport availability, NOT inference authority.
+    property var localRequestHost: null
+    property var localRequestOwner: LocalRequest.createLocalRequestOwner()
+    property var localRequestState: ({status:"HELD",canSubmit:false,canStop:false})
+    property double localViewEpoch: 0
+    property bool localMountCompleted: false
+    readonly property bool localViewWanted: !fixtureOnly && menuOpen && visible
+        && !!localRequestHost && localRequestHost.ready === true
+        && !!selectedLocalModel && !!sessionPreview
+        && sessionPreview.width >= 300 && sessionPreview.height >= 160
+    function publishLocalRequestState() {
+        localRequestState = localRequestOwner.state();
+    }
+    function retireLocalRequestView() {
+        if (!localRequestOwner)
+            return;
+        localRequestOwner.withdraw();
+        publishLocalRequestState();
+    }
+    function synchronizeLocalRequestView() {
+        if (localRequestState.epoch === localViewEpoch && localRequestState.epoch !== null)
+            return;
+        retireLocalRequestView();
+        if (!localMountCompleted || !localViewWanted || !publicPreviewLoader
+                || publicPreviewLoader.status !== Loader.Ready)
+            return;
+        const item = publicPreviewLoader.item;
+        if (!item || !item.localConversationFeed)
+            return;
+        if (!Number.isSafeInteger(localViewEpoch + 1))
+            return;
+        localViewEpoch += 1;
+        const presentation = LocalPresentation.createPresentation(item.localConversationFeed);
+        localRequestOwner.observe(localRequestHost, localViewEpoch, selectedLocalModel, presentation);
+        publishLocalRequestState();
+    }
+    function requestComposerAction() {
+        if (fixtureOnly)
+            return requestFixtureDemoAction();
+        if (!localViewWanted)
+            return false;
+        let accepted = false;
+        if (localRequestState.canStop)
+            accepted = localRequestOwner.stop();
+        else if (localRequestState.canSubmit && forestPromptInput) {
+            const exactDraft = forestPromptInput.text;
+            accepted = localRequestOwner.submit(selectedLocalModel, exactDraft, localViewEpoch);
+            if (accepted && forestPromptInput.text === exactDraft)
+                forestPromptInput.clear();
+        }
+        publishLocalRequestState();
+        return accepted;
+    }
+    // Adapter supplies original epoch and canonical correlation object.
+    // No packet establishes the current view or native admission.
+    function receiveLocalSnapshot(epoch, correlation, snapshot) {
+        if (!localViewWanted)
+            return false;
+        const accepted = localRequestOwner.receive(epoch, correlation, snapshot);
+        publishLocalRequestState();
+        return accepted;
+    }
+    onLocalViewWantedChanged: {
+        retireLocalRequestView();
+        if (localViewWanted && publicPreviewGate)
+            publicPreviewGate.dismissPreview();
+        if (localMountCompleted)
+            Qt.callLater(synchronizeLocalRequestView);
+    }
+    onLocalRequestHostChanged: {
+        retireLocalRequestView();
+        if (localMountCompleted)
+            Qt.callLater(synchronizeLocalRequestView);
+    }
+    onSelectedLocalModelChanged: {
+        retireLocalRequestView();
+        if (localMountCompleted)
+            Qt.callLater(synchronizeLocalRequestView);
+    }
+    Connections {
+        target: root
+        function onSelectedTreeIndexChanged() {
+            root.retireLocalRequestView();
+            if (root.localMountCompleted)
+                Qt.callLater(root.synchronizeLocalRequestView);
+        }
+    }
+    Component.onDestruction: {
+        localMountCompleted = false;
+        retireLocalRequestView();
+    }
+
     // Forest B0 inventory only proves model discovery. It is not permission
     // to record audio, submit a prompt, or attach a provider session.
     // Until protected Forest host adapters exist both controls fail closed.
@@ -77,7 +173,12 @@ PanelWindow {
             }
         }
     }
-    Component.onCompleted: if (!fixtureOnly) preferenceStore.load()
+    Component.onCompleted: {
+        if (!fixtureOnly) preferenceStore.load();
+        localMountCompleted = true;
+        if (localViewWanted)
+            Qt.callLater(synchronizeLocalRequestView);
+    }
     function saveModelPreferences() {
         if (fixtureOnly)
             return false;
@@ -869,8 +970,8 @@ PanelWindow {
                 labelPixelSize: 10
                 accentColor: Colors.orange
                 selected: publicPreviewGate.active
-                available: publicPreviewGate.eligible
-                interactive: publicPreviewGate.eligible
+                available: publicPreviewGate.eligible && !root.localViewWanted
+                interactive: publicPreviewGate.eligible && !root.localViewWanted
                 acceptedButtons: Qt.LeftButton
                 Accessible.name: publicPreviewGate.active
                     ? "Close public conversation preview"
@@ -1703,13 +1804,16 @@ PanelWindow {
                     id: publicPreviewLoader
                     objectName: "forestPublicPreviewLoader"
                     anchors.fill: parent
-                    active: publicPreviewGate.active
+                    active: publicPreviewGate.active || root.localViewWanted
                     visible: active && status === Loader.Ready
                     enabled: visible
-                    sourceComponent: publicPreviewComponent
+                    sourceComponent: root.localViewWanted ? localConversationComponent : publicPreviewComponent
+                    onLoaded: if (root.localViewWanted) Qt.callLater(root.synchronizeLocalRequestView)
                     onStatusChanged: {
-                        if (status === Loader.Error)
+                        if (status === Loader.Error) {
+                            root.retireLocalRequestView();
                             publicPreviewGate.dismissPreview();
+                        }
                     }
                 }
 
@@ -1717,6 +1821,45 @@ PanelWindow {
                     id: publicPreviewComponent
                     PublicPreview.PublicConversationFixture {
                         developmentDemoMode: root.fixtureOnly
+                    }
+                }
+
+                // Mutually exclusive with the existing public preview, in
+                // the SAME Loader and conversation footprint. No composer.
+                Component {
+                    id: localConversationComponent
+                    Item {
+                        property alias localConversationFeed: localFeed
+                        GohuText {
+                            id: localStatus
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 20
+                            text: "LOCAL // " + root.localRequestState.status
+                            textFormat: Text.PlainText
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+                        ConversationFeed {
+                            id: localFeed
+                            objectName: "forestRealLocalFeed"
+                            anchors.top: localStatus.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            conversation: ({id:"forest-local-"+root.localViewEpoch,
+                                displayNameInProfile:root.activeTree.name})
+                            scopeId: "forest-local-" + root.localViewEpoch
+                            showHeader: false
+                            showComposer: false
+                            sendEnabled: false
+                            richMessageActions: false
+                            messageTextFormat: Text.PlainText
+                            streamingTailEnabled: true
+                            emptyConversationLabel: "LOCAL // NO RESPONSE YET"
+                        }
                     }
                 }
 
@@ -2180,6 +2323,7 @@ PanelWindow {
                         Accessible.name: "Forest local draft text input"
                         Accessible.description: root.fixtureOnly
                             ? "In-memory draft only. TEST uses a fixed public prompt, not this draft."
+                            : root.localViewWanted ? "Local draft. SEND requires independent Runtime acceptance."
                             : "In-memory draft only. SEND is locked until a trusted Forest chat host is connected."
                         // Intentionally no onAccepted / transport / history.
                     }
@@ -2192,6 +2336,7 @@ PanelWindow {
                         visible: forestPromptInput.text.length === 0
                                  && !forestPromptInput.activeFocus
                         text: root.fixtureOnly ? "DRAFT NOT SENT // SAMPLE THEN TEST"
+                            : root.localViewWanted ? "MESSAGE..."
                             : root.frameHeight < 540
                             ? "SEND LOCKED // HOST NOT CONNECTED"
                             : "SEND LOCKED // B4 TRUSTED HOST NOT CONNECTED"
@@ -2326,19 +2471,22 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     width: Math.max(54, Math.min(86,
                         Math.round(promptRow.width * 0.21)))
-                    enabledAction: root.fixtureOnly ? root.fixtureDemoActionAvailable : root.chatHostTrusted
+                    enabledAction: root.fixtureOnly ? root.fixtureDemoActionAvailable
+                        : root.localViewWanted && (root.localRequestState.canStop
+                            || (root.localRequestState.canSubmit && forestPromptInput.text.length > 0))
                     recording: false
                     processing: false
                     idleAccent: Colors.green
                     recordingAccent: Colors.magenta
-                    askLabel: root.fixtureOnly ? (root.fixtureDemoStreaming ? "STOP" : "TEST") : "SEND"
+                    askLabel: root.fixtureOnly ? (root.fixtureDemoStreaming ? "STOP" : "TEST")
+                        : root.localRequestState.canStop ? "STOP" : "SEND"
                     sendLabel: "SEND"
                     allowSecondaryAction: false
                     Accessible.name: root.fixtureOnly
                         ? (root.fixtureDemoStreaming ? "Stop fixed simulated reply" : "Run fixed public test, no model or save")
-                        : "SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
-                    // Explicit fixture-only event, never model/session submission.
-                    onPrimaryRequested: root.requestFixtureDemoAction()
+                        : root.localViewWanted ? (root.localRequestState.canStop ? "Stop original local request" : "Send local request")
+                            : "SEND LOCKED // TRUSTED FOREST CHAT HOST NOT CONNECTED"
+                    onPrimaryRequested: root.requestComposerAction()
                 }
 
             }

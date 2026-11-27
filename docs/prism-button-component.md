@@ -80,3 +80,22 @@ Validation: `node --test tests/components/test_prism_artwork.cjs
 tests/components/test_prism_dock.cjs tests/components/test_prism_index.cjs`.
 Native/operator visual review still determines final header spacing and
 border/glow appearance.
+
+## Prism // Central Post Apollo help
+
+Operator direction: Prism is the central Post Apollo help surface, extending
+beyond color semantics. The first two standard main-mode buttons are SYNTAGMA
+(the visual language and future semantic dictionary) and ATLAS (a schematic
+map of the mounted shell entry points). Shared `PrismHelpContent.qml` owns
+these help bodies and reads `services/prism/PrismAtlas.js` for location data.
+The Atlas lists actual mounts in source order, not live service availability
+and not whether an individual module has a local Prism popup. The diagnostic
+placement index remains independent and returns to the previous help mode.
+
+The intended later App Control final HELP/PRISM section is another presentation
+of this same help content and source data, not a second dictionary or a separate
+help database. Compact contextual Prism popups should use the same foundation.
+App Control placement and compact popup integration are subsequent owner-coordinated
+work; this change does not modify App Control. Syntagma definitions await operator
+authorship. Atlas V1 is a read-only schematic rather than a live or clickable
+desktop map.

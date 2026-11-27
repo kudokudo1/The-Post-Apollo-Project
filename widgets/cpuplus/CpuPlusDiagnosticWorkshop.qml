@@ -1,6 +1,8 @@
 import QtQuick
+import QtQuick.Controls as Controls
 import qs.services.diagnostics
 import "../../services/diagnostics/DiagnosticCalibration.js" as Calibration
+import "../../services/diagnostics/DiagnosticTargetRegistry.js" as Targets
 import "../../services/diagnostics/DiagnosticWorkflowReceipt.js" as Receipt
 import "../../services/diagnostics/CpuPlusDiagnosticsPolicy.js" as DiagnosticPolicy
 import "../../components"
@@ -23,7 +25,30 @@ Column {
     property string subject: "ALL"
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
+    property string selectedTargetId: "automatic"
+    readonly property var selectedTarget: Targets.findDiagnosticTarget(selectedTargetId)
+    readonly property var targetCompatibility: Targets.targetPlanCompatibility(selectedTargetId,plan,{
+        workshopDraftFromPlan: p=>Calibration.workshopDraftFromPlan(p),
+        previewCalibration: c=>Calibration.previewCalibration(c)
+    })
+    readonly property bool targetPickerOpen: targetPicker.opened
+    function targetCanSelect(row) {
+        return !!row && row.available && row.route==="configured" &&
+            row.kinds.some(k=>filterKinds.includes(k));
+    }
+    function selectTarget(id) {
+        if(locked || saveEditorOpen || !targetCanSelect(Targets.findDiagnosticTarget(id))) return false;
+        disarm();
+        selectedTargetId=id;
+        targetPicker.close();
+        return true;
+    }
+    function targetAllowsInstrument(kind) {
+        return !!selectedTarget && selectedTarget.kinds.includes(kind);
+    }
     readonly property string targetText: {
+        if(selectedTargetId!=="automatic" && selectedTarget)
+            return "TARGET // "+selectedTarget.label.toUpperCase();
         if (subject==="SYSTEM" && draft.selected.length>1) return "TARGET // "+draft.selected.length+" INSTRUMENTS";
         if (draft.selected.includes("netio")) return "TARGET // ALL VISIBLE INTERFACES";
         if (draft.selected.includes("swapio")) return "TARGET // HOST SWAP";
@@ -127,7 +152,7 @@ Column {
             storageCadenceExplicit:true,storageSampleSeconds:pair.sampleSeconds,storageReportSeconds:pair.reportSeconds}));
     }
     function toggle(kind) {
-        if (locked || !filterKinds.includes(kind)) return;
+        if (locked || !filterKinds.includes(kind) || (!draft.selected.includes(kind) && !targetAllowsInstrument(kind))) return;
         // SYSTEM permits every instrument to be selected independently.
         const standalone=["hostcpu","gpu","diskio","swapio","netio"];
         if (subject!=="SYSTEM" && standalone.includes(kind)) { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
@@ -143,7 +168,7 @@ Column {
         if(workflowName) workflowName.text="";
     }
     function openSaveEditor() {
-        if (locked || calibrating || !preview.ok || saveEditorOpen) return false;
+        if (locked || calibrating || !preview.ok || saveEditorOpen || selectedTargetId!=="automatic") return false;
         disarm();
         saveNotice="";
         savePlanText=planText;
@@ -153,7 +178,7 @@ Column {
         return true;
     }
     function confirmSave() {
-        if (!saveEditorOpen || locked || calibrating || !preview.ok || savePlanText!==planText) return false;
+        if (!saveEditorOpen || locked || calibrating || !preview.ok || savePlanText!==planText || selectedTargetId!=="automatic") return false;
         if (!CpuPlusDiagnostics.workflowCatalogReady) {
             saveNotice="";
             return CpuPlusDiagnostics.loadWorkflowCatalog();
@@ -185,7 +210,7 @@ Column {
         function onSetActiveChanged() { if(CpuPlusDiagnostics.setActive) root.closeSaveEditor(); }
     }
     function activate() {
-        if (locked || calibrating || !preview.ok || saveEditorOpen) return;
+        if (locked || calibrating || !preview.ok || saveEditorOpen || !targetCompatibility.ok || targetPicker.visible) return;
         saveNotice="";
         if (ready) {
             const frozen=JSON.parse(preparedText);
@@ -195,21 +220,22 @@ Column {
         }
         disarm();
         calibrating=true;
-        const generation=preparationGeneration, exact=planText, sequence=CpuPlusDiagnostics.captureSequence;
+        const generation=preparationGeneration, exact=planText, sequence=CpuPlusDiagnostics.captureSequence, target=selectedTargetId;
         // Defer only the synchronous validation handoff, not a fake loading
         // duration. No elapsed timer or launch until the second click.
         Qt.callLater(function() {
             if (!root || root.preparationGeneration!==generation || !root.visible) return;
             root.calibrating=false;
-            if (!root.locked && root.planText===exact && root.preview.ok
+            if (!root.locked && root.planText===exact && root.preview.ok && root.targetCompatibility.ok && root.selectedTargetId===target
                     && CpuPlusDiagnostics.captureSequence===sequence) {
                 root.preparedText=exact;
                 root.preparedSequence=sequence;
             }
         });
     }
-    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
-    onVisibleChanged: if (!visible) { disarm(); closeSaveEditor(); saveNotice=""; }
+    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; selectedTargetId="automatic"; if(targetPicker) targetPicker.close(); }
+    onSelectedTargetIdChanged: disarm()
+    onVisibleChanged: if (!visible) { disarm(); closeSaveEditor(); saveNotice=""; if(targetPicker) targetPicker.close(); }
     onLockedChanged: if (locked) disarm()
     onPlanTextChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
     onRecordingChanged: if (recording) displayNow=Date.now()
@@ -258,7 +284,7 @@ Column {
                 selected: root.draft.selected.includes(modelData.kind)
                 contentGlowSelectedOpacity: 0.95
                 normalFace: true
-                available: !root.locked
+                available: !root.locked && (root.targetAllowsInstrument(modelData.kind) || selected)
                 acceptedButtons: Qt.LeftButton
                 Accessible.name: modelData.kind.toUpperCase()
                 Accessible.role: Accessible.Button
@@ -841,7 +867,9 @@ Column {
             text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
                 : CpuPlusDiagnostics.busy ? "SHARED CAPTURE ACTIVE // "+CpuPlusDiagnostics.kind.toUpperCase()
                 : root.saveEditorOpen ? (root.saveNotice || CpuPlusDiagnostics.workshopPresetFeedback)
+                : !root.targetCompatibility.ok && root.preview.ok ? root.targetCompatibility.reason
                 : root.ready ? "SECOND CLICK STARTS CAPTURE"
+                : root.selectedTargetId!=="automatic" ? "TARGET SELECTED // SAVE SUPPORT PENDING"
                 : root.saveNotice || (root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
                 : root.preview.reason)
             // Multi-instrument previews have a separate aggregate observation field.
@@ -865,12 +893,22 @@ Column {
                 label: "SAVE"
                 normalFace: true
                 accentColor: Colors.magenta
-                available: !root.locked && !root.calibrating && root.preview.ok
+                available: !root.locked && !root.calibrating && root.preview.ok && root.selectedTargetId==="automatic"
                 onLeftClicked: root.openSaveEditor()
+            }
+            ActionButton {
+                objectName: "cpuplusWorkshopTarget"
+                width: 54
+                height: 28
+                label: "TARGET"
+                normalFace: true
+                accentColor: Colors.purple
+                available: !root.locked && !root.calibrating
+                onLeftClicked: { root.disarm(); targetPicker.open(); }
             }
             CpuPlusDiagnosticExecutionButton {
                 objectName: "cpuplusWorkshopExecute"
-                width: Math.max(0,parent.width-98)
+                width: Math.max(0,parent.width-156)
                 height: 28
                 phase: root.phase
                 caption: root.phase==="READY" ? "READY // START"
@@ -879,7 +917,7 @@ Column {
                 progress: root.phase==="READY" || root.phase==="COMPLETE" ? 1
                     : root.phase==="RECORDING" || root.phase==="STOPPING" ? root.elapsedFraction : 0
                 available: true
-                interactive: !root.locked && !root.calibrating && root.preview.ok
+                interactive: !root.locked && !root.calibrating && root.preview.ok && root.targetCompatibility.ok && !targetPicker.visible
                 onLeftClicked: root.activate()
             }
             ActionButton {
@@ -954,4 +992,110 @@ Column {
         }
     
     }
+    Controls.Popup {
+        id: targetPicker
+        objectName: "cpuplusWorkshopTargetPicker"
+        parent: root
+        x: 0
+        y: 0
+        width: root.width
+        height: Math.min(300,Math.max(150,root.height))
+        padding: 5
+        modal: true
+        focus: true
+        closePolicy: Controls.Popup.CloseOnEscape | Controls.Popup.CloseOnPressOutside
+        property string category: "ALL"
+        onOpened: { category="ALL"; targetSearch.text=""; targetSearch.forceActiveFocus(); }
+        background: Rectangle { color: Colors.black; border.color: Colors.purple }
+        contentItem: Column {
+            spacing: 4
+            Row {
+                width: parent.width
+                spacing: 4
+                Rectangle {
+                    width: Math.max(0,parent.width-120)
+                    height: 28
+                    color: Colors.black
+                    border.color: Colors.purple
+                    TextInput {
+                        id: targetSearch
+                        objectName: "cpuplusWorkshopTargetSearch"
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        maximumLength: 128
+                        color: Colors.white
+                        font.pixelSize: 11
+                        verticalAlignment: TextInput.AlignVCenter
+                        selectByMouse: true
+                    }
+                    GohuText {
+                        anchors.centerIn: parent
+                        visible: targetSearch.text.length===0 && !targetSearch.activeFocus
+                        text: "SEARCH TARGETS"
+                        color: Colors.purple
+                        font.pixelSize: 10
+                    }
+                }
+                Controls.ComboBox {
+                    objectName: "cpuplusWorkshopTargetCategory"
+                    width: 82
+                    height: 28
+                    model: Targets.targetCategories()
+                    currentIndex: model.indexOf(targetPicker.category)
+                    onActivated: targetPicker.category=currentText
+                }
+                ActionButton {
+                    width: 30
+                    height: 28
+                    label: "X"
+                    normalFace: true
+                    accentColor: Colors.red
+                    onLeftClicked: targetPicker.close()
+                }
+            }
+            GohuText {
+                width: parent.width
+                height: 16
+                text: root.targetText
+                color: Colors.purple
+                font.pixelSize: 10
+                elide: Text.ElideRight
+            }
+            ListView {
+                objectName: "cpuplusWorkshopTargetResults"
+                width: parent.width
+                height: Math.max(0,parent.height-52)
+                clip: true
+                spacing: 3
+                model: Targets.searchDiagnosticTargets(targetSearch.text,targetPicker.category)
+                delegate: Column {
+                    required property var modelData
+                    width: ListView.view.width
+                    spacing: 1
+                    ActionButton {
+                        objectName: "cpuplusWorkshopTarget-"+modelData.id
+                        width: parent.width
+                        height: 26
+                        normalFace: true
+                        accentColor: Colors.purple
+                        selected: root.selectedTargetId===modelData.id
+                        label: modelData.label+(modelData.route==="fixed"?" // QUICK ONLY":!modelData.available?" // LOCKED":!root.targetCanSelect(modelData)?" // OUTSIDE SUBJECT":"")
+                        labelPixelSize: 10
+                        labelFontSizeMode: Text.HorizontalFit
+                        labelMinimumPixelSize: 8
+                        available: !root.locked && root.targetCanSelect(modelData)
+                        onLeftClicked: root.selectTarget(modelData.id)
+                    }
+                    GohuText {
+                        width: parent.width
+                        text: modelData.detail
+                        color: Colors.white
+                        font.pixelSize: 9
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
+    }
+
 }

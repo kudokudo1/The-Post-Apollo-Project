@@ -75,6 +75,33 @@ ShellRoot {
         repeat: false
         onTriggered: root.verifyStore()
     }
+    // Only in-memory lock operations on synthetic identities; never call
+    // ProcessControl or ProcessLimits mutation methods.
+    function verifyControlCustody() {
+        const old={pid:4321,startTicks:98765,comm:"sway",user:"synthetic"};
+        const same={pid:4321,startTicks:98765,comm:"sway",user:"synthetic"};
+        const reused={pid:4321,startTicks:98766,comm:"sway",user:"synthetic"};
+        const unknown={pid:4321,startTicks:0,comm:"sway",user:"synthetic"};
+        const safety=first.store.safety;
+        if (safety !== second.store.safety
+                || first.store.control !== second.store.control
+                || first.store.limits !== second.store.limits
+                || !safety.requiresDangerUnlock(old)
+                || first.store.limits.applyLoading
+                || first.store.limits.activeRequest !== null
+                || first.store.limits.queuedRequest !== null) return false;
+        safety.toggleDangerStickyUnlock(old);
+        if (second.store.safety.dangerUnlockMode(same)!=="sticky"
+                || safety.dangerUnlockMode(reused)!==""
+                || safety.dangerUnlockMode(unknown)!=="") return false;
+        safety.toggleDangerUnlock(old);
+        safety.toggleDangerActionUnlock(old,"freeze");
+        if (second.store.safety.dangerActionUnlockMode(same,"freeze")!=="once"
+                || safety.dangerActionUnlockMode(reused,"freeze")!=="") return false;
+        safety.relockDangerAction(same,"freeze");
+        return safety.dangerActionUnlockMode(same,"freeze")==="";
+    }
+
     function verifyStore() {
         const sample = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 31, rss: 2048, mem: 3, elapsed: "00:05"}];
@@ -97,7 +124,7 @@ ShellRoot {
         const combiCadence=first.store.snapshotInterval===1800 && first.store.miniProbeNeeded;
         first.store.donorFavoritesVisible=false;
         first.store.donorCombiVisible=false;
-        if (!verifySession() || !cpuCadence || !resourceCadence || !combiCadence
+        if (!verifyControlCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
                 || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry
                 || first.graphState !== second.graphState

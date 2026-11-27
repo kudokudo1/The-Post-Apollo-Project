@@ -268,7 +268,8 @@ test('Hunter display short circuits preserve thresholds and protection classes',
 
 test('menu visibility binds immutable graph presentation policy', () => {
     const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
-    assert.match(app, /property: "graphVisible"\s*value: appControlWindow\.menuOpen/);
+    assert.match(app, /property: "donorGraphVisible"\s*value: appControlWindow\.menuOpen/);
+    assert.match(store, /readonly property bool graphVisible: cpuVisible \|\| donorGraphVisible/);
     assert.match(store, /taskMiniHistoryKeepImmutable: root\.graphVisible/);
     assert.match(graph, /if \(immutable\) \{/);
 });

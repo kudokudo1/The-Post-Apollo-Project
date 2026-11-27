@@ -46,7 +46,6 @@ PanelWindow {
 
     property bool menuOpen: false
     // Shell-owned visibility demand: read-only telemetry consumers do not start their own pollers.
-    property bool cpuPlusProcessVisible: false
     readonly property var cpuBulkReview: KillBackend.KillStore.cpuBulkReview
     readonly property bool cpuBulkOperation: hunterOperationController.recipientOwned
         && hunterOperationPhase !== "idle"
@@ -903,11 +902,6 @@ PanelWindow {
             && appControlWindow.favoritesScopeMode === appControlWindow.favoritesScopeCombi
     }
     Binding {
-        target: KillBackend.KillStore
-        property: "hasTaskFavorites"
-        value: appControlWindow.hasTaskFavorites()
-    }
-    Binding {
         target: appControlWindow.killDetailSession
         property: "donorActive"
         value: appControlWindow.menuOpen && !appControlWindow.killViewSwitchPending
@@ -917,8 +911,8 @@ PanelWindow {
     // Preserve the existing visible/hidden history policy.
     Binding {
         target: KillBackend.KillStore
-        property: "graphVisible"
-        value: appControlWindow.menuOpen || appControlWindow.cpuPlusProcessVisible
+        property: "donorGraphVisible"
+        value: appControlWindow.menuOpen
     }
     Binding {
         target: KillBackend.KillStore

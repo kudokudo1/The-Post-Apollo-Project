@@ -51,7 +51,7 @@ Column {
         ? CpuPlusDiagnostics.archiveRows : []
     readonly property var beforeRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareBeforeId) || null
     readonly property var afterRecord: archiveRows.find(row => row.id === CpuPlusDiagnostics.compareAfterId) || null
-    readonly property bool canChooseComparison: !["workflow","stall","hostcpu"].includes(selectedReport) && report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
+    readonly property bool canChooseComparison: !["workflow","stall","hostcpu","gpu"].includes(selectedReport) && report !== null && archiveRows.some(row => row.id === report.id && row.status === "COMPLETE")
     readonly property var comparison: showComparison ? Compare.compare(beforeRecord, afterRecord, Policy.summarize, Policy.appControlMetrics) : null
     readonly property var memoryDetails: memoryBreakdown(selectedReport, report, true, true)
     readonly property var hostDetails: memoryDetails ? memoryDetails.hostContext : null
@@ -210,7 +210,7 @@ Column {
             width: parent.width
             height: 26
             visible: CpuPlusDiagnostics.setActive || (CpuPlusDiagnostics.busy && (root.viewMode !== "WORK"
-                || CpuPlusDiagnostics.captureId !== CpuPlusDiagnostics.workshopRunId) && root.viewMode !== "QUICK")
+                || !workshopLoader.item || !workshopLoader.item.recording) && root.viewMode !== "QUICK")
             available: CpuPlusDiagnostics.setActive ? !CpuPlusDiagnostics.setStopRequested : !CpuPlusDiagnostics.cancelled
             accentColor: Colors.red
             destructive: true
@@ -589,12 +589,12 @@ Column {
             width: parent.width
             spacing: 3
             Repeater {
-                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu"]
+                model: ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu"]
                 delegate: ActionButton {
                     required property string modelData
-                    width: Math.max(0, Math.floor((reportRail.width - 24) / 9))
+                    width: Math.max(0, Math.floor((reportRail.width - 27) / 10))
                     height: 27
-                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : modelData === "stall" ? "STALL" : modelData === "hostcpu" ? "CPU" : "STORE"
+                    label: modelData === "inventory" ? "SCAN" : modelData === "memory" ? "MEM" : modelData === "threads" ? "THREAD" : modelData === "census" ? "CENSUS" : modelData === "appcontrol" ? "APP" : modelData === "workflow" ? "WORK" : modelData === "stall" ? "STALL" : modelData === "hostcpu" ? "CPU" : modelData === "gpu" ? "GPU" : "STORE"
                     labelPixelSize: 9
                     labelFontSizeMode: Text.HorizontalFit
                     labelMinimumPixelSize: 8

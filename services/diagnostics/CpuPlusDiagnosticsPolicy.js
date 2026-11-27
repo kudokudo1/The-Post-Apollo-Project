@@ -21,7 +21,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu"].indexOf(kind) >= 0;
 }
 
 function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
@@ -36,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -148,6 +148,7 @@ function storageCadence(c) {
 // Observer receipts extend the terminal record rather than prepend a row,
 // keeping existing memory, census and storage projections compatible.
 function configuredEvidence(kind,text,expected) {
+    if (kind==="hostcpu") { const d=hostCpuEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="threads") return configuredThreadEvidence(text,expected);
     try {
         if (!["memory","census","storage"].includes(kind) || typeof text!=="string" || text.length>65536) return null;
@@ -371,6 +372,7 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind==="hostcpu") return hostCpuSummary(text);
     if (kind === "stall") {
         const d=stallEvidence(text,null);
         return d ? "UI HEARTBEAT // "+d.coverageMs+" ms observed / "+d.durationSeconds+" s requested"
@@ -768,4 +770,62 @@ function storageCountdown(p,field,now) {
     const span=Math.max(1,(target-previous)*1000);
     return {remainingMs:remaining,fraction:Math.min(1,remaining/span),finished:finished,
         waiting:!finished&&remaining===0,flash:count>0&&now-(field==="sample"?p.receivedWallMs:p.reportReceivedWallMs)<350};
+}
+
+
+// Host counters have a distinct scope and unit from process CPU percentages.
+function hostCpuEvidence(text,expected) {
+    try {
+        if (typeof text!=="string" || text.length>65536 || /[^\x00-\x7f]/.test(text)) return null;
+        const records=text.trim().split("\n").map(line=>JSON.parse(line)), end=records.pop();
+        const schema="post-apollo-host-cpu-v1", integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        const c=end&&end.calibration;
+        const keys=(o,k)=>!!o&&Object.keys(o).length===k.length&&k.every(x=>Object.prototype.hasOwnProperty.call(o,x));
+        if (!keys(end,["schema","event","samples","observedMs","calibration"])
+                || end.schema!==schema||end.event!=="complete"||!keys(c,["kind","durationSeconds","intervalMs"])
+                || c.kind!=="hostcpu"||!integer(c.durationSeconds,1,30)
+                ||!integer(c.intervalMs,1000,Math.min(5000,c.durationSeconds*1000))||c.intervalMs%1000
+                || (expected&&(!keys(expected,Object.keys(c))||Object.keys(c).some(k=>c[k]!==expected[k])))) return null;
+        const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+        if (n>12||records.length!==n||end.samples!==n||!integer(end.observedMs,c.durationSeconds*1000,45000))return null;
+        const validTicks=a=>Array.isArray(a)&&a.length===3&&integer(a[0],1,1000000000)
+            &&integer(a[1],0,a[0])&&integer(a[2],0,a[0]-a[1]);
+        let elapsed=0, ids=null;
+        for (let i=0;i<n;i++) {
+            const row=records[i];
+            if (!keys(row,["schema","event","sequence","elapsedMs","intervalMs","aggregate","cores","psiSomeAvg10"])
+                    ||row.schema!==schema||row.event!=="hostcpu"||row.sequence!==i+1
+                    ||!integer(row.elapsedMs,Math.min((i+1)*c.intervalMs,c.durationSeconds*1000),end.observedMs)
+                    ||!integer(row.intervalMs,1,45000)||row.elapsedMs!==elapsed+row.intervalMs
+                    ||!validTicks(row.aggregate)||!Array.isArray(row.cores)||row.cores.length<1||row.cores.length>128
+                    ||(row.psiSomeAvg10!==null&&(!numeric(row.psiSomeAvg10)||row.psiSomeAvg10>100)))return null;
+            if(row.cores.some((a,j)=>!Array.isArray(a)||a.length!==5||!integer(a[0],0,1048575)
+                ||(j>0&&a[0]<=row.cores[j-1][0])||!validTicks(a.slice(1,4))
+                ||(a[4]!==null&&!integer(a[4],1,100000000))))return null;
+            const current=row.cores.map(a=>a[0]).join(",");
+            if(ids!==null&&ids!==current)return null;
+            ids=current;elapsed=row.elapsedMs;
+        }
+        if(elapsed!==end.observedMs)return null;
+        return {calibration:c,records:records,observedMs:elapsed};
+    }catch(_){return null;}
+}
+function hostCpuSummary(text) {
+    const d=hostCpuEvidence(text,null);
+    if(!d)return null;
+    const rows=d.records, last=rows[rows.length-1], pct=(a,b)=>100*a/b,
+        sum=(r,i)=>r.reduce((a,b)=>a+b.aggregate[i],0);
+    const frequency=last.cores.filter(a=>a[4]!==null).map(a=>a[4]/1000);
+    const coreStats=last.cores.map((a,i)=>{
+        let ticks=0,busy=0;
+        for(const r of rows){ticks+=r.cores[i][1];busy+=r.cores[i][2];}
+        return {id:a[0],busy:pct(busy,ticks)};
+    }).sort((a,b)=>b.busy-a.busy||a.id-b.id);
+    return "HOST CPU // "+rows.length+" intervals / "+last.cores.length+" logical CPUs / "+d.observedMs+" ms"
+        +"\nBUSY // mean "+pct(sum(rows,1),sum(rows,0)).toFixed(1)+"% / peak "+Math.max(...rows.map(r=>pct(r.aggregate[1],r.aggregate[0]))).toFixed(1)+"%"
+        +"\nIOWAIT // "+pct(sum(rows,2),sum(rows,0)).toFixed(1)+"% weighted"
+        +"\nCPU PSI SOME AVG10 // "+(last.psiSomeAvg10===null?"N/A":last.psiSomeAvg10.toFixed(2)+"% (last reading)")
+        +"\nSCALING FREQUENCY // "+(frequency.length?Math.min(...frequency).toFixed(0)+"–"+Math.max(...frequency).toFixed(0)+" MHz / "+frequency.length+"/"+last.cores.length+" CPUs":"N/A")
+        +"\nTOP LOGICAL CPUs // "+coreStats.slice(0,8).map(a=>"CPU"+a.id+" "+a.busy.toFixed(1)+"%").join(" / ")
+        +"\nHost busy excludes idle and iowait, includes steal; 100% = aggregate capacity. PSI is a rolling kernel reading, not capture-local stall time. Scaling frequency is driver-reported, not measured clock. Raw report retains every covered logical CPU.";
 }

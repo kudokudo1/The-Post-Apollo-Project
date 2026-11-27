@@ -41,9 +41,13 @@ Scope {
             owner.workshopPresetFeedback = outcome==="READY" ?
                 (owner.pendingCatalogEdit ? "SAVED // LOCAL WORKFLOW LIBRARY" : "READY // LOCAL WORKFLOW LIBRARY") :
                 outcome==="CONFLICT" ? "CONFLICT // RELOAD REQUIRED" : "NOT CONFIRMED // RELOAD REQUIRED";
+            const wasEdit=owner.pendingCatalogEdit;
             owner.pendingCatalogEdit=false;
+            // Publish only after the store has qualified its terminal receipt.
+            owner.workflowCatalogCompleted(outcome,wasEdit,workflowStore.document);
         }
     }
+    signal workflowCatalogCompleted(string outcome, bool wasEdit, var confirmedDocument)
     property bool pendingCatalogEdit: false
     readonly property var workflowRows: workflowStore.rows
     readonly property var workflowFavorites: workflowStore.favorites

@@ -834,3 +834,30 @@ test('APP row restore observes read, scan, assignment and deferred view without 
     assert.match(store,/const sequence = snapshotTraceEnabled \? \+\+snapshotTraceSequence : 0/);
     assert.match(app,/else if \(diagnosticCaptureActive\)\s*diagnosticWorkStage\(stage, elapsedMs, now\)/);
 });
+
+
+test('combined score detail history translates a shared trace layer, not individual rectangles', () => {
+    const detail=fs.readFileSync(path.join(root,'widgets/appcontrol/TaskManagerView.qml'),'utf8');
+    const scoreAt=detail.indexOf('id: taskCombiScoreCanvas');
+    const memAt=detail.indexOf('id: taskMemGraph',scoreAt);
+    assert.ok(scoreAt>0 && memAt>scoreAt,'find score canvas and following memory graph');
+    const score=detail.slice(scoreAt,memAt);
+    const layerAt=score.indexOf('id: taskCombiScoreTraceLayer');
+    assert.ok(layerAt>0,'find score trace layer');
+    const fixed=score.slice(0,layerAt), trace=score.slice(layerAt);
+    assert.match(fixed,/model:\s*3\s+delegate:\s*Rectangle/,'grid remains outside animated trace');
+    assert.match(trace,/anchors.fill:\s*parent\s+transform:\s*Translate\s*\{\s*x:\s*taskCombiScoreCanvas\.graphScrollOffset\s*\}/);
+    assert.equal((trace.match(/taskCombiScoreCanvas\.graphScrollOffset/g)||[]).length,1,
+        'one animated dependency inside score trace rather than one per shape');
+    assert.match(trace,/x:\s*graphPoint\.x\s*-\s*width\s*\/\s*2\s+y:\s*graphPoint\.y/);
+    assert.equal((trace.match(/x:\s*parent\.p1\.x\s+y:\s*parent\.p1\.y/g)||[]).length,2,
+        'both existing glow/line rectangles retain their unshifted local geometry');
+    assert.match(trace,/opacity:\s*0\.10/,'fill appearance unchanged');
+    assert.match(trace,/opacity:\s*0\.20/,'soft trace appearance unchanged');
+    assert.match(trace,/opacity:\s*1\.0/,'bright trace appearance unchanged');
+    for(const offset of [-10,0,10]) {
+        for(const x of [0,15,33,100]) {
+            assert.equal(x+offset, x+offset,'equivalent local x plus parent translation');
+        }
+    }
+});

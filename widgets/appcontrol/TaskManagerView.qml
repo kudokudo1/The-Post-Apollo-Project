@@ -893,78 +893,87 @@ import "../../components"
                             }
                         }
 
-                        // Filled space under the restored combined-score trace.
-                        Repeater {
-                            model: taskCombiScoreCanvas.graphPoints.length
-
-                            delegate: Rectangle {
-                                readonly property point graphPoint:
-                                    taskCombiScoreCanvas.graphPoints[index]
-                                x: graphPoint.x - width / 2 + taskCombiScoreCanvas.graphScrollOffset
-                                y: graphPoint.y
-                                width: Math.max(
-                                    2.0,
-                                    taskCombiScoreCanvas.width
-                                    / Math.max(
-                                        2,
-                                        presentationState.taskCombiRenderPointLimit - 1
-                                    )
-                                    + 1.4
-                                )
-                                height: Math.max(
-                                    0,
-                                    taskCombiScoreCanvas.height - graphPoint.y - 1
-                                )
-                                color: taskCombiScoreGraph.accent
-                                opacity: 0.10
-                                antialiasing: true
+                        // Animate one trace layer, not every fill/line rectangle.
+                        // Reference grid stays fixed in the clipped canvas.
+                        Item {
+                            id: taskCombiScoreTraceLayer
+                            anchors.fill: parent
+                            transform: Translate {
+                                x: taskCombiScoreCanvas.graphScrollOffset
                             }
-                        }
+                            // Filled space under the restored combined-score trace.
+                            Repeater {
+                                model: taskCombiScoreCanvas.graphPoints.length
 
-                        Repeater {
-                            model: Math.max(
-                                0,
-                                taskCombiScoreCanvas.graphPoints.length - 1
-                            )
-
-                            delegate: Item {
-                                anchors.fill: parent
-
-                                readonly property point p1:
-                                    taskCombiScoreCanvas.graphPoints[index]
-                                readonly property point p2:
-                                    taskCombiScoreCanvas.graphPoints[index + 1]
-                                readonly property real dx: p2.x - p1.x
-                                readonly property real dy: p2.y - p1.y
-                                readonly property real segmentLength:
-                                    Math.sqrt(dx * dx + dy * dy)
-                                readonly property real segmentAngle:
-                                    Math.atan2(dy, dx) * 180 / Math.PI
-
-                                Rectangle {
-                                    x: parent.p1.x + taskCombiScoreCanvas.graphScrollOffset
-                                    y: parent.p1.y - height / 2
-                                    width: parent.segmentLength
-                                    height: 7
-                                    radius: 3.5
-                                    rotation: parent.segmentAngle
-                                    transformOrigin: Item.Left
+                                delegate: Rectangle {
+                                    readonly property point graphPoint:
+                                        taskCombiScoreCanvas.graphPoints[index]
+                                    x: graphPoint.x - width / 2
+                                    y: graphPoint.y
+                                    width: Math.max(
+                                        2.0,
+                                        taskCombiScoreCanvas.width
+                                        / Math.max(
+                                            2,
+                                            presentationState.taskCombiRenderPointLimit - 1
+                                        )
+                                        + 1.4
+                                    )
+                                    height: Math.max(
+                                        0,
+                                        taskCombiScoreCanvas.height - graphPoint.y - 1
+                                    )
                                     color: taskCombiScoreGraph.accent
-                                    opacity: 0.20
+                                    opacity: 0.10
                                     antialiasing: true
                                 }
+                            }
 
-                                Rectangle {
-                                    x: parent.p1.x + taskCombiScoreCanvas.graphScrollOffset
-                                    y: parent.p1.y - height / 2
-                                    width: parent.segmentLength
-                                    height: 2
-                                    radius: 1
-                                    rotation: parent.segmentAngle
-                                    transformOrigin: Item.Left
-                                    color: taskCombiScoreGraph.accent
-                                    opacity: 1.0
-                                    antialiasing: true
+                            Repeater {
+                                model: Math.max(
+                                    0,
+                                    taskCombiScoreCanvas.graphPoints.length - 1
+                                )
+
+                                delegate: Item {
+                                    anchors.fill: parent
+
+                                    readonly property point p1:
+                                        taskCombiScoreCanvas.graphPoints[index]
+                                    readonly property point p2:
+                                        taskCombiScoreCanvas.graphPoints[index + 1]
+                                    readonly property real dx: p2.x - p1.x
+                                    readonly property real dy: p2.y - p1.y
+                                    readonly property real segmentLength:
+                                        Math.sqrt(dx * dx + dy * dy)
+                                    readonly property real segmentAngle:
+                                        Math.atan2(dy, dx) * 180 / Math.PI
+
+                                    Rectangle {
+                                        x: parent.p1.x
+                                        y: parent.p1.y - height / 2
+                                        width: parent.segmentLength
+                                        height: 7
+                                        radius: 3.5
+                                        rotation: parent.segmentAngle
+                                        transformOrigin: Item.Left
+                                        color: taskCombiScoreGraph.accent
+                                        opacity: 0.20
+                                        antialiasing: true
+                                    }
+
+                                    Rectangle {
+                                        x: parent.p1.x
+                                        y: parent.p1.y - height / 2
+                                        width: parent.segmentLength
+                                        height: 2
+                                        radius: 1
+                                        rotation: parent.segmentAngle
+                                        transformOrigin: Item.Left
+                                        color: taskCombiScoreGraph.accent
+                                        opacity: 1.0
+                                        antialiasing: true
+                                    }
                                 }
                             }
                         }

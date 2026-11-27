@@ -1,4 +1,5 @@
 import QtQuick
+import "../favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
 
 QtObject {
     id: hunterOperationController
@@ -29,13 +30,13 @@ QtObject {
                 pid: Number(entry.pid || 0),
                 startTicks: Number(entry.startTicks || 0),
                 name: String(entry.comm || entry.name || "PROCESS").trim(),
-                identity: host.taskPersistentIdentity(entry)
+                identity: FavoriteIdentity.taskIdentity(entry)
             };
         });
     }
 
     function targetIsFavorite(target) {
-        if (!favoriteStoreObject) return true; // unavailable policy: do not dispatch
+        if (!favoriteStoreObject || !favoriteStoreObject.favoriteKeys) return true; // unavailable policy: do not dispatch
         if (!target)
             return false;
 
@@ -204,7 +205,7 @@ QtObject {
             if (Number(row.pid) === target.pid
                     && Number(row.startTicks) === target.startTicks
                     && String(row.comm || row.name || "").trim() === target.name
-                    && host.taskPersistentIdentity(row) === target.identity)
+                    && FavoriteIdentity.taskIdentity(row) === target.identity)
                 return row;
         }
         return null;

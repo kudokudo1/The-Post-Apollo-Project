@@ -173,7 +173,7 @@ ShellRoot {
         repeat: true
         running: !root.done
         onTriggered: {
-            if (++root.ticks > 640) {
+            if (++root.ticks > 680) {
                 root.check(false, "timeout // " + CpuPlusDiagnostics.feedback);
                 return;
             }
@@ -1221,6 +1221,47 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "swap remount retains scope but not readiness"))return;
                 console.log("CPU_D9A_SWAP_NATIVE_PASS");
+                root.paneActive=false;
+                root.resourceSubject="NETWORK";
+                root.resourcePaneActive=true;
+                root.phase=62;return;
+            }
+            if(root.phase===62 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!w)return;
+                const slider=root.findItem(w,"cpuplusWorkshopNetIoInterval");
+                if(!root.check(w.subject==="NETWORK" && w.draft.selected.join(",")==="netio"
+                    && slider && slider.visible && w.preview.ok && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.targetText==="TARGET // ALL VISIBLE INTERFACES"
+                    && root.resourceStatusGeometry(resourcePane.item),"Network shared status geometry and independent instrument"))return;
+                w.edit("durationSeconds",1);
+                w.edit("netIoIntervalMs",1000);
+                w.activate();root.phase=63;return;
+            }
+            if(root.phase===63 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && w.ready && !CpuPlusDiagnostics.busy,"Network PREPARE does not launch"))return;
+                w.activate();
+                if(!root.check(CpuPlusDiagnostics.busy && CpuPlusDiagnostics.kind==="netio","Network explicit START"))return;
+                root.resourcePaneActive=false;root.phase=64;return;
+            }
+            if(root.phase===64){
+                if(CpuPlusDiagnostics.busy||CpuPlusDiagnostics.archiveBusy)return;
+                const report=CpuPlusDiagnostics.reports.netio;
+                if(!root.check(report && report.status==="COMPLETE" && report.summary.includes("NETWORK //")
+                    && report.summary.includes("eth0 [2]") && report.summary.includes("lo [1]")
+                    && CpuPlusDiagnostics.archiveRows.some(r=>r.id===report.id&&r.kind==="netio"),
+                    "real Network reader and archive across unload // "+CpuPlusDiagnostics.feedback))return;
+                root.resourcePaneActive=true;root.phase=65;return;
+            }
+            if(root.phase===65 && resourcePane.item){
+                const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
+                if(!root.check(w && !w.ready && !CpuPlusDiagnostics.busy
+                    && w.draft.durationSeconds===1 && w.draft.selected.join(",")==="netio"
+                    && CpuPlusDiagnostics.swapWorkshopDraft.durationSeconds===1
+                    && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
+                    "Network remount retains draft without cross-scope authority"))return;
+                console.log("CPU_D10A_NETWORK_NATIVE_PASS");
                 console.log("CPU_DIAG_NATIVE_PASS");
                 root.done = true;
                 Qt.quit();

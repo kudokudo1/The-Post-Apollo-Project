@@ -66,6 +66,10 @@ Column {
     readonly property var preview: plan.instruments.length === 1
         ? Calibration.previewCalibration(Object.assign({},plan.instruments[0],{durationSeconds:plan.durationSeconds}))
         : Calibration.previewWorkflow(plan)
+    property bool saveEditorOpen: false
+    property string savePlanText: ""
+    property string pendingSaveName: ""
+    property string saveNotice: ""
     property string preparedText: ""
     property int preparedSequence: -1
     property bool calibrating: false
@@ -131,8 +135,57 @@ Column {
         if (i<0) selected.push(kind); else selected.splice(i,1);
         edit("selected",selected);
     }
+    function closeSaveEditor() {
+        saveEditorOpen=false;
+        savePlanText="";
+        pendingSaveName="";
+        if(workflowName) workflowName.text="";
+    }
+    function openSaveEditor() {
+        if (locked || calibrating || !preview.ok || saveEditorOpen) return false;
+        disarm();
+        saveNotice="";
+        savePlanText=planText;
+        saveEditorOpen=true;
+        if (!CpuPlusDiagnostics.workflowCatalogReady)
+            CpuPlusDiagnostics.loadWorkflowCatalog();
+        return true;
+    }
+    function confirmSave() {
+        if (!saveEditorOpen || locked || calibrating || !preview.ok || savePlanText!==planText) return false;
+        if (!CpuPlusDiagnostics.workflowCatalogReady) {
+            saveNotice="";
+            return CpuPlusDiagnostics.loadWorkflowCatalog();
+        }
+        const name=workflowName.text;
+        if (!CpuPlusDiagnostics.saveWorkshopPreset(name,subject)) {
+            saveNotice=CpuPlusDiagnostics.workshopPresetFeedback;
+            return false;
+        }
+        pendingSaveName=name;
+        saveNotice="SAVING // WAIT FOR CONFIRMATION";
+        return true;
+    }
+    Connections {
+        target: CpuPlusDiagnostics
+        function onWorkflowCatalogBusyChanged() {
+            if (CpuPlusDiagnostics.workflowCatalogBusy || !root.pendingSaveName) return;
+            const row=CpuPlusDiagnostics.workshopPresets.find(r=>r.name===root.pendingSaveName);
+            if (CpuPlusDiagnostics.workflowCatalogReady && row && row.execution==="configured"
+                    && JSON.stringify(row.plan)===root.savePlanText) {
+                root.closeSaveEditor();
+                root.saveNotice="SAVED // LOCAL WORKFLOW LIBRARY";
+            } else {
+                root.pendingSaveName="";
+                root.saveNotice="SAVE NOT CONFIRMED // RELOAD REQUIRED";
+            }
+        }
+        function onBusyChanged() { if(CpuPlusDiagnostics.busy) root.closeSaveEditor(); }
+        function onSetActiveChanged() { if(CpuPlusDiagnostics.setActive) root.closeSaveEditor(); }
+    }
     function activate() {
-        if (locked || calibrating || !preview.ok) return;
+        if (locked || calibrating || !preview.ok || saveEditorOpen) return;
+        saveNotice="";
         if (ready) {
             const frozen=JSON.parse(preparedText);
             disarm();
@@ -154,10 +207,10 @@ Column {
             }
         });
     }
-    onSubjectChanged: disarm()
-    onVisibleChanged: if (!visible) disarm()
+    onSubjectChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
+    onVisibleChanged: if (!visible) { disarm(); closeSaveEditor(); saveNotice=""; }
     onLockedChanged: if (locked) disarm()
-    onPlanTextChanged: disarm()
+    onPlanTextChanged: { disarm(); closeSaveEditor(); saveNotice=""; }
     onRecordingChanged: if (recording) displayNow=Date.now()
     Timer {
         interval: root.storageRunning ? 100 : 250
@@ -786,11 +839,13 @@ Column {
             width: parent.width
             text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
                 : CpuPlusDiagnostics.busy ? "SHARED CAPTURE ACTIVE // "+CpuPlusDiagnostics.kind.toUpperCase()
+                : root.saveEditorOpen ? (root.saveNotice || CpuPlusDiagnostics.workshopPresetFeedback)
                 : root.ready ? "SECOND CLICK STARTS CAPTURE"
-                : root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
-                : root.preview.reason
+                : root.saveNotice || (root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
+                : root.preview.reason)
             // Multi-instrument previews have a separate aggregate observation field.
-            color: root.recording ? Colors.green : root.ready ? Colors.orange : root.preview.ok ? Colors.omnitrix : Colors.yellow
+            color: root.recording ? Colors.green : root.saveEditorOpen ? Colors.magenta : root.ready ? Colors.orange
+                : root.saveNotice.startsWith("SAVED //") ? Colors.omnitrix : root.preview.ok ? Colors.omnitrix : Colors.yellow
             font.pixelSize: 10
             height: 14
             fontSizeMode: Text.HorizontalFit
@@ -801,9 +856,20 @@ Column {
         Row {
             width: parent.width
             spacing: 4
+            visible: !root.saveEditorOpen
+            ActionButton {
+                objectName: "cpuplusWorkshopSave"
+                width: 54
+                height: 28
+                label: "SAVE"
+                normalFace: true
+                accentColor: Colors.magenta
+                available: !root.locked && !root.calibrating && root.preview.ok
+                onLeftClicked: root.openSaveEditor()
+            }
             CpuPlusDiagnosticExecutionButton {
                 objectName: "cpuplusWorkshopExecute"
-                width: Math.max(0,parent.width-40)
+                width: Math.max(0,parent.width-98)
                 height: 28
                 phase: root.phase
                 caption: root.phase==="READY" ? "READY // START"
@@ -829,6 +895,60 @@ Column {
                 Accessible.role: Accessible.Button
                 Accessible.onPressAction: if (available) CpuPlusDiagnostics.cancel()
                 onLeftClicked: CpuPlusDiagnostics.cancel()
+            }
+        }
+        Row {
+            objectName: "cpuplusWorkshopSaveEditor"
+            visible: root.saveEditorOpen
+            width: parent.width
+            spacing: 4
+            Rectangle {
+                width: Math.max(0,parent.width-108)
+                height: 28
+                color: Colors.black
+                border.color: Colors.magenta
+                TextInput {
+                    id: workflowName
+                    objectName: "cpuplusWorkshopSaveName"
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    maximumLength: 32
+                    color: Colors.white
+                    font.pixelSize: 11
+                    verticalAlignment: TextInput.AlignVCenter
+                    selectByMouse: true
+                    enabled: !root.locked
+                    onTextChanged: if(!root.pendingSaveName) root.saveNotice=""
+                    onAccepted: root.confirmSave()
+                }
+                GohuText {
+                    anchors.centerIn: parent
+                    visible: workflowName.text.length===0 && !workflowName.activeFocus
+                    text: "WORKFLOW NAME"
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                }
+            }
+            ActionButton {
+                objectName: "cpuplusWorkshopConfirmSave"
+                width: 66
+                height: 28
+                label: CpuPlusDiagnostics.workflowCatalogReady ? "SAVE" : "RELOAD"
+                normalFace: true
+                accentColor: Colors.omnitrix
+                available: !root.locked && root.preview.ok &&
+                    (!CpuPlusDiagnostics.workflowCatalogReady || workflowName.text.length>0)
+                onLeftClicked: root.confirmSave()
+            }
+            ActionButton {
+                objectName: "cpuplusWorkshopCancelSave"
+                width: 34
+                height: 28
+                label: "X"
+                normalFace: true
+                accentColor: Colors.red
+                available: !CpuPlusDiagnostics.workflowCatalogBusy
+                onLeftClicked: { root.closeSaveEditor(); root.saveNotice=""; }
             }
         }
     

@@ -407,8 +407,8 @@ assert.match(automotive,/readonly property string detailTier:/);
 assert.match(automotive,/readonly property int unitPixelSize: Math.max\(9,/);
 assert.match(automotive,/function cut\(m,k,fill,stroke\)/);
 assert.match(chassis,/readonly property real screwSlotWidth: Math.max\(1.5,/);
-assert.match(chassis,/c.fillRect\(x-span\/2,y-slot\/2,span,slot\)/);
-assert.match(chassis,/c.fillRect\(x-slot\/2,y-span\/2,slot,span\)/);
+assert.match(chassis,/function cross\(half,arm,fill\)/);
+assert.match(chassis,/cross\(half,arm,metal\(arm,/);
 assert.match(stopwatchDialSource,/objectName: "selectorDialReadableValue"/);
 
 // Inset readouts use the actual chamfer vertices and never overlap the numeric text.
@@ -418,5 +418,14 @@ assert.match(automotive,/root.minimumSegmentGap\/\(inner\*u\)/);
 assert.match(automotive,/height: Math.max\(0,parent.height-2-parent.unitHeight\)/);
 assert.match(automotive,/width: Math.max\(0,parent.width-4-parent.unitWidth\)/);
 assert.match(chassis,/readonly property real screwEdgeClearance: screwInset-screwDiameter\/2/);
-assert.match(chassis,/createLinearGradient\(x-rad,y-rad,x\+rad,y\+rad\)/);
+assert.match(chassis,/createLinearGradient\(-head,-head,head,head\)/);
+for(const source of [chassis,automotive,stopwatchDialSource]) assert.match(source,/property color screwColor: "#40899b"/);
+assert.match(automotive,/screwColor: root.screwColor/);
+assert.equal((stopwatchDialSource.match(/screwColor: dialRoot.screwColor/g)||[]).length,2);
+assert.match(chassis,/function onScrewColorChanged\(\) \{ plate.requestPaint\(\) \}/);
+for(const [property,value] of [["screwShadow","0.75"],["screwDirectLight","0.20"],["screwReflectedLight","0.10"],["screwCatchlight","0.40"],["screwRecessDepth","0.14"]]) assert.ok(chassis.includes("readonly property real "+property+": "+value));
+assert.ok(chassis.indexOf("disk(head,shade)") > chassis.indexOf("cross(half,arm,metal"));
+assert.ok(chassis.indexOf("Fixed screen-space top-right catchlight") > chassis.indexOf("disk(head,shade)"));
+assert.match(chassis,/Math.atan2\(height\/2-y,width\/2-x\)-Math.PI\/4/);
+assert.doesNotMatch(chassis,/c.arc\(x\+0.35,y\+0.55/);
 assert.match(stopwatchDialSource,/externalUnitReadout: true/);

@@ -440,7 +440,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     const c=vm.createContext({});
     vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
     assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("CPU"))',c),'["threads","census","hostcpu"]');
-    assert.equal(vm.runInContext('workshopSubjectKinds("GPU").length',c),0);
+    assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("GPU"))',c),'["gpu"]');
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"CPU")',c),true);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"storage"}]},"CPU")',c),false);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"GPU")',c),false);
@@ -450,7 +450,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     const resource=read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml");
     assert.match(resource,/CpuPlusDiagnosticsPane\s*\{/);
     assert.doesNotMatch(resource,/\b(?:Timer|Process)\s*\{|requestWorkshopCapture\(/);
-    assert.match(read("widgets/CpuPlusW.qml"),/sourceComponent: CpuPlusResourceDiagnosticsPane \{ subject: "CPU" \}/);
+    assert.match(read("widgets/CpuPlusW.qml"),/sourceComponent: CpuPlusResourceDiagnosticsPane \{ subject: cpuResourceDiagnosticsLoader\.resourceSubject \}/);
 }
 
 // D6b host CPU evidence and calibration, distinct from process CPU.

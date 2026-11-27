@@ -6,13 +6,13 @@
 function createPresentation(feed) {
     let observed = null, epoch = null, scope = "", used = false;
     let prompt = "", text = "", sequence = 0, status = "IDLE";
-    let admitted = false, terminal = false, baseline = "";
+    let admitted = false, terminal = false, baseline = "", stopFrozen = false;
     const ranks = {PREPARED:1, LOCAL_RESERVED:2, GENERATING:3,
         STOP_REQUESTED:4, LOCAL_COMMITTED:5, UNKNOWN_HOLD:5};
     const keys = ["sequence","status","text","local_outcome","provisional","native_admitted"];
     function validEpoch(v) { return Number.isSafeInteger(v) && v > 0; }
     function bounded(s, max, allowEmpty) {
-        if (typeof s !== "string" || (!allowEmpty && !s) || s.indexOf("\x00") !== -1)
+        if (typeof s !== "string" || s.length > max || (!allowEmpty && !s) || s.indexOf("\x00") !== -1)
             return false;
         try { return encodeURIComponent(s).replace(/%[0-9a-fA-F]{2}|[^%]/g,"x").length <= max; }
         catch (_) { return false; }
@@ -92,6 +92,13 @@ function createPresentation(feed) {
         return s.provisional === !!s.text && (!s.text || s.native_admitted)
             && s.text.indexOf(text) === 0;
     }
+    // UI1 calls this for the original view BEFORE calling host.stop. This is
+    // a presentation fence, not proof of accepted cancellation or provider idle.
+    function requestStop(v) {
+        if (terminal || stopFrozen || !current(v)) return false;
+        stopFrozen = true; status = "STOP_REQUESTED";
+        return true;
+    }
     function receive(v,s) {
         // Stale/duplicate packets do not advance or damage current display.
         if (epoch === null || v !== epoch || observed !== epoch || terminal)
@@ -99,13 +106,21 @@ function createPresentation(feed) {
         if (!current(v)) { retire(); return false; }
         if (s && Number.isSafeInteger(s.sequence) && s.sequence <= sequence)
             return false;
+        // In-flight pre-STOP snapshots can arrive after the owner fence.
+        // Do not grow or erase the visible partial in response to them.
+        if (stopFrozen && s && ["PREPARED","LOCAL_RESERVED","GENERATING"].indexOf(s.status)>=0)
+            return false;
         if (!validSnapshot(s)) return hold();
         if (s.status === "UNKNOWN_HOLD") {
             hold();
             sequence = s.sequence; admitted = s.native_admitted;
             return true;
         }
-        if (s.text) {
+        if (s.status === "STOP_REQUESTED") stopFrozen = true;
+        // Only the original independently correlated commit-won terminal
+        // can replace the frozen text. STOP alone never settles the attempt.
+        const show = !stopFrozen || s.status === "LOCAL_COMMITTED";
+        if (show && s.text) {
             if (!baseline) {
                 baseline = s.text;
                 feed.messages = [outgoing(),{direction:"incoming",body:baseline}];
@@ -113,7 +128,8 @@ function createPresentation(feed) {
             // Retain the original incoming row; replace only its display text.
             if (!feed.updateStreamingTail(scope,s.text)) return hold();
         }
-        text = s.text; sequence = s.sequence; status = s.status;
+        if (show) text = s.text;
+        sequence = s.sequence; status = s.status;
         admitted = s.native_admitted;
         terminal = status === "LOCAL_COMMITTED";
         return true;
@@ -126,5 +142,5 @@ function createPresentation(feed) {
         return {status:status,sequence:sequence,terminal:terminal,
             nativeAdmitted:admitted};
     }
-    return {observe,attach,receive,withdraw,state};
+    return {observe,attach,receive,requestStop,withdraw,state};
 }

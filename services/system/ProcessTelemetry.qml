@@ -453,7 +453,7 @@ Scope {
             + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
             + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
             + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
-            + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2; n++} END{if(n==2) print sum+0; else print \"-\"}' /proc/$pid/io 2>/dev/null); "
+            + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2; n++} END{if(n==2) printf \"%.0f\", sum+0; else print \"-\"}' /proc/$pid/io 2>/dev/null); "
             + "birth=$(awk '{sub(/^.*[)] /,\"\"); print $20}' /proc/$pid/stat 2>/dev/null); "
             + "[ \"$birth\" = \"$start\" ] || exit 0; "
             + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "

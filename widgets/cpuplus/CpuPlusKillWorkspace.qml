@@ -26,7 +26,7 @@ Item {
     property var selectedGraphKeys: ["cpu","mem"]
 
     function toggleMetricGraph(key) {
-        if (["cpu","mem","rss","threads","io","age","combined"].indexOf(key)<0) return;
+        if (["cpu","mem","rss","threads","io","age","swap","combined"].indexOf(key)<0) return;
         const previous=selectedGraphKeys;
         if (key==="combined") {
             selectedGraphKeys=previous.indexOf("combined")>=0 ? [] : ["combined","score"];
@@ -749,16 +749,20 @@ Item {
                                 objectName: "cpuPlusProcessIdentityMetadata"
                                 width: parent.width
                                 text: workspace.currentTask
-                                    ? "PID "+workspace.selectedPid+" • "+String(workspace.currentTask.user || "?")
-                                      +" • "+String(workspace.currentTask.state || "?") : ""
-                                textFormat: Text.PlainText
+                                    ? workspace.reviewInk("PID ", Colors.magenta)
+                                      + workspace.reviewInk(workspace.selectedPid, Colors.white)
+                                      + workspace.reviewInk(" • ", Colors.magenta)
+                                      + workspace.reviewInk(workspace.currentTask.user || "?", Colors.white)
+                                      + workspace.reviewInk(" • ", Colors.magenta)
+                                      + workspace.reviewInk(workspace.currentTask.state || "?", Colors.white) : ""
+                                textFormat: Text.StyledText
                                 font.pixelSize: 12
                                 color: Colors.white
                                 elide: Text.ElideRight
                                 layer.enabled: true
                                 layer.effect: DropShadow {
-                                    radius: 5; samples: 7; opacity: 0.55
-                                    color: Colors.cyan; transparentBorder: true
+                                    radius: 5; samples: 7; opacity: 0.65
+                                    color: Colors.magenta; transparentBorder: true
                                 }
                             }
                         }
@@ -981,6 +985,7 @@ Item {
                     model: workspace.currentTask ? [
                         {key:"rss", label:"RSS", unit:" MiB", accent:Colors.resourceColor("rss"), range:16, decimals:1},
                         {key:"threads", label:"THREADS", unit:"", accent:Colors.resourceColor("threads"), range:4, decimals:0},
+                        {key:"swap", label:"SWAP", unit:" MiB", accent:Colors.resourceColor("swap"), range:16, decimals:1},
                         {key:"io", label:"I/O", unit:" MiB/s", accent:Colors.cyan, range:0.25, decimals:2},
                         {key:"age", label:"UPTIME", unit:" min", accent:Colors.resourceColor("uptime"), range:1, decimals:2}
                     ].filter(m=>workspace.selectedGraphKeys.indexOf(m.key)>=0) : []

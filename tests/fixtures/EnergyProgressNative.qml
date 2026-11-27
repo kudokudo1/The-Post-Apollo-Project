@@ -21,12 +21,19 @@ ShellRoot {
             }
             return ok;
         }
+        EnergyPressureField { id: field }
         Column {
             anchors.fill: parent
             anchors.margins: 18
             spacing: 20
             Repeater {
                 id: faces
+                onItemAdded: function(index, item) {
+                    field.sources = field.sources.concat([item]);
+                }
+                onItemRemoved: function(index, item) {
+                    field.sources = field.sources.filter(source => source !== item);
+                }
                 model: ["omnitrix","tron","ki-blast","flamethrower"]
                 EnergyProgressFace {
                     required property string modelData
@@ -44,6 +51,18 @@ ShellRoot {
             onTriggered: {
                 const elapsed = Date.now()-lab.started;
                 if (!lab.require(faces.count===4,"variant count")) return;
+                if (!lab.require(Math.abs(field.offsetX)<=3.000001 && Math.abs(field.offsetY)<=2.000001,
+                        "bounded aggregate widget pressure")) return;
+                if (lab.stage===0 || lab.stage===3 || lab.stage>=4) {
+                    if (!lab.require(field.pressure===0 && field.offsetX===0 && field.offsetY===0,
+                            "idle, hidden or reduced host pressure "+lab.stage)) return;
+                } else if (lab.stage===1) {
+                    if (!lab.require(field.pressure>0 && field.pressure<=1,
+                            "running host pressure")) return;
+                    const f=faces.itemAt(0);
+                    if (elapsed>4800 && !lab.require(field.pressure>.5,
+                            "overdrive host pressure")) return;
+                }
                 for (let i=0;i<faces.count;i++) {
                     const f=faces.itemAt(i);
                     if (!lab.require(f && f.headCenterY===f.height/2,"centerline "+i)) return;
@@ -77,7 +96,7 @@ ShellRoot {
                 }
                 if (lab.stage===1 && elapsed<=4800) return;
                 if (lab.stage===6) {
-                    console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset");
+                    console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset; bounded host pressure; hidden and reduced host rest");
                     Qt.quit();
                     return;
                 }

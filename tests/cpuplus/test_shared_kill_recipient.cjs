@@ -677,8 +677,8 @@ test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results wi
     assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
     assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
     assert.doesNotMatch(owner,/property: "donorHunterFavorites"/);
-    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!host \|\| !favoriteStoreObject\) return;/);
-    assert.match(controller,/if \(!host \|\| !favoriteStoreObject\) \{ stopRemaining\(\); return; \}/);
+    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!policyReady \|\| \(cpuRecipient !== true && !host\)\) return;/);
+    assert.match(controller,/if \(!policyReady\) \{ stopRemaining\(\); return; \}/);
     assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
     assert.doesNotMatch(owner,/property alias hunterOperation/);
 });
@@ -778,7 +778,7 @@ test("K4c: shared HOG and MICE rules retain thresholds and refuse unknown window
     assert.deepEqual(api.hunterHogCandidates(1),[top,above]);
     assert.match(owner,/return KillBackend\.KillStore\.hunterHogCandidates\(/);
     assert.match(owner,/return KillBackend\.KillStore\.hunterMouseCandidates\(\)/);
-    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.swayWindows/);
+    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.windowDataReady && !appControlWindow\.windowDataError\s*\? appControlWindow\.swayWindows : null/);
 });
 
 test("K4d: direct service admission consumes only the reviewed targets and preserves exclusion", () => {
@@ -791,7 +791,7 @@ test("K4d: direct service admission consumes only the reviewed targets and prese
     assert.ok(a>=0 && b>a && c>b && d>c);
     const row={pid:4321,startTicks:98765,name:"synthetic",identity:"synthetic"};
     let starts=[];
-    const operation={host:{},favoriteStoreObject:{},phase:"idle",recipientOwned:false,
+    const operation={policyReady:true,phase:"idle",recipientOwned:false,
         targetsFromRows:rs=>rs.map(r=>({...r})),targetIsFavorite:r=>!!r.favorite,
         start:(kind,targets,owned)=>{starts.push({kind,targets,owned});operation.phase="running";operation.recipientOwned=owned;}};
     const gate={pending:null,busy:false,bulkBlocked:false};
@@ -815,13 +815,33 @@ test("K4d: direct service admission consumes only the reviewed targets and prese
     gate.pending={};
     assert.equal(api.confirmCpuBulkReview(review),false);
     gate.pending=null;
-    operation.host=null;
+    operation.policyReady=false;
     assert.equal(api.confirmCpuBulkReview(review),false);
-    operation.host={};
+    operation.policyReady=true;
     assert.equal(api.confirmCpuBulkReview(review),true);
     assert.equal(api.confirmCpuBulkReview(review),false);
     assert.equal(starts.length,1);
     assert.equal(starts[0].targets,review.targets);
     assert.equal(starts[0].owned,true);
     assert.doesNotMatch(recipient,/appControlWindow\.(cpuBulk|prepareCpuBulk|confirmCpuBulk|cancelCpuBulk|acknowledgeCpuBulk|hunterOperationPhase|hunterOperationKind)/);
+});
+
+test("K4e: Hunter dispatch reads the service policy and never the legacy dialog host", () => {
+    const store=read("services/kill/KillStore.qml");
+    const controller=read("services/kill/HunterOperationController.qml");
+    assert.match(store,/policyOwner: root/);
+    assert.match(controller,/policyOwner\.collectionEnabled === true/);
+    assert.match(controller,/for \(const row of policyOwner\.rows\)/);
+    assert.match(controller,/policyOwner\.taskEligibleForKillAll\(row\)/);
+    assert.match(controller,/policyOwner\.hunterMouseProtectedReason\(row\)/);
+    assert.doesNotMatch(controller,/host\.(taskRows|taskEligibleForKillAll|hunterMouseProtectedReason|taskPersistentIdentity)/);
+    const begin=controller.indexOf("    function liveRow("),end=controller.indexOf("    function dispatchNext(",begin);
+    const policy={rows:[{pid:4321,startTicks:999,comm:"Synthetic"}]};
+    const api=new Function("policyOwner","FavoriteIdentity","let policyReady=true;"+controller.slice(begin,end)
+        +"\nreturn {liveRow,ready:v=>policyReady=v};")(policy,{taskIdentity:r=>r.comm.toLowerCase()});
+    const target={pid:4321,startTicks:999,name:"Synthetic",identity:"synthetic"};
+    assert.equal(api.liveRow(target),policy.rows[0]);
+    assert.equal(api.liveRow({...target,startTicks:998}),null);
+    api.ready(false);
+    assert.equal(api.liveRow(target),null);
 });

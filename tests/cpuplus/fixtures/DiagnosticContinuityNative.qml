@@ -870,18 +870,53 @@ ShellRoot {
                 const name=root.findItem(pane.item,"cpuplusDiagnosticPresetName");
                 const save=root.findItem(pane.item,"cpuplusDiagnosticSavePreset");
                 if(!root.check(name&&save&&name.visible&&save.visible,"library restored by bottom filter"))return;
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workflowCatalogReady && CpuPlusDiagnostics.workshopPresets.length===6,
+                    "initial durable library contains six defaults"))return;
                 name.text="STALL SESSION";
                 save.leftClicked(null);
-                if (!root.check(CpuPlusDiagnostics.workshopPresets.length===1
-                    && CpuPlusDiagnostics.workshopPresets[0].plan.instruments[1].thresholdMs===500
-                    && !CpuPlusDiagnostics.saveWorkshopPreset("stall session")
-                    && !CpuPlusDiagnostics.busy,"save calibrated session preset without starting")) return;
-                root.paneActive=false;
-                root.phase=29;
+                if(!root.check(CpuPlusDiagnostics.workflowCatalogBusy&&!CpuPlusDiagnostics.busy,
+                    "SAVE starts storage only"))return;
+                root.phase=282;
                 return;
             }
+            if(root.phase===282 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                const row=CpuPlusDiagnostics.workshopPresets.find(r=>r.name==="STALL SESSION");
+                if(!root.check(CpuPlusDiagnostics.workflowCatalogReady && CpuPlusDiagnostics.workshopPresets.length===7
+                    && row && row.plan.instruments[1].thresholdMs===500 && !row.favorite
+                    && !CpuPlusDiagnostics.saveWorkshopPreset("stall session") && !CpuPlusDiagnostics.busy,
+                    "confirmed saved calibration and duplicate rejection"))return;
+                const favorite=root.findItem(pane.item,"cpuplusDiagnosticFavorite-"+row.id);
+                if(!root.check(favorite&&favorite.available,"library favorite button"))return;
+                favorite.leftClicked(null);
+                root.phase=283;return;
+            }
+            if(root.phase===283 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workflowFavorites.some(r=>r.name==="STALL SESSION")
+                    && !CpuPlusDiagnostics.busy && CpuPlusDiagnostics.loadWorkflowCatalog(),
+                    "favorite shared with QUICK; reload explicit"))return;
+                root.phase=284;return;
+            }
+            if(root.phase===284 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workflowCatalogReady
+                    && CpuPlusDiagnostics.workflowFavorites.some(r=>r.name==="STALL SESSION")
+                    && !CpuPlusDiagnostics.busy,"favorite survives actual disk reload"))return;
+                root.findItem(pane.item,"cpuplusDiagnosticWorkspace-WORK").leftClicked(null);
+                root.findItem(pane.item,"cpuplusDiagnosticView-QUICK").leftClicked(null);
+                root.phase=285;return;
+            }
+            if(root.phase===285 && pane.item){
+                const row=CpuPlusDiagnostics.workflowFavorites.find(r=>r.name==="STALL SESSION");
+                if(!root.check(row && root.findItem(pane.item,"cpuplusQuick-"+row.id)
+                    && !CpuPlusDiagnostics.busy,"saved workflow visible in QUICK without execution"))return;
+                root.paneActive=false;
+                root.phase=29;return;
+            }
             if (root.phase===29) {
-                if (!root.check(CpuPlusDiagnostics.workshopPresets.length===1,"preset survives menu destruction")) return;
+                if (!root.check(CpuPlusDiagnostics.workshopPresets.some(r=>r.name==="STALL SESSION"),"preset survives menu destruction")) return;
                 root.paneActive=true;
                 root.phase=30;
                 return;
@@ -918,14 +953,29 @@ ShellRoot {
                 workshop.chooseStorageCadence("report",10);
                 if (!root.check(workshop.preview.ok && workshop.draft.storageSampleSeconds===1 && workshop.draft.storageReportSeconds===10,
                     "explicit recalibration enables short set capture")) return;
-                if (!root.check(CpuPlusDiagnostics.saveWorkshopPreset("QUICK A")
-                    && CpuPlusDiagnostics.saveWorkshopPreset("QUICK B")
-                    && CpuPlusDiagnostics.queueWorkshop("QUICK A")
+                if(!root.check(CpuPlusDiagnostics.saveWorkshopPreset("QUICK A"),"save first set step"))return;
+                root.phase=320;return;
+            }
+            if(root.phase===320 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workshopPresets.some(r=>r.name==="QUICK A")
+                    && CpuPlusDiagnostics.saveWorkshopPreset("QUICK B"),"save second set step"))return;
+                root.phase=321;return;
+            }
+            if(root.phase===321 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if (!root.check(CpuPlusDiagnostics.queueWorkshop("QUICK A")
                     && CpuPlusDiagnostics.queueWorkshop("QUICK B")
                     && CpuPlusDiagnostics.moveWorkshopQueue(1,-1)
                     && CpuPlusDiagnostics.saveWorkshopSet("ORDERED")
                     && CpuPlusDiagnostics.clearWorkshopQueue()
-                    && CpuPlusDiagnostics.removeWorkshopPreset("QUICK A")
+                    && CpuPlusDiagnostics.removeWorkshopPreset("QUICK A"),
+                    "remove catalog row after set snapshot"))return;
+                root.phase=322;return;
+            }
+            if(root.phase===322 && pane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(!CpuPlusDiagnostics.workshopPresets.some(r=>r.name==="QUICK A")
                     && CpuPlusDiagnostics.loadWorkshopSet("ORDERED")
                     && CpuPlusDiagnostics.workshopQueue[0].name==="QUICK B"
                     && CpuPlusDiagnostics.workshopQueue[1].name==="QUICK A"
@@ -982,7 +1032,12 @@ ShellRoot {
                     && !CpuPlusDiagnostics.loadWorkshopPreset("STALL SESSION","CPU")
                     && CpuPlusDiagnostics.saveWorkshopPreset("CPU ONLY","CPU"),
                     "CPU draft and preset scope isolated from general calibration"))return;
-                w.activate(); root.phase=36; return;
+                root.phase=350;return;
+            }
+            if(root.phase===350 && resourcePane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workshopPresets.some(r=>r.name==="CPU ONLY"),"CPU save confirmed"))return;
+                root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop").activate();root.phase=36;return;
             }
             if(root.phase===36 && resourcePane.item){
                 const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
@@ -1056,7 +1111,12 @@ ShellRoot {
                 if(!root.check(JSON.stringify(CpuPlusDiagnostics.cpuWorkshopDraft)===root.cpuDraftWitness
                     && !CpuPlusDiagnostics.loadWorkshopPreset("CPU ONLY","GPU")
                     && CpuPlusDiagnostics.saveWorkshopPreset("GPU ONLY","GPU"),"GPU calibration and preset scope isolated"))return;
-                w.activate();root.phase=44;return;
+                root.phase=430;return;
+            }
+            if(root.phase===430 && resourcePane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workshopPresets.some(r=>r.name==="GPU ONLY"),"GPU save confirmed"))return;
+                root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop").activate();root.phase=44;return;
             }
             if(root.phase===44 && resourcePane.item){
                 const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");
@@ -1110,7 +1170,12 @@ ShellRoot {
                     && JSON.stringify(CpuPlusDiagnostics.gpuWorkshopDraft)===root.gpuDraftWitness
                     && JSON.stringify(CpuPlusDiagnostics.workshopDraft)===root.generalDraftWitness,
                     "storage cadence and preset scope remain independent"))return;
-                w.activate();root.phase=49;return;
+                root.phase=480;return;
+            }
+            if(root.phase===480 && resourcePane.item){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workshopPresets.some(r=>r.name==="STORAGE ONLY"),"storage save confirmed"))return;
+                root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop").activate();root.phase=49;return;
             }
             if(root.phase===49 && resourcePane.item){
                 const w=root.findItem(resourcePane.item,"cpuplusDiagnosticWorkshop");

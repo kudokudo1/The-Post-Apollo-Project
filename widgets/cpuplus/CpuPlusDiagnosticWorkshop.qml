@@ -265,17 +265,17 @@ Column {
         fillColor: Colors.orange
         visible: root.draft.selected.includes("hostcpu")
         title: "HOST SAMPLE INTERVAL"
-        readout: (root.draft.hostCpuIntervalMs||1000)/1000+" SEC"
+        readout: root.draft.hostCpuIntervalMs/1000+" SEC"
         minimumValue: 1
         maximumValue: 5
-        currentValue: (root.draft.hostCpuIntervalMs||1000)/1000
+        currentValue: root.draft.hostCpuIntervalMs/1000
         adjustable: !root.locked
         onValueRequested: value=>root.edit("hostCpuIntervalMs",value*1000)
     }
     GohuText {
         width: parent.width
         visible: root.draft.selected.includes("hostcpu")
-        text: "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY\n".trim()+" · 12 SAMPLES MAX"
+        text: "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
         color: Colors.orange
         font.pixelSize: 10
         wrapMode: Text.WordWrap

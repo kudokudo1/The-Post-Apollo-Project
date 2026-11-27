@@ -108,3 +108,17 @@ function speedSample(previous,current,dt,prior) {
     const old=Math.max(0,Math.min(1,Number.isFinite(prior)?prior:0));
     return old+(target-old)*(1-Math.exp(-dt/.16));
 }
+
+// Three logical pixels of clear space after the one-pixel chassis stroke
+// at the canonical 34px height. Scale with height, not track length.
+// Tiny tracks retain at least half of each dimension for the fill.
+function trackGeometry(width,height,fraction) {
+    const w=Math.max(0,Number.isFinite(width)?width:0);
+    const h=Math.max(0,Number.isFinite(height)?height:0);
+    const p=Math.max(0,Math.min(1,Number.isFinite(fraction)?fraction:0));
+    const gap=Math.min(6,3*h/34);
+    const inset=Math.min(1+gap,w/4,h/4);
+    const innerWidth=w-2*inset, innerHeight=h-2*inset;
+    return {inset:inset,gap:Math.max(0,inset-1),width:innerWidth,height:innerHeight,
+        front:inset+innerWidth*p};
+}

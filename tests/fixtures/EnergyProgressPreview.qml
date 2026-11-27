@@ -63,7 +63,7 @@ ShellRoot {
                     const light=field.clashLight;
                     if(!light || width<=0 || height<=0) return;
                     const source=light.source;
-                    const origin=source.mapToItem(battlefieldLight,source.width*light.fraction,source.height/2);
+                    const origin=source.mapToItem(battlefieldLight,source.headCenterX,source.headCenterY);
                     const split=Math.max(0,Math.min(width,origin.x));
                     const heat=light.heat;
                     const enemy=Qt.rgba(1,.67-.56*heat,.35-.20*heat,1);
@@ -82,8 +82,8 @@ ShellRoot {
                         g.addColorStop(1,Qt.rgba(color.r,color.g,color.b,0));
                         c.fillStyle=g; c.fillRect(-1,-1,2,2); c.restore();
                     }
-                    const start=source.mapToItem(battlefieldLight,0,source.height/2).x;
-                    const end=source.mapToItem(battlefieldLight,source.width,source.height/2).x;
+                    const start=source.mapToItem(battlefieldLight,source.track.inset,source.headCenterY).x;
+                    const end=source.mapToItem(battlefieldLight,source.track.inset+source.track.width,source.headCenterY).x;
                     // Extended sources follow the actual occupied beam lengths.
                     // Falloff occurs both vertically and horizontally. No flat
                     // territory tint or hard boundary is drawn.
@@ -125,7 +125,7 @@ ShellRoot {
                     c.reset(); c.clearRect(0,0,width,height);
                     for(const light of field.localLights) {
                         const source=light.source;
-                        const p=source.mapToItem(localRadiance,source.width*light.fraction,source.height/2);
+                        const p=source.mapToItem(localRadiance,source.headCenterX,source.headCenterY);
                         const h=source.height;
                         const flame=light.fire?source.flameMotion:null;
                         const rx=h*(light.fire?5.2*flame.stretch:4.8);
@@ -351,7 +351,7 @@ ShellRoot {
                 const source=field.flashSource;
                 if (!source || field.completionFlash<=0 || width<=0 || height<=0) return;
                 const origin=source.mapToItem(flashOverlay,
-                    source.width*source.displayedFraction,source.height/2);
+                    source.headCenterX,source.headCenterY);
                 const radius=Math.max(1,Math.hypot(Math.max(origin.x,width-origin.x),
                     Math.max(origin.y,height-origin.y))*(.10+1.25*field.flashSpread));
                 const ink=field.flashColor, alpha=field.completionFlash;

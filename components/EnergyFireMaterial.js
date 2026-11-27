@@ -42,7 +42,7 @@ function drawAsh(c,x,y,w,h,edge,hot) {
 }
 // Render only the remaining solid chassis. The left region is genuinely
 // transparent except for small stationary burnt fragments near the cut.
-function drawRemaining(c,x,y,w,h,edge,hot,border) {
+function drawRemaining(c,x,y,w,h,edge,hot,border,inset) {
     const remaining=Math.max(0,x+w-edge);
     if(remaining>0 && h>0) {
         const n=Math.min(remaining,h*.24);
@@ -57,7 +57,23 @@ function drawRemaining(c,x,y,w,h,edge,hot,border) {
         c.closePath();
         const g=c.createLinearGradient(0,y,0,y+h);
         g.addColorStop(0,"#26212b"); g.addColorStop(.5,"#3b323c"); g.addColorStop(1,"#16121b");
-        c.fillStyle=g; c.fill(); c.strokeStyle=border; c.lineWidth=1; c.stroke();
+        const pad=Math.max(0,Number.isFinite(inset)?inset:0);
+        if(pad>0) {
+            // The surviving shell is still present, but its solid material
+            // sits inside the same clear channel as the other treatments.
+            c.fillStyle="#16051F"; c.fill();
+            c.save(); c.clip();
+            const left=Math.max(x+pad,edge+pad);
+            const right=x+w-pad;
+            if(right>left && h>2*pad) {
+                c.fillStyle=g;
+                c.fillRect(left,y+pad,right-left,h-2*pad);
+            }
+            c.restore();
+        } else {
+            c.fillStyle=g; c.fill();
+        }
+        c.strokeStyle=border; c.lineWidth=1; c.stroke();
         c.restore();
     }
     if(hot && remaining>0) {

@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - "services/diagnostics/DiagnosticWorkflowDefaults.js"
+      - "services/diagnostics/DiagnosticTargetRegistry.js"
+      - "tests/cpuplus/test_diagnostic_target_registry.cjs"
       - "services/diagnostics/DiagnosticWorkflowReceipt.js"
       - "services/diagnostics/DiagnosticWorkflowStore.qml"
       - "tests/cpuplus/test_diagnostic_workflow_receipt.cjs"
@@ -26,4 +28,5 @@ jobs:
       - run: node tests/cpuplus/test_diagnostic_workflow_defaults.cjs
       - run: node tests/cpuplus/test_diagnostic_workflow_catalog.cjs
       - run: node tests/cpuplus/test_diagnostic_workflow_receipt.cjs
+      - run: node tests/cpuplus/test_diagnostic_target_registry.cjs
       - run: python3 -B tests/cpuplus/test_diagnostic_workflow_storage.py

@@ -109,8 +109,29 @@ function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, bor
         data[at+2]=a>0?Math.round(clamp(p[2]/a)*255):0;
         data[at+3]=Math.round(clamp(a)*255);
     }
-    const center=(Math.floor(h/2)*w+Math.floor(w/2))*4;
-    console.info("PRISM_BUFFER_CENTER",data[center],data[center+1],data[center+2],data[center+3],data.length);
     ctx.clearRect(0,0,w,h);
     ctx.putImageData(image,0,0);
+
+    // Qt 6 QuickShell Canvas.Image may silently discard putImageData() even
+    // when the RGBA buffer is populated. The independent native probe tests
+    // the actual Canvas center, not the input array. If its opaque nucleus
+    // was lost, reproduce the SAME pixels through Context2D's working fill
+    // path. This is a static repaint only; no timers or second artwork recipe.
+    const x0=Math.floor(w/2), y0=Math.floor(h/2);
+    const middle=(y0*w+x0)*4;
+    if (data[middle+3]>0 && typeof ctx.getImageData==="function"
+            && typeof ctx.fillRect==="function") {
+        const result=ctx.getImageData(x0,y0,1,1).data;
+        if (result[3]===0) {
+            ctx.clearRect(0,0,w,h);
+            let previous="";
+            for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+                const at=(y*w+x)*4, alpha=data[at+3];
+                if (alpha<2) continue;
+                const face="rgba("+data[at]+","+data[at+1]+","+data[at+2]+","+(alpha/255)+")";
+                if (face!==previous) { ctx.fillStyle=face; previous=face; }
+                ctx.fillRect(x,y,1,1);
+            }
+        }
+    }
 }

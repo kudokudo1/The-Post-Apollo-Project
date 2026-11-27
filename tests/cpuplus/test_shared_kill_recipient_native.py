@@ -31,7 +31,8 @@ with tempfile.TemporaryDirectory(prefix="cpu-shared-kill-") as tmp:
                  config / "widgets/cpuplus")
     for name in ("GraphHistory.qml", "ProcessPresentationState.qml",
                  "HunterPresentation.qml", "ProcessTelemetry.qml",
-                 "TaskSafety.qml", "ProcessControl.qml", "ProcessLimits.qml"):
+                 "TaskSafety.qml", "ProcessControl.qml", "ProcessLimits.qml",
+                 "ProcessPresentationController.qml"):
         shutil.copy2(ROOT / "services/system" / name,
                      config / "services/system")
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/SharedKillRecipientNative.qml",
@@ -68,7 +69,8 @@ with tempfile.TemporaryDirectory(prefix="kill-store-") as tmp:
     shutil.copytree(ROOT / "components", config / "components")
     for name in ("ProcessTelemetry.qml", "ProcessPresentationState.qml",
                  "HunterPresentation.qml", "TaskSafety.qml",
-                 "ProcessControl.qml", "ProcessLimits.qml"):
+                 "ProcessControl.qml", "ProcessLimits.qml",
+                 "ProcessPresentationController.qml"):
         shutil.copy2(ROOT / "services/system" / name, config / "services/system")
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/KillStoreStandaloneNative.qml",
                  config / "smoke.qml")

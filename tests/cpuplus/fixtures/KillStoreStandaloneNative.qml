@@ -102,6 +102,26 @@ ShellRoot {
         return safety.dangerActionUnlockMode(same,"freeze")==="";
     }
 
+    // No confirm() or probe execution: only prepare/cancel and refusal
+    // on synthetic process identities inside the isolated singleton.
+    function verifyActionGateway() {
+        const gate=first.store.actionGate;
+        const other=second.store.actionGate;
+        if (gate !== other || gate.presentationOwner !== first.store.presentation
+                || gate.pending || gate.busy || !first.rows.length) return false;
+        const row=first.rows[0], pid=row.pid, birth=row.startTicks, name=row.comm;
+        if (gate.prepare(pid,birth+1,name,"end",0)) return false;
+        first.store.donorActionBlocked=true;
+        const refused=!gate.prepare(pid,birth,name,"end",0);
+        first.store.donorActionBlocked=false;
+        if (!refused || !gate.prepare(pid,birth,name,"end",0)) return false;
+        const pending=gate.pending;
+        if (!pending || other.pending !== pending || other.busy
+                || other.prepare(pid,birth,name,"restart",0)) return false;
+        return other.cancel() && !gate.pending && !gate.busy
+            && gate.feedback==="CANCELLED // NO ACTION";
+    }
+
     function verifyStore() {
         const sample = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 31, rss: 2048, mem: 3, elapsed: "00:05"}];
@@ -124,7 +144,7 @@ ShellRoot {
         const combiCadence=first.store.snapshotInterval===1800 && first.store.miniProbeNeeded;
         first.store.donorFavoritesVisible=false;
         first.store.donorCombiVisible=false;
-        if (!verifyControlCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
+        if (!verifyActionGateway() || !verifyControlCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
                 || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry
                 || first.graphState !== second.graphState

@@ -16,6 +16,16 @@ PanelWindow {
     // The owning shell binds this to the actual Prism dock border color.
     property color prismBorderColor: Colors.white
     property bool indexOpen: false
+    property string helpPage: "syntagma"
+    readonly property var helpModes: [
+        { id: "syntagma", label: "SYNTAGMA" },
+        { id: "atlas", label: "ATLAS" }
+    ]
+    function selectHelpPage(page) {
+        if (page !== "syntagma" && page !== "atlas") return;
+        helpPage = page;
+        indexOpen = false;
+    }
     // Source-backed registered placements. Not a service scan or heartbeat.
     readonly property var registeredLocations: PrismIndex.registered()
     onMenuOpenChanged: if (!menuOpen) indexOpen = false
@@ -244,43 +254,48 @@ PanelWindow {
             PrismBorderGlow { anchors.fill: parent; divider: true }
         }
 
+        // Ordinary main-mode buttons; no Prism overrides on controls.
+        Row {
+            id: prismMainModes
+            anchors.top: prismDivider.bottom
+            anchors.topMargin: 8
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            height: 38
+            spacing: 6
+
+            Repeater {
+                model: root.helpModes
+                ModeButton {
+                    required property var modelData
+                    width: Math.max(0, (prismMainModes.width - prismMainModes.spacing)
+                                           / root.helpModes.length)
+                    height: prismMainModes.height
+                    textOnly: true
+                    labelText: modelData.label
+                    labelFontSize: 12
+                    bordered: false
+                    selected: !root.indexOpen && root.helpPage === modelData.id
+                    onTriggered: root.selectHelpPage(modelData.id)
+                }
+            }
+        }
+
         Item {
             id: prismBody
-            anchors.top: prismDivider.bottom
+            anchors.top: prismMainModes.bottom
+            anchors.topMargin: 8
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
 
-            Column {
+            PrismHelpContent {
+                anchors.fill: parent
                 visible: !root.indexOpen
-                anchors.centerIn: parent
-                width: Math.max(0, parent.width - 28)
-                spacing: 12
-
-                GohuText {
-                    width: parent.width
-                    text: "VISUAL LANGUAGE // DICTIONARY"
-                    font.pixelSize: 13
-                    color: root.prismBorderColor
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                }
-                GohuText {
-                    width: parent.width
-                    text: "NO DEFINITIONS YET"
-                    font.pixelSize: 12
-                    color: Colors.orange
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                }
-                GohuText {
-                    width: parent.width
-                    text: "POST APOLLO // CONTEXTUAL HELP"
-                    font.pixelSize: 11
-                    color: root.prismBorderColor
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                }
+                page: root.helpPage
+                structuralColor: root.prismBorderColor
             }
 
             // First dossier/index: exactly those Prism placements registered

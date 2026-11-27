@@ -72,6 +72,31 @@ Scope {
         onRefreshRequested: afterAction.restart()
     }
 
+    // CPU++ lock projection and toggles share the same in-memory TaskSafety.
+    // Keep sticky/per-action methods off the Hub-facing gateway interface.
+    function lockModeForIdentity(pid, birth, name, action, localOnly) {
+        const row = actionGate.exactRow(pid, birth, name);
+        if (!row) return "";
+        if (!action) return localOnly ? "" : safety.dangerUnlockMode(row);
+        return localOnly ? safety.dangerActionLocalUnlockMode(row, action)
+                         : safety.dangerActionUnlockMode(row, action);
+    }
+
+    function toggleLockForIdentity(pid, birth, name, action, sticky) {
+        if (actionGate.pending || actionGate.busy || actionGate.bulkBlocked)
+            return false;
+        const row = actionGate.exactRow(pid, birth, name);
+        if (!row || !safety.requiresDangerUnlock(row) || typeof sticky !== "boolean")
+            return false;
+        if (action !== "" && ["kill", "restart", "freeze", "limit"].indexOf(action) === -1)
+            return false;
+        if (!action && !sticky) return actionGate.toggleOneShotUnlock(pid, birth, name);
+        if (!action) safety.toggleDangerStickyUnlock(row);
+        else if (sticky) safety.toggleDangerActionStickyUnlock(row, action);
+        else safety.toggleDangerActionUnlock(row, action);
+        return true;
+    }
+
     function snapshotCadence(cpu, resource, kill, taskFavorites, combi,
                              preload, target, favorites) {
         if (cpu) return 600;

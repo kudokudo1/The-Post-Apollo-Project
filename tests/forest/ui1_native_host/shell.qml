@@ -311,6 +311,63 @@ ShellRoot {
         }
         return !failed;
     }
+    // Exercise actual existing preview state and cancellation method on
+    // the mounted shared slider. No physical pointer/source-provenance claim.
+    function modelFormPreviewWithdrawalWitness() {
+        const slider = find(parts.model, "forestModelFormSlider");
+        check(slider && slider.visible && slider.enabledSlider,
+            "model form preview rail available");
+        if (failed) return false;
+        let store = null;
+        for (let i = 0; i < slider.resources.length; ++i) {
+            const target = slider.resources[i] ? slider.resources[i].target : null;
+            if (target && target.status !== undefined && target.busy !== undefined
+                    && target.committed !== undefined)
+                store = target;
+        }
+        check(store && store.status === "READY" && store.committed !== null,
+            "model form rail actual store ready");
+        if (failed) return false;
+        const original = forest.selectedTreeIndex;
+        const equipment = JSON.stringify(forest.selectedTreeEquipment);
+        function prime() {
+            slider.previewCancelled = false;
+            slider.previewIndex = (slider.currentIndex + 1) % 3;
+            slider.previewHandleY = 10;
+            slider.previewGestureActive = true;
+            check(slider.previewActive, "model form rail preview primed");
+        }
+        function retired(label) {
+            check(slider.previewCancelled && !slider.previewGestureActive
+                && !slider.previewActive && slider.previewIndex === -1
+                && JSON.stringify(forest.selectedTreeEquipment) === equipment, label);
+        }
+        prime();
+        store.status = "SAVING";
+        check(!slider.enabledSlider, "model form rail busy disabled");
+        retired("model form rail busy withdrawal");
+        store.status = "READY";
+        retired("model form rail busy ABA stays retired");
+        prime();
+        const receipt = store.committed;
+        store.committed = Object.assign({}, receipt, {revision: receipt.revision + 1});
+        retired("model form rail committed revision withdrawal");
+        store.committed = receipt;
+        prime();
+        forest.selectedTreeIndex = (original + 1) % 5;
+        forest.selectedTreeIndex = original;
+        forest.modelPopupOpen = true;
+        retired("model form rail Tree ABA stays retired");
+        prime();
+        forest.modelPopupOpen = false;
+        forest.modelPopupOpen = true;
+        retired("model form rail popup ABA stays retired");
+        prime();
+        slider.cancelIndexPreview();
+        retired("model form rail fresh preview can be cancelled");
+        if (!failed) console.info("FOREST_HOST_FORM_RAIL_WITHDRAWAL_PASS");
+        return !failed;
+    }
     function capture() {
         const names = {
             chat: "forestChatPane", heading: "forestChatHeading",
@@ -1599,6 +1656,7 @@ ShellRoot {
                 witness.geometry(true);
                 witness.check(forest.frameWidth > 930 && parts.model.visible, "full stage/model popup");
                 if (!witness.directFormGestureWitness()) return;
+                if (!witness.modelFormPreviewWithdrawalWitness()) return;
                 forest.modelPopupOpen = false;
                 forest.selectedTreeIndex = 1;
                 break;

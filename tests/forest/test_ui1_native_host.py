@@ -304,6 +304,8 @@ def trial(width, height, count):
             matrix = [line.split("FOREST_HOST_DIRECT_FORM_MATRIX_PASS ", 1)[1].strip()
                       for line in output.splitlines()
                       if "FOREST_HOST_DIRECT_FORM_MATRIX_PASS " in line]
+            if output.count("FOREST_HOST_FORM_RAIL_WITHDRAWAL_PASS") != (1 if width == 1366 else 0):
+                raise AssertionError("FORM_RAIL_WITHDRAWAL_MISSING_OR_DUPLICATE")
             expected_matrix = {1366: ["FULL"], 770: ["COMPACT"], 420: []}[width]
             if matrix != expected_matrix:
                 raise AssertionError("DIRECT_FORM_MATRIX_MISSING_OR_DUPLICATE")

@@ -100,6 +100,16 @@ Scope {
         optimisticReset.restart();
     }
 
+    function limitResultFor(entry) {
+        const target = entry || currentTask;
+        const owner = individualActionGate;
+        if (target && owner && owner.busy && owner.pending && owner.pending.action === "limit"
+                && owner.pending.pid === target.pid && owner.pending.startTicks === target.startTicks
+                && owner.pending.name === target.comm)
+            return {state:"pending",message:"LIMIT // VERIFYING KERNEL RESULT"};
+        return limitsService.limitResultFor(target);
+    }
+
     function hasSoftLimit(entry) {
         return limitsService.hasSoftLimit(entry || currentTask);
     }
@@ -120,37 +130,39 @@ Scope {
         return limitsService.limitPercent(entry || currentTask);
     }
 
-    function setLimitMiB(mib, entry) {
+    function setLimitMiB(mib, entry, gateway) {
         const target = entry || currentTask;
+        const owner = individualActionGate;
+        if (!target || !owner || typeof mib !== "number" || !isFinite(mib) || mib <= 0)
+            return false;
+        if (requiresDangerUnlock(target) && !dangerActionUnlocked(target, "limit"))
+            return false;
 
-        if (!target || Number(target.pid || 0) <= 1)
-            return;
+        if (gateway === owner && owner.busy && owner.pending && owner.pending.action === "limit"
+                && owner.pending.pid === target.pid && owner.pending.startTicks === target.startTicks
+                && owner.pending.name === target.comm)
+            return limitsService.setLimitMiB(target,mib);
 
-        if (requiresDangerUnlock(target)
-                && !dangerActionUnlocked(target, "limit"))
-            return;
-
-        limitsService.setLimitMiB(target, mib);
+        if (!owner.prepareLimitMiB(Number(target.pid),Number(target.startTicks),String(target.comm || ""),mib)) {
+            relockDangerAction(target,"limit");
+            return false;
+        }
+        const captured = owner.pending;
+        if (owner.confirm()) return true;
+        if (!owner.busy && owner.pending === captured) owner.cancel();
+        return false;
     }
 
-    function setLimitPercent(percent, entry) {
+    function setLimitPercent(percent, entry, gateway) {
         const target = entry || currentTask;
-        if (!target)
-            return;
-
-        const pct = Math.max(0, Math.min(100, Number(percent || 0)));
-
-        if (pct >= 99.5) {
-            setLimitMiB(limitsService.maximumMiB(target), target);
-            return;
-        }
-
+        if (!target || typeof percent !== "number" || !isFinite(percent))
+            return false;
+        const pct = Math.max(0, Math.min(100, percent));
+        if (pct >= 99.5)
+            return setLimitMiB(limitsService.maximumMiB(target),target,gateway);
         const minMiB = limitsService.minimumMiB(target);
         const maxMiB = limitsService.maximumMiB(target);
-        const capMiB =
-            minMiB + (maxMiB - minMiB) * (pct / 98.5);
-
-        setLimitMiB(capMiB, target);
+        return setLimitMiB(minMiB + (maxMiB-minMiB)*(pct/98.5),target,gateway);
     }
 
     function rowForPid(pid) {

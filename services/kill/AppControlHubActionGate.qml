@@ -21,6 +21,9 @@ Scope {
     property string feedback: ""
     property string probeReply: ""
     property bool probeExited: false
+    property bool probeStdoutDone: false
+    property int probeExitStatus: -1
+    property int limitDispatchSerial: 0
     property int probeExitCode: -1
 
     function exactRow(pid, startTicks, name) {
@@ -66,6 +69,20 @@ Scope {
         return row ? Math.round(presentationOwner.limitPercent(row)) : 100;
     }
 
+    function currentLimitStatus(pid, startTicks, name) {
+        const row = exactRow(pid,startTicks,name);
+        return row ? presentationOwner.limitResultFor(row).message : "LIMIT IDENTITY UNAVAILABLE";
+    }
+
+    function prepareLimitMiB(pid, startTicks, name, mib) {
+        if (typeof mib !== "number" || !isFinite(mib) || mib <= 0)
+            return false;
+        if (!prepare(pid,startTicks,name,"limit",0))
+            return false;
+        pending = Object.assign({},pending,{mib:mib});
+        return true;
+    }
+
     function toggleOneShotUnlock(pid, startTicks, name) {
         const row = exactRow(pid, startTicks, name);
         if (!row || busy || pending || bulkBlocked || !safetyOwner.requiresDangerUnlock(row))
@@ -83,6 +100,11 @@ Scope {
         if (!row) { feedback = "STALE PROCESS IDENTITY // SELECT AGAIN"; return false; }
         if (["freeze","resume","end","restart","limit"].indexOf(action) === -1) {
             feedback = "UNSUPPORTED ACTION"; return false;
+        }
+        if (action === "limit" && (limitsOwner.applyLoading || limitsOwner.queuedRequest
+                || limitsOwner.limitStateFor(row) === "unknown")) {
+            feedback = "LIMIT BUSY OR OWNERSHIP UNKNOWN // REFUSED";
+            return false;
         }
         if (action === "limit"
                 && (typeof percent !== "number" || !isFinite(percent)
@@ -132,6 +154,8 @@ Scope {
         }
         probeReply = "";
         probeExited = false;
+        probeStdoutDone = false;
+        probeExitStatus = -1;
         probeExitCode = -1;
         busy = true;
         feedback = "VERIFYING PROCESS START IDENTITY";
@@ -151,8 +175,10 @@ Scope {
     }
 
     function maybeFinishProbe() {
-        if (busy && !signalDispatchActive && probeExited && probeReply.length > 0)
-            finishProbe(probeExitCode);
+        if (busy && !signalDispatchActive && !limitDispatchSerial && probeExited && probeStdoutDone) {
+            probeExited = false;
+            finishProbe(probeExitStatus === 0 ? probeExitCode : -1);
+        }
     }
 
     function finishProbe(exitCode) {
@@ -198,14 +224,45 @@ Scope {
             return;
         }
         if (req.action === "limit") {
-            presentationOwner.setLimitPercent(req.percent,row);
+            if (limitsOwner.applyLoading || limitsOwner.queuedRequest
+                    || limitsOwner.limitStateFor(row) === "unknown") {
+                safetyOwner.relockDangerAction(row,kind);
+                finishRequest("LIMIT BUSY OR OWNERSHIP UNKNOWN // REFUSED");
+                return;
+            }
+            limitDispatchSerial = limitsOwner.requestSerial + 1;
+            feedback = "LIMIT // VERIFYING KERNEL RESULT";
+            const admitted = req.mib !== undefined
+                ? presentationOwner.setLimitMiB(req.mib,row,gate)
+                : presentationOwner.setLimitPercent(req.percent,row,gate);
+            safetyOwner.relockDangerAction(row,kind);
+            if (!admitted) {
+                limitDispatchSerial = 0;
+                finishRequest("LIMIT REQUEST REFUSED // " + limitsOwner.applyError);
+            }
+            return;
         }
-        safetyOwner.relockDangerAction(row,kind);
-        finishRequest(req.action.toUpperCase() + " // REQUEST ISSUED // VERIFY OWNER STATE");
-        refreshOwner.restart();
+        finishRequest("UNSUPPORTED ACTION // REFUSED");
     }
 
     property bool signalDispatchActive: false
+
+    function finishLimit(result) {
+        const req = pending;
+        if (!busy || !limitDispatchSerial || !req || req.action !== "limit" || !result
+                || result.serial !== limitDispatchSerial || result.pid !== req.pid
+                || result.startTicks !== req.startTicks || result.name !== req.name)
+            return false;
+        limitDispatchSerial = 0;
+        finishRequest(result.message);
+        refreshOwner.restart();
+        return true;
+    }
+
+    Connections {
+        target: gate.limitsOwner
+        function onLimitCompleted(result) { gate.finishLimit(result); }
+    }
 
     function finishRequest(message) {
         feedback = message;
@@ -258,12 +315,14 @@ Scope {
         stdout: StdioCollector {
             onStreamFinished: {
                 gate.probeReply = String(text || "");
+                gate.probeStdoutDone = true;
                 gate.maybeFinishProbe();
             }
         }
         onExited: function(exitCode, exitStatus) {
             gate.probeExited = true;
             gate.probeExitCode = exitCode;
+            gate.probeExitStatus = exitStatus;
             gate.maybeFinishProbe();
         }
     }

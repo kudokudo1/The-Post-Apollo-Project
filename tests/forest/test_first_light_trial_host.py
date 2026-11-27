@@ -185,6 +185,67 @@ class FirstLightHostTests(unittest.TestCase):
         finally:
             host.close()
 
+    def test_original_iterator_rejects_foreign_resume_and_close(self):
+        peer, transport = self.peer([packet("READY", done=True)])
+        host = fl.FirstLightTrialHost(test_transport=transport)
+        host.submit(fl.PROMPT)
+        gen = host.run_internal()
+        rejected = []
+
+        def foreign():
+            for action in (lambda: next(gen), gen.close):
+                try:
+                    action()
+                except fl.FirstLightRefusal as exc:
+                    rejected.append(str(exc))
+
+        def check_foreign():
+            thread = threading.Thread(target=foreign)
+            thread.start()
+            thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+
+        try:
+            check_foreign()  # even before first next
+            self.assertEqual(next(gen).payload["event"], "REQUESTED")
+            self.assertEqual(next(gen).payload["event"], "RESERVED")
+            check_foreign()  # paused at original durable reservation
+            self.assertEqual(rejected, ["OWNER_ACTION_UNAVAILABLE"] * 4)
+            self.assertEqual(peer.observed, [])
+            self.assertEqual(host._db.execute(
+                "SELECT status FROM forest_attempts_b3").fetchall(),
+                [("RESERVED",)])
+            self.assertEqual(list(gen)[-1].payload["event"], "COMMITTED")
+            self.assertEqual(host.local_outcome(), "COMMITTED_LOCAL")
+            self.assertEqual(len(peer.observed), 1)
+        finally:
+            gen.close()
+            host.close()
+
+    def test_close_unstarted_original_spends_iterator_without_dispatch(self):
+        calls = []
+        host = fl.FirstLightTrialHost(test_transport=lambda **kw: calls.append(kw))
+        host.submit(fl.PROMPT)
+        gen = host.run_internal()
+        try:
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "TRIAL_ALREADY_USED"):
+                host.run_internal()
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "ORIGINAL_ACTIVE"):
+                host.close()
+            gen.close()
+            gen.close()
+            self.assertEqual(host.phase, "UNKNOWN_HOLD")
+            self.assertEqual(host.local_outcome(), "UNKNOWN_HOLD")
+            self.assertEqual(list(gen), [])
+            self.assertEqual(host._db.execute(
+                "SELECT count(*) FROM forest_attempts_b3").fetchone(), (0,))
+            with self.assertRaisesRegex(fl.FirstLightRefusal, "TRIAL_ALREADY_USED"):
+                host.run_internal()
+            self.assertEqual(calls, [])
+        finally:
+            gen.close()
+            host.close()
+
     def test_worker_close_early_does_not_allow_retry(self):
         calls = []
         host = fl.FirstLightTrialHost(test_transport=lambda **kw: calls.append(kw))

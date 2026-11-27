@@ -14,6 +14,8 @@ QtObject {
         let best = null;
         let light = null;
         let flash = 0;
+        let flashSource = null;
+        let flashSpread = 0;
         let fragments = 0;
         let fragmentColor = Colors.magenta;
         let fragmentTime = 0;
@@ -25,7 +27,7 @@ QtObject {
                 const f = source.visualFrame;
                 const level = source.phase === "running"
                     ? .12 + .88 * f.intensity
-                    : source.phase === "success" ? f.impact : 0;
+                    : source.phase === "success" ? f.impact : f.defeat || 0;
                 const v = Profiles.host(source.variant, source.elapsed, level,
                     strength, source.phase, false);
                 // Independent maxima: bulk requests cannot stack displacement,
@@ -41,7 +43,11 @@ QtObject {
                     fragmentTime = source.elapsed;
                     fragmentStyle = v.style;
                 }
-                flash = Math.max(flash, v.flash);
+                if (v.flash > flash) {
+                    flash = v.flash;
+                    flashSource = source;
+                    flashSpread = v.flashSpread;
+                }
             }
         }
         return {
@@ -51,6 +57,8 @@ QtObject {
             dx: best ? best.dx : 0,
             dy: best ? best.dy : 0,
             flash: completionFlashEnabled ? flash : 0,
+            flashSource: completionFlashEnabled ? flashSource : null,
+            flashSpread: completionFlashEnabled ? flashSpread : 0,
             style: light ? light.style : "",
             fragments: fragments,
             fragmentColor: fragmentColor,
@@ -64,6 +72,9 @@ QtObject {
     readonly property real motionTime: reaction.time
     readonly property color pressureColor: reaction.color
     readonly property real completionFlash: reaction.flash
+    readonly property Item flashSource: reaction.flashSource
+    readonly property real flashSpread: reaction.flashSpread
+    readonly property color flashColor: flashSource ? flashSource.energyColor : Colors.omnitrix
     readonly property string reactionStyle: reaction.style
     readonly property real fragmentPressure: reaction.fragments
     readonly property color fragmentColor: reaction.fragmentColor

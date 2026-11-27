@@ -876,3 +876,37 @@ test("K4f: shared Sway inventory retains tree semantics and refuses unresolved s
     assert.match(source,/!loading \|\| !exited \|\| !stdoutDone \|\| !stderrDone/);
     assert.match(store,/readonly property var hunterVisibleWindows: compositor\.settled \? compositor\.windows : null/);
 });
+
+test("K5a: Hub process projection and guarded action route use KillStore directly", () => {
+    const shell=read("shell.qml");
+    const store=read("services/kill/KillStore.qml");
+    const gate=read("services/kill/AppControlHubActionGate.qml");
+    assert.match(shell,/processActionGate: KillBackend\.KillStore\.collectionEnabled\s*\? KillBackend\.KillStore\.actionGate : null/);
+    assert.match(shell,/processSnapshot: KillBackend\.KillStore\.collectionEnabled\s*\? HubProcessesPolicy\.snapshot\(\s*KillBackend\.KillStore\.rows,\s*KillBackend\.KillStore\.telemetry\.snapshotLoading,\s*KillBackend\.KillStore\.telemetry\.snapshotError\)\s*: null/);
+    assert.doesNotMatch(shell,/process(?:Snapshot|ActionGate): appControlWindow/);
+    assert.match(shell,/appControlAvailable: appControlWindow !== null/);
+    assert.match(store,/readonly property var rows: sampler\.rows/);
+    assert.match(store,/readonly property var actionGate: guardedActions/);
+    assert.match(gate,/if \(busy \|\| pending \|\| bulkBlocked\)/);
+    const a=shell.indexOf("            processActionGate: KillBackend.KillStore.collectionEnabled");
+    const b=shell.indexOf("            // Clone only bounded display fields",a);
+    const c=shell.indexOf("            processSnapshot: KillBackend.KillStore.collectionEnabled",b);
+    const d=shell.indexOf("            socialActionsAvailable:",c);
+    assert.ok(a>=0 && b>a && c>b && d>c);
+    const gateExpr=shell.slice(a,b).split("processActionGate:")[1].trim();
+    const snapExpr=shell.slice(c,d).split("processSnapshot:")[1].trim();
+    const project=new Function("KillBackend","HubProcessesPolicy",
+        "return {gate:"+gateExpr+",snapshot:"+snapExpr+"};");
+    const row={pid:42}, guarded={tag:"existing gate"};
+    const model={collectionEnabled:false,rows:[row],telemetry:{snapshotLoading:true,snapshotError:""},actionGate:guarded};
+    let projected=0;
+    const policy={snapshot:(rows,loading,error)=>{projected++;return {rows,loading,error};}};
+    assert.deepEqual(project({KillStore:model},policy),{gate:null,snapshot:null});
+    assert.equal(projected,0);
+    model.collectionEnabled=true;
+    const result=project({KillStore:model},policy);
+    assert.equal(result.gate,guarded);
+    assert.equal(result.snapshot.rows,model.rows);
+    assert.equal(result.snapshot.loading,true);
+    assert.equal(projected,1);
+});

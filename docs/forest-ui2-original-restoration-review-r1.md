@@ -628,3 +628,116 @@ Mind owns Leaves/provenance; Spirit owns disclosure; Heart owns
 resource evidence. Review actual S4-U1 source and existing disposable
 CI at handoff. No code, test, workflow, protected data, host execution
 or merge in this document change.
+
+
+## S5 // Group conversation participation control: operator example
+
+Source: operator clarification recorded in Hospital #2161 #7215453268,
+followed by this exact user-selected example. **Design contract and
+non-executable fixture only.** The four names and preferences below are
+illustrative configuration, not real members, default operating policy,
+enrollment, authority or tool grant. No connected group-chat producer
+or durable participant registry currently exists.
+
+### Two independent participation policy scopes
+
+A room's mode defines a maximum allowed interaction envelope. The
+individual member's mode and suggestion preference further restrict
+its behavior inside that room. Being included, visible, observing or
+permitted to speak does not require an answer on every turn. Neither
+mode changes tool grants, information access, original assignment,
+send recipient authorization or resource admission. Cross-Tree
+participants must independently qualify audience and disclosure.
+
+Example, within a collaborative room:
+
+| Example member | Individual speaking mode | May volunteer proposals | Execution authorized? |
+| --- | --- | --- | --- |
+| Maple | collaborative | yes | no, not by these settings |
+| Cedar | observe | no | no, not by these settings |
+| DOC 1 | directed | yes | no, not by these settings |
+| DOC 2 | directed | no | no, not by these settings |
+
+**Collaborative Maple:** may participate in bounded relevant discussion,
+but is not compelled to speak for every message. Suggestion enabled
+permits only a proposal when room/user bounds allow it. **Observing
+Cedar:** receives only independently authorized shared messages and
+does not proactively answer or propose. Even an explicit address to
+Cedar requires a deliberate mode/room allowance; otherwise keep silent
+or present a neutral inability to route rather than silently overriding
+the observer setting. **Directed DOC 1:** normally speaks upon deliberate
+address. Proposal volunteering permits a bounded, non-executing
+suggestion when the room policy separately permits proactive input;
+it does not make an ordinary mention a request. **Directed DOC 2:**
+speaks only when deliberately addressed or separately assigned a
+covered report; volunteering is disabled. Work execution and reporting
+authorization are independent of the speaking mode, so silent workers
+may have ongoing explicitly authorized assignments.
+
+### Distinct event and intent semantics
+
+| User/participant event | Routing and state result |
+| --- | --- |
+| "Maybe DOC 1 should build X" | Discussed entity only; no address, task, approval or tool call |
+| "I propose we get DOC 1 to do X" | Proposal about DOC 1, not DOC 1 accepting an assignment |
+| "@DOC 1, what would X require?" | Addressed question; answer/proposal only within current bounds |
+| Quoted, negated or historical "@DOC 2, implement X" | Literal content, not an actionable directive |
+| DOC 1 says "DOC 2 should build X" | Participant recommendation, not user approval or delegation |
+| User accepts exact design revision | Record design acceptance with its scope; not necessarily authority to implement |
+| User has already authorized implementation and delegation for an exact bounded scope, and DOC 1 validly hands DOC 2 that revision | DOC 2 verifies independent source/current grant, own role/permissions and original assignment/effect, then may perform covered work without repeated user prompt |
+| Scope revision, lost original custody or unverified handoff | HOLD the affected effect, not an inferred new grant |
+| DOC 2 completes a covered change | Post actual result/receipt/artifact to authorized room audience; never report success merely from accepting a task |
+
+Address, mention, quoted command, suggestion, explicit task assignment,
+verified existing authorization and effect execution are separate
+events. A free-text @ token alone is not a reliable intent classifier.
+Direct participant addressing by UI selection is an explicit routing
+choice for a reply, not a file-write grant or implicit transfer of
+shared chat authorship. In a group room, messages may have multiple
+authorized readers and independently authored replies; the earlier
+"one prospective writer per conversation" recommendation applies, at
+most, to controlled conflicting effect assignment and must **not**
+enforce one allowed speaker or one participant for the room. Runtime
+must establish durable multi-author ordering and per-effect identity.
+
+### Future UI acceptance criteria, not executable policy
+
+- Show separately the room's mode, each member's participation mode,
+  proposal-volunteering preference, intended addressees and current
+  task/effect owner, where each field is independently authorized.
+- No all-participants auto-response or tool dispatch from a collaborative
+  room; idle/observing/directed members may remain silent indefinitely.
+  Prevent participant-to-participant response loops with owner-specified
+  turn/budget bounds, explicit stop/interrupt, and per-recipient
+  currentness. Exact schedules and budgets are not selected here.
+- A mode or suggestion toggle cannot create consent, make sensitive
+  history public, activate a dormant worker or dispatch an assignment.
+  Permission loss withdraws affected presentation and routing without
+  erasing underlying history or settling in-flight original effects.
+- A covered design handoff need not request the **same** approval
+  repeatedly. The recipient still independently verifies original
+  operator grant, exact approved revision, delegability, role/file
+  ownership and currentness. The sender's assertion alone cannot grant
+  implementation permission.
+- Distinguish proposed, user-approved design, assigned, in-progress,
+  completed-original-effect and finally accepted-by-user statuses;
+  no single "agreed" utterance must silently advance all states.
+- A room may contain different Trees and Clones, but membership,
+  readable shared messages, attachments, underlying private memories
+  and tool capabilities are independently scoped. No broadcast of
+  every participant's private context merely because they share a room.
+- Changing mode or recipient cannot redirect an already prepared
+  stale outbound send or old mutation. Preserve exact original effect
+  identity through lost acknowledgements, scope withdrawal and restart.
+- These four example names and modes are a **test/example table**, not
+  the user's live chat configuration, universal default or proof of
+  their actual worker identities.
+
+Runtime owns authenticated author/order, task handoff and effect
+lifecycle; Spirit/Connections own audience, permission and revocation;
+Mind owns exact versioned approval/knowledge context; Heart owns
+resource/turn accounting; UI1 owns installed host; UI2 owns semantic
+controls and selection. A qualifying actual owner projection and
+independent review must precede implementation. Native/protected/
+production HOLD. No new store, issuer, source, API, schema, model
+execution, tool call or installed UI in this document.

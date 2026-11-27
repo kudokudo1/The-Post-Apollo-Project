@@ -32,7 +32,15 @@ class CpuPlusSocialLinkModifiers(unittest.TestCase):
         self.assertIn("if (allowed.indexOf(task) === -1)", CPU)
         self.assertIn('if (idManagementSection !== section)', CPU)
         self.assertIn('idManagementTask = "EDITOR";', CPU)
-        for x in ("implicitWidth: 1000", "implicitHeight: 834",
+        # The default remains 1000x834, but screen-bounded resize steps
+        # replaced fixed implicit dimensions without changing these bays.
+        for x in (
+                  "property int resizeLevel: 1",
+                  "{ width: 1000, height: 834 }",
+                  "implicitWidth: Math.min(",
+                  "resizeSteps[resizeLevel].width",
+                  "implicitHeight: Math.min(",
+                  "resizeSteps[resizeLevel].height",
                   "id: sharedInstrumentPane", "width: 390",
                   "id: targetPane", "width: 260", "id: actuatorPane"):
             self.assertIn(x, CPU)

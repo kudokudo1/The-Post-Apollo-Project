@@ -100,6 +100,9 @@ ShellRoot {
                 || first.store.hunterOperation.host !== null
                 || first.store.hunterOperation.policyOwner !== first.store
                 || first.store.hunterOperation.policyReady
+                || first.store.windowInventory !== second.store.windowInventory
+                || first.store.windowInventory.loading || first.store.windowInventory.settled
+                || first.store.hunterVisibleWindows !== null
                 || first.store.hunterOperation.favoriteStoreObject !== FavoritesStore
                 || first.store.favoriteStore !== second.store.favoriteStore
                 || !safety.requiresDangerUnlock(old)

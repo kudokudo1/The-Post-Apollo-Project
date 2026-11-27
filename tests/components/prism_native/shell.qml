@@ -7,6 +7,7 @@ import "./components" as Ui
 ShellRoot {
     id: witness
     property bool failed: false
+    property real glowDuration: -1
     function descendant(item, wanted) {
         if (!item) return null;
         if (item.objectName === wanted) return item;
@@ -55,6 +56,39 @@ ShellRoot {
             else
                 console.info("PRISM_NATIVE_CANVAS_PAINTED");
             console.info("PRISM_NATIVE_PAINT_MS",canvas.lastPaintDurationMs);
+            const glow=witness.descendant(prism,"prismGlowArtwork");
+            if (!glow || glow.lastPaintDurationMs<0 || !glow.getContext("2d")
+                    || glow.opacity<0.10 || glow.opacity>0.20
+                    || prism.activeBorderWidth!==1
+                    || prism.idleBorderWidth!==1 || prism.hoverBorderWidth!==1
+                    || prism.pressedBorderWidth!==1 || prism.selectedBorderWidth!==1
+                    || prism.keyboardSelectedBorderWidth!==1) {
+                console.error("PRISM_NATIVE_FAIL fixed border or cached glow setup");
+                Qt.quit(); return;
+            }
+            witness.glowDuration=glow.lastPaintDurationMs;
+            prism.grabToImage(function(result) {
+                if (!result.saveToFile("/tmp/prism-render-idle.png")) {
+                    console.error("PRISM_NATIVE_FAIL idle snapshot");
+                    Qt.quit(); return;
+                }
+                prism.selected=true;
+                selectionCheck.start();
+            });
+        }
+    }
+    Timer {
+        id: selectionCheck
+        interval: 150
+        repeat: false
+        onTriggered: {
+            const glow=witness.descendant(prism,"prismGlowArtwork");
+            if (!glow || !prism.selected || prism.activeBorderWidth!==1
+                    || glow.opacity<0.7 || glow.lastPaintDurationMs!==witness.glowDuration) {
+                console.error("PRISM_NATIVE_FAIL selected border/glow or unexpected repaint");
+                Qt.quit(); return;
+            }
+            console.info("PRISM_NATIVE_SELECTED_GLOW",glow.opacity,glow.lastPaintDurationMs);
             prism.grabToImage(function(result) {
                 console.info("PRISM_NATIVE_COMPOSITE",result.saveToFile("/tmp/prism-render-composite.png"));
                 console.info("PRISM_NATIVE_DONE");

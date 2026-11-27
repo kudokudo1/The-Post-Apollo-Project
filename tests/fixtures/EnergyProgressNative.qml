@@ -13,6 +13,8 @@ ShellRoot {
         property int stage: 0
         property double started: Date.now()
         property bool failed: false
+        property bool sawFlash: false
+        property double pulseStarted: 0
         function require(ok, message) {
             if (!ok) {
                 failed = true;
@@ -53,7 +55,7 @@ ShellRoot {
                 if (!lab.require(faces.count===4,"variant count")) return;
                 if (!lab.require(Math.abs(field.offsetX)<=3.000001 && Math.abs(field.offsetY)<=2.000001,
                         "bounded aggregate widget pressure")) return;
-                if (lab.stage===0 || lab.stage===3 || lab.stage>=4) {
+                if (lab.stage===0 || lab.stage===3 || (lab.stage>=4 && lab.stage<=6)) {
                     if (!lab.require(field.pressure===0 && field.offsetX===0 && field.offsetY===0,
                             "idle, hidden or reduced host pressure "+lab.stage)) return;
                 } else if (lab.stage===1) {
@@ -62,6 +64,19 @@ ShellRoot {
                     const f=faces.itemAt(0);
                     if (elapsed>4800 && !lab.require(field.pressure>.5,
                             "overdrive host pressure")) return;
+                }
+                if (lab.stage===7) {
+                    const omni=faces.itemAt(0);
+                    if (!lab.require(Math.abs(field.offsetX)<=.300001 && Math.abs(field.offsetY)<=.100001,
+                            "contained Omnitrix motion")) return;
+                    if (field.completionFlash>.2) lab.sawFlash=true;
+                    if (Date.now()-lab.pulseStarted>1000) {
+                        if (!lab.require(lab.sawFlash && field.completionFlash===0 && !omni.animationActive,
+                                "single completion pulse settles")) return;
+                        console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset; bounded host pressure; Omnitrix pulse");
+                        Qt.quit();
+                    }
+                    return;
                 }
                 for (let i=0;i<faces.count;i++) {
                     const f=faces.itemAt(i);
@@ -96,8 +111,13 @@ ShellRoot {
                 }
                 if (lab.stage===1 && elapsed<=4800) return;
                 if (lab.stage===6) {
-                    console.log("ENERGY_NATIVE_PASS four variants; centerline; breakthrough; exact fraction; resize; hide; reduced motion; success; failure; reset; bounded host pressure; hidden and reduced host rest");
-                    Qt.quit();
+                    const omni=faces.itemAt(0);
+                    omni.reducedMotion=false;
+                    omni.phase="running";
+                    omni.progress=.7;
+                    omni.phase="success";
+                    lab.pulseStarted=Date.now();
+                    lab.stage=7;
                     return;
                 }
                 lab.stage++;

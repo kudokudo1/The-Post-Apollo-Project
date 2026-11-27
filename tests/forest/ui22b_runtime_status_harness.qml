@@ -9,6 +9,8 @@ Item {
     property string historyJson: "[]"
     readonly property string labelText: status.statusText
     readonly property string viewState: status.state
+    readonly property string localOutcome: status.localOutcome
+    property bool abortAccepted: false
     readonly property bool labelVisible: status.visible
     readonly property real labelHeight: status.height
     readonly property bool authority: status.sourceAuthenticated || status.permissionGranted
@@ -48,6 +50,10 @@ Item {
     function openView() { status.viewOpen = true; status.treeKey = "CHERRY"; }
     function openLifetime() { status.openLifetime(JSON.parse(inputJson)); }
     function receiveUnit() { status.receiveUnit(JSON.parse(inputJson)); }
+    function recordLocalAbort() {
+        const result = JSON.parse(inputJson);
+        abortAccepted = status.recordLocalAbort(result.ref, result.code, result.finalSequence);
+    }
     function invalidateLifetime() { status.invalidateLifetime(JSON.parse(inputJson)); }
     function closeView() { status.viewOpen = false; }
     function switchTree() { status.treeKey = "MAPLE"; }

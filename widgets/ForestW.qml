@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../components"
 import "forest/ui2" as PublicPreview
+import "forest/ui2/InteractionTargetLatch.js" as GestureLatch
 import "ForestChassisPolicy.js" as ForestSizing
 import "../services/forest"
 import "../services/forest/ForestResidencyPolicy.js" as ResidencyPolicy
@@ -1045,9 +1046,71 @@ PanelWindow {
                                     font.pixelSize: 9
                                 }
                                 MouseArea {
+                                    id: formPointer
+                                    objectName: "forestModelForm-" + parent.modelData
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.chooseModelForm(parent.modelData)
+                                    property var gestureLatch: GestureLatch.createTargetLatch()
+                                    property var gestureTicket: null
+
+                                    function formTarget() {
+                                        return root.menuOpen && root.visible && root.modelPopupOpen
+                                            && visible && enabled && !preferenceStore.busy
+                                            && root.selectedTreeIndex >= 0
+                                            && root.selectedTreeIndex < root.selectedTreeEquipment.length
+                                            ? "tree-" + root.selectedTreeIndex : "";
+                                    }
+                                    function invalidateFormGesture() {
+                                        if (gestureLatch)
+                                            gestureLatch.clear();
+                                        gestureTicket = null;
+                                    }
+                                    function beginFormGesture() {
+                                        const target = formTarget();
+                                        gestureLatch.observe(target);
+                                        gestureTicket = gestureLatch.begin(target);
+                                    }
+                                    function commitFormGesture() {
+                                        const ticket = gestureTicket;
+                                        gestureTicket = null;
+                                        if (gestureLatch.finish(ticket, formTarget()))
+                                            return root.chooseModelForm(parent.modelData);
+                                        return false;
+                                    }
+                                    function cancelFormGesture(ticket) {
+                                        if (gestureLatch.cancel(ticket) && gestureTicket === ticket)
+                                            gestureTicket = null;
+                                    }
+                                    // Observe every owner transition, not just a changed form
+                                    // or final index. A -> B -> A must not revive a click.
+                                    onVisibleChanged: invalidateFormGesture()
+                                    onEnabledChanged: invalidateFormGesture()
+                                    Connections {
+                                        target: root
+                                        function onSelectedTreeIndexChanged() { formPointer.invalidateFormGesture(); }
+                                        function onSelectedTreeEquipmentChanged() { formPointer.invalidateFormGesture(); }
+                                        function onSelectedTreeReasoningStepsChanged() { formPointer.invalidateFormGesture(); }
+                                        function onMenuOpenChanged() { formPointer.invalidateFormGesture(); }
+                                        function onModelPopupOpenChanged() { formPointer.invalidateFormGesture(); }
+                                        function onVisibleChanged() { formPointer.invalidateFormGesture(); }
+                                    }
+                                    Connections {
+                                        target: preferenceStore
+                                        function onBusyChanged() { formPointer.invalidateFormGesture(); }
+                                        function onCommittedChanged() { formPointer.invalidateFormGesture(); }
+                                    }
+                                    onPressed: beginFormGesture()
+                                    onCanceled: invalidateFormGesture()
+                                    onClicked: commitFormGesture()
+                                    onReleased: {
+                                        // clicked follows released for a valid click.
+                                        // Retire a release without click after delivery;
+                                        // the captured ticket cannot cancel a newer press.
+                                        const released = gestureTicket;
+                                        Qt.callLater(function() {
+                                            formPointer.cancelFormGesture(released);
+                                        });
+                                    }
                                 }
                             }
                         }

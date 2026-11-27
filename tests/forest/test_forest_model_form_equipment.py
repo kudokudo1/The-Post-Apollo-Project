@@ -98,6 +98,24 @@ class ForestModelFormEquipmentTests(unittest.TestCase):
         # At the width threshold the list still has room for its buttons.
         self.assertGreaterEqual(320 - 53 - 7 - 43 - 32 - 45 - 20, 100)
 
+    def test_direct_model_form_has_explicit_gesture_custody(self):
+        view = (ROOT / "widgets/ForestW.qml").read_text()
+        button = view.split("id: formPointer", 1)[1].split("Column {", 1)[0]
+        for witness in ("GestureLatch.createTargetLatch()", "gestureLatch.observe(target)",
+                        "gestureLatch.begin(target)", "gestureLatch.finish(ticket, formTarget())",
+                        "gestureLatch.cancel(ticket)", "onPressed: beginFormGesture()",
+                        "onClicked: commitFormGesture()", "onCanceled: invalidateFormGesture()",
+                        "onVisibleChanged: invalidateFormGesture()", "onEnabledChanged: invalidateFormGesture()",
+                        "onSelectedTreeIndexChanged()", "onSelectedTreeEquipmentChanged()",
+                        "onSelectedTreeReasoningStepsChanged()", "onMenuOpenChanged()",
+                        "onModelPopupOpenChanged()", "onVisibleChanged()", "onBusyChanged()",
+                        "onCommittedChanged()", "!preferenceStore.busy", "Qt.callLater"):
+            self.assertIn(witness, button)
+        self.assertLess(button.index("gestureLatch.finish(ticket, formTarget())"),
+                        button.index("root.chooseModelForm(parent.modelData)"))
+        self.assertNotIn("preferenceStore.save(", button)
+        self.assertNotIn("scanModels(", button)
+
     @unittest.skipUnless(shutil.which("node"), "Node.js unavailable")
     def test_equipment_preserves_both_slots_and_tree_isolation(self):
         js = textwrap.dedent(r"""

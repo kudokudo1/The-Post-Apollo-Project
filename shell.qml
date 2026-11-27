@@ -1653,6 +1653,9 @@ PanelWindow {
     PrismW {
         id: prismWindow
         screen: shellRoot.screen
+        // The widget's frame/title/dividers share the mounted Prism button's
+        // actual border identity. This is one binding, not a second palette.
+        prismBorderColor: prismDock.prismBorderColor
         // Reuse Trash's real vertical maximum rather than a new cap.
         fullHeightReserve: trashWindow.fullHeightReserve
         dockCenterX: 108 // 73px panel left + 10px face x + 25px half face

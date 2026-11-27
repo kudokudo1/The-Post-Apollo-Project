@@ -151,46 +151,82 @@ Scope {
     }
 
     function maybeFinishProbe() {
-        if (busy && probeExited && probeReply.length > 0)
+        if (busy && !signalDispatchActive && probeExited && probeReply.length > 0)
             finishProbe(probeExitCode);
     }
 
     function finishProbe(exitCode) {
         const req = pending;
-        busy = false;
-        pending = null;
         if (!req || exitCode !== 0 || probeReply.trim() !== "MATCH") {
-            feedback = "PROCESS IDENTITY NOT VERIFIED // NO ACTION";
+            finishRequest("PROCESS IDENTITY NOT VERIFIED // NO ACTION");
             return;
         }
         const row = exactRow(req.pid,req.startTicks,req.name);
-        if (!row) { feedback="PROCESS CHANGED SINCE VERIFICATION // REFUSED"; return; }
-        const kind = actionLockKind(req.action);
-        if (!kind) { pending=null; feedback="UNSUPPORTED ACTION"; return false; }
-        if (safetyOwner.requiresDangerUnlock(row)
-                && !safetyOwner.dangerActionUnlocked(row,kind)) {
-            feedback="SAFETY LOCK LOST // REFUSED"; return;
+        if (!row || bulkBlocked) {
+            finishRequest("PROCESS OR ACTION STATE CHANGED // REFUSED");
+            return;
         }
-        // Existing AppControl owners dispatch every change. No new
-        // kill/prlimit backend. Detached commands are requests, not proof.
-        if (req.action === "freeze") {
-            if (presentationOwner.isFrozen(row)) { feedback="ALREADY STOPPED"; return; }
-            if (!controlOwner.sendSignal(req.pid,"-STOP")) { feedback="REQUEST REJECTED"; return; }
-            presentationOwner.markFrozen(row,true);
-        } else if (req.action === "resume") {
-            if (!presentationOwner.isFrozen(row)) { feedback="NOT STOPPED"; return; }
-            if (!controlOwner.sendSignal(req.pid,"-CONT")) { feedback="REQUEST REJECTED"; return; }
-            presentationOwner.markFrozen(row,false);
-        } else if (req.action === "end") {
-            if (!controlOwner.sendSignal(req.pid,"-TERM")) { feedback="REQUEST REJECTED"; return; }
-        } else if (req.action === "restart") {
-            if (!controlOwner.restart(req.pid)) { feedback="REQUEST REJECTED"; return; }
+        const kind = actionLockKind(req.action);
+        if (!kind || (safetyOwner.requiresDangerUnlock(row)
+                && !safetyOwner.dangerActionUnlocked(row,kind))) {
+            finishRequest("SAFETY LOCK LOST // REFUSED");
+            return;
+        }
+        if (req.action === "freeze" || req.action === "resume" || req.action === "end") {
+            if (req.action === "freeze" && presentationOwner.isFrozen(row)) {
+                finishRequest("ALREADY STOPPED"); return;
+            }
+            if (req.action === "resume" && !presentationOwner.isFrozen(row)) {
+                finishRequest("NOT STOPPED"); return;
+            }
+            const sig = req.action === "freeze" ? "-STOP" : req.action === "resume" ? "-CONT" : "-TERM";
+            const command = controlOwner.identitySignalCommand(req.pid,req.startTicks,req.name,sig);
+            if (!command.length) { finishRequest("REQUEST REJECTED"); return; }
+            safetyOwner.relockDangerAction(row,kind);
+            signalDispatchActive = true;
+            feedback = "DISPATCHING IDENTITY-BOUND SIGNAL";
+            signalDispatch.exec(command);
+            return;
+        }
+        // Restart and address-space limit retain existing paths.
+        if (req.action === "restart") {
+            if (!controlOwner.restart(req.pid)) { finishRequest("REQUEST REJECTED"); return; }
         } else if (req.action === "limit") {
             presentationOwner.setLimitPercent(req.percent,row);
         }
         safetyOwner.relockDangerAction(row,kind);
-        feedback = req.action.toUpperCase() + " // REQUEST ISSUED // VERIFY OWNER STATE";
+        finishRequest(req.action.toUpperCase() + " // REQUEST ISSUED // VERIFY OWNER STATE");
         refreshOwner.restart();
+    }
+
+    property bool signalDispatchActive: false
+
+    function finishRequest(message) {
+        feedback = message;
+        pending = null;
+        busy = false;
+    }
+
+    function finishSignal(exitCode, exitStatus) {
+        if (!signalDispatchActive) return;
+        signalDispatchActive = false;
+        const req = pending;
+        if (req && exitCode === 0 && exitStatus === 0) {
+            const row = exactRow(req.pid,req.startTicks,req.name);
+            if (row && (req.action === "freeze" || req.action === "resume"))
+                presentationOwner.markFrozen(row,req.action === "freeze");
+            finishRequest(req.action.toUpperCase() + " // SIGNAL ACCEPTED // VERIFY OWNER STATE");
+        } else {
+            finishRequest("SIGNAL FAILED OR TARGET CHANGED // VERIFY OWNER STATE");
+        }
+        refreshOwner.restart();
+    }
+
+    Process {
+        id: signalDispatch
+        onExited: function(exitCode, exitStatus) {
+            gate.finishSignal(exitCode, exitStatus);
+        }
     }
 
     Process {

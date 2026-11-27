@@ -23,7 +23,7 @@ function drawAsh(c,x,y,w,h,edge,hot) {
     base.addColorStop(0,"#39383e"); base.addColorStop(.48,"#67656b");
     base.addColorStop(1,"#25252a");
     c.fillStyle=base; c.fillRect(x,y,burned,h);
-    for(let i=0;i<Math.min(300,Math.ceil(burned*h/32));i++){
+    for(let i=0;i<Math.min(300,Math.ceil(w*h/32));i++){
         const px=x+grain(i,1)*w, py=y+grain(i,2)*h;
         const r=grain(i,3), size=.5+grain(i,4)*2.3;
         if(px>x+burned) continue;

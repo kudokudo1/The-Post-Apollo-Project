@@ -1,0 +1,19 @@
+name: CPU++ KILL K8c read-only capability contract
+on:
+  pull_request:
+    paths:
+      - 'services/kill/resource_capability_probe.py'
+      - 'tests/cpuplus/test_kill_resource_capability.py'
+      - 'docs/cpuplus-kill-k8c-capability-inventory.md'
+      - '.github/workflows/cpuplus-kill-k8c-capability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify read-only KILL capability evidence
+        run: python3 -B tests/cpuplus/test_kill_resource_capability.py

@@ -464,13 +464,6 @@ Item {
                     const playerAlpha=Math.min(1,p*12);
                     const enemyAlpha=Math.min(1,f.enemyFraction*12)*f.enemyOpacity;
                     const playerWins=contact.left.rx>=contact.right.rx;
-                    if(playerWins) {
-                        compressed(1,enemyInk,enemyCore,enemyAlpha);
-                        compressed(-1,ink,Qt.rgba(.70,.91,1,1),playerAlpha);
-                    } else {
-                        compressed(-1,ink,Qt.rgba(.70,.91,1,1),playerAlpha);
-                        compressed(1,enemyInk,enemyCore,enemyAlpha);
-                    }
                     if(touching) {
                         const tall=contact.chord;
                         const winner=playerWins?ink:enemyInk;
@@ -488,6 +481,17 @@ Item {
                             c.fillStyle=g;
                             c.fillRect(Math.min(edge,end),y+1,penetration,h-2);
                         }
+                    }
+                    if(playerWins) {
+                        compressed(1,enemyInk,enemyCore,enemyAlpha);
+                        compressed(-1,ink,Qt.rgba(.70,.91,1,1),playerAlpha);
+                    } else {
+                        compressed(-1,ink,Qt.rgba(.70,.91,1,1),playerAlpha);
+                        compressed(1,enemyInk,enemyCore,enemyAlpha);
+                    }
+                    if(touching) {
+                        const tall=contact.chord;
+                        const winner=playerWins?ink:enemyInk;
                         orb(h*1.75,h*1.7,[[0,tint(winner,.57)],
                             [.34,tint(winner,.32)],[1,tint(winner,0)]]);
                         orb(Math.max(h*.14,tall*.55),tall*1.1,[

@@ -194,6 +194,7 @@ class Worker:
         self.pending = None
         self.kind = None
         self.attached = False
+        self.observed_epoch = None
         self.closed = False
 
     def command(self, op, data):
@@ -220,18 +221,27 @@ class Worker:
         if self.kind == "SUBMIT_BEGIN":
             return "PENDING"
         if op == "OBSERVE":
-            self.attached = False
-            return b.observe(data["epoch"])
+            epoch = data["epoch"]
+            result = b.observe(epoch)
+            if result and epoch != self.observed_epoch:
+                self.attached = False
+                self.observed_epoch = epoch
+            return result
         if op == "ATTACH":
-            self.attached = b.attach(data["correlation"])
-            return self.attached
+            result = b.attach(data["correlation"])
+            if result:
+                self.attached = True
+            return result
         if op == "TAKE":
             return b.take(data["correlation"])
         if op == "STOP":
             return b.stop(data["correlation"])
         if op == "WITHDRAW":
-            self.attached = False
-            return b.withdraw(data["correlation"])
+            result = b.withdraw(data["correlation"])
+            if result:
+                self.attached = False
+                self.observed_epoch = None
+            return result
         if op == "CLOSE":
             if self.pending is not None:
                 return "PENDING"

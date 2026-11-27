@@ -112,6 +112,47 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(bridge.submit(MODEL,PROMPT,2),"REFUSED")
         bridge.close()
 
+    def test_bridge_stale_observe_preserves_original_custody(self):
+        from unittest.mock import Mock
+        bridge = RealLocalRequestBridge()
+        bridge._runtime.close()
+        runtime = Mock(spec=RealLocalDelivery)
+        bridge._runtime = runtime
+        runtime.observe.return_value = True
+        runtime.submit.return_value = "ACCEPTED"
+        runtime.stop.return_value = "STOP_LATCHED"
+        self.assertTrue(bridge.observe(3))
+        corr = bridge.submit(MODEL, PROMPT, 3)["correlation"]
+        self.assertTrue(bridge.attach(corr))
+        self.assertTrue(bridge.observe(3))
+        for epoch in (1, 2, True, 0):
+            self.assertFalse(bridge.observe(epoch))
+        runtime.withdraw.assert_not_called()
+        runtime.observe.assert_called_once_with(3)
+        self.assertTrue(bridge.stop(corr))
+        runtime.stop.assert_called_once_with(3)
+        self.assertTrue(bridge.withdraw(corr))
+        self.assertFalse(bridge.observe(3))
+        self.assertTrue(bridge.observe(4))
+        self.assertFalse(bridge.observe(3))
+        runtime.withdraw.assert_called_once_with(3)
+        bridge.close()
+
+    def test_bridge_token_failure_precedes_original_effect(self):
+        from unittest.mock import Mock
+        bridge = RealLocalRequestBridge()
+        bridge._runtime.close()
+        runtime = Mock(spec=RealLocalDelivery)
+        bridge._runtime = runtime
+        runtime.observe.return_value = True
+        self.assertTrue(bridge.observe(1))
+        with patch("first_light_delivery.secrets.token_hex",
+                   side_effect=RuntimeError("entropy unavailable")):
+            self.assertEqual(bridge.submit(MODEL, PROMPT, 1), "UNKNOWN_HOLD")
+        runtime.submit.assert_not_called()
+        self.assertEqual(bridge.submit(MODEL, PROMPT, 1), "REFUSED")
+        bridge.close()
+
     def test_bridge_unknown_submit_cannot_retry(self):
         from unittest.mock import Mock
         bridge = RealLocalRequestBridge()

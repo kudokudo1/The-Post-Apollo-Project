@@ -39,6 +39,38 @@ class RealStdioTests(unittest.TestCase):
         self.assertEqual(decode(frame(1,"SUBMIT_BEGIN",dict(
             epoch=1, model=MODEL, prompt=prompt)),1)[1]["prompt"],prompt)
 
+    def test_worker_rejected_commands_preserve_attachment(self):
+        # Command-state translation only; no provider or native admission.
+        from unittest.mock import Mock
+        from real_local_runtime_stdio import Worker
+        worker = Worker.__new__(Worker)
+        worker.bridge = Mock()
+        worker.kind = worker.pending = None
+        worker.observed_epoch = 3
+        worker.attached = True
+        corr = {"token": "a" * 32}
+        worker.bridge.observe.return_value = False
+        self.assertFalse(worker.command("OBSERVE", {"epoch": 2}))
+        self.assertTrue(worker.attached)
+        worker.bridge.observe.return_value = True
+        self.assertTrue(worker.command("OBSERVE", {"epoch": 3}))
+        self.assertTrue(worker.attached)
+        worker.bridge.attach.return_value = False
+        self.assertFalse(worker.command("ATTACH", {"correlation": corr}))
+        self.assertTrue(worker.attached)
+        worker.bridge.withdraw.return_value = False
+        self.assertFalse(worker.command("WITHDRAW", {"correlation": corr}))
+        self.assertTrue(worker.attached)
+        self.assertTrue(worker.command("OBSERVE", {"epoch": 4}))
+        self.assertFalse(worker.attached)
+        self.assertEqual(worker.observed_epoch, 4)
+        worker.bridge.attach.return_value = True
+        self.assertTrue(worker.command("ATTACH", {"correlation": corr}))
+        worker.bridge.withdraw.return_value = True
+        self.assertTrue(worker.command("WITHDRAW", {"correlation": corr}))
+        self.assertFalse(worker.attached)
+        self.assertIsNone(worker.observed_epoch)
+
     def launch(self, home, *args):
         return subprocess.Popen([sys.executable,"-I","-B","-u",
             str(SCRIPTS/"real_local_runtime_stdio.py"),*args],

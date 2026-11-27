@@ -6,6 +6,7 @@ import "../../components"
 import "../appcontrol"
 import "../../services/system"
 import "../../services/kill" as KillBackend
+import "../../services/kill/ProcessPurpose.js" as ProcessPurpose
 import qs.services.favorites
 import "../../services/favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
 
@@ -15,7 +16,6 @@ import "../../services/favorites/FavoritesAppControlIdentityPolicy.js" as Favori
 Item {
     id: workspace
     objectName: "cpuPlusSharedKillWorkspace"
-    required property var appControlWindow
     required property var graphSource
     required property var graphController
     required property var graphSession
@@ -1096,8 +1096,8 @@ Item {
                 contextActive: workspace.active && !!workspace.currentTask
                     && !workspace.locallyPending && !workspace.hasBulkReview && !workspace.bulkOperation
                 task: contextActive ? workspace.currentTask : null
-                purpose: open && contextActive && task && workspace.appControlWindow.taskSimplePurpose
-                    ? workspace.appControlWindow.taskSimplePurpose(task) : ""
+                purpose: open && contextActive && task
+                    ? ProcessPurpose.taskSimplePurpose(task) : ""
                 scopeText: open && contextActive && task ? processView.scopeProcessText() : ""
                 virtualMemory: open && contextActive && task ? processView.formatMemory(task.vsz) : "?"
             }

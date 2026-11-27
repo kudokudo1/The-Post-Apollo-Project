@@ -972,3 +972,21 @@ test("K5c: process classification and exclusion use shared safety and store stat
     assert.equal(make(safety,null).isProtected({comm:"worker"}),true);
     assert.ok(api.protectedProcessRisk({comm:"sway"}).endsWith("SESSION-CRITICAL"));
 });
+
+test("K5d: workspace mounts without an AppControl instance and shares process descriptions", () => {
+    const donor=read("widgets/AppControlW.qml");
+    const fixture=read("tests/cpuplus/fixtures/SharedKillRecipientNative.qml");
+    const purpose=read("services/kill/ProcessPurpose.js");
+    const loader=host.slice(host.indexOf("id: sharedKillWorkspaceLoader"));
+    assert.doesNotMatch(recipient,/appControlWindow/);
+    assert.doesNotMatch(loader,/appControlWindow/);
+    assert.match(loader,/&& KillBackend\.KillStore\.collectionEnabled/);
+    assert.doesNotMatch(fixture,/appControlWindow: fakeOwner/);
+    assert.match(donor,/function taskSimplePurpose\(entry\) \{\s*return ProcessPurpose\.taskSimplePurpose\(entry\);/);
+    assert.match(recipient,/ProcessPurpose\.taskSimplePurpose\(task\)/);
+    const describe=new Function(purpose.replace(/^\.pragma library\s*/,"")+"\nreturn taskSimplePurpose;")();
+    assert.equal(describe(null),"");
+    assert.ok(describe({comm:"sway"}).startsWith("Sway is the Wayland window manager"));
+    assert.ok(describe({comm:"BRAVE"}).startsWith("BRAVE is part of the web browser."));
+    assert.ok(describe({name:"synthetic-worker"}).startsWith("synthetic-worker is one live Linux process."));
+});

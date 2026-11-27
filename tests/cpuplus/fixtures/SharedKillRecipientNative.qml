@@ -218,7 +218,6 @@ ShellRoot {
             else return fakeGate.toggleOneShotUnlock(pid,birth,name);
             return true;
         }
-        function taskSimplePurpose(row) { return "Synthetic purpose"; }
         function monitorResultIcon(row) { return "(╭ರ_•́)"; }
         property bool menuOpen: false
         property int selectedModeIndex: 0
@@ -238,7 +237,6 @@ ShellRoot {
             anchors.fill: parent
             active: smoke.armed
             sourceComponent: CpuPlusKillWorkspace {
-                appControlWindow: fakeOwner
                 graphSource: fakeHistory
                 graphController: fakeGraph
                 graphSession: fakeSession
@@ -401,7 +399,7 @@ ShellRoot {
                 if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===0, "click does not open hover-only help or request action")) return;
                 info.open=true;
                 if (!smoke.check(info.visible && infoButton.selected
-                    && info.purpose==="Synthetic purpose"
+                    && info.purpose==="synthetic-worker is one live Linux process. This panel shows its live CPU, memory, I/O, and age and can limit, freeze, or end this exact process."
                     && smoke.find(info,"processInformationScope")
                     && smoke.find(info,"processInformationArguments")
                     && smoke.find(info,"processInformationBirthIdentity").text.includes("967833")

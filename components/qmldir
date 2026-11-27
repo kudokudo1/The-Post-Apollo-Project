@@ -22,6 +22,7 @@ NeonScrollPaneV2 1.0 NeonScrollPaneV2.qml
 DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
 InformationButton 1.0 InformationButton.qml
+PrismButton 1.0 PrismButton.qml
 DiagnosticsDockButton 1.0 DiagnosticsDockButton.qml
 DiagnosticsServicePopup 1.0 DiagnosticsServicePopup.qml
 VoiceToTextButton 1.0 VoiceToTextButton.qml

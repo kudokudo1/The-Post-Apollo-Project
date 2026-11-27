@@ -11,7 +11,7 @@ function cards() {
         {key:"swap",title:"SWAP",scope:"CGROUP / SHARED-GROUP BUDGET",controls:[
             {key:"budget",title:"SWAP BUDGET",min:0,max:8192,step:128,unit:"MiB",initial:1024}
         ],note:"CGROUP MEMBERSHIP AND DELEGATION UNVERIFIED"},
-        {key:"disk",title:"DISK I/O",scope:"CGROUP / BLOCK DEVICE",controls:[
+        {key:"disk",title:"DISK I/O",scope:"I/O PRIORITY / THREAD; BANDWIDTH / GROUP",controls:[
             {key:"read",title:"READ DRAFT",min:1,max:512,step:1,unit:"MiB/s",initial:64},
             {key:"write",title:"WRITE DRAFT",min:1,max:512,step:1,unit:"MiB/s",initial:64}
         ],note:"NO VERIFIED DEVICE OR CONTROLLER"},
@@ -77,7 +77,7 @@ function stageValue(previous,key,field,value) {
     return result;
 }
 function mode(previous,key) {
-    return previous[key]?previous[key].mode:(key==="cpu"?"manual":"hold");
+    return previous[key]?previous[key].mode:(key==="cpu"||key==="disk"?"manual":"hold");
 }
 function value(previous,key,field) {
     var spec=find(key);
@@ -128,6 +128,19 @@ function dropAffinity(previous) {
     else result.cpu={mode:entry.mode,values:values};
     return result;
 }
+function ioPriority(previous) {
+    var entry=previous.disk, p=entry&&entry.values&&entry.values.ioPriority;
+    return p || {kind:"best_effort",level:4};
+}
+function stageIoPriority(previous,kind,level) {
+    if(kind!=="best_effort"&&kind!=="idle") return previous;
+    if(kind==="best_effort"&&(!Number.isInteger(level)||level<0||level>7)) return previous;
+    var result=Object.assign({},previous);
+    var entry=previous.disk||{mode:"manual",values:{}};
+    var priority=kind==="idle"?{kind:kind}:{kind:kind,level:level};
+    result.disk={mode:"manual",values:Object.assign({},entry.values,{ioPriority:priority})};
+    return result;
+}
 function summary(previous) {
     var lines=[];
     var rows=cards();
@@ -141,11 +154,15 @@ function summary(previous) {
                 var c=spec.controls[j];
                 // Priority and quota are different kernel operations. Never
                 // turn a placeholder value into a requested CPU setting.
-                if(spec.key==="cpu"&&!hasValue(previous,spec.key,c.key)) continue;
+                if((spec.key==="cpu"||spec.key==="disk")&&!hasValue(previous,spec.key,c.key)) continue;
                 fields.push(c.title+" "+value(previous,spec.key,c.key)+" "+c.unit);
             }
             if(spec.key==="cpu"&&hasValue(previous,"cpu","affinity")) fields.push("AFFINITY "+entry.values.affinity.join(","));
-            description+=" // "+(fields.length?fields.join(" · "):"NO CPU VALUES SELECTED");
+            if(spec.key==="disk"&&hasValue(previous,"disk","ioPriority")) {
+                var p=entry.values.ioPriority;
+                fields.push(p.kind==="idle"?"I/O PRIORITY IDLE":"I/O PRIORITY BEST EFFORT "+p.level);
+            }
+            description+=" // "+(fields.length?fields.join(" · "):spec.key==="cpu"?"NO CPU VALUES SELECTED":"NO DISK VALUES SELECTED");
         }
         if(entry.mode==="auto") description+=" // POLICY NOT DEFINED";
         lines.push(description);

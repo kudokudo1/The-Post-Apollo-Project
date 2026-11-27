@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity,ioPriority,stageIoPriority};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
@@ -120,7 +120,7 @@ test("K8d3 has a functional right-aligned information button directly below filt
     assert.match(ui,/onLeftClicked: root.informationOpen = !root.informationOpen/);
     assert.match(ui,/objectName: "cpuPlusResourceInformationPopup"/);
     assert.match(ui,/visible: root.informationOpen/);
-    assert.match(ui,/anchors.top: resourceInfoStrip.bottom/);
+    assert.ok(ui.includes("y: headerContent.y + resourceInfoStrip.y + resourceInfoStrip.height + 3"));
     assert.match(ui,/APPLY REMAINS LOCKED UNTIL THE RESOURCE BACKEND IS VERIFIED/);
 });
 
@@ -236,4 +236,29 @@ test("K8e2a sparse observed CPU masks only; never empty or out-of-mask",()=>{
     assert.equal(draft.value(draft.dropAffinity(next),"cpu","nice"),10);
     assert.equal(draft.hasValue(draft.dropAffinity(next),"cpu","affinity"),false);
     assert.equal(draft.summary(draft.dropAffinity(draft.stageAffinity({},allowed,[8]))).length,0);
+});
+
+test("K8e3a disk class and level are explicit; no bandwidth defaults",()=>{
+    assert.equal(draft.mode({},"disk"),"manual");
+    assert.equal(draft.summary({}).length,0);
+    assert.deepEqual(draft.ioPriority({}),{kind:"best_effort",level:4});
+    const empty={};
+    for(const [kind,level] of [["realtime",0],["best_effort",-1],["best_effort",8],["best_effort",2.5]])
+        assert.equal(draft.stageIoPriority(empty,kind,level),empty);
+    const best=draft.stageIoPriority(empty,"best_effort",2);
+    assert.ok(draft.summary(best)[0].includes("BEST EFFORT 2"));
+    assert.ok(!draft.summary(best)[0].includes("READ DRAFT"));
+    assert.ok(!draft.summary(best)[0].includes("WRITE DRAFT"));
+    const idle=draft.stageIoPriority(best,"idle",2);
+    assert.deepEqual(draft.ioPriority(idle),{kind:"idle"});
+    assert.ok(draft.summary(idle)[0].endsWith("IDLE"));
+    const both=draft.stageIoPriority(draft.stageValue({},"disk","read",50),"idle");
+    assert.ok(draft.summary(both)[0].includes("READ DRAFT 50"));
+    assert.ok(!draft.summary(both)[0].includes("WRITE DRAFT"));
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes('objectName: "cpuPlusIoPriorityDial"'));
+    assert.ok(ui.includes('objectName: "cpuPlusIoClass-"'));
+    assert.ok(ui.includes('root.modeFor("disk")==="manual" && ioRow.bestEffort'));
+    assert.ok(ui.includes('PREVIEW // NOT OBSERVED'));
+    assert.ok(ui.includes('objectName: "cpuPlusIoRealtimeLocked"'));
 });

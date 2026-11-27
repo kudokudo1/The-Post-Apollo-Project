@@ -533,7 +533,32 @@ ShellRoot {
                 if (!smoke.check(!consolePane.hasDraft && !consolePane.reviewing
                         && fakeGate.confirmations===0 && fakeGate.preparations===0,
                         "red clear draft does not affect owner state")) return;
-                                const header=smoke.find(view,"cpuPlusProcessIdentity");
+                const diskFilter=smoke.find(view,"cpuPlusResourceFilter-disk");
+                diskFilter.leftClicked(null);
+                const ioDial=smoke.find(view,"cpuPlusIoPriorityDial");
+                const idleClass=smoke.find(view,"cpuPlusIoClass-idle");
+                const bestClass=smoke.find(view,"cpuPlusIoClass-best_effort");
+                const realtimeClass=smoke.find(view,"cpuPlusIoRealtimeLocked");
+                if (!smoke.check(ioDial && idleClass && bestClass && realtimeClass
+                        && ioDial.interactive && bestClass.selected && !realtimeClass.available
+                        && !consolePane.hasDraft,
+                        "disk priority opens ready with preview and locked realtime")) return;
+                ioDial.valueRequested(2);
+                if (!smoke.check(consolePane.reviewLines[0].includes("BEST EFFORT 2")
+                        && !consolePane.reviewLines[0].includes("READ DRAFT")
+                        && !consolePane.reviewLines[0].includes("WRITE DRAFT"),
+                        "disk priority dial stages only I/O priority")) return;
+                idleClass.leftClicked(null);
+                if (!smoke.check(idleClass.selected && !ioDial.interactive
+                        && consolePane.reviewLines[0].endsWith("IDLE"),
+                        "idle class has no level and disables dial")) return;
+                bestClass.leftClicked(null);
+                if (!smoke.check(bestClass.selected && ioDial.interactive
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "best effort reenables dial without dispatch")) return;
+                clearDraft.leftClicked(null);
+                cpuFilter.leftClicked(null);
+                const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");
                 const identityText=smoke.find(view,"cpuPlusProcessIdentityText");
                 const name=smoke.find(view,"cpuPlusProcessIdentityName");
@@ -741,8 +766,8 @@ ShellRoot {
                     toggle.clicked(null);
                     const extra=smoke.find(view,"cpuPlusDetailGraph-"+metric);
                     if (!smoke.check(view.selectedGraphKeys.length<=2 && extra
-                        && extra.historyValues.length===1
-                        && Math.abs(extra.historyValues[0]-expected)<0.00001
+                        && extra.historyValues.length===(metric==="rss"?2:1)
+                        && extra.historyValues.every(function(v) { return Math.abs(v-expected)<0.00001; })
                         && extra.historyLimit===132 && extra.scrollDuration===920
                         && Math.abs(footer.mapToItem(view,0,0).y-footerY)<1,
                         "selected observed graph "+metric)) return;

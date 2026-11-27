@@ -95,6 +95,18 @@ Item {
         return modeFor("cpu") === "manual"
             && priorityValue() === nice;
     }
+    function stageIoClass(kind) {
+        if (!selectionReady || selectedKey!=="disk") return;
+        const current=Draft.ioPriority(staged);
+        staged=Draft.stageIoPriority(staged,kind,current.kind==="best_effort"?current.level:4);
+        reviewing=false;
+    }
+    function stageIoLevel(level) {
+        if (!selectionReady || selectedKey!=="disk" || modeFor("disk")!=="manual"
+                || Draft.ioPriority(staged).kind!=="best_effort") return;
+        staged=Draft.stageIoPriority(staged,"best_effort",level);
+        reviewing=false;
+    }
     function accentFor(key) {
         if (key === "cpu") return Colors.orange;
         if (key === "memory") return Colors.magenta;
@@ -235,8 +247,7 @@ Item {
             id: resourceInformationPopup
             objectName: "cpuPlusResourceInformationPopup"
             anchors.right: headerContent.right
-            anchors.top: resourceInfoStrip.bottom
-            anchors.topMargin: 3
+            y: headerContent.y + resourceInfoStrip.y + resourceInfoStrip.height + 3
             width: Math.min(320,Math.max(0,root.width - 14))
             height: informationContent.implicitHeight + 12
             color: Colors.black
@@ -554,6 +565,89 @@ Item {
                                                 else
                                                     text = String(field.priorityField ? root.priorityValue() : root.valueFor(resourcePanel.key,field.modelData.key));
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                            Loader {
+                                objectName: "cpuPlusIoPrioritySlot"
+                                width: parent.width
+                                active: resourcePanel.key==="disk"
+                                visible: active
+                                height: active ? 158 : 0
+                                sourceComponent: Row {
+                                    id: ioRow
+                                    spacing: 5
+                                    readonly property var priority: Draft.ioPriority(root.staged)
+                                    readonly property bool bestEffort: priority.kind==="best_effort"
+                                    SelectorDial {
+                                        id: ioDial
+                                        objectName: "cpuPlusIoPriorityDial"
+                                        width: Math.max(70,Math.min(142,(ioRow.width-5)*0.54))
+                                        height: 150
+                                        labelText: "I/O PRIORITY"
+                                        titleColor: Colors.blue
+                                        titlePixelSize: 9
+                                        selectorMode: "continuous"
+                                        minimumValue: 0
+                                        maximumValue: 7
+                                        valueStep: 1
+                                        valueDecimals: 0
+                                        snapContinuousToStep: true
+                                        currentValue: ioRow.bestEffort ? ioRow.priority.level : 4
+                                        readoutText: ioRow.bestEffort ? String(Math.round(previewNumericValue)) : "N/A"
+                                        options: ["0","1","2","3","4","5","6","7"]
+                                        displayOptions: options
+                                        numericReferenceValues: [0,1,2,3,4,5,6,7]
+                                        numericLabelPixelSize: 9
+                                        showInstrumentChassis: false
+                                        accentColor: Colors.blue
+                                        markerColor: Colors.blue
+                                        activeDetentColor: Colors.blue
+                                        labelColor: Colors.white
+                                        interactive: root.selectionReady && root.modeFor("disk")==="manual" && ioRow.bestEffort
+                                        onValueRequested: function(value) {
+                                            if (interactive) root.stageIoLevel(Math.round(value));
+                                        }
+                                    }
+                                    Column {
+                                        width: Math.max(1,ioRow.width-ioDial.width-ioRow.spacing)
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 4
+                                        Repeater {
+                                            model: [{key:"best_effort",label:"BEST EFFORT"},{key:"idle",label:"IDLE"}]
+                                            delegate: ActionButton {
+                                                required property var modelData
+                                                objectName: "cpuPlusIoClass-"+modelData.key
+                                                width: parent.width
+                                                height: 28
+                                                label: modelData.label
+                                                labelPixelSize: 9
+                                                labelMinimumPixelSize: 7
+                                                normalFace: true
+                                                accentColor: Colors.blue
+                                                selected: root.modeFor("disk")==="manual" && ioRow.priority.kind===modelData.key
+                                                available: root.selectionReady
+                                                onLeftClicked: root.stageIoClass(modelData.key)
+                                            }
+                                        }
+                                        ActionButton {
+                                            objectName: "cpuPlusIoRealtimeLocked"
+                                            width: parent.width
+                                            height: 28
+                                            label: "REALTIME // LOCKED"
+                                            labelPixelSize: 8
+                                            normalFace: true
+                                            accentColor: Colors.blue
+                                            available: false
+                                        }
+                                        GohuText {
+                                            width: parent.width
+                                            text: Draft.hasValue(root.staged,"disk","ioPriority") ? "CLASS // DRAFT"
+                                                : "PREVIEW // NOT OBSERVED"
+                                            color: Colors.white
+                                            wrapMode: Text.Wrap
+                                            font.pixelSize: 9
                                         }
                                     }
                                 }

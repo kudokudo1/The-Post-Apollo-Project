@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'widgets/forest/ui2/PublicRuntimeStatusDisplay.js'
+      - 'widgets/forest/ui2/LocalConversationPresentation.js'
+      - 'tests/forest/test_ui2_local_conversation_presentation.js'
       - 'tests/forest/test_ui22a_runtime_status.js'
       - 'tests/forest/ui2_r4b_public_fixture.py'
       - 'scripts/forest/runtime_public_delivery_r4b.py'
@@ -23,3 +25,4 @@ jobs:
         with:
           persist-credentials: false
       - run: node tests/forest/test_ui22a_runtime_status.js
+      - run: node tests/forest/test_ui2_local_conversation_presentation.js

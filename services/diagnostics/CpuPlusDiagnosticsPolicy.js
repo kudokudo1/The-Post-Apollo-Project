@@ -21,7 +21,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio", "swapio"].indexOf(kind) >= 0;
 }
 
 function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
@@ -36,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE", swapio: "SWAP OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -148,6 +148,7 @@ function storageCadence(c) {
 // Observer receipts extend the terminal record rather than prepend a row,
 // keeping existing memory, census and storage projections compatible.
 function configuredEvidence(kind,text,expected) {
+    if (kind==="swapio") { const d=swapIoEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="diskio") { const d=diskIoEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="gpu") { const d=gpuEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="hostcpu") { const d=hostCpuEvidence(text,expected); return d ? d.calibration : null; }
@@ -374,6 +375,7 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind==="swapio") return swapIoSummary(text);
     if (kind==="diskio") return diskIoSummary(text);
     if (kind==="gpu") return gpuSummary(text);
     if (kind==="hostcpu") return hostCpuSummary(text);
@@ -961,4 +963,80 @@ function diskIoSummary(text) {
     return "DISK I/O // "+rows.length+" intervals / "+last.devices.length+" devices / "+d.observedMs+" ms\n"
         +lines.join("\n\n")+"\nTop "+Math.min(8,last.devices.length)+" by bytes; raw report retains all devices."
         +" Device-backed whole block counters only; excludes virtual layers, partitions, discard and flush. Kernel time counters are not latency or saturation guarantees.";
+}
+
+
+// D9a-b: VM swap traffic, not disk traffic; optional pressure and zram
+// data retain their availability and interval coverage.
+function swapIoEvidence(text,expected) {
+    try {
+        if(typeof text!=="string"||text.length>65536||/[^\x00-\x7f]/.test(text))return null;
+        const records=text.trim().split("\n").map(line=>JSON.parse(line)),end=records.pop();
+        const schema="post-apollo-swap-io-v1",max=Number.MAX_SAFE_INTEGER;
+        const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        const keys=(o,k)=>!!o&&Object.keys(o).length===k.length&&k.every(x=>Object.prototype.hasOwnProperty.call(o,x));
+        const c=end&&end.calibration,page=end&&end.pageSize;
+        if(!keys(end,["schema","event","samples","observedMs","pageSize","calibration"])
+            ||end.schema!==schema||end.event!=="complete"||!keys(c,["kind","durationSeconds","intervalMs"])
+            ||c.kind!=="swapio"||!integer(c.durationSeconds,1,30)
+            ||!integer(c.intervalMs,1000,Math.min(5000,c.durationSeconds*1000))||c.intervalMs%1000
+            ||!integer(page,1024,1048576)||(page&(page-1))!==0
+            ||(expected&&(!keys(expected,Object.keys(c))||Object.keys(c).some(k=>c[k]!==expected[k]))))return null;
+        const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+        if(n>12||records.length!==n||end.samples!==n||!integer(end.observedMs,c.durationSeconds*1000,45000))return null;
+        let elapsed=0,identity=null,capacity=null,bytes=[0,0],pressureTotals=[0,0],pressureMs=0;
+        const pct=v=>typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=100;
+        for(let i=0;i<n;i++){
+            const row=records[i],m=row&&row.memoryKiB,p=row&&row.pressure;
+            if(!keys(row,["schema","event","sequence","elapsedMs","intervalMs","memoryKiB","swapBytes","pressure","zram"])
+                ||row.schema!==schema||row.event!=="swapio"||row.sequence!==i+1
+                ||!integer(row.elapsedMs,Math.min((i+1)*c.intervalMs,c.durationSeconds*1000),end.observedMs)
+                ||!integer(row.intervalMs,1,45000)||row.elapsedMs!==elapsed+row.intervalMs
+                ||!Array.isArray(m)||m.length!==4||!m.every(v=>integer(v,0,max))
+                ||m[0]===0||m[1]>m[0]||m[3]>m[2]
+                ||!Array.isArray(row.swapBytes)||row.swapBytes.length!==2
+                ||!row.swapBytes.every(v=>integer(v,0,max)&&v%page===0)
+                ||(p!==null&&(!Array.isArray(p)||p.length!==4||!pct(p[0])||!pct(p[1])
+                    ||!integer(p[2],0,max)||!integer(p[3],0,max)))
+                ||!Array.isArray(row.zram)||row.zram.length>16)return null;
+            if(!row.zram.every((z,j)=>Array.isArray(z)&&z.length===4
+                &&typeof z[0]==="string"&&/^zram(?:0|[1-9][0-9]{0,5})$/.test(z[0])
+                &&(j===0||z[0]>row.zram[j-1][0])
+                &&(z.slice(1).every(v=>v===null)||z.slice(1).every(v=>integer(v,0,max)))))return null;
+            const next=JSON.stringify(row.zram.map(z=>z[0])),cap=JSON.stringify([m[0],m[2]]);
+            if(identity!==null&&identity!==next||capacity!==null&&capacity!==cap)return null;
+            identity=next;capacity=cap;
+            for(let k=0;k<2;k++){
+                bytes[k]+=row.swapBytes[k];
+                if(!Number.isSafeInteger(bytes[k]))return null;
+                if(p!==null){
+                    pressureTotals[k]+=p[k+2];
+                    if(!Number.isSafeInteger(pressureTotals[k]))return null;
+                }
+            }
+            if(p!==null)pressureMs+=row.intervalMs;
+            elapsed=row.elapsedMs;
+        }
+        if(elapsed!==end.observedMs)return null;
+        return {calibration:c,records:records,observedMs:elapsed,pageSize:page,bytes:bytes,pressureTotals:pressureTotals,pressureMs:pressureMs};
+    }catch(_){return null;}
+}
+function swapIoSummary(text) {
+    const d=swapIoEvidence(text,null);
+    if(!d)return null;
+    const rows=d.records,last=rows[rows.length-1],sec=d.observedMs/1000;
+    const mib=b=>(b/1048576).toFixed(2),gib=k=>(k/1048576).toFixed(2);
+    const zram=last.zram.map(z=>z[0]+" // "+(z[1]===null?"N/A":
+        mib(z[1])+" / "+mib(z[2])+" / "+mib(z[3])+" MiB (original / compressed / allocated)"));
+    return "SWAP // "+rows.length+" intervals / "+d.observedMs+" ms / page "+d.pageSize+" B"
+        +"\nRAM AVAILABLE // "+gib(last.memoryKiB[1])+" / "+gib(last.memoryKiB[0])+" GiB last"
+        +" / minimum "+gib(Math.min(...rows.map(r=>r.memoryKiB[1])))+" GiB"
+        +"\nSWAP USED // "+gib(last.memoryKiB[3])+" / "+gib(last.memoryKiB[2])+" GiB last"
+        +"\nSWAP IN / OUT // "+mib(d.bytes[0])+" / "+mib(d.bytes[1])+" MiB total"
+        +" | "+mib(d.bytes[0]/sec)+" / "+mib(d.bytes[1]/sec)+" MiB/s mean"
+        +"\nMEMORY PSI SOME / FULL AVG10 // "+(last.pressure===null?"N/A":last.pressure[0].toFixed(2)+" / "+last.pressure[1].toFixed(2)+"% last")
+        +"\nPSI STALL SOME / FULL // "+(d.pressureMs===0?"N/A":
+            (d.pressureTotals[0]/1000).toFixed(1)+" / "+(d.pressureTotals[1]/1000).toFixed(1)+" ms over "+d.pressureMs+" ms observed")
+        +"\nACTIVE ZRAM // "+(zram.length?"\n"+zram.join("\n"):"NONE")
+        +"\nVM swap counters are not disk throughput. PSI covers all host memory pressure, not just swap. ZRAM allocation consumes RAM. Snapshots are non-atomic; no process attribution.";
 }

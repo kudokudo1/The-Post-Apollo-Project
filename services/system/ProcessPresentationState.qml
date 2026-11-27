@@ -12,6 +12,8 @@ QtObject {
 
     property var taskCpuHistory: []
     property var taskMemHistory: []
+    // Selected-process observations only, never fabricated prehistory.
+    property var taskExtraDetailHistories: ({rss: [], threads: [], io: [], age: []})
 
     readonly property int taskHistoryLimit: 132
     readonly property int taskGraphScrollDuration: 920
@@ -54,6 +56,7 @@ QtObject {
         taskHistoryPid = 0;
         taskCpuHistory = [];
         taskMemHistory = [];
+        taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: []});
         taskHunterDetailHistories = ({
             cpu: [],
             mem: [],

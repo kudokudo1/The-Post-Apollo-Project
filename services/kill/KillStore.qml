@@ -670,6 +670,7 @@ Scope {
         telemetry: cpuDetailSampler
         hunterPresentation: cpuHunter
         sharedMiniController: graph
+        extraDetailHistoryEnabled: true
     }
     KillDetailSession {
         id: cpuSelectedDetail

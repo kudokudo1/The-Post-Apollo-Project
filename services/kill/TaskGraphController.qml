@@ -8,6 +8,7 @@ QtObject {
     required property var hunterPresentation
     property var taskRows: []
     property var sharedMiniController: null
+    property bool extraDetailHistoryEnabled: false
     readonly property var miniTaskLookup: sharedMiniController
         ? sharedMiniController.miniTaskLookup : buildMiniTaskLookup(taskRows)
 
@@ -115,6 +116,7 @@ QtObject {
         presentationState.taskHistoryPid = 0;
         presentationState.taskCpuHistory = [];
         presentationState.taskMemHistory = [];
+        presentationState.taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: []});
         presentationState.taskHunterDetailHistories = ({
             cpu: [], mem: [], io: [], age: [], combined: []
         });
@@ -142,6 +144,7 @@ QtObject {
         }
 
         presentationState.taskHistoryPid = pid;
+        presentationState.taskExtraDetailHistories = ({rss: [], threads: [], io: [], age: []});
 
         const preload =
             Array.isArray(preloadedCpu) && preloadedCpu.length > 0
@@ -216,6 +219,30 @@ QtObject {
         });
     }
 
+    // Missing observations break a series instead of inventing zeroes.
+    function appendExtraDetailHistories(data) {
+        const previous = presentationState.taskExtraDetailHistories;
+        const next = ({});
+        const values = {
+            rss: data.rssObserved === true ? data.rssKiB / 1024 : null,
+            threads: data.threadCount,
+            io: data.ioRateObserved === true ? data.ioRateBytes / (1024 * 1024) : null,
+            age: data.ageObserved === true ? data.ageSeconds / 60 : null
+        };
+        for (const key of ["rss", "threads", "io", "age"]) {
+            const value = values[key];
+            if (typeof value !== "number" || !Number.isFinite(value) || value < 0
+                    || (key === "threads" && (!Number.isSafeInteger(value) || value < 1))) {
+                next[key] = [];
+                continue;
+            }
+            next[key] = (Array.isArray(previous[key]) ? previous[key] : [])
+                .slice(-(presentationState.taskHistoryLimit - 1));
+            next[key].push(value);
+        }
+        presentationState.taskExtraDetailHistories = next;
+    }
+
     function applyDetailProbe(sample, currentEntry) {
         const data = sample || ({});
         const pid = Number(data.pid || 0);
@@ -231,6 +258,8 @@ QtObject {
             Number(data.cpuPercent || 0),
             Number(data.memPercent || 0)
         );
+
+        if (extraDetailHistoryEnabled) appendExtraDetailHistories(data);
 
         appendSelectedTaskHunterHistories(
             currentEntry,

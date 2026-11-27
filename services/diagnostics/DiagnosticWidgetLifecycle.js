@@ -37,7 +37,7 @@ function lifecycleStart(ids,states,now,durationMs) {
     // Snapshot selected flags only; no titles, payload, paths, account or process data.
     return {schema:lifecycleSchema,ids:ids.slice(),startedMs:now,deadlineMs:now+durationMs,
         initial:JSON.parse(JSON.stringify(states)),current:JSON.parse(JSON.stringify(states)),
-        events:[],lastMs:now,fault:"",timings:[],timingRejected:0};
+        events:[],lastMs:now,fault:"",timings:[],timingRejected:0,loop:{ticks:0,maxIntervalMs:0,firstOffsetMs:null,lastOffsetMs:null,gapCount:0,gaps:[],omittedGaps:0,rejected:0}};
 }
 function lifecycleFault(run,reason){if(run&&!run.fault)run.fault=reason;return false;}
 function lifecycleObserve(run,id,open,now) {
@@ -74,7 +74,8 @@ function lifecycleFinish(run,now,outcome) {
     });
     return {schema:lifecycleSchema,status:outcome,elapsedMs,targets:run.ids.slice(),
         events:run.events.map(e=>({id:e.id,open:e.open,atMs:e.atMs})),stats,
-        timings:run.timings.map(t=>Object.assign({},t)),timingRejected:run.timingRejected};
+        timings:run.timings.map(t=>Object.assign({},t)),timingRejected:run.timingRejected,
+        eventLoop:JSON.parse(JSON.stringify(run.loop))};
 }
 
 // The cutoff is the requested observation window, not the timer callback.
@@ -116,4 +117,38 @@ function lifecycleTiming(run,id,channel,stage,mode,elapsed,now) {
     row.count++;row.totalMs+=elapsed;row.maxMs=Math.max(row.maxMs,elapsed);
     run.lastMs=now;
     return true;
+}
+
+// Reuse the existing 100ms shell timer. Full intervals only, bounded gap list.
+// Timer delivery delay is not a CPU profile or widget attribution.
+function lifecycleLoopTick(run,elapsed,now) {
+    if(!run||run.fault)return false;
+    const l=run.loop;
+    if(!validTime(now)||!Number.isSafeInteger(elapsed)||elapsed<=0||now>run.deadlineMs||
+        now-elapsed<run.startedMs||now<run.lastMs||
+        (l.lastOffsetMs!==null&&now-run.startedMs<=l.lastOffsetMs)||l.ticks>=2048){
+        l.rejected=Math.min(1000000,l.rejected+1);return false;
+    }
+    const offset=now-run.startedMs;
+    if(l.firstOffsetMs===null)l.firstOffsetMs=offset-elapsed;
+    l.lastOffsetMs=offset;l.ticks++;l.maxIntervalMs=Math.max(l.maxIntervalMs,elapsed);
+    if(elapsed>=350){
+        l.gapCount++;
+        if(l.gaps.length<128)l.gaps.push({fromMs:offset-elapsed,atMs:offset,intervalMs:elapsed});
+        else l.omittedGaps++;
+    }
+    run.lastMs=now;
+    return true;
+}
+function lifecycleCombined(lifecycle,resource,requested,stopped) {
+    if(!lifecycle)return null;
+    const result=JSON.parse(JSON.stringify(lifecycle));
+    if(!requested)return result;
+    result.lifecycleStatus=lifecycle.status;
+    result.resource=resource?JSON.parse(JSON.stringify(resource)):{status:"NOT VERIFIED",evidence:null};
+    if(lifecycle.status==="FAILED")return result;
+    if(stopped||lifecycle.status==="CANCELLED"){result.status="CANCELLED";return result;}
+    if(lifecycle.status!=="COMPLETE"||result.resource.status!=="COMPLETE"||!result.resource.evidence||
+       !result.eventLoop||!result.eventLoop.ticks||result.eventLoop.omittedGaps)result.status="PARTIAL";
+    return result;
 }

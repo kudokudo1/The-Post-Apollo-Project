@@ -73,3 +73,22 @@ assert(shell.includes('"notifications": notificationsHubWindow'));assert(adapter
 assert(shell.includes('"media": sharedMediaDock'));assert(adapter.includes('recorder.subscribed("media")'));
 assert(!/\bProcess\s*\{/.test(adapter));
 assert(!/repeat:\s*true/.test(adapter));
+
+vm.runInContext(`
+    const timed=lifecycleStart(["appcontrol","git","hospital","media"],{appcontrol:false,git:false,hospital:false,media:false},1000,1000);
+    assert(lifecycleTiming(timed,"appcontrol","opening","selection-row","app",7,1020));
+    assert(lifecycleTiming(timed,"appcontrol","work","task-rows","cpu-kill",4,1030));
+    assert(lifecycleTiming(timed,"git","dock","toggle","",10,1050));
+    assert(lifecycleTiming(timed,"git","dock","toggle","",20,1080));
+    assert(lifecycleTiming(timed,"hospital","dock","toggle","",2,1085));
+    assert(lifecycleTiming(timed,"media","frame","cava-apply","",1,1090));
+    assert(!lifecycleTiming(timed,"forest","dock","toggle","",1,1090));
+    assert(!lifecycleTiming(timed,"git","dock","private title","",1,1090));
+    assert(!lifecycleTiming(timed,"git","dock","toggle","",100,1090));
+    assert(!lifecycleTiming(timed,"git","dock","toggle","",1,2001));
+    const report=lifecycleFinish(timed,2000,"COMPLETE");
+    assert(report.timings.length===5&&report.timingRejected===3);
+    const git=report.timings.find(x=>x.id==="git");
+    assert(git.count===2&&git.totalMs===30&&git.maxMs===20);
+    git.count=99;assert(timed.timings.find(x=>x.id==="git").count===2);
+`,ctx);

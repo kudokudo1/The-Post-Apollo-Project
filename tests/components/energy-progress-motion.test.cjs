@@ -90,7 +90,7 @@ test("four personalities preserve bounded motion, distinct intensity and flash i
 });
 
 const material = vm.runInNewContext(fs.readFileSync(path.join(root,
-    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining,heatBed});",
+    "components/EnergyFireMaterial.js"), "utf8") + "\n({geometry,grain,drawAsh,drawRemaining,heatBed,heatFootprint});",
     {Qt:{rgba:(r,g,b,a)=>({r,g,b,a})}});
 test("material experiments preserve standard and partition the chassis", () => {
     for(const mode of ["standard","ash-trail","burn-away","unknown"]){
@@ -625,4 +625,21 @@ test("all fire treatments extinguish on result without changing actual progress"
     assert.match(source,/PixelFire.releasedEmbers\(fireState.cool\)/);
     assert.match(source,/c.scale\(fireState.scale,fireState.scale\)/);
     assert.match(field,/fire\?source.fireState.heat:1/);
+});
+
+test("compact under-burn stays near the flame at every speed and size",()=>{
+    for(const h of [12,24,34,68,120]){
+        for(let i=0;i<180;i++){
+            const v=(i%11)/10, bed=material.heatBed(i/30,v,false), tip=h*.55;
+            const f=material.heatFootprint(h,tip,bed.reach,v);
+            assert.ok(f.ahead>=tip && f.ahead-tip<=h*.66+1e-9);
+            assert.ok(f.behind>=0 && f.behind<=h*1.176+1e-9);
+            assert.ok(f.ahead<(h*1.85+tip)*bed.reach);
+            assert.ok(f.behind<h*(1.1+.75*v)*bed.reach);
+        }
+    }
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/Material.heatFootprint\(h,root.flameTipOffset,bed.reach,flame.speed\)/);
+    assert.match(source,/footprint.ahead\*fireState.heat/);
+    assert.match(source,/Math.min\(inner\*p,footprint.behind\)/);
 });

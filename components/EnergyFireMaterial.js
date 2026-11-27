@@ -104,3 +104,13 @@ function heatBed(time,speed,reduced) {
     return {pulse:.82+.11*Math.sin(t*8.9)+.07*Math.sin(t*15.1),
         reach:.86+.22*v+.10*Math.sin(t*6.8), rows:rows};
 }
+
+// Keep contact heat beneath the flame, with only a short moving margin
+// beyond its leading pixels. This does not shorten the flame or its light.
+function heatFootprint(height,tipOffset,reach,speed) {
+    const h=Math.max(0,Number.isFinite(height)?height:0);
+    const tip=Math.max(0,Number.isFinite(tipOffset)?tipOffset:0);
+    const r=Math.max(0,Math.min(1.2,Number.isFinite(reach)?reach:0));
+    const v=Math.max(0,Math.min(1,Number.isFinite(speed)?speed:0));
+    return {ahead:tip+h*.55*r,behind:h*(.66+.32*v)*r};
+}

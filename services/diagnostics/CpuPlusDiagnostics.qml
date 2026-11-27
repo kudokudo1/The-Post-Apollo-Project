@@ -128,15 +128,20 @@ Scope {
     property var gpuWorkshopDraft: ({durationSeconds:10, selected:["gpu"], gpuIntervalMs:1000,
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
         hostCpuIntervalMs:1000, storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
+    property var storageWorkshopDraft: ({durationSeconds:30, selected:["storage"],
+        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
+        hostCpuIntervalMs:1000, gpuIntervalMs:1000, storageCadenceExplicit:true, storageSampleSeconds:1, storageReportSeconds:10})
     function draftForSubject(subject) {
-        return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft : workshopDraft;
+        return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft
+            : subject==="STORAGE" ? storageWorkshopDraft : workshopDraft;
     }
     function setDraftForSubject(subject, draft) {
         if (workshopPresetLocked || !draft || !Array.isArray(draft.selected)
-                || !["CPU","GPU","ALL"].includes(subject)
+                || !["CPU","GPU","STORAGE","ALL"].includes(subject)
                 || !draft.selected.every(k=>Calibration.workshopSubjectKinds(subject).includes(k))) return false;
         if (subject==="CPU") cpuWorkshopDraft=draft;
         else if (subject==="GPU") gpuWorkshopDraft=draft;
+        else if (subject==="STORAGE") storageWorkshopDraft=draft;
         else workshopDraft=draft;
         return true;
     }

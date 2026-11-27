@@ -497,3 +497,22 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"ALL")',c),false);
     assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"gpu",intervalMs:1000},{kind:"hostcpu",intervalMs:1000}]}).ok',c),false);
 }
+
+
+// D8a: STORAGE reuses the existing observer and calibration, independent draft.
+{
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const p={durationSeconds:4,instruments:[{kind:"storage",sampleSeconds:2,reportSeconds:4}]};
+    const call=expr=>vm.runInContext(expr,c);
+    assert.equal(call('JSON.stringify(workshopSubjectKinds("STORAGE"))'),'["storage"]');
+    assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(p)+',"STORAGE")'),true);
+    assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(p)+',"GPU")'),false);
+    assert.equal(call('workshopPlanMatchesSubject('+JSON.stringify(p)+',"CPU")'),false);
+    assert.equal(call('JSON.stringify(workshopPlanFromDraft(workshopDraftFromPlan('+JSON.stringify(p)+')))'),JSON.stringify(p));
+    assert.match(owner,/property var storageWorkshopDraft:/);
+    assert.match(owner,/else if \(subject==="STORAGE"\) storageWorkshopDraft=draft;/);
+    assert.match(read("widgets/CpuPlusW.qml"),/\["CPU","GPU","STORAGE"\]\.includes\(resourceSubject\)/);
+    assert.match(workshop,/TARGET \/\/ 18 KNOWN FILES/);
+    assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/does not measure physical disk throughput/);
+}

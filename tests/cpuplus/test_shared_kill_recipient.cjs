@@ -653,3 +653,16 @@ test("K3c.2a: shared bulk review is immutable and consumed only by exact referen
     assert.equal(api.releaseCpuBulkReview(review),false);
     assert.equal(api.current(),null);
 });
+
+test("K3c.2b-1: one service-owned Hunter executor retains donor admission and result routing", () => {
+    const store=read("services/kill/KillStore.qml");
+    const owner=read("widgets/AppControlW.qml");
+    assert.equal((store.match(/^\s*HunterExecutor\s*\{/gm)||[]).length,1);
+    assert.match(store,/readonly property var hunterExecutor: hunterExecution/);
+    assert.doesNotMatch(owner,/^\s*HunterExecutor\s*\{/m);
+    assert.match(owner,/readonly property var hunterExecutor: KillBackend\.KillStore\.hunterExecutor/);
+    assert.match(owner,/HunterOperationController\s*\{\s*id: hunterOperationController[\s\S]*?executor: hunterExecutor/);
+    assert.match(owner,/Connections\s*\{\s*target: appControlWindow\.hunterExecutor\s*function onResultReady\(result\)\s*\{\s*appControlWindow\.applyHunterOperationResult\(result\)/);
+    assert.match(owner,/function onFinished\(\)\s*\{\s*appControlWindow\.finishHunterOperation\(\)/);
+    assert.match(owner,/function onErrorRaised\(message\)\s*\{\s*console\.log\("AppControl: HUNTER"/);
+});

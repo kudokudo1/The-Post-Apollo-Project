@@ -5,6 +5,7 @@ on:
       - 'services/system/TaskSafety.qml'
       - 'services/system/HunterExecutor.qml'
       - 'widgets/appcontrol/HunterOperationController.qml'
+      - 'services/kill/HunterOperationController.qml'
       - 'widgets/appcontrol/GlobalTaskActionController.qml'
       - 'widgets/AppControlW.qml'
       - 'services/system/ProcessControl.qml'
@@ -73,9 +74,9 @@ jobs:
           set -eu
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          mkdir -p "$tmp/widgets/appcontrol" "$tmp/runtime" "$tmp/home"
+          mkdir -p "$tmp/services/kill" "$tmp/runtime" "$tmp/home"
           chmod 700 "$tmp/runtime"
-          cp widgets/appcontrol/HunterOperationController.qml "$tmp/widgets/appcontrol/"
+          cp services/kill/HunterOperationController.qml "$tmp/services/kill/"
           cp tests/cpuplus/fixtures/HunterSerialNative.qml "$tmp/shell.qml"
           export XDG_RUNTIME_DIR="$tmp/runtime" HOME="$tmp/home"
           export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software

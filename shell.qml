@@ -215,10 +215,12 @@ PanelWindow {
         const widget = String(route.widget || "");
         if (widget === "cpu") {
             if (route.view === "diagnostics") {
-                if (!CpuPlusDiagnostics.selectExactReport(route.reportKind, route.reportId)) return false;
+                if (!CpuPlusDiagnostics.selectExactReport(route.reportKind, route.reportId, false)) return false;
                 if (!cpuPlusWindow.menuOpen) cpuPlusWindow.open();
                 cpuPlusWindow.selectMode(3);
-                cpuPlusWindow.selectSystemSubMode("MEMORY");
+                cpuPlusWindow.selectSystemSubMode("ALL");
+                // Deliver report view after selecting the durable general workspace.
+                CpuPlusDiagnostics.pendingReportView = true;
                 shellRoot.requestControlKeyboard("cpu", "notification-route");
                 return true;
             }

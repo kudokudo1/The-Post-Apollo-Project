@@ -344,6 +344,9 @@ function workshopSubjectKinds(subject) {
     if (subject==="STORAGE") return ["storage","diskio"];
     if (subject==="SWAP") return ["swapio"];
     if (subject==="NETWORK") return ["netio"];
+    if (subject==="MEMORY") return ["memory"];
+    if (subject==="SYSTEM") return ["threads","memory","census","storage","stall","hostcpu","gpu","diskio","swapio","netio"];
+    // Legacy core scope retained for existing calibration callers; not a SYSTEM menu.
     if (subject==="ALL") return ["threads","memory","census","storage","stall"];
     return [];
 }

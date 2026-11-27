@@ -252,7 +252,10 @@ test('Hunter display short circuits preserve thresholds and protection classes',
     assert.equal(counts.avg,1);
     assert.equal(counts.protected,1);
     const gate=app.slice(app.indexOf('function taskEligibleForKillAll(entry)'),app.indexOf('function killAllEligibleTasks()'));
-    assert.match(gate,/return !taskProtectedFromKillAll\(entry\)/);
+    assert.match(gate,/return KillBackend\.KillStore\.taskEligibleForKillAll\(entry\)/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    const policy=store.slice(store.indexOf('function taskEligibleForKillAll(entry)'),store.indexOf('function killAllEligibleTasks()'));
+    assert.match(policy,/return !safety\.protectedFromKillAll\(entry\)/);
 });
 
 test('menu visibility binds immutable graph presentation policy', () => {

@@ -3316,11 +3316,16 @@ PanelWindow {
                 operationClock = Date.now();
                 operationResultHold.stop();
             } else if (operationPhase === "running") {
-                // A finished Git process is not a verified success until
-                // its existing journal path reports a successful exit code.
-                operationPhase = gitService.actionExitCode === 0
-                    ? "success" : "failure";
-                operationResultHold.restart();
+                // Some early refusal paths update the exit code just after
+                // lowering actionBusy. Read once the synchronous writer ends.
+                Qt.callLater(function() {
+                    if (gitAction.operationBusy
+                            || gitAction.operationPhase !== "running")
+                        return;
+                    gitAction.operationPhase = gitService.actionExitCode === 0
+                        ? "success" : "failure";
+                    operationResultHold.restart();
+                });
             }
         }
         Timer {

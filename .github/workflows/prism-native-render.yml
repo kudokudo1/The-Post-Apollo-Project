@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
-          trap 'rm -rf "$work"; rm -f /tmp/prism-render-composite.png' EXIT
+          trap 'rm -rf "$work"; rm -f /tmp/prism-render-composite.png /tmp/prism-render-idle.png' EXIT
           export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/run"
           mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
@@ -55,14 +55,20 @@ jobs:
           if grep -q PRISM_NATIVE_FAIL "$work/output"; then exit 1; fi
           python3 - <<'PY'
           from PIL import Image
-          with Image.open("/tmp/prism-render-composite.png") as original:
-              im=original.convert("RGBA")
-              box=im.getbbox()
-              center=im.getpixel((im.width//2, im.height//2))
-              pixels=list(im.getdata())
+          with Image.open("/tmp/prism-render-idle.png") as idle_file, \
+               Image.open("/tmp/prism-render-composite.png") as selected_file:
+              idle=idle_file.convert("RGBA")
+              selected=selected_file.convert("RGBA")
+              if idle.size != (50,50) or selected.size != (50,50):
+                  raise SystemExit("Prism button geometry changed across states")
+              pixels=list(selected.getdata())
               colorful=sum(1 for r,g,b,a in pixels if a>100 and
                            max(r,g,b)-min(r,g,b)>28)
-              print(f"PRISM_NATIVE_IMAGE_COMPOSITE {im.size} bbox={box} center={center} colorful={colorful}",flush=True)
-              if not box or colorful<40:
-                  raise SystemExit("Composed Prism artwork missing, not just its white frame")
+              differences=sum(1 for a,b in zip(idle.getdata(),pixels)
+                              if max(abs(int(a[k])-int(b[k])) for k in range(3))>=4)
+              print(f"PRISM_NATIVE_IMAGE_COMPOSITE {selected.size} "
+                    f"center={selected.getpixel((25,25))} colorful={colorful} "
+                    f"state_changed_pixels={differences}",flush=True)
+              if colorful<40 or differences<25:
+                  raise SystemExit("Prism glow failed to brighten in the actual native composite")
           PY

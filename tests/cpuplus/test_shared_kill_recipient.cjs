@@ -678,3 +678,25 @@ test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results wi
     assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
     assert.doesNotMatch(owner,/property alias hunterOperation/);
 });
+
+test("K4a: donor and service share original bulk eligibility policy", () => {
+    const store=read("services/kill/KillStore.qml");
+    const a=store.indexOf("    function taskEligibleForKillAll(");
+    const b=store.indexOf("    function snapshotCadence(",a);
+    assert.ok(a>=0 && b>a);
+    const rows=[{_taskRecord:true,pid:4321,user:"synthetic",state:"S"},
+                {_taskRecord:true,pid:4322,user:"other",state:"S"},
+                {_taskRecord:true,pid:4323,user:"synthetic",state:"Z"},
+                {_taskRecord:true,pid:4324,user:"synthetic",state:"S",protected:true},
+                {_taskRecord:true,pid:1,user:"synthetic",state:"S"},
+                {pid:4325,user:"synthetic",state:"S"}];
+    const safety={protectedFromKillAll:row=>!!row.protected};
+    const api=new Function("Quickshell","safety","rows",store.slice(a,b)
+        +"\nreturn {taskEligibleForKillAll,killAllEligibleTasks};")({env:()=>"synthetic"},safety,rows);
+    assert.deepEqual(rows.map(api.taskEligibleForKillAll),[true,false,false,false,false,false]);
+    assert.deepEqual(api.killAllEligibleTasks(),[rows[0]]);
+    assert.equal(api.taskEligibleForKillAll(null),false);
+    const owner=read("widgets/AppControlW.qml");
+    assert.match(owner,/return KillBackend\.KillStore\.taskEligibleForKillAll\(entry\)/);
+    assert.match(owner,/return KillBackend\.KillStore\.killAllEligibleTasks\(\)/);
+});

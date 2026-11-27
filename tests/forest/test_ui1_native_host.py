@@ -301,6 +301,14 @@ def trial(width, height, count):
                            if "FOREST_HOST_TREE_PREFERENCE_ISOLATION_PASS " in line]
             if preferences != [str(expected_rail)]:
                 raise AssertionError("FOREST_HOST_TREE_PREFERENCE_ISOLATION_MISSING_OR_MISMATCH")
+            matrix = [line.split("FOREST_HOST_DIRECT_FORM_MATRIX_PASS ", 1)[1].strip()
+                      for line in output.splitlines()
+                      if "FOREST_HOST_DIRECT_FORM_MATRIX_PASS " in line]
+            expected_matrix = {1366: ["FULL"], 770: ["COMPACT"], 420: []}[width]
+            if matrix != expected_matrix:
+                raise AssertionError("DIRECT_FORM_MATRIX_MISSING_OR_DUPLICATE")
+            if (work / "data" / "post-apollo" / "forest" / "ui-preferences").exists():
+                raise AssertionError("UNEXPECTED_PREFERENCE_PERSISTENCE")
             fl5 = [line.split("FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS ", 1)[1].strip()
                    for line in output.splitlines()
                    if "FOREST_HOST_FIRST_LIGHT_CAPTURE_PHASE_PASS " in line]

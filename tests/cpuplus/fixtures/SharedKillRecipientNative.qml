@@ -364,6 +364,28 @@ ShellRoot {
                         && consolePane.reviewLines.length===0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "resource console mounts draft-only beside existing KILL controls; " + detailState)) return;
+                // All seven filter buttons must fit simultaneously in the top bar.
+                const filterButtons=["cpu","memory","swap","disk","threads","gpu","network"]
+                    .map(function(key) { return smoke.find(view,"cpuPlusResourceFilter-"+key); });
+                let lastEdge=-1;
+                let oneRow=true;
+                let selectedCount=0;
+                let filterY=0;
+                if (filterButtons.every(function(button) { return !!button; })) {
+                    filterY=filterButtons[0].mapToItem(consolePane,0,0).y;
+                    for (const button of filterButtons) {
+                        const pos=button.mapToItem(consolePane,0,0);
+                        if (!button.visible || pos.x<0 || pos.x<lastEdge-0.5
+                                || pos.x+button.width>consolePane.width+0.5
+                                || Math.abs(pos.y-filterY)>0.5 || button.width<30)
+                            oneRow=false;
+                        lastEdge=pos.x+button.width;
+                        if (button.selected) selectedCount++;
+                    }
+                } else oneRow=false;
+                if (!smoke.check(oneRow && selectedCount===1
+                        && filterButtons.every(function(button) { return !!button; }),
+                        "seven resource filters remain on one visible non-overlapping row")) return;
                 consolePane.stageMode("cpu","manual");
                 consolePane.stageNumber("cpu","nice",9);
                 if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1

@@ -4,8 +4,9 @@ import QtQuick
 import Quickshell
 import "../system"
 
-// Authoritative runtime acquisition store. No widget dependency, persistence,
-// process mutation, or extra polling loop. Shell owns service admission;
+// Authoritative runtime KILL store. No widget dependency, persistence,
+// or extra polling loop. Mutation primitives retain existing guarded callers.
+// Shell owns service admission;
 // the original snapshot, mini and detail cadences live in this module.
 Scope {
     id: root
@@ -31,6 +32,45 @@ Scope {
         donorCombiVisible, histories.taskMiniPreloadSnapshots,
         histories.taskMiniPreloadTarget, hasTaskFavorites)
     readonly property var refreshAfterActionTimer: afterAction
+
+    // Single custody for existing runtime locks, process mutation primitives
+    // and the serialized limit queue. No policy or execution changes in K3a.
+    readonly property var safety: safetyState
+    readonly property var control: controlBackend
+    readonly property var limits: limitBackend
+
+    // Shared individual action authority. Only the transitional legacy
+    // confirmation UI selects donorTask and contributes its bulk exclusion.
+    property var donorTask: null
+    property bool donorActionBlocked: false
+    readonly property var presentation: actionPresentation
+    readonly property var actionGate: guardedActions
+    ProcessPresentationController {
+        id: actionPresentation
+        safetyService: root.safety
+        limitsService: root.limits
+        controlService: root.control
+        currentTask: root.donorTask
+        taskRows: root.rows
+        onRefreshRequested: afterAction.restart()
+    }
+    AppControlHubActionGate {
+        id: guardedActions
+        ownerRows: root.rows
+        safetyOwner: root.safety
+        presentationOwner: root.presentation
+        controlOwner: root.control
+        limitsOwner: root.limits
+        refreshOwner: root.refreshAfterActionTimer
+        bulkBlocked: root.donorActionBlocked
+    }
+
+    TaskSafety { id: safetyState }
+    ProcessControl { id: controlBackend }
+    ProcessLimits {
+        id: limitBackend
+        onRefreshRequested: afterAction.restart()
+    }
 
     function snapshotCadence(cpu, resource, kill, taskFavorites, combi,
                              preload, target, favorites) {
@@ -128,12 +168,67 @@ Scope {
         rows: root.rows
     }
 
-    function publishSnapshot(rows) {
-        sampler.rows = Array.isArray(rows) ? rows : [];
+    // Publication never requires a widget. Transitional observers preserve
+    // the donor's ordering, selection and opt-in diagnostic stage markers.
+    property bool snapshotTraceEnabled: false
+    property bool miniTraceEnabled: false
+    property int snapshotTraceSequence: 0
+    signal snapshotStarted(var rows)
+    signal snapshotOrdering(var rows)
+    signal snapshotStage(string stage, int sequence, double startMs, int rowCount)
+    signal snapshotPublished(var rows, int sequence)
+    signal miniStage(string stage, double startMs)
+
+    function publishSnapshot(input) {
+        const snapshotRows = Array.isArray(input) ? input : [];
+        const sequence = snapshotTraceEnabled ? ++snapshotTraceSequence : 0;
+        const count = snapshotRows.length;
+        snapshotStarted(snapshotRows);
+
+        if (!miniProbeNeeded) {
+            let started = sequence ? Date.now() : 0;
+            graph.updateMiniCpuHistories(snapshotRows);
+            if (sequence) snapshotStage("cpu-history", sequence, started, count);
+            started = sequence ? Date.now() : 0;
+            graph.updateMiniHunterMetricHistories(snapshotRows);
+            if (sequence) snapshotStage("hunter-history", sequence, started, count);
+            started = sequence ? Date.now() : 0;
+            histories.taskMiniHistoryRevision += 1;
+            histories.taskMiniDisplayRevision += 1;
+            if (sequence) snapshotStage("history-revisions", sequence, started, count);
+        }
+
+        let started = sequence ? Date.now() : 0;
+        snapshotOrdering(snapshotRows);
+        if (sequence) snapshotStage("task-order", sequence, started, count);
+        started = sequence ? Date.now() : 0;
+        sampler.rows = snapshotRows;
+        if (sequence) snapshotStage("task-rows", sequence, started, count);
+        histories.taskMiniPreloadSnapshots = Math.min(
+            histories.taskMiniPreloadTarget, histories.taskMiniPreloadSnapshots + 1);
+        snapshotPublished(snapshotRows, sequence);
+    }
+
+    function publishMiniSamples(input) {
+        const samples = Array.isArray(input) ? input : [];
+        if (!samples.length) return;
+        const timed = miniTraceEnabled;
+        let started = timed ? Date.now() : 0;
+        graph.updateMiniCpuHistories(samples);
+        if (timed) miniStage("mini-cpu-history", started);
+        started = timed ? Date.now() : 0;
+        graph.updateMiniHunterMetricHistories(samples);
+        if (timed) miniStage("mini-hunter-history", started);
+        started = timed ? Date.now() : 0;
+        histories.taskMiniHistoryRevision += 1;
+        histories.taskMiniDisplayRevision += 1;
+        if (timed) miniStage("mini-history-revisions", started);
     }
 
     ProcessTelemetry {
         id: sampler
+        onSnapshotReady: function(rows) { root.publishSnapshot(rows); }
+        onMiniProbeReady: function(rows) { root.publishMiniSamples(rows); }
         onDetailProbeReady: function(sample) { selectedDetail.accept(sample); }
     }
 }

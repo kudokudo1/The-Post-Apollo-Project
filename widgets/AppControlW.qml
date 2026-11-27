@@ -60,7 +60,7 @@ PanelWindow {
     property string savedSystemWatchSourceId: ""
     property string savedSystemWatchBoxId: ""
     // Owner-owned typed action surface for Hub RUNNING. No service clones.
-    property alias hubProcessActionGate: appControlHubGate
+    readonly property var hubProcessActionGate: KillBackend.KillStore.actionGate
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
 
@@ -931,18 +931,36 @@ PanelWindow {
         controller: appControlWindow
     }
 
+    Binding {
+        target: KillBackend.KillStore
+        property: "snapshotTraceEnabled"
+        value: appControlWindow.appControlSnapshotTraceEnabled
+            || appControlWindow.diagnosticCaptureActive
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "miniTraceEnabled"
+        value: appControlWindow.diagnosticCaptureActive && appControlWindow.menuOpen
+            && appControlWindow.selectedModeIndex === appControlWindow.killModeIndex
+    }
     Connections {
-        target: appControlWindow.processTelemetry
+        target: KillBackend.KillStore
 
-        function onSnapshotReady(rows) {
-            appControlWindow.applyTaskSnapshot(rows);
+        function onSnapshotStarted(rows) {
+            appControlWindow.prepareTaskSnapshot();
         }
-
-        function onMiniProbeReady(rows) {
-            appControlWindow.applyTaskMiniProbeRows(rows);
+        function onSnapshotOrdering(rows) {
+            appControlWindow.appendNewKillTaskOrderIds(rows);
         }
-
-        // Selected-detail samples are routed by KillStore, not this widget.
+        function onSnapshotStage(stage, sequence, startMs, rowCount) {
+            appControlWindow.traceTaskSnapshotDuration(stage, sequence, startMs, rowCount);
+        }
+        function onSnapshotPublished(rows, sequence) {
+            appControlWindow.applyTaskSnapshot(rows, sequence);
+        }
+        function onMiniStage(stage, startMs) {
+            appControlWindow.traceKillWork(stage, startMs);
+        }
     }
 
     Connections {
@@ -994,30 +1012,28 @@ PanelWindow {
         // The service's existing one-second detail cadence handles retries.
     }
 
-    TaskSafety {
-        id: taskSafety
+    // K3a: preserve all guarded callers; custody now lives in KillStore.
+    readonly property var taskSafety: KillBackend.KillStore.safety
+    readonly property var processControl: KillBackend.KillStore.control
+    readonly property var processLimits: KillBackend.KillStore.limits
+
+    readonly property var processPresentationController: KillBackend.KillStore.presentation
+
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorTask"
+        value: appControlWindow.selectedTask()
     }
-
-    ProcessControl {
-        id: processControl
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorActionBlocked"
+        value: appControlWindow.cpuBulkReview !== null
+            || appControlWindow.hunterOperationPhase !== "idle"
+            || appControlWindow.destructiveConfirmOpen
     }
-
-    ProcessLimits {
-        id: processLimits
-
-        onRefreshRequested: taskRefreshAfterKillTimer.restart()
-    }
-
-    ProcessPresentationController {
-        id: processPresentationController
-
-        safetyService: taskSafety
-        limitsService: processLimits
-        controlService: processControl
-        currentTask: appControlWindow.selectedTask()
-        taskRows: appControlWindow.taskRows
-
-        onConfirmationRequested: function(
+    Connections {
+        target: appControlWindow.processPresentationController
+        function onConfirmationRequested(
             kind,
             title,
             message,
@@ -1036,8 +1052,6 @@ PanelWindow {
             appControlWindow.destructiveConfirmTargetName =
                 String(targetName || "");
         }
-
-        onRefreshRequested: taskRefreshAfterKillTimer.restart()
     }
 
     GlobalTaskActionController {
@@ -1048,19 +1062,6 @@ PanelWindow {
         processControllerObject: processPresentationController
         processLimitsObject: processLimits
         refreshTimer: taskRefreshAfterKillTimer
-    }
-
-    AppControlHubActionGate {
-        id: appControlHubGate
-        ownerRows: appControlWindow.taskRows
-        safetyOwner: taskSafety
-        presentationOwner: processPresentationController
-        controlOwner: processControl
-        limitsOwner: processLimits
-        refreshOwner: taskRefreshAfterKillTimer
-        bulkBlocked: appControlWindow.cpuBulkReview !== null
-            || appControlWindow.hunterOperationPhase !== "idle"
-            || appControlWindow.destructiveConfirmOpen
     }
 
     HunterOperationController {
@@ -1335,7 +1336,7 @@ PanelWindow {
     // excluded there even while a row is manually unlocked.
     // Optimistic STOP/CONT state makes the FREEZE button react immediately;
     // the live task snapshot remains the authority after this short window.
-    property alias taskFrozenOptimistic: processPresentationController.frozenOptimistic
+    readonly property var taskFrozenOptimistic: processPresentationController.frozenOptimistic
 
     // HUNTER operation state lives in a cold-path controller. Keep aliases
     // here so the rest of AppControl and its overlay retain the same contract.
@@ -1600,14 +1601,6 @@ PanelWindow {
     // Shared graph geometry lives outside AppControl so CPU++ and future
     // telemetry surfaces can render the same history without copying this
     // implementation. Keep these compatibility wrappers during extraction.
-    function updateTaskMiniCpuHistories(rows) {
-        taskGraphController.updateMiniCpuHistories(rows);
-    }
-
-    function updateTaskMiniHunterMetricHistories(rows) {
-        taskGraphController.updateMiniHunterMetricHistories(rows);
-    }
-
     function seedHunterDetailHistories(entry) {
         if (killDetailSession.cpuActive) return;
         taskGraphController.seedHunterDetailHistories(entry);
@@ -1744,7 +1737,7 @@ PanelWindow {
     // Only fixed stage labels, row counts and durations are logged.
     readonly property bool appControlSnapshotTraceEnabled:
         String(Quickshell.env("POST_APOLLO_SUBPROCESS_LAG_PROBE") || "").trim() === "1"
-    property int appControlSnapshotTraceSequence: 0
+    property int pendingSnapshotSelectionPid: 0
 
     function traceTaskSnapshotDuration(stage, sequence, startMs, rowCount) {
         if (sequence <= 0)
@@ -1804,41 +1797,15 @@ PanelWindow {
         return now;
     }
 
-    function applyTaskSnapshot(rows) {
-        const snapshotRows = Array.isArray(rows) ? rows : [];
-        const traceSequence = (appControlSnapshotTraceEnabled || diagnosticCaptureActive)
-            ? ++appControlSnapshotTraceSequence : 0;
+    function prepareTaskSnapshot() {
+        pendingSnapshotSelectionPid = selectedModeIndex === killModeIndex
+                && selectedResultIsTask() ? Number(selectedResult().pid || 0) : 0;
+    }
+
+    function applyTaskSnapshot(snapshotRows, traceSequence) {
         const traceRowCount = snapshotRows.length;
-
-        let preservedPid = 0;
-
-        if (selectedModeIndex === killModeIndex
-                && selectedResultIsTask()) {
-            preservedPid = Number(selectedResult().pid || 0);
-        }
-
-        if (!taskMiniProbeNeeded()) {
-            let stageStart = traceSequence ? Date.now() : 0;
-            updateTaskMiniCpuHistories(snapshotRows);
-            traceTaskSnapshotDuration("cpu-history", traceSequence, stageStart, traceRowCount);
-
-            stageStart = traceSequence ? Date.now() : 0;
-            updateTaskMiniHunterMetricHistories(snapshotRows);
-            traceTaskSnapshotDuration("hunter-history", traceSequence, stageStart, traceRowCount);
-
-            stageStart = traceSequence ? Date.now() : 0;
-            appControlWindow.processPresentationState.taskMiniHistoryRevision += 1;
-            appControlWindow.processPresentationState.taskMiniDisplayRevision += 1;
-            traceTaskSnapshotDuration("history-revisions", traceSequence, stageStart, traceRowCount);
-        }
-
-        let stageStart = traceSequence ? Date.now() : 0;
-        appendNewKillTaskOrderIds(snapshotRows);
-        traceTaskSnapshotDuration("task-order", traceSequence, stageStart, traceRowCount);
-
-        stageStart = traceSequence ? Date.now() : 0;
-        KillBackend.KillStore.publishSnapshot(snapshotRows);
-        traceTaskSnapshotDuration("task-rows", traceSequence, stageStart, traceRowCount);
+        const preservedPid = pendingSnapshotSelectionPid;
+        pendingSnapshotSelectionPid = 0;
 
         if (menuOpen
                 && (selectedResultIsApplication()
@@ -1851,12 +1818,7 @@ PanelWindow {
             });
         }
 
-        appControlWindow.processPresentationState.taskMiniPreloadSnapshots = Math.min(
-            taskMiniPreloadTarget,
-            taskMiniPreloadSnapshots + 1
-        );
-
-        stageStart = traceSequence ? Date.now() : 0;
+        const stageStart = traceSequence ? Date.now() : 0;
         checkTaskMetricAlerts(snapshotRows);
         traceTaskSnapshotDuration("metric-alerts", traceSequence, stageStart, traceRowCount);
 
@@ -1897,9 +1859,9 @@ PanelWindow {
     // KILL MODE / GLOBAL TASK ACTIONS
     // ============================================================
 
-    property alias taskSoftLimitPids: processLimits.softLimitPids
-    property alias taskLimitApplyLoading: processLimits.applyLoading
-    property alias taskLimitApplyError: processLimits.applyError
+    readonly property var taskSoftLimitPids: processLimits.softLimitPids
+    readonly property bool taskLimitApplyLoading: processLimits.applyLoading
+    readonly property string taskLimitApplyError: processLimits.applyError
 
     function taskProtectedFromKillAll(entry) {
         return taskSafety.protectedFromKillAll(entry);
@@ -2639,24 +2601,6 @@ PanelWindow {
 
     function taskMiniProbeNeeded() {
         return KillBackend.KillStore.miniProbeNeeded;
-    }
-
-    function applyTaskMiniProbeRows(rows) {
-        const samples = Array.isArray(rows) ? rows : [];
-
-        if (samples.length > 0) {
-            const timed = killDiagnosticActive();
-            let stageStart = timed ? Date.now() : 0;
-            updateTaskMiniCpuHistories(samples);
-            traceKillWork("mini-cpu-history", stageStart);
-            stageStart = timed ? Date.now() : 0;
-            updateTaskMiniHunterMetricHistories(samples);
-            traceKillWork("mini-hunter-history", stageStart);
-            stageStart = timed ? Date.now() : 0;
-            appControlWindow.processPresentationState.taskMiniHistoryRevision += 1;
-            appControlWindow.processPresentationState.taskMiniDisplayRevision += 1;
-            traceKillWork("mini-history-revisions", stageStart);
-        }
     }
 
     // All collection scheduling and delayed action refresh now live in KillStore.

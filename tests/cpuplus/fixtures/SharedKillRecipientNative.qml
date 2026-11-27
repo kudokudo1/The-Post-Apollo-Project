@@ -129,6 +129,7 @@ ShellRoot {
     QtObject {
         id: fakeOwner
         property var hubProcessActionGate: fakeGate
+        readonly property var actionGate: fakeGate
         property var taskRows: [{
             id: "task:3442", _taskRecord: true, pid: 3442, startTicks: 967833,
             comm:"synthetic-worker", name:"synthetic-worker",

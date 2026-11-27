@@ -267,22 +267,26 @@ test('AppControl six stage markers remain opt-in and preserve model assignment',
     assert.ok(app.includes('readonly property bool appControlSnapshotTraceEnabled:'));
     assert.ok(app.includes('if (sequence <= 0)\n            return;'));
     assert.ok(app.includes('SYNTAGMA_COMPLETION_PROBE // service=appcontrol'));
-    const body = app.split('function applyTaskSnapshot(rows) {', 2)[1].split(
-        '// ============================================================', 1)[0];
-    const order = ['cpu-history', 'hunter-history', 'history-revisions',
-        'task-order', 'task-rows', 'metric-alerts'];
-    let prev = -1;
-    for (const step of order) {
-        const ix = body.indexOf('traceTaskSnapshotDuration("' + step + '"');
-        assert.ok(ix > prev, 'ordered stage: ' + step);
-        prev = ix;
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    const body=store.slice(store.indexOf('    function publishSnapshot('),store.indexOf('    function publishMiniSamples('));
+    const order=['snapshotStarted(snapshotRows)','graph.updateMiniCpuHistories(snapshotRows)',
+        'snapshotStage("cpu-history"','graph.updateMiniHunterMetricHistories(snapshotRows)',
+        'snapshotStage("hunter-history"','snapshotStage("history-revisions"',
+        'snapshotOrdering(snapshotRows)','snapshotStage("task-order"',
+        'sampler.rows = snapshotRows','snapshotStage("task-rows"',
+        'snapshotPublished(snapshotRows, sequence)'];
+    let prev=-1;
+    for(const marker of order) {
+        const ix=body.indexOf(marker);
+        assert.ok(ix>prev,'ordered stage: '+marker); prev=ix;
     }
-    assert.ok(body.indexOf('KillBackend.KillStore.publishSnapshot(snapshotRows);') > body.indexOf('traceTaskSnapshotDuration("task-order"'));
-    assert.ok(body.indexOf('KillBackend.KillStore.publishSnapshot(snapshotRows);') < body.indexOf('traceTaskSnapshotDuration("task-rows"'));
-    assert.ok(body.includes('Qt.callLater(function() {'));
-    assert.ok(body.includes('checkTaskMetricAlerts(snapshotRows);'));
     assert.ok(body.includes('taskMiniHistoryRevision += 1;'));
     assert.ok(body.includes('taskMiniDisplayRevision += 1;'));
+    const observer=app.slice(app.indexOf('    function applyTaskSnapshot(snapshotRows'),app.indexOf('    // KILL MODE / GLOBAL TASK ACTIONS'));
+    assert.ok(observer.includes('Qt.callLater(function() {'));
+    assert.ok(observer.includes('checkTaskMetricAlerts(snapshotRows);'));
+    assert.ok(observer.includes('traceTaskSnapshotDuration("metric-alerts"'));
+    assert.doesNotMatch(observer,/publishSnapshot\(|updateTaskMiniCpuHistories\(/);
 });
 
 test('mini graph lookup preserves old scan results and rebuilds on snapshot replacement', () => {
@@ -356,8 +360,10 @@ test('mini graph lookup preserves old scan results and rebuilds on snapshot repl
     assert.equal(updated.resolve(stale), replacement[0]);
     assert.equal(indexed.resolve(stale), first);
     assert.match(graph, /readonly property var miniTaskLookup:\s*buildMiniTaskLookup\(taskRows\)/);
-    assert.match(app, /taskRows:\s*appControlWindow\.taskRows/);
-    assert.match(app, /KillBackend\.KillStore\.publishSnapshot\(snapshotRows\);/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    assert.match(store, /readonly property var rows:\s*sampler\.rows/);
+    assert.match(store, /TaskGraphController\s*\{\s*id: graph[\s\S]*?taskRows:\s*root\.rows\s*\}/);
+    assert.match(store, /sampler.rows = snapshotRows;/);
 });
 
 test('mini COMBI histories align once on demand and preserve snapshot isolation', () => {
@@ -567,7 +573,7 @@ test('visible Kill model resolves each stable slot once without changing display
 
 test('opt-in AppControl opening markers preserve synchronous operation order', () => {
     const begin = app.indexOf('    function traceAppControlOpen(');
-    const end = app.indexOf('    function applyTaskSnapshot(', begin);
+    const end = app.indexOf('    function prepareTaskSnapshot(', begin);
     assert.ok(begin >= 0 && end > begin);
     let clockReads = 0;
     const messages = [];
@@ -680,8 +686,10 @@ test('opening substages and runtime KILL work remain opt-in and keep existing op
     assert.match(app,/return diagnosticCaptureActive && menuOpen && selectedModeIndex === killModeIndex/);
     assert.match(app,/if \(!startMs \|\| !killDiagnosticActive\(\)\)\s*return/);
     assert.match(app,/traceKillWork\("snapshot-selection", selectionStart\)/);
-    const mini=app.slice(app.indexOf('    function applyTaskMiniProbeRows('),app.indexOf('    // All collection scheduling',app.indexOf('    function applyTaskMiniProbeRows(')));
-    assert.match(mini,/updateTaskMiniCpuHistories\(samples\);[\s\S]*?traceKillWork\("mini-cpu-history"[\s\S]*?updateTaskMiniHunterMetricHistories\(samples\);[\s\S]*?traceKillWork\("mini-hunter-history"[\s\S]*?taskMiniDisplayRevision \+= 1;[\s\S]*?traceKillWork\("mini-history-revisions"/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    const mini=store.slice(store.indexOf('    function publishMiniSamples('),store.indexOf('    ProcessTelemetry {',store.indexOf('    function publishMiniSamples(')));
+    assert.match(mini,/updateMiniCpuHistories\(samples\);[\s\S]*?miniStage\("mini-cpu-history"[\s\S]*?updateMiniHunterMetricHistories\(samples\);[\s\S]*?miniStage\("mini-hunter-history"[\s\S]*?taskMiniDisplayRevision \+= 1;[\s\S]*?miniStage\("mini-history-revisions"/);
+    assert.match(app,/function onMiniStage\(stage, startMs\) \{\s*appControlWindow.traceKillWork\(stage, startMs\)/);
 });
 
 
@@ -792,6 +800,8 @@ test('APP row restore observes read, scan, assignment and deferred view without 
         const ix=body.indexOf(marker,prev+1);assert.ok(ix>prev,marker);prev=ix;
     }
     assert.match(app,/if \(!startMs \|\| !diagnosticCaptureActive\)\s*return 0/);
-    assert.match(app,/traceSequence = \(appControlSnapshotTraceEnabled \|\| diagnosticCaptureActive\)/);
+    const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
+    assert.match(app,/property: "snapshotTraceEnabled"\s*value: appControlWindow\.appControlSnapshotTraceEnabled\s*\|\| appControlWindow\.diagnosticCaptureActive/);
+    assert.match(store,/const sequence = snapshotTraceEnabled \? \+\+snapshotTraceSequence : 0/);
     assert.match(app,/else if \(diagnosticCaptureActive\)\s*diagnosticWorkStage\(stage, elapsedMs, now\)/);
 });

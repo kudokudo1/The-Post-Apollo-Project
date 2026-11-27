@@ -371,7 +371,7 @@ test('mini graph lookup preserves old scan results and rebuilds on snapshot repl
     const stale = favorite(first, 'brave');
     assert.equal(updated.resolve(stale), replacement[0]);
     assert.equal(indexed.resolve(stale), first);
-    assert.match(graph, /readonly property var miniTaskLookup:\s*buildMiniTaskLookup\(taskRows\)/);
+    assert.match(graph, /readonly property var miniTaskLookup: sharedMiniController\s*\? sharedMiniController\.miniTaskLookup : buildMiniTaskLookup\(taskRows\)/);
     const store=fs.readFileSync(path.join(root, 'services/kill/KillStore.qml'), 'utf8');
     assert.match(store, /readonly property var rows:\s*sampler\.rows/);
     assert.match(store, /TaskGraphController\s*\{\s*id: graph[\s\S]*?taskRows:\s*root\.rows\s*\}/);

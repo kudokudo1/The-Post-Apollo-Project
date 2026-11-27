@@ -70,7 +70,7 @@ ShellRoot {
                     const blue=source.energyColor;
                     const p=light.fraction, h=source.height;
                     const dominance=Math.min(1,Math.abs(p-.5)*2);
-                    const playerWins=p>=.5;
+                    const playerWins=p>=.5+heat*(.22/2.4);
                     const winner=playerWins?blue:enemy;
                     function bloom(cx,cy,rx,ry,color,alpha) {
                         if(rx<=0 || ry<=0 || alpha<=0) return;

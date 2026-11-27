@@ -218,6 +218,11 @@ def trial(width, height, count):
                        for line in output.splitlines() if "FOREST_HOST_UNIFIED_RAIL_PASS " in line]
             if unified != [str(expected_rail)]:
                 raise AssertionError("FOREST_HOST_UNIFIED_RAIL_MISSING_OR_MISMATCH")
+            preferences = [line.split("FOREST_HOST_TREE_PREFERENCE_ISOLATION_PASS ", 1)[1].strip()
+                           for line in output.splitlines()
+                           if "FOREST_HOST_TREE_PREFERENCE_ISOLATION_PASS " in line]
+            if preferences != [str(expected_rail)]:
+                raise AssertionError("FOREST_HOST_TREE_PREFERENCE_ISOLATION_MISSING_OR_MISMATCH")
             if (output.count("FOREST_HOST_SEASON_SOURCE_DEFAULT_PASS") != 1 or
                     season != ([str(i) for i in range(9)] if width >= 770 else []) or
                     output.count("FOREST_HOST_SEASON_PLACEMENT_PASS") != (1 if width >= 770 else 0) or

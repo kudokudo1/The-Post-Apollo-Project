@@ -697,3 +697,44 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.match(resource,/readonly property bool stacked: general && width<270/);
     assert.match(resource,/wrapMode: Text.NoWrap/);
 }
+
+/* K7a: exclusive stable KILL measurement buckets, legacy reports still valid. */
+{
+    const shell=read("shell.qml");
+    const start=shell.indexOf('property: "appControlMode"');
+    const expr=shell.slice(start,shell.indexOf("\n    }",start)).split("value:")[1].trim();
+    const mode=new Function("cpuPlusWindow","appControlWindow","return "+expr);
+    const cpu={menuOpen:false,selectedModeIndex:1};
+    const app={menuOpen:true,selectedModeIndex:7,killModeIndex:7,appsModeIndex:2};
+    assert.equal(mode(cpu,app),"kill");
+    cpu.menuOpen=true;
+    assert.equal(mode(cpu,app),"mixed");
+    app.menuOpen=false;
+    assert.equal(mode(cpu,app),"cpu-kill");
+    cpu.selectedModeIndex=4;
+    assert.equal(mode(cpu,app),"other");
+    cpu.menuOpen=false;
+    assert.equal(mode(cpu,app),"closed");
+    const modes=[{tsMs:1000,mode:"kill"},{tsMs:2500,mode:"mixed"},
+        {tsMs:3500,mode:"cpu-kill"},{tsMs:5500,mode:"closed"}];
+    const rows=[{event:"start",pid:123,tsMs:1000,durationSeconds:30},
+        ...[2000,3000,4000,5000,6000].map((tsMs,i)=>({event:"threads",pid:123,tsMs,
+            sampleIntervalMs:1000,totalCpuPct:50+i*10,main:{tid:123,cpuPct:25+i*5}})),
+        {event:"complete",pid:123,tsMs:6000}];
+    const evidence=policy.combineAppControl(jsonl(rows),modes,[],false,[],
+        [{stage:"event-loop-gap",mode:"cpu-kill",tsMs:4900,elapsedMs:350}]);
+    assert.ok(evidence);
+    const measured=policy.appControlMetrics(evidence);
+    assert.equal(measured.kill.count,1);
+    assert.equal(measured.kill.total,50);
+    assert.equal(measured.cpuKill.count,1);
+    assert.equal(measured.cpuKill.total,80);
+    assert.equal(measured.cpuKill.ms,1000);
+    assert.equal(measured.all.count,5);
+    assert.equal(measured.work["cpu-kill / event-loop-gap"].maxMs,350);
+    assert.match(policy.summarize("appcontrol",evidence),/CPU\+\+ KILL \/\/ 80\.0% total \/ 40\.0% main/);
+    assert.equal(policy.appControlMetrics(ac).cpuKill.count,0);
+    assert.equal(policy.appControlMetrics(ac).cpuKill.total,null);
+    assert.equal(policy.combineAppControl(jsonl(rows),[{tsMs:1000,mode:"fake"}],[],false),null);
+}
+console.log("CPU++ K7a exclusive donor/recipient comparison PASS");

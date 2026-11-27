@@ -57,6 +57,49 @@ class DeliveryTests(unittest.TestCase):
         with self.assertRaisesRegex(DeliveryRefusal, "SUBMIT_UNAVAILABLE"):
             d.submit(view, PROMPT)
 
+    def test_committed_delivery_requires_exact_persisted_utf8_body(self):
+        d, view, peer = self.setup_trial([packet("RÉ"), packet("ADY", done=True)])
+        self.finish(d)
+        final = d.take(view)
+        self.assertEqual((final.status, final.text, final.local_outcome),
+                         ("LOCAL_COMMITTED", "RÉADY", "COMMITTED_LOCAL"))
+        self.assertEqual(d._host._db.execute(
+            "SELECT CAST(body AS BLOB) FROM forest_turns WHERE ordinal=2"
+        ).fetchone(), ("RÉADY".encode("utf-8"),))
+        self.assertEqual(len(peer.observed), 1)
+
+    def test_mismatched_persisted_body_never_promotes_response(self):
+        d, view, peer = self.setup_trial([packet("RE"), packet("ADY", done=True)])
+        for _ in range(4):
+            d.advance()
+        self.assertEqual(d.take(view).text, "RE")
+        actual_outcome = d._host.local_outcome
+        checked = []
+
+        def alter_before_original_readback():
+            # Actual bridge has committed the exact original reply;
+            # simulate unexpected local body change with metadata intact.
+            db = d._host._db
+            self.assertFalse(d._host._running)
+            self.assertEqual(db.execute(
+                "SELECT body FROM forest_turns WHERE ordinal=2"
+            ).fetchone(), ("READY",))
+            db.execute("UPDATE forest_turns SET body=? WHERE ordinal=2", ("other",))
+            db.commit()
+            checked.append(True)
+            return actual_outcome()
+
+        with patch.object(d._host, "local_outcome", side_effect=alter_before_original_readback):
+            self.finish(d)
+        self.assertEqual(checked, [True])
+        final = d.take(view)
+        self.assertEqual((final.status, final.local_outcome, final.text, final.provisional),
+                         ("UNKNOWN_HOLD", "UNKNOWN_HOLD", "", False))
+        self.assertEqual(d._host.local_outcome(), "UNKNOWN_HOLD")
+        self.assertEqual(len(peer.observed), 1)
+        with self.assertRaisesRegex(DeliveryRefusal, "SUBMIT_UNAVAILABLE"):
+            d.submit(view, PROMPT)
+
     def test_queued_delta_withdrawal_and_aba_do_not_retarget_original(self):
         d, view, peer = self.setup_trial([packet("first"), packet(" last", done=True)])
         for _ in range(4):

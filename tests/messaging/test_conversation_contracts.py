@@ -130,8 +130,13 @@ assert "Quickshell.execDetached" not in providers
 
 assert DOCTORS.is_file(), DOCTORS
 doctors = DOCTORS.read_text()
-assert '"hospital",\n            "doctors"' in doctors
-assert '"doctor-put"' in doctors
+# Native H1 read-only Doctor directory replaces the legacy desktop PX
+# command. Missing protected native access must fail closed; no write fallback.
+assert '"/usr/libexec/post-apollo/hospital/hospital-room-read"' in doctors
+assert 'process.exec([nativeReaderPath, "doctor-directory"]);' in doctors
+assert 'readonly property bool protectedDoctorWritesReady: false' in doctors
+assert 'HOSPITAL DOCTOR WRITE // PROTECTED ROUTE NOT ENABLED' in doctors
+assert '"doctor-put"' not in doctors
 assert "function doctorById(value)" in doctors
 assert "function saveDoctor(idValue, nameValue, roleValue, statusValue)" in doctors
 assert "function releaseDoctor(idValue)" in doctors

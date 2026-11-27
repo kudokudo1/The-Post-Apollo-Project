@@ -525,7 +525,14 @@ test("DEFAULT is monotonic, bounded, and does not emit host energy effects",()=>
     const start=source.indexOf('if(root.variant==="default") {');
     const end=source.indexOf('const hot=',start);
     assert.ok(start>=0 && end>start);
-    assert.doesNotMatch(source.slice(start,end),/createRadialGradient|shadowBlur|orb\(/);
+    const flat=source.slice(start,end);
+    assert.doesNotMatch(flat,/shadowBlur|orb\(/);
+    assert.match(flat,/const rx=Math.min\(inner\*\.25,Math.max\(1.2,h\*\.16\)\)/);
+    assert.match(flat,/const ry=Math.min\(fillHeight\*\.5,Math.max\(2.2,h\*\.42\)\)/);
+    assert.match(flat,/c.rect\(fx,fy,inner,fillHeight\); c.clip\(\)/);
+    assert.match(flat,/c.translate\(edge,mid\); c.scale\(rx,ry\)/);
+    assert.match(flat,/eye.addColorStop\(1,Qt.rgba\(ink.r,ink.g,ink.b,0\)\)/);
+    assert.equal((flat.match(/createRadialGradient/g)||[]).length,1);
     assert.match(field,/source.variant==="default"\) continue/);
     assert.match(preview,/name:"DEFAULT",key:"default"/);
 });
@@ -588,7 +595,7 @@ test("reactive heat bed moves while stalled, stretches with speed and respects r
     assert.match(source,/Material.heatBed\(root.elapsed,root.flameSpeed,root.reducedMotion\)/);
     assert.match(source,/if\(rearSpan>0\)/);
     assert.match(source,/const active=c.createLinearGradient\(edge-span,mid,edge,mid\)/);
-    assert.match(source,/c.fillRect\(edge-cap,fy,cap,fillHeight\)/);
+    assert.match(source,/c.fillRect\(edge-span,fy,span,fillHeight\)/);
 });
 
 test("all fire treatments extinguish on result without changing actual progress",()=>{
@@ -704,4 +711,16 @@ test("rear combustion follows the actual tail with a short transparent margin",(
     assert.match(source,/Material.rearHeatSpan\(h,root.flameRearOffset,bed.reach/);
     assert.match(source,/back.addColorStop\(1,tint\(Colors.red,0\)\)/);
     assert.match(source,/c.rect\(edge-rearSpan,fy,rearSpan,fillHeight\)/);
+});
+
+test("DEFAULT eye remains vertical at ordinary heights and fits compact tracks",()=>{
+    for(const h of [12,17,24,34,42,68,120]){
+        for(const w of [40,150,800,2400]){
+            const track=currents.trackGeometry(w,h,.63);
+            const rx=Math.min(track.width*.25,Math.max(1.2,h*.16));
+            const ry=Math.min(track.height*.5,Math.max(2.2,h*.42));
+            assert.ok(rx>0 && ry>0 && ry>=rx*1.8);
+            assert.ok(ry*2<=track.height && rx*2<=track.width);
+        }
+    }
 });

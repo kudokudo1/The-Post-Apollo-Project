@@ -159,7 +159,7 @@ def capture_first_light():
     return {"prompt": PROMPT, "trials": captures}
 
 
-def trial(width, height, count):
+def trial(width, height, count, fixture_only=False):
     with tempfile.TemporaryDirectory(prefix="forest-private-wayland-") as name:
         work = Path(name)
         for d in ("run", "home", "cache", "config-home", "data", "config"):
@@ -201,7 +201,8 @@ def trial(width, height, count):
                      "recovery_inspect_b4d.py", "ollama_chat_transport.py", "ollama_inventory.py",
                      "capability_registry_b6r2.py", "runtime_stop_control_r2.py", "local_terminal_outbox_b4f.py"):
             shutil.copyfile(ROOT / "scripts/forest" / name, scene / "runtime" / name)
-        shutil.copy2(ROOT / "tests/forest/ui1_native_host/shell.qml", scene / "shell.qml")
+        shell_name = "FixtureVisualShell.qml" if fixture_only else "shell.qml"
+        shutil.copy2(ROOT / "tests/forest/ui1_native_host" / shell_name, scene / "shell.qml")
         shutil.copy2(ROOT / "tests/forest/ui1_native_host/FirstLightProcess.qml",
                      scene / "FirstLightProcess.qml")
         (scene / "privateFirstLight").mkdir(mode=0o700)
@@ -217,7 +218,7 @@ def trial(width, height, count):
                 raise AssertionError("FIRST_LIGHT_CHILD_SOURCE_MISMATCH")
         # A finite, pre-captured public witness from actual owner delivery.
         # No command receiver, provider connection, or native admission.
-        capture = capture_first_light() if width >= 770 else {}
+        capture = capture_first_light() if width >= 770 and not fixture_only else {}
         (scene / "FirstLightCapture.js").write_text(
             "var capture = " + json.dumps(capture, ensure_ascii=True) + ";\n", encoding="ascii")
         for relative in ("widgets/ForestW.qml", "widgets/ForestChatList.qml",
@@ -268,10 +269,16 @@ def trial(width, height, count):
                     "--no-color", "--log-rules", env["QT_LOGGING_RULES"]],
                     env=env, cwd=work, stdin=subprocess.DEVNULL, stdout=log,
                     stderr=subprocess.STDOUT, start_new_session=True)
-                if width == 1366:
+                if width == 1366 and not fixture_only:
                     observe_joined_db(qs, scene, qs_log)
                 code = qs.wait(timeout=85)
             output = qs_log.read_text(errors="replace")
+            if fixture_only:
+                if (code != 0 or output.count("FOREST_FIXTURE_VISUAL_PASS") != 1
+                        or "FOREST_HOST_FAIL" in output
+                        or (work / "data" / "post-apollo" / "forest" / "ui-preferences").exists()):
+                    raise AssertionError("FIXTURE_VISUAL_INCOMPLETE")
+                return
             phases = [line.split("FOREST_HOST_PHASE_PASS ", 1)[1].strip()
                       for line in output.splitlines() if "FOREST_HOST_PHASE_PASS " in line]
             negative = [line.split("FOREST_HOST_HISTORY_NEGATIVE_PASS ", 1)[1].strip()
@@ -349,3 +356,4 @@ if __name__ == "__main__":
     trial(1366, 900, 18)
     trial(770, 450, 10)
     trial(420, 340, 3)
+    trial(770, 450, 0, fixture_only=True)

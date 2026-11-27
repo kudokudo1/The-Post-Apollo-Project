@@ -3528,6 +3528,11 @@ PanelWindow {
         property bool loadingComplete: false
         property bool loadingWasActive: false
         property real loadingProgress: 0.0
+        // Opt-in presentation; preserve the existing operation and keyboard owner.
+        property string loadingEnergyVariant: ""
+        property color loadingEnergyColor: primaryBlue ? Colors.blue
+            : orangeAccent ? Colors.orange : Colors.cyan
+        property string loadingEnergyPhase: "idle"
         property string leftIcon: ""
         property string rightIcon: ""
         property int iconPixelSize: 24
@@ -3634,6 +3639,7 @@ PanelWindow {
                 loadingWasActive = true;
                 loadingComplete = false;
                 loadingProgress = 0.0;
+                loadingEnergyPhase = "running";
                 loadingPrefill.restart();
                 loadingCompletion.stop();
                 loadingReset.stop();
@@ -3650,6 +3656,7 @@ PanelWindow {
                 } else {
                     loadingComplete = false;
                     loadingProgress = 0.0;
+                    loadingEnergyPhase = "idle";
                 }
             }
         }
@@ -3674,7 +3681,10 @@ PanelWindow {
             duration: 260
             easing.type: Easing.OutQuad
 
-            onFinished: loadingReset.restart()
+            onFinished: {
+                actionButton.loadingEnergyPhase = "success";
+                loadingReset.restart();
+            }
         }
 
         Timer {
@@ -3685,16 +3695,17 @@ PanelWindow {
             onTriggered: {
                 actionButton.loadingComplete = false;
                 actionButton.loadingProgress = 0.0;
+                actionButton.loadingEnergyPhase = "idle";
             }
         }
 
         Rectangle {
             id: loadingFill
 
-            visible:
+            visible: actionButton.loadingEnergyVariant === "" && (
                 actionButton.loading
                 || actionButton.loadingComplete
-                || actionButton.loadingProgress > 0.0
+                || actionButton.loadingProgress > 0.0)
 
             anchors {
                 left: parent.left
@@ -3719,6 +3730,24 @@ PanelWindow {
                 : Colors.cyan
 
             opacity: 0.98
+        }
+
+        Loader {
+            id: loadingEnergyLoader
+            anchors.fill: parent
+            anchors.margins: actionButton.border.width
+            z: 1
+            clip: true
+            active: actionButton.loadingEnergyVariant !== ""
+            visible: active && actionButton.loadingEnergyPhase !== "idle"
+            sourceComponent: EnergyProgressFace {
+                variant: actionButton.loadingEnergyVariant
+                energyColor: actionButton.loadingEnergyColor
+                chassisColor: actionButton.loadingEnergyColor
+                progressMode: "timed"
+                progress: actionButton.loadingProgress
+                phase: actionButton.loadingEnergyPhase
+            }
         }
 
         GohuText {
@@ -7167,6 +7196,7 @@ PanelWindow {
                                                                         width: 184
                                                                         height: 38
                                                                         primaryBlue: true
+                                                                        loadingEnergyVariant: "omnitrix"
                                                                         loading:
                                                                             githubService.factoryBusy
                                                                             && githubService.factoryMode === "install"

@@ -47,15 +47,32 @@ ShellRoot {
                 model: 12
                 Rectangle {
                     required property int index
-                    readonly property real drift: (field.motionTime*(.55+index*.035)+index*.19)%1
+                    readonly property real drift: (field.fragmentTime*(.55+index*.035)+index*.19)%1
                     width: 2 + index%3
                     height: 1 + index%2
                     x: index%2===0 ? 3+drift*12 : parent.width-3-drift*12
-                    y: parent.height*(.14+.066*index)-drift*18*field.pressure
-                    color: field.pressureColor
-                    opacity: Math.max(0,(field.pressure-.38)*1.25)*(1-drift)
+                    y: parent.height*(.14+.066*index)-drift*18*field.fragmentPressure
+                    color: field.fragmentColor
+                    opacity: Math.max(0,(field.fragmentPressure-.38)*1.25)*(1-drift)
                     rotation: index*37+drift*65
-                    visible: field.pressure>.38
+                    visible: field.fragmentPressure>.38
+                    z: 2
+                }
+            }
+
+            // TRON's lateral light streaks suggest acceleration, not debris.
+            Repeater {
+                model: 10
+                Rectangle {
+                    required property int index
+                    readonly property real drift: (field.motionTime*(.9+index*.08)+index*.21)%1
+                    width: 8+index%4*7
+                    height: 1
+                    x: (1-drift)*(parent.width-width)
+                    y: index%2===0 ? 3+index%3*2 : parent.height-5-index%3*2
+                    color: Colors.cyan
+                    opacity: field.pressure*(1-drift)*.65
+                    visible: field.reactionStyle==="speed" && field.pressure>.1
                     z: 2
                 }
             }
@@ -186,6 +203,15 @@ ShellRoot {
                 }
             }
         }
+        }
+        // Single soft pulse confined to the laboratory widget, not the
+        // desktop or other monitors. No input handler; reduced motion opts out.
+        Rectangle {
+            anchors.fill: parent
+            z: 20
+            color: "#D8FFEA"
+            opacity: field.completionFlash
+            visible: opacity > 0
         }
     }
 }

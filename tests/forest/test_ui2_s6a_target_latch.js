@@ -108,4 +108,42 @@ check("begin cannot silently change observed target",()=>{
     const t=c.begin(treeA);
     assert.equal(c.finish(t,treeA),true);
 });
+check("live gesture checks every immediate request and finishes once",()=>{
+    const c=make(); c.observe(treeA);
+    const t=c.begin(treeA);
+    let writes=0;
+    for (let i=0;i<3;i++) if(c.checkCurrent(t,treeA)) writes++;
+    assert.equal(writes,3);
+    assert.equal(c.finish(t,treeA),true);
+    assert.equal(c.checkCurrent(t,treeA),false);
+});
+check("live gesture cannot mutate replacement even with same label after ABA",()=>{
+    const c=make(); c.observe(treeA); const t=c.begin(treeA);
+    assert.equal(c.checkCurrent(t,treeA),true);
+    c.observe(treeB); c.observe(treeA);
+    assert.equal(c.checkCurrent(t,treeA),false);
+    assert.equal(c.finish(t,treeA),false);
+});
+check("live request mismatch retires original ticket",()=>{
+    const c=make(); c.observe(treeA); const t=c.begin(treeA);
+    assert.equal(c.checkCurrent(t,treeB),false);
+    assert.equal(c.checkCurrent(t,treeA),false);
+});
+check("live stale or foreign ticket cannot retire current gesture",()=>{
+    const c=make(), foreign=make(); c.observe(treeA); foreign.observe(treeA);
+    const old=c.begin(treeA), fresh=c.begin(treeA);
+    assert.equal(c.checkCurrent(old,treeB),false);
+    assert.equal(c.checkCurrent(foreign.begin(treeA),treeA),false);
+    assert.equal(c.checkCurrent(fresh,treeA),true);
+});
+check("live gestures retire on revision, withdrawal and cancel",()=>{
+    const c=make();
+    for(const next of ["local-tree-a:r2",null]) {
+        c.observe(treeA); const t=c.begin(treeA);
+        c.observe(next); c.observe(treeA);
+        assert.equal(c.checkCurrent(t,treeA),false);
+    }
+    c.observe(treeA); const t=c.begin(treeA); c.cancel(t);
+    assert.equal(c.checkCurrent(t,treeA),false);
+});
 console.log("UI2_S6A_LOCAL_TARGET_LATCH_PASS",count);

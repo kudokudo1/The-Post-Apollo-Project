@@ -579,6 +579,16 @@ ShellRoot {
                 clearDraft.leftClicked(null);
                 if (!smoke.check(view.stagedLimitPercent===-1 && !memoryApply.available,
                         "clear removes shared draft without owner dispatch")) return;
+                memorySlider.valueRequested(42);
+                memoryApply.leftClicked(null);
+                if (!smoke.check(view.hasOwnedPending && fakeGate.pending.action==="limit"
+                        && fakeGate.pending.percent===42 && fakeGate.preparations===1
+                        && fakeGate.confirmations===0,
+                        "green memory action opens existing owner review without execution")) return;
+                view.cancelOwned();
+                if (!smoke.check(fakeGate.pending===null && fakeGate.cancels===1
+                        && fakeGate.confirmations===0 && view.stagedLimitPercent===-1,
+                        "memory owner review cancellation clears captured draft")) return;
                 fakeOwner.protectTargets=true;
                 cpuFilter.leftClicked(null);
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
@@ -659,7 +669,7 @@ ShellRoot {
                     "compact identity with hidden shared information")) return;
                 if (!smoke.check(!help.visible && !help.open && helpButton.available, "lock help initially hidden")) return;
                 helpButton.leftClicked(null);
-                if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===0, "click does not open hover-only help or request action")) return;
+                if (!smoke.check(!help.visible && !helpButton.selected && fakeGate.preparations===1, "click does not open hover-only help or request action")) return;
                 info.open=true;
                 if (!smoke.check(info.visible && infoButton.selected
                     && info.purpose==="synthetic-worker is one live Linux process. This panel shows its live CPU, memory, I/O, and age and can limit, freeze, or end this exact process."
@@ -676,7 +686,7 @@ ShellRoot {
                 if (!smoke.check(view.legacyActionBlocked
                     && !view.prepareAction("end")
                     && !view.canChangeLock(view.currentTask)
-                    && fakeGate.preparations===0,
+                    && fakeGate.preparations===1,
                     "shared legacy exclusion refuses competing actions")) return;
                 fakeOwner.destructiveConfirmOpen=false;
                 if (!smoke.check(!view.legacyActionBlocked,
@@ -941,7 +951,7 @@ ShellRoot {
                 smoke.priorInstrumentY=smoke.find(view,"cpuPlusKillInstrumentViewport").contentY;
                 smoke.priorReviewGeometry=smoke.instrumentGeometry(view);
                 if (!smoke.check(view.prepareAction("end")
-                    && fakeGate.preparations===1
+                    && fakeGate.preparations===2
                     && fakeGate.confirmations===0
                     && view.hasOwnedPending
                     && smoke.find(view,"cpuPlusProcessReviewWarning").text.indexOf("WARNING // PROTECTED PROCESS")>=0
@@ -970,7 +980,7 @@ ShellRoot {
             }
             if (smoke.phase === 2) {
                 if (!smoke.check(fakeGate.pending===null
-                    && fakeGate.cancels===1
+                    && fakeGate.cancels===2
                     && fakeGate.confirmations===0, "cancelled without execution"))
                     return;
                 if (!smoke.check(view.prepareAction("freeze")
@@ -1038,7 +1048,7 @@ ShellRoot {
                 "disappearing process closes information")) return;
             if (!smoke.check(!view.currentTask && !view.exactTargetAvailable
                 && !view.prepareAction("end") && !view.hasOwnedPending
-                && fakeGate.pending===null && fakeGate.cancels===2
+                && fakeGate.pending===null && fakeGate.cancels===3
                 && fakeGate.confirmations===1, "stale selection refusal and owned review cancelled"))
                 return;
             fakeOwner.taskRows = [smoke.lastRow];

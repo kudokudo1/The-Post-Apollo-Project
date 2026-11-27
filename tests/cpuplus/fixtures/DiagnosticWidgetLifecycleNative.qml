@@ -73,17 +73,19 @@ ShellRoot {
                 source12.menuOpen=true;
                 source13.menuOpen=true;
                 source14.deckOpen=true;
+                if(!root.check(recorder.timing("git","dock","toggle","",0,Date.now()) && recorder.timing("media","frame","cava-apply","",0,Date.now()),"selected timing samples"))return;
                 root.phase=2;return;
             }
             if(root.phase===2){
                 if(recorder.active)return;
                 const r=recorder.report;
                 if(!root.check(r && r.status==="COMPLETE" && r.elapsedMs===1000 && r.completionDelayMs>=0
-                    && r.events.length===15 && r.stats.length===15
+                    && r.events.length===15 && r.stats.length===15 && r.timings.length===2
                     && r.stats[0].closes===1 && r.stats[14].opens===1,"all 15 real QML signals"))return;
                 if(!root.check(CpuPlusDiagnostics.lifecycleReport && CpuPlusDiagnostics.setLifecycleSelection(["git"]) && CpuPlusDiagnostics.startLifecycleCapture(),"single selection via owner"))return;
                 source0.menuOpen=true;
                 source4.menuOpen=false;
+                if(!root.check(!recorder.timing("media","frame","cava-apply","",0,Date.now()),"unselected timing refused"))return;
                 if(!root.check(CpuPlusDiagnostics.cancelLifecycleCapture()&&recorder.report.status==="CANCELLED"
                     && recorder.report.events.length===1 && recorder.report.events[0].id==="git",
                     "unselected ignored, cancellation bounded"))return;

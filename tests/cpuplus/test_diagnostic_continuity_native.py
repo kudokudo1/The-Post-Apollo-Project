@@ -154,8 +154,15 @@ for entry in [start,row,row,row,row,end]: print(json.dumps(entry))
     real_scripts = config / "real-capture" / "scripts"
     real_scripts.mkdir(parents=True)
     for name in ("cpuplus_diagnostic_workflow.py", "cpuplus_storage_observer.py",
-                 "syntagma_quickshell_thread_sampler.py", "cpuplus_stall_clock_witness.py"):
+                 "syntagma_quickshell_thread_sampler.py", "cpuplus_stall_clock_witness.py",
+                 "cpuplus_diagnostic_workflow_catalog.py", "cpuplus_diagnostic_archive.py"):
         shutil.copy2(ROOT / "scripts" / name, real_scripts / name)
+    (scripts / "cpuplus_diagnostic_workflow_catalog.py").write_text("""import os,sys
+from pathlib import Path
+target=Path(__file__).resolve().parents[1]/"real-capture"/"scripts"/"cpuplus_diagnostic_workflow_catalog.py"
+assert len(sys.argv)==1
+os.execv(sys.executable,[sys.executable,"-E","-s","-B",str(target)])
+""")
     # Standalone Storage uses the real observer and real sampler import, not
     # the synthetic thread fixture in scripts/. Keep disposable path arguments.
     (scripts / "cpuplus_storage_observer.py").write_text("""import os,sys
@@ -208,5 +215,5 @@ print(json.dumps(dict(schema="post-apollo-diagnostic-workflow-transport-v1",stat
                             cwd=config, env=env, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=95, check=False)
     print(result.stdout)
-    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_D9A_SWAP_NATIVE_PASS" not in result.stdout or "CPU_D10A_NETWORK_NATIVE_PASS" not in result.stdout or "CPU_D10B_SYSTEM_MEMORY_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_DIAG_NATIVE_PASS" not in result.stdout or "CPU_M10_HOST_INSTRUMENT_PASS" not in result.stdout or "CPU_D1B_NATIVE_PASS" not in result.stdout or "CPU_D2C_NATIVE_PASS" not in result.stdout or "CPU_D3A_NATIVE_PASS" not in result.stdout or "CPU_D3D_NATIVE_PASS" not in result.stdout or "CPU_D3E_NATIVE_PASS" not in result.stdout or "CPU_Q3_DIRECT_SAVE_PASS" not in result.stdout or "CPU_D4A_NATIVE_PASS" not in result.stdout or "CPU_D4B_NATIVE_PASS" not in result.stdout or "CPU_D4B_FIXED_FOOTER_PASS" not in result.stdout or "CPU_D6A_RESOURCE_NATIVE_PASS" not in result.stdout or "CPU_D6B_HOST_NATIVE_PASS" not in result.stdout or "CPU_D7A_GPU_NATIVE_PASS" not in result.stdout or "CPU_D8A_STORAGE_NATIVE_PASS" not in result.stdout or "CPU_D8C_DISK_NATIVE_PASS" not in result.stdout or "CPU_D9A_SWAP_NATIVE_PASS" not in result.stdout or "CPU_D10A_NETWORK_NATIVE_PASS" not in result.stdout or "CPU_D10B_SYSTEM_MEMORY_NATIVE_PASS" not in result.stdout or "CPU_DIAG_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native diagnostic continuity failed")

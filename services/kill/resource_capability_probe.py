@@ -93,6 +93,27 @@ def drm_fdinfo(pid):
             return state
     return "not_observed"
 
+def priority_evidence(pid):
+    """Read-only leader-thread evidence, not a write permission grant."""
+    evidence = {"scope":"leader_thread", "nice":None, "scheduler":None,
+                "rlimit_nice_soft":None, "mutation_permission":"not_verified",
+                "restoration_permission":"not_verified"}
+    try:
+        evidence["nice"] = os.getpriority(os.PRIO_PROCESS, pid)
+    except (OSError, AttributeError) as error:
+        evidence["read_state"] = status(error) if isinstance(error, OSError) else "unavailable"
+        return evidence
+    try:
+        evidence["scheduler"] = os.sched_getscheduler(pid)
+    except (OSError, AttributeError):
+        pass
+    try:
+        soft, _ = resource.prlimit(pid, resource.RLIMIT_NICE)
+        evidence["rlimit_nice_soft"] = soft
+    except (OSError, AttributeError):
+        pass
+    return evidence
+
 def observe(pid, birth, comm):
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1 or not isinstance(birth, int) or isinstance(birth, bool) or birth <= 0 or not isinstance(comm, str) or not comm:
         return {"schema":"post-apollo-kill-capability-k8c-v1","state":"invalid_target","resources":{}}
@@ -108,11 +129,8 @@ def observe(pid, birth, comm):
         "gpu": {"drm_fdinfo":drm_fdinfo(pid)},
         "network": {"network_namespace":source_observation(f"/proc/{pid}/net/dev")},
     }
-    try:
-        os.getpriority(os.PRIO_PROCESS, pid)
-        sources["cpu"]["priority_read"] = "observed"
-    except (OSError, AttributeError) as error:
-        sources["cpu"]["priority_read"] = status(error) if isinstance(error, OSError) else "unavailable"
+    priority = priority_evidence(pid)
+    sources["cpu"]["priority_read"] = priority.pop("read_state", "observed" if priority["nice"] is not None else "unavailable")
     try:
         os.sched_getaffinity(pid)
         sources["cpu"]["affinity_read"] = "observed"
@@ -142,7 +160,8 @@ def observe(pid, birth, comm):
             category:{
                 "observation":sources[category],
                 "actuation":"not_verified",
-                "permission_to_change":"not_verified"
+                "permission_to_change":"not_verified",
+                **({"priority_evidence":priority} if category=="cpu" else {})
             } for category in CATEGORIES
         },
         "limits":{

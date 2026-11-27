@@ -3,6 +3,7 @@
 Manual GitHub-hosted job only. No model/service invocation, credentials, model
 pull, retry, artifact publishing or native admission. Fail closed on unknowns.
 """
+import errno
 import hashlib
 import http.client
 import json
@@ -313,6 +314,20 @@ def extract_archive(path, root, deadline):
                 proc.wait()
 
 
+def require_closed_fds():
+    # Independent verifier check remains in preflight. Only the already
+    # closed enumeration descriptor (EBADF) is an acceptable miss.
+    for name in os.listdir("/proc/self/fd"):
+        if int(name) > 2:
+            try:
+                os.fstat(int(name))
+            except OSError as exc:
+                if exc.errno == errno.EBADF:
+                    continue
+                raise Hold("FD_CHECK_UNKNOWN") from None
+            raise Hold("INHERITED_FD")
+
+
 def preflight(root):
     require(sys.platform == "linux" and os.uname().machine == "x86_64"
             and os.getuid() != 0 and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
@@ -331,14 +346,7 @@ def preflight(root):
     require(shutil.disk_usage(root).free >= ARCHIVE_SIZE + MODEL_LIMIT
             + EXTRACT_LIMIT + DISK_RESERVE, "DISK_PREFLIGHT")
     require(Path("/usr/bin/zstd").is_file(), "DECOMPRESSOR_MISSING")
-    # No inherited open files other than stdio; listing fd may have closed.
-    for name in os.listdir("/proc/self/fd"):
-        if int(name) > 2:
-            try:
-                os.fstat(int(name))
-            except OSError:
-                continue
-            raise Hold("INHERITED_FD")
+    require_closed_fds()
     cgroup = Path("/proc/self/cgroup").read_text().splitlines()
     require(len(cgroup) == 1 and cgroup[0].startswith("0::/"), "CGROUP_UNKNOWN")
     relative = cgroup[0][4:]

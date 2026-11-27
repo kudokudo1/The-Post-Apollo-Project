@@ -230,6 +230,17 @@ Item {
         }
 
         GohuText {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 3
+            font.pixelSize: 6
+            color: button.accent
+            text: "NO RESPONSE"
+            visible: button.progressQuiet
+            z: 2
+        }
+
+        GohuText {
             id: buttonLabel
             anchors.centerIn: parent
             text: button.label

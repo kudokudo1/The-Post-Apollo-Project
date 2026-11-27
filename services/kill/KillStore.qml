@@ -180,7 +180,18 @@ Scope {
     }
 
     function acknowledgeCpuBulkReport() {
-        if (!cpuBulkOperation || hunterOperationPhase !== "report") return false;
+        return acknowledgeHunterReport(true);
+    }
+
+    function acknowledgeDonorBulkReport() {
+        return acknowledgeHunterReport(false);
+    }
+
+    // Report dismissal is owned by the initiating consumer, not its sibling.
+    // Neither consumer may acknowledge an in-flight operation.
+    function acknowledgeHunterReport(cpuRecipient) {
+        if (hunterOperation.phase !== "report"
+                || hunterOperation.recipientOwned !== cpuRecipient) return false;
         hunterOperation.phase = "idle";
         hunterOperation.kind = "";
         hunterOperation.targets = [];

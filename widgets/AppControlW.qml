@@ -1064,28 +1064,17 @@ PanelWindow {
         refreshTimer: taskRefreshAfterKillTimer
     }
 
-    HunterOperationController {
-        id: hunterOperationController
-        host: appControlWindow
-        favoriteStoreObject: favoriteStore
-        executor: hunterExecutor
-        refreshTimer: taskRefreshAfterKillTimer
-    }
-
+    readonly property var hunterOperationController: KillBackend.KillStore.hunterOperation
     readonly property var hunterExecutor: KillBackend.KillStore.hunterExecutor
-
-    Connections {
-        target: appControlWindow.hunterExecutor
-
-        function onResultReady(result) {
-            appControlWindow.applyHunterOperationResult(result);
-        }
-
-        function onFinished() { appControlWindow.finishHunterOperation(); }
-
-        function onErrorRaised(message) {
-            console.log("AppControl: HUNTER", String(message || ""));
-        }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorHunterHost"
+        value: appControlWindow
+    }
+    Binding {
+        target: KillBackend.KillStore
+        property: "donorHunterFavorites"
+        value: appControlWindow.favoriteStore
     }
 
     readonly property var thermalRows:
@@ -1342,13 +1331,13 @@ PanelWindow {
 
     // HUNTER operation state lives in a cold-path controller. Keep aliases
     // here so the rest of AppControl and its overlay retain the same contract.
-    property alias hunterOperationPhase: hunterOperationController.phase
-    property alias hunterOperationKind: hunterOperationController.kind
-    property alias hunterOperationTargets: hunterOperationController.targets
-    property alias hunterOperationResults: hunterOperationController.results
-    property alias hunterOperationCompleted: hunterOperationController.completed
-    property alias hunterOperationTotal: hunterOperationController.total
-    property alias hunterPendingTargets: hunterOperationController.pendingTargets
+    readonly property string hunterOperationPhase: hunterOperationController.phase
+    readonly property string hunterOperationKind: hunterOperationController.kind
+    readonly property var hunterOperationTargets: hunterOperationController.targets
+    readonly property var hunterOperationResults: hunterOperationController.results
+    readonly property int hunterOperationCompleted: hunterOperationController.completed
+    readonly property int hunterOperationTotal: hunterOperationController.total
+    readonly property var hunterPendingTargets: hunterOperationController.pendingTargets
     readonly property bool hunterOperationActive:
         hunterOperationPhase === "running"
     readonly property color hunterOperationAccent:
@@ -1364,7 +1353,7 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
-        hunterPendingTargets = [];
+        hunterOperationController.pendingTargets = [];
         destructiveConfirmOpen = true;
         detailFocused = false;
         modeRailFocused = false;
@@ -1377,12 +1366,12 @@ PanelWindow {
         // Closing a finished report acknowledges it. A running hunt continues
         // in the background and can be reopened by either HUNTER kill button.
         if (hunterOperationPhase === "report") {
-            hunterOperationPhase = "idle";
-            hunterOperationKind = "";
-            hunterOperationTargets = [];
-            hunterOperationResults = [];
-            hunterOperationCompleted = 0;
-            hunterOperationTotal = 0;
+            hunterOperationController.phase = "idle";
+            hunterOperationController.kind = "";
+            hunterOperationController.targets = [];
+            hunterOperationController.results = [];
+            hunterOperationController.completed = 0;
+            hunterOperationController.total = 0;
         }
 
         Qt.callLater(function() { searchInput.forceActiveFocus(); });
@@ -1421,7 +1410,7 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
-        hunterPendingTargets = [];
+        hunterOperationController.pendingTargets = [];
         Qt.callLater(function() { searchInput.forceActiveFocus(); });
     }
 
@@ -1434,7 +1423,7 @@ PanelWindow {
 
         if (kind === "kill-all" || kind === "kill-hogs" || kind === "kill-mice") {
             const captured = hunterPendingTargets.slice();
-            hunterPendingTargets = [];
+            hunterOperationController.pendingTargets = [];
             if (captured.length === 0) {
                 cancelDestructiveConfirm();
                 return;
@@ -1448,7 +1437,7 @@ PanelWindow {
         destructiveConfirmChoice = 0;
         destructiveConfirmTargetPids = [];
         destructiveConfirmTargetName = "";
-        hunterPendingTargets = [];
+        hunterOperationController.pendingTargets = [];
 
         if (kind === "reboot")
             Quickshell.execDetached(["systemctl", "reboot"]);
@@ -2049,12 +2038,12 @@ PanelWindow {
 
     function acknowledgeCpuBulkReport() {
         if (!cpuBulkOperation || hunterOperationPhase !== "report") return false;
-        hunterOperationPhase = "idle";
-        hunterOperationKind = "";
-        hunterOperationTargets = [];
-        hunterOperationResults = [];
-        hunterOperationCompleted = 0;
-        hunterOperationTotal = 0;
+        hunterOperationController.phase = "idle";
+        hunterOperationController.kind = "";
+        hunterOperationController.targets = [];
+        hunterOperationController.results = [];
+        hunterOperationController.completed = 0;
+        hunterOperationController.total = 0;
         return true;
     }
 
@@ -2497,7 +2486,7 @@ PanelWindow {
             + "SURVIVORS ARE REPORTED; THEY ARE NOT RETRIED AUTOMATICALLY.",
             "KILL HOGS"
         );
-        hunterPendingTargets = captured;
+        hunterOperationController.pendingTargets = captured;
         destructiveConfirmTargetPids = rows.map(function(entry) {
             return Number(entry.pid || 0);
         });
@@ -2530,7 +2519,7 @@ PanelWindow {
             + "SURVIVORS ARE REPORTED; THEY ARE NOT RETRIED AUTOMATICALLY.",
             "KILL MICE"
         );
-        hunterPendingTargets = captured;
+        hunterOperationController.pendingTargets = captured;
         destructiveConfirmTargetPids = rows.map(function(entry) {
             return Number(entry.pid || 0);
         });
@@ -28481,7 +28470,7 @@ PanelWindow {
             appControlWindow.destructiveConfirmChoice = 0;
             appControlWindow.destructiveConfirmTargetPids = [];
             if (!appControlWindow.hunterOperationActive)
-                appControlWindow.hunterPendingTargets = [];
+                appControlWindow.hunterOperationController.pendingTargets = [];
 
             appControlWindow.favoritesFaceClickPulse = false;
             appControlWindow.favoritesFaceBlinking = false;

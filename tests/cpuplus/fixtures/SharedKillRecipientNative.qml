@@ -474,8 +474,22 @@ ShellRoot {
                 manualMode.leftClicked(null);
                 if (!smoke.check(manualMode.selected && consolePane.modeFor("cpu")==="manual",
                         "inline MANUAL mode button stages only local draft state")) return;
-                consolePane.stageMode("cpu","manual");
-                consolePane.stageNumber("cpu","nice",9);
+                const priorityRow=smoke.find(view,"cpuPlusResourceInstrumentRow-cpu-nice");
+                const priorityDial=smoke.find(priorityRow,"cpuPlusPriorityDial");
+                const presetColumn=smoke.find(priorityRow,"cpuPlusPriorityPresets");
+                const backgroundPreset=smoke.find(priorityRow,"cpuPlusPriorityPreset-background");
+                const normalPreset=smoke.find(priorityRow,"cpuPlusPriorityPreset-normal");
+                if (!smoke.check(priorityRow && priorityDial && presetColumn && backgroundPreset
+                        && normalPreset && priorityDial.visible && presetColumn.visible
+                        && priorityDial.interactive && !normalPreset.selected
+                        && presetColumn.x>=priorityDial.x+priorityDial.width-1,
+                        "CPU priority dial and presets share the same unboxed instrument row")) return;
+                backgroundPreset.leftClicked(null);
+                if (!smoke.check(backgroundPreset.selected && consolePane.valueFor("cpu","nice")===10
+                        && consolePane.reviewLines[0].indexOf("QUOTA DRAFT")<0
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "priority preset stages only nice, not quota or kernel dispatch")) return;
+                priorityDial.valueRequested(9);
                 if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,

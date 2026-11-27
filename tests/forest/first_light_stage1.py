@@ -321,21 +321,30 @@ def preflight(root):
     require(".." not in PurePosixPath(relative).parts, "CGROUP_UNKNOWN")
     mount = Path("/sys/fs/cgroup")
     group = mount / relative
+    # Root controller limit files need not exist on cgroup v2. Verify
+    # the actual unified mount exposes hierarchy root, not a subtree.
+    mounts = Path("/proc/self/mountinfo").read_text().splitlines()
+    roots = [line.split() for line in mounts if " - cgroup2 " in line]
+    require(len(roots) == 1 and roots[0][3] == "/"
+            and roots[0][4] == str(mount), "CGROUP_MOUNT_UNKNOWN")
+    require(group.is_dir() and group != mount, "CGROUP_SCOPE_UNKNOWN")
     limits = []
-    while True:
-        # Read-only actual ancestry visibility, not a placement/demand proof.
+    while group != mount:
+        # Read-only visible non-root ancestry, not a demand proof.
         values = {}
         for key in ("memory.max", "memory.current", "memory.swap.max",
                     "cpu.max", "pids.max", "pids.current"):
             raw = (group / key).read_text().strip()
-            require(re.fullmatch(r"(?:max|[0-9]+)(?: [0-9]+)?", raw) is not None,
-                    "CGROUP_UNKNOWN")
+            pattern = (r"(?:max|[0-9]+) [0-9]+" if key == "cpu.max"
+                       else r"[0-9]+" if key.endswith(".current")
+                       else r"(?:max|[0-9]+)")
+            require(re.fullmatch(pattern, raw) is not None, "CGROUP_UNKNOWN")
             values[key] = raw
         limits.append(values)
-        if group == mount:
-            break
         require(mount in group.parents and len(limits) < 32, "CGROUP_UNKNOWN")
         group = group.parent
+    # Explicitly distinguish root from a measured finite controller limit.
+    limits.append({"scope": "visible_hierarchy_root_no_limit_claim"})
     mem = Path("/proc/meminfo").read_text()
     available = re.search(r"^MemAvailable:\s+([0-9]+) kB$", mem, re.M)
     require(available is not None, "MEMORY_UNKNOWN")

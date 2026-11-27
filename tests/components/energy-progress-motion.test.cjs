@@ -437,3 +437,20 @@ test("fire light uses the forward pixel and reflection overlays the material",()
     assert.match(preview,/light.fire\?source.flameTipOffset/);
     assert.match(field,/ki-blast"\?\.38:fire\?\.36/);
 });
+
+test("flame brightness is integrated into the pixels rather than a foreground orb",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    assert.match(source,/mix\(fireOrange\[cell.heat\],fireTip\[cell.heat\],k\*heat\)/);
+    assert.doesNotMatch(source,/orb\(h\*\.65,h\*\.62/);
+    assert.doesNotMatch(source,/orb\(h\*1.18,h\*1.10/);
+});
+test("battlefield light follows beam geometry and the winner bleeds into contact",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    assert.match(source,/const penetration=Math.min/);
+    assert.match(source,/tint\(winner,.60\*dominance\)/);
+    assert.match(preview,/bloom\(start\+left\*\.53,origin.y/);
+    assert.match(preview,/bloom\(split\+right\*\.47,origin.y/);
+    assert.match(preview,/bloom\(split,origin.y,h\*3.2/);
+    assert.doesNotMatch(preview,/const lo=Math.max\(0,\(split-blend\)/);
+});

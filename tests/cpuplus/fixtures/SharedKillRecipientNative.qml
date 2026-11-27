@@ -341,13 +341,22 @@ ShellRoot {
                 const consolePane=smoke.find(view,"cpuPlusKillResourceConsole");
                 const cpuCard=smoke.find(view,"cpuPlusResourceCard-cpu");
                 const applyLocked=smoke.find(view,"cpuPlusResourceApplyLocked");
+                const detailState = "console=" + (!!consolePane)
+                    + " ready=" + (consolePane ? consolePane.selectionReady : "missing")
+                    + " identity=" + (consolePane ? consolePane.targetIdentity : "missing")
+                    + " card=" + (!!cpuCard)
+                    + " expanded=" + (cpuCard ? cpuCard.expanded : "missing")
+                    + " apply=" + (!!applyLocked)
+                    + " available=" + (applyLocked ? applyLocked.available : "missing")
+                    + " draft=" + (consolePane ? consolePane.reviewLines.length : "missing")
+                    + " prep=" + fakeGate.preparations + " confirm=" + fakeGate.confirmations;
                 if (!smoke.check(consolePane && consolePane.selectionReady
                         && consolePane.targetIdentity.length>0
                         && cpuCard && cpuCard.expanded
                         && applyLocked && !applyLocked.available
                         && consolePane.reviewLines.length===0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
-                        "resource console mounts draft-only beside existing KILL controls")) return;
+                        "resource console mounts draft-only beside existing KILL controls; " + detailState)) return;
                 consolePane.stageMode("cpu","manual");
                 consolePane.stageNumber("cpu","nice",9);
                 if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1

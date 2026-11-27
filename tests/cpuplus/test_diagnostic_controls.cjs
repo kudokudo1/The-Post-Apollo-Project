@@ -33,7 +33,7 @@ const owner = read("services/diagnostics/CpuPlusDiagnostics.qml");
 const ui = read("widgets/cpuplus/CpuPlusDiagnosticsPane.qml");
 const parent = read("widgets/cpuplus/CpuPlusMemoryActuatorPane.qml");
 assert.match(owner,/pragma Singleton/);
-assert.match(owner,/if \(busy \|\| faulted \|\| worker.running \|\| archive.busy \|\| workflowCatalogBusy \|\| \(setActive && !setDispatching\)\) return false/);
+assert.match(owner,/if \(busy \|\| faulted \|\| worker.running \|\| archive.busy \|\| workflowCatalogBusy \|\| lifecycleActive \|\| \(setActive && !setDispatching\)\) return false/);
 assert.match(owner,/if \(!busy \|\| !received \|\| !exited\) return/);
 assert.match(owner,/worker\.exec\(args\)/);
 assert.match(owner,/maximumReport: 65536/);
@@ -731,7 +731,7 @@ assert.match(owner,/workflowCatalogCompleted\(outcome,wasEdit,workflowStore.docu
 assert.match(workshop,/onWorkflowCatalogCompleted\(outcome,wasEdit,confirmedDocument\)/);
 assert.match(workshop,/if \(!wasEdit \|\| !root.pendingSaveName\) return/);
 assert.match(workshop,/Receipt.sameValue\(row.plan,JSON.parse\(root.savePlanText\)\)/);
-assert.match(workshop,/if \(locked \|\| calibrating \|\| !preview.ok \|\| saveEditorOpen \|\| !targetCompatibility.ok \|\| targetPicker.visible\) return/);
+assert.match(workshop,/if \(locked \|\| calibrating \|\| !preview.ok \|\| saveEditorOpen \|\| !targetCompatibility.ok \|\| targetPicker.visible \|\| lifecyclePicker.visible\) return/);
 assert.match(workshop,/Targets.targetPlanCompatibility\(selectedTargetId,plan/);
 assert.match(workshop,/Targets.searchDiagnosticTargets\(targetSearch.text,targetPicker.category\)/);
 assert.match(workshop,/row.route==="configured"/);
@@ -841,3 +841,9 @@ assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/worksho
     assert.match(read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"),/helpSubject: root.subject/);
     console.log("D10g context-sensitive help palette PASS");
 }
+
+assert.match(owner,/function startLifecycleCapture\(\)/);
+assert.match(owner,/lifecycleRecorder.start\(lifecycleSelection,lifecycleDurationSeconds\*1000\)/);
+assert.match(workshop,/objectName: "cpuplusWorkshopOpenDump"/);
+assert.match(ui,/objectName: "cpuplusLifecycleGlobalStop"/);
+assert.match(read("widgets/cpuplus/CpuPlusLifecycleDumpPopup.qml"),/CpuPlusDiagnostics.startLifecycleCapture\(\)/);

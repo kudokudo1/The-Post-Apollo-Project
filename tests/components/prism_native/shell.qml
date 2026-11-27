@@ -48,6 +48,20 @@ ShellRoot {
                 border.width: 1
                 border.color: "#DCF3FA"
                 Ui.PrismBorderGlow { anchors.fill: parent }
+                Ui.PrismTextGlow { labelItem: testLabel }
+                Ui.GohuText {
+                    id: testLabel
+                    anchors.centerIn: parent
+                    width: parent.width - 16
+                    height: 26
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    color: "#ffffff"
+                    font.pixelSize: 13
+                    font.bold: true
+                    text: "PRISM TEST"
+                    elide: Text.ElideRight
+                }
             }
         }
     }

@@ -174,6 +174,10 @@ PanelWindow {
     }
 
     function reportSyntagmaToggleTime(widgetName, startMs, nowOpen) {
+        if (startMs && universalLifecycle.measures(widgetName)) {
+            const now=Date.now();
+            universalLifecycle.timing(widgetName,"dock","toggle","",now-startMs,now);
+        }
         if (!syntagmaLagProbeEnabled)
             return;
 
@@ -837,15 +841,21 @@ PanelWindow {
 
             AppControlW {
                 id: appControlWindow
-                diagnosticCaptureActive: CpuPlusDiagnostics.appControlCaptureActive
+                diagnosticCaptureActive: CpuPlusDiagnostics.appControlCaptureActive || universalLifecycle.measures("appcontrol")
                 onDiagnosticOpeningStage: function(stage, sequence, elapsedMs, timestampMs) {
                     CpuPlusDiagnostics.recordOpening(stage, sequence, elapsedMs, timestampMs);
+                    if (universalLifecycle.measures("appcontrol"))
+                        universalLifecycle.timing("appcontrol","opening",stage,CpuPlusDiagnostics.appControlMode,elapsedMs,timestampMs);
                 }
                 onDiagnosticKillWorkStage: function(stage, elapsedMs, timestampMs) {
                     CpuPlusDiagnostics.recordKillWork(stage, elapsedMs, timestampMs);
+                    if (universalLifecycle.measures("appcontrol"))
+                        universalLifecycle.timing("appcontrol","kill-work",stage,CpuPlusDiagnostics.appControlMode,elapsedMs,timestampMs);
                 }
                 onDiagnosticWorkStage: function(stage, elapsedMs, timestampMs) {
                     CpuPlusDiagnostics.recordWork(stage, elapsedMs, timestampMs);
+                    if (universalLifecycle.measures("appcontrol"))
+                        universalLifecycle.timing("appcontrol","work",stage,CpuPlusDiagnostics.appControlMode,elapsedMs,timestampMs);
                 }
 
                 systemTelemetry: sharedSystemTelemetry
@@ -871,6 +881,10 @@ PanelWindow {
 
         Mediaplayer {
             id: sharedMediaDock
+            diagnosticTimingActive: universalLifecycle.measures("media")
+            onDiagnosticFrameTiming: function(elapsedMs,timestampMs) {
+                universalLifecycle.timing("media","frame","cava-apply","",elapsedMs,timestampMs);
+            }
         }
 
         // CAMERA // Independent from Social, Media/TV, and Files. The
@@ -925,7 +939,7 @@ PanelWindow {
                 menuOpen: hospitalWindow.menuOpen
 
                 onToggleRequested: {
-                    const startMs = shellRoot.syntagmaLagProbeEnabled
+                    const startMs = (shellRoot.syntagmaLagProbeEnabled || universalLifecycle.measures("hospital"))
                                     ? Date.now() : 0;
                     hospitalWindow.toggle();
                     shellRoot.reportSyntagmaToggleTime(
@@ -1040,7 +1054,7 @@ PanelWindow {
                 menuOpen: gitWindow.menuOpen
 
                 onToggleRequested: {
-                    const startMs = shellRoot.syntagmaLagProbeEnabled
+                    const startMs = (shellRoot.syntagmaLagProbeEnabled || universalLifecycle.measures("git"))
                                     ? Date.now() : 0;
                     gitWindow.toggle();
                     shellRoot.reportSyntagmaToggleTime(

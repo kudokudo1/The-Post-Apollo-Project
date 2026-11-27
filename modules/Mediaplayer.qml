@@ -17,6 +17,8 @@ Item {
     implicitHeight: mediaDock.implicitHeight
 
     property bool deckOpen: false
+    property bool diagnosticTimingActive: false
+    signal diagnosticFrameTiming(real elapsedMs, real timestampMs)
 
     // This owner is the one writer of deckOpen (including Escape close).
     // Reuse the dock's placement calculation for both mouse and Super+R.
@@ -585,6 +587,7 @@ Item {
         }
         const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
         const trialStartMs = cavaTrialProbeEnabled ? Date.now() : 0;
+        const dumpStartMs = mediaRoot.diagnosticTimingActive ? Date.now() : 0;
         if (trialStartMs && !cavaDrainingPending)
             cavaTrialStats.received += 1;
         var raw = String(frame).trim();
@@ -620,6 +623,10 @@ Item {
         if (changed)
             levels = newLevels;
 
+        if (dumpStartMs && mediaRoot.diagnosticTimingActive) {
+            const now=Date.now();
+            mediaRoot.diagnosticFrameTiming(now-dumpStartMs,now);
+        }
         if (trialStartMs) {
             const elapsed = Date.now() - trialStartMs;
             cavaTrialStats.applied += 1;

@@ -37,7 +37,7 @@ function lifecycleStart(ids,states,now,durationMs) {
     // Snapshot selected flags only; no titles, payload, paths, account or process data.
     return {schema:lifecycleSchema,ids:ids.slice(),startedMs:now,deadlineMs:now+durationMs,
         initial:JSON.parse(JSON.stringify(states)),current:JSON.parse(JSON.stringify(states)),
-        events:[],lastMs:now,fault:""};
+        events:[],lastMs:now,fault:"",timings:[],timingRejected:0};
 }
 function lifecycleFault(run,reason){if(run&&!run.fault)run.fault=reason;return false;}
 function lifecycleObserve(run,id,open,now) {
@@ -73,7 +73,8 @@ function lifecycleFinish(run,now,outcome) {
         return {id,initialOpen:run.initial[id],finalOpen:open,opens,closes,openMs};
     });
     return {schema:lifecycleSchema,status:outcome,elapsedMs,targets:run.ids.slice(),
-        events:run.events.map(e=>({id:e.id,open:e.open,atMs:e.atMs})),stats};
+        events:run.events.map(e=>({id:e.id,open:e.open,atMs:e.atMs})),stats,
+        timings:run.timings.map(t=>Object.assign({},t)),timingRejected:run.timingRejected};
 }
 
 // The cutoff is the requested observation window, not the timer callback.
@@ -85,4 +86,34 @@ function lifecycleFinishObserved(run,now) {
     const report=lifecycleFinish(run,run.deadlineMs,"COMPLETE");
     if(report)report.completionDelayMs=delay;
     return report;
+}
+
+// These are elapsed handler/stage timings, not exclusive CPU time.
+// Aggregate fixed labels only, with separate mode context for AppControl.
+function lifecycleTimingAllowed(id,channel,stage,mode) {
+    const opening=["graph-invalidation","mode-restore","selection","selection-state","selection-row","selection-detail","probe-schedule","refresh-dispatch","focus","handler-total"];
+    const work=["cpu-history","hunter-history","history-revisions","task-order","task-rows","metric-alerts","snapshot-selection","mini-cpu-history","mini-hunter-history","mini-history-revisions"];
+    if(id==="appcontrol"){
+        if(!["closed","app","kill","cpu-kill","mixed","other","unavailable"].includes(mode))return false;
+        return channel==="opening"?opening.includes(stage):channel==="kill-work"?work.includes(stage):
+            channel==="work"&&work.concat(["app-model-read","app-key-scan","app-index-write","app-position-view","resource-reconcile"]).includes(stage);
+    }
+    return mode===""&&((["git","hospital"].includes(id)&&channel==="dock"&&stage==="toggle")||
+        (id==="media"&&channel==="frame"&&stage==="cava-apply"));
+}
+function lifecycleTiming(run,id,channel,stage,mode,elapsed,now) {
+    if(!run||run.fault||!run.ids.includes(id))return false;
+    if(!lifecycleTimingAllowed(id,channel,stage,mode)||!validTime(now)||!Number.isFinite(elapsed)||elapsed<0||
+        elapsed>lifecycleMaxDuration||now>run.deadlineMs||now-elapsed<run.startedMs||now<run.lastMs){
+        run.timingRejected=Math.min(1000000,run.timingRejected+1);return false;
+    }
+    let row=run.timings.find(t=>t.id===id&&t.channel===channel&&t.stage===stage&&t.mode===mode);
+    if(!row){
+        if(run.timings.length>=256){run.timingRejected=Math.min(1000000,run.timingRejected+1);return false;}
+        row={id,channel,stage,mode,count:0,totalMs:0,maxMs:0};run.timings.push(row);
+    }
+    if(row.count>=1000000){run.timingRejected=Math.min(1000000,run.timingRejected+1);return false;}
+    row.count++;row.totalMs+=elapsed;row.maxMs=Math.max(row.maxMs,elapsed);
+    run.lastMs=now;
+    return true;
 }

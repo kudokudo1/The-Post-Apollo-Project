@@ -11,6 +11,11 @@ Scope {
     readonly property bool active: run!==null
     property var report: null
     signal completed(var result)
+    function measures(id) { return active && run.ids.includes(id); }
+    function timing(id,channel,stage,mode,elapsed,now) {
+        if(!measures(id))return false;
+        return Lifecycle.lifecycleTiming(run,id,channel,stage,mode,elapsed,now);
+    }
     function subscribed(id) {
         return active && run.ids.includes(id) ? (sources[id] || null) : null;
     }

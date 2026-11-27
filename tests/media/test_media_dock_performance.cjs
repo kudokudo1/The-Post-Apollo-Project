@@ -25,6 +25,7 @@ function harness() {
     // property explicitly so normal CAVA frame tests exercise the production
     // fast path even after the probe was introduced.
     const context = vm.createContext({
+        mediaRoot: {diagnosticTimingActive: false},
         barCount: 20,
         levels: Array(20).fill(0),
         bgLagProbeEnabled: false,
@@ -53,7 +54,7 @@ test("left taskbar preserves Media and Camera while Tray is bottom-centered", ()
         ?.split("// ===== CENTER MODULE", 2)[0];
     assert.ok(left, "left taskbar row must exist");
     const workspaces = left.indexOf("Workspaces {}");
-    const media = left.indexOf("Mediaplayer {\n            id: sharedMediaDock\n        }");
+    const media = left.search(/Mediaplayer\s*\{\s*id:\s*sharedMediaDock\b/);
     const camera = left.indexOf("id: cameraHost");
     const hospital = left.indexOf("// Hospital");
     assert.ok(workspaces >= 0 && workspaces < media &&
@@ -806,6 +807,7 @@ test("coalesced mode keeps last valid frame, ignores malformed input and bounds 
     const drainBody = source.match(/function drainCavaFrame\(\) \{([\s\S]*?)\n    \}\n\n    \/\/ CAVA visualizes/)?.[1];
     assert.ok(stageBody && drainBody);
     const context = vm.createContext({
+        mediaRoot: {diagnosticTimingActive: false},
         barCount: 20, levels: Array(20).fill(0),
         bgLagProbeEnabled: false, cavaCoalesceEnabled: true,
         cavaTrialProbeEnabled: true, cavaDrainingPending: false,
@@ -842,4 +844,22 @@ test("coalesced mode keeps last valid frame, ignores malformed input and bounds 
     assert.equal(context.levels, after, "identical levels remain deduplicated");
     assert.equal(context.cavaTrialStats.applied, 2);
     assert.equal(context.cavaTrialStats.changed, 1);
+});
+
+test("universal timing stays dormant until selected; reports only valid applied frames", () => {
+    const {context, receive} = harness();
+    const readings=[];
+    context.mediaRoot.diagnosticFrameTiming=(elapsed,stamp)=>readings.push([elapsed,stamp]);
+    const frame=Array(20).fill("3").join(";")+";";
+    receive(frame);
+    assert.equal(readings.length,0);
+    context.mediaRoot.diagnosticTimingActive=true;
+    receive("bad");
+    assert.equal(readings.length,0);
+    receive(frame);
+    assert.equal(readings.length,1);
+    assert.ok(Number.isFinite(readings[0][0])&&readings[0][0]>=0);
+    context.mediaRoot.diagnosticTimingActive=false;
+    receive(frame);
+    assert.equal(readings.length,1);
 });

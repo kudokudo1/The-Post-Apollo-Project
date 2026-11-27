@@ -288,7 +288,7 @@ assert.match(workshop,/SelectorDial\s*\{/);
 assert.match(workshop,/markerColor: Colors.orange/);
 assert.match(workshop,/Colors.resourceColor\(modelData.subject\)/);
 assert.match(workshop,/if \(ready\) \{[\s\S]*?requestWorkshopCapture\(frozen\)/);
-assert.match(workshop,/onPlanTextChanged: disarm\(\)/);
+assert.match(workshop,/onPlanTextChanged: \{ disarm\(\); closeSaveEditor\(\);/);
 assert.match(workshop,/running: root.visible && root.recording && !CpuPlusDiagnostics.cancelled/);
 assert.match(executionFace,/phase === "COMPLETE" \? Colors.omnitrix/);
 assert.match(owner,/property var workshopDraft:/);

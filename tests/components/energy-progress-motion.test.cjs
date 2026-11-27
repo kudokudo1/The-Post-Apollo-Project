@@ -724,3 +724,51 @@ test("DEFAULT eye remains vertical at ordinary heights and fits compact tracks",
         }
     }
 });
+
+test("GitW Save Workflow uses timed blue Omnitrix without replacing backend or keyboard authority",()=>{
+    const git=fs.readFileSync(path.join(root,"widgets/GitW.qml"),"utf8");
+    const start=git.indexOf("id: saveWorkflowButton");
+    const save=git.slice(start,start+4200);
+    assert.match(save,/primaryBlue: true/);
+    assert.match(save,/loadingEnergyVariant: "omnitrix"/);
+    assert.match(save,/githubService.factoryBusy\s*&& githubService.factoryMode === "install"/);
+    assert.match(save,/githubService.factoryValidationStatus === "PASS"/);
+    assert.match(save,/!!githubService.factoryInstallCommit\s*\|\| !!githubService.factoryPullRequest/);
+    assert.match(save,/githubService.factoryMode === "preview"/);
+    assert.match(save,/githubService.factoryLastTemplate === root.factoryTemplate/);
+    assert.match(save,/githubService.factoryLastTrigger === root.factoryTrigger/);
+    assert.match(save,/githubService.factoryLastSlug === factoryNameInput.text.trim\(\)/);
+    assert.match(save,/onTriggered: githubService.installWorkflow/);
+    const button=git.slice(git.indexOf("component ActionButton: Rectangle"),start);
+    assert.match(button,/loadingEnergyColor: primaryBlue \? Colors.blue/);
+    assert.match(button,/id: loadingPrefill[\s\S]*?to: 0.90[\s\S]*?duration: 3600/);
+    assert.match(button,/id: loadingCompletion[\s\S]*?duration: 260[\s\S]*?loadingEnergyPhase = "success"/);
+    assert.match(button,/id: loadingReset[\s\S]*?interval: 2200[\s\S]*?loadingEnergyPhase = "idle"/);
+    assert.match(button,/sourceComponent: EnergyProgressFace[\s\S]*?progressMode: "timed"[\s\S]*?progress: actionButton.loadingProgress/);
+    assert.match(button,/root.registerGitKeyboardControl\(actionButton\)/);
+    assert.match(git,/id: ignitionDial/);
+});
+test("Trash Burn Away starts only after confirmed work and retains the real receipt",()=>{
+    const trash=fs.readFileSync(path.join(root,"modules/Trash.qml"),"utf8");
+    const arm=trash.slice(trash.indexOf("function advanceResearchBurn()"),trash.indexOf("function confirmResearchBurn()"));
+    assert.match(arm,/!researchBurnPointerRelocated/);
+    assert.match(arm,/researchBurnArmAnimation.restart\(\)/);
+    assert.match(arm,/if \(!researchBurnLoadComplete\)\s*return false/);
+    assert.match(arm,/burnUiStage = "clicked";\s*burnCommitDelay.restart\(\)/);
+    assert.match(trash,/id: researchBurnArmAnimation[\s\S]*?duration: 850/);
+    assert.match(trash,/id: burnCommitDelay[\s\S]*?interval: 420[\s\S]*?burnUiStage = "working"/);
+    assert.match(trash,/onLeftClicked: trashLauncher.advanceResearchBurn\(\)/);
+    assert.match(trash,/id: researchBurnLoadFill/);
+    assert.match(trash,/CLICK AGAIN \/\/ BURN/);
+    const i=trash.indexOf("id: burnOperationFace"),j=trash.indexOf("// Stays here until DONE.",i);
+    const face=trash.slice(i,j);
+    assert.match(face,/fireMode: "burn-away"/);
+    assert.match(face,/variant: "flamethrower"/);
+    assert.match(face,/burnUiStage === "working" \? "running"/);
+    assert.match(face,/burnUiStage === "result" && trashLauncher.burnReceiptVerified\s*\? "success"/);
+    assert.match(face,/\? "failure" : "idle"/);
+    assert.match(face,/\? burnReceiptProgressSlot : researchBurnFace/);
+    assert.doesNotMatch(face,/onClicked|onLeftClicked|onPhaseChanged|onFinished|confirmBurn\(|runResearch\(/);
+    assert.match(trash,/payload.verified === true\s*&& payload.partial !== true\s*&& burnReceiptCount === attempted/);
+    assert.match(trash,/id: burnReceiptDone[\s\S]*?onLeftClicked: trashLauncher.dismissBurnReceipt\(\)/);
+});
